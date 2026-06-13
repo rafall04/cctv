@@ -8,7 +8,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { QRCodeSVG } from 'qrcode.react';
+import { QRCodeCanvas } from 'qrcode.react';
 import customerService from '../../services/customerService';
 import { formatRupiah } from '../../layouts/CustomerLayout';
 
@@ -44,6 +44,9 @@ function TopupPanel({ onCompleted, resumable = [] }) {
     const [giftBusy, setGiftBusy] = useState(false);
     const [giftMsg, setGiftMsg] = useState(null);
     const pollRef = useRef(null);
+    const qrBoxRef = useRef(null);
+    const [copied, setCopied] = useState(false);
+    const shareSupported = typeof navigator !== 'undefined' && typeof navigator.canShare === 'function';
 
     const effectiveAmount = customAmount ? parseInt(customAmount, 10) : amount;
 
@@ -156,6 +159,52 @@ function TopupPanel({ onCompleted, resumable = [] }) {
         }
     };
 
+    const qrCanvas = () => qrBoxRef.current?.querySelector('canvas');
+
+    // Save the QR as a PNG so a customer paying on the SAME phone can use their payment
+    // app's "scan from gallery" — the standard way to pay QRIS without a second device.
+    const downloadQr = () => {
+        const canvas = qrCanvas();
+        if (!canvas) return;
+        const link = document.createElement('a');
+        link.download = `qris-topup-${pending?.amount || ''}.png`;
+        link.href = canvas.toDataURL('image/png');
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+    };
+
+    const copyQris = async () => {
+        const code = pending?.qris?.qr_string;
+        if (!code) return;
+        try {
+            await navigator.clipboard.writeText(code);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        } catch {
+            // clipboard blocked — the Simpan QR button still covers the customer
+        }
+    };
+
+    // Web Share (mobile): hand the QR PNG to the OS share sheet → save to gallery or send
+    // straight to an e-wallet app. Falls back silently if unsupported/cancelled.
+    const shareQr = async () => {
+        const canvas = qrCanvas();
+        if (!canvas) return;
+        try {
+            const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+            if (!blob) return;
+            const file = new File([blob], 'qris-topup.png', { type: 'image/png' });
+            if (navigator.canShare?.({ files: [file] })) {
+                await navigator.share({ files: [file], title: 'QRIS Top-up Saldo' });
+            } else {
+                downloadQr();
+            }
+        } catch {
+            // user cancelled or unsupported — no-op
+        }
+    };
+
     if (pending) {
         const statusLabel = STATUS_LABELS[pending.status] || STATUS_LABELS.pending;
         return (
@@ -174,9 +223,28 @@ function TopupPanel({ onCompleted, resumable = [] }) {
                 {pending.status === 'pending' && (pending.qris?.qr_string || pending.qris?.qr_url) && (
                     <div className="mt-3 flex flex-col items-center gap-2">
                         {pending.qris?.qr_string ? (
-                            <div className="rounded-lg bg-white p-3">
-                                <QRCodeSVG value={pending.qris.qr_string} size={208} level="M" marginSize={2} />
-                            </div>
+                            <>
+                                <div ref={qrBoxRef} className="rounded-lg bg-white p-3">
+                                    <QRCodeCanvas value={pending.qris.qr_string} size={232} level="M" marginSize={2} />
+                                </div>
+                                <div className="flex w-full flex-wrap items-center justify-center gap-2">
+                                    <button type="button" onClick={downloadQr} className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-primary-600">
+                                        ⬇ Simpan QR
+                                    </button>
+                                    <button type="button" onClick={copyQris} className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800">
+                                        {copied ? '✓ Tersalin' : '⧉ Salin kode'}
+                                    </button>
+                                    {shareSupported && (
+                                        <button type="button" onClick={shareQr} className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800">
+                                            ↗ Bagikan
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="rounded-lg bg-blue-50 p-2.5 text-center text-xs leading-relaxed text-blue-700 dark:bg-blue-900/20 dark:text-blue-300">
+                                    <b>Bayar dari HP ini?</b> Tap <b>Simpan QR</b> → buka aplikasi e-wallet/m-banking → pilih <b>&ldquo;Scan dari galeri/album&rdquo;</b> → pilih gambar QR tadi.
+                                    <span className="mt-1 block text-gray-500 dark:text-gray-400">Bayar dari HP lain / komputer? Cukup scan QR di atas. Saldo masuk otomatis.</span>
+                                </div>
+                            </>
                         ) : (
                             <a
                                 href={pending.qris.qr_url}
@@ -187,12 +255,9 @@ function TopupPanel({ onCompleted, resumable = [] }) {
                                 Buka halaman QRIS untuk scan →
                             </a>
                         )}
-                        <p className="text-center text-xs text-gray-500 dark:text-gray-400">
-                            Scan QRIS dengan aplikasi e-wallet / m-banking apa pun. Saldo masuk otomatis setelah terbayar.
-                        </p>
-                        {pending.qris?.qr_string && pending.qris?.qr_url && (
+                        {pending.qris?.qr_url && (
                             <a href={pending.qris.qr_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline">
-                                Buka di tab baru
+                                Buka halaman QRIS resmi iPaymu
                             </a>
                         )}
                     </div>
