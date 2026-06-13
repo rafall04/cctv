@@ -29,6 +29,7 @@ function StatusCell({ customer }) {
 
 export default function CustomersTab({ customers, plans, run, busy }) {
     const [topupForm, setTopupForm] = useState({ user_id: '', amount: 25000, note: '' });
+    const [adjustForm, setAdjustForm] = useState({ user_id: '', direction: 'credit', amount: 10000, reason: '' });
 
     const changePlan = (customer, planKey) => {
         if (planKey && window.confirm(`Ubah paket ${customer.username} ke ${planKey}? Harga kamera menyesuaikan.`)) {
@@ -47,6 +48,24 @@ export default function CustomersTab({ customers, plans, run, busy }) {
             'Saldo ditambahkan'
         );
         if (ok) setTopupForm({ user_id: '', amount: 25000, note: '' });
+    };
+
+    const submitAdjust = async (e) => {
+        e.preventDefault();
+        const magnitude = parseInt(adjustForm.amount, 10);
+        if (!adjustForm.user_id || !Number.isInteger(magnitude) || magnitude <= 0) return;
+        const signed = adjustForm.direction === 'debit' ? -magnitude : magnitude;
+        const verb = adjustForm.direction === 'debit' ? 'Kurangi saldo (refund)' : 'Tambah saldo';
+        if (!window.confirm(`${verb} ${formatRupiah(magnitude)}? Alasan: ${adjustForm.reason || '(kosong)'}`)) return;
+        const ok = await run(
+            () => billingAdminService.adjustWallet({
+                user_id: parseInt(adjustForm.user_id, 10),
+                amount: signed,
+                reason: adjustForm.reason,
+            }),
+            'Saldo disesuaikan'
+        );
+        if (ok) setAdjustForm({ user_id: '', direction: 'credit', amount: 10000, reason: '' });
     };
 
     const planSelect = (customer, extra = '') => (
@@ -79,10 +98,34 @@ export default function CustomersTab({ customers, plans, run, busy }) {
         </form>
     );
 
+    const adjustForm_ = (
+        <form onSubmit={submitAdjust} className={cardClass}>
+            <h3 className="font-semibold text-gray-900 dark:text-white">Penyesuaian Saldo</h3>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Koreksi manual: tambah (kompensasi) atau kurangi (refund). Tercatat di riwayat &amp; audit.</p>
+            <div className="mt-3 space-y-2">
+                <select value={adjustForm.user_id} onChange={(e) => setAdjustForm({ ...adjustForm, user_id: e.target.value })} required className={inputClass}>
+                    <option value="">Pilih pelanggan…</option>
+                    {customers.map((c) => (<option key={c.id} value={c.id}>{c.username} ({formatRupiah(c.balance)})</option>))}
+                </select>
+                <div className="flex gap-2">
+                    <select value={adjustForm.direction} onChange={(e) => setAdjustForm({ ...adjustForm, direction: e.target.value })} className={`${inputClass} w-auto shrink-0`}>
+                        <option value="credit">+ Tambah</option>
+                        <option value="debit">− Kurangi</option>
+                    </select>
+                    <input type="number" min="1" step="1000" value={adjustForm.amount} onChange={(e) => setAdjustForm({ ...adjustForm, amount: e.target.value })} required className={inputClass} placeholder="Nominal" />
+                </div>
+                <input type="text" value={adjustForm.reason} onChange={(e) => setAdjustForm({ ...adjustForm, reason: e.target.value })} required maxLength={200} className={inputClass} placeholder="Alasan (wajib) — mis. refund kelebihan bayar" />
+                <button type="submit" disabled={busy || !adjustForm.reason.trim()} className={`w-full rounded-xl px-4 py-2 text-sm font-medium text-white transition-colors disabled:opacity-50 ${adjustForm.direction === 'debit' ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}>
+                    {adjustForm.direction === 'debit' ? 'Kurangi Saldo' : 'Tambah Saldo'}
+                </button>
+            </div>
+        </form>
+    );
+
     return (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-            {/* Form first in DOM so it sits ABOVE the list on mobile; on lg it moves to the right column. */}
-            <div className="lg:order-2 lg:col-span-1">{topupForm_}</div>
+            {/* Forms first in DOM so they sit ABOVE the list on mobile; on lg they move to the right column. */}
+            <div className="space-y-4 lg:order-2 lg:col-span-1">{topupForm_}{adjustForm_}</div>
 
             <div className="lg:order-1 lg:col-span-2">
                 {customers.length === 0 ? (

@@ -19,6 +19,12 @@ export const billingAdminService = {
         return response.data;
     },
 
+    // Signed wallet correction: amount > 0 credits, < 0 debits (refund). reason required.
+    async adjustWallet({ user_id, amount, reason }) {
+        const response = await apiClient.post('/api/admin/billing/wallet-adjust', { user_id, amount, reason });
+        return response.data;
+    },
+
     async getSubscriptions() {
         const response = await apiClient.get('/api/admin/billing/subscriptions');
         return response.data;

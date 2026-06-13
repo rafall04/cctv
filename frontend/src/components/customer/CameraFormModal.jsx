@@ -134,6 +134,18 @@ export default function CameraFormModal({ camera = null, areas = [], onClose, on
                         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                             Dari aplikasi kamera/NVR Anda. Pastikan kamera bisa diakses dari jaringan RAF NET.
                         </p>
+                        <details className="mt-2 rounded-xl border border-gray-200 bg-gray-50 p-3 text-xs dark:border-gray-700/50 dark:bg-gray-900/40">
+                            <summary className="cursor-pointer font-medium text-primary">Tidak tahu URL RTSP? Klik di sini</summary>
+                            <div className="mt-2 space-y-2 text-gray-600 dark:text-gray-300">
+                                <p>Format umum: <code className="rounded bg-gray-200 px-1 dark:bg-gray-800">rtsp://user:password@IP-kamera:554/jalur</code></p>
+                                <ul className="ml-4 list-disc space-y-1">
+                                    <li><b>Hikvision:</b> <code>rtsp://user:pass@IP:554/Streaming/Channels/101</code></li>
+                                    <li><b>Dahua/Imou:</b> <code>rtsp://user:pass@IP:554/cam/realmonitor?channel=1&amp;subtype=0</code></li>
+                                    <li><b>EZVIZ/V380/lainnya:</b> cek menu aplikasi → Pengaturan → RTSP/ONVIF.</li>
+                                </ul>
+                                <p><b>IP kamera</b> = alamat lokal kamera di jaringan Anda (mis. 192.168.1.10). <b>user/password</b> = login kamera. Tidak yakin? Hubungi admin RAF NET — kami bantu setel.</p>
+                            </div>
+                        </details>
                     </div>
 
                     <div>

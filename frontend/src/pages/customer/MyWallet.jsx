@@ -38,10 +38,33 @@ function TopupPanel({ onCompleted, resumable = [] }) {
     const [methods, setMethods] = useState([]);
     const [selectedMethod, setSelectedMethod] = useState('');
     const [promoCode, setPromoCode] = useState('');
+    const [promoPreview, setPromoPreview] = useState(null); // { ok, bonus } | { ok:false, error }
     const [giftCode, setGiftCode] = useState('');
     const [giftBusy, setGiftBusy] = useState(false);
     const [giftMsg, setGiftMsg] = useState(null);
     const pollRef = useRef(null);
+
+    const effectiveAmount = customAmount ? parseInt(customAmount, 10) : amount;
+
+    // Live promo preview: validate the code against the chosen amount (debounced) so the
+    // customer sees the exact bonus BEFORE paying, instead of finding out on submit.
+    useEffect(() => {
+        const code = promoCode.trim();
+        if (!code || !Number.isInteger(effectiveAmount) || effectiveAmount < 10000) {
+            setPromoPreview(null);
+            return undefined;
+        }
+        let active = true;
+        const timer = setTimeout(async () => {
+            try {
+                const res = await customerService.validatePromo(code, effectiveAmount);
+                if (active && res?.success) setPromoPreview({ ok: true, bonus: res.data?.bonus || 0 });
+            } catch (err) {
+                if (active) setPromoPreview({ ok: false, error: err.response?.data?.message || 'Kode promo tidak valid' });
+            }
+        }, 450);
+        return () => { active = false; clearTimeout(timer); };
+    }, [promoCode, effectiveAmount]);
 
     useEffect(() => {
         let mounted = true;
@@ -167,9 +190,29 @@ function TopupPanel({ onCompleted, resumable = [] }) {
                     </p>
                 )}
                 {pending.status === 'paid' && (
-                    <p className="mt-3 text-sm text-emerald-600 dark:text-emerald-400">
-                        ✅ Saldo sudah masuk. Kamera yang ditangguhkan otomatis aktif kembali.
-                    </p>
+                    <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-800/50 dark:bg-emerald-900/20">
+                        <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">✅ Pembayaran berhasil — bukti top-up</p>
+                        <dl className="mt-2 space-y-1 text-sm">
+                            <div className="flex justify-between">
+                                <dt className="text-gray-500 dark:text-gray-400">Nominal</dt>
+                                <dd className="font-medium text-gray-900 dark:text-white">{formatRupiah(pending.amount)}</dd>
+                            </div>
+                            {pending.promo_bonus > 0 && (
+                                <div className="flex justify-between">
+                                    <dt className="text-gray-500 dark:text-gray-400">Bonus promo{pending.promo_code ? ` (${pending.promo_code})` : ''}</dt>
+                                    <dd className="font-medium text-emerald-600 dark:text-emerald-400">+{formatRupiah(pending.promo_bonus)}</dd>
+                                </div>
+                            )}
+                            <div className="flex justify-between border-t border-emerald-200 pt-1 dark:border-emerald-800/50">
+                                <dt className="text-gray-600 dark:text-gray-300">Total masuk</dt>
+                                <dd className="font-bold text-gray-900 dark:text-white">{formatRupiah(pending.amount + (pending.promo_bonus || 0))}</dd>
+                            </div>
+                            {pending.paid_at && (
+                                <p className="pt-1 text-xs text-gray-400">{String(pending.paid_at).replace('T', ' ').slice(0, 19)} · #{pending.id}</p>
+                            )}
+                        </dl>
+                        <p className="mt-2 text-xs text-emerald-600 dark:text-emerald-400">Kamera yang ditangguhkan otomatis aktif kembali.</p>
+                    </div>
                 )}
 
                 <button
@@ -254,6 +297,14 @@ function TopupPanel({ onCompleted, resumable = [] }) {
                 placeholder="Kode promo (opsional)"
                 className="mt-2 w-full rounded-xl border border-gray-300 bg-gray-50 px-4 py-2.5 text-sm uppercase text-gray-900 placeholder:normal-case focus:outline-none focus:ring-2 focus:ring-primary dark:border-gray-700 dark:bg-gray-900/50 dark:text-white"
             />
+            {promoPreview?.ok && promoPreview.bonus > 0 && (
+                <p className="mt-1.5 text-sm font-medium text-emerald-600 dark:text-emerald-400">
+                    ✓ Bonus +{formatRupiah(promoPreview.bonus)} akan masuk setelah pembayaran berhasil
+                </p>
+            )}
+            {promoPreview && !promoPreview.ok && (
+                <p className="mt-1.5 text-sm text-amber-600 dark:text-amber-400">{promoPreview.error}</p>
+            )}
             {error && <p className="mt-2 text-sm text-red-600 dark:text-red-400">{error}</p>}
             <button
                 type="submit"
@@ -300,13 +351,16 @@ export default function MyWallet() {
     const [wallet, setWallet] = useState(null);
     const [payments, setPayments] = useState([]);
     const [loading, setLoading] = useState(true);
+    // "Muat lebih banyak" bumps these; reload refetches with the new caps.
+    const [walletLimit, setWalletLimit] = useState(50);
+    const [paymentsLimit, setPaymentsLimit] = useState(20);
 
     const reload = useCallback(async () => {
         try {
             const [summaryRes, walletRes, paymentsRes] = await Promise.all([
                 customerService.getSummary(),
-                customerService.getWallet(),
-                customerService.getPayments(),
+                customerService.getWallet(walletLimit),
+                customerService.getPayments(paymentsLimit),
             ]);
             if (summaryRes.success) setSummary(summaryRes.data);
             if (walletRes.success) setWallet(walletRes.data);
@@ -316,7 +370,7 @@ export default function MyWallet() {
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [walletLimit, paymentsLimit]);
 
     // Pending top-ups that are still payable (not expired) — so a created-but-unpaid QR/VA
     // is never lost on navigation/refresh and the customer can resume it.
@@ -333,7 +387,31 @@ export default function MyWallet() {
         return <div className="py-16 text-center text-gray-500 dark:text-gray-400">Memuat saldo…</div>;
     }
 
+    const daysLeft = summary?.estimated_days_left;
+    const hasDailyCost = (summary?.daily_cost || 0) > 0;
+    const emptyBalance = hasDailyCost && (summary?.balance || 0) <= 0;
+    const lowBalance = hasDailyCost && daysLeft !== null && daysLeft !== undefined && daysLeft <= 3;
+
     return (
+        <div className="space-y-4">
+        {(emptyBalance || lowBalance) && (
+            <div className={`flex items-start gap-3 rounded-2xl border p-4 ${emptyBalance
+                ? 'border-red-200 bg-red-50 dark:border-red-800/50 dark:bg-red-900/20'
+                : 'border-amber-200 bg-amber-50 dark:border-amber-800/50 dark:bg-amber-900/20'
+            }`}>
+                <span className="text-xl leading-none">{emptyBalance ? '🔴' : '⚠️'}</span>
+                <div className="min-w-0">
+                    <p className={`text-sm font-semibold ${emptyBalance ? 'text-red-700 dark:text-red-300' : 'text-amber-800 dark:text-amber-300'}`}>
+                        {emptyBalance
+                            ? 'Saldo habis — kamera berbayar Anda ditangguhkan'
+                            : `Saldo menipis — perkiraan cukup untuk ±${daysLeft} hari lagi`}
+                    </p>
+                    <p className={`mt-0.5 text-xs ${emptyBalance ? 'text-red-600 dark:text-red-400' : 'text-amber-700 dark:text-amber-400'}`}>
+                        Isi saldo di panel <b>Isi Saldo</b> agar kamera tetap aktif. Biaya {formatRupiah(summary?.daily_cost)}/hari.
+                    </p>
+                </div>
+            </div>
+        )}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
             <div className="space-y-4 lg:col-span-2">
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -405,6 +483,11 @@ export default function MyWallet() {
                     ) : (
                         <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Belum ada transaksi.</p>
                     )}
+                    {wallet?.transactions?.length >= walletLimit && (
+                        <button onClick={() => setWalletLimit((n) => n + 50)} className="mt-2 w-full rounded-lg border border-gray-200 py-1.5 text-xs text-gray-500 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800">
+                            Muat lebih banyak
+                        </button>
+                    )}
                 </div>
 
                 <div className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
@@ -427,12 +510,18 @@ export default function MyWallet() {
                     ) : (
                         <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Belum ada pembayaran.</p>
                     )}
+                    {payments.length >= paymentsLimit && (
+                        <button onClick={() => setPaymentsLimit((n) => n + 20)} className="mt-2 w-full rounded-lg border border-gray-200 py-1.5 text-xs text-gray-500 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800">
+                            Muat lebih banyak
+                        </button>
+                    )}
                 </div>
             </div>
 
             <div>
                 <TopupPanel onCompleted={reload} resumable={pendingTopups} />
             </div>
+        </div>
         </div>
     );
 }
