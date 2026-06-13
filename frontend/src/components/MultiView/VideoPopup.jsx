@@ -21,6 +21,7 @@ import { getHLSConfig } from '../../utils/hlsConfig';
 import { cleanupMediaResources } from '../../utils/mediaResourceCleanup';
 import { preloadHls, preloadFlv } from '../../utils/preloadManager';
 import { usePauseOnHidden } from '../../hooks/usePauseOnHidden.js';
+import { useFocusTrap } from '../../hooks/useFocusTrap.js';
 import { resolveStreamUrl } from '../../utils/directStreamHelper';
 import { useStreamTimeout } from '../../hooks/useStreamTimeout';
 import { viewerService } from '../../services/viewerService';
@@ -91,6 +92,11 @@ function VideoPopup({
     const renderedCameraIdRef = useRef(camera.id);
     const streamRunIdRef = useRef(0);
     const { branding } = useBranding(); // ← FIX: Add branding context
+
+    // Trap keyboard focus inside the popup and return focus to the trigger
+    // (the camera card) on close. ESC stays handled by the keydown effect
+    // below — we do NOT pass onEscape here, to avoid a double onClose.
+    useFocusTrap(modalRef);
 
     // Handle close with fullscreen exit
     const handleClose = async () => {
@@ -1146,6 +1152,9 @@ function VideoPopup({
             <div
                 ref={modalRef}
                 data-testid={modalTestId}
+                role="dialog"
+                aria-modal="true"
+                aria-label={camera.name}
                 // v6 modal: width = JS aspect-fit, height grows
                 // naturally. NO `overflow-y-auto` (backdrop owns the
                 // scroll now), NO max-height constraint. The sticky
