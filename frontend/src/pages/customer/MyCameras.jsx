@@ -14,6 +14,7 @@ import CustomerLivePlayer from '../../components/customer/CustomerLivePlayer';
 import CameraFormModal from '../../components/customer/CameraFormModal';
 import { formatRupiah } from '../../layouts/CustomerLayout';
 import { buildApiAssetUrl } from '../../config/config';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 function statusInfo(camera) {
     if (camera.billing_status === 'suspended') {
@@ -35,6 +36,7 @@ export default function MyCameras() {
     const [activeCamera, setActiveCamera] = useState(null);
     const [formCamera, setFormCamera] = useState(undefined); // undefined=closed, null=add, object=edit
     const [busyId, setBusyId] = useState(null);
+    const confirm = useConfirm();
 
     const reload = useCallback(async () => {
         // Cameras + plan + areas load in parallel (plan/areas are best-effort — their
@@ -71,7 +73,11 @@ export default function MyCameras() {
 
     const togglePublic = async (camera) => {
         const makePublic = !camera.is_public;
-        if (makePublic && !window.confirm(`Tampilkan "${camera.name}" di hub publik RAF NET? Siapa pun bisa menontonnya selama saldo aktif.`)) {
+        if (makePublic && !(await confirm({
+            title: 'Tampilkan di hub publik?',
+            message: `"${camera.name}" akan tampil di peta & daftar publik RAF NET — siapa pun bisa menontonnya selama saldo aktif.`,
+            confirmLabel: 'Tampilkan',
+        }))) {
             return;
         }
         setBusyId(camera.id);
@@ -92,7 +98,12 @@ export default function MyCameras() {
     };
 
     const handleDelete = async (camera) => {
-        if (!window.confirm(`Hapus kamera "${camera.name}"? Tagihan kamera ini berhenti dan stream-nya dimatikan.`)) {
+        if (!(await confirm({
+            title: `Hapus kamera "${camera.name}"?`,
+            message: 'Tagihan kamera ini berhenti dan stream-nya dimatikan.',
+            confirmLabel: 'Hapus',
+            tone: 'danger',
+        }))) {
             return;
         }
         setBusyId(camera.id);

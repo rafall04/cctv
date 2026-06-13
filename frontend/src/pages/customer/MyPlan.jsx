@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import customerService from '../../services/customerService';
 import { formatRupiah } from '../../layouts/CustomerLayout';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 function trialDaysLeft(trialEndsAt) {
     if (!trialEndsAt) return null;
@@ -23,6 +24,7 @@ export default function MyPlan() {
     const [loading, setLoading] = useState(true);
     const [busyKey, setBusyKey] = useState(null);
     const [message, setMessage] = useState(null);
+    const confirm = useConfirm();
 
     const reload = useCallback(async () => {
         try {
@@ -44,7 +46,11 @@ export default function MyPlan() {
     }, [reload]);
 
     const handleSwitch = async (plan) => {
-        if (!window.confirm(`Pindah ke paket ${plan.name}? Harga semua kamera Anda menyesuaikan (${formatRupiah(plan.price_per_camera)}/kamera/bulan) dan biaya hari ini langsung dipotong dari saldo.`)) {
+        if (!(await confirm({
+            title: `Pindah ke paket ${plan.name}?`,
+            message: `Harga semua kamera Anda menyesuaikan (${formatRupiah(plan.price_per_camera)}/kamera/bulan) dan biaya hari ini langsung dipotong dari saldo.`,
+            confirmLabel: 'Pindah Paket',
+        }))) {
             return;
         }
         setBusyKey(plan.key);

@@ -32,12 +32,15 @@ vi.mock('../../components/customer/CustomerLivePlayer', () => ({
     default: () => <div data-testid="live-player" />,
 }));
 
+import { ConfirmProvider } from '../../contexts/ConfirmContext';
 import MyCameras from './MyCameras';
 
 function renderPage() {
     return render(
         <MemoryRouter>
-            <MyCameras />
+            <ConfirmProvider>
+                <MyCameras />
+            </ConfirmProvider>
         </MemoryRouter>
     );
 }
