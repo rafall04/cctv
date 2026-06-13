@@ -20,9 +20,13 @@ export function formatCompactCount(value) {
         { value: 1000, suffix: 'k' },
     ];
     const scale = suffixes.find((item) => count >= item.value);
-    const scaled = count / scale.value;
-    const rounded = Math.round(scaled * 10) / 10;
-    const formatted = scaled >= 100 ? Math.round(scaled).toString() : rounded.toFixed(1);
+    // Truncate, never round up: 1170 views must read "1.1k", not "1.2k" (which implies 1200+).
+    // Integer math (count is an integer) avoids float drift at the tenth boundary, so exact
+    // values like 1200 stay "1.2k" instead of slipping to "1.1k".
+    const tenths = Math.floor(count / (scale.value / 10));
+    const whole = Math.floor(tenths / 10);
+    const decimal = tenths % 10;
+    const formatted = whole >= 100 ? String(whole) : `${whole}.${decimal}`;
     return `${formatted.replace(/\.0$/, '')}${scale.suffix}`;
 }
 
