@@ -758,6 +758,28 @@ describe('VideoPopup non-live states', () => {
         expect(flvPlayers[0].attachMediaElement).toHaveBeenCalled();
         expect(flvPlayers[0].load).toHaveBeenCalled();
     });
+
+    it('menawarkan tap-to-play saat browser memblokir autoplay', async () => {
+        const blocked = Object.assign(new Error('autoplay blocked'), { name: 'NotAllowedError' });
+        HTMLMediaElement.prototype.play.mockImplementation(() => Promise.reject(blocked));
+
+        render(
+            <VideoPopup camera={{ ...baseCamera, id: 40 }} onClose={vi.fn()} />
+        );
+
+        await waitFor(() => {
+            expect(hlsInstances).toHaveLength(1);
+        });
+
+        await act(async () => {
+            hlsInstances[0].emit('manifestParsed');
+            await Promise.resolve();
+        });
+
+        await waitFor(() => {
+            expect(screen.getByText('Ketuk untuk memutar')).toBeTruthy();
+        });
+    });
 });
 
 

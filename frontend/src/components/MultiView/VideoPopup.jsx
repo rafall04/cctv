@@ -169,6 +169,11 @@ function VideoPopup({
     const [showTroubleshooting, setShowTroubleshooting] = useState(false);
     const [forceProxyFallback, setForceProxyFallback] = useState(false);
     const [videoAspectRatio, setVideoAspectRatio] = useState(null);
+    // Set when the browser BLOCKS autoplay (play() rejects NotAllowedError) so
+    // we can show a tap-to-play prompt instead of silently hanging until the
+    // timeout fires. The popup video is muted (autoplay normally allowed), so
+    // this is a rare fallback for data-saver / low-power / some webviews.
+    const [needsUserPlay, setNeedsUserPlay] = useState(false);
     // Optimistic: mount the <video> for FLV cameras so the (now lazy-loaded) flv.js init effect can
     // attach to it; that effect calls the real flvjs.isSupported() and flips this to false on a
     // browser that can't actually play FLV. flv.js is never loaded for HLS-only viewing.
@@ -312,12 +317,26 @@ function VideoPopup({
         }, 250);
         return () => clearInterval(handle);
     }, [videoAspectRatio, syncVideoAspectRatio, camera.id]);
+
+    // Once playback actually starts, drop the tap-to-play prompt.
+    useEffect(() => {
+        if (status === 'live' || status === 'playing') {
+            setNeedsUserPlay(false);
+        }
+    }, [status]);
+
     const requestVideoPlay = useCallback((target = videoRef.current) => {
         if (!target?.play) return;
         try {
             const playAttempt = target.play();
             if (playAttempt?.catch) {
-                playAttempt.catch(() => { });
+                playAttempt.catch((err) => {
+                    // Browser blocked autoplay → offer a tap-to-play prompt.
+                    // Other rejections (e.g. AbortError during teardown) are benign.
+                    if (err?.name === 'NotAllowedError') {
+                        setNeedsUserPlay(true);
+                    }
+                });
             }
         } catch {
             // Ignore autoplay/runtime failures; popup state machine handles recoverable errors separately.
@@ -478,6 +497,7 @@ function VideoPopup({
         setConsecutiveFailures(0);
         setShowTroubleshooting(false);
         setForceProxyFallback(false);
+        setNeedsUserPlay(false);
         setVideoAspectRatio(null);
         internalWarmupRetryCountRef.current = 0;
         loadingStageRef.current = LoadingStage.CONNECTING;
@@ -916,6 +936,7 @@ function VideoPopup({
     const handleRetry = useCallback(() => {
         streamRunIdRef.current += 1;
         cleanupResources({ resetVideo: false });
+        setNeedsUserPlay(false);
         setStatus('connecting');
         setErrorType(null);
         setLoadingStage(LoadingStage.CONNECTING);
@@ -1451,6 +1472,19 @@ function VideoPopup({
                         autoRetryCount={autoRetryCount}
                         maxAutoRetries={3}
                     />
+                    {needsUserPlay && !isPlaybackLocked && (
+                        <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setNeedsUserPlay(false); requestVideoPlay(); }}
+                            className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 bg-black/70 text-white"
+                            aria-label="Ketuk untuk memutar"
+                        >
+                            <span className="flex h-16 w-16 items-center justify-center rounded-full bg-white text-primary shadow-lg">
+                                <Icons.Play />
+                            </span>
+                            <span className="text-sm font-medium">Ketuk untuk memutar</span>
+                        </button>
+                    )}
                 </div>
 
                 {/* Slim controls bar — kept inside the chrome budget so
