@@ -98,6 +98,10 @@ export default function LoginPage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [warning, setWarning] = useState('');
+    // Registration-approval gate notice (pending/rejected) — shown as a calm
+    // info/warning, NOT a red error, so a warm lead returning before approval
+    // isn't told "login failed".
+    const [accountNotice, setAccountNotice] = useState(null);
     
     // Field-level validation errors (Requirements: 2.1, 2.2, 2.9)
     const [fieldErrors, setFieldErrors] = useState({ username: '', password: '' });
@@ -152,6 +156,7 @@ export default function LoginPage() {
         
         setError('');
         setWarning('');
+        setAccountNotice(null);
     };
 
     // Validate individual field (Requirements: 2.1, 2.2)
@@ -195,6 +200,7 @@ export default function LoginPage() {
         setLoading(true);
         setError('');
         setWarning('');
+        setAccountNotice(null);
         setFieldErrors({ username: '', password: '' });
         
         try {
@@ -279,6 +285,26 @@ export default function LoginPage() {
             return;
         }
         
+        // Registration-approval gate: not a failure, a "you're in the queue"
+        // (pending) or "declined" (rejected) state — render it calmly, not as
+        // a red error, so a warm lead doesn't think signup broke.
+        if (result.reason === 'pending_approval') {
+            setAccountNotice({
+                tone: 'info',
+                title: 'Akun sedang menunggu persetujuan',
+                message: result.message || 'Pendaftaran Anda sedang ditinjau admin. Anda bisa masuk setelah disetujui — kami akan menghubungi Anda.',
+            });
+            return;
+        }
+        if (result.reason === 'registration_rejected') {
+            setAccountNotice({
+                tone: 'warning',
+                title: 'Pendaftaran tidak disetujui',
+                message: result.message || 'Maaf, pendaftaran akun Anda tidak disetujui. Silakan hubungi admin untuk informasi lebih lanjut.',
+            });
+            return;
+        }
+
         // Default error message
         setError(result.message || 'Login failed. Please try again.');
     };
@@ -373,6 +399,19 @@ export default function LoginPage() {
                                             Attempts remaining: <span className="font-semibold">{attemptsRemaining}</span>
                                         </p>
                                     )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Account approval notice (pending / rejected) — calm info/warning, not an error */}
+                        {accountNotice && (
+                            <div className={`flex items-start gap-3 p-4 rounded-xl border ${accountNotice.tone === 'info' ? 'bg-sky-50 dark:bg-sky-500/10 border-sky-200 dark:border-sky-500/30' : 'bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/30'}`}>
+                                <div className={`flex-shrink-0 ${accountNotice.tone === 'info' ? 'text-sky-500' : 'text-amber-500'}`}>
+                                    {accountNotice.tone === 'info' ? <Icons.Clock /> : <Icons.Warning />}
+                                </div>
+                                <div className="flex-1">
+                                    <p className={`text-sm font-semibold ${accountNotice.tone === 'info' ? 'text-sky-700 dark:text-sky-300' : 'text-amber-700 dark:text-amber-300'}`}>{accountNotice.title}</p>
+                                    <p className={`text-sm mt-0.5 ${accountNotice.tone === 'info' ? 'text-sky-600 dark:text-sky-400' : 'text-amber-600 dark:text-amber-400'}`}>{accountNotice.message}</p>
                                 </div>
                             </div>
                         )}
