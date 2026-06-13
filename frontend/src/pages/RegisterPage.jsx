@@ -10,6 +10,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { authService } from '../services/authService';
+import userService from '../services/userService';
 
 const inputClass = 'w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary';
 
@@ -25,6 +26,7 @@ export default function RegisterPage() {
     const [errorList, setErrorList] = useState([]);
     const [submitting, setSubmitting] = useState(false);
     const [submitted, setSubmitted] = useState(false);
+    const [pwdRequirements, setPwdRequirements] = useState([]);
 
     useEffect(() => {
         let isMounted = true;
@@ -34,6 +36,12 @@ export default function RegisterPage() {
                 setInfoLoading(false);
             }
         });
+        // Show the password policy up front (public endpoint) so users don't
+        // discover the rules only after a rejected submit. Backend still
+        // validates on submit; this list is a nice-to-have if the fetch fails.
+        userService.getPasswordRequirements()
+            .then((r) => { if (isMounted && r?.success) setPwdRequirements(r.data?.requirements || []); })
+            .catch(() => {});
         return () => { isMounted = false; };
     }, []);
 
@@ -129,6 +137,11 @@ export default function RegisterPage() {
                                 <div>
                                     <label htmlFor="reg-password" className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Password</label>
                                     <input id="reg-password" name="password" type="password" value={form.password} onChange={handleChange} required minLength={12} className={inputClass} placeholder="Minimal 12 karakter" />
+                                    {pwdRequirements.length > 0 && (
+                                        <ul className="mt-1.5 space-y-0.5 text-xs text-gray-500 dark:text-gray-400">
+                                            {pwdRequirements.map((r) => (<li key={r}>• {r}</li>))}
+                                        </ul>
+                                    )}
                                 </div>
                                 <div>
                                     <label htmlFor="reg-confirm" className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Ulangi Password</label>
