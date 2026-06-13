@@ -14,6 +14,7 @@ saves here.
 */
 
 import { useCallback, useEffect, useState } from 'react';
+import { useConfirm } from '../../../contexts/ConfirmContext';
 import { useNotification } from '../../../contexts/NotificationContext';
 import sponsorPackageService from '../../../services/sponsorPackageService';
 
@@ -63,6 +64,7 @@ function textareaToFeatures(text) {
 
 export default function SponsorPackagePanel({ packages = [], onChanged }) {
     const { success: notifySuccess, error: notifyError } = useNotification();
+    const confirm = useConfirm();
     const [showModal, setShowModal] = useState(false);
     const [editingId, setEditingId] = useState(null);
     const [form, setForm] = useState(DEFAULT_FORM);
@@ -136,7 +138,7 @@ export default function SponsorPackagePanel({ packages = [], onChanged }) {
     };
 
     const handleDelete = async (pkg) => {
-        if (!window.confirm(`Hapus profil paket "${pkg.name}"?`)) return;
+        if (!(await confirm({ title: `Hapus profil paket "${pkg.name}"?`, confirmLabel: 'Hapus', tone: 'danger' }))) return;
         const result = await sponsorPackageService.deletePackage(pkg.id);
         if (!result.success) {
             notifyError('Gagal menghapus profil paket', result.message || 'Permintaan ditolak server.');

@@ -8,6 +8,7 @@ SideEffects: Calls admin sponsor / sponsor-packages / camera APIs.
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNotification } from '../contexts/NotificationContext';
+import { useConfirm } from '../contexts/ConfirmContext';
 import * as sponsorService from '../services/sponsorService';
 import sponsorPackageService from '../services/sponsorPackageService';
 import { cameraService } from '../services/cameraService';
@@ -55,6 +56,7 @@ function normalizeCameraRows(response) {
 
 function SponsorManagement() {
     const { success: notifySuccess, error: notifyError } = useNotification();
+    const confirm = useConfirm();
     const [sponsors, setSponsors] = useState([]);
     const [packages, setPackages] = useState([]);
     const [stats, setStats] = useState(null);
@@ -246,7 +248,7 @@ function SponsorManagement() {
     };
 
     const handleDelete = async (sponsor) => {
-        if (!window.confirm(`Hapus sponsor "${sponsor.name}"?`)) return;
+        if (!(await confirm({ title: `Hapus sponsor "${sponsor.name}"?`, confirmLabel: 'Hapus', tone: 'danger' }))) return;
         const result = await sponsorService.deleteSponsor(sponsor.id);
         if (!result.success) {
             notifyError('Gagal menghapus sponsor', result.message);
@@ -286,7 +288,7 @@ function SponsorManagement() {
     };
 
     const handleQuickUnassign = async (cameraId, cameraName) => {
-        if (!window.confirm(`Lepas sponsor dari "${cameraName}"?`)) return;
+        if (!(await confirm({ title: `Lepas sponsor dari "${cameraName}"?`, confirmLabel: 'Lepas', tone: 'danger' }))) return;
         setPendingCameraId(cameraId);
         const result = await sponsorService.removeSponsorFromCamera(cameraId);
         setPendingCameraId(null);

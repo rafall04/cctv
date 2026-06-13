@@ -2,10 +2,12 @@ import { useState, useEffect, useCallback } from 'react';
 import { brandingService } from '../../../services/brandingService';
 import { useBranding } from '../../../contexts/BrandingContext';
 import { useNotification } from '../../../contexts/NotificationContext';
+import { useConfirm } from '../../../contexts/ConfirmContext';
 
 export default function BrandingSettingsPanel() {
     const { refreshBranding } = useBranding();
     const { success, error: showError } = useNotification();
+    const confirm = useConfirm();
     const [settings, setSettings] = useState([]);
     const [formData, setFormData] = useState({});
     const [loading, setLoading] = useState(true);
@@ -64,7 +66,7 @@ export default function BrandingSettingsPanel() {
     };
 
     const handleReset = async () => {
-        if (!window.confirm('Reset semua branding ke default?')) {
+        if (!(await confirm({ title: 'Reset semua branding ke default?', confirmLabel: 'Reset', tone: 'danger' }))) {
             return;
         }
 

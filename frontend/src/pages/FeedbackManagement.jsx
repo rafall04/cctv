@@ -8,6 +8,7 @@
 
 import { feedbackService } from '../services/feedbackService';
 import { useNotification } from '../contexts/NotificationContext';
+import { useConfirm } from '../contexts/ConfirmContext';
 import { FeedbackIcons } from '../components/admin/feedback/feedbackConstants.jsx';
 import { useFeedbackManagementData } from '../hooks/admin/useFeedbackManagementData';
 import FeedbackStatsGrid from '../components/admin/feedback/FeedbackStatsGrid';
@@ -19,6 +20,7 @@ import { TIMESTAMP_STORAGE, useTimezone } from '../contexts/TimezoneContext';
 export default function FeedbackManagement() {
     const { formatDateTime } = useTimezone();
     const { success: notifySuccess, error: notifyError } = useNotification();
+    const confirm = useConfirm();
     const {
         feedbacks,
         stats,
@@ -47,7 +49,7 @@ export default function FeedbackManagement() {
     };
 
     const handleDelete = async (id) => {
-        if (!confirm('Yakin ingin menghapus feedback ini?')) {
+        if (!(await confirm({ title: 'Hapus feedback ini?', confirmLabel: 'Hapus', tone: 'danger' }))) {
             return;
         }
 

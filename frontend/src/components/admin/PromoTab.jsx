@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import billingAdminService from '../../services/billingAdminService';
 import { useNotification } from '../../contexts/NotificationContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 const inputClass = 'w-full px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary';
 const cardClass = 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-4';
@@ -26,6 +27,7 @@ function promoValueLabel(p) {
 
 export default function PromoTab() {
     const { success, error: showError } = useNotification();
+    const confirm = useConfirm();
     const [promos, setPromos] = useState([]);
     const [loading, setLoading] = useState(true);
     const [busy, setBusy] = useState(false);
@@ -94,8 +96,8 @@ export default function PromoTab() {
         p.active === 1 ? 'Promo dinonaktifkan' : 'Promo diaktifkan'
     );
 
-    const remove = (p) => {
-        if (window.confirm(`Hapus kode promo "${p.code}"? Riwayat penukaran tetap tersimpan.`)) {
+    const remove = async (p) => {
+        if (await confirm({ title: `Hapus kode promo "${p.code}"?`, message: 'Riwayat penukaran tetap tersimpan.', confirmLabel: 'Hapus', tone: 'danger' })) {
             run(() => billingAdminService.deletePromo(p.id), 'Promo dihapus');
         }
     };

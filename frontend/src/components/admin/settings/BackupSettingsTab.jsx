@@ -8,6 +8,7 @@ SideEffects: Downloads backup files, previews/imports backup data, and reloads t
 
 import { useState, useRef } from 'react';
 import { adminAPI } from '../../../services/api';
+import { useConfirm } from '../../../contexts/ConfirmContext';
 import { Download, Upload, Database, FileJson, Info } from 'lucide-react';
 
 export default function BackupSettingsTab() {
@@ -18,6 +19,7 @@ export default function BackupSettingsTab() {
     const [backupFile, setBackupFile] = useState(null);
     const [error, setError] = useState(null);
     const [success, setSuccess] = useState(false);
+    const confirm = useConfirm();
     const fileInputRef = useRef(null);
 
     const handleExportBackup = async () => {
@@ -78,11 +80,14 @@ export default function BackupSettingsTab() {
             return;
         }
 
-        if (!window.confirm(
-            importMode === 'replace' 
-                ? '⚠️ PERINGATAN: Mode REPLACE akan menghapus semua data existing dan menggantinya dengan data dari backup. Lanjutkan?' 
-                : 'Import backup dalam mode MERGE? Data existing akan dipertahankan.'
-        )) {
+        if (!(await confirm({
+            title: importMode === 'replace' ? '⚠️ Mode REPLACE' : 'Import backup (MERGE)',
+            message: importMode === 'replace'
+                ? 'Mode REPLACE akan menghapus SEMUA data existing dan menggantinya dengan data dari backup. Lanjutkan?'
+                : 'Data existing akan dipertahankan. Lanjutkan import?',
+            confirmLabel: 'Import',
+            tone: importMode === 'replace' ? 'danger' : 'default',
+        }))) {
             return;
         }
 
