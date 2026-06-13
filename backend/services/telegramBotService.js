@@ -21,7 +21,15 @@ import { formatDateTime } from './timezoneService.js';
 import { callTelegramApi, getBotRuntimeConfig, isCommandChat } from './telegramService.js';
 import * as presenter from './telegramBotPresenter.js';
 
-const LONG_POLL_SECONDS = 30;
+// SHORT-poll, not long-poll. Some hosting networks (e.g. the prod VPS) sever a
+// long-lived HTTPS connection to Telegram after a few seconds, so a 30s long-poll
+// getUpdates intermittently throws "fetch failed" — while short requests (getMe,
+// timeout=0 getUpdates) complete reliably. So we poll with timeout=0 (returns
+// immediately) and pace with a small idle sleep. Trade ~POLL_IDLE_MS of latency for
+// robustness on flaky networks; long-polling capable networks are unaffected.
+const POLL_TIMEOUT_SECONDS = 0;
+const POLL_REQUEST_TIMEOUT_MS = 20000; // bound a single (short) getUpdates request
+const POLL_IDLE_MS = 2000;             // wait between polls when no updates arrived
 const IDLE_RECHECK_MS = 15000;        // no token yet → recheck so an admin can enable the bot without a restart
 const TRANSPORT_BACKOFF_MS = 5000;    // network hiccup
 const API_ERROR_BACKOFF_MS = 10000;   // Telegram returned ok:false (e.g. 409 conflict with another poller/webhook)
@@ -115,9 +123,9 @@ class TelegramBotService {
 
                 const data = await callTelegramApi('getUpdates', {
                     offset: this.offset,
-                    timeout: LONG_POLL_SECONDS,
+                    timeout: POLL_TIMEOUT_SECONDS,
                     allowed_updates: ALLOWED_UPDATES,
-                }, { timeoutMs: (LONG_POLL_SECONDS + 5) * 1000, signal: this.abortController.signal });
+                }, { timeoutMs: POLL_REQUEST_TIMEOUT_MS, signal: this.abortController.signal });
 
                 if (!this.isRunning) {
                     break;
@@ -138,7 +146,8 @@ class TelegramBotService {
                     continue;
                 }
 
-                for (const update of data.result || []) {
+                const updates = data.result || [];
+                for (const update of updates) {
                     this.offset = update.update_id + 1;
                     if (!this.isRunning) {
                         break;
@@ -146,6 +155,12 @@ class TelegramBotService {
                     await this.handleUpdate(update).catch((error) => {
                         console.error('[TelegramBot] Update handling error:', error?.message);
                     });
+                }
+
+                // Short-poll pacing: when idle, wait before the next cheap poll; when
+                // updates arrived, loop immediately so bursts stay responsive.
+                if (this.isRunning && updates.length === 0) {
+                    await this.sleep(POLL_IDLE_MS);
                 }
             } catch (error) {
                 if (this.isRunning) {

@@ -221,22 +221,24 @@ describe('logBotHealth', () => {
 
 describe('poll loop', () => {
     it('drains backlog on start, then handles a live update and advances the offset', async () => {
-        let liveCalls = 0;
+        // Short-poll: drain AND live use timeout=0, so count getUpdates calls instead.
+        // Call 1 = drain (empty → drain exits); call 2 = live update; call 3 = stop.
+        let getUpdatesCalls = 0;
         h.query.mockReturnValue([]);
         h.queryOne.mockReturnValue({ n: 0, total: 0 });
-        h.callTelegramApi.mockImplementation(async (method, payload) => {
-            if (method === 'getUpdates') {
-                if (payload.timeout === 0) {
-                    return { ok: true, result: [] }; // drain phase → nothing queued
-                }
-                liveCalls += 1;
-                if (liveCalls === 1) {
-                    return { ok: true, result: [{ update_id: 100, message: { chat: { id: '-100' }, from: { id: 1, username: 'a' }, text: '/stats' } }] };
-                }
-                bot.stop();
-                return { ok: true, result: [] };
+        h.callTelegramApi.mockImplementation(async (method) => {
+            if (method !== 'getUpdates') {
+                return { ok: true };
             }
-            return { ok: true };
+            getUpdatesCalls += 1;
+            if (getUpdatesCalls === 1) {
+                return { ok: true, result: [] }; // drain → nothing queued
+            }
+            if (getUpdatesCalls === 2) {
+                return { ok: true, result: [{ update_id: 100, message: { chat: { id: '-100' }, from: { id: 1, username: 'a' }, text: '/stats' } }] };
+            }
+            bot.stop();
+            return { ok: true, result: [] };
         });
 
         bot.start();

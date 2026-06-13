@@ -557,7 +557,10 @@ export async function callTelegramApi(method, payload = {}, { timeoutMs = TELEGR
         return await response.json();
     } catch (error) {
         if (error?.name !== 'AbortError') {
-            console.error(`[Telegram] API ${method} error:`, error.message);
+            // undici surfaces the real reason in error.cause (e.g. ECONNRESET,
+            // UND_ERR_HEADERS_TIMEOUT, ENETUNREACH); message alone is just "fetch failed".
+            const cause = error?.cause?.code || error?.cause?.message;
+            console.error(`[Telegram] API ${method} error:`, error.message, cause ? `(cause: ${cause})` : '');
         }
         return null;
     } finally {
