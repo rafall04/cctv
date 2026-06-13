@@ -62,6 +62,15 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
         preloadPublicVideoPopup();
     };
 
+    // Keyboard activation for the (div-based) thumbnail "watch" target so it
+    // behaves like a button — the primary action on the card.
+    const handleOpenKeyDown = (e) => {
+        if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+            e.preventDefault();
+            onClick?.(e);
+        }
+    };
+
     return (
         <div
             className={`relative rounded-2xl overflow-hidden bg-white dark:bg-gray-900 ${shadowClass} ring-1 ${transitionClass} ${hoverTransform} ${contentVisibilityClass} group/card ${cardStyle}`}
@@ -95,7 +104,14 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
                 </button>
             </div>
 
-            <div onClick={onClick} className={`aspect-video relative cursor-pointer overflow-hidden ${bgStyle}`}>
+            <div
+                role="button"
+                tabIndex={0}
+                aria-label={`Tonton ${camera.name}`}
+                onClick={onClick}
+                onKeyDown={handleOpenKeyDown}
+                className={`aspect-video relative cursor-pointer overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset ${bgStyle}`}
+            >
                 <CameraThumbnail
                     cameraId={camera.id}
                     thumbnailPath={camera.external_snapshot_url || camera.thumbnail_path}
