@@ -10,7 +10,7 @@ import { lazy } from 'react';
 import { useCameras } from '../../contexts/CameraContext';
 import { useLandingCameraFilters } from '../../hooks/public/useLandingCameraFilters';
 import { GridSkeleton, CameraCardSkeleton } from '../ui/Skeleton';
-import { NoSearchResultsEmptyState, NoDataWithFilterEmptyState } from '../ui/EmptyState';
+import { NoSearchResultsEmptyState, NoDataWithFilterEmptyState, ErrorEmptyState } from '../ui/EmptyState';
 import { Icons } from '../ui/Icons';
 import LandingCameraToolbar from './LandingCameraToolbar';
 import LandingAreaFilter from './LandingAreaFilter';
@@ -144,7 +144,7 @@ export default function CamerasSection({
     isFavorite,
     disableHeavyEffects = false,
 }) {
-    const { cameras, areas, loading } = useCameras();
+    const { cameras, areas, loading, error, refreshData } = useCameras();
     const filters = useLandingCameraFilters(cameras, areas, favorites, viewMode, onCameraClick);
     const {
         connectionTab,
@@ -224,6 +224,14 @@ export default function CamerasSection({
 
                 {loading ? (
                     <GridSkeleton items={6} columns={3} SkeletonComponent={CameraCardSkeleton} />
+                ) : error && cameras.length === 0 ? (
+                    // Initial load actually FAILED (after the context's built-in
+                    // retries) — show a recoverable error with "Coba Lagi" instead
+                    // of a false "Belum Ada Kamera" that reads as an empty hub.
+                    // Pass only onRetry: ErrorEmptyState renders `description`
+                    // directly, and `error` here is an Error object (not a string),
+                    // so we let it use its default Indonesian copy.
+                    <ErrorEmptyState onRetry={() => refreshData({ mode: 'initial' })} />
                 ) : displayCameras.length === 0 ? (
                     searchQuery ? (
                         <NoSearchResultsEmptyState
