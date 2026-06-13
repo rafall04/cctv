@@ -83,6 +83,27 @@ describe('walletService', () => {
         expect(db.prepare("SELECT COUNT(*) AS n FROM wallet_transactions WHERE type = 'charge'").get().n).toBe(0);
     });
 
+    it('adjust credits (+) as adjustment, debits (−) as refund, capped at balance', () => {
+        const up = walletService.adjust({ userId: 5, signedAmount: 5000, reference: 'adjust-admin:1:1', note: 'comp' });
+        expect(up.balance_after).toBe(5000);
+        expect(up.type).toBe('adjustment');
+
+        const down = walletService.adjust({ userId: 5, signedAmount: -2000, reference: 'adjust-admin:1:2', note: 'refund' });
+        expect(down.balance_after).toBe(3000);
+        expect(down.type).toBe('refund');
+
+        // A refund bigger than the balance is refused (402); balance unchanged.
+        expect(() => walletService.adjust({ userId: 5, signedAmount: -9000 })).toThrowError(
+            expect.objectContaining({ statusCode: 402 })
+        );
+        expect(walletService.getBalance(5)).toBe(3000);
+
+        // Zero is rejected (400).
+        expect(() => walletService.adjust({ userId: 5, signedAmount: 0 })).toThrowError(
+            expect.objectContaining({ statusCode: 400 })
+        );
+    });
+
     it('rejects non-integer and non-positive amounts', () => {
         expect(() => walletService.credit({ userId: 5, amount: 100.5 })).toThrowError(
             expect.objectContaining({ statusCode: 400 })

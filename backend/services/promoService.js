@@ -89,6 +89,20 @@ class PromoService {
             throw badRequest('Kode ini hadiah saldo — pakai lewat "Tukar Kode", bukan saat top-up');
         }
         this._assertRedeemable(promo, userId);
+        // Unpaid top-ups already carrying this code reserve a slot of the per-user limit:
+        // without this, the same code could preview "+bonus" on several pending top-ups when
+        // only one would ever credit (applyTopupBonus caps it). Count redemptions + pending.
+        const reserved = queryOne(
+            "SELECT COUNT(*) AS n FROM payments WHERE user_id = ? AND promo_code = ? AND status = 'pending'",
+            [userId, promo.code]
+        ).n;
+        const used = queryOne(
+            'SELECT COUNT(*) AS n FROM promo_redemptions WHERE promo_id = ? AND user_id = ?',
+            [promo.id, userId]
+        ).n;
+        if (used + reserved >= promo.per_user_limit) {
+            throw badRequest('Kode ini sudah dipakai pada top-up Anda yang belum dibayar — selesaikan dulu pembayaran itu');
+        }
         if (amount < (promo.min_topup || 0)) {
             throw badRequest(`Kode ini butuh top-up minimal Rp${Number(promo.min_topup).toLocaleString('id-ID')}`);
         }

@@ -43,6 +43,8 @@ function seed() {
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         );
         CREATE TABLE promo_redemptions (id INTEGER PRIMARY KEY AUTOINCREMENT, promo_id INTEGER, user_id INTEGER, payment_id INTEGER, bonus_amount INTEGER, created_at TEXT DEFAULT CURRENT_TIMESTAMP);
+        DROP TABLE IF EXISTS payments;
+        CREATE TABLE payments (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, promo_code TEXT, status TEXT);
         INSERT INTO users (id, username) VALUES (42, 'budi'), (99, 'siti');
     `);
 }
@@ -73,6 +75,15 @@ describe('promoService.validateForTopup', () => {
         expect(() => promoService.validateForTopup('GIFT5K', 42, 50000)).toThrowError(/Tukar Kode/);
         expect(() => promoService.validateForTopup('MIN50', 42, 25000)).toThrowError(/minimal/);
         expect(() => promoService.validateForTopup('EXPIRED', 42, 50000)).toThrowError(/kedaluwarsa/);
+    });
+
+    it('rejects when an unpaid top-up already reserved the per-user limit', () => {
+        promoService.createPromo({ code: 'solo', type: 'flat', value: 2000, per_user_limit: 1 });
+        // user 42 already has a pending top-up carrying this code → reserve the only slot
+        db.prepare("INSERT INTO payments (user_id, promo_code, status) VALUES (42, 'SOLO', 'pending')").run();
+        expect(() => promoService.validateForTopup('SOLO', 42, 50000)).toThrowError(/belum dibayar/);
+        // a different user is unaffected
+        expect(promoService.validateForTopup('SOLO', 99, 50000)).toMatchObject({ bonus: 2000 });
     });
 });
 

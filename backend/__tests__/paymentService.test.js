@@ -94,6 +94,7 @@ beforeEach(() => {
             qris_payload TEXT,
             expires_at TEXT,
             paid_at TEXT,
+            failure_reason TEXT,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
@@ -387,7 +388,12 @@ describe('paymentService ipaymu driver', () => {
         });
         // 502 + expose so the customer sees a friendly gateway message, not a generic 500.
         await expect(paymentService.createTopup(42, 25000)).rejects.toMatchObject({ statusCode: 502, expose: true });
-        expect(db.prepare("SELECT COUNT(*) AS n FROM payments WHERE gateway='ipaymu'").get().n).toBe(0);
+        // No payable (pending) row is created …
+        expect(db.prepare("SELECT COUNT(*) AS n FROM payments WHERE gateway='ipaymu' AND status='pending'").get().n).toBe(0);
+        // … but the failed attempt IS persisted with the gateway reason, so an admin can see WHY.
+        const failed = db.prepare("SELECT * FROM payments WHERE gateway='ipaymu' AND status='failed'").get();
+        expect(failed).toBeTruthy();
+        expect(failed.failure_reason).toContain('unauthorized');
     });
 
     it('uses the admin-curated method (VA bank) and stores the VA number', async () => {

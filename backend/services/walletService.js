@@ -99,6 +99,23 @@ class WalletService {
     }
 
     /**
+     * Admin manual correction. `signedAmount` > 0 credits (goodwill/compensation),
+     * < 0 debits (refund/clawback). A debit can never drive the balance below zero
+     * (_apply throws 402). Defaults the ledger type to 'adjustment' for a credit and
+     * 'refund' for a debit so the customer's history reads sensibly.
+     */
+    adjust({ userId, signedAmount, reference = null, note = null, type = null }) {
+        if (!Number.isInteger(signedAmount) || signedAmount === 0) {
+            const err = new Error('Nominal penyesuaian harus bilangan bulat selain 0');
+            err.statusCode = 400;
+            throw err;
+        }
+        const resolvedType = type || (signedAmount > 0 ? 'adjustment' : 'refund');
+        assertValidType(resolvedType);
+        return this._apply({ userId, type: resolvedType, signedAmount, reference, note });
+    }
+
+    /**
      * Idempotent daily-charge debit: the partial UNIQUE index on
      * wallet_transactions.reference (type='charge') makes a duplicate reference
      * throw SQLITE_CONSTRAINT — translated here to {alreadyCharged: true} so

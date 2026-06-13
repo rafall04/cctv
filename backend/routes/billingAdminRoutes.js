@@ -9,6 +9,7 @@
 import {
     listCustomers,
     manualTopup,
+    adjustWallet,
     listSubscriptions,
     assignSubscription,
     updateSubscription,
@@ -68,6 +69,24 @@ export default async function billingAdminRoutes(fastify) {
             },
         },
     }, manualTopup);
+
+    // Manual wallet correction (+credit / −debit refund). `amount` is signed; the handler
+    // blocks a debit larger than the balance and requires a reason (audit-logged).
+    fastify.post('/wallet-adjust', {
+        onRequest: guard,
+        schema: {
+            body: {
+                type: 'object',
+                required: ['user_id', 'amount', 'reason'],
+                properties: {
+                    user_id: { type: 'integer', minimum: 1 },
+                    amount: { type: 'integer' },
+                    reason: { type: 'string', minLength: 1, maxLength: 200 },
+                },
+                additionalProperties: false,
+            },
+        },
+    }, adjustWallet);
 
     fastify.get('/subscriptions', { onRequest: guard }, listSubscriptions);
 

@@ -263,7 +263,11 @@ class PaymentService {
 
         const data = body?.Data || body?.data;
         if (!httpOk || !data?.TransactionId) {
-            console.error('[Payment] iPaymu charge failed:', body?.Message || body?.message || 'unknown');
+            const gatewayMsg = body?.Message || body?.message || 'Gateway menolak transaksi';
+            console.error('[Payment] iPaymu charge failed:', gatewayMsg);
+            // Persist the failed attempt so an admin can see WHY (e.g. "Suspicious buyer")
+            // instead of the failure vanishing. gateway_ref is made unique via referenceId.
+            this._recordFailedAttempt({ userId, gateway: 'ipaymu', gatewayRef: `failed-${referenceId}`, amount, reason: gatewayMsg });
             const err = new Error('Pembayaran gagal dibuat di gateway. Coba metode pembayaran lain, atau ulangi sebentar lagi.');
             err.statusCode = 502;
             err.expose = true; // friendly message goes to the customer, not a generic 500
@@ -420,7 +424,9 @@ class PaymentService {
 
         const body = await response.json().catch(() => ({}));
         if (!response.ok || !['200', '201'].includes(String(body.status_code))) {
-            console.error('[Payment] Midtrans charge failed:', body.status_message || response.status);
+            const gatewayMsg = body.status_message || `HTTP ${response.status}`;
+            console.error('[Payment] Midtrans charge failed:', gatewayMsg);
+            this._recordFailedAttempt({ userId, gateway: 'midtrans', gatewayRef: `failed-${orderId}`, amount, reason: gatewayMsg });
             const err = new Error('Gagal membuat QRIS - coba lagi sebentar lagi');
             err.statusCode = 502;
             err.expose = true;
@@ -534,9 +540,10 @@ class PaymentService {
         }
         if (['expire', 'cancel', 'deny', 'failure'].includes(status)) {
             const mapped = status === 'expire' ? 'expired' : (status === 'cancel' ? 'cancelled' : 'failed');
+            const reason = mapped === 'failed' ? `Gateway: ${status}` : null;
             execute(
-                "UPDATE payments SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'pending'",
-                [mapped, payment.id]
+                "UPDATE payments SET status = ?, failure_reason = COALESCE(?, failure_reason), updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'pending'",
+                [mapped, reason, payment.id]
             );
             return { handled: true, status: mapped };
         }
@@ -586,6 +593,24 @@ class PaymentService {
                 "UPDATE payments SET status = 'expired', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'pending'",
                 [payment.id]
             );
+        }
+    }
+
+    /**
+     * Persist a non-confirmable failed top-up attempt (gateway rejected the charge) with a
+     * human-readable reason, so an admin can see WHY a customer's top-up failed instead of
+     * it vanishing. Best-effort: this audit insert must never mask the original gateway
+     * error, so any failure here is swallowed.
+     */
+    _recordFailedAttempt({ userId, gateway, gatewayRef, amount, reason }) {
+        try {
+            execute(
+                `INSERT INTO payments (user_id, gateway, gateway_ref, amount, status, failure_reason)
+                 VALUES (?, ?, ?, ?, 'failed', ?)`,
+                [userId, gateway, gatewayRef, amount, reason ? String(reason).slice(0, 300) : null]
+            );
+        } catch (error) {
+            console.error('[Payment] Could not persist failed attempt:', error.message);
         }
     }
 
@@ -672,6 +697,10 @@ class PaymentService {
         };
         if (includeUsername && payment.username) {
             presented.username = payment.username;
+        }
+        // failure_reason carries gateway internals ("Suspicious buyer") — admin-only.
+        if (includeUsername) {
+            presented.failure_reason = payment.failure_reason || null;
         }
         return presented;
     }

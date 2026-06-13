@@ -8,7 +8,7 @@
  * SideEffects: Mutates billing tables via services; audit-logged inside the services.
  */
 
-import { query } from '../database/connectionPool.js';
+import { query, queryOne } from '../database/connectionPool.js';
 import billingService from '../services/billingService.js';
 import billingPlanService from '../services/billingPlanService.js';
 import walletService from '../services/walletService.js';
@@ -205,6 +205,66 @@ export async function manualTopup(request, reply) {
         });
     } catch (error) {
         return handleError(reply, error, 'Manual topup error:');
+    }
+}
+
+/**
+ * Manual wallet correction: a signed `amount` (+credit goodwill / −debit refund). A debit
+ * can never drive the balance negative; a credit re-resumes suspended cameras like a top-up.
+ * Distinct from manualTopup (which only ever credits and is labelled as a payment top-up).
+ */
+export async function adjustWallet(request, reply) {
+    try {
+        const userId = Number(request.body?.user_id);
+        const amount = Number(request.body?.amount); // signed: + credit, − debit/refund
+        const reason = String(request.body?.reason || '').trim();
+        const rp = (n) => `Rp${Number(n || 0).toLocaleString('id-ID')}`;
+
+        if (!Number.isInteger(amount) || amount === 0) {
+            return reply.code(400).send({ success: false, message: 'Nominal harus bilangan bulat selain 0' });
+        }
+        if (!reason) {
+            return reply.code(400).send({ success: false, message: 'Alasan penyesuaian wajib diisi' });
+        }
+        const customer = queryOne("SELECT id, username FROM users WHERE id = ? AND role = 'customer'", [userId]);
+        if (!customer) {
+            return reply.code(404).send({ success: false, message: 'Pelanggan tidak ditemukan' });
+        }
+        if (amount < 0) {
+            const balance = walletService.getBalance(userId);
+            if (balance + amount < 0) {
+                return reply.code(400).send({
+                    success: false,
+                    message: `Saldo pelanggan hanya ${rp(balance)} — tidak bisa dikurangi ${rp(Math.abs(amount))}`,
+                });
+            }
+        }
+
+        const result = walletService.adjust({
+            userId,
+            signedAmount: amount,
+            reference: `adjust-admin:${request.user.id}:${Date.now()}`,
+            note: `${amount > 0 ? 'Penyesuaian (+)' : 'Refund (−)'} oleh ${request.user.username}: ${reason}`,
+        });
+
+        // A credit may cover suspended cameras again — resume like a manual top-up does.
+        const resume = amount > 0 ? billingService.tryResumeForUser(userId) : { resumedCameraIds: [] };
+
+        logAdminAction({
+            action: 'billing_wallet_adjusted',
+            customerId: userId,
+            amount,
+            reason,
+            resumedCameraIds: resume.resumedCameraIds,
+        }, request);
+
+        return reply.send({
+            success: true,
+            message: amount > 0 ? 'Saldo ditambahkan' : 'Saldo dikurangi (refund)',
+            data: { ...result, resumed_camera_ids: resume.resumedCameraIds },
+        });
+    } catch (error) {
+        return handleError(reply, error, 'Adjust wallet error:');
     }
 }
 
