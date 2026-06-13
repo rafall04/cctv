@@ -116,9 +116,9 @@ export function NetworkStatusBanner({
                 <div className="flex items-center justify-center gap-3 max-w-7xl mx-auto">
                     <WifiOffIcon />
                     <div className="flex-1 text-center">
-                        <span className="font-medium">You are offline</span>
+                        <span className="font-medium">Anda sedang offline</span>
                         <span className="hidden sm:inline ml-2 text-red-100">
-                            — Please check your internet connection
+                            — Periksa koneksi internet Anda
                         </span>
                     </div>
                 </div>
@@ -144,15 +144,15 @@ export function NetworkStatusBanner({
                 <div className="flex items-center justify-center gap-3 max-w-7xl mx-auto">
                     <WifiIcon />
                     <div className="flex-1 text-center">
-                        <span className="font-medium">Back online</span>
+                        <span className="font-medium">Kembali online</span>
                         <span className="hidden sm:inline ml-2 text-emerald-100">
-                            — Connection restored
+                            — Koneksi pulih
                         </span>
                     </div>
                     <button
                         onClick={dismissOnlineSuccess}
                         className="p-1 rounded hover:bg-emerald-500 transition-colors"
-                        aria-label="Dismiss"
+                        aria-label="Tutup notifikasi"
                     >
                         <CloseIcon />
                     </button>
@@ -179,8 +179,8 @@ export function getBannerConfig(status) {
             type: 'offline',
             bgColor: 'bg-red-600',
             textColor: 'text-white',
-            message: 'You are offline',
-            description: 'Please check your internet connection',
+            message: 'Anda sedang offline',
+            description: 'Periksa koneksi internet Anda',
         };
     }
     
@@ -189,8 +189,8 @@ export function getBannerConfig(status) {
         type: 'online',
         bgColor: 'bg-emerald-600',
         textColor: 'text-white',
-        message: 'Back online',
-        description: 'Connection restored',
+        message: 'Kembali online',
+        description: 'Koneksi pulih',
     };
 }
 

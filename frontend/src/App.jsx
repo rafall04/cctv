@@ -16,6 +16,7 @@ import { TimezoneProvider } from './contexts/TimezoneContext';
 import { ToastContainer } from './components/ui/ToastContainer';
 import { ApiClientInitializer } from './components/ApiClientInitializer';
 import ErrorBoundary from './components/ui/ErrorBoundary';
+import { NetworkStatusBanner } from './components/ui/NetworkStatusBanner';
 import PwaInstallPrompt from './components/PwaInstallPrompt';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
@@ -56,6 +57,21 @@ const RegisterPage = lazyWithRetry(() => import('./pages/RegisterPage'), 'regist
 // and admin /admin/playback routes already render it inside <Suspense>, and LandingCamerasSection also
 // imports it dynamically — so Vite splits it into its own chunk loaded only when playback is opened.
 const Playback = lazyWithRetry(() => import('./pages/Playback'), 'playback');
+
+// Public visitor routes: own ErrorBoundary so a crash in one public page
+// (e.g. a bad camera record in the landing/map/playback subtree) shows a
+// contained fallback instead of white-screening the whole app, plus the
+// offline banner so mobile visitors on flaky connections get feedback.
+function PublicPageRoute({ children }) {
+    return (
+        <ErrorBoundary>
+            <NetworkStatusBanner />
+            <Suspense fallback={<div className="flex min-h-screen items-center justify-center">Memuat…</div>}>
+                {children}
+            </Suspense>
+        </ErrorBoundary>
+    );
+}
 
 function CustomerPageRoute({ children }) {
     return (
@@ -101,22 +117,16 @@ function App() {
             <PwaInstallPrompt />
             <Routes>
                 {/* Public routes */}
-                <Route path="/" element={<LandingPage />} />
+                <Route path="/" element={<PublicPageRoute><LandingPage /></PublicPageRoute>} />
                 <Route path="/area/:areaSlug" element={
-                    <Suspense fallback={<div className="flex min-h-screen items-center justify-center">Loading...</div>}>
-                        <AreaPublicPage />
-                    </Suspense>
+                    <PublicPageRoute><AreaPublicPage /></PublicPageRoute>
                 } />
                 <Route path="/playback" element={
-                    <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
-                        <Playback accessScope="public_preview" />
-                    </Suspense>
+                    <PublicPageRoute><Playback accessScope="public_preview" /></PublicPageRoute>
                 } />
                 <Route path="/admin/login" element={<LoginPage />} />
                 <Route path="/daftar" element={
-                    <Suspense fallback={<div className="flex min-h-screen items-center justify-center">Loading...</div>}>
-                        <RegisterPage />
-                    </Suspense>
+                    <PublicPageRoute><RegisterPage /></PublicPageRoute>
                 } />
 
                 {/* Customer portal (role: customer) */}
