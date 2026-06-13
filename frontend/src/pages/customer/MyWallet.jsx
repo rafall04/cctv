@@ -277,9 +277,12 @@ function TopupPanel({ onCompleted, resumable = [] }) {
                     </div>
                 )}
                 {pending.status === 'pending' && !pending.qris?.qr_string && !pending.qris?.qr_url && !pending.qris?.va_number && (
-                    <p className="mt-3 rounded-lg bg-gray-50 p-3 text-sm text-gray-600 dark:bg-gray-800 dark:text-gray-300">
-                        {pending.instructions || 'Bayar ke admin sesuai nominal, saldo akan dikonfirmasi manual oleh admin.'}
-                    </p>
+                    <div className="mt-3 rounded-lg bg-gray-50 p-3 text-sm text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                        <p>{pending.instructions || 'Bayar ke admin sesuai nominal, saldo akan dikonfirmasi manual oleh admin.'}</p>
+                        <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                            Halaman ini otomatis memperbarui begitu admin mengonfirmasi. Anda juga bisa membukanya lagi nanti untuk memeriksa statusnya.
+                        </p>
+                    </div>
                 )}
                 {pending.status === 'paid' && (
                     <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-800/50 dark:bg-emerald-900/20">

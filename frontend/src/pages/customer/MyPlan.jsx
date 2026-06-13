@@ -46,9 +46,15 @@ export default function MyPlan() {
     }, [reload]);
 
     const handleSwitch = async (plan) => {
+        const isTrialPlan = plan.is_trial === 1;
         if (!(await confirm({
             title: `Pindah ke paket ${plan.name}?`,
-            message: `Harga semua kamera Anda menyesuaikan (${formatRupiah(plan.price_per_camera)}/kamera/bulan) dan biaya hari ini langsung dipotong dari saldo.`,
+            // Paid plans charge today's fee immediately and SUSPEND on the spot
+            // if the balance can't cover it — warn about that up front (the
+            // trial→paid reactivation is exactly where users got surprised).
+            message: isTrialPlan
+                ? `Anda akan pindah ke paket ${plan.name} (gratis ${plan.trial_days} hari).`
+                : `Harga semua kamera Anda menyesuaikan jadi ${formatRupiah(plan.price_per_camera)}/kamera/bulan, dan biaya hari ini langsung dipotong dari saldo. Jika saldo tidak cukup, kamera otomatis ditangguhkan sampai Anda mengisi saldo lagi.`,
             confirmLabel: 'Pindah Paket',
         }))) {
             return;
