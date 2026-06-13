@@ -19,12 +19,15 @@ import { TIMESTAMP_STORAGE, useTimezone } from '../contexts/TimezoneContext';
  * Password validation requirements
  * Requirements: 6.3
  */
+// Mirrors the backend policy (services/passwordValidator.js) so the "green" meter can't
+// pass a password the server will reject. Backend also enforces not-common + no-reuse
+// (last 5) — those are server-only and surfaced via the API error message on submit.
 export const PASSWORD_REQUIREMENTS = {
-    minLength: 8,
+    minLength: 12,
     requireUppercase: true,
     requireLowercase: true,
     requireNumber: true,
-    requireSpecial: false,
+    requireSpecial: true,
 };
 
 /**
@@ -32,7 +35,7 @@ export const PASSWORD_REQUIREMENTS = {
  * @param {string} password - Password to validate
  * @returns {{ isValid: boolean, errors: string[], requirements: Object }}
  */
-export function validatePassword(password) {
+export function validatePassword(password, username = '') {
     const errors = [];
     const requirements = {
         minLength: false,
@@ -40,6 +43,7 @@ export function validatePassword(password) {
         hasLowercase: false,
         hasNumber: false,
         hasSpecial: false,
+        noUsername: true,
     };
 
     if (!password) {
@@ -80,13 +84,21 @@ export function validatePassword(password) {
         }
     }
 
-    // Check special character
+    // Check special character (same set the backend accepts)
     if (PASSWORD_REQUIREMENTS.requireSpecial) {
-        if (/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
+        if (/[!@#$%^&*()_+\-=[\]{}|;:'",.<>?/`~]/.test(password)) {
             requirements.hasSpecial = true;
         } else {
             errors.push('Password must contain at least one special character');
         }
+    }
+
+    // Must not contain the username (case-insensitive) — the backend rule that most often
+    // rejects an otherwise-"green" password. Only meaningful for usernames of 3+ chars.
+    const uname = String(username || '').trim().toLowerCase();
+    if (uname.length >= 3 && password.toLowerCase().includes(uname)) {
+        requirements.noUsername = false;
+        errors.push('Password cannot contain the username');
     }
 
     return {
@@ -109,9 +121,9 @@ export function isSelfDeletion(userId, currentUserId) {
 /**
  * Password Requirements Display Component
  */
-function PasswordRequirementsDisplay({ password }) {
-    const { requirements } = validatePassword(password || '');
-    
+function PasswordRequirementsDisplay({ password, username = '' }) {
+    const { requirements } = validatePassword(password || '', username);
+
     const items = [
         { key: 'minLength', label: `At least ${PASSWORD_REQUIREMENTS.minLength} characters`, met: requirements.minLength },
         { key: 'hasUppercase', label: 'One uppercase letter', met: requirements.hasUppercase },
@@ -121,6 +133,10 @@ function PasswordRequirementsDisplay({ password }) {
 
     if (PASSWORD_REQUIREMENTS.requireSpecial) {
         items.push({ key: 'hasSpecial', label: 'One special character', met: requirements.hasSpecial });
+    }
+
+    if (username) {
+        items.push({ key: 'noUsername', label: 'Does not contain the username', met: requirements.noUsername });
     }
 
     return (
@@ -238,7 +254,7 @@ export default function UserManagement() {
 
         // Password validation (only for new users)
         if (!editingUser) {
-            const passwordValidation = validatePassword(formData.password);
+            const passwordValidation = validatePassword(formData.password, formData.username);
             if (!passwordValidation.isValid) {
                 errors.password = passwordValidation.errors[0];
             }
@@ -317,13 +333,13 @@ export default function UserManagement() {
             return;
         }
         
-        // Validate password requirements
-        const passwordValidation = validatePassword(passwordData.password);
+        // Validate password requirements (incl. "not containing the username")
+        const passwordValidation = validatePassword(passwordData.password, passwordUser?.username);
         if (!passwordValidation.isValid) {
             setPasswordError(passwordValidation.errors[0]);
             return;
         }
-        
+
         setSubmitting(true);
         try {
             const result = await userService.changeUserPassword(passwordUser.id, passwordData.password);
@@ -331,11 +347,15 @@ export default function UserManagement() {
                 success('Password Changed', `Password for ${passwordUser.username} has been updated`);
                 setShowPasswordModal(false);
             } else {
-                setPasswordError(result.message);
-                showError('Password Change Failed', result.message || 'Failed to change password');
+                const msg = result.errors?.[0] || result.message;
+                setPasswordError(msg);
+                showError('Password Change Failed', msg || 'Failed to change password');
             }
         } catch (err) {
-            const errorMsg = err.response?.data?.message || 'Failed to change password';
+            const data = err.response?.data;
+            // Surface the SPECIFIC backend reason (e.g. "Password has been used recently",
+            // common-password) instead of the generic "does not meet requirements".
+            const errorMsg = (Array.isArray(data?.errors) && data.errors[0]) || data?.message || 'Failed to change password';
             setPasswordError(errorMsg);
             showError('Error', errorMsg);
         } finally {
@@ -598,7 +618,7 @@ export default function UserManagement() {
                                     {fieldErrors.password && (
                                         <p className="mt-1 text-sm text-red-500">{fieldErrors.password}</p>
                                     )}
-                                    <PasswordRequirementsDisplay password={formData.password} />
+                                    <PasswordRequirementsDisplay password={formData.password} username={formData.username} />
                                 </div>
                             )}
 
@@ -673,7 +693,7 @@ export default function UserManagement() {
                                     placeholder="Enter new password" 
                                     required 
                                 />
-                                <PasswordRequirementsDisplay password={passwordData.password} />
+                                <PasswordRequirementsDisplay password={passwordData.password} username={passwordUser?.username} />
                             </div>
 
                             <div>
