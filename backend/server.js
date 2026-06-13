@@ -11,15 +11,20 @@ import cookie from '@fastify/cookie';
 import fastifyStatic from '@fastify/static';
 import { config, assertSecureConfig } from './config/config.js';
 import dns from 'node:dns';
+import net from 'node:net';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
-// Prefer IPv4 for all outbound DNS. Node 17+ resolves "verbatim" (often IPv6
-// first); on hosts with broken/unrouted IPv6 (this VPS has working IPv4 but dead
-// IPv6 to api.telegram.org & payment gateways), global fetch() then intermittently
-// throws "fetch failed" before falling back. Forcing ipv4first uses the working
-// route directly. Harmless where IPv6 works. Must run before any outbound fetch.
+// Force outbound HTTPS onto IPv4. This VPS has working IPv4 but DEAD IPv6 egress,
+// while api.telegram.org & payment gateways publish AAAA records. Two settings are
+// BOTH required (verified on prod: default resolution failed 11/12 connects with
+// ETIMEDOUT; IPv4-only = 0/12):
+//   1) ipv4first — order IPv4 ahead of IPv6 in DNS results, AND
+//   2) autoSelectFamily(false) — disable Happy Eyeballs, which otherwise RACES both
+//      families and ignores (1), so it keeps trying the dead IPv6 route and times out.
+// Harmless where IPv6 works. Must run before any outbound fetch/connect.
 dns.setDefaultResultOrder('ipv4first');
+net.setDefaultAutoSelectFamily(false);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
