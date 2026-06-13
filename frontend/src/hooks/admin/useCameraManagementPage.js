@@ -10,6 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { cameraService } from '../../services/cameraService';
 import { areaService } from '../../services/areaService';
 import { useNotification } from '../../contexts/NotificationContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import { useFormValidation } from '../useFormValidation';
 import { useAdminReconnectRefresh } from './useAdminReconnectRefresh';
 import { REQUEST_POLICY } from '../../services/requestPolicy';
@@ -62,6 +63,7 @@ export function useCameraManagementPage() {
     const mountedRef = useRef(true);
 
     const { success, error: showError } = useNotification();
+    const confirm = useConfirm();
 
     const handleLifecycleResult = useCallback((lifecycle) => {
         if (!lifecycle?.sourceChanged) {
@@ -331,7 +333,7 @@ export function useCameraManagementPage() {
     ]);
 
     const deleteCamera = useCallback(async (camera) => {
-        if (!window.confirm(`Delete camera "${camera.name}"?`)) {
+        if (!(await confirm({ title: `Delete camera "${camera.name}"?`, confirmLabel: 'Delete', tone: 'danger' }))) {
             return;
         }
 
@@ -349,7 +351,7 @@ export function useCameraManagementPage() {
         } finally {
             setDeletingId(null);
         }
-    }, [showError, success]);
+    }, [confirm, showError, success]);
 
     const toggleEnabled = useCallback(async (camera) => {
         const previousEnabled = camera.enabled;

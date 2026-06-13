@@ -26,6 +26,10 @@ vi.mock('../contexts/NotificationContext', () => ({
     }),
 }));
 
+vi.mock('../contexts/ConfirmContext', () => ({
+    useConfirm: () => () => Promise.resolve(true),
+}));
+
 vi.mock('../services/authService', () => ({
     authService: {
         getCurrentUser: () => ({ id: 99, username: 'admin' }),

@@ -46,6 +46,10 @@ vi.mock('../contexts/NotificationContext', () => ({
     }),
 }));
 
+vi.mock('../contexts/ConfirmContext', () => ({
+    useConfirm: () => () => Promise.resolve(true),
+}));
+
 vi.mock('../components/LocationPicker', () => ({
     default: ({ onLocationChange }) => (
         <button type="button" onClick={() => onLocationChange('-7.1', '112.1')}>

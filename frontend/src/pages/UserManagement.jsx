@@ -10,6 +10,7 @@ import { useEffect, useState } from 'react';
 import { userService } from '../services/userService';
 import { authService } from '../services/authService';
 import { useNotification } from '../contexts/NotificationContext';
+import { useConfirm } from '../contexts/ConfirmContext';
 import { TableSkeleton } from '../components/ui/Skeleton';
 import { NoUsersEmptyState } from '../components/ui/EmptyState';
 import { Alert } from '../components/ui/Alert';
@@ -182,6 +183,7 @@ export default function UserManagement() {
     const [fieldErrors, setFieldErrors] = useState({});
     const currentUser = authService.getCurrentUser();
     const { success, error: showError } = useNotification();
+    const confirm = useConfirm();
 
     useEffect(() => {
         loadUsers();
@@ -373,7 +375,7 @@ export default function UserManagement() {
     };
 
     const handleDelete = async (user) => {
-        if (!window.confirm(`Delete user "${user.username}"? This action cannot be undone.`)) return;
+        if (!(await confirm({ title: `Delete user "${user.username}"?`, message: 'This action cannot be undone.', confirmLabel: 'Delete', tone: 'danger' }))) return;
         try {
             const result = await userService.deleteUser(user.id);
             if (result.success) {
