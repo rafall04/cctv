@@ -6,8 +6,9 @@
  * SideEffects: None beyond callback props.
  */
 
-import { Suspense } from 'react';
+import { Suspense, useRef } from 'react';
 import { Alert } from '../../ui';
+import { useFocusTrap } from '../../../hooks/useFocusTrap';
 import { AREA_COVERAGE_OPTIONS } from '../../../utils/areaCoverage';
 import { GRID_DEFAULT_LIMIT_OPTIONS, INTERNAL_INGEST_POLICY_OPTIONS, INTERNAL_RTSP_TRANSPORT_OPTIONS } from '../../../utils/admin/areaManagementOptions';
 
@@ -24,9 +25,21 @@ export default function AreaFormModal({
     onErrorDismiss,
     onLocationChange,
 }) {
+    const dialogRef = useRef(null);
+    // Focus-trap + return-focus + dialog semantics. No ESC-to-close: this modal
+    // isn't dismissible by backdrop click, so we keep "explicit cancel only" to
+    // avoid losing form input from a stray keypress.
+    useFocusTrap(dialogRef);
+
     return (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-            <div className="bg-white dark:bg-gray-800 w-full max-w-lg rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700/50 max-h-[90vh] overflow-y-auto">
+            <div
+                ref={dialogRef}
+                role="dialog"
+                aria-modal="true"
+                aria-label={editingArea ? 'Edit Area' : 'Tambah Area'}
+                className="bg-white dark:bg-gray-800 w-full max-w-lg rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700/50 max-h-[90vh] overflow-y-auto"
+            >
                 <div className="p-6 border-b border-gray-200 dark:border-gray-700/50 flex justify-between items-center sticky top-0 bg-white dark:bg-gray-800">
                     <div>
                         <h3 className="text-lg font-bold text-gray-900 dark:text-white">{editingArea ? 'Edit Area' : 'Tambah Area'}</h3>

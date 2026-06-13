@@ -1,8 +1,10 @@
+import { useRef } from 'react';
 import { Alert } from '../../ui/Alert';
 import CameraBasicFields from './CameraBasicFields';
 import CameraSourceFields from './CameraSourceFields';
 import CameraLocationSection from './CameraLocationSection';
 import CameraRecordingSection from './CameraRecordingSection';
+import { useFocusTrap } from '../../../hooks/useFocusTrap';
 
 export default function CameraFormModal({
     show,
@@ -20,6 +22,12 @@ export default function CameraFormModal({
     setFieldValue,
     setModalError,
 }) {
+    const dialogRef = useRef(null);
+    // Called before the early-return below to obey the Rules of Hooks; `active`
+    // tracks `show` so the trap only engages while the modal is open. No
+    // ESC-to-close (modal isn't backdrop-dismissible).
+    useFocusTrap(dialogRef, { active: show });
+
     if (!show) {
         return null;
     }
@@ -30,7 +38,13 @@ export default function CameraFormModal({
 
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
-            <div className="bg-white dark:bg-gray-800 w-full max-w-lg rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700/50 my-auto max-h-[90vh] flex flex-col">
+            <div
+                ref={dialogRef}
+                role="dialog"
+                aria-modal="true"
+                aria-label={editingCamera ? 'Edit Camera' : 'Add Camera'}
+                className="bg-white dark:bg-gray-800 w-full max-w-lg rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700/50 my-auto max-h-[90vh] flex flex-col"
+            >
                 <div className="p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700/50 flex justify-between items-center shrink-0">
                     <div>
                         <h3 className="text-lg font-bold text-gray-900 dark:text-white">
