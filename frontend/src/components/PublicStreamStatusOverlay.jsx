@@ -87,6 +87,8 @@ export default function PublicStreamStatusOverlay({
     consecutiveFailures = 0,
     className = 'absolute inset-0 z-10',
     disableAnimations = false,
+    autoRetryCount = 0,
+    maxAutoRetries = 3,
 }) {
     if (!state) return null;
 
@@ -108,6 +110,11 @@ export default function PublicStreamStatusOverlay({
                 <div className="text-center px-4">
                     <p className="text-white font-medium text-sm">{state.title}</p>
                     <p className="text-gray-400 text-xs mt-1">{state.description}</p>
+                    {autoRetryCount > 0 && (
+                        <p className="text-sky-300 text-xs mt-1 font-medium">
+                            Mencoba menyambungkan ulang… (percobaan {Math.min(autoRetryCount, maxAutoRetries)} dari {maxAutoRetries})
+                        </p>
+                    )}
                 </div>
             </div>
         );
@@ -126,11 +133,11 @@ export default function PublicStreamStatusOverlay({
             </div>
             {showTroubleshooting && state.variant === 'timeout' && consecutiveFailures >= 3 && (
                 <div className="mt-4 bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 max-w-sm text-left">
-                    <p className="text-amber-400 text-xs font-medium mb-1">Troubleshooting Tips:</p>
+                    <p className="text-amber-400 text-xs font-medium mb-1">Tips Mengatasi:</p>
                     <ul className="text-gray-400 text-xs list-disc list-inside space-y-1">
-                        <li>Check your internet connection</li>
-                        <li>Camera may be offline</li>
-                        <li>Try refreshing the page</li>
+                        <li>Periksa koneksi internet Anda</li>
+                        <li>Kamera mungkin sedang offline</li>
+                        <li>Coba muat ulang halaman</li>
                     </ul>
                 </div>
             )}

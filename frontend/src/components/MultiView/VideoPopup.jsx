@@ -131,14 +131,17 @@ function VideoPopup({
             }
         }
 
-        // Fallback: Copy to clipboard
+        // Fallback: copy to clipboard. Use the in-popup toast
+        // (snapshotNotification) instead of a blocking alert()/prompt() —
+        // native dialogs are jarring on mobile and interrupt the stream.
         try {
             await navigator.clipboard.writeText(url);
-            alert('Link kamera berhasil disalin!\n\n' + url);
+            setSnapshotNotification({ type: 'success', message: 'Link kamera disalin!' });
         } catch (err) {
             console.error('Failed to copy:', err);
-            prompt('Salin link ini:', url);
+            setSnapshotNotification({ type: 'error', message: 'Gagal menyalin link kamera' });
         }
+        setTimeout(() => setSnapshotNotification(null), 3000);
     }, [camera, searchParams]);
 
     // Check camera status first
@@ -1436,6 +1439,8 @@ function VideoPopup({
                         showTroubleshooting={showTroubleshooting}
                         consecutiveFailures={consecutiveFailures}
                         disableAnimations={disableAnimations}
+                        autoRetryCount={autoRetryCount}
+                        maxAutoRetries={3}
                     />
                 </div>
 
