@@ -38,6 +38,7 @@ import {
     getPublicPopupBodyStyle,
     getPublicPopupModalStyle,
     getVideoAspectRatio,
+    normalizePublicPopupAspectRatio,
 } from '../../utils/publicPopupLayout.js';
 import {
     getPublicPopupErrorType,
@@ -1054,24 +1055,22 @@ function VideoPopup({
         isPlaybackLocked,
         videoAspectRatio,
     });
-    // Modal width is computed from the video target height (a fraction
-    // of the viewport) × aspect ratio — see getPublicPopupModalStyle.
-    // headerHeight / footerHeight are no longer subtracted from the
-    // calculation; the popup is allowed to grow past the viewport and
-    // scroll, with the video kept at a comfortable size regardless of
-    // how tall the title bar, detail panel, ads, and related strip
-    // turn out to be.
+    // v7: the video is sized to fill the viewport height left over
+    // after the always-on-screen chrome — the sticky header + the slim
+    // controls bar (both measured live in layoutMetrics). The detail
+    // panel, related strip, and ad are intentionally NOT counted, so
+    // they sit below the video+controls and the backdrop scrolls down
+    // to them when an ad is present ("tetap fit, iklan scroll bawah").
+    // The SAME detected videoAspectRatio drives the width, so every
+    // ratio (16:9, 4:3, 1:1, 9:16, panoramic) auto-fits.
+    const chromeHeight = (layoutMetrics.headerHeight || 0) + (layoutMetrics.footerHeight || 0);
     const modalStyle = getPublicPopupModalStyle({
         isFullscreen,
         isPlaybackLocked,
         videoAspectRatio,
         viewportWidth: layoutMetrics.viewportWidth,
         viewportHeight: layoutMetrics.viewportHeight,
-        // 1280 lifts the prior 1024 cap so on FHD / WQHD monitors the
-        // modal scales up before plateau-ing. Anything wider tends to
-        // make the chrome feel out of proportion; users on 4K+ have
-        // the Fullscreen button for edge-to-edge.
-        maxDesktopWidth: 1280,
+        chromeHeight,
     });
 
     // Check if animations should be disabled on low-end devices - **Validates: Requirements 5.2**
@@ -1082,12 +1081,24 @@ function VideoPopup({
         if (typeof window === 'undefined') return undefined;
 
         const updateLayoutMetrics = () => {
-            setLayoutMetrics({
+            const next = {
                 viewportWidth: window.innerWidth,
                 viewportHeight: window.innerHeight,
                 headerHeight: headerRef.current?.offsetHeight || 0,
                 footerHeight: footerRef.current?.offsetHeight || 0,
-            });
+            };
+            // Only commit when something actually moved — the video
+            // width depends on the measured chrome height, and an
+            // unconditional setState here could thrash (and risk a
+            // measure→resize→measure loop) on every render.
+            setLayoutMetrics((prev) => (
+                prev.viewportWidth === next.viewportWidth
+                && prev.viewportHeight === next.viewportHeight
+                && prev.headerHeight === next.headerHeight
+                && prev.footerHeight === next.footerHeight
+                    ? prev
+                    : next
+            ));
         };
 
         updateLayoutMetrics();
@@ -1140,22 +1151,10 @@ function VideoPopup({
                 // is exactly where we want it to anchor (viewport
                 // top). `w-full` is the mobile fallback. Rounded
                 // corners + border give the centered-card affordance.
-                className={`relative bg-white dark:bg-gray-900 shadow-2xl flex flex-col ${isFullscreen ? 'w-full h-full overflow-hidden' : 'w-full rounded-2xl border border-gray-200 dark:border-gray-800'}`}
+                className={`relative bg-white dark:bg-gray-900 shadow-2xl flex flex-col ${isFullscreen ? 'w-full h-full overflow-hidden' : 'w-full rounded-2xl border border-gray-200 dark:border-gray-800 transition-[width] duration-200 ease-out motion-reduce:transition-none'}`}
                 style={modalStyle}
                 onClick={(e) => e.stopPropagation()}
             >
-
-                {showPopupTopBanner && (
-                    <InlineAdSlot
-                        slotKey="popup-top-banner"
-                        label="Sponsored"
-                        script={adsConfig.slots.popupTopBanner.script}
-                        variant="popup-inline"
-                        className="border-b border-gray-200 bg-white/90 px-3 py-3 dark:border-gray-800 dark:bg-gray-900/90"
-                        minHeightClassName="min-h-[96px]"
-                        maxHeight={popupMaxHeight}
-                    />
-                )}
 
                 {/* Header Info - di atas video (hide in fullscreen).
                     Sticky so the camera name + close button stay anchored
@@ -1190,6 +1189,18 @@ function VideoPopup({
                                     <span className={`w-1.5 h-1.5 rounded-full ${statusDisplay.dotColor} ${renderStatus === 'live' && !disableAnimations ? 'animate-pulse' : ''}`} />
                                     {statusDisplay.label}
                                 </span>
+                                {/* Persistent close in the sticky header — stays
+                                    reachable even when the user scrolls down to
+                                    the ad / related strip. aria-label (not title)
+                                    so the footer "Tutup" button stays the unique
+                                    title-matched control for tests + tooltips. */}
+                                <button
+                                    onClick={onClose}
+                                    aria-label="Tutup"
+                                    className="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg text-gray-500 dark:text-gray-400"
+                                >
+                                    <Icons.X />
+                                </button>
                             </div>
                         </div>
                         {/* Location + Area */}
@@ -1210,15 +1221,6 @@ function VideoPopup({
                         )}
                         <CameraViewerStatsBadges camera={camera} className="mt-2" />
                     </div>
-                )}
-
-                {!isFullscreen && (
-                    <CameraDetailPanel
-                        camera={camera}
-                        isFavorite={Boolean(isFavorite?.(camera.id))}
-                        onShare={handleShare}
-                        onToggleFavorite={onToggleFavorite}
-                    />
                 )}
 
                 {/* Video - expand to full screen in fullscreen mode */}
@@ -1276,9 +1278,19 @@ function VideoPopup({
                                 alt={camera.name}
                                 data-testid="external-mjpeg-body"
                                 className="w-full h-full object-contain bg-black pointer-events-none"
-                                onLoad={() => {
+                                onLoad={(event) => {
                                     setStatus('live');
                                     setLoadingStage(LoadingStage.PLAYING);
+                                    // MJPEG has no <video> metadata, but the <img>
+                                    // exposes its intrinsic size — use it so the
+                                    // popup fits the camera's real aspect instead
+                                    // of the 16:9 default.
+                                    const mjpegAspectRatio = normalizePublicPopupAspectRatio(
+                                        (event.currentTarget?.naturalWidth || 0) / (event.currentTarget?.naturalHeight || 0),
+                                    );
+                                    if (mjpegAspectRatio) {
+                                        setVideoAspectRatio(mjpegAspectRatio);
+                                    }
                                     reportRuntimeSuccess('external_mjpeg_open');
                                 }}
                                 onError={() => {
@@ -1427,13 +1439,11 @@ function VideoPopup({
                     />
                 </div>
 
-                {/* Controls Panel + Codec Description - hide in fullscreen */}
+                {/* Slim controls bar — kept inside the chrome budget so
+                    header + video + this bar = one screen. Related strip,
+                    metadata, codec note, and the ad all move BELOW it so
+                    they sit below the fold (the backdrop scrolls to them). */}
                 <div ref={footerRef} className={`shrink-0 border-t border-gray-200 dark:border-gray-800 ${isFullscreen ? 'hidden' : ''}`}>
-                    <RelatedCamerasStrip
-                        cameras={relatedCameras}
-                        onCameraClick={onRelatedCameraClick}
-                    />
-
                     {/* Controls */}
                     <div className="p-3 flex items-center justify-between">
                         {/* Camera Description - Kiri Bawah */}
@@ -1487,21 +1497,38 @@ function VideoPopup({
                             </button>
                         </div>
                     </div>
+                </div>
 
-                    {/* Codec Description - Simpel dan Jelas */}
-                    {camera.video_codec && camera.video_codec === 'h265' && (
-                        <div className="px-3 pb-3">
-                            <div className="flex items-start gap-2 px-3 py-2 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
-                                <svg className="w-4 h-4 text-yellow-400 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                                </svg>
-                                <div className="flex-1 text-xs text-yellow-400">
-                                    <strong>Codec H.265:</strong> Terbaik di Safari. Chrome/Edge tergantung hardware device.
+                {/* Below the fold: metadata, related cameras, codec note,
+                    and the sponsor ad — scrolled to via the backdrop so the
+                    video + controls own the first screen. */}
+                {!isFullscreen && (
+                    <>
+                        <CameraDetailPanel
+                            camera={camera}
+                            isFavorite={Boolean(isFavorite?.(camera.id))}
+                            onShare={handleShare}
+                            onToggleFavorite={onToggleFavorite}
+                        />
+                        <RelatedCamerasStrip
+                            cameras={relatedCameras}
+                            onCameraClick={onRelatedCameraClick}
+                        />
+                        {/* Codec Description - Simpel dan Jelas */}
+                        {camera.video_codec && camera.video_codec === 'h265' && (
+                            <div className="px-3 py-3 border-t border-gray-200 dark:border-gray-800">
+                                <div className="flex items-start gap-2 px-3 py-2 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+                                    <svg className="w-4 h-4 text-yellow-400 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                    </svg>
+                                    <div className="flex-1 text-xs text-yellow-400">
+                                        <strong>Codec H.265:</strong> Terbaik di Safari. Chrome/Edge tergantung hardware device.
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    )}
-                </div>
+                        )}
+                    </>
+                )}
 
                 {showPopupBottomNative && (
                     <InlineAdSlot
@@ -1513,6 +1540,17 @@ function VideoPopup({
                         minHeightClassName="min-h-[96px]"
                         maxHeight={popupMaxHeight}
                         suppressWhenOversize={false}
+                    />
+                )}
+                {showPopupTopBanner && (
+                    <InlineAdSlot
+                        slotKey="popup-top-banner"
+                        label="Sponsored"
+                        script={adsConfig.slots.popupTopBanner.script}
+                        variant="popup-inline"
+                        className="border-t border-gray-200 bg-white/90 px-3 py-3 dark:border-gray-800 dark:bg-gray-900/90"
+                        minHeightClassName="min-h-[96px]"
+                        maxHeight={popupMaxHeight}
                     />
                 )}
             </div>

@@ -255,3 +255,89 @@ describe('publicPopupLayout — desktop modal sizing (v6 aspect-fit + backdrop-s
         expect(style).toEqual({ width: '270px' });
     });
 });
+
+describe('publicPopupLayout — desktop modal sizing with chrome budget (v7)', () => {
+    it('reserves chrome height so header + video fit one screen (16:9)', () => {
+        // 1920×1080, 16:9, chrome=200 → budget = 880.
+        // heightBound = 880 * 16/9 = 1564.4 → 1564 (tighter than 1920).
+        // video height = 1564 / (16/9) ≈ 880 = budget, so header+video ≈ 1080.
+        const style = getPublicPopupModalStyle({
+            isFullscreen: false,
+            isPlaybackLocked: false,
+            videoAspectRatio: 16 / 9,
+            viewportWidth: 1920,
+            viewportHeight: 1080,
+            chromeHeight: 200,
+        });
+        expect(style).toEqual({ width: '1564px' });
+    });
+
+    it('auto-fits a non-16:9 camera (4:3) to the same chrome budget', () => {
+        // Same 1920×1080 + chrome=200 budget (880), but 4:3:
+        // heightBound = 880 * 4/3 = 1173.3 → 1173. The sides narrow to the
+        // camera's real ratio — "tidak semua 16:9, tetap menyesuaikan & fit".
+        const style = getPublicPopupModalStyle({
+            isFullscreen: false,
+            isPlaybackLocked: false,
+            videoAspectRatio: 4 / 3,
+            viewportWidth: 1920,
+            viewportHeight: 1080,
+            chromeHeight: 200,
+        });
+        expect(style).toEqual({ width: '1173px' });
+    });
+
+    it('shrinks the modal as the chrome grows so nothing overflows', () => {
+        const base = {
+            isFullscreen: false,
+            isPlaybackLocked: false,
+            videoAspectRatio: 16 / 9,
+            viewportWidth: 1920,
+            viewportHeight: 1080,
+        };
+        const shortChrome = getPublicPopupModalStyle({ ...base, chromeHeight: 200 });
+        const tallChrome = getPublicPopupModalStyle({ ...base, chromeHeight: 500 });
+        expect(shortChrome).toEqual({ width: '1564px' });
+        expect(tallChrome).toEqual({ width: '1031px' });
+    });
+
+    it('clamps to a minimum video height when chrome would eat the whole viewport', () => {
+        // 1366×400, chrome=350 → budget = max(240, 50) = 240 (floor wins).
+        // The video keeps a usable size and the backdrop scrolls instead.
+        const style = getPublicPopupModalStyle({
+            isFullscreen: false,
+            isPlaybackLocked: false,
+            videoAspectRatio: 16 / 9,
+            viewportWidth: 1366,
+            viewportHeight: 400,
+            chromeHeight: 350,
+        });
+        expect(style).toEqual({ width: '426px' });
+    });
+
+    it('treats chromeHeight 0 / omitted as the legacy full-viewport budget', () => {
+        const base = {
+            isFullscreen: false,
+            isPlaybackLocked: false,
+            videoAspectRatio: 16 / 9,
+            viewportWidth: 1366,
+            viewportHeight: 768,
+        };
+        const omitted = getPublicPopupModalStyle(base);
+        const zero = getPublicPopupModalStyle({ ...base, chromeHeight: 0 });
+        expect(omitted).toEqual({ width: '1365px' });
+        expect(zero).toEqual(omitted);
+    });
+
+    it('ignores chromeHeight on mobile — w-full owns sizing there', () => {
+        const style = getPublicPopupModalStyle({
+            isFullscreen: false,
+            isPlaybackLocked: false,
+            videoAspectRatio: 16 / 9,
+            viewportWidth: 390,
+            viewportHeight: 844,
+            chromeHeight: 200,
+        });
+        expect(style).toEqual({});
+    });
+});
