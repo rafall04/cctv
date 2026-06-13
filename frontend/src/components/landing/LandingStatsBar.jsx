@@ -6,8 +6,9 @@
  * SideEffects: Locks body scroll while stats modal is open and handles Escape to close it.
  */
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useCameras } from '../../contexts/CameraContext';
+import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { getCameraAvailabilityState } from '../../utils/cameraAvailability.js';
 import { Icons } from '../ui/Icons';
 import { shouldDisableAnimations } from '../../utils/animationControl';
@@ -50,6 +51,11 @@ function ListModal({ title, items, type, onClose, onCameraClick }) {
 
     const disableAnimations = shouldDisableAnimations();
 
+    const modalRef = useRef(null);
+    // Trap focus inside the dialog + restore it on close. ESC is already
+    // handled by the keydown effect below, so we don't pass onEscape.
+    useFocusTrap(modalRef);
+
     useEffect(() => {
         const originalOverflow = document.body.style.overflow;
         document.body.style.overflow = 'hidden';
@@ -71,8 +77,10 @@ function ListModal({ title, items, type, onClose, onCameraClick }) {
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 dark:bg-black/80" onClick={onClose}>
             <div
+                ref={modalRef}
                 role="dialog"
                 aria-modal="true"
+                aria-label={title}
                 className="max-h-[70vh] w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-gray-900"
                 onClick={e => e.stopPropagation()}
             >
