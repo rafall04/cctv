@@ -102,6 +102,17 @@ export const userService = {
             throw error;
         }
     },
+
+    // Password policy requirements (public endpoint — no auth)
+    async getPasswordRequirements() {
+        try {
+            const response = await apiClient.get('/api/users/password-requirements');
+            return response.data;
+        } catch (error) {
+            console.error('Get password requirements error:', error);
+            throw error;
+        }
+    },
 };
 
 export default userService;

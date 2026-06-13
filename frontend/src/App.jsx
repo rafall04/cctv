@@ -50,6 +50,7 @@ const CustomerLayout = lazyWithRetry(() => import('./layouts/CustomerLayout'), '
 const MyCameras = lazyWithRetry(() => import('./pages/customer/MyCameras'), 'my-cameras');
 const MyWallet = lazyWithRetry(() => import('./pages/customer/MyWallet'), 'my-wallet');
 const MyPlan = lazyWithRetry(() => import('./pages/customer/MyPlan'), 'my-plan');
+const MyAccount = lazyWithRetry(() => import('./pages/customer/MyAccount'), 'my-account');
 const RegisterPage = lazyWithRetry(() => import('./pages/RegisterPage'), 'register-page');
 
 function CustomerPageRoute({ children }) {
@@ -136,6 +137,14 @@ function App() {
                     element={
                         <CustomerPageRoute>
                             <MyWallet />
+                        </CustomerPageRoute>
+                    }
+                />
+                <Route
+                    path="/my/akun"
+                    element={
+                        <CustomerPageRoute>
+                            <MyAccount />
                         </CustomerPageRoute>
                     }
                 />
