@@ -224,7 +224,12 @@ function TopupPanel({ onCompleted, resumable = [] }) {
                     <div className="mt-3 flex flex-col items-center gap-2">
                         {pending.qris?.qr_string ? (
                             <>
-                                <div ref={qrBoxRef} className="rounded-lg bg-white p-3">
+                                {/* Hidden hi-res canvas (generous quiet zone) backs Simpan/Bagikan so
+                                    the SAVED PNG scans reliably from a gallery regardless of display size. */}
+                                <div ref={qrBoxRef} className="hidden" aria-hidden="true">
+                                    <QRCodeCanvas value={pending.qris.qr_string} size={640} level="M" marginSize={4} />
+                                </div>
+                                <div className="rounded-lg bg-white p-3">
                                     <QRCodeCanvas value={pending.qris.qr_string} size={232} level="M" marginSize={2} />
                                 </div>
                                 <div className="flex w-full flex-wrap items-center justify-center gap-2">
