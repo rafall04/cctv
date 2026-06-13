@@ -3,6 +3,7 @@ import { useRef } from 'react';
 export default function PlaybackTimeline({
     segments,
     selectedSegment,
+    currentTime = 0,
     onSegmentClick,
     onTimelineClick,
     formatTimestamp,
@@ -39,6 +40,19 @@ export default function PlaybackTimeline({
     };
 
     const timelineData = getTimelineData();
+
+    // Live playhead: map the video's in-segment currentTime to an absolute
+    // position across the whole-range timeline so the user sees where playback
+    // currently is (timeline was previously blind — click-and-hope).
+    let playheadOffset = null;
+    if (selectedSegment && currentTime > 0 && timelineData.start && timelineData.duration > 0) {
+        const segStartMs = new Date(selectedSegment.start_time).getTime();
+        const absoluteMs = segStartMs + currentTime * 1000;
+        const offset = ((absoluteMs - timelineData.start.getTime()) / 1000 / timelineData.duration) * 100;
+        if (offset >= 0 && offset <= 100) {
+            playheadOffset = offset;
+        }
+    }
 
     const handleTimelineClick = (e) => {
         if (!timelineRef.current || !timelineData.duration) return;
@@ -108,6 +122,14 @@ export default function PlaybackTimeline({
                             />
                         );
                     })}
+
+                    {playheadOffset !== null && (
+                        <div
+                            className="pointer-events-none absolute top-0 bottom-0 z-10 w-0.5 bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.45)]"
+                            style={{ left: `${playheadOffset}%` }}
+                            aria-hidden="true"
+                        />
+                    )}
                 </div>
                 
                 <div className="flex items-center gap-6 mt-3 text-xs text-gray-600 dark:text-gray-400">

@@ -1132,6 +1132,7 @@ function Playback({
                 <PlaybackTimeline
                     segments={segments}
                     selectedSegment={selectedSegment}
+                    currentTime={currentTime}
                     onSegmentClick={handleSegmentClick}
                     onTimelineClick={handleTimelineClick}
                     formatTimestamp={formatTimestamp}
