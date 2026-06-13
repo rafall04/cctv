@@ -366,7 +366,7 @@ export default function LoginPage() {
                     <form onSubmit={handleSubmit} className="space-y-6">
                         {/* Error Alert */}
                         {error && (
-                            <div className="flex items-center gap-3 p-4 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded-xl">
+                            <div role="alert" className="flex items-center gap-3 p-4 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded-xl">
                                 <div className="text-red-500 flex-shrink-0">
                                     {(isRateLimited || isLocked) ? <Icons.Clock /> : <Icons.Alert />}
                                 </div>
@@ -390,7 +390,7 @@ export default function LoginPage() {
 
                         {/* Warning Alert */}
                         {warning && (
-                            <div className="flex items-center gap-3 p-4 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-xl">
+                            <div role="status" className="flex items-center gap-3 p-4 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-xl">
                                 <div className="text-amber-500 flex-shrink-0"><Icons.Warning /></div>
                                 <div className="flex-1">
                                     <p className="text-amber-600 dark:text-amber-400 text-sm font-medium">{warning}</p>
@@ -434,7 +434,7 @@ export default function LoginPage() {
 
                         {/* Username Field */}
                         <div>
-                            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                            <label htmlFor="login-username" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                                 Username
                             </label>
                             <div className="relative">
@@ -442,6 +442,7 @@ export default function LoginPage() {
                                     <Icons.User />
                                 </div>
                                 <input
+                                    id="login-username"
                                     type="text"
                                     name="username"
                                     value={formData.username}
@@ -451,11 +452,13 @@ export default function LoginPage() {
                                     placeholder="Enter your username"
                                     disabled={isSubmitDisabled}
                                     autoComplete="username"
+                                    aria-invalid={Boolean(fieldErrors.username)}
+                                    aria-describedby={fieldErrors.username ? 'login-username-error' : undefined}
                                 />
                             </div>
                             {/* Field-level error (Requirements: 2.1, 2.9) */}
                             {fieldErrors.username && (
-                                <p className="mt-1.5 text-sm text-red-500 dark:text-red-400 flex items-center gap-1">
+                                <p id="login-username-error" role="alert" className="mt-1.5 text-sm text-red-500 dark:text-red-400 flex items-center gap-1">
                                     <Icons.Alert />
                                     {fieldErrors.username}
                                 </p>
@@ -464,7 +467,7 @@ export default function LoginPage() {
 
                         {/* Password Field */}
                         <div>
-                            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                            <label htmlFor="login-password" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                                 Password
                             </label>
                             <div className="relative">
@@ -472,6 +475,7 @@ export default function LoginPage() {
                                     <Icons.Key />
                                 </div>
                                 <input
+                                    id="login-password"
                                     type={showPassword ? 'text' : 'password'}
                                     name="password"
                                     value={formData.password}
@@ -481,6 +485,8 @@ export default function LoginPage() {
                                     placeholder="Enter your password"
                                     disabled={isSubmitDisabled}
                                     autoComplete="current-password"
+                                    aria-invalid={Boolean(fieldErrors.password)}
+                                    aria-describedby={fieldErrors.password ? 'login-password-error' : undefined}
                                 />
                                 <button
                                     type="button"
@@ -493,7 +499,7 @@ export default function LoginPage() {
                             </div>
                             {/* Field-level error (Requirements: 2.2, 2.9) */}
                             {fieldErrors.password && (
-                                <p className="mt-1.5 text-sm text-red-500 dark:text-red-400 flex items-center gap-1">
+                                <p id="login-password-error" role="alert" className="mt-1.5 text-sm text-red-500 dark:text-red-400 flex items-center gap-1">
                                     <Icons.Alert />
                                     {fieldErrors.password}
                                 </p>

@@ -174,7 +174,7 @@ export default function CameraFormModal({ camera = null, areas = [], onClose, on
                         </p>
                     </div>
 
-                    {error && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-300">{error}</p>}
+                    {error && <p role="alert" className="rounded-lg bg-red-50 p-2 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-300">{error}</p>}
 
                     <div className="flex gap-2 pt-1">
                         <button type="button" onClick={onClose} disabled={submitting} className="flex-1 rounded-xl border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800">

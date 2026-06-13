@@ -149,7 +149,7 @@ export default function RegisterPage() {
                                 </div>
 
                                 {error && (
-                                    <div className="rounded-xl bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-300">
+                                    <div role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-300">
                                         {error}
                                         {errorList.length > 0 && (
                                             <ul className="mt-1 list-inside list-disc text-xs">
