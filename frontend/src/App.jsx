@@ -11,6 +11,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { SecurityProvider } from './contexts/SecurityContext';
 import { NotificationProvider } from './contexts/NotificationContext';
+import { ConfirmProvider } from './contexts/ConfirmContext';
 import { BrandingProvider } from './contexts/BrandingContext';
 import { TimezoneProvider } from './contexts/TimezoneContext';
 import { ToastContainer } from './components/ui/ToastContainer';
@@ -110,6 +111,7 @@ function App() {
         <BrandingProvider>
         <SecurityProvider>
         <NotificationProvider>
+        <ConfirmProvider>
         <TimezoneProvider>
         <ApiClientInitializer>
         <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
@@ -334,6 +336,7 @@ function App() {
         </BrowserRouter>
         </ApiClientInitializer>
         </TimezoneProvider>
+        </ConfirmProvider>
         </NotificationProvider>
         </SecurityProvider>
         </BrandingProvider>
