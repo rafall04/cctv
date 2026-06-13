@@ -16,13 +16,19 @@ import { isCameraHardOffline, isCameraDegraded } from '../../utils/cameraAvailab
 import { getPublicCameraQuality } from '../../utils/landingCameraInsights';
 import { preloadPublicVideoPopup } from '../../utils/preloadPublicVideoPopup';
 
-const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMulti, isFavorite, onToggleFavorite, thumbnailPriority = false }) {
+const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMulti, isFavorite, onToggleFavorite, thumbnailPriority = false, disableHeavyEffects }) {
     const didPrewarmVideoPopupRef = useRef(false);
     const isMaintenance = camera.status === 'maintenance';
     const isOffline = isCameraHardOffline(camera);
     const isDegraded = isCameraDegraded(camera);
     const isTunnel = camera.is_tunnel === 1;
-    const disableAnimations = shouldDisableAnimations();
+    // Lite experience (mobile / save-data / low-end / user opt-in) drops expensive paint. Motion is a
+    // superset: also off for reduced-motion / low tier via shouldDisableAnimations(). When the prop is
+    // omitted (other callers) behaviour is unchanged.
+    const liteEffects = disableHeavyEffects === true;
+    const disableAnimations = liteEffects || shouldDisableAnimations();
+    // shadow-lg over a grid of cards is a real paint cost on weak GPUs; shadow-sm keeps depth far cheaper.
+    const shadowClass = liteEffects ? 'shadow-sm' : 'shadow-lg';
     const isFav = isFavorite?.(camera.id);
     const quality = getPublicCameraQuality(camera);
 
@@ -55,7 +61,7 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
 
     return (
         <div
-            className={`relative rounded-2xl overflow-hidden bg-white dark:bg-gray-900 shadow-lg ring-1 ${transitionClass} ${hoverTransform} group/card ${cardStyle}`}
+            className={`relative rounded-2xl overflow-hidden bg-white dark:bg-gray-900 ${shadowClass} ring-1 ${transitionClass} ${hoverTransform} group/card ${cardStyle}`}
             onPointerEnter={prewarmVideoPopup}
             onFocus={prewarmVideoPopup}
         >

@@ -20,6 +20,7 @@ const LandingGridCameraCard = memo(function LandingGridCameraCard({
     isFavorite,
     onToggleFavorite,
     thumbnailPriority,
+    disableHeavyEffects,
 }) {
     const handleCameraClick = useCallback(() => {
         onCameraClick(camera);
@@ -38,6 +39,7 @@ const LandingGridCameraCard = memo(function LandingGridCameraCard({
             isFavorite={isFavorite}
             onToggleFavorite={onToggleFavorite}
             thumbnailPriority={thumbnailPriority}
+            disableHeavyEffects={disableHeavyEffects}
         />
     );
 });
@@ -52,6 +54,7 @@ export default function LandingResultsGrid({
     initialVisibleCount,
     loadMoreCount,
     priorityThumbnailCount,
+    disableHeavyEffects = false,
 }) {
     const adaptiveGridWindow = useMemo(() => getAdaptiveGridWindow(), []);
     const resolvedInitialVisibleCount = initialVisibleCount ?? adaptiveGridWindow.initialVisibleCount;
@@ -63,9 +66,19 @@ export default function LandingResultsGrid({
     const hiddenCount = Math.max(cameras.length - visibleCameras.length, 0);
     const nextLoadCount = Math.min(resolvedLoadMoreCount, hiddenCount);
 
+    // Order-independent identity of the camera SET. A background refresh hands us a new array with the
+    // same cameras (and may reorder them, e.g. by live viewers), which previously reset the window and
+    // collapsed an expanded grid. Keying the reset on the id-set means we only reset when the user
+    // actually changes the filter/tab/search (the set changes) — not on refresh or reorder.
+    const cameraSignature = useMemo(() => {
+        const ids = cameras.map((camera) => camera.id ?? '');
+        ids.sort();
+        return ids.join('|');
+    }, [cameras]);
+
     useEffect(() => {
         setVisibleCount(resolvedInitialVisibleCount);
-    }, [cameras, resolvedInitialVisibleCount]);
+    }, [cameraSignature, resolvedInitialVisibleCount]);
 
     return (
         <>
@@ -80,6 +93,7 @@ export default function LandingResultsGrid({
                         isFavorite={isFavorite}
                         onToggleFavorite={onToggleFavorite}
                         thumbnailPriority={index < resolvedPriorityThumbnailCount}
+                        disableHeavyEffects={disableHeavyEffects}
                     />
                 ))}
             </div>

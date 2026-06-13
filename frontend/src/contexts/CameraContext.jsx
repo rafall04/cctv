@@ -11,6 +11,8 @@ import { cameraService } from '../services/cameraService';
 import { areaService } from '../services/areaService';
 import { REQUEST_POLICY } from '../services/requestPolicy';
 import { detectDeviceTier } from '../utils/deviceDetector';
+import { reconcileById } from '../utils/reconcileById';
+import { shouldUseLiteExperience } from '../utils/publicExperienceMode';
 
 const CameraContext = createContext(null);
 const RESUME_RETRY_DELAYS = [500, 1500];
@@ -24,6 +26,9 @@ export function CameraProvider({ children, autoRefresh = true }) {
     const [initialLoadError, setInitialLoadError] = useState(null);
     const [backgroundRefreshError, setBackgroundRefreshError] = useState(null);
     const [deviceTier] = useState(() => detectDeviceTier());
+    // Sampled once: the lite experience (mobile / save-data / slow net / low tier / user opt-in) gets a
+    // slower background refresh cadence to cut network + re-render churn on constrained devices.
+    const [lite] = useState(() => shouldUseLiteExperience());
     const camerasRef = useRef([]);
     const areasRef = useRef([]);
     const requestIdRef = useRef(0);
@@ -68,20 +73,24 @@ export function CameraProvider({ children, autoRefresh = true }) {
             latestAppliedRequestRef.current = requestId;
 
             if (Array.isArray(camsRes?.data)) {
-                setCameras(camsRes.data);
-                camerasRef.current = camsRes.data;
+                // Reconcile so a no-op refresh keeps the same array reference (setState bails out → no
+                // re-render) and a partial refresh only re-creates the cameras that actually changed.
+                const reconciledCameras = reconcileById(camerasRef.current, camsRes.data);
+                setCameras(reconciledCameras);
+                camerasRef.current = reconciledCameras;
             }
             if (Array.isArray(areasRes?.data)) {
-                setAreas(areasRes.data);
-                areasRef.current = areasRes.data;
+                const reconciledAreas = reconcileById(areasRef.current, areasRes.data);
+                setAreas(reconciledAreas);
+                areasRef.current = reconciledAreas;
             }
 
             setBackgroundRefreshError(null);
             setInitialLoadError(null);
 
             return {
-                cameras: camsRes.data || [],
-                areas: areasRes.data || [],
+                cameras: camerasRef.current,
+                areas: areasRef.current,
             };
         } catch (err) {
             if (!mountedRef.current || requestId < latestAppliedRequestRef.current) {
@@ -152,7 +161,7 @@ export function CameraProvider({ children, autoRefresh = true }) {
     useEffect(() => {
         if (!autoRefresh) return;
 
-        const refreshMs = deviceTier === 'low' ? 120000 : deviceTier === 'high' ? 30000 : 60000;
+        const refreshMs = (lite || deviceTier === 'low') ? 120000 : deviceTier === 'high' ? 30000 : 60000;
         const refreshInterval = setInterval(async () => {
             if (document.visibilityState === 'hidden') {
                 return;
@@ -166,7 +175,7 @@ export function CameraProvider({ children, autoRefresh = true }) {
         }, refreshMs);
 
         return () => clearInterval(refreshInterval);
-    }, [deviceTier, autoRefresh, refreshData]);
+    }, [deviceTier, lite, autoRefresh, refreshData]);
 
     useEffect(() => {
         if (!autoRefresh) return;

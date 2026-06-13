@@ -34,6 +34,8 @@ vi.mock('../services/areaService', () => ({
 
 vi.mock('../utils/deviceDetector', () => ({
     detectDeviceTier: () => 'medium',
+    isMobileDevice: () => false,
+    getConnectionType: () => 'unknown',
 }));
 
 function CameraConsumer() {

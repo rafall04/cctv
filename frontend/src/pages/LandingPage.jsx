@@ -17,6 +17,7 @@ import { useLandingModeState } from '../hooks/public/useLandingModeState';
 import { useLandingPublicConfig } from '../hooks/public/useLandingPublicConfig';
 import { useLandingPageController } from '../hooks/public/useLandingPageController';
 import { useDeferredPublicFloatingWidgets } from '../hooks/public/useDeferredPublicFloatingWidgets';
+import { useLitePublicExperience } from '../hooks/public/useLitePublicExperience';
 import LandingNavbar from '../components/landing/LandingNavbar';
 import LandingHero from '../components/landing/LandingHero';
 import LandingFooter from '../components/landing/LandingFooter';
@@ -105,7 +106,12 @@ function LandingPageContent({ onRefreshPauseChange }) {
 
     useCameraStatusTracker(cameras, addToast);
 
-    const disableHeavyEffects = deviceTier === 'low';
+    // Single, reliable "lite" gate. deviceTier alone almost never reports 'low' on real low-end phones
+    // (deviceMemory is absent on iOS/Firefox and quantized on Android), so we also treat mobile,
+    // Save-Data, and slow networks as constrained — with an explicit user opt-out. Drives heavy-effect
+    // gating, floating-widget deferral, and (via CameraContext) the background refresh cadence.
+    const lite = useLitePublicExperience({ deviceTier });
+    const disableHeavyEffects = lite;
     const isMobileAdsViewport = isAdsMobileViewport();
     const isPublicModalActive = Boolean(popup);
     const shouldHideFixedUiForPopup = isPublicModalActive && adsConfig?.popup?.hideFloatingWidgetsOnPopup !== false;
@@ -113,6 +119,7 @@ function LandingPageContent({ onRefreshPauseChange }) {
     const shouldRenderFloatingWidgets = useDeferredPublicFloatingWidgets({
         enabled: !shouldHideFloatingWidgets,
         deviceTier,
+        lite,
     });
     const shouldSuspendSocialBar = isPublicModalActive && adsConfig?.popup?.hideSocialBarOnPopup !== false;
     const showSocialBar = !shouldSuspendSocialBar && shouldRenderAdSlot(adsConfig, 'socialBar', isMobileAdsViewport);
@@ -181,6 +188,7 @@ function LandingPageContent({ onRefreshPauseChange }) {
                         onMapCameraOpen={handleMapPopupOpen}
                         hideFloatingWidgets={!shouldRenderFloatingWidgets}
                         deviceTier={deviceTier}
+                        disableHeavyEffects={disableHeavyEffects}
                         announcement={landingSettings.announcement}
                         eventBanner={landingSettings.eventBanner}
                         publicConfigLoading={publicConfigReady}
@@ -290,6 +298,7 @@ function LandingPageContent({ onRefreshPauseChange }) {
                     favorites={favorites}
                     onToggleFavorite={toggleFavorite}
                     isFavorite={isFavorite}
+                    disableHeavyEffects={disableHeavyEffects}
                 />
 
                 {showAfterCamerasNative && (

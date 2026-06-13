@@ -140,6 +140,7 @@ export default function CamerasSection({
     favorites = [],
     onToggleFavorite,
     isFavorite,
+    disableHeavyEffects = false,
 }) {
     const { cameras, areas, loading } = useCameras();
     const filters = useLandingCameraFilters(cameras, areas, favorites, viewMode, onCameraClick);
@@ -278,6 +279,7 @@ export default function CamerasSection({
                         multiCameras={multiCameras}
                         isFavorite={isFavorite}
                         onToggleFavorite={onToggleFavorite}
+                        disableHeavyEffects={disableHeavyEffects}
                     />
                 )}
             </div>

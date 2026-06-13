@@ -11,9 +11,12 @@ import { useEffect, useState } from 'react';
 export function useDeferredPublicFloatingWidgets({
     enabled = true,
     deviceTier = 'medium',
+    lite = false,
     delayMs = 1200,
 } = {}) {
-    const [shouldRender, setShouldRender] = useState(() => enabled && deviceTier !== 'low');
+    // Constrained = low tier OR the broader lite experience (mobile / save-data / slow net / opt-in).
+    const constrained = lite === true || deviceTier === 'low';
+    const [shouldRender, setShouldRender] = useState(() => enabled && !constrained);
 
     useEffect(() => {
         if (!enabled) {
@@ -21,7 +24,7 @@ export function useDeferredPublicFloatingWidgets({
             return undefined;
         }
 
-        if (deviceTier !== 'low') {
+        if (!constrained) {
             setShouldRender(true);
             return undefined;
         }
@@ -45,7 +48,7 @@ export function useDeferredPublicFloatingWidgets({
         return () => {
             window.clearTimeout(timeoutId);
         };
-    }, [delayMs, deviceTier, enabled]);
+    }, [delayMs, constrained, enabled]);
 
     return shouldRender;
 }

@@ -44,10 +44,15 @@ const SmartFeedCameraButton = memo(function SmartFeedCameraButton({ camera, onCa
 export default function LandingSmartFeed({
     cameras = [],
     onCameraClick,
-    now = new Date(),
+    now: nowProp,
     variant = 'default',
 }) {
     const isSimple = variant === 'simple';
+    // Sample "now" once per mount when the caller does not pass it. A default param of `new Date()`
+    // created a fresh object every render, busting this memo (re-sorting/filtering all cameras each
+    // render) and the memoized camera buttons below. Day-granularity drift over a session is harmless.
+    const fallbackNow = useMemo(() => new Date(), []);
+    const now = nowProp ?? fallbackNow;
     const sections = useMemo(() => {
         const baseSections = buildPublicSmartFeedSections(cameras, now, isSimple ? 3 : 6);
 

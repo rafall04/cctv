@@ -47,4 +47,18 @@ describe('useDeferredPublicFloatingWidgets', () => {
 
         expect(screen.getByText('deferred')).toBeTruthy();
     });
+
+    it('defers on the lite experience even when the tier is not low', () => {
+        vi.useFakeTimers();
+
+        render(createElement(Probe, { deviceTier: 'medium', lite: true, delayMs: 1000 }));
+
+        expect(screen.getByText('deferred')).toBeTruthy();
+
+        act(() => {
+            vi.advanceTimersByTime(1000);
+        });
+
+        expect(screen.getByText('ready')).toBeTruthy();
+    });
 });

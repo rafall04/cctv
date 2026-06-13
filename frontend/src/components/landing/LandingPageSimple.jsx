@@ -5,7 +5,7 @@
  * MainFuncs: LandingPageSimple, SimpleHeader, SimpleStatusOverview, SimpleFooter.
  * SideEffects: Lazy-loads optional floating widgets and ad slots.
  */
-import { Suspense } from 'react';
+import { Suspense, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useBranding } from '../../contexts/BrandingContext';
@@ -13,12 +13,14 @@ import { useCameras } from '../../contexts/CameraContext';
 import InlineAdSlot from '../ads/InlineAdSlot';
 import { isAdsMobileViewport, shouldRenderAdSlot } from '../ads/adsConfig';
 import { shouldDisableAnimations } from '../../utils/animationControl';
+import { setLitePreference } from '../../utils/publicExperienceMode';
 import lazyWithRetry from '../../utils/lazyWithRetry';
 import LayoutModeToggle from './LayoutModeToggle';
 import LandingPublicTopStack from './LandingPublicTopStack';
 import LandingDiscoveryStrip from './LandingDiscoveryStrip';
 import LandingQuickAccessStrip from './LandingQuickAccessStrip';
 import LandingSmartFeed from './LandingSmartFeed';
+import DeferUntilVisible from './DeferUntilVisible';
 
 const FeedbackWidget = lazyWithRetry(() => import('../FeedbackWidget'), 'feedback-widget-inline');
 const SaweriaSupport = lazyWithRetry(() => import('../SaweriaSupport'), 'saweria-support-inline');
@@ -26,11 +28,14 @@ const SaweriaSupport = lazyWithRetry(() => import('../SaweriaSupport'), 'saweria
 const Icons = {
     Sun: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="4" /><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" /></svg>,
     Moon: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" /></svg>,
+    Bolt: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>,
 };
 
-function SimpleHeader({ branding, layoutMode, onLayoutToggle }) {
+function SimpleHeader({ branding, layoutMode, onLayoutToggle, disableHeavyEffects = false }) {
     const { isDark, toggleTheme } = useTheme();
-    const disableAnimations = shouldDisableAnimations();
+    // backdrop-blur on a sticky header re-composites the scrolling content behind it on every frame —
+    // the worst scroll-jank offender on weak GPUs. Drop it under the lite experience (or low/reduced-motion).
+    const disableAnimations = disableHeavyEffects || shouldDisableAnimations();
     const handleLayoutChange = (nextMode) => {
         if (nextMode !== layoutMode) {
             onLayoutToggle();
@@ -53,6 +58,23 @@ function SimpleHeader({ branding, layoutMode, onLayoutToggle }) {
                             onChange={handleLayoutChange}
                             compact
                         />
+                        <button
+                            type="button"
+                            onClick={() => setLitePreference(!disableHeavyEffects)}
+                            aria-pressed={disableHeavyEffects}
+                            aria-label="Mode Hemat"
+                            className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold transition-colors ${
+                                disableHeavyEffects
+                                    ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-300'
+                                    : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                            }`}
+                            title={disableHeavyEffects
+                                ? 'Mode Hemat aktif — ketuk untuk efek penuh'
+                                : 'Aktifkan Mode Hemat (ringan untuk perangkat lemah)'}
+                        >
+                            <Icons.Bolt />
+                            <span className="hidden sm:inline">Hemat</span>
+                        </button>
                         <button
                             onClick={toggleTheme}
                             className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
@@ -110,17 +132,12 @@ function SimpleFooter({ branding, saweriaEnabled, saweriaLink }) {
     );
 }
 
-function SimpleStatusOverview() {
+function SimpleStatusOverview({ disableHeavyEffects = false }) {
     const { cameras, loading } = useCameras();
 
-    const statusCounts = cameras.reduce((counts, camera) => {
-        if (camera?.is_online === 1 || camera?.is_online === true) {
-            counts.online += 1;
-        }
-
-        return counts;
-    }, { online: 0 });
-    const onlineCount = statusCounts.online;
+    const onlineCount = useMemo(() => cameras.reduce((total, camera) => (
+        (camera?.is_online === 1 || camera?.is_online === true) ? total + 1 : total
+    ), 0), [cameras]);
     const offlineCount = Math.max(cameras.length - onlineCount, 0);
     const cards = [
         {
@@ -145,7 +162,7 @@ function SimpleStatusOverview() {
 
     return (
         <div className="mx-auto max-w-7xl px-4 pt-3 sm:px-6 lg:px-8">
-            <div className="overflow-hidden rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.16),_transparent_35%),linear-gradient(135deg,rgba(15,23,42,0.96),rgba(2,6,23,0.98))] shadow-[0_18px_60px_rgba(2,6,23,0.28)]">
+            <div className={`overflow-hidden rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.16),_transparent_35%),linear-gradient(135deg,rgba(15,23,42,0.96),rgba(2,6,23,0.98))] ${disableHeavyEffects ? 'shadow-md' : 'shadow-[0_18px_60px_rgba(2,6,23,0.28)]'}`}>
                 <div className="flex flex-col gap-5 px-5 py-5 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
                     <div className="max-w-2xl">
                         <div className="inline-flex items-center gap-2 rounded-full border border-sky-400/20 bg-sky-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-200">
@@ -201,10 +218,29 @@ export default function LandingPageSimple({
     favoriteCameras = [],
     onQuickCameraOpen,
     smartFeedCameras = [],
+    disableHeavyEffects = false,
 }) {
     const { branding } = useBranding();
     const showFooterBanner = shouldRenderAdSlot(adsConfig, 'footerBanner', isAdsMobileViewport());
     const shouldRenderFloatingWidgets = !hideFloatingWidgets;
+
+    // Secondary discovery strips below the fold. Under the lite experience they are mounted only when
+    // scrolled near the viewport, trimming initial mount/paint work on constrained devices.
+    const smartFeedSection = (
+        <LandingSmartFeed
+            cameras={smartFeedCameras}
+            onCameraClick={onQuickCameraOpen || onCameraClick}
+            variant="simple"
+        />
+    );
+    const quickAccessSection = (
+        <LandingQuickAccessStrip
+            recentCameras={recentCameras}
+            favoriteCameras={favoriteCameras}
+            onCameraClick={onQuickCameraOpen || onCameraClick}
+            forceVisible
+        />
+    );
 
     return (
         <div className="min-h-screen bg-gray-50 pb-24 dark:bg-gray-950 flex flex-col sm:pb-0">
@@ -212,6 +248,7 @@ export default function LandingPageSimple({
                 branding={branding}
                 layoutMode={layoutMode}
                 onLayoutToggle={onLayoutToggle}
+                disableHeavyEffects={disableHeavyEffects}
             />
 
             <LandingPublicTopStack
@@ -221,7 +258,7 @@ export default function LandingPageSimple({
                 announcement={announcement}
             />
 
-            <SimpleStatusOverview />
+            <SimpleStatusOverview disableHeavyEffects={disableHeavyEffects} />
 
             <LandingDiscoveryStrip
                 discovery={publicDiscovery}
@@ -230,18 +267,13 @@ export default function LandingPageSimple({
                 className="pt-2"
             />
 
-            <LandingSmartFeed
-                cameras={smartFeedCameras}
-                onCameraClick={onQuickCameraOpen || onCameraClick}
-                variant="simple"
-            />
+            {disableHeavyEffects
+                ? <DeferUntilVisible minHeight={96}>{smartFeedSection}</DeferUntilVisible>
+                : smartFeedSection}
 
-            <LandingQuickAccessStrip
-                recentCameras={recentCameras}
-                favoriteCameras={favoriteCameras}
-                onCameraClick={onQuickCameraOpen || onCameraClick}
-                forceVisible
-            />
+            {disableHeavyEffects
+                ? <DeferUntilVisible minHeight={120}>{quickAccessSection}</DeferUntilVisible>
+                : quickAccessSection}
 
             <main className="flex-1 min-h-0 pb-4 sm:pb-6">
                 {CamerasSection && (
@@ -249,14 +281,15 @@ export default function LandingPageSimple({
                         onCameraClick={onCameraClick}
                         onAddMulti={onAddMulti}
                         multiCameras={multiCameras}
-                    viewMode={viewMode}
-                    setViewMode={setViewMode}
-                    adsConfig={adsConfig}
-                    onMapCameraOpen={onMapCameraOpen}
-                    favorites={favorites}
-                    onToggleFavorite={onToggleFavorite}
-                    isFavorite={isFavorite}
-                />
+                        viewMode={viewMode}
+                        setViewMode={setViewMode}
+                        adsConfig={adsConfig}
+                        onMapCameraOpen={onMapCameraOpen}
+                        favorites={favorites}
+                        onToggleFavorite={onToggleFavorite}
+                        isFavorite={isFavorite}
+                        disableHeavyEffects={disableHeavyEffects}
+                    />
                 )}
             </main>
 

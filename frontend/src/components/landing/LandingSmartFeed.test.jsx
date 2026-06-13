@@ -98,4 +98,23 @@ describe('LandingSmartFeed', () => {
 
         expect(buildPublicSmartFeedSections).toHaveBeenCalledTimes(1);
     });
+
+    it('does not recompute across rerenders when no now prop is provided (stable mount-time now)', () => {
+        buildPublicSmartFeedSections.mockClear();
+        const cameras = [
+            { id: 1, name: 'Stable 1', area_name: 'A', is_online: 1, live_viewers: 3, total_views: 30 },
+            { id: 2, name: 'Stable 2', area_name: 'B', is_online: 1, live_viewers: 0, total_views: 20 },
+        ];
+        const { rerender } = render(
+            <LandingSmartFeed cameras={cameras} onCameraClick={vi.fn()} />
+        );
+
+        expect(buildPublicSmartFeedSections).toHaveBeenCalledTimes(1);
+
+        // A bare parent rerender must not bust the memo. Before the fix, the `now = new Date()` default
+        // param produced a fresh object every render and re-sorted/filtered all cameras each time.
+        rerender(<LandingSmartFeed cameras={cameras} onCameraClick={vi.fn()} />);
+
+        expect(buildPublicSmartFeedSections).toHaveBeenCalledTimes(1);
+    });
 });

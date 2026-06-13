@@ -122,4 +122,74 @@ describe('LandingResultsGrid optimization', () => {
 
         expect(cameraCardRenderSpy).toHaveBeenCalledTimes(2);
     });
+
+    it('keeps the expanded window when refreshed with a new array of the same camera set', () => {
+        const cameras = makeCameras(30);
+        const { rerender } = render(
+            <LandingResultsGrid
+                cameras={cameras}
+                initialVisibleCount={12}
+                loadMoreCount={8}
+                onCameraClick={vi.fn()}
+                onAddMulti={vi.fn()}
+                multiCameras={[]}
+            />
+        );
+
+        expect(screen.getAllByTestId('camera-card')).toHaveLength(12);
+
+        fireEvent.click(screen.getByRole('button', { name: /Tampilkan 8 kamera lagi/i }));
+        expect(screen.getAllByTestId('camera-card')).toHaveLength(20);
+
+        // Simulate a background refresh: brand-new array instances, same camera ids, reordered.
+        const refreshed = cameras.map((camera) => ({ ...camera })).reverse();
+        rerender(
+            <LandingResultsGrid
+                cameras={refreshed}
+                initialVisibleCount={12}
+                loadMoreCount={8}
+                onCameraClick={vi.fn()}
+                onAddMulti={vi.fn()}
+                multiCameras={[]}
+            />
+        );
+
+        // The window must NOT collapse back to 12 just because the array reference changed.
+        expect(screen.getAllByTestId('camera-card')).toHaveLength(20);
+    });
+
+    it('resets the window when the camera set actually changes', () => {
+        const cameras = makeCameras(30);
+        const { rerender } = render(
+            <LandingResultsGrid
+                cameras={cameras}
+                initialVisibleCount={12}
+                loadMoreCount={8}
+                onCameraClick={vi.fn()}
+                onAddMulti={vi.fn()}
+                multiCameras={[]}
+            />
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: /Tampilkan 8 kamera lagi/i }));
+        expect(screen.getAllByTestId('camera-card')).toHaveLength(20);
+
+        // A different set (e.g. filter/tab change) — distinct ids — should reset to the initial window.
+        const otherSet = Array.from({ length: 30 }, (_, index) => ({
+            id: index + 101,
+            name: `Other ${index + 1}`,
+        }));
+        rerender(
+            <LandingResultsGrid
+                cameras={otherSet}
+                initialVisibleCount={12}
+                loadMoreCount={8}
+                onCameraClick={vi.fn()}
+                onAddMulti={vi.fn()}
+                multiCameras={[]}
+            />
+        );
+
+        expect(screen.getAllByTestId('camera-card')).toHaveLength(12);
+    });
 });
