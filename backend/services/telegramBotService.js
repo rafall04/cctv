@@ -212,7 +212,13 @@ class TelegramBotService {
         if (reply_markup) {
             payload.reply_markup = reply_markup;
         }
-        return callTelegramApi('sendMessage', payload);
+        const data = await callTelegramApi('sendMessage', payload);
+        // Surface a Telegram rejection (e.g. HTML parse error, bot blocked) instead of
+        // swallowing it — a silently-dropped 400 is how the /stats "<3" bug hid.
+        if (data && !data.ok) {
+            console.error(`[TelegramBot] sendMessage to ${chatId} rejected: ${data.description}`);
+        }
+        return data;
     }
 
     async editMessage(chatId, messageId, { text, reply_markup } = {}) {

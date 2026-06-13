@@ -156,6 +156,42 @@ describe('buildCustomersPage', () => {
     });
 });
 
+describe('Telegram HTML safety (no stray < / > that break parse_mode=HTML)', () => {
+    // Strip the tags we actually use + escaped entities; anything left with < or >
+    // is an unescaped angle bracket Telegram would reject with HTTP 400.
+    const ALLOWED_TAGS = /<\/?(?:b|i|u|s|code|pre|a)(?:\s[^>]*)?>/g;
+    const strayAngles = (text) => text.replace(ALLOWED_TAGS, '').replace(/&lt;|&gt;|&amp;/g, '');
+
+    it('stats message has no stray "<" (regression: the "<3 hari" bug)', () => {
+        const msg = presenter.buildStatsMessage({
+            customersTotal: 5, pending: 1, approved: 3, rejected: 1, subsActive: 2,
+            subsSuspended: 1, customersWithSuspended: 1, walletTotal: 1000, lowBalanceCount: 2,
+            generatedAt: '2026-06-13 10:00',
+        });
+        expect(msg.text).toContain('&lt;3 hari');
+        expect(strayAngles(msg.text)).not.toMatch(/[<>]/);
+    });
+
+    it('escapes angle brackets coming from customer-supplied fields', () => {
+        const reg = presenter.buildRegistrationAlert({ id: 1, username: '<a>&b', phone: '<x>', email: '<e>', plan: { name: '<p>', is_trial: false } });
+        expect(strayAngles(reg.text)).not.toMatch(/[<>]/);
+
+        const detail = presenter.buildCustomerDetail({
+            id: 1, username: '<u>', phone: '<p>', email: null, account_status: 'approved',
+            plan: { name: '<plan>', is_trial: false }, balance: 0, daily_cost: 0,
+            estimated_days_left: 3, low_balance: true,
+            subscriptions: [{ camera_name: '<cam>', status: 'active', monthly_price: 1000 }],
+        });
+        expect(strayAngles(detail.text)).not.toMatch(/[<>]/);
+
+        const page = presenter.buildCustomersPage({
+            customers: [{ id: 1, username: '<x>', account_status: 'approved', balance: 0, camera_count: 0, suspended_subscriptions: 0 }],
+            page: 0, pageCount: 1, total: 1, query: '<q>',
+        });
+        expect(strayAngles(page.text)).not.toMatch(/[<>]/);
+    });
+});
+
 describe('buildTopupConfirm / buildStatsMessage', () => {
     it('encodes the exact amount into the confirm button', () => {
         const msg = presenter.buildTopupConfirm({ customer: { id: 9, username: 'budi', balance: 10000 }, amount: 50000 });

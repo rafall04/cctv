@@ -333,7 +333,7 @@ export function buildStatsMessage(stats) {
             '',
             '<b>Saldo</b>',
             `• Total saldo pelanggan: ${formatRupiah(stats.walletTotal)}`,
-            `• Saldo menipis (<3 hari): ${stats.lowBalanceCount}`,
+            `• Saldo menipis (&lt;3 hari): ${stats.lowBalanceCount}`,
             '━━━━━━━━━━━━━━━━━━━━',
             `<i>${escapeHtml(stats.generatedAt)}</i>`,
         ].join('\n'),
