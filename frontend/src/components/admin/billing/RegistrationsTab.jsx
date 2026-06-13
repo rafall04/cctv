@@ -7,6 +7,7 @@
 
 import billingAdminService from '../../../services/billingAdminService';
 import { DesktopTable, formatDateTime } from './billingFormat';
+import { useConfirm } from '../../../contexts/ConfirmContext';
 
 function PlanTag({ reg }) {
     if (!reg.plan_name) return <span className="text-gray-400">—</span>;
@@ -21,9 +22,10 @@ function PlanTag({ reg }) {
 }
 
 export default function RegistrationsTab({ registrations, run, busy }) {
+    const confirm = useConfirm();
     const approve = (reg) => run(() => billingAdminService.approveRegistration(reg.id), 'Pendaftaran disetujui');
-    const reject = (reg) => {
-        if (window.confirm(`Tolak pendaftaran ${reg.username}? Akun tidak akan bisa login.`)) {
+    const reject = async (reg) => {
+        if (await confirm({ title: `Tolak pendaftaran ${reg.username}?`, message: 'Akun tidak akan bisa login.', confirmLabel: 'Tolak', tone: 'danger' })) {
             run(() => billingAdminService.rejectRegistration(reg.id), 'Pendaftaran ditolak');
         }
     };

@@ -8,9 +8,11 @@
 import { useMemo, useState } from 'react';
 import billingAdminService from '../../../services/billingAdminService';
 import { formatRupiah, StatusBadge, SUB_STATUS_BADGES, cardClass, inputClass, DesktopTable } from './billingFormat';
+import { useConfirm } from '../../../contexts/ConfirmContext';
 
 export default function SubscriptionsTab({ subscriptions, assignableCameras, customers, run, busy }) {
     const [assignForm, setAssignForm] = useState({ camera_id: '', user_id: '', monthly_price: 20000 });
+    const confirm = useConfirm();
 
     // Per-area monitoring: how many customer cameras live in each area + how many online/suspended.
     const areaSummary = useMemo(() => {
@@ -31,8 +33,8 @@ export default function SubscriptionsTab({ subscriptions, assignableCameras, cus
         () => billingAdminService.updateSubscription(sub.id, { status: sub.status === 'active' ? 'suspended' : 'active' }),
         sub.status === 'active' ? 'Langganan ditangguhkan' : 'Langganan diaktifkan'
     );
-    const cancelSub = (sub) => {
-        if (window.confirm(`Hentikan langganan ${sub.camera_name}? Stream akan diblokir.`)) {
+    const cancelSub = async (sub) => {
+        if (await confirm({ title: `Hentikan langganan ${sub.camera_name}?`, message: 'Stream akan diblokir.', confirmLabel: 'Hentikan', tone: 'danger' })) {
             run(() => billingAdminService.updateSubscription(sub.id, { status: 'cancelled' }), 'Langganan dihentikan');
         }
     };

@@ -9,6 +9,7 @@
 import { useState } from 'react';
 import billingAdminService from '../../../services/billingAdminService';
 import { formatRupiah, StatusBadge, SUB_STATUS_BADGES, cardClass, inputClass, DesktopTable } from './billingFormat';
+import { useConfirm } from '../../../contexts/ConfirmContext';
 
 function AccountTag({ status }) {
     if (status === 'pending') {
@@ -30,9 +31,10 @@ function StatusCell({ customer }) {
 export default function CustomersTab({ customers, plans, run, busy }) {
     const [topupForm, setTopupForm] = useState({ user_id: '', amount: 25000, note: '' });
     const [adjustForm, setAdjustForm] = useState({ user_id: '', direction: 'credit', amount: 10000, reason: '' });
+    const confirm = useConfirm();
 
-    const changePlan = (customer, planKey) => {
-        if (planKey && window.confirm(`Ubah paket ${customer.username} ke ${planKey}? Harga kamera menyesuaikan.`)) {
+    const changePlan = async (customer, planKey) => {
+        if (planKey && await confirm({ title: `Ubah paket ${customer.username} ke ${planKey}?`, message: 'Harga kamera menyesuaikan.', confirmLabel: 'Ubah Paket' })) {
             run(() => billingAdminService.changeCustomerPlan(customer.id, planKey), 'Paket pelanggan diubah');
         }
     };
@@ -56,7 +58,7 @@ export default function CustomersTab({ customers, plans, run, busy }) {
         if (!adjustForm.user_id || !Number.isInteger(magnitude) || magnitude <= 0) return;
         const signed = adjustForm.direction === 'debit' ? -magnitude : magnitude;
         const verb = adjustForm.direction === 'debit' ? 'Kurangi saldo (refund)' : 'Tambah saldo';
-        if (!window.confirm(`${verb} ${formatRupiah(magnitude)}? Alasan: ${adjustForm.reason || '(kosong)'}`)) return;
+        if (!(await confirm({ title: `${verb}?`, message: `${formatRupiah(magnitude)} — alasan: ${adjustForm.reason || '(kosong)'}`, confirmLabel: verb, tone: adjustForm.direction === 'debit' ? 'danger' : 'default' }))) return;
         const ok = await run(
             () => billingAdminService.adjustWallet({
                 user_id: parseInt(adjustForm.user_id, 10),

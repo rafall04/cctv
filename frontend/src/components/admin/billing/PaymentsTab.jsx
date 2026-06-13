@@ -10,6 +10,7 @@
 import { useMemo, useState } from 'react';
 import billingAdminService from '../../../services/billingAdminService';
 import { formatRupiah, formatDateTime, StatusBadge, PAY_STATUS_BADGES, DesktopTable } from './billingFormat';
+import { useConfirm } from '../../../contexts/ConfirmContext';
 
 const FILTERS = [
     { key: 'all', label: 'Semua' },
@@ -21,6 +22,7 @@ const FILTERS = [
 
 export default function PaymentsTab({ payments, run, busy }) {
     const [filter, setFilter] = useState('all');
+    const confirm = useConfirm();
 
     const counts = useMemo(() => {
         const c = {};
@@ -33,8 +35,8 @@ export default function PaymentsTab({ payments, run, busy }) {
         [payments, filter]
     );
 
-    const confirmPaid = (payment) => {
-        if (window.confirm(`Konfirmasi pembayaran ${formatRupiah(payment.amount)} dari ${payment.username}? Saldo akan dikreditkan.`)) {
+    const confirmPaid = async (payment) => {
+        if (await confirm({ title: 'Konfirmasi pembayaran?', message: `${formatRupiah(payment.amount)} dari ${payment.username} — saldo akan dikreditkan.`, confirmLabel: 'Konfirmasi' })) {
             run(() => billingAdminService.markPaymentPaid(payment.id), 'Pembayaran dikonfirmasi');
         }
     };
