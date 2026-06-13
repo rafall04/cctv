@@ -57,14 +57,15 @@ describe('App public routing', () => {
         });
     });
 
-    it('merender public playback sebagai route kritikal tanpa lazy chunk playback', async () => {
+    it('merender public playback (lazy) di route /playback tanpa layout admin', async () => {
+        // Playback is intentionally lazy-loaded (kept out of the eager App chunk for low-end devices);
+        // it resolves through its <Suspense> boundary, so assert asynchronously.
         window.history.pushState({}, '', '/playback');
 
         render(<App />);
 
-        expect(screen.getByTestId('public-playback-page').textContent).toBe('playback:public_preview');
-        await waitFor(() => {
-            expect(screen.queryByTestId('admin-layout')).toBeNull();
-        });
+        const playback = await screen.findByTestId('public-playback-page');
+        expect(playback.textContent).toBe('playback:public_preview');
+        expect(screen.queryByTestId('admin-layout')).toBeNull();
     });
 });

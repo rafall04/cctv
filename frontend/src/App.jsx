@@ -19,7 +19,6 @@ import ErrorBoundary from './components/ui/ErrorBoundary';
 import PwaInstallPrompt from './components/PwaInstallPrompt';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
-import Playback from './pages/Playback';
 import ProtectedRoute from './components/ProtectedRoute';
 import CustomerRoute from './components/CustomerRoute';
 import lazyWithRetry from './utils/lazyWithRetry';
@@ -52,6 +51,11 @@ const MyWallet = lazyWithRetry(() => import('./pages/customer/MyWallet'), 'my-wa
 const MyPlan = lazyWithRetry(() => import('./pages/customer/MyPlan'), 'my-plan');
 const MyAccount = lazyWithRetry(() => import('./pages/customer/MyAccount'), 'my-account');
 const RegisterPage = lazyWithRetry(() => import('./pages/RegisterPage'), 'register-page');
+// Playback (recordingService + full playback component/hook tree, ~72 KB raw) is lazy so it stays OUT
+// of the eager App chunk that every public-landing visit downloads + parses. Both the public /playback
+// and admin /admin/playback routes already render it inside <Suspense>, and LandingCamerasSection also
+// imports it dynamically — so Vite splits it into its own chunk loaded only when playback is opened.
+const Playback = lazyWithRetry(() => import('./pages/Playback'), 'playback');
 
 function CustomerPageRoute({ children }) {
     return (

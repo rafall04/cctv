@@ -29,6 +29,9 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
     const disableAnimations = liteEffects || shouldDisableAnimations();
     // shadow-lg over a grid of cards is a real paint cost on weak GPUs; shadow-sm keeps depth far cheaper.
     const shadowClass = liteEffects ? 'shadow-sm' : 'shadow-lg';
+    // Let the browser skip layout/paint for off-screen cards while scrolling (big win on long grids /
+    // weak GPUs); `contain-intrinsic-size` reserves an approximate height so the scrollbar stays stable.
+    const contentVisibilityClass = liteEffects ? '[content-visibility:auto] [contain-intrinsic-size:auto_320px]' : '';
     const isFav = isFavorite?.(camera.id);
     const quality = getPublicCameraQuality(camera);
 
@@ -61,7 +64,7 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
 
     return (
         <div
-            className={`relative rounded-2xl overflow-hidden bg-white dark:bg-gray-900 ${shadowClass} ring-1 ${transitionClass} ${hoverTransform} group/card ${cardStyle}`}
+            className={`relative rounded-2xl overflow-hidden bg-white dark:bg-gray-900 ${shadowClass} ring-1 ${transitionClass} ${hoverTransform} ${contentVisibilityClass} group/card ${cardStyle}`}
             onPointerEnter={prewarmVideoPopup}
             onFocus={prewarmVideoPopup}
         >

@@ -18,10 +18,12 @@ import LandingConnectionTabs from './LandingConnectionTabs';
 import LandingResultsGrid from './LandingResultsGrid';
 import LandingMapPanel from './LandingMapPanel';
 import LandingPlaybackPanel from './LandingPlaybackPanel';
-import Playback from '../../pages/Playback';
 import { preloadLandingMapView } from '../../utils/preloadLandingMapView';
 
 const MapView = lazy(() => preloadLandingMapView());
+// Lazy so Playback (recordingService + playback tree) stays out of the eager landing bundle; it is only
+// needed when the user switches to playback view mode. LandingPlaybackPanel renders it inside <Suspense>.
+const Playback = lazy(() => import('../../pages/Playback'));
 
 export function renderSearchDropdown({
     cameras,
