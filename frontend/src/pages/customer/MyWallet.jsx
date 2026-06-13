@@ -8,6 +8,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
 import customerService from '../../services/customerService';
 import { formatRupiah } from '../../layouts/CustomerLayout';
 
@@ -167,15 +168,36 @@ function TopupPanel({ onCompleted, resumable = [] }) {
                     </p>
                 )}
 
-                {pending.status === 'pending' && pending.qris?.qr_url && (
+                {/* QRIS: render the QR from the EMVCo payload (qr_string) ourselves — iPaymu's
+                    production qr_url is an HTML page, not an image, so an <img> would break.
+                    Fall back to opening that page only when we have no payload. */}
+                {pending.status === 'pending' && (pending.qris?.qr_string || pending.qris?.qr_url) && (
                     <div className="mt-3 flex flex-col items-center gap-2">
-                        <img src={pending.qris.qr_url} alt="QRIS" className="h-52 w-52 rounded-lg bg-white p-2" />
+                        {pending.qris?.qr_string ? (
+                            <div className="rounded-lg bg-white p-3">
+                                <QRCodeSVG value={pending.qris.qr_string} size={208} level="M" marginSize={2} />
+                            </div>
+                        ) : (
+                            <a
+                                href={pending.qris.qr_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="rounded-xl bg-primary px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-600"
+                            >
+                                Buka halaman QRIS untuk scan →
+                            </a>
+                        )}
                         <p className="text-center text-xs text-gray-500 dark:text-gray-400">
-                            Scan QRIS di atas dengan aplikasi pembayaran apa pun. Saldo masuk otomatis setelah terbayar.
+                            Scan QRIS dengan aplikasi e-wallet / m-banking apa pun. Saldo masuk otomatis setelah terbayar.
                         </p>
+                        {pending.qris?.qr_string && pending.qris?.qr_url && (
+                            <a href={pending.qris.qr_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline">
+                                Buka di tab baru
+                            </a>
+                        )}
                     </div>
                 )}
-                {pending.status === 'pending' && !pending.qris?.qr_url && pending.qris?.va_number && (
+                {pending.status === 'pending' && !pending.qris?.qr_string && !pending.qris?.qr_url && pending.qris?.va_number && (
                     <div className="mt-3 rounded-lg bg-gray-50 p-3 dark:bg-gray-800">
                         <p className="text-xs text-gray-500 dark:text-gray-400">{pending.qris.payment_name || 'Virtual Account'}</p>
                         <p className="mt-0.5 select-all font-mono text-lg font-bold tracking-wider text-gray-900 dark:text-white">{pending.qris.va_number}</p>
@@ -184,7 +206,7 @@ function TopupPanel({ onCompleted, resumable = [] }) {
                         </p>
                     </div>
                 )}
-                {pending.status === 'pending' && !pending.qris?.qr_url && !pending.qris?.va_number && (
+                {pending.status === 'pending' && !pending.qris?.qr_string && !pending.qris?.qr_url && !pending.qris?.va_number && (
                     <p className="mt-3 rounded-lg bg-gray-50 p-3 text-sm text-gray-600 dark:bg-gray-800 dark:text-gray-300">
                         {pending.instructions || 'Bayar ke admin sesuai nominal, saldo akan dikonfirmasi manual oleh admin.'}
                     </p>
