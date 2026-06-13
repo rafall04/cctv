@@ -89,6 +89,7 @@ export default function TelegramSettingsPanel() {
         notificationTargets: [],
         notificationRules: [],
         healthAlertTargetId: '',
+        commandChatIds: [],
         alertConfirmation: { downMs: 120000, upMs: 60000 },
     });
 
@@ -115,6 +116,7 @@ export default function TelegramSettingsPanel() {
                 notificationTargets: response.data.notificationTargets || [],
                 notificationRules: response.data.notificationRules || [],
                 healthAlertTargetId: response.data.healthAlertTargetId || '',
+                commandChatIds: response.data.commandChatIds || [],
                 alertConfirmation: {
                     downMs: response.data.alertConfirmation?.downMs ?? 120000,
                     upMs: response.data.alertConfirmation?.upMs ?? 60000,
@@ -180,6 +182,7 @@ export default function TelegramSettingsPanel() {
             notificationTargets: telegramStatus?.notificationTargets || [],
             notificationRules: telegramStatus?.notificationRules || [],
             healthAlertTargetId: telegramStatus?.healthAlertTargetId || '',
+            commandChatIds: telegramStatus?.commandChatIds || [],
             alertConfirmation: {
                 downMs: telegramStatus?.alertConfirmation?.downMs ?? 120000,
                 upMs: telegramStatus?.alertConfirmation?.upMs ?? 60000,
@@ -377,6 +380,32 @@ export default function TelegramSettingsPanel() {
                                     placeholder="-1009876543210"
                                     className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                                 />
+                            </div>
+
+                            <div className="border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50/40 dark:bg-emerald-500/5 rounded-xl p-4 space-y-3">
+                                <div>
+                                    <h3 className="font-semibold text-gray-900 dark:text-white">Bot Pengelola Pelanggan</h3>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                                        Chat ID yang boleh memberi perintah ke bot dan menekan tombol <b>Setujui / Tolak</b> pendaftaran, top-up, suspend/resume, dan ubah paket. Pendaftaran baru otomatis dikirim ke sini.
+                                    </p>
+                                </div>
+                                <textarea
+                                    aria-label="Chat ID Admin Bot"
+                                    rows={3}
+                                    value={(formData.commandChatIds || []).join('\n')}
+                                    onChange={(event) => setFormData((prev) => ({
+                                        ...prev,
+                                        commandChatIds: event.target.value
+                                            .split('\n')
+                                            .map((line) => line.trim())
+                                            .filter(Boolean),
+                                    }))}
+                                    placeholder={'-1001234567890\n123456789'}
+                                    className="w-full px-3 py-2 font-mono text-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                                />
+                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                    Satu Chat ID per baris. Kosongkan untuk memakai <b>Chat ID Monitoring Kamera</b> sebagai default. Kirim <code className="px-1 bg-gray-100 dark:bg-gray-700 rounded">/id</code> ke bot untuk tahu Chat ID Anda.
+                                </p>
                             </div>
 
                             <div className="border border-gray-200 dark:border-gray-700 rounded-xl p-4 space-y-4">
@@ -680,6 +709,25 @@ export default function TelegramSettingsPanel() {
                                     Alert pipeline recording dikirim ke:{' '}
                                     <span className="font-medium text-gray-900 dark:text-white">{healthAlertTargetName}</span>
                                 </p>
+                            </div>
+                            <div className="mt-6 rounded-xl border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50/40 dark:bg-emerald-500/5 p-4">
+                                <h3 className="font-semibold text-gray-900 dark:text-white">Bot Pengelola Pelanggan</h3>
+                                <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                                    Approval pendaftaran & kelola pelanggan langsung dari Telegram (/pending, /customers, top-up, suspend).
+                                </p>
+                                {(telegramStatus?.effectiveCommandChatIds || []).length > 0 ? (
+                                    <p className="mt-2 text-sm text-gray-700 dark:text-gray-300">
+                                        Chat yang diizinkan:{' '}
+                                        <span className="font-medium">{telegramStatus.effectiveCommandChatIds.join(', ')}</span>
+                                        {(telegramStatus?.commandChatIds || []).length === 0 && (
+                                            <span className="text-gray-500 dark:text-gray-400"> (default: Chat ID Monitoring)</span>
+                                        )}
+                                    </p>
+                                ) : (
+                                    <p className="mt-2 text-sm text-amber-600 dark:text-amber-400">
+                                        Belum ada chat yang diizinkan — isi Chat ID Admin Bot atau Chat ID Monitoring agar approval via Telegram aktif.
+                                    </p>
+                                )}
                             </div>
                         </>
                     )}

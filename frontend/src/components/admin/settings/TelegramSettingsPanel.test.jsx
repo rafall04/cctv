@@ -113,6 +113,29 @@ describe('TelegramSettingsPanel', () => {
         });
     });
 
+    it('shows the customer-management bot card and warns when no chat is authorized', async () => {
+        renderPanel();
+
+        expect(await screen.findByText('Bot Pengelola Pelanggan')).toBeTruthy();
+        expect(screen.getByText(/Belum ada chat yang diizinkan/i)).toBeTruthy();
+    });
+
+    it('saves the bot command allow-list parsed one Chat ID per line', async () => {
+        renderPanel();
+
+        fireEvent.click(await screen.findByText('Edit'));
+        fireEvent.change(screen.getByLabelText('Chat ID Admin Bot'), {
+            target: { value: '-1001112223\n 444555 \n\n-1001112223' },
+        });
+        fireEvent.click(screen.getByText('Simpan'));
+
+        await waitFor(() => {
+            expect(adminService.updateTelegramConfig).toHaveBeenCalledWith(
+                expect.objectContaining({ commandChatIds: ['-1001112223', '444555', '-1001112223'] })
+            );
+        });
+    });
+
     it('allows operators to disable online events for an area rule', async () => {
         renderPanel();
 

@@ -69,6 +69,7 @@ import { recordingService } from './services/recordingService.js';
 import recordingScheduler from './services/recordingScheduler.js';
 import recordingHealthAlertService from './services/recordingHealthAlertService.js';
 import thumbnailService from './services/thumbnailService.js';
+import telegramBotService from './services/telegramBotService.js';
 
 recordingService.attachScheduler(recordingScheduler);
 
@@ -498,6 +499,12 @@ const start = async () => {
         // Prepaid billing: hourly tick, idempotent per local day (suspends empty
         // wallets, resumes topped-up ones). Cheap no-op when nothing is due.
         billingService.startBillingScheduler();
+
+        // Interactive Telegram bot: long-polls for /commands & approve/manage button
+        // taps. Idle (re-checks every 15s) until a bot token is configured, so it is
+        // safe to start unconditionally and activates the moment a token is saved.
+        telegramBotService.start();
+        console.log('[TelegramBot] Customer-management bot started (long-polling)');
     } catch (err) {
         fastify.log.error(err);
         process.exit(1);
@@ -527,6 +534,7 @@ const shutdown = async () => {
         playbackViewerSessionService.stopCleanup();
         thumbnailService.stop();
         billingService.stopBillingScheduler();
+        telegramBotService.stop();
         stopDailyCleanup();
         
         // Cleanup MediaMTX paths to prevent zombie connections

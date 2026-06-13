@@ -170,7 +170,42 @@ function normalizeTelegramSettings(settings = {}) {
         healthAlertTargetId: String(settings.healthAlertTargetId || '').trim(),
         // Operator-tunable anti-flap windows for camera DOWN/UP alerts.
         alertConfirmation: normalizeAlertConfirmation(settings.alertConfirmation),
+        // Chat IDs allowed to COMMAND the bot (send /commands, tap approve/manage
+        // buttons). This is the bot's authorization gate — anything outside it is
+        // ignored/denied. Empty here means "fall back to the monitoring chat"
+        // (resolved by resolveCommandChatIds), so an operator who only set a
+        // monitoring chat can manage customers from it with zero extra config.
+        commandChatIds: normalizeChatIdList(settings.commandChatIds),
     };
+}
+
+function normalizeChatIdList(value) {
+    if (!Array.isArray(value)) {
+        return [];
+    }
+    const seen = new Set();
+    const result = [];
+    for (const raw of value) {
+        const id = String(raw == null ? '' : raw).trim();
+        if (id && !seen.has(id)) {
+            seen.add(id);
+            result.push(id);
+        }
+    }
+    return result;
+}
+
+/**
+ * Resolve the bot command allow-list: the explicitly-configured commandChatIds,
+ * or — when none are set — the monitoring chat as a sensible default so the
+ * operator's existing chat can manage customers without extra setup.
+ */
+function resolveCommandChatIds(settings) {
+    if (Array.isArray(settings.commandChatIds) && settings.commandChatIds.length > 0) {
+        return settings.commandChatIds;
+    }
+    const monitoring = String(settings.monitoringChatId || '').trim();
+    return monitoring ? [monitoring] : [];
 }
 
 function getCameraArea(camera = {}) {
@@ -488,47 +523,76 @@ function setCooldown(key) {
 }
 
 /**
- * Send message to Telegram bot
+ * Low-level Telegram Bot API call — the single outbound HTTP path for the whole
+ * app (sendMessage, editMessageText, answerCallbackQuery, getUpdates, ...).
+ * Returns the parsed Telegram response ({ ok, result, description }) or null on
+ * a missing token / transport failure / abort. `timeoutMs` overrides the default
+ * bound (getUpdates long-polling needs a ceiling above its long-poll timeout),
+ * and `signal` lets a caller (e.g. graceful shutdown) cancel an in-flight poll.
  */
-async function sendToTelegram(message, chatId) {
+export async function callTelegramApi(method, payload = {}, { timeoutMs = TELEGRAM_SEND_TIMEOUT_MS, signal } = {}) {
     const settings = getTelegramSettings();
-    
-    if (!settings.botToken || !chatId) {
-        console.log('[Telegram] Bot not configured or chat ID missing');
-        return false;
+    if (!settings.botToken) {
+        return null;
     }
 
-    const url = `https://api.telegram.org/bot${settings.botToken}/sendMessage`;
-
+    const url = `https://api.telegram.org/bot${settings.botToken}/${method}`;
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), TELEGRAM_SEND_TIMEOUT_MS);
+    const onExternalAbort = () => controller.abort();
+    if (signal) {
+        if (signal.aborted) {
+            controller.abort();
+        } else {
+            signal.addEventListener('abort', onExternalAbort, { once: true });
+        }
+    }
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
     try {
         const response = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                chat_id: chatId,
-                text: message,
-                parse_mode: 'HTML',
-                disable_web_page_preview: true,
-            }),
+            body: JSON.stringify(payload),
             signal: controller.signal,
         });
-
-        const data = await response.json();
-
-        if (!data.ok) {
-            console.error('[Telegram] Failed:', data.description);
-            return false;
-        }
-
-        return true;
+        return await response.json();
     } catch (error) {
-        console.error('[Telegram] Error:', error.message);
-        return false;
+        if (error?.name !== 'AbortError') {
+            console.error(`[Telegram] API ${method} error:`, error.message);
+        }
+        return null;
     } finally {
         clearTimeout(timeout);
+        if (signal) {
+            signal.removeEventListener?.('abort', onExternalAbort);
+        }
     }
+}
+
+/**
+ * Send message to Telegram bot
+ */
+async function sendToTelegram(message, chatId) {
+    if (!chatId) {
+        console.log('[Telegram] Chat ID missing');
+        return false;
+    }
+
+    const data = await callTelegramApi('sendMessage', {
+        chat_id: chatId,
+        text: message,
+        parse_mode: 'HTML',
+        disable_web_page_preview: true,
+    });
+
+    if (!data) {
+        console.log('[Telegram] Bot not configured or request failed');
+        return false;
+    }
+    if (!data.ok) {
+        console.error('[Telegram] Failed:', data.description);
+        return false;
+    }
+    return true;
 }
 
 export async function sendCameraStatusNotifications(eventType, cameras = [], options = {}) {
@@ -797,6 +861,28 @@ Tipe: ${type === 'monitoring' ? 'Monitoring Kamera' : 'Kritik & Saran'}
     return sendMonitoringMessage(message);
 }
 
+/**
+ * Runtime context for the interactive bot (telegramBotService). Exposes whether
+ * a token is configured and the resolved command allow-list. The raw token is
+ * never returned here — callers send via callTelegramApi, which reads it.
+ */
+export function getBotRuntimeConfig() {
+    const settings = getTelegramSettings();
+    return {
+        hasToken: Boolean(settings.botToken),
+        commandChatIds: resolveCommandChatIds(settings),
+    };
+}
+
+/** True when `chatId` is authorized to command the bot (after default fallback). */
+export function isCommandChat(chatId) {
+    const target = String(chatId == null ? '' : chatId).trim();
+    if (!target) {
+        return false;
+    }
+    return getBotRuntimeConfig().commandChatIds.includes(target);
+}
+
 export function isTelegramConfigured() {
     const settings = getTelegramSettings();
     return !!(settings.botToken && (settings.monitoringChatId || settings.notificationTargets.length > 0));
@@ -823,10 +909,18 @@ export function getTelegramStatus() {
         notificationRuleIssues,
         healthAlertTargetId: settings.healthAlertTargetId || '',
         alertConfirmation: normalizeAlertConfirmation(settings.alertConfirmation),
+        // Bot command authorization: the saved allow-list plus the effective
+        // (post-fallback) list the bot actually honors — so the UI can show the
+        // monitoring-chat fallback when commandChatIds is empty.
+        commandChatIds: settings.commandChatIds || [],
+        effectiveCommandChatIds: resolveCommandChatIds(settings),
     };
 }
 
 export default {
+    callTelegramApi,
+    getBotRuntimeConfig,
+    isCommandChat,
     sendMonitoringMessage,
     sendHealthAlertMessage,
     sendFeedbackMessage,

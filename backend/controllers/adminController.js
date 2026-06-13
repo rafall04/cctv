@@ -136,6 +136,7 @@ export async function updateTelegramConfig(request, reply) {
             notificationTargets = [],
             notificationRules = [],
             healthAlertTargetId = '',
+            commandChatIds = [],
             alertConfirmation,
         } = request.body;
 
@@ -146,6 +147,9 @@ export async function updateTelegramConfig(request, reply) {
             notificationTargets: Array.isArray(notificationTargets) ? notificationTargets : [],
             notificationRules: Array.isArray(notificationRules) ? notificationRules : [],
             healthAlertTargetId: healthAlertTargetId || '',
+            // Bot command allow-list (saveTelegramSettings normalizes/dedupes). Empty
+            // means "fall back to the monitoring chat" at resolve time.
+            commandChatIds: Array.isArray(commandChatIds) ? commandChatIds : [],
             // Pass through anti-flap windows; saveTelegramSettings normalizes/clamps.
             alertConfirmation: alertConfirmation && typeof alertConfirmation === 'object' ? alertConfirmation : undefined,
             enabled: !!(botToken && (monitoringChatId || feedbackChatId || notificationTargets.length > 0))

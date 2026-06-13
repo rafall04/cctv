@@ -8,6 +8,7 @@
 
 import authService from '../services/authService.js';
 import billingPlanService from '../services/billingPlanService.js';
+import telegramBotService from '../services/telegramBotService.js';
 import { getAuthCookieOptions } from '../utils/authCookieOptions.js';
 
 export async function login(request, reply) {
@@ -75,6 +76,10 @@ export async function register(request, reply) {
             { username, password, phone, email },
             request
         );
+        // Fire-and-forget: push an approve/reject card to the admin Telegram chat(s)
+        // so a new signup can be acted on from a phone. Never block (or fail) the
+        // registration response on a Telegram round-trip.
+        telegramBotService.notifyNewRegistration(user.id).catch(() => {});
         return reply.send({
             success: true,
             message: 'Pendaftaran berhasil — silakan login',
