@@ -66,6 +66,7 @@ import sponsorPackageRoutes from './routes/sponsorPackageRoutes.js';
 import saweriaRoutes from './routes/saweriaRoutes.js';
 import voucherRoutes from './routes/voucherRoutes.js';
 import voucherWebhookRoutes from './routes/voucherWebhookRoutes.js';
+import voucherAdminRoutes from './routes/voucherAdminRoutes.js';
 import recordingRoutes from './routes/recordingRoutes.js';
 import playbackTokenRoutes from './routes/playbackTokenRoutes.js';
 import brandingRoutes from './routes/brandingRoutes.js';
@@ -356,6 +357,7 @@ await fastify.register(playbackTokenRoutes, { prefix: '/api' });
 await fastify.register(brandingRoutes, { prefix: '/api/branding' });
 await fastify.register(customerRoutes, { prefix: '/api/customer' });
 await fastify.register(billingAdminRoutes, { prefix: '/api/admin/billing' });
+await fastify.register(voucherAdminRoutes, { prefix: '/api/admin/voucher' });
 await fastify.register(billingWebhookRoutes, { prefix: '/api/billing' });
 // thumbnailRoutes removed - @fastify/static handles /api/thumbnails/* automatically
 
