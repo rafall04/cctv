@@ -91,7 +91,9 @@ describe('LandingCameraCard', () => {
         );
 
         expect(getByText('3 live')).toBeTruthy();
-        expect(getByText('12.5k views')).toBeTruthy();
+        // Counts truncate, never round up: 12450 reads "12.4k" (not "12.5k"), so the
+        // figure never overstates actual views. See formatCompactCount in CameraViewerStatsBadges.
+        expect(getByText('12.4k views')).toBeTruthy();
     });
 
     it('prewarms the video popup chunk on first card intent', () => {
