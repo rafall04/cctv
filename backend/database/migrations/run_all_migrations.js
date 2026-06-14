@@ -1,116 +1,35 @@
 #!/usr/bin/env node
 
 /**
- * Purpose: Run all forward-only SQLite migrations in a stable order.
- * Caller: npm run migrate, backend migration gate, and deployment scripts.
- * Deps: better-sqlite3, Node fs/path/url helpers, migration files in this directory.
- * MainFuncs: MIGRATIONS runner loop.
- * SideEffects: Applies schema, index, and data backfill changes to backend/data/cctv.db.
+ * Purpose: DEPRECATED compatibility shim. Delegates to the active runner so running this file
+ *          can NEVER produce a stale/partial schema. Do not add migrations here.
+ * Caller: Nobody should import this — `npm run migrate` and deploy scripts use
+ *         `../run-all-migrations.js` (hyphen). Kept only so a manual/legacy invocation still works.
+ * Deps: ../run-all-migrations.js (the active, auto-discovering runner).
+ * MainFuncs: thin delegation to runMigrations().
+ * SideEffects: Applies ALL forward-only migrations via the active runner (full schema).
+ *
+ * History: this file used to carry a hardcoded MIGRATIONS array that drifted out of date (it stopped
+ * at zz_20260518_repair_recording_segment_timezone.js and silently omitted billing/approval/promo/
+ * voucher migrations). The active runner `database/run-all-migrations.js` (hyphen) auto-discovers
+ * every `.js` in migrations/ and `.sort()`s them, and already excludes this filename via
+ * AGGREGATE_MIGRATION_RUNNERS — so delegating here is safe (no recursion) and always complete.
  */
 
-import Database from 'better-sqlite3';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
-import { readdirSync } from 'fs';
+import { runMigrations } from '../run-all-migrations.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const dbPath = join(__dirname, '..', '..', 'data', 'cctv.db');
+console.warn(
+    '[DEPRECATED] backend/database/migrations/run_all_migrations.js is a thin shim.\n' +
+    '             Use `npm run migrate` (database/run-all-migrations.js, with a hyphen).\n' +
+    '             Delegating to the active auto-discovering runner so the full schema is applied...\n'
+);
 
-// Migration files in order
-const MIGRATIONS = [
-    '001_migrate_security.js',
-    'add_settings_table.js',
-    'add_timezone_settings.js',
-    'add_branding_settings.js',
-    'add_landing_page_settings.js',
-    'add_watermark_settings.js',
-    'add_saweria_settings.js',
-    'add_feedbacks_table.js',
-    'add_viewer_sessions.js',
-    'add_coordinates.js',
-    'add_area_coordinates.js',
-    'add_video_codec.js',
-    'add_stream_key.js',
-    'add_is_tunnel_field.js',
-    'add_camera_status.js',
-    'add_camera_online_status.js',
-    'add_priority_camera.js',
-    'add_sponsor_fields.js',
-    'add_thumbnail_path.js',
-    'fix_thumbnail_paths.js',
-    'add_recording_system.js',
-    'create_recordings_table.js',
-    'add_core_indexes.js',
-    'add_analytics_indexes.js',
-    'add_external_stream.js',
-    'add_external_proxy_controls.js',
-    'add_external_health_mode.js',
-    'add_area_health_override.js',
-    'add_area_coverage_scope.js',
-    'add_area_grid_default_visibility.js',
-    'add_area_grid_default_limit.js',
-    'add_internal_ingest_policy.js',
-    'add_internal_rtsp_transport_policy.js',
-    'add_public_playback_controls.js',
-    'add_playback_viewer_sessions.js',
-    'create_camera_discovery_table.js',
-    'add_camera_delivery_types.js',
-    'backfill_camera_delivery_types.js',
-    'add_runtime_state_and_history_retention.js',
-    'zz_20260507_add_area_slug_indexes.js',
-    'zz_20260518_add_recording_maintenance_state.js',
-    'zz_20260518_repair_recording_segment_timezone.js'
-];
-
-console.log('🚀 Starting migration process...\n');
-console.log(`📁 Database: ${dbPath}\n`);
-
-let successCount = 0;
-let skipCount = 0;
-let errorCount = 0;
-
-for (const migrationFile of MIGRATIONS) {
-    const migrationPath = join(__dirname, migrationFile);
-
-    try {
-        console.log(`⏳ Running: ${migrationFile}`);
-
-        // Import and run migration
-        const migration = await import(`file://${migrationPath}`);
-
-        // Most migrations are self-executing, but some export a function
-        if (typeof migration.default === 'function') {
-            await migration.default();
-        }
-
-        console.log(`✅ Success: ${migrationFile}\n`);
-        successCount++;
-
-    } catch (error) {
-        if (error.message.includes('already exists') ||
-            error.message.includes('duplicate column')) {
-            console.log(`⏭️  Skipped: ${migrationFile} (already applied)\n`);
-            skipCount++;
-        } else {
-            console.error(`❌ Error: ${migrationFile}`);
-            console.error(`   ${error.message}\n`);
-            errorCount++;
-        }
+runMigrations().catch((error) => {
+    console.error('\nFatal error running migrations:', error.message);
+    if (error.failed) {
+        error.failed.forEach(({ file, error: itemError }) => {
+            console.error(`- ${file}: ${itemError}`);
+        });
     }
-}
-
-console.log('━'.repeat(60));
-console.log('📊 Migration Summary:');
-console.log(`   ✅ Success: ${successCount}`);
-console.log(`   ⏭️  Skipped: ${skipCount}`);
-console.log(`   ❌ Errors:  ${errorCount}`);
-console.log('━'.repeat(60));
-
-if (errorCount > 0) {
-    console.log('\n⚠️  Some migrations failed. Check errors above.');
     process.exit(1);
-} else {
-    console.log('\n🎉 All migrations completed successfully!');
-    process.exit(0);
-}
+});
