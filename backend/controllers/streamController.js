@@ -1,9 +1,15 @@
 import streamService from '../services/streamService.js';
+import { readVoucherDeviceHash } from '../services/voucherPass.js';
 
 export async function getStreamUrls(request, reply) {
     try {
         const { cameraId } = request.params;
-        const data = streamService.getStreamUrls(cameraId, request.hostname, request.user || null);
+        const data = streamService.getStreamUrls(
+            cameraId,
+            request.hostname,
+            request.user || null,
+            readVoucherDeviceHash(request)
+        );
 
         return reply.send({ success: true, data });
     } catch (error) {
@@ -28,7 +34,12 @@ export async function getAllActiveStreams(request, reply) {
 export async function generateStreamToken(request, reply) {
     try {
         const { cameraId } = request.params;
-        const data = streamService.generateStreamToken(cameraId, request.hostname, request.user || null);
+        const data = streamService.generateStreamToken(
+            cameraId,
+            request.hostname,
+            request.user || null,
+            readVoucherDeviceHash(request)
+        );
 
         return reply.send({ success: true, data });
     } catch (error) {

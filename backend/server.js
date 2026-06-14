@@ -64,6 +64,7 @@ import externalStreamProxyRoutes from './routes/externalStreamProxyRoutes.js';
 import sponsorRoutes from './routes/sponsorRoutes.js';
 import sponsorPackageRoutes from './routes/sponsorPackageRoutes.js';
 import saweriaRoutes from './routes/saweriaRoutes.js';
+import voucherRoutes from './routes/voucherRoutes.js';
 import recordingRoutes from './routes/recordingRoutes.js';
 import playbackTokenRoutes from './routes/playbackTokenRoutes.js';
 import brandingRoutes from './routes/brandingRoutes.js';
@@ -153,6 +154,16 @@ await fastify.register(cors, {
 await fastify.register(cookie, {
     secret: config.jwt.secret,
     parseOptions: {},
+});
+
+// Voucher area-gate cache safety: when a request served a voucher-gated stream the gate sets
+// request.voucherPrivate; force private/no-store so a gated segment is never shared/edge-cached and
+// replayed to a viewer without a pass. No-op for every normal request (flag unset → zero change).
+fastify.addHook('onSend', async (request, reply, payload) => {
+    if (request.voucherPrivate) {
+        reply.header('Cache-Control', 'private, no-store');
+    }
+    return payload;
 });
 
 // Tenancy gate for thumbnails: files are named {cameraId}.jpg, so rented/private
@@ -337,6 +348,7 @@ await fastify.register(hlsProxyRoutes, { prefix: '/hls' });
 await fastify.register(sponsorRoutes, { prefix: '/api/sponsors' });
 await fastify.register(sponsorPackageRoutes, { prefix: '/api/sponsor-packages' });
 await fastify.register(saweriaRoutes, { prefix: '/api/saweria' });
+await fastify.register(voucherRoutes, { prefix: '/api/voucher' });
 await fastify.register(recordingRoutes, { prefix: '/api' });
 await fastify.register(playbackTokenRoutes, { prefix: '/api' });
 await fastify.register(brandingRoutes, { prefix: '/api/branding' });

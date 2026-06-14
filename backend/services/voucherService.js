@@ -36,6 +36,13 @@ const DEFAULT_DURATION_MINUTES = 1440; // 1 hari
 const MAX_DURATION_MINUTES = 525600;   // 1 tahun
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
+// The feature flag is read on the per-segment live gate (canViewLive → isAreaAccessGated). A short
+// TTL keeps that hot path DB-free in the common feature-OFF case while still letting an admin toggle
+// take effect within a few seconds (same order as cameraAccessService's 30s access cache). Busted on
+// write; reset in tests via resetGateCaches().
+const FEATURE_CACHE_TTL_MS = 8000;
+let featureCache = { value: false, at: 0 };
+
 function badRequest(message) {
     const err = new Error(message);
     err.statusCode = 400;
@@ -189,12 +196,19 @@ class VoucherService {
     // ------------------------------------------------------------------
 
     isFeatureEnabled() {
+        const now = Date.now();
+        if (featureCache.at && now - featureCache.at < FEATURE_CACHE_TTL_MS) {
+            return featureCache.value;
+        }
+        let enabled = false;
         try {
             const row = queryOne('SELECT value FROM settings WHERE key = ?', [FEATURE_KEY]);
-            return !!row && (row.value === 'true' || row.value === '1' || row.value === 1);
+            enabled = !!row && (row.value === 'true' || row.value === '1' || row.value === 1);
         } catch {
-            return false;
+            enabled = false;
         }
+        featureCache = { value: enabled, at: now };
+        return enabled;
     }
 
     setFeatureEnabled(enabled, request = null) {
@@ -204,10 +218,16 @@ class VoucherService {
              ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP`,
             [FEATURE_KEY, on ? 'true' : 'false', 'Aktifkan pembatasan akses CCTV via voucher per-area']
         );
+        featureCache = { value: on, at: Date.now() }; // bust so the toggle is reflected immediately
         if (request) {
             logAdminAction({ action: 'voucher_feature_toggled', enabled: on }, request);
         }
         return { enabled: on };
+    }
+
+    /** Test/ops helper: drop the short-lived feature-flag cache so the next read hits the DB fresh. */
+    resetGateCaches() {
+        featureCache = { value: false, at: 0 };
     }
 
     // ------------------------------------------------------------------
@@ -234,6 +254,17 @@ class VoucherService {
 
     listGatedAreaIds() {
         return query('SELECT id FROM areas WHERE is_access_gated = 1 ORDER BY id').map((r) => r.id);
+    }
+
+    /**
+     * Convenience for the live gate: an area is access-gated for the PUBLIC only when the global
+     * feature is ON **and** the area is explicitly marked. The feature flag is short-TTL cached
+     * (isFeatureEnabled) so the common feature-OFF path stays DB-free per segment; the per-area mark
+     * (isAreaGated) stays a live indexed lookup so un-gating an area takes effect immediately.
+     */
+    isAreaAccessGated(areaId) {
+        if (!areaId) return false;
+        return this.isFeatureEnabled() && this.isAreaGated(areaId);
     }
 
     // ------------------------------------------------------------------
@@ -587,6 +618,22 @@ class VoucherService {
 
     hasAreaAccess(areaId, { deviceHash = null } = {}) {
         return this.getAccessibleAreaIds({ deviceHash }).includes(Number(areaId));
+    }
+
+    /**
+     * Public gate snapshot for the frontend (GET /api/voucher/access): whether the feature is on,
+     * which areas are gated, and which of those THIS device currently has access to. The frontend
+     * renders a lock on a camera whose area is in gated_area_ids but not in accessible_area_ids.
+     */
+    getPublicGateState({ deviceHash = null } = {}) {
+        if (!this.isFeatureEnabled()) {
+            return { enabled: false, gated_area_ids: [], accessible_area_ids: [] };
+        }
+        return {
+            enabled: true,
+            gated_area_ids: this.listGatedAreaIds(),
+            accessible_area_ids: deviceHash ? this.getAccessibleAreaIds({ deviceHash }) : [],
+        };
     }
 
     // ------------------------------------------------------------------

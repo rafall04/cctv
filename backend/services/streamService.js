@@ -13,6 +13,7 @@ import { sanitizeCameraThumbnailList } from './thumbnailPathService.js';
 import cameraHealthService from './cameraHealthService.js';
 import cameraViewStatsService from './cameraViewStatsService.js';
 import { getAccessInfo, canViewLive } from './cameraAccessService.js';
+import voucherService from './voucherService.js';
 import { PUBLIC_LIVE_SQL } from '../utils/cameraVisibility.js';
 import {
     getEffectiveDeliveryType,
@@ -25,7 +26,7 @@ function resolveViewerStats(statsByCamera, cameraId) {
 }
 
 class StreamService {
-    buildCameraResponse(camera) {
+    buildCameraResponse(camera, { lockGatedStreams = false } = {}) {
         const deliveryType = getEffectiveDeliveryType(camera);
         const streamPath = camera.stream_key || `camera${camera.id}`;
         const capabilities = getStreamCapabilities(deliveryType);
@@ -80,16 +81,47 @@ class StreamService {
             ? null
             : (camera.external_stream_url || (deliveryType === 'external_hls' ? camera.external_hls_url || null : null));
 
+        let streams = isExternalHls
+            ? externalStreams
+            : (deliveryType === 'internal_hls' ? this.buildStreamUrls(streamPath, camera._requestHost) : {});
+        let extHlsUrl = sanitizedExternalHlsUrl;
+        let extStreamUrl = sanitizedExternalStreamUrl;
+
+        // Voucher area-gate, read-model side: a gated camera must NEVER hand out an ungated playable
+        // URL. WebRTC (/webrtc/*) goes straight to MediaMTX with no backend gate, and a raw external
+        // direct-stream URL is played client-side — both bypass canViewLive. So for a gated camera we
+        // only ever expose the GATED HLS proxy URL (internal /hls or /api/stream/:id/external, both of
+        // which re-check the pass per segment) and drop webrtc; in the PUBLIC LIST (lockGatedStreams)
+        // we expose nothing — the frontend renders a lock from GET /api/voucher/access and fetches the
+        // gated URL per-device via GET /api/stream/:id only once the viewer holds a pass.
+        // NOTE: WebRTC remains ungated at the infra layer (nginx → MediaMTX); a determined holder can
+        // still derive the stream key — closing that fully requires gating /webrtc at nginx/MediaMTX
+        // (Phase-5 activation blocker, see the design spec).
+        const voucherGated = !!camera.area_id && voucherService.isAreaAccessGated(camera.area_id);
+        if (voucherGated) {
+            if (lockGatedStreams) {
+                streams = {};
+                extHlsUrl = null;
+                extStreamUrl = null;
+            } else if (isExternalHls && !externalProxyEnabled) {
+                // External direct-stream has no gated proxy path → withhold the raw URL entirely
+                // (admin must enable external_use_proxy for a gated external camera to be viewable).
+                streams = { hls: null, webrtc: null };
+                extHlsUrl = null;
+                extStreamUrl = null;
+            } else {
+                streams = { ...streams, webrtc: null };
+            }
+        }
+
         return {
             ...publicAvailability,
             delivery_type: deliveryType,
             stream_capabilities: capabilities,
-            streams: isExternalHls
-                ? externalStreams
-                : (deliveryType === 'internal_hls' ? this.buildStreamUrls(streamPath, camera._requestHost) : {}),
+            streams,
             stream_source: camera.stream_source || (deliveryType === 'internal_hls' ? 'internal' : 'external'),
-            external_hls_url: sanitizedExternalHlsUrl,
-            external_stream_url: sanitizedExternalStreamUrl,
+            external_hls_url: extHlsUrl,
+            external_stream_url: extStreamUrl,
             external_embed_url: camera.external_embed_url || null,
             external_snapshot_url: camera.external_snapshot_url || null,
             external_origin_mode: camera.external_origin_mode || 'direct',
@@ -126,11 +158,12 @@ class StreamService {
         };
     }
 
-    getStreamUrls(cameraId, requestHost, user = null) {
+    getStreamUrls(cameraId, requestHost, user = null, voucherDeviceHash = null) {
         // Tenancy gate first: non-community cameras (owner_private/subscriber) are only
-        // visible to staff or their owner, and subscriber cameras must be billing-active.
+        // visible to staff or their owner, subscriber cameras must be billing-active, and a
+        // community camera in a voucher-gated area needs an active pass for this device.
         const accessInfo = getAccessInfo(cameraId);
-        const access = canViewLive({ info: accessInfo, user });
+        const access = canViewLive({ info: accessInfo, user, voucherDeviceHash });
         if (!access.allowed) {
             const err = new Error(
                 access.reason === 'subscription_suspended'
@@ -219,12 +252,12 @@ class StreamService {
             ...camera,
             _requestHost: requestHost,
             viewer_stats: resolveViewerStats(statsByCamera, camera.id),
-        }));
+        }, { lockGatedStreams: true }));
 
         return sanitizeCameraThumbnailList(camerasWithStreams);
     }
 
-    generateStreamToken(cameraId, requestHost, user = null) {
+    generateStreamToken(cameraId, requestHost, user = null, voucherDeviceHash = null) {
         const camera = queryOne(
             'SELECT id, stream_key, enabled FROM cameras WHERE id = ?',
             [cameraId]
@@ -240,7 +273,7 @@ class StreamService {
         // and a suspended subscriber camera hands them to staff only. The /hls proxy
         // independently re-checks billing on every playlist fetch, so a token issued
         // moments before a suspension cannot outlive it by more than the access-cache TTL.
-        const access = canViewLive({ info: getAccessInfo(cameraId), user });
+        const access = canViewLive({ info: getAccessInfo(cameraId), user, voucherDeviceHash });
         if (!access.allowed) {
             const err = new Error(
                 access.reason === 'subscription_suspended'

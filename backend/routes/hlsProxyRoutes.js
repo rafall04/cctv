@@ -27,6 +27,7 @@ import {
     getAccessInfoByStreamKey,
     canViewLive,
 } from '../services/cameraAccessService.js';
+import { readVoucherDeviceHash } from '../services/voucherPass.js';
 
 // Resolve tenancy info for an /hls path segment: UUID stream keys hit the
 // stream_key index; legacy "camera<id>" paths fall back to the numeric id.
@@ -74,13 +75,22 @@ export default async function hlsProxyRoutes(fastify, _options) {
         // cached (30s TTL), so suspension propagates to live streams within
         // seconds without a DB hit per segment.
         const accessInfo = resolveHlsAccessInfo(cameraPath);
-        const isGatedCamera = !!accessInfo && accessInfo.camera_class !== 'community';
-        if (isGatedCamera) {
+        // Always run the gate when we know the camera: community streams may be voucher-gated
+        // (an admin-marked area while the feature is on), which the old `!== community`
+        // short-circuit would have skipped. canViewLive returns voucherGated so we can keep the
+        // stream out of shared/edge caches.
+        let isGatedCamera = false;
+        if (accessInfo) {
             const access = canViewLive({
                 info: accessInfo,
                 user: resolveHlsViewerUser(request),
                 streamToken: request.streamToken || null,
+                voucherDeviceHash: readVoucherDeviceHash(request),
             });
+            isGatedCamera = accessInfo.camera_class !== 'community' || access.voucherGated === true;
+            if (access.voucherGated) {
+                request.voucherPrivate = true;
+            }
             if (!access.allowed) {
                 reply.header('Content-Type', 'text/plain');
                 reply.header('Cache-Control', 'no-store');

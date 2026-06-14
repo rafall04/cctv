@@ -22,6 +22,7 @@ import https from 'https';
 import { queryOne } from '../database/connectionPool.js';
 import cameraHealthService from '../services/cameraHealthService.js';
 import { getAccessInfo, canViewLive } from '../services/cameraAccessService.js';
+import { readVoucherDeviceHash } from '../services/voucherPass.js';
 import {
     createPlaylistCache,
     createSegmentCache,
@@ -170,14 +171,21 @@ function isCameraProxyable(camera) {
  */
 function denyIfNotViewable(request, reply, cameraId) {
     const info = getAccessInfo(cameraId);
-    if (!info || info.camera_class === 'community') {
+    if (!info) {
         return false;
     }
+    // No community short-circuit: a community camera in a voucher-gated area must still pass the
+    // gate. canViewLive returns voucherGated → flag the request so the onSend hook forces
+    // private/no-store and the (otherwise edge-cacheable) segments never enter a shared cache.
     const access = canViewLive({
         info,
         user: resolveHlsViewerUser(request),
         streamToken: request.streamToken || null,
+        voucherDeviceHash: readVoucherDeviceHash(request),
     });
+    if (access.voucherGated) {
+        request.voucherPrivate = true;
+    }
     if (access.allowed) {
         return false;
     }

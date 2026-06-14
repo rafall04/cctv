@@ -112,6 +112,7 @@ function rawCode(code) {
 describe('voucherService', () => {
     beforeEach(() => {
         seedSchema();
+        voucherService.resetGateCaches();
     });
 
     describe('feature flag', () => {
@@ -381,6 +382,39 @@ describe('voucherService', () => {
             expect(result.expired).toBe(2);
             expect(rawCode(c1.code).status).toBe('expired');
             expect(rawCode(c2.code).status).toBe('expired');
+        });
+    });
+
+    describe('gate helpers (Phase 2)', () => {
+        it('isAreaAccessGated requires BOTH the feature on AND the area marked', () => {
+            voucherService.setAreaGated(1, true);
+            expect(voucherService.isAreaAccessGated(1)).toBe(false); // feature still off
+            voucherService.setFeatureEnabled(true);
+            expect(voucherService.isAreaAccessGated(1)).toBe(true);
+            expect(voucherService.isAreaAccessGated(2)).toBe(false); // area not marked
+            expect(voucherService.isAreaAccessGated(null)).toBe(false);
+        });
+
+        it('getPublicGateState reports the feature cleanly when off', () => {
+            expect(voucherService.getPublicGateState({ deviceHash: 'd' }))
+                .toEqual({ enabled: false, gated_area_ids: [], accessible_area_ids: [] });
+        });
+
+        it('getPublicGateState lists gated areas and the device-accessible subset', () => {
+            voucherService.setFeatureEnabled(true);
+            voucherService.setAreaGated(1, true);
+            voucherService.setAreaGated(2, true);
+            const p = makeProfile({ area_ids: [1] });
+            const [code] = voucherService.generateCodes(p.id, 1);
+            voucherService.redeemCode(code.code, { deviceHash: 'dev-A' });
+
+            const state = voucherService.getPublicGateState({ deviceHash: 'dev-A' });
+            expect(state.enabled).toBe(true);
+            expect(state.gated_area_ids.sort()).toEqual([1, 2]);
+            expect(state.accessible_area_ids).toEqual([1]);
+
+            // A device without a pass sees the gated areas but none accessible.
+            expect(voucherService.getPublicGateState({ deviceHash: 'dev-B' }).accessible_area_ids).toEqual([]);
         });
     });
 });

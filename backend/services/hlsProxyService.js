@@ -25,6 +25,7 @@ import {
     getAccessInfo as getCameraAccessInfo,
     canViewLive as checkCanViewLive,
 } from '../services/cameraAccessService.js';
+import { readVoucherDeviceHash } from './voucherPass.js';
 
 const IPV4_MAPPED_PREFIX = '::ffff:';
 const DEFAULT_HLS_CONFIG = {
@@ -1422,12 +1423,18 @@ export async function handleExternalStreamProxy(state, request, reply) {
         // payload, since all public read models filter to community-class.)
         if (externalCameraConfig?.cameraId) {
             const accessInfo = getCameraAccessInfo(externalCameraConfig.cameraId);
-            if (accessInfo && accessInfo.camera_class !== 'community') {
+            // No community short-circuit: a community camera in a voucher-gated area must still pass
+            // the gate. voucherGated → flag the request so onSend keeps its segments out of caches.
+            if (accessInfo) {
                 const access = checkCanViewLive({
                     info: accessInfo,
                     user: resolveHlsViewerUser(request),
                     streamToken: request.streamToken || null,
+                    voucherDeviceHash: readVoucherDeviceHash(request),
                 });
+                if (access.voucherGated) {
+                    request.voucherPrivate = true;
+                }
                 if (!access.allowed) {
                     reply.header('Cache-Control', 'no-store');
                     return reply.code(access.statusCode === 402 ? 402 : 403).send('');

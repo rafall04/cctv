@@ -1,7 +1,7 @@
 # Voucher Area Access — Design Spec (2026-06-14)
 
-Status: Phase 1 SHIPPED 2026-06-14 (skema + voucherService + tests, additive, flag OFF). Phase 2-5
-belum. Lihat "Implementation status" di bawah untuk nama kolom final & keputusan yang sudah dikunci.
+Status: Phase 1 + Phase 2 SHIPPED 2026-06-14 (skema + service + GATE + cookie + API publik + tests,
+additive, flag OFF). Phase 3-5 belum. Lihat "Implementation status" di bawah.
 
 ## Implementation status & keputusan terkunci (Phase 1 — 2026-06-14)
 
@@ -27,7 +27,54 @@ Phase 1 men-ship: migrasi `zz_20260614_add_voucher_access.js`, `services/voucher
   s/d cap). (Draft §5 yang menyebut `expires_at += durasi` digantikan oleh keputusan ini.)
 - **Fail-closed**: akses hanya untuk kode `active` dengan `expires_at` non-null & di masa depan.
 
-### Pengingat WAJIB untuk Phase 2/3 (dari review)
+## Implementation status — Phase 2 (gerbang LIVE) shipped 2026-06-14
+
+Semua di balik flag OFF; saat off perilaku publik byte-identik (suite 1025/1025 hijau).
+
+- **Gerbang terpusat di `canViewLive`** (cameraAccessService): cabang voucher untuk kamera
+  community / published-public — butuh pass aktif untuk device (`voucherService.hasAreaAccess`) bila
+  area gated + fitur on; staff bypass; mengembalikan `voucherGated` di SEMUA outcome (untuk cache).
+  `area_id` ditambah ke ACCESS_PROJECTION. Camera_class TIDAK disentuh.
+- **Semua choke point live** kini oper `voucherDeviceHash` + buang short-circuit `=== community`:
+  internal `/hls` (hlsProxyRoutes), proxy eksternal (`hlsProxyService` + `externalStreamProxyService`),
+  `streamService.getStreamUrls`/`generateStreamToken` (+ streamController).
+- **Identitas = cookie `vdev`** (signed httpOnly, random 24-byte = bearer tak tertebak; `voucherPass.js`).
+  Diset saat redeem, dibaca tiap request stream. Bukan phone (phone tetap kontak saja).
+- **Anti cache-bocor**: gate set `request.voucherPrivate`; global `onSend` hook (server.js) paksa
+  `private, no-store` → segmen gated tak pernah masuk shared/edge cache (CDN). Internal path juga
+  set no-store langsung (belt+suspenders).
+- **API publik**: `POST /api/voucher/redeem` (kode→cookie→area_ids), `GET /api/voucher/access`
+  (`{enabled, gated_area_ids, accessible_area_ids}`). Frontend render gembok dari `/access`
+  (mengganti rencana draft "PUBLIC_LIVE_SQL locked payload" — lebih ringan, tak menyentuh read-model
+  kamera). Redeem balas pesan generik (anti-oracle).
+- **Sengaja TIDAK digate (scope)**: thumbnail kamera gated tetap publik (umpan); **public PLAYBACK**
+  kamera gated belum digate — fitur ini fokus LIVE. Tinjau di fase lanjut bila klien ingin playback
+  ikut terkunci.
+
+### Blocker aktivasi (Phase 5) + keputusan dari review Phase 2 (2026-06-14)
+
+Gerbang HLS/cache/cookie sudah rapat & terverifikasi (onSend override cache HIT+MISS; nginx hormati
+no-store; cookie signed httpOnly 192-bit; tak ada token-bypass). Yang TERSISA sebelum fitur boleh
+dinyalakan sebagai paywall keras:
+
+- **WebRTC ungated (residual INFRA) — BLOCKER paywall.** `/webrtc/*` diproxy nginx langsung ke
+  MediaMTX (`webrtcAllowOrigin '*'`), tanpa gerbang backend. Read-model SUDAH tidak menyiarkan URL
+  webrtc untuk kamera gated (list publik sembunyikan SEMUA URL; detail/pass-holder hanya URL HLS
+  gated), TAPI pemegang pass masih bisa menurunkan stream key dari URL HLS lalu share via
+  `/webrtc/{key}`. Untuk paywall keras: **gate `/webrtc` di nginx/MediaMTX** (auth per-path) ATAU
+  nonaktifkan WebRTC untuk deployment ini. Tanpa ini, gating bersifat "lunak" di lapisan app.
+- **Purge CDN saat pertama meng-gate sebuah area.** Segmen community yang sudah ter-cache Cloudflare
+  `public, immutable` bisa terlayan ke non-pass-holder s/d TTL (~60s) habis. Purge `/hls` +
+  `/external-segment` saat flag dinyalakan (runbook Phase 5).
+- **PLAYBACK kamera gated belum dikunci (keputusan produk).** `recordingPlaybackService` hanya menolak
+  non-community; kamera gated tetap community → rekamannya bisa ditonton gratis bila public-playback
+  aktif untuk area itu. Fitur ini fokus LIVE. Bila klien ingin playback ikut terkunci, tambah cabang
+  voucher di `resolvePlaybackAccess` (mirror canViewLive). Catatan: banyak deployment mematikan public
+  playback demi privasi → kondisi bocor ini sempit.
+- **`/api/stream/:id` + `/token` JSON** tidak ditandai no-store untuk kamera gated — BUKAN bypass (URL
+  HLS-nya tetap gated cookie; stream token tak bypass gerbang voucher community). Defense-in-depth saja.
+
+### Pengingat WAJIB untuk Phase 2/3 (dari review Phase 1)
 - **Endpoint redeem publik `/buka` (Phase 3) WAJIB rate-limit** per-IP + per-device, dan kembalikan
   **satu pesan error generik** untuk semua kasus tak-bisa-ditebus (kode salah/dicabut/kadaluwarsa) agar
   tidak jadi oracle keberadaan kode. (Pesan spesifik saat ini hanya untuk layanan/admin.)

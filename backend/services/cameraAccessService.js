@@ -10,6 +10,7 @@
  */
 
 import { queryOne } from '../database/connectionPool.js';
+import voucherService from './voucherService.js';
 
 export const CAMERA_CLASSES = ['community', 'owner_private', 'subscriber'];
 export const STAFF_ROLES = new Set(['admin', 'viewer']);
@@ -17,7 +18,7 @@ export const STAFF_ROLES = new Set(['admin', 'viewer']);
 // 30s TTL: suspension/resume and class changes take effect on live streams within
 // this window without putting a DB lookup on every HLS segment request.
 const ACCESS_CACHE_TTL_MS = 30000;
-const ACCESS_PROJECTION = 'id, stream_key, enabled, owner_user_id, camera_class, billing_status, is_public';
+const ACCESS_PROJECTION = 'id, stream_key, enabled, owner_user_id, camera_class, billing_status, is_public, area_id';
 
 const cacheById = new Map();
 const cacheByStreamKey = new Map();
@@ -35,6 +36,7 @@ function normalizeInfo(row) {
         camera_class: cameraClass,
         billing_status: row.billing_status || null,
         is_public: row.is_public === 1 || row.is_public === true,
+        area_id: row.area_id ?? null,
     };
 }
 
@@ -129,33 +131,62 @@ export function isOwner(info, user) {
 }
 
 /**
+ * Voucher area-gate decision for a PUBLIC-by-class camera. Returns true when access must be
+ * BLOCKED because the camera's area is voucher-gated (feature on + area marked) and the requester
+ * is neither staff nor a device holding an active pass for that area. Staff always bypass.
+ */
+function voucherBlocks(info, user, voucherDeviceHash, voucherGated) {
+    if (!voucherGated || isStaff(user)) {
+        return false;
+    }
+    return !(voucherDeviceHash
+        && voucherService.hasAreaAccess(info.area_id, { deviceHash: voucherDeviceHash }));
+}
+
+/**
  * Live-view decision for a single camera.
  *
  * @param {object} params
- * @param {object|null} params.info        result of getAccessInfo*
- * @param {object|null} params.user        decoded JWT user ({id, role}) or null
- * @param {object|null} params.streamToken decoded stream_access JWT ({cameraId}) or null
- * @returns {{allowed: boolean, statusCode?: number, reason?: string}}
+ * @param {object|null} params.info             result of getAccessInfo*
+ * @param {object|null} params.user             decoded JWT user ({id, role}) or null
+ * @param {object|null} params.streamToken      decoded stream_access JWT ({cameraId}) or null
+ * @param {string|null} params.voucherDeviceHash device id from the signed voucher cookie, or null
+ * @returns {{allowed: boolean, statusCode?: number, reason?: string, voucherGated: boolean}}
+ *
+ * `voucherGated` is returned on EVERY outcome so callers can mark the response private/no-store
+ * and never edge-cache a gated stream's segments (a cached segment would bypass this gate).
  */
-export function canViewLive({ info, user = null, streamToken = null }) {
+export function canViewLive({ info, user = null, streamToken = null, voucherDeviceHash = null }) {
     if (!info || !info.enabled) {
-        return { allowed: false, statusCode: 404, reason: 'camera_not_found' };
+        return { allowed: false, statusCode: 404, reason: 'camera_not_found', voucherGated: false };
     }
 
+    // OVERLAY: a community / published-public camera in an admin-marked gated area requires an
+    // active voucher pass while the feature is on. camera_class is untouched, so the
+    // "non-community never public" rule still holds — this is a separate access layer on top.
+    const voucherGated = !!info.area_id && voucherService.isAreaAccessGated(info.area_id);
+
     if (info.camera_class === 'community') {
-        return { allowed: true };
+        if (voucherBlocks(info, user, voucherDeviceHash, voucherGated)) {
+            return { allowed: false, statusCode: 402, reason: 'voucher_required', voucherGated: true };
+        }
+        return { allowed: true, voucherGated };
     }
 
     // A subscriber camera the owner published is public-live while actively paid — anyone
-    // may view it, no token/login. When it suspends (billing_status !== 'active') it falls
-    // through and only the owner/staff/token can see it, so it disappears from the public.
+    // may view it, no token/login (still subject to the voucher area-gate overlay above).
+    // When it suspends (billing_status !== 'active') it falls through and only the
+    // owner/staff/token can see it, so it disappears from the public.
     if (isPublishedSubscriber(info)) {
-        return { allowed: true };
+        if (voucherBlocks(info, user, voucherDeviceHash, voucherGated)) {
+            return { allowed: false, statusCode: 402, reason: 'voucher_required', voucherGated: true };
+        }
+        return { allowed: true, voucherGated };
     }
 
     // Staff bypass: ops must be able to inspect any stream, including suspended ones.
     if (isStaff(user)) {
-        return { allowed: true };
+        return { allowed: true, voucherGated };
     }
 
     const tokenMatchesCamera = !!streamToken
@@ -163,14 +194,14 @@ export function canViewLive({ info, user = null, streamToken = null }) {
     const viewerAuthorized = isOwner(info, user) || tokenMatchesCamera;
 
     if (!viewerAuthorized) {
-        return { allowed: false, statusCode: 403, reason: 'not_camera_owner' };
+        return { allowed: false, statusCode: 403, reason: 'not_camera_owner', voucherGated };
     }
 
     if (info.camera_class === 'subscriber' && info.billing_status !== 'active') {
-        return { allowed: false, statusCode: 402, reason: 'subscription_suspended' };
+        return { allowed: false, statusCode: 402, reason: 'subscription_suspended', voucherGated };
     }
 
-    return { allowed: true };
+    return { allowed: true, voucherGated };
 }
 
 export default {

@@ -19,6 +19,15 @@ vi.mock('../database/connectionPool.js', () => ({
     execute: vi.fn(),
 }));
 
+const { voucherMock } = vi.hoisted(() => ({
+    voucherMock: {
+        isAreaAccessGated: vi.fn(() => false),
+        hasAreaAccess: vi.fn(() => false),
+    },
+}));
+
+vi.mock('../services/voucherService.js', () => ({ default: voucherMock }));
+
 import {
     getAccessInfo,
     getAccessInfoByStreamKey,
@@ -43,6 +52,75 @@ describe('cameraAccessService', () => {
     beforeEach(() => {
         queryOneMock.mockReset();
         invalidateCameraAccessCache();
+        voucherMock.isAreaAccessGated.mockReset();
+        voucherMock.isAreaAccessGated.mockReturnValue(false);
+        voucherMock.hasAreaAccess.mockReset();
+        voucherMock.hasAreaAccess.mockReturnValue(false);
+    });
+
+    describe('voucher area-gate (overlay on public-by-class cameras)', () => {
+        const communityInfo = { ...cameraRow({ camera_class: 'community', owner_user_id: null, area_id: 5 }), enabled: true };
+
+        it('is inert when the area is not voucher-gated — community stays public', () => {
+            voucherMock.isAreaAccessGated.mockReturnValue(false);
+            const r = canViewLive({ info: communityInfo, user: null });
+            expect(r.allowed).toBe(true);
+            expect(r.voucherGated).toBe(false);
+            expect(voucherMock.hasAreaAccess).not.toHaveBeenCalled();
+        });
+
+        it('blocks an anonymous viewer without a pass (402 voucher_required)', () => {
+            voucherMock.isAreaAccessGated.mockReturnValue(true);
+            voucherMock.hasAreaAccess.mockReturnValue(false);
+            const r = canViewLive({ info: communityInfo, user: null, voucherDeviceHash: 'dev-x' });
+            expect(r.allowed).toBe(false);
+            expect(r.statusCode).toBe(402);
+            expect(r.reason).toBe('voucher_required');
+            expect(r.voucherGated).toBe(true);
+        });
+
+        it('allows a device that holds an active pass for the area', () => {
+            voucherMock.isAreaAccessGated.mockReturnValue(true);
+            voucherMock.hasAreaAccess.mockReturnValue(true);
+            const r = canViewLive({ info: communityInfo, user: null, voucherDeviceHash: 'dev-pass' });
+            expect(r.allowed).toBe(true);
+            expect(r.voucherGated).toBe(true);
+            expect(voucherMock.hasAreaAccess).toHaveBeenCalledWith(5, { deviceHash: 'dev-pass' });
+        });
+
+        it('blocks when no device hash is present even though the area is gated', () => {
+            voucherMock.isAreaAccessGated.mockReturnValue(true);
+            const r = canViewLive({ info: communityInfo, user: null, voucherDeviceHash: null });
+            expect(r.allowed).toBe(false);
+            expect(r.statusCode).toBe(402);
+        });
+
+        it('lets staff bypass the voucher gate', () => {
+            voucherMock.isAreaAccessGated.mockReturnValue(true);
+            voucherMock.hasAreaAccess.mockReturnValue(false);
+            const r = canViewLive({ info: communityInfo, user: { id: 1, role: 'admin' } });
+            expect(r.allowed).toBe(true);
+            expect(r.voucherGated).toBe(true);
+        });
+
+        it('also gates a published-public subscriber camera in a gated area', () => {
+            voucherMock.isAreaAccessGated.mockReturnValue(true);
+            voucherMock.hasAreaAccess.mockReturnValue(false);
+            const info = { ...cameraRow({ is_public: true, billing_status: 'active', area_id: 5 }), enabled: true };
+            const r = canViewLive({ info, user: null, voucherDeviceHash: 'dev-x' });
+            expect(r.allowed).toBe(false);
+            expect(r.statusCode).toBe(402);
+            expect(r.reason).toBe('voucher_required');
+        });
+
+        it('does not consult the voucher service for a camera with no area', () => {
+            voucherMock.isAreaAccessGated.mockReturnValue(true);
+            const info = { ...cameraRow({ camera_class: 'community', owner_user_id: null, area_id: null }), enabled: true };
+            const r = canViewLive({ info, user: null });
+            expect(r.allowed).toBe(true);
+            expect(r.voucherGated).toBe(false);
+            expect(voucherMock.isAreaAccessGated).not.toHaveBeenCalled();
+        });
     });
 
     describe('canViewLive decision matrix', () => {

@@ -10,10 +10,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import streamService from '../services/streamService.js';
 import { invalidateCameraAccessCache } from '../services/cameraAccessService.js';
 
-const { queryMock, queryOneMock, viewStatsMock } = vi.hoisted(() => ({
+const { queryMock, queryOneMock, viewStatsMock, voucherGatedMock } = vi.hoisted(() => ({
     queryMock: vi.fn(),
     queryOneMock: vi.fn(),
     viewStatsMock: vi.fn(),
+    voucherGatedMock: vi.fn(() => false),
 }));
 
 vi.mock('../database/connectionPool.js', () => ({
@@ -40,6 +41,10 @@ vi.mock('../services/cameraHealthService.js', () => ({
     },
 }));
 
+vi.mock('../services/voucherService.js', () => ({
+    default: { isAreaAccessGated: voucherGatedMock },
+}));
+
 describe('streamService camera response routing', () => {
     beforeEach(() => {
         queryMock.mockReset();
@@ -49,6 +54,56 @@ describe('streamService camera response routing', () => {
         // The tenancy gate caches access rows for 30s — clear between tests so
         // each test's queryOne mock fully controls what the gate sees.
         invalidateCameraAccessCache();
+        voucherGatedMock.mockReset();
+        voucherGatedMock.mockReturnValue(false);
+    });
+
+    describe('voucher-gated read model (Phase 2)', () => {
+        it('drops webrtc but keeps the gated HLS proxy URL for a pass-holder (detail view)', () => {
+            voucherGatedMock.mockReturnValue(true);
+            const r = streamService.buildCameraResponse({
+                id: 9, stream_key: 'cam9key', stream_source: 'internal', area_id: 5,
+            });
+            expect(r.streams.hls).toContain('cam9key');
+            expect(r.streams.webrtc).toBeNull();
+            expect(voucherGatedMock).toHaveBeenCalledWith(5);
+        });
+
+        it('hides ALL stream URLs for a gated camera in the public list (lockGatedStreams)', () => {
+            voucherGatedMock.mockReturnValue(true);
+            const r = streamService.buildCameraResponse(
+                { id: 9, stream_key: 'cam9key', stream_source: 'internal', area_id: 5 },
+                { lockGatedStreams: true }
+            );
+            expect(r.streams).toEqual({});
+        });
+
+        it('withholds the raw URL for a gated external direct-stream camera (no gated proxy path)', () => {
+            voucherGatedMock.mockReturnValue(true);
+            const r = streamService.buildCameraResponse({
+                id: 12, stream_source: 'external',
+                external_hls_url: 'https://up.example/live.m3u8',
+                external_stream_url: 'https://up.example/live.m3u8',
+                external_use_proxy: 0, area_id: 5,
+            });
+            expect(r.streams.hls).toBeNull();
+            expect(r.external_hls_url).toBeNull();
+            expect(r.external_stream_url).toBeNull();
+        });
+
+        it('leaves a non-gated camera untouched (feature off / area not marked)', () => {
+            voucherGatedMock.mockReturnValue(false);
+            const r = streamService.buildCameraResponse({
+                id: 9, stream_key: 'cam9key', stream_source: 'internal', area_id: 5,
+            });
+            expect(r.streams.webrtc).toContain('cam9key');
+        });
+
+        it('does not consult the voucher service for a camera with no area', () => {
+            voucherGatedMock.mockReturnValue(true);
+            streamService.buildCameraResponse({ id: 9, stream_key: 'cam9key', stream_source: 'internal' });
+            expect(voucherGatedMock).not.toHaveBeenCalled();
+        });
     });
 
     it('routes external_hls streams.hls through the opaque /api/stream proxy when external_use_proxy is enabled (default)', () => {
