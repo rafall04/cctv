@@ -133,6 +133,7 @@ export default function AdminLayout({ children }) {
         { label: 'Areas', path: '/admin/areas', icon: <Icons.MapPin /> },
         { label: 'Sponsors', path: '/admin/sponsors', icon: <Icons.Feedback />, adminOnly: true },
         { label: 'Billing Pelanggan', path: '/admin/billing', icon: <Icons.Users />, adminOnly: true },
+        { label: 'Voucher Akses', path: '/admin/voucher', icon: <Icons.Shield />, adminOnly: true },
         { label: 'IP Kamera (Routing)', path: '/admin/customer-ips', icon: <Icons.Camera />, adminOnly: true },
         { label: 'Ads', path: '/admin/ads', icon: <Icons.Settings />, adminOnly: true },
         { label: 'Users', path: '/admin/users', icon: <Icons.Users />, adminOnly: true },

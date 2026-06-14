@@ -46,6 +46,7 @@ const AdsManagement = lazyWithRetry(() => import('./pages/AdsManagement'), 'ads-
 const RecordingDashboard = lazyWithRetry(() => import('./pages/RecordingDashboard'), 'recording-dashboard');
 const AreaPublicPage = lazyWithRetry(() => import('./pages/AreaPublicPage'), 'area-public-page');
 const BillingManagement = lazyWithRetry(() => import('./pages/BillingManagement'), 'billing-management');
+const VoucherManagement = lazyWithRetry(() => import('./pages/VoucherManagement'), 'voucher-management');
 const CustomerCameraIPs = lazyWithRetry(() => import('./pages/CustomerCameraIPs'), 'customer-camera-ips');
 const CustomerLayout = lazyWithRetry(() => import('./layouts/CustomerLayout'), 'customer-layout');
 const MyCameras = lazyWithRetry(() => import('./pages/customer/MyCameras'), 'my-cameras');
@@ -315,6 +316,14 @@ function App() {
                     element={
                         <AdminPageRoute adminOnly>
                             <BillingManagement />
+                        </AdminPageRoute>
+                    }
+                />
+                <Route
+                    path="/admin/voucher"
+                    element={
+                        <AdminPageRoute adminOnly>
+                            <VoucherManagement />
                         </AdminPageRoute>
                     }
                 />
