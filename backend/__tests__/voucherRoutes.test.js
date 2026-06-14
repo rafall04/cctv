@@ -11,21 +11,29 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Fastify from 'fastify';
 import cookie from '@fastify/cookie';
 
-const { voucherMock } = vi.hoisted(() => ({
+const { voucherMock, orderMock } = vi.hoisted(() => ({
     voucherMock: {
         redeemCode: vi.fn(),
         getPublicGateState: vi.fn(),
     },
+    orderMock: {
+        createOrder: vi.fn(),
+        getOwnedOrderStatus: vi.fn(),
+        handleWebhook: vi.fn(),
+    },
 }));
 
 vi.mock('../services/voucherService.js', () => ({ default: voucherMock }));
+vi.mock('../services/voucherOrderService.js', () => ({ default: orderMock }));
 
 import voucherRoutes from '../routes/voucherRoutes.js';
+import voucherWebhookRoutes from '../routes/voucherWebhookRoutes.js';
 
 async function buildApp() {
     const app = Fastify();
     await app.register(cookie, { secret: 'test-secret-abcdefghijklmnopqrstuvwxyz' });
     await app.register(voucherRoutes, { prefix: '/api/voucher' });
+    await app.register(voucherWebhookRoutes, { prefix: '/api/voucher/webhook' });
     return app;
 }
 
@@ -38,6 +46,9 @@ describe('voucher routes', () => {
     beforeEach(async () => {
         voucherMock.redeemCode.mockReset();
         voucherMock.getPublicGateState.mockReset();
+        orderMock.createOrder.mockReset();
+        orderMock.getOwnedOrderStatus.mockReset();
+        orderMock.handleWebhook.mockReset();
         app = await buildApp();
     });
 
@@ -99,5 +110,48 @@ describe('voucher routes', () => {
         const res = await app.inject({ method: 'POST', url: '/api/voucher/redeem', payload: {} });
         expect(res.statusCode).toBe(400);
         expect(voucherMock.redeemCode).not.toHaveBeenCalled();
+    });
+
+    it('POST /order creates an order, sets the device cookie, returns the QR payload', async () => {
+        orderMock.createOrder.mockResolvedValue({ id: 7, status: 'pending', amount: 10000, qris: { qr_string: '00020101' } });
+        const res = await app.inject({ method: 'POST', url: '/api/voucher/order', payload: { profileId: 3, name: 'Budi', phone: '0812' } });
+        expect(res.statusCode).toBe(200);
+        expect(res.json().data.id).toBe(7);
+        expect(String(res.headers['set-cookie'])).toContain('vdev=');
+        expect(orderMock.createOrder).toHaveBeenCalledWith(3, expect.objectContaining({ name: 'Budi', deviceHash: expect.any(String) }));
+    });
+
+    it('POST /order rejects a missing profileId via schema', async () => {
+        const res = await app.inject({ method: 'POST', url: '/api/voucher/order', payload: { name: 'x' } });
+        expect(res.statusCode).toBe(400);
+        expect(orderMock.createOrder).not.toHaveBeenCalled();
+    });
+
+    it('GET /order/:id/status returns the order (private, no-store)', async () => {
+        orderMock.getOwnedOrderStatus.mockResolvedValue({ id: 7, status: 'paid', voucher: { code: 'ABCD-EFGH', area_ids: [1] } });
+        const res = await app.inject({ method: 'GET', url: '/api/voucher/order/7/status' });
+        expect(res.statusCode).toBe(200);
+        expect(res.json().data.voucher.code).toBe('ABCD-EFGH');
+        expect(res.headers['cache-control']).toContain('no-store');
+    });
+
+    it('GET /order/:id/status maps a 404 from the service', async () => {
+        const err = new Error('Order tidak ditemukan');
+        err.statusCode = 404;
+        orderMock.getOwnedOrderStatus.mockRejectedValue(err);
+        const res = await app.inject({ method: 'GET', url: '/api/voucher/order/99/status' });
+        expect(res.statusCode).toBe(404);
+    });
+
+    it('POST /webhook/ipaymu accepts form-urlencoded notify and delegates to the service', async () => {
+        orderMock.handleWebhook.mockResolvedValue({ handled: true, status: 'paid' });
+        const res = await app.inject({
+            method: 'POST',
+            url: '/api/voucher/webhook/ipaymu',
+            headers: { 'content-type': 'application/x-www-form-urlencoded' },
+            payload: 'trx_id=TRX123&status=berhasil',
+        });
+        expect(res.statusCode).toBe(200);
+        expect(orderMock.handleWebhook).toHaveBeenCalledWith(expect.objectContaining({ trx_id: 'TRX123' }));
     });
 });

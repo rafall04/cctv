@@ -48,7 +48,8 @@ export const CSRF_SKIP_ENDPOINTS = [
     '/api/auth/refresh',                // Token rotation via httpOnly cookie; CSRF cookie can expire first
     '/health',                          // Health check endpoint
     '/hls',                             // HLS proxy - public streaming endpoint
-    '/api/billing/webhook'              // Payment gateway webhooks - authenticated by gateway signature
+    '/api/billing/webhook',             // Payment gateway webhooks - authenticated by gateway signature
+    '/api/voucher/webhook'              // Voucher payment webhook - re-verified against the gateway API
 ];
 
 /**

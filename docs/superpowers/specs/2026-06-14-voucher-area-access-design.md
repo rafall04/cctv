@@ -1,7 +1,7 @@
 # Voucher Area Access — Design Spec (2026-06-14)
 
-Status: Phase 1 + Phase 2 SHIPPED 2026-06-14 (skema + service + GATE + cookie + API publik + tests,
-additive, flag OFF). Phase 3-5 belum. Lihat "Implementation status" di bawah.
+Status: Phase 1 + 2 + 3 SHIPPED 2026-06-14 (skema + service + GATE + cookie + API publik + PEMBAYARAN
+mandiri + tests, additive, flag OFF). Phase 4-5 belum. Lihat "Implementation status" di bawah.
 
 ## Implementation status & keputusan terkunci (Phase 1 — 2026-06-14)
 
@@ -50,6 +50,29 @@ Semua di balik flag OFF; saat off perilaku publik byte-identik (suite 1025/1025 
 - **Sengaja TIDAK digate (scope)**: thumbnail kamera gated tetap publik (umpan); **public PLAYBACK**
   kamera gated belum digate — fitur ini fokus LIVE. Tinjau di fase lanjut bila klien ingin playback
   ikut terkunci.
+
+## Implementation status — Phase 3 (pembayaran mandiri) shipped 2026-06-14
+
+Self-serve: pilih paket → bayar iPaymu QRIS → webhook/poll → otomatis terbit + aktivasi 1 kode untuk
+device pembeli. **ISOLASI (keputusan D1): tabel `voucher_orders` terpisah; tabel billing `payments`
+TIDAK disentuh.**
+
+- `voucher_orders` (migrasi `zz_20260614b`): satu order pembayaran (profil, pembeli nama+HP,
+  device_hash, gateway_ref iPaymu, amount, status, qris_payload, code_id, expiry).
+- `voucherOrderService`: `createOrder` (iPaymu `/payment/direct`; reuse pending duplikat), `syncOrder`
+  (re-query `/transaction`, throttled 15s), `handleWebhook` (body untrusted → re-query API),
+  `_confirmOrder` (guarded flip pending→paid + `_ensureCodeIssued` = exactly-once + crash-recovery).
+  Confirm → `voucherService.generateCodes(source:'self')` → set `code_id` → `redeemCode` aktivasi untuk
+  device pembeli.
+- `utils/ipaymuClient.js`: klien iPaymu signed standalone (sengaja DIPISAH dari paymentService demi
+  isolasi; paymentService tak disentuh). Ada duplikasi signing kecil — future task bisa DRY.
+- API publik: `POST /api/voucher/order` (→ QR; set cookie `vdev` di muka), `GET
+  /api/voucher/order/:id/status` (poll; hanya device pemilik), `POST /api/voucher/webhook/ipaymu`
+  (urlencoded, CSRF-exempt, re-verify ke API). Cookie diset saat order → device sama dapat akses saat lunas.
+- **Anti free-access**: konfirmasi HANYA bila iPaymu lapor `paid` + amount cukup (guard mismatch);
+  webhook tak pernah percaya body; exactly-once via guarded flip. Uang INTEGER rupiah.
+- Gateway Phase 3 = **iPaymu** (aktif). Midtrans/GoPay-direct = follow-up (createOrder tinggal ditambah
+  cabang gateway). Tes: `voucherOrderService.test` (11) + route/webhook. Suite penuh 1046/1046.
 
 ### Blocker aktivasi (Phase 5) + keputusan dari review Phase 2 (2026-06-14)
 

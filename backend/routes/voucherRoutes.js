@@ -9,7 +9,12 @@
  * global rate limiter; tighten per-IP/device limits here when the self-serve flow lands (Phase 3).
  */
 
-import { getVoucherAccess, redeemVoucher } from '../controllers/voucherController.js';
+import {
+    getVoucherAccess,
+    redeemVoucher,
+    createVoucherOrder,
+    getVoucherOrderStatus,
+} from '../controllers/voucherController.js';
 
 export default async function voucherRoutes(fastify) {
     fastify.get('/access', getVoucherAccess);
@@ -27,4 +32,23 @@ export default async function voucherRoutes(fastify) {
             },
         },
     }, redeemVoucher);
+
+    // Self-serve payment (Phase 3). CSRF-protected like every public POST (SPA attaches the token);
+    // the webhook lives at /api/voucher/webhook (separate plugin, CSRF-exempt).
+    fastify.post('/order', {
+        schema: {
+            body: {
+                type: 'object',
+                properties: {
+                    profileId: { type: 'integer', minimum: 1 },
+                    name: { type: 'string', maxLength: 100 },
+                    phone: { type: 'string', maxLength: 30 },
+                    methodKey: { type: 'string', maxLength: 40 },
+                },
+                required: ['profileId'],
+            },
+        },
+    }, createVoucherOrder);
+
+    fastify.get('/order/:id/status', getVoucherOrderStatus);
 }

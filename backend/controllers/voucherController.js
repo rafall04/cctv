@@ -7,6 +7,7 @@
  */
 
 import voucherService from '../services/voucherService.js';
+import voucherOrderService from '../services/voucherOrderService.js';
 import {
     readVoucherDeviceHash,
     setVoucherDeviceCookie,
@@ -71,4 +72,76 @@ export async function redeemVoucher(request, reply) {
     }
 }
 
-export default { getVoucherAccess, redeemVoucher };
+/**
+ * POST /api/voucher/order { profileId, name?, phone?, methodKey? } — open a self-serve iPaymu QRIS
+ * payment for a voucher profile, charged to THIS device. Sets the device cookie up-front so the same
+ * device receives access on confirmation. Returns the order + QR payload for the claim page to render.
+ */
+export async function createVoucherOrder(request, reply) {
+    let deviceHash = readVoucherDeviceHash(request);
+    if (!deviceHash) {
+        deviceHash = generateDeviceHash();
+    }
+    try {
+        const { profileId, name = null, phone = null, methodKey = null } = request.body || {};
+        const order = await voucherOrderService.createOrder(profileId, { name, phone, deviceHash, methodKey, ip: request.ip });
+        setVoucherDeviceCookie(request, reply, deviceHash);
+        reply.header('Cache-Control', 'private, no-store');
+        return reply.send({ success: true, data: order });
+    } catch (error) {
+        if (error.statusCode === 429) {
+            return reply.code(429).send({ success: false, message: error.message });
+        }
+        if (error.statusCode === 503) {
+            return reply.code(503).send({ success: false, message: error.message });
+        }
+        if (error.statusCode === 400 || error.statusCode === 404) {
+            return reply.code(400).send({ success: false, message: error.message });
+        }
+        console.error('Create voucher order error:', error);
+        return reply.code(500).send({ success: false, message: 'Gagal membuat order pembayaran' });
+    }
+}
+
+/**
+ * GET /api/voucher/order/:id/status — claim-page poll. Re-checks the gateway and, once paid, returns
+ * the issued voucher (code + area_ids); the device cookie set at order creation already grants access.
+ * Visible only to the device that created the order.
+ */
+export async function getVoucherOrderStatus(request, reply) {
+    try {
+        const { id } = request.params;
+        const deviceHash = readVoucherDeviceHash(request);
+        const order = await voucherOrderService.getOwnedOrderStatus(id, deviceHash);
+        reply.header('Cache-Control', 'private, no-store');
+        return reply.send({ success: true, data: order });
+    } catch (error) {
+        if (error.statusCode === 404) {
+            return reply.code(404).send({ success: false, message: 'Order tidak ditemukan' });
+        }
+        console.error('Voucher order status error:', error);
+        return reply.code(500).send({ success: false, message: 'Internal server error' });
+    }
+}
+
+/**
+ * POST /api/voucher/webhook/ipaymu — iPaymu notify (form-urlencoded, no signature). The body is a
+ * HINT only: the order is re-verified against the iPaymu API before anything is issued.
+ */
+export async function handleVoucherIpaymuWebhook(request, reply) {
+    try {
+        const result = await voucherOrderService.handleWebhook(request.body || {});
+        return reply.send({ success: true, ...result });
+    } catch (error) {
+        console.error('Voucher iPaymu webhook error:', error);
+        return reply.code(500).send({ success: false, message: 'Webhook processing failed' });
+    }
+}
+
+export default {
+    getVoucherAccess,
+    redeemVoucher,
+    createVoucherOrder,
+    getVoucherOrderStatus,
+    handleVoucherIpaymuWebhook,
+};
