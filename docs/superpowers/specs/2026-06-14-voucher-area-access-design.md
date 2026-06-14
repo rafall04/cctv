@@ -1,7 +1,27 @@
 # Voucher Area Access — Design Spec (2026-06-14)
 
-Status: Phase 1 + 2 + 3 SHIPPED 2026-06-14 (skema + service + GATE + cookie + API publik + PEMBAYARAN
-mandiri + tests, additive, flag OFF). Phase 4-5 belum. Lihat "Implementation status" di bawah.
+Status: Phase 1-3 + Phase 4a (admin API) + 4b (admin UI) SHIPPED (skema + service + GATE + cookie +
+API publik + PEMBAYARAN mandiri + admin endpoints + halaman admin React, additive, flag OFF). SISA:
+UI PUBLIK (kamera terkunci + halaman klaim/poll QR + form redeem /buka) + Phase 5 (aktivasi: gate
+WebRTC infra + purge CDN). Lihat "Implementation status" di bawah.
+
+## Implementation status — Phase 4 (admin) shipped 2026-06-15
+
+- **4a backend** (`commit ae4281f`): admin endpoints `/api/admin/voucher/*` (requireAdmin) —
+  `settings` (flag + gated_area_ids), `areas/:id/gate`, `profiles` CRUD, `profiles/:id/codes`
+  (generate), `codes` + `codes/:id/revoke`. Thin glue di atas voucherService. Tes voucherAdminRoutes.
+- **4b frontend service** (`commit e16ed0d`): `voucherAdminService` + `voucherPublicService`.
+- **4b admin UI** (`commit a61b71a`): halaman `pages/VoucherManagement.jsx` di route `/admin/voucher`
+  (lazy di App.jsx + nav "Voucher Akses" di AdminLayout, adminOnly) — toggle flag, toggle area
+  berbayar, CRUD profil (modal durasi value+satuan/harga/maks-pemakai/area-bundle), generate kode
+  batch (salin/cetak) + daftar/cabut. Tes `VoucherManagement.test` (5). Lint bersih.
+  GOTCHA: mock `useNotification` di test HARUS objek stabil (hoisted) — kalau fresh tiap render,
+  `notifyError` ganti identitas → `loadData` useCallback → useEffect reload loop tak henti.
+- **SISA Phase 4 (UI publik):** overlay kamera terkunci di landing/stream-list (derive lock dari
+  `GET /api/voucher/access`: area ∈ gated_area_ids & ∉ accessible_area_ids), halaman klaim/poll QR
+  (createOrder → poll getOrderStatus → tampil kode + buka), form redeem `/buka` (voucherPublicService
+  sudah ada). Suite frontend 588/589 hijau (1 gagal PRE-EXISTING & tak terkait: LandingCameraCard
+  view-stats test stale — di-flag terpisah).
 
 ## Implementation status & keputusan terkunci (Phase 1 — 2026-06-14)
 
