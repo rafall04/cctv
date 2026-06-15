@@ -15,6 +15,20 @@ class StreamWarmer {
         this.warmStreams = new Map(); // pathName -> intervalId
         this.hlsBaseUrl = config.mediamtx?.hlsUrlInternal || 'http://localhost:8888';
         this.mediamtxApiUrl = config.mediamtx?.apiUrl || 'http://localhost:9997';
+        // Source of truth for "which cameras should be warm", injected at startup so reconcile()
+        // can self-fetch without importing the DB layer (avoids an import cycle with mediaMtxService).
+        this.cameraProvider = null;
+        this.reconcileTimer = null; // debounce handle for scheduleReconcile()
+    }
+
+    /** MediaMTX path name for a camera (matches mediaMtxService path naming). */
+    pathNameFor(camera) {
+        return camera.stream_key || `camera${camera.id}`;
+    }
+
+    /** True when the camera's resolved internal ingest policy is always_on (i.e. should be kept warm). */
+    shouldWarm(camera) {
+        return resolveInternalIngestPolicy(camera, camera._areaPolicy || null).mode === 'always_on';
     }
 
     /**
@@ -119,18 +133,17 @@ class StreamWarmer {
         console.log(`[StreamWarmer] Evaluating ${cameras.length} camera streams for pre-warm...`);
         
         for (const camera of cameras) {
-            const resolvedPolicy = resolveInternalIngestPolicy(camera, camera._areaPolicy || null);
-            const pathName = camera.stream_key || `camera${camera.id}`;
+            const pathName = this.pathNameFor(camera);
 
-            if (resolvedPolicy.mode !== 'always_on') {
+            if (!this.shouldWarm(camera)) {
                 skipped++;
                 this.stopWarming(pathName);
                 continue;
             }
-            
+
             this.warmStream(pathName);
             warmed++;
-            
+
             await this.waitBetweenWarmStarts();
         }
         
@@ -142,6 +155,84 @@ class StreamWarmer {
         };
     }
 
+    /**
+     * Reconcile the warm set against the current desired state (idempotent).
+     *
+     * Unlike warmAllCameras() — a one-shot startup pass over a snapshot — this also STOPS warming
+     * paths that are no longer eligible: camera deleted, disabled, flipped to on_demand, moved to an
+     * on_demand area, or whose stream_key changed. That makes it safe to run on every camera/area
+     * mutation and on a periodic timer, and it is a no-op when nothing changed.
+     *
+     * This is the piece that keeps cameras created/edited AFTER backend startup warm without a
+     * restart — warmAllCameras() only ever saw the boot-time camera list, so a camera added later was
+     * never warmed (its HLS muxer stayed cold under hlsAlwaysRemux:no → slow first-viewer TTFF).
+     *
+     * @param {Array} cameras - enabled internal cameras (e.g. mediaMtxService.getDatabaseCameras()).
+     */
+    async reconcile(cameras = []) {
+        const desired = new Set();
+        for (const camera of cameras) {
+            if (this.shouldWarm(camera)) {
+                desired.add(this.pathNameFor(camera));
+            }
+        }
+
+        // Stop paths that should no longer be warm (deleted / disabled / flipped to on_demand /
+        // re-keyed). warmAllCameras never did this for cameras absent from its list, leaking intervals.
+        let stopped = 0;
+        for (const pathName of [...this.warmStreams.keys()]) {
+            if (!desired.has(pathName)) {
+                this.stopWarming(pathName);
+                stopped++;
+            }
+        }
+
+        // Start newly-eligible paths. Stagger only the genuinely new starts (steady state adds none,
+        // so a periodic reconcile is effectively free).
+        let started = 0;
+        for (const pathName of desired) {
+            if (!this.warmStreams.has(pathName)) {
+                await this.warmStream(pathName);
+                started++;
+                await this.waitBetweenWarmStarts();
+            }
+        }
+
+        if (started > 0 || stopped > 0) {
+            console.log(`[StreamWarmer] Reconcile: +${started} started, -${stopped} stopped (${desired.size} always_on)`);
+        }
+
+        return { desired: desired.size, started, stopped };
+    }
+
+    /**
+     * Inject the source of truth for the desired warm set (set once at startup). Keeps this service
+     * DB-agnostic so it does not import mediaMtxService (which would create an import cycle).
+     */
+    setCameraProvider(fn) {
+        this.cameraProvider = typeof fn === 'function' ? fn : null;
+    }
+
+    /**
+     * Debounced reconcile trigger for camera/area mutations. Coalesces bursts (bulk edits, rapid
+     * saves) into a single reconcile shortly after the last change, so toggling always_on/on_demand
+     * takes effect within ~1.5s instead of waiting for the periodic pass. No-op until a provider is set.
+     */
+    scheduleReconcile(delayMs = 1500) {
+        if (!this.cameraProvider) {
+            return;
+        }
+        if (this.reconcileTimer) {
+            clearTimeout(this.reconcileTimer);
+        }
+        this.reconcileTimer = setTimeout(() => {
+            this.reconcileTimer = null;
+            Promise.resolve()
+                .then(() => this.reconcile(this.cameraProvider() || []))
+                .catch((error) => console.error('[StreamWarmer] Reconcile failed:', error.message));
+        }, delayMs);
+    }
+
     async waitBetweenWarmStarts(delayMs = 5000) {
         await new Promise(resolve => setTimeout(resolve, delayMs));
     }
@@ -150,6 +241,10 @@ class StreamWarmer {
      * Stop all warming
      */
     stopAll() {
+        if (this.reconcileTimer) {
+            clearTimeout(this.reconcileTimer);
+            this.reconcileTimer = null;
+        }
         for (const [pathName, intervalId] of this.warmStreams) {
             clearInterval(intervalId);
         }

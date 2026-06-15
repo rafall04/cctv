@@ -484,6 +484,20 @@ const start = async () => {
             await streamWarmer.warmAllCameras(cameras);
             console.log('[StreamWarmer] Streams pre-warmed for instant playback');
         }
+
+        // Keep the warm set in sync AFTER startup. warmAllCameras() above only saw the boot-time
+        // snapshot, so a camera created/edited later (or flipped always_on⇄on_demand) was never
+        // (un)warmed — its HLS muxer stayed cold under hlsAlwaysRemux:no → slow first-viewer TTFF.
+        // Provider = source of truth; periodic reconcile = self-healing net (mirrors mediaMtxService's
+        // 30s path sync); mutations also trigger a debounced reconcile via streamWarmer.scheduleReconcile().
+        streamWarmer.setCameraProvider(() => mediaMtxService.getDatabaseCameras());
+        recordingScheduler.register({
+            name: 'streamwarmer-reconcile',
+            task: () => streamWarmer.reconcile(mediaMtxService.getDatabaseCameras()),
+            intervalMs: 30000,
+            initialDelayMs: 30000,
+        });
+        console.log('[StreamWarmer] Warm-set reconcile scheduled (30s interval)');
         
         // Start security audit log cleanup scheduler
         startDailyCleanup();

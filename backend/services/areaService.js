@@ -3,6 +3,7 @@ import { PUBLIC_LIVE_SQL } from '../utils/cameraVisibility.js';
 import cache, { CacheTTL, CacheNamespace, cacheKey } from './cacheService.js';
 import cameraHealthService from './cameraHealthService.js';
 import mediaMtxService from './mediaMtxService.js';
+import streamWarmer from './streamWarmer.js';
 import { getCameraDeliveryProfile, normalizeExternalHealthMode } from '../utils/cameraDelivery.js';
 import {
     normalizeInternalIngestPolicy,
@@ -480,6 +481,9 @@ class AreaService {
                 mediaMtxService.syncAreaCameras(id).catch((error) => {
                     console.error(`[Area] Failed to sync MediaMTX area ${id}:`, error.message);
                 });
+                // Area default flips the resolved mode of every default-policy camera in the area
+                // (always_on⇄on_demand), so re-sync the warm set too — not just MediaMTX path config.
+                streamWarmer.scheduleReconcile();
             }
             return updatedArea;
         } catch (error) {

@@ -24,6 +24,7 @@ import { sanitizeCameraThumbnail, sanitizeCameraThumbnailList } from './thumbnai
 import cameraHealthService from './cameraHealthService.js';
 import cameraRuntimeStateService from './cameraRuntimeStateService.js';
 import cameraSourceLifecycleService from './cameraSourceLifecycleService.js';
+import streamWarmer from './streamWarmer.js';
 import {
     DELIVERY_TYPES,
     DELIVERY_TYPE_PATTERNS,
@@ -1336,6 +1337,10 @@ class CameraService {
         cacheInvalidate(`${CacheNamespace.STATS}:camera-`);
         // Tenancy gate cache: class/owner/billing changes must hit live streams fast.
         invalidateCameraAccessCache();
+        // Any camera mutation (create/update/delete/bulk/source-change/enable) funnels through here,
+        // so this is the single chokepoint that keeps the always_on warm set in sync without a
+        // restart. Debounced + no-op until the provider is wired at startup, so it is test-safe.
+        streamWarmer.scheduleReconcile();
         console.log('[Cache] Camera cache invalidated');
     }
 
