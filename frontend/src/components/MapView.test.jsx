@@ -1244,6 +1244,109 @@ describe('MapView area filter visibility', () => {
         });
     });
 
+    it('memfokuskan peta ke lokasi pengguna dan meringkas CCTV terdekat saat tombol GPS ditekan', async () => {
+        const getCurrentPosition = vi.fn((ok) => ok({
+            coords: { latitude: -7.1506, longitude: 111.8816, accuracy: 20 },
+        }));
+        Object.defineProperty(navigator, 'geolocation', {
+            configurable: true,
+            value: { getCurrentPosition },
+        });
+
+        try {
+            render(<MapView cameras={cameras} areas={[]} showAreaFilter />);
+
+            setViewMock.mockClear();
+            fireEvent.click(screen.getByTestId('map-locate-me'));
+
+            await waitFor(() => {
+                expect(setViewMock).toHaveBeenCalledWith([-7.1506, 111.8816], 16, { animate: true, duration: 0.5 });
+            });
+
+            expect(getCurrentPosition).toHaveBeenCalledTimes(1);
+            // "You are here" marker rendered at the resolved coordinates.
+            expect(screen.getByTestId('marker--7.1506-111.8816')).toBeTruthy();
+            // Nearby summary references the nearest camera (the lone Lobby camera ~15 m away).
+            expect(screen.getByTestId('map-locate-nearby').textContent).toMatch(/Lobby/);
+        } finally {
+            Object.defineProperty(navigator, 'geolocation', { configurable: true, value: undefined });
+        }
+    });
+
+    it('menampilkan pesan error saat akses GPS ditolak', async () => {
+        const getCurrentPosition = vi.fn((_ok, err) => err({ code: 1 }));
+        Object.defineProperty(navigator, 'geolocation', {
+            configurable: true,
+            value: { getCurrentPosition },
+        });
+
+        try {
+            render(<MapView cameras={cameras} areas={[]} showAreaFilter />);
+
+            fireEvent.click(screen.getByTestId('map-locate-me'));
+
+            await waitFor(() => {
+                expect(screen.getByTestId('map-locate-error').textContent).toContain('Akses GPS ditolak');
+            });
+            expect(screen.queryByTestId('marker--7.1506-111.8816')).toBeNull();
+        } finally {
+            Object.defineProperty(navigator, 'geolocation', { configurable: true, value: undefined });
+        }
+    });
+
+    it('membersihkan marker GPS dan ringkasan terdekat saat Reset view ditekan', async () => {
+        const getCurrentPosition = vi.fn((ok) => ok({
+            coords: { latitude: -7.1506, longitude: 111.8816, accuracy: 20 },
+        }));
+        Object.defineProperty(navigator, 'geolocation', {
+            configurable: true,
+            value: { getCurrentPosition },
+        });
+
+        try {
+            render(<MapView cameras={cameras} areas={[]} showAreaFilter />);
+
+            fireEvent.click(screen.getByTestId('map-locate-me'));
+            await waitFor(() => {
+                expect(screen.getByTestId('marker--7.1506-111.8816')).toBeTruthy();
+            });
+            expect(screen.getByTestId('map-locate-nearby')).toBeTruthy();
+
+            fireEvent.click(screen.getByTestId('map-reset-view'));
+
+            await waitFor(() => {
+                expect(screen.queryByTestId('marker--7.1506-111.8816')).toBeNull();
+            });
+            expect(screen.queryByTestId('map-locate-nearby')).toBeNull();
+        } finally {
+            Object.defineProperty(navigator, 'geolocation', { configurable: true, value: undefined });
+        }
+    });
+
+    it('mengabaikan fix GPS bogus di (0,0) Null Island', async () => {
+        const getCurrentPosition = vi.fn((ok) => ok({
+            coords: { latitude: 0, longitude: 0, accuracy: 5 },
+        }));
+        Object.defineProperty(navigator, 'geolocation', {
+            configurable: true,
+            value: { getCurrentPosition },
+        });
+
+        try {
+            render(<MapView cameras={cameras} areas={[]} showAreaFilter />);
+
+            setViewMock.mockClear();
+            fireEvent.click(screen.getByTestId('map-locate-me'));
+
+            await waitFor(() => expect(getCurrentPosition).toHaveBeenCalledTimes(1));
+            expect(screen.queryByTestId('marker-0-0')).toBeNull();
+            expect(screen.queryByTestId('map-locate-nearby')).toBeNull();
+            expect(setViewMock).not.toHaveBeenCalled();
+        } finally {
+            Object.defineProperty(navigator, 'geolocation', { configurable: true, value: undefined });
+        }
+    });
+
     it('menggunakan fitBounds dengan zoom kabupaten saat coverage area luas', async () => {
         const broadAreaCameras = [
             {

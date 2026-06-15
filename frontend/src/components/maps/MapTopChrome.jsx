@@ -1,10 +1,12 @@
 /*
  * Purpose: Render public map top chrome controls without blocking Leaflet layer controls.
  * Caller: MapView public CCTV map.
- * Deps: React props from MapView.
+ * Deps: React props from MapView, ui/Icons for the GPS pin glyph.
  * MainFuncs: MapTopChrome.
- * SideEffects: Emits area filter and reset events through callback props.
+ * SideEffects: Emits area filter, reset, and locate-me events through callback props.
  */
+
+import { Icons } from '../ui/Icons.jsx';
 
 export default function MapTopChrome({
     showAreaFilter,
@@ -16,6 +18,10 @@ export default function MapTopChrome({
     shouldShowZoomHint,
     onAreaChange,
     onResetView,
+    onLocateMe,
+    isLocating = false,
+    locateError = null,
+    nearbyMessage = null,
 }) {
     return (
         <div
@@ -59,6 +65,46 @@ export default function MapTopChrome({
                                 Reset
                             </button>
                         </div>
+                    </div>
+                )}
+
+                {typeof onLocateMe === 'function' && (
+                    <div
+                        data-testid="map-locate-panel"
+                        className="pointer-events-auto rounded-2xl border border-white/55 bg-white/78 p-1.5 shadow-[0_14px_30px_rgba(15,23,42,0.12)] backdrop-blur-xl dark:border-white/10 dark:bg-gray-900/72"
+                    >
+                        <button
+                            type="button"
+                            onClick={onLocateMe}
+                            disabled={isLocating}
+                            aria-busy={isLocating}
+                            data-testid="map-locate-me"
+                            aria-label="Cek CCTV terdekat dari lokasi saya"
+                            className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-white/40 bg-white/70 px-3 py-2 text-[11px] font-semibold text-gray-700 shadow-sm transition-all hover:-translate-y-0.5 hover:bg-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-gray-800/85 dark:text-gray-200 dark:hover:bg-gray-800"
+                        >
+                            <Icons.MapPin />
+                            {isLocating ? 'Mencari lokasi…' : 'Cek CCTV terdekat'}
+                        </button>
+                        {locateError && (
+                            <p
+                                data-testid="map-locate-error"
+                                role="alert"
+                                className="mt-1.5 px-1 text-[11px] font-medium text-red-600 dark:text-red-400"
+                            >
+                                {locateError}
+                            </p>
+                        )}
+                        {!locateError && nearbyMessage && (
+                            <p
+                                data-testid="map-locate-nearby"
+                                role="status"
+                                aria-live="polite"
+                                title="Jarak garis lurus (bukan jarak tempuh)"
+                                className="mt-1.5 px-1 text-[11px] font-medium text-gray-600 dark:text-gray-300"
+                            >
+                                {nearbyMessage}
+                            </p>
+                        )}
                     </div>
                 )}
 

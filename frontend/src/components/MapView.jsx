@@ -23,6 +23,8 @@ import {
     hasValidCoords,
     normalizeAreaKey,
 } from '../utils/mapCoordinateUtils.js';
+import { sortCamerasByDistance, formatDistanceLabel } from '../utils/geoDistance.js';
+import { useGeolocation } from '../hooks/useGeolocation.js';
 
 // Fix Leaflet icons
 delete L.Icon.Default.prototype._getIconUrl;
@@ -40,6 +42,35 @@ const DENSE_AREA_THRESHOLD = 24;
 const ALL_AREA_SUPER_AGGREGATE_ZOOM = 11;
 const VIEWPORT_RECALC_DEBOUNCE_MS = 100;
 const MAX_VISIBLE_INDIVIDUAL_MARKERS = 120;
+// Neighborhood scale for "Cek CCTV terdekat" so individual nearby cameras become visible.
+const USER_LOCATION_ZOOM = 16;
+// Radius used to summarize how many cameras sit near the located user (+ a clean round-km label).
+const NEARBY_RADIUS_METERS = 5000;
+const NEARBY_RADIUS_LABEL = '5 km';
+
+// "You are here" marker icon (cached). Reuses the transparent divIcon wrapper convention; the
+// blue dot + pulse styling lives in styles/leaflet-overrides.css (.custom-user-marker).
+const createUserLocationIcon = () => {
+    const cacheKey = 'user-location';
+    if (iconCache.has(cacheKey)) {
+        return iconCache.get(cacheKey);
+    }
+
+    const icon = L.divIcon({
+        className: 'custom-user-marker',
+        html: `
+            <div class="user-location-dot">
+                <span class="user-location-pulse"></span>
+                <span class="user-location-core"></span>
+            </div>
+        `,
+        iconSize: [22, 22],
+        iconAnchor: [11, 11],
+    });
+
+    iconCache.set(cacheKey, icon);
+    return icon;
+};
 
 // CCTV Marker - dengan support status (active, maintenance, tunnel, offline)
 const createCameraIcon = (status = 'active', isTunnel = false, isOnline = true, availabilityState = 'online') => {
@@ -609,6 +640,36 @@ const MapView = memo(({
     const previousSelectedAreaRef = useRef(selectedAreaValue);
     const lastFocusedCameraIdRef = useRef(null);
 
+    // Opt-in GPS "Cek CCTV terdekat" — only requests location on explicit button press.
+    const {
+        position: rawUserLocation,
+        loading: isLocating,
+        error: locateError,
+        requestLocation,
+        clearPosition,
+    } = useGeolocation();
+
+    // A fix at exactly (0,0) is a bogus/zeroed reading (Null Island), not a real location in our
+    // coverage area. Treat only finite, non-null-island coordinates as usable so the marker, fly-to,
+    // and nearby summary all agree on what counts as "located".
+    const userLocation = useMemo(() => {
+        if (!rawUserLocation) {
+            return null;
+        }
+        const { latitude, longitude } = rawUserLocation;
+        if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+            return null;
+        }
+        if (latitude === 0 && longitude === 0) {
+            return null;
+        }
+        return rawUserLocation;
+    }, [rawUserLocation]);
+
+    const handleLocateMe = useCallback(() => {
+        requestLocation();
+    }, [requestLocation]);
+
     const setSelectedAreaValue = useCallback((value) => {
         if (typeof onAreaChange === 'function') {
             onAreaChange(value);
@@ -633,6 +694,19 @@ const MapView = memo(({
             ...command,
         });
     }, []);
+
+    // When the user shares their location, fly the map there at neighborhood zoom so nearby
+    // cameras become visible. A new position object on each request re-triggers this.
+    useEffect(() => {
+        if (!userLocation) {
+            return;
+        }
+        enqueueViewportCommand({
+            type: 'focus_user',
+            center: [userLocation.latitude, userLocation.longitude],
+            zoom: USER_LOCATION_ZOOM,
+        });
+    }, [userLocation, enqueueViewportCommand]);
 
     useEffect(() => {
         if (!focusedCameraId || focusedCameraId === lastFocusedCameraIdRef.current) {
@@ -696,6 +770,28 @@ const MapView = memo(({
     }, [viewportState.currentBounds, viewportState.currentZoom]);
 
     const camerasWithCoords = useMemo(() => cameras.filter(hasValidCoords), [cameras]);
+
+    // Summary shown after locating: how many cameras sit within NEARBY_RADIUS_METERS of the user,
+    // plus the single nearest one. Straight-line (haversine); honest "garis lurus" wording.
+    const nearbyMessage = useMemo(() => {
+        if (!userLocation) {
+            return null;
+        }
+        const ranked = sortCamerasByDistance(camerasWithCoords, userLocation);
+        const nearest = ranked.find((camera) => Number.isFinite(camera._distanceMeters));
+        if (!nearest) {
+            return 'Belum ada CCTV dengan koordinat.';
+        }
+        const nearestName = nearest.name?.trim() || 'CCTV terdekat';
+        const nearestLabel = `${nearestName} (${formatDistanceLabel(nearest._distanceMeters)})`;
+        const withinRadius = ranked.filter((camera) => (
+            Number.isFinite(camera._distanceMeters) && camera._distanceMeters <= NEARBY_RADIUS_METERS
+        )).length;
+
+        return withinRadius > 0
+            ? `${withinRadius} CCTV dalam ${NEARBY_RADIUS_LABEL} · terdekat ${nearestLabel}`
+            : `Tidak ada CCTV dalam ${NEARBY_RADIUS_LABEL}. Terdekat ${nearestLabel}`;
+    }, [userLocation, camerasWithCoords]);
 
     const camerasWithCoordsByAreaKey = useMemo(() => {
         const nextMap = new Map();
@@ -926,13 +1022,14 @@ const MapView = memo(({
     };
 
     const handleResetView = useCallback(() => {
+        clearPosition();
         setViewportState((current) => ({
             ...current,
             hasUserInteracted: false,
             viewportMode: 'programmatic',
         }));
         enqueueViewportCommand(buildAreaViewportCommand(selectedAreaValue));
-    }, [buildAreaViewportCommand, enqueueViewportCommand, selectedAreaValue]);
+    }, [buildAreaViewportCommand, clearPosition, enqueueViewportCommand, selectedAreaValue]);
 
     const handleViewportChange = useCallback((nextState) => {
         setViewportState((current) => ({
@@ -942,12 +1039,13 @@ const MapView = memo(({
     }, []);
 
     const handleCommandApplied = useCallback((command) => {
+        const isUserFocus = command.type === 'focus_camera' || command.type === 'focus_user';
         setViewportState((current) => ({
             ...current,
-            viewportMode: command.type === 'focus_camera' ? 'user_controlled' : 'programmatic',
+            viewportMode: isUserFocus ? 'user_controlled' : 'programmatic',
             lastAppliedArea: command.areaName || current.lastAppliedArea,
             lastAppliedFocusCameraId: command.type === 'focus_camera' ? focusedCameraId : current.lastAppliedFocusCameraId,
-            hasUserInteracted: command.type === 'focus_camera' ? true : current.hasUserInteracted,
+            hasUserInteracted: isUserFocus ? true : current.hasUserInteracted,
         }));
     }, [focusedCameraId]);
 
@@ -1015,6 +1113,12 @@ const MapView = memo(({
                     <AggregateMarker key={marker.key} marker={marker} onClick={handleAggregateMarkerClick} />
                 ))}
                 <ImperativeMarkerLayer cameras={visibleIndividualMarkers} onClick={openModal} />
+                {userLocation && (
+                    <Marker
+                        position={[userLocation.latitude, userLocation.longitude]}
+                        icon={createUserLocationIcon()}
+                    />
+                )}
             </MapContainer>
 
             <MapTopChrome
@@ -1027,6 +1131,10 @@ const MapView = memo(({
                 shouldShowZoomHint={shouldShowZoomHint}
                 onAreaChange={handleAreaChange}
                 onResetView={handleResetView}
+                onLocateMe={handleLocateMe}
+                isLocating={isLocating}
+                locateError={locateError}
+                nearbyMessage={nearbyMessage}
             />
 
             <div className="pointer-events-none absolute bottom-3 left-1/2 z-[1000] w-full -translate-x-1/2 px-3">

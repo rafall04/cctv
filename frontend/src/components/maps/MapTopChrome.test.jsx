@@ -59,4 +59,57 @@ describe('MapTopChrome', () => {
         expect(onAreaChange).toHaveBeenCalledTimes(1);
         expect(onResetView).toHaveBeenCalledTimes(1);
     });
+
+    it('omits the GPS locate panel when onLocateMe is not provided', () => {
+        render(<MapTopChrome {...defaultProps} />);
+        expect(screen.queryByTestId('map-locate-panel')).toBeNull();
+        expect(screen.queryByTestId('map-locate-me')).toBeNull();
+    });
+
+    it('renders a clickable GPS locate control in a pointer-events-auto panel', () => {
+        const onLocateMe = vi.fn();
+        render(<MapTopChrome {...defaultProps} onLocateMe={onLocateMe} />);
+
+        const panel = screen.getByTestId('map-locate-panel');
+        expect(panel.className).toContain('pointer-events-auto');
+
+        fireEvent.click(screen.getByTestId('map-locate-me'));
+        expect(onLocateMe).toHaveBeenCalledTimes(1);
+    });
+
+    it('shows a loading label and disables the control while locating', () => {
+        render(<MapTopChrome {...defaultProps} onLocateMe={vi.fn()} isLocating />);
+        const button = screen.getByTestId('map-locate-me');
+        expect(button.disabled).toBe(true);
+        expect(button.getAttribute('aria-busy')).toBe('true');
+        expect(button.textContent).toContain('Mencari lokasi');
+    });
+
+    it('renders locate error and hides the nearby message when an error is present', () => {
+        render(
+            <MapTopChrome
+                {...defaultProps}
+                onLocateMe={vi.fn()}
+                locateError="Akses GPS ditolak. Izinkan akses lokasi di browser."
+                nearbyMessage="3 CCTV dalam 5,0 km · terdekat Lobby (120 m)"
+            />
+        );
+        expect(screen.getByTestId('map-locate-error').textContent).toContain('Akses GPS ditolak');
+        expect(screen.queryByTestId('map-locate-nearby')).toBeNull();
+    });
+
+    it('renders the nearby summary as a polite status with a straight-line qualifier', () => {
+        render(
+            <MapTopChrome
+                {...defaultProps}
+                onLocateMe={vi.fn()}
+                nearbyMessage="3 CCTV dalam 5 km · terdekat Lobby (120 m)"
+            />
+        );
+        const nearby = screen.getByTestId('map-locate-nearby');
+        expect(nearby.textContent).toContain('terdekat Lobby');
+        expect(nearby.getAttribute('role')).toBe('status');
+        expect(nearby.getAttribute('aria-live')).toBe('polite');
+        expect(nearby.getAttribute('title')).toContain('garis lurus');
+    });
 });
