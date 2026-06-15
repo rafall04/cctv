@@ -32,6 +32,7 @@ import InlineAdSlot from '../components/ads/InlineAdSlot';
 import GlobalAdScript from '../components/ads/GlobalAdScript';
 import { isAdsMobileViewport, shouldRenderAdSlot } from '../components/ads/adsConfig';
 import lazyWithRetry from '../utils/lazyWithRetry';
+import { sortCamerasByDistance } from '../utils/geoDistance';
 
 const LandingPageSimple = lazyWithRetry(() => import('../components/landing/LandingPageSimple'), 'landing-page-simple');
 const MultiViewLayout = lazyWithRetry(() => import('../components/MultiView/MultiViewLayout'), 'multi-view-layout');
@@ -142,25 +143,27 @@ function LandingPageContent({ onRefreshPauseChange }) {
             return [];
         }
 
-        return [...cameras]
-            .filter((camera) => camera.id !== popup.id)
-            .sort((left, right) => {
-                const leftSameArea = left.area_name && left.area_name === popup.area_name ? 1 : 0;
-                const rightSameArea = right.area_name && right.area_name === popup.area_name ? 1 : 0;
-                if (leftSameArea !== rightSameArea) {
-                    return rightSameArea - leftSameArea;
-                }
+        // Nearest-first; same-area + viewer ranking is the tiebreaker when distance is
+        // equal or unavailable (cameras without coordinates fall back to this order).
+        const rankByAreaThenViewers = (left, right) => {
+            const leftSameArea = left.area_name && left.area_name === popup.area_name ? 1 : 0;
+            const rightSameArea = right.area_name && right.area_name === popup.area_name ? 1 : 0;
+            if (leftSameArea !== rightSameArea) {
+                return rightSameArea - leftSameArea;
+            }
 
-                const liveDelta = Number(right.live_viewers || right.viewer_stats?.live_viewers || 0)
-                    - Number(left.live_viewers || left.viewer_stats?.live_viewers || 0);
-                if (liveDelta !== 0) {
-                    return liveDelta;
-                }
+            const liveDelta = Number(right.live_viewers || right.viewer_stats?.live_viewers || 0)
+                - Number(left.live_viewers || left.viewer_stats?.live_viewers || 0);
+            if (liveDelta !== 0) {
+                return liveDelta;
+            }
 
-                return Number(right.total_views || right.viewer_stats?.total_views || 0)
-                    - Number(left.total_views || left.viewer_stats?.total_views || 0);
-            })
-            .slice(0, 5);
+            return Number(right.total_views || right.viewer_stats?.total_views || 0)
+                - Number(left.total_views || left.viewer_stats?.total_views || 0);
+        };
+
+        const candidates = cameras.filter((camera) => camera.id !== popup.id);
+        return sortCamerasByDistance(candidates, popup, rankByAreaThenViewers).slice(0, 5);
     }, [cameras, popup]);
 
     const publicConfigReady = publicConfigLoading || brandingLoading;

@@ -35,6 +35,33 @@ describe('RelatedCamerasStrip', () => {
         expect(onCameraClick).toHaveBeenCalledWith(expect.objectContaining({ id: 2 }));
     });
 
+    it('renders a distance label when the camera carries _distanceMeters', () => {
+        render(
+            <RelatedCamerasStrip
+                cameras={[
+                    { id: 2, name: 'CCTV Dekat', live_viewers: 0, total_views: 5, _distanceMeters: 354 },
+                    { id: 3, name: 'CCTV Jauh', live_viewers: 0, total_views: 5, _distanceMeters: 1234 },
+                ]}
+                onCameraClick={() => {}}
+            />
+        );
+
+        expect(screen.getByText('350 m')).toBeTruthy();
+        expect(screen.getByText('1,2 km')).toBeTruthy();
+    });
+
+    it('omits the distance label when _distanceMeters is absent', () => {
+        render(
+            <RelatedCamerasStrip
+                cameras={[{ id: 2, name: 'CCTV Tanpa Koordinat', live_viewers: 0, total_views: 5 }]}
+                onCameraClick={() => {}}
+            />
+        );
+
+        expect(screen.queryByText(/km$/)).toBeNull();
+        expect(screen.queryByText(/\bm$/)).toBeNull();
+    });
+
     it('does not render without related cameras', () => {
         const { container } = render(<RelatedCamerasStrip cameras={[]} />);
         expect(container.textContent).toBe('');

@@ -1,10 +1,12 @@
 /*
  * Purpose: Provide pure ranking helpers for public area pages.
  * Caller: AreaPublicPage and related public area tests.
- * Deps: None.
+ * Deps: geoDistance.sortCamerasByDistance for distance-first related ordering.
  * MainFuncs: getAreaCameraLiveViewers, getAreaCameraTotalViews, buildAreaPublicRankingLists.
  * SideEffects: None.
  */
+
+import { sortCamerasByDistance } from './geoDistance.js';
 
 export function getAreaCameraLiveViewers(camera) {
     return Number(camera?.live_viewers || camera?.viewer_stats?.live_viewers || 0);
@@ -41,18 +43,23 @@ export function buildAreaPublicRankingLists(cameras = [], trendingCameras = [], 
         .sort(sortByNewest)
         .slice(0, 4);
 
-    const relatedPopupCameras = selectedCamera
-        ? [...cameras]
-            .filter((camera) => camera.id !== selectedCamera.id)
-            .sort((left, right) => {
-                const liveDelta = getAreaCameraLiveViewers(right) - getAreaCameraLiveViewers(left);
-                if (liveDelta !== 0) {
-                    return liveDelta;
-                }
+    // Nearest-first from the playing camera; viewer ranking is the tiebreaker when distance
+    // is equal or unavailable (cameras without coordinates fall back to this order).
+    const rankByViewers = (left, right) => {
+        const liveDelta = getAreaCameraLiveViewers(right) - getAreaCameraLiveViewers(left);
+        if (liveDelta !== 0) {
+            return liveDelta;
+        }
 
-                return getAreaCameraTotalViews(right) - getAreaCameraTotalViews(left);
-            })
-            .slice(0, 5)
+        return getAreaCameraTotalViews(right) - getAreaCameraTotalViews(left);
+    };
+
+    const relatedPopupCameras = selectedCamera
+        ? sortCamerasByDistance(
+            cameras.filter((camera) => camera.id !== selectedCamera.id),
+            selectedCamera,
+            rankByViewers,
+        ).slice(0, 5)
         : [];
 
     return {
