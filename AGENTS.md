@@ -19,6 +19,22 @@ Read the matching guide **only when your task touches that area** — don't load
 | Security policy & posture | [SECURITY.md](SECURITY.md) |
 | Running DB migrations on a populated DB | [MIGRATION_GUIDE.md](MIGRATION_GUIDE.md) |
 
+## Navigation & read discipline (keeps token cost low)
+
+Several files are huge — `cameraHealthService.js` (~3.7k lines / ~38k tokens) and `cameraService.js`
+(~3.2k lines / ~34k tokens), plus ~800–1.6k-line `MapView.jsx`, `Playback.jsx`, `AreaManagement.jsx`,
+`VideoPopup.jsx`, `hlsProxyService.js`, `playbackTokenService.js`. **One full read of a giant file can
+cost more than this entire rulebook**, so:
+
+- **Map first.** Every major folder has a git-tracked `.module_map.md` (e.g. `backend/services/.module_map.md`,
+  `frontend/src/.module_map.md`) naming each module's responsibility. Read it to find the right file/symbol
+  *before* opening code.
+- **Grep, then read narrow.** Locate the symbol with Grep, then Read with `offset`/`limit`. Don't full-read a
+  file >~800 lines unless you genuinely need all of it.
+- **Delegate broad searches** ("where is X handled across the codebase?") to the **Explore** subagent — it
+  returns the conclusion, not file dumps, keeping the main context lean.
+- **Don't re-read** unchanged files; run focused tests (`npm test -- <file>`) over the full suite while iterating.
+
 ## Project Overview
 
 RAF NET Secure CCTV Hub — a secure, high-performance video streaming system that isolates private IP
