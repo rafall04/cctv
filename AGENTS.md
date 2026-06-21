@@ -1,225 +1,85 @@
 # AGENTS.md - Agentic Coding Guidelines
 
-This file provides guidelines for AI agents working in this repository.
+This file provides guidelines for AI agents working in this repository. It is **auto-loaded every
+session** (via `@AGENTS.md` in CLAUDE.md), so it stays lean on purpose — universal rules + critical
+invariants only. Anything domain-specific or example-heavy lives in the on-demand guides below.
 
 > **Current conformance gaps:** the code does not yet follow every rule below. See "Known Rule Deviations" in [SYSTEM_MAP.md](SYSTEM_MAP.md) for the precise list (with `file:line`) so you don't rely on or propagate a known gap.
 
+## Deep-dive guides — read on demand (NOT auto-loaded, to keep context lean)
+
+Read the matching guide **only when your task touches that area** — don't load them speculatively.
+
+| When you are working on… | Read |
+|---|---|
+| Where code lives / runtime flows / verification / stabilization | [SYSTEM_MAP.md](SYSTEM_MAP.md) |
+| React components, hooks, playback/landing view modes, frontend perf | [docs/frontend-guide.md](docs/frontend-guide.md) |
+| Billing, subscriber/customer cameras, payment gateways, plans, registration, playback scope | [docs/billing-rental.md](docs/billing-rental.md) |
+| Deployment / env-var setup / PM2 / Nginx / MediaMTX | [README.md](README.md) |
+| Security policy & posture | [SECURITY.md](SECURITY.md) |
+| Running DB migrations on a populated DB | [MIGRATION_GUIDE.md](MIGRATION_GUIDE.md) |
+
 ## Project Overview
 
-RAF NET Secure CCTV Hub - A secure, high-performance video streaming system that isolates private IP cameras from public exposure while providing public web access to camera streams.
+RAF NET Secure CCTV Hub — a secure, high-performance video streaming system that isolates private IP
+cameras from public exposure while providing public web access to camera streams.
 
-**Tech Stack:**
-- **Backend:** Node.js 20+, Fastify 4.28.1, SQLite (better-sqlite3), JWT auth, ES modules
-- **Frontend:** React 18.3.1, Vite 5.3.1, Tailwind CSS 3.4.4, HLS.js, Leaflet
-- **Streaming:** MediaMTX v1.9.0 (RTSP to HLS)
+**Tech Stack:** Backend = Node.js 20+, Fastify 4.28.1, SQLite (better-sqlite3), JWT, ES modules.
+Frontend = React 18.3.1, Vite 5.3.1, Tailwind CSS 3.4.4, HLS.js, Leaflet. Streaming = MediaMTX v1.9.0
+(RTSP→HLS). Exact versions live in `backend/package.json` / `frontend/package.json`.
+
+---
+
+## Critical Invariants (NEVER violate)
+
+These prevent expensive, hard-to-undo mistakes (data loss, privacy leaks, billing errors). They are
+small on purpose so they stay loaded every session — the *how* behind them is in the on-demand guides.
+
+- **Public surface is community-only.** Every public query filters `camera_class = 'community'`;
+  non-community (`owner_private`, `subscriber`) cameras must NEVER appear on any public surface
+  (landing/map/stream list/area/trending/discovery/public playback/thumbnails). Per-camera endpoints
+  (`/api/stream/:id`, `/hls/*`, proxies) gate through `cameraAccessService.canViewLive`. Detail:
+  [docs/billing-rental.md](docs/billing-rental.md).
+- **Never expose RTSP URLs to the frontend** — only HLS stream URLs.
+- **Money is INTEGER rupiah, never float.**
+- **`customer` role is denied-by-default** on every auth-required endpoint except the whitelist in
+  `middleware/customerAccessPolicy.js` (`/api/auth/*`, `/api/users/profile*`, `/api/customer/*`).
+- **Subscriber product is live-only** — no public playback, no playback-token access, recordings stay staff-only.
+- **Production DB safety** — never mutate the prod DB to "verify"; never `INSERT OR REPLACE` ad-hoc
+  rows; always back up `data/cctv.db` first. Full rationale in [Database](#database) below (real incident).
+- **Parameterized SQL only** — `?` placeholders, never string-interpolate user/values into SQL.
 
 ---
 
 ## Build, Lint, and Test Commands
 
-### Backend Commands
-
 ```bash
-# Install dependencies
-cd backend && npm install
-
-# Run development server (with hot reload)
-npm run dev
-
-# Start production server
-npm start
-
-# Setup database
-npm run setup-db
-
-# Run migrations
-npm run migrate
-# Note: after adding new schema like playback viewer tables, run migrations before restarting backend
-
-# Run security migrations
-npm run migrate-security
-
-# Run all tests
-npm test
-
-# Run tests in watch mode
+# Backend (cd backend)
+npm install
+npm run dev              # dev server (nodemon hot reload)
+npm start                # production server
+npm run setup-db         # initialize database
+npm run migrate          # run all migrations (run BEFORE restarting backend after schema changes)
+npm run migrate-security # security migrations
+npm test                 # all tests (vitest --run)
 npm run test:watch
+npm test -- cameraHealthService.test.js              # single file
+npm test -- cameraHealthService.test.js -t "name"    # single test
 
-# Run a single test file
-npm test -- cameraHealthService.test.js
-npm test -- recordingPlaybackService.test.js
-npm test -- playbackViewerRoutes.test.js
-
-# Run a single test
-npm test -- cameraHealthService.test.js -t "test name"
-```
-
-### Frontend Commands
-
-```bash
-# Install dependencies
-cd frontend && npm install
-
-# Run development server (Vite)
-npm run dev
-
-# Build for production
-npm run build
-
-# Preview production build
+# Frontend (cd frontend)
+npm install
+npm run dev              # Vite dev server
+npm run build            # production build
 npm run preview
-
-# Run ESLint
-npm run lint
-
-# Run all tests
-npm test
-
-# Run tests in watch mode
-npm run test:watch
-
-# Run a single test file
-npm test -- CameraManagement.test.jsx
-npm test -- src/pages/PlaybackAnalytics.test.jsx
-
-# Run a single test
-npm test -- CameraManagement.test.jsx -t "test name"
+npm run lint             # ESLint over src (max-warnings 0)
+npm test                 # all tests (vitest run)
+npm test -- CameraManagement.test.jsx                # single file
+npm test -- CameraManagement.test.jsx -t "name"      # single test
 ```
 
-### Current Playback/Admin Workflow
-
-- Public playback route: `/playback` with `accessScope='public_preview'`
-- Admin full playback route: `/admin/playback` (protected)
-- Admin playback analytics route: `/admin/playback-analytics` (protected)
-- Public playback API uses `/api/recordings/:cameraId/segments`, `/stream/:filename`, and `/playlist.m3u8`
-- Playback viewer tracking is separate from live viewer tracking and uses `/api/playback-viewer/*`
-
-### Current Subscriber Rental/Billing Workflow
-
-- Camera classes: `community` (public hub, default), `owner_private`, `subscriber` (rented, live-only).
-  Non-community cameras must NEVER appear on any public surface (landing/map/stream list/area pages/
-  trending/discovery/public playback/thumbnails) — all public queries filter `camera_class = 'community'`
-  and `cameraAccessService.canViewLive` gates per-camera endpoints (`/api/stream/:id`, `/hls/*`, proxies).
-- Role `customer` logs in at the shared login and lands on `/my` (portal: Kamera Saya + Saldo & Tagihan).
-  Customers are denied-by-default on every other auth-required endpoint (`customerAccessPolicy`).
-- Billing is prepaid: wallet balance, daily prorated charge (`monthly_price/30`, local date, idempotent by
-  `charge:{subscriptionId}:{date}` unique reference), suspend on empty balance (streams 402 within ~30s),
-  auto-resume + charge on top-up. Money columns are INTEGER rupiah only — never float.
-- Admin manages everything at `/admin/billing` (assign camera→customer, harga, suspend/resume/cancel,
-  manual top-up, mark-paid, plan catalog, registration settings). Gateway drivers: `manual` (default),
-  `midtrans` (webhook signature-verified), or `ipaymu` (credentials from admin/settings;
-  callbacks carry no signature so the webhook NEVER trusts the body — it re-queries the iPaymu API, and
-  customer status polls do the same re-check throttled). Webhooks under `/api/billing/webhook/*` are
-  exempt from CSRF/API-key validation.
-- Gateway config is admin-editable (NO .env needed): `paymentSettingsService` resolves every value
-  DB(settings) -> env -> default, so old `.env` deployments keep working until an admin overrides. The
-  `/admin/billing` -> Gateway Pembayaran tab sets active gateway, iPaymu VA/API key + sandbox/production,
-  Midtrans server key, public base URL, and the curated enabled payment methods/banks (`ipaymu_methods`:
-  QRIS/VA-bank/cstore; admin toggles + can add custom `method:channel`). Secrets are write-only —
-  `getAdminView()` returns only a `*_set` flag + masked hint, never the raw key. Customer top-up shows
-  only enabled methods (`GET /api/customer/payment-options`), rendering QR / VA number / payment code.
-- Account plans (paket): `billing_plans` sets price_per_camera + max_cameras (+ trial via is_trial/
-  trial_days). Customers self-switch at `/my/paket` (repricing all their subscriptions; trial once per
-  account — `users.trial_used`); active trial days are charge-free, expired trial suspends all cameras
-  until a paid plan is chosen.
-- Self-service: customers add/edit/delete their own cameras at `/my` within the plan's max_cameras;
-  customer RTSP URLs pass `utils/rtspUrlPolicy.js` (rtsp/rtsps only; loopback/link-local/multicast and
-  `BILLING_RTSP_BLOCKED_HOSTS` blocked; RFC1918 allowed — ISP reality). Self-registration at `/daftar`
-  (`POST /api/auth/register`, unique phone, admin toggle + default plan in `/admin/billing` Paket tab).
-- Registration approval: self-registered customers start `users.account_status='pending'` and CANNOT log
-  in (login → 403 `reason: pending_approval`) until an admin approves them in `/admin/billing` →
-  Persetujuan tab. The plan/trial clock starts ON APPROVAL (deferred at signup) so the trial isn't
-  consumed while waiting. `account_status` defaults to `'approved'` — existing and admin-created users
-  are never locked out; declined accounts are `'rejected'` (login → 403 `reason: registration_rejected`).
-- Subscriber product is live-only: no public playback, no playback-token access, recordings stay staff-only.
-
----
-
-## Project Structure
-
-### Frontend Structure (Target)
-
-```
-frontend/src/
-├── pages/
-│   ├── public/
-│   │   ├── LandingPage.jsx
-│   │   └── LoginPage.jsx
-│   ├── admin/
-│   │   ├── Dashboard.jsx
-│   │   ├── CameraManagement.jsx
-│   │   ├── AreaManagement.jsx
-│   │   ├── UserManagement.jsx
-│   │   ├── Playback.jsx
-│   │   └── PlaybackAnalytics.jsx
-│   └── settings/
-│       └── UnifiedSettings.jsx
-├── components/
-│   ├── ui/                    # Base UI components (Button, Input, Modal)
-│   │   ├── Alert.jsx
-│   │   ├── Button.jsx
-│   │   ├── EmptyState.jsx
-│   │   ├── ErrorBoundary.jsx
-│   │   ├── FormField.jsx
-│   │   ├── Icons.jsx
-│   │   ├── Skeleton.jsx
-│   │   ├── ThemeSwitcher.jsx
-│   │   └── Toast.jsx
-│   ├── common/                # Reusable business components
-│   │   ├── DataTable.jsx     # CRUD tables with sorting/filtering
-│   │   ├── SearchBar.jsx
-│   │   ├── FilterBar.jsx
-│   │   └── ConfirmDialog.jsx
-│   ├── landing/               # Landing page components
-│   │   ├── LandingNavbar.jsx
-│   │   ├── LandingFooter.jsx
-│   │   ├── LandingHero.jsx
-│   │   ├── LandingCameraCard.jsx
-│   │   ├── LandingCamerasSection.jsx
-│   │   ├── LandingFilterDropdown.jsx
-│   │   └── LandingStatsBar.jsx
-│   ├── playback/               # Playback presentation components
-│   │   ├── PlaybackHeader.jsx
-│   │   ├── PlaybackVideo.jsx
-│   │   ├── PlaybackTimeline.jsx
-│   │   └── PlaybackSegmentList.jsx
-│   ├── admin/                 # Admin-specific components
-│   │   ├── CameraCard.jsx
-│   │   ├── StatsWidget.jsx
-│   │   └── ...
-│   └── features/              # Feature-based components
-│       ├── video/
-│       │   ├── VideoPlayer.jsx
-│       │   ├── VideoPopup.jsx
-│       │   ├── ZoomableVideo.jsx
-│       │   └── MultiView/
-│       └── maps/
-│           └── MapView.jsx
-├── contexts/                  # React Context (global state)
-├── hooks/                     # Custom hooks
-│   ├── useCameraHistory.js   # Favorites & recent cameras (localStorage)
-│   ├── useCameraStatusTracker.js
-│   └── ...
-├── services/                  # API services
-├── utils/                     # Utility functions
-└── config/                   # Configuration
-```
-
-### Current Issues to Fix
-
-> For the authoritative, maintained list see "Stabilization Priorities" in
-> [SYSTEM_MAP.md](SYSTEM_MAP.md). The notes below reflect the latest audit.
-
-1. **Pages still oversized (>500 lines)** — extract page state into `hooks/` and split into widgets:
-   - `pages/AreaManagement.jsx` (~800 lines)
-   - `pages/ViewerAnalytics.jsx` (~500 lines)
-   - (`CameraManagement.jsx` ~180 lines and `Dashboard.jsx` ~280 lines are already decomposed via hooks/sub-components — use them as the reference pattern.)
-
-2. **Legacy duplicate locations** — the new path is canonical; the old path is now a
-   compatibility re-export shim to be phased out:
-   - `components/LandingPageSimple.jsx` → prefer `components/landing/LandingPageSimple.jsx`
-   - `components/AdminLayout.jsx` → prefer `layouts/AdminLayout.jsx`
-   - `components/settings/*` → prefer `components/admin/settings/*`
+**Verification gates** (run before committing a change in that area):
+- Backend: `cd backend && npm run migrate && npm test`
+- Frontend: `cd frontend && npm test && npm run build && npm run lint`
 
 ---
 
@@ -227,203 +87,89 @@ frontend/src/
 
 ### General Principles
 
-- Use ES modules (import/export syntax)
-- Use 4 spaces for indentation (not tabs)
-- Use single quotes for strings
-- Use async/await over raw promises
-- Use `console.log` for debugging, structured logging via pino-pretty for production
-- Add error.statusCode property to thrown errors for HTTP status codes (e.g., `err.statusCode = 404`)
+- ES modules (import/export). 4 spaces, not tabs. Single quotes. `async/await` over raw promises.
+- `console.log` for debugging; structured logging via pino-pretty in production.
+- Attach `error.statusCode` to thrown errors for HTTP status (e.g. `err.statusCode = 404`).
 
 ### Backend (Node.js/Fastify)
 
-**File Naming:**
-- Use camelCase: `cameraController.js`, `mediaMtxService.js`, `authMiddleware.js`
-
-**Imports:**
-- Use relative imports with `.js` extension
-- Group imports: external libs → internal services → middleware → database
-
-```javascript
-import fs from 'fs';
-import { query, execute } from '../database/connectionPool.js';
-import cameraService from '../services/cameraService.js';
-import { logAction } from '../services/securityAuditLogger.js';
-```
-
-**Functions:**
-- Use named exports for route handlers
-- Use class-based services with methods
+- **File naming:** camelCase — `cameraController.js`, `mediaMtxService.js`, `authMiddleware.js`.
+- **Imports:** relative with `.js` extension; group external libs → internal services → middleware → database.
+- **Functions:** named exports for route handlers; class-based services (`export default new XService()`).
+- **DB access:** `query()` for SELECT, `queryOne()` for single row, `execute()` for INSERT/UPDATE/DELETE;
+  always parameterized with `?`.
+- **Errors:** attach `statusCode`; return `{ success: boolean, message?, data? }`.
 
 ```javascript
-// Controller - named export, async handler
+// Controller — named export, async handler
 export async function getCameraById(request, reply) {
     try {
-        const { id } = request.params;
-        const camera = cameraService.getCameraById(id);
+        const camera = cameraService.getCameraById(request.params.id);
         return reply.send({ success: true, data: camera });
     } catch (error) {
         console.error('Get camera error:', error);
-        if (error.statusCode === 404) {
-            return reply.code(404).send({ success: false, message: error.message });
-        }
-        return reply.code(500).send({ success: false, message: 'Internal server error' });
+        const code = error.statusCode || 500;
+        return reply.code(code).send({ success: false, message: code === 500 ? 'Internal server error' : error.message });
     }
 }
-
-// Service - class-based
+// Service — class-based; throw with statusCode
 class CameraService {
-    getAllCameras() {
-        return query('SELECT * FROM cameras ORDER BY id ASC');
+    getCameraById(id) {
+        const camera = queryOne('SELECT * FROM cameras WHERE id = ?', [id]);
+        if (!camera) { const err = new Error('Camera not found'); err.statusCode = 404; throw err; }
+        return camera;
     }
-}
-export default new CameraService();
-```
-
-**Database Queries:**
-- Use parameterized queries with `?` placeholders
-- Use `query()` for SELECT, `execute()` for INSERT/UPDATE/DELETE
-- Use `queryOne()` for single row results
-
-```javascript
-const camera = queryOne(
-    'SELECT c.*, a.name as area_name FROM cameras c LEFT JOIN areas a ON c.area_id = a.id WHERE c.id = ?',
-    [id]
-);
-```
-
-**Error Handling:**
-- Attach `statusCode` property to custom errors
-- Return consistent response format: `{ success: boolean, message?: string, data?: any }`
-
-```javascript
-if (!camera) {
-    const err = new Error('Camera not found');
-    err.statusCode = 404;
-    throw err;
 }
 ```
 
 ### Frontend (React)
 
-**File Naming:**
-- Use PascalCase for components: `CameraManagement.jsx`, `VideoPlayer.jsx`
-- Use camelCase for utilities/hooks: `useFormValidation.js`, `validators.js`
-
-**Components:**
-- Use functional components with hooks
-- Use named exports for page components, default exports for reusable components
-
-```javascript
-// Page component - named export
-export default function CameraManagement() {
-    const [cameras, setCameras] = useState([]);
-    
-    useEffect(() => {
-        loadCameras();
-    }, []);
-
-    return ( ... );
-}
-```
-
-**Imports:**
-- Group in this order: React → external libs → internal components → internal hooks/utils → styles
-
-```jsx
-import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { cameraService } from '../services/cameraService';
-import { useNotification } from '../contexts/NotificationContext';
-import { Alert } from '../components/ui/Alert';
-import { Skeleton } from '../components/ui/Skeleton';
-```
-
-**State Management:**
-- Use React Context for global state (theme, notifications, branding)
-- Use local useState for component-specific state
-
-**Forms:**
-- Use custom `useFormValidation` hook
-- Define validation rules as functions returning error messages
-
-```javascript
-const getValidationRules = () => ({
-    name: {
-        required: 'Camera name is required',
-        minLength: { value: 2, message: 'Name must be at least 2 characters' },
-    },
-});
-```
-
-**Styling:**
-- Use Tailwind CSS exclusively
-- Use custom colors from theme: `primary`, `dark-*`, `light-*`
-- Use semantic class names: `text-gray-600 dark:text-gray-300`
-
-```jsx
-<button className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-600 transition-colors">
-    Save
-</button>
-```
-
-**Error Boundaries:**
-- Wrap components with ErrorBoundary for graceful error handling
+- **File naming:** PascalCase components (`VideoPlayer.jsx`); camelCase utils/hooks (`useFormValidation.js`).
+- Functional components + hooks; named exports for pages, default exports for reusable components.
+- **All hooks BEFORE any conditional return** (React Error #310). Import order: React → external → components → hooks/utils → styles.
+- React Context for global state (theme/notifications/branding); local `useState` for component state.
+- Forms via `useFormValidation`. **Tailwind only** — semantic classes, theme colors (`primary`, `dark-*`, `light-*`). Wrap risky trees in `ErrorBoundary`.
+- Full examples + hook/race-condition/URL-param/perf patterns → [docs/frontend-guide.md](docs/frontend-guide.md).
 
 ---
 
 ## API Response Format
 
-All API responses should follow this format:
-
 ```javascript
-// Success
-{ success: true, data: [...] }
-
-// Success with message
-{ success: true, message: 'Camera created successfully', data: {...} }
-
-// Error
-{ success: false, message: 'Error description' }
+{ success: true, data: [...] }                                    // success
+{ success: true, message: 'Camera created successfully', data: {...} } // success + message
+{ success: false, message: 'Error description' }                  // error
 ```
 
 ---
 
 ## Security Guidelines
 
-- Never expose RTSP URLs to frontend - only HLS stream URLs
-- Use JWT for authentication: short-lived access token (~1h, `JWT_EXPIRATION`) + refresh-token rotation (~7d)
-- Hash passwords with bcrypt
-- Implement rate limiting on auth endpoints
-- Validate and sanitize all user inputs
-- Log security events via securityAuditLogger
-- Use CSRF protection for state-changing operations
+- JWT auth: short-lived access token (~1h, `JWT_EXPIRATION`) + refresh-token rotation (~7d). bcrypt password hashing.
+- Rate-limit auth endpoints. Validate and sanitize all inputs. CSRF protection for state-changing operations.
+- Log security events via `securityAuditLogger`. (See also: Critical Invariants above, [SECURITY.md](SECURITY.md).)
 
 ---
 
 ## Testing
 
-- Tests go in `__tests__/` directory for backend
-- Frontend tests are co-located beside source as `*.test.jsx`/`*.spec.jsx` (only `setup.js` lives in `src/__tests__/`)
-- Use vitest for both backend and frontend
-- Backend uses `node` environment, frontend uses `jsdom`
-- Use property-based testing with `fast-check` for critical logic
+- Backend tests in `__tests__/` (node env). Frontend tests co-located as `*.test.jsx`/`*.spec.jsx` (jsdom; only `setup.js` lives in `src/__tests__/`).
+- vitest for both. Use property-based testing with `fast-check` for critical logic.
 
 ---
 
 ## Database
 
-- SQLite with better-sqlite3 (synchronous API)
-- Store in `backend/data/cctv.db`
-- Use migrations in `backend/database/migrations/`
-- All table names use snake_case: `cameras`, `areas`, `users`
+- SQLite with better-sqlite3 (synchronous API). DB at `backend/data/cctv.db`. Migrations in `backend/database/migrations/`.
+- Table names snake_case: `cameras`, `areas`, `users`. Use `query()`/`queryOne()`/`execute()`/`transaction()` from `database/connectionPool.js`.
 
 ### Production data safety (LEARNED FROM A REAL INCIDENT — a customer row was lost)
 
 - **NEVER mutate the production DB to "verify" a change.** No inserting/deleting temp rows on the live
   DB. Verify via the API with a throwaway/test account, or inside a transaction you **ROLL BACK**, or
-  against a **copy** of `cctv.db`. (Root cause of the incident: a verify script inserted temp users with
-  explicit high IDs, which bumped `AUTOINCREMENT`; a real customer then registered into that same ID and
-  was overwritten + deleted by the script's `INSERT OR REPLACE` + `DELETE`.)
+  against a **copy** of `cctv.db`. (Root cause: a verify script inserted temp users with explicit high
+  IDs, bumping `AUTOINCREMENT`; a real customer then registered into that same ID and was overwritten +
+  deleted by the script's `INSERT OR REPLACE` + `DELETE`.)
 - **NEVER use `INSERT OR REPLACE` for ad-hoc/test rows.** On ANY primary-key or UNIQUE conflict it
   silently **DELETES** the conflicting (possibly real) row first. Use plain `INSERT` (fails loudly) or
   `INSERT OR IGNORE`. Never hand-pick explicit IDs that can collide with the autoincrement range.
@@ -436,303 +182,32 @@ All API responses should follow this format:
 
 ## Environment Configuration
 
-- Backend: `backend/.env` file
-- Frontend: `frontend/.env` file (prefix vars with `VITE_`)
-- All configuration via environment variables, no hardcoded values
+- Backend: `backend/.env`. Frontend: `frontend/.env` (prefix vars with `VITE_`). All config via env vars, no hardcoded values.
 
 ---
 
 ## Common Patterns
 
-### Cache Invalidation
-After mutations, invalidate relevant cache keys:
-```javascript
-import { invalidateCache } from '../middleware/cacheMiddleware.js';
-invalidateCache('/api/cameras');
-```
-
-### Audit Logging
-Log admin actions:
-```javascript
-import { logCameraCreated } from '../services/securityAuditLogger.js';
-logCameraCreated(userId, cameraId, cameraName, request);
-```
-
-### File Paths
-- Use path.resolve for file operations
-- Store paths relative to project root
-
-### CRUD Pattern for Admin Pages
-Use consistent pattern for admin CRUD pages:
-```javascript
-// hooks/useCRUD.js - create reusable hook
-export function useCRUD(endpoint) {
-  const [data, setData] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-
-  const fetchAll = async () => { /* ... */ };
-  const create = async (item) => { /* ... */ };
-  const update = async (id, item) => { /* ... */ };
-  const remove = async (id) => { /* ... */ };
-
-  return { data, loading, error, fetchAll, create, update, remove };
-}
-```
-
-### Playback Tracking Pattern
-
-- Start playback viewer sessions only after real playback begins (`playing` or equivalent progress), not when the page opens
-- Keep playback tracking separate from live tracking:
-  - live: `viewer_sessions`, `/api/viewer/*`
-  - playback: `playback_viewer_sessions`, `/api/playback-viewer/*`
-- When changing camera or segment in playback, stop the old playback session before starting a new one
-- For public/admin playback differences, pass the correct `accessScope` (`public_preview` or `admin_full`) through frontend and backend calls
+- **Cache invalidation** after mutations: `invalidateCache('/api/cameras')` from `middleware/cacheMiddleware.js`.
+- **Audit logging** for admin actions: `logCameraCreated(userId, cameraId, cameraName, request)` from `services/securityAuditLogger.js`.
+- **File paths:** use `path.resolve`; store relative to project root.
+- **Admin CRUD pages:** reuse a `useCRUD(endpoint)` hook exposing `{ data, loading, error, fetchAll, create, update, remove }`.
+- **Playback vs live tracking** must stay separate, and **frontend view-mode/URL-param** rules → [docs/frontend-guide.md](docs/frontend-guide.md) + [docs/billing-rental.md](docs/billing-rental.md).
 
 ---
 
 ## Git & Version Control
 
-**PUSH TO GITHUB - WAJIB dilakukan setelah setiap selesai task:**
+**Push after every task — even the smallest change** (typo, copy, spacing, Tailwind class, test, small refactor, light config).
 
-1. Setelah menyelesaikan setiap task/fitur, langsung push ke GitHub
-2. Jangan menunggu banyak perubahan - push secara berkala setiap task selesai
-3. Gunakan commit message yang jelas dan deskriptif
-4. Format commit message: `"Add: [deskripsi]"`, `"Fix: [deskripsi]"`, `"Refactor: [deskripsi]"`
-
-### Aturan Wajib Push Setiap Perubahan Sekecil Apa Pun
-
-1. Setiap perubahan, sekecil apa pun, wajib diakhiri dengan `git add`, `git commit`, dan `git push`
-2. Tidak boleh menumpuk perubahan kecil untuk dipush nanti; satu perubahan kecil tetap harus dipush saat selesai
-3. Perubahan seperti typo, copy text, spacing, class Tailwind, test, refactor kecil, dan config ringan tetap dianggap pekerjaan yang wajib dipush
-4. Sebelum push, wajib cek `git status` agar perubahan yang ikut commit memang sesuai
-5. Jika ada perubahan user lain yang belum boleh ikut dikirim, commit hanya file yang relevan, jangan asal `git add .`
-6. Jika pekerjaan belum lolos verifikasi yang relevan, selesaikan verifikasi dulu sebelum commit dan push
-7. Setelah commit, wajib push ke branch kerja yang aktif di GitHub pada sesi itu
-8. Jangan mengakhiri pekerjaan hanya di local repository; status akhir yang benar adalah perubahan sudah ada di GitHub
-
-### Workflow Minimum Setelah Selesai Mengerjakan Apa Pun
+1. `git status` first — verify only the intended files are staged. If unrelated changes exist, stage only the relevant files (don't blanket `git add .`).
+2. Finish the relevant verification gate before committing.
+3. Commit with a clear message: `"Add: …"`, `"Fix: …"`, or `"Refactor: …"`.
+4. `git push` to the active working branch. Done = pushed to GitHub, not just committed locally.
 
 ```bash
-# 1. Cek perubahan
 git status
-
-# 2. Add file yang relevan
-git add <file-yang-diubah>
-
-# 3. Commit dengan pesan jelas
+git add <changed-files>
 git commit -m "Fix: perbaiki status bar MapView"
-
-# 4. Push ke GitHub
 git push
 ```
-
-Contoh workflow:
-```bash
-# 1. Check status
-git status
-
-# 2. Add perubahan
-git add .
-
-# 3. Commit dengan pesan yang jelas
-git commit -m "Add Ramadan atmosphere to public landing pages"
-
-# 4. Push ke GitHub
-git push origin main
-```
-
----
-
-## React Hooks Best Practices & Race Condition Prevention
-
-### Critical Rules for React Hooks
-
-1. **ALWAYS place ALL hooks (useState, useEffect, useCallback, useRef) BEFORE any conditional returns**
-   - React Error #310 occurs when hooks are called inconsistently between renders
-   - Example of WRONG code:
-   ```javascript
-   function Component() {
-       const [value, setValue] = useState(0);
-       
-       if (value === 0) {
-           return <div>Zero</div>; // WRONG - hooks called after conditional return
-       }
-       
-       useEffect(() => { ... }, [value]); // This will cause Error #310
-       return <div>{value}</div>;
-   }
-   ```
-
-2. **Use `useRef` to avoid stale closures in async operations**
-   ```javascript
-   function Component() {
-       const [data, setData] = useState(null);
-       const dataRef = useRef(null);
-       
-       useEffect(() => {
-           dataRef.current = data;
-       }, [data]);
-       
-       const handleAsync = async () => {
-           // Use dataRef.current instead of data to avoid stale closure
-           const currentData = dataRef.current;
-       };
-   }
-   ```
-
-3. **For async media/session starts, guard duplicate event bursts with a pending ref/token**
-   - Repeated media events like `playing` can fire before the first async start finishes
-   - Use a `pendingKeyRef` / `pendingTokenRef` pattern so the same playback segment does not create duplicate sessions
-
-### Mode Switching (LandingPage View Modes)
-
-When switching between view modes (map/grid/playback), follow these patterns:
-
-1. **Use separate route params for different modes**
-   - Live stream: `/?camera=1` (map/grid mode)
-   - Playback: `/?cam=1&t=timestamp` (playback mode)
-   - DON'T use same param (`camera`) for both - it causes popup to open unexpectedly
-
-2. **Check current mode before updating URL**
-   ```javascript
-   useEffect(() => {
-       if (viewMode === 'playback') return; // Don't run in playback mode
-       // ... handle camera URL param
-   }, [cameras, searchParams, viewMode]);
-   ```
-
-3. **Always add cleanup in useEffect for async operations**
-   ```javascript
-   useEffect(() => {
-       let isMounted = true;
-       
-       fetchData().then(result => {
-           if (isMounted) {
-               setData(result);
-           }
-       });
-       
-       return () => { isMounted = false; };
-   }, [dependency]);
-   ```
-
-### URL Parameter Best Practices
-
-1. **Use distinct parameter names for different features**
-   - Don't reuse `camera` param for both live stream and playback
-   - Use `cam` for playback, `camera` for live stream
-
-2. **Parse URL params in correct order**
-   ```javascript
-   // First: parse camera from URL
-   const cameraIdFromUrl = searchParams.get('cam');
-   
-   // Second: fetch data based on camera
-   useEffect(() => {
-       if (cameraIdFromUrl) {
-           fetchSegments(cameraIdFromUrl);
-       }
-   }, [cameraIdFromUrl]);
-   
-   // Third: select segment from URL after data loads
-   useEffect(() => {
-       if (segments.length > 0) {
-           const segmentId = searchParams.get('t');
-           // find and select segment
-       }
-   }, [segments, searchParams]);
-   ```
-
-3. **Avoid race condition between URL update and state selection**
-   - Update URL FIRST, then set state
-   ```javascript
-   const handleSegmentClick = (segment) => {
-       // Update URL first
-       setSearchParams({ cam: cameraId, t: timestamp }, { replace: false });
-       // Then update state
-       setSelectedSegment(segment);
-   };
-   ```
-
-4. **Keep playback route scope and share params separate**
-   - Public playback stays on `/playback`
-   - Admin full playback stays on `/admin/playback`
-   - Playback sharing still uses `cam` and `t`; admin scope must not leak into public share links
-
-### Share Link Best Practices
-
-1. **Use stable identifiers (timestamps) instead of IDs**
-   - Segment IDs can change when new segments are created
-   - Use `start_time` timestamp as stable identifier
-   - URL: `?cam=1&t=1708483200` (timestamp) instead of `?cam=1&segment=5`
-
-2. **Handle missing data gracefully**
-   ```javascript
-   const targetSegment = segments.find(s => 
-       s.start_time <= targetTime && s.end_time >= targetTime
-   );
-   if (!targetSegment) {
-       // Fallback to closest segment
-       const closest = findClosestSegment(targetTime);
-       setSelectedSegment(closest);
-   }
-   ```
-
-### Performance Optimizations
-
-1. **Extract clock/time updates to separate component**
-   ```javascript
-   function ClockDisplay() {
-       const timeRef = useRef(null);
-       
-       useEffect(() => {
-           const updateTime = () => {
-               if (timeRef.current) {
-                   timeRef.current.textContent = new Date().toLocaleTimeString();
-               }
-           };
-           updateTime();
-           const interval = setInterval(updateTime, 1000);
-           return () => clearInterval(interval);
-       }, []);
-       
-       return <span ref={timeRef} />;
-   }
-   ```
-
-2. **Use `useMemo` for filtered/computed lists**
-   ```javascript
-   const filteredCameras = useMemo(() => {
-       return cameras.filter(c => c.is_tunnel === 1);
-   }, [cameras]);
-   ```
-
-3. **Memoize components that re-render frequently**
-   ```javascript
-   const Hero = memo(function Hero({ title }) {
-       return <h1>{title}</h1>;
-   });
-   ```
-
-4. **Lazy load heavy components**
-   ```javascript
-   const MapView = lazy(() => import('../MapView'));
-   const Playback = lazy(() => import('../../pages/Playback'));
-   ```
-
----
-
-## Dependencies
-
-### Backend Key Dependencies
-- fastify ^4.28.1
-- @fastify/jwt ^8.0.1
-- better-sqlite3 ^11.7.0
-- bcrypt ^5.1.1
-
-### Frontend Key Dependencies
-- react ^18.3.1
-- vite ^5.3.1
-- tailwindcss ^3.4.4
-- hls.js ^1.5.15

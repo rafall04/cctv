@@ -13,8 +13,15 @@ this file stays thin on purpose.
 - **[SYSTEM_MAP.md](SYSTEM_MAP.md)** — navigation & architecture map: entry points, critical runtime
   flows, data/index notes, verification commands, stabilization priorities, and the current
   **Known Rule Deviations** list. Start here for "where does X live / how does flow Y work".
+- **[docs/frontend-guide.md](docs/frontend-guide.md)** — React conventions: structure, hooks/race-condition
+  rules, view-mode/URL-param/share-link patterns, frontend perf. Read when doing frontend work.
+- **[docs/billing-rental.md](docs/billing-rental.md)** — subscriber rental + prepaid billing + payment
+  gateways + plans + registration approval + playback scope. Read when touching billing/customer cameras.
 - **[README.md](README.md)** — deployment, env-var setup, operational runbook (PM2 / Nginx / MediaMTX).
 - **[SECURITY.md](SECURITY.md)** — security policy & posture.
+- **[INSTALLATION_SECURITY.md](INSTALLATION_SECURITY.md)** — installer hardening (interactive install, generated secrets).
+- **[MIGRATION_GUIDE.md](MIGRATION_GUIDE.md)** — running DB migrations safely on existing data. Read before
+  `npm run migrate` on a populated DB (see the production data-safety rules in AGENTS.md).
 
 ## Known rule deviations
 

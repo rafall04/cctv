@@ -15,6 +15,7 @@ SideEffects: None; documentation only.
 - `deployment/`: aaPanel, PM2, Nginx, environment generation, and deployment scripts/config.
 - `mediamtx/`: MediaMTX runtime/config assets.
 - `docs/superpowers/`: Approved specs, implementation plans, and stabilization reports.
+- `docs/frontend-guide.md`, `docs/billing-rental.md`: on-demand deep-dive guides extracted from `AGENTS.md` (read only when the task touches that area, to keep auto-loaded context lean).
 - Root import/export JSON, `tmp_*`, `.apk`, `.sec`, `.dec.txt`, and local backup files are operational artifacts; do not add new ones to commits.
 
 ## Backend Entry Points
