@@ -35,7 +35,7 @@ SideEffects: None; documentation only.
 - `frontend/src/components/landing/`: Public landing sections, filters, cards, map/playback panels.
 - `frontend/src/components/playback/`: Playback presentation components.
 - `frontend/src/components/admin/`: Admin-specific cards, analytics, camera, recording, feedback, and settings panels.
-- `frontend/src/layouts/AdminLayout.jsx`: Active admin shell. Prefer this over legacy `frontend/src/components/AdminLayout.jsx`.
+- `frontend/src/layouts/AdminLayout.jsx`: Active admin shell (the old `components/AdminLayout.jsx` shim has been removed).
 - `frontend/src/hooks/`: Page/data hooks. Prefer extracting page state here before expanding large pages.
 - `frontend/src/services/`: API clients and domain service wrappers.
 - `frontend/src/utils/`: Pure helpers for share URLs, playback segment selection, map coordinates, delivery, validation, and stream logic.

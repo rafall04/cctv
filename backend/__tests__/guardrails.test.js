@@ -129,3 +129,28 @@ describe('guardrail: auth perimeter stays tested (coverage-floor surrogate)', ()
         });
     }
 });
+
+describe('guardrail: governance docs reference no deleted files (doc-lint)', () => {
+    // Catches the "stale reference to a deleted/renamed file" drift (the shim/Playback class of bug).
+    // README is excluded — it is an ops runbook full of external/illustrative paths.
+    const REPO_ROOT = path.resolve(BACKEND_ROOT, '..');
+    const DOCS = [
+        'SYSTEM_MAP.md', 'AGENTS.md', 'CLAUDE.md',
+        'docs/frontend-guide.md', 'docs/billing-rental.md',
+        'backend/.module_map.md', 'backend/services/.module_map.md',
+        'backend/utils/.module_map.md', 'frontend/src/.module_map.md',
+    ];
+    // Repo-relative file paths only; the (?![A-Za-z]) stops `package.json` matching as `.js`.
+    const PATH_RE = /\b(?:backend|frontend|docs|deployment|mediamtx)\/[A-Za-z0-9_./-]+\.(?:js|jsx|cjs|md)(?![A-Za-z])/g;
+    it('every repo-relative file path in the agent docs still exists', () => {
+        const broken = [];
+        for (const doc of DOCS) {
+            const full = path.join(REPO_ROOT, doc);
+            if (!fs.existsSync(full)) continue;
+            for (const ref of (fs.readFileSync(full, 'utf8').match(PATH_RE) || [])) {
+                if (!fs.existsSync(path.join(REPO_ROOT, ref))) broken.push(`${doc} → ${ref}`);
+            }
+        }
+        expect(broken, `\nGovernance docs point at files that no longer exist (fix the doc in the same PR):\n  ${broken.join('\n  ')}\n`).toEqual([]);
+    });
+});
