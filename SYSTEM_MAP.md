@@ -77,6 +77,7 @@ SideEffects: None; documentation only.
 - Frontend full gate: `cd frontend && npm test && npm run build && npm run lint`.
 - Frontend focused test: `cd frontend && npm test -- <test-file>`.
 - Frontend lint runs against full `src` via `frontend/package.json`.
+- **Anti-"penumpukan" guardrails (run inside `npm test`, fail on regression):** `backend/__tests__/guardrails.test.js` + `frontend/src/__tests__/guardrails.test.js` enforce a file-size ratchet (new files <800 ln; named giants frozen at current size — may shrink, not grow), layering (routes never import the DB; services never import controllers/routes), and data-safety (no NEW `INSERT OR REPLACE`; no NEW `REAL` money column). CI: `.github/workflows/ci.yml` runs lint+test both sides on push/PR. To intentionally change a frozen baseline, edit it in the same PR so growth is a visible decision, not silent drift.
 
 ## Stabilization Priorities
 
@@ -87,12 +88,9 @@ SideEffects: None; documentation only.
   - `frontend/src/components/MapView.jsx`
   - `frontend/src/pages/AreaManagement.jsx`
   - `frontend/src/pages/Playback.jsx`
-  - `backend/routes/hlsProxyRoutes.js`
+  - `backend/services/hlsProxyService.js` and `backend/services/playbackTokenService.js` (next pile-up candidates per 2026-06-22 audit)
 - Remove or archive tracked root artifacts only with explicit approval.
-- Resolve legacy duplicate frontend locations:
-  - Prefer `frontend/src/layouts/AdminLayout.jsx`; phase out `frontend/src/components/AdminLayout.jsx`.
-  - Prefer `frontend/src/components/landing/LandingPageSimple.jsx`; phase out `frontend/src/components/LandingPageSimple.jsx`.
-  - Prefer `frontend/src/components/admin/settings/`; `frontend/src/components/settings/` now contains compatibility re-exports only.
+- ✅ Legacy duplicate frontend locations RESOLVED (2026-06): the old shims (`components/AdminLayout.jsx`, `components/LandingPageSimple.jsx`, `components/settings/`) are deleted — only canonical `layouts/AdminLayout.jsx`, `components/landing/LandingPageSimple.jsx`, `components/admin/settings/` remain (0 stale imports).
 - Keep full-scope frontend lint passing before adding new feature surfaces.
 - Add Header Docs to active entrypoints that still lack them before modifying those files.
 
@@ -106,7 +104,7 @@ Snapshot from the 2026-06-09 conformance audit — places where code does not ye
 - ✅ ~~Orphan test~~ — `recordingMaintenanceService.test.js` removed; coverage retained by `recordingMaintenanceCoordinator.test.js` + `recordingMaintenanceStateRepository.test.js`.
 
 **Structural rule violations:**
-- **DB dual-connection — hazard mitigated, full convergence deferred:** `database/database.js` now sets `busy_timeout=5000` (matching connectionPool), removing the SQLITE_BUSY asymmetry that was the concrete hazard. The 16 modules below still use its own single connection rather than `connectionPool` — full convergence is **deferred**, and is NOT a mechanical import swap: connectionPool's separate read/write connections break the read-after-write consistency those modules rely on (proven — `cameraRuntimeStateService` reads back its just-written row and gets the pre-write state). Needs a per-module audit. Modules: `adminController`, `adminDashboardService`, `apiKeyService`, `backupService`, `brandingService`, `bruteForceProtection`, `feedbackService`, `notificationDiagnosticsService`, `passwordExpiry`, `passwordHistory`, `saweriaService`, `settingsService`, `telegramService`, `thumbnailService`, `timezoneService`, `userService`.
+- **DB dual-connection — hazard mitigated, full convergence deferred:** `database/database.js` now sets `busy_timeout=5000` (matching connectionPool), removing the SQLITE_BUSY asymmetry that was the concrete hazard. The 15 modules below still use its own single connection rather than `connectionPool` — full convergence is **deferred**, and is NOT a mechanical import swap: connectionPool's separate read/write connections break the read-after-write consistency those modules rely on (proven — `cameraRuntimeStateService` reads back its just-written row and gets the pre-write state). Needs a per-module audit. Modules: `adminDashboardService`, `apiKeyService`, `backupService`, `brandingService`, `bruteForceProtection`, `feedbackService`, `notificationDiagnosticsService`, `passwordExpiry`, `passwordHistory`, `saweriaService`, `settingsService`, `telegramService`, `thumbnailService`, `timezoneService`, `userService`.
 - **Parameterized-SQL — hardened, full param deferred:** `viewerAnalyticsService.js` and `adminDashboardService.js` still interpolate dates into SQL, but every interpolated value now passes a strict `sqlDate()` guard (throws on anything not `YYYY-MM-DD`), so injection is structurally impossible (values were already server-generated / regex-validated). Full `?`-parameterization (10+ queries, one uses the filter twice) is **deferred** — these analytics services have no tests to verify a rewrite. `playbackViewerSessionService.js:39-55` is the correct `?`-param reference.
 - ✅ **Routes not thin — RESOLVED 2026-06-09 (3 of 3):** `configRoutes.js` → `services/appConfigService.js` (route 45 lines, 0 DB); `hlsProxyRoutes.js` (was 1585) → helper/class library to `services/hlsProxyService.js`, leaving a 154-line route; `externalStreamProxyRoutes.js` (was 848) → the whole stateful SWR/dedup proxy plugin to `services/externalStreamProxyService.js` (moved byte-exact via `git mv`), leaving a thin re-export route. All importers + source-text guard tests repointed; full backend suite green. **Caveat:** the external-proxy handlers have no unit test (source-text guards + pure-helper unit tests only) — run a live stream check before relying on it in prod.
 - ✅ **Frontend context perf — fixed 2026-06-09:** all 7 React contexts (`Theme`, `Toast`, `Branding`, `Timezone`, `Camera`, `Notification`, `Security`) now memoize their `value` with `useMemo`, stabilizing handlers with `useCallback` where they were recreated each render (notably `ThemeContext.toggleTheme` and `TimezoneContext`'s formatters + `loadTimezone`). Verified: lint + 487 frontend tests + build all green.
@@ -115,7 +113,6 @@ Snapshot from the 2026-06-09 conformance audit — places where code does not ye
 **Partial / lower severity:**
 - Area mutations lack audit logging (camera mutations have it).
 - Prod env template does not set `API_KEY_REQUIRE_KEYS=true` (empty-keys-table bypass stays open).
-- `Playback` route is eager-imported in `App.jsx` (not lazy, against the lazy-load guidance).
 - Auth/security services (`authService`, `authController`, `bruteForceProtection`, `sessionManager`, `apiKeyService`, `securityAuditLogger`) have no dedicated tests.
 - vitest coverage has no thresholds (coverage reported, never enforced).
 

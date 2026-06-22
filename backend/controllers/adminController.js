@@ -7,7 +7,6 @@
  */
 
 import os from 'os';
-import { query, queryOne } from '../database/database.js';
 import adminDashboardService from '../services/adminDashboardService.js';
 import mediaMtxService from '../services/mediaMtxService.js';
 import viewerSessionService from '../services/viewerSessionService.js';
