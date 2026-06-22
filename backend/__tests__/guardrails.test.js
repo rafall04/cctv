@@ -114,3 +114,18 @@ describe('guardrail: data-safety patterns', () => {
         expect(offenders, `Money columns must be INTEGER rupiah, not REAL: ${offenders.join(', ')}`).toEqual([]);
     });
 });
+
+describe('guardrail: auth perimeter stays tested (coverage-floor surrogate)', () => {
+    // The auth front door was 0-tests on a paying-customer system. These floors stop the tests being
+    // silently deleted/gutted. True %-coverage thresholds need @vitest/coverage-v8 (not installed) +
+    // CI running `--coverage`; until then this dependency-free test-count ratchet is the floor.
+    const FLOOR = { authService: 10, sessionManager: 10, bruteForceProtection: 10, apiKeyService: 8 };
+    for (const [name, min] of Object.entries(FLOOR)) {
+        it(`${name} keeps >= ${min} test cases`, () => {
+            const file = path.join(BACKEND_ROOT, '__tests__', `${name}.test.js`);
+            expect(fs.existsSync(file), `${name}.test.js is missing — the auth perimeter must stay tested`).toBe(true);
+            const count = (read(file).match(/\bit\(/g) || []).length;
+            expect(count, `${name}.test.js has ${count} test cases, below the floor of ${min}`).toBeGreaterThanOrEqual(min);
+        });
+    }
+});
