@@ -42,15 +42,24 @@ export function toMediaMtxSourceProtocol(transport) {
     return 'tcp';
 }
 
-export function buildFfmpegRtspInputArgs(inputUrl, transport = 'tcp') {
+export function buildFfmpegRtspInputArgs(inputUrl, transport = 'tcp', { socketTimeoutMicros = null } = {}) {
     const normalized = normalizeInternalRtspTransport(transport);
+    // -stimeout makes FFmpeg abort a socket read after N microseconds of no I/O,
+    // so a camera that stops delivering frames causes the process to EXIT instead
+    // of hanging forever (routing it through the normal failure handler). This is
+    // the RTSP socket-timeout option for FFmpeg 4.x.
+    const timeoutArgs = Number.isFinite(socketTimeoutMicros) && socketTimeoutMicros > 0
+        ? ['-stimeout', String(Math.floor(socketTimeoutMicros))]
+        : [];
+
     if (normalized === 'auto') {
-        return ['-i', inputUrl];
+        return [...timeoutArgs, '-i', inputUrl];
     }
 
     return [
         '-rtsp_transport',
         normalized === 'udp' ? 'udp' : 'tcp',
+        ...timeoutArgs,
         '-i',
         inputUrl,
     ];

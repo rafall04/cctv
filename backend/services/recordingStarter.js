@@ -18,6 +18,7 @@ import {
     getPendingRecordingDir,
     getPendingRecordingPattern,
 } from './recordingSegmentFilePolicy.js';
+import { RECORDING_RTSP_SOCKET_TIMEOUT_MICROS } from './recordingIntervalsPolicy.js';
 
 const EXTERNAL_RECORDING_PROTOCOL_WHITELIST = 'file,http,https,tcp,tls,crypto';
 
@@ -101,7 +102,9 @@ export function buildRecordingFfmpegArgs({ cameraDir, outputPattern, inputUrl, s
             '-protocol_whitelist', EXTERNAL_RECORDING_PROTOCOL_WHITELIST,
             '-i', inputUrl,
         ]
-        : buildFfmpegRtspInputArgs(inputUrl, rtspTransport);
+        : buildFfmpegRtspInputArgs(inputUrl, rtspTransport, {
+            socketTimeoutMicros: RECORDING_RTSP_SOCKET_TIMEOUT_MICROS,
+        });
 
     return [
         ...inputArgs,

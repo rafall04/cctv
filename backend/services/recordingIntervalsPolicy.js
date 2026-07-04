@@ -64,6 +64,11 @@ export const RECORDING_HEALTH_TIMEOUT_TUNNEL_MS = 10 * 1000;
 // recovery. Must exceed the freeze timeout above so a no-media camera can never
 // confirm recovery before its freeze is detected.
 export const RECORDING_RECOVERY_CONFIRM_MS = 45 * 1000;
+// FFmpeg RTSP socket I/O timeout (microseconds). Makes a recording process EXIT on
+// data starvation instead of hanging, so a dead-media camera routes through the
+// normal close→markFailure path. Kept below the internal freeze timeout above so
+// FFmpeg self-exits before the health monitor has to kill it.
+export const RECORDING_RTSP_SOCKET_TIMEOUT_MICROS = 20 * 1000 * 1000;
 
 // === Emergency disk ===
 export const RECORDING_EMERGENCY_DISK_THRESHOLD_BYTES = readPositiveIntEnv(

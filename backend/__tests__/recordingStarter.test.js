@@ -118,6 +118,10 @@ describe('recordingStarter.buildRecordingFfmpegArgs', () => {
         expect(args).toContain('600');
         expect(args).toContain('-strftime');
         expect(args).toContain('+frag_keyframe+empty_moov+default_base_moof');
+        // Internal RTSP recording carries a socket timeout so a stalled camera makes
+        // FFmpeg exit instead of hanging (routes through the failure handler).
+        expect(args).toContain('-stimeout');
+        expect(args.indexOf('-stimeout')).toBeLessThan(args.indexOf('-i'));
         expect(args[args.length - 1]).toBe('/recordings/camera1/pending/%Y%m%d_%H%M%S.mp4.partial');
     });
 
