@@ -59,6 +59,21 @@ export const RECORDING_PROCESS_GRACEFUL_STOP_MS = 10 * 1000;
 // === Health monitoring ===
 export const RECORDING_HEALTH_TIMEOUT_INTERNAL_MS = 30 * 1000;
 export const RECORDING_HEALTH_TIMEOUT_TUNNEL_MS = 10 * 1000;
+// A (re)started recording only clears its failure counter after it has stayed
+// healthy (data flowing) for this long — spawning the process is NOT proof of
+// recovery. Must exceed the freeze timeout above so a no-media camera can never
+// confirm recovery before its freeze is detected.
+export const RECORDING_RECOVERY_CONFIRM_MS = 45 * 1000;
+// FFmpeg RTSP socket I/O timeout (microseconds). Makes a recording process EXIT on
+// data starvation instead of hanging, so a dead-media camera routes through the
+// normal close→markFailure path. Kept below the internal freeze timeout above so
+// FFmpeg self-exits before the health monitor has to kill it.
+export const RECORDING_RTSP_SOCKET_TIMEOUT_MICROS = 20 * 1000 * 1000;
+// Upper bound on the retry backoff for a camera stuck with NO media (frozen). Unlike
+// a hard crash, a no-media camera usually recovers on its own (its live counterpart
+// streams fine), so we keep retrying briskly instead of backing off to the 5-min
+// general cap — recording resumes within ~1 min of the camera returning.
+export const RECORDING_NO_MEDIA_MAX_COOLDOWN_MS = 60 * 1000;
 
 // === Emergency disk ===
 export const RECORDING_EMERGENCY_DISK_THRESHOLD_BYTES = readPositiveIntEnv(

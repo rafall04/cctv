@@ -103,6 +103,27 @@ describe('recordingRecoveryScanner', () => {
         expect(result.duplicatePartialsDeleted).toBe(1);
     });
 
+    it('deletes empty (0-byte) pending partials instead of queuing them for recovery', async () => {
+        fsMock.stat.mockImplementation(async (targetPath) => {
+            if (String(targetPath).endsWith('.partial')) {
+                return { isDirectory: () => false, mtimeMs: Date.parse('2026-05-17T01:00:00.000Z'), size: 0 };
+            }
+            return { isDirectory: () => true, mtimeMs: Date.parse('2026-05-17T01:00:00.000Z'), size: 4096 };
+        });
+        const scanner = createScanner();
+
+        const result = await scanner.scanOnce();
+
+        expect(deleteFileSafely).toHaveBeenCalledWith(expect.objectContaining({
+            cameraId: 7,
+            filename: '20260517_010000.mp4.partial',
+            reason: 'empty_pending_partial',
+        }));
+        expect(onSegmentCreated).not.toHaveBeenCalled();
+        expect(result.emptyPartialsDeleted).toBe(1);
+        expect(result.queuedSegments).toBe(0);
+    });
+
     it('queues unregistered final segments for recovery instead of deletion', async () => {
         fsMock.readdir.mockImplementation(async (targetPath) => {
             if (targetPath === base) return ['camera7'];

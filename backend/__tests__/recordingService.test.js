@@ -129,12 +129,10 @@ describe('recordingService external recording support', () => {
             streamSource: 'internal',
         });
 
-        expect(args.slice(0, 4)).toEqual([
-            '-rtsp_transport',
-            'tcp',
-            '-i',
-            'rtsp://user:pass@10.0.0.2/stream',
-        ]);
+        expect(args.slice(0, 2)).toEqual(['-rtsp_transport', 'tcp']);
+        expect(args).toContain('-stimeout'); // socket timeout so a stalled camera exits
+        expect(args.indexOf('-stimeout')).toBeLessThan(args.indexOf('-i'));
+        expect(args[args.indexOf('-i') + 1]).toBe('rtsp://user:pass@10.0.0.2/stream');
         expect(args).toContain('-c:v');
         expect(args).toContain('copy');
         expect(args).toContain('-segment_format');
@@ -151,12 +149,8 @@ describe('recordingService external recording support', () => {
             rtspTransport: 'udp',
         });
 
-        expect(args.slice(0, 4)).toEqual([
-            '-rtsp_transport',
-            'udp',
-            '-i',
-            'rtsp://user:pass@10.0.0.2/stream',
-        ]);
+        expect(args.slice(0, 2)).toEqual(['-rtsp_transport', 'udp']);
+        expect(args[args.indexOf('-i') + 1]).toBe('rtsp://user:pass@10.0.0.2/stream');
     });
 
     it('omits fixed RTSP transport for auto recording mode', async () => {
@@ -169,11 +163,8 @@ describe('recordingService external recording support', () => {
             rtspTransport: 'auto',
         });
 
-        expect(args.slice(0, 2)).toEqual([
-            '-i',
-            'rtsp://user:pass@10.0.0.2/stream',
-        ]);
         expect(args).not.toContain('-rtsp_transport');
+        expect(args[args.indexOf('-i') + 1]).toBe('rtsp://user:pass@10.0.0.2/stream');
     });
 
     it('builds direct HLS recording args for external cameras', async () => {

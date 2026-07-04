@@ -90,6 +90,25 @@ export function createRecordingRecoveryScanner({
             }
 
             if (fileAge > RECOVERY_MIN_AGE_MS) {
+                // An empty partial is an aborted segment: the camera opened the file
+                // but delivered no frames (e.g. a stalled/hung stream). There is
+                // nothing to recover, so delete it immediately instead of churning it
+                // through the recovery queue — and inflating the diagnostics/health
+                // backlog that drives false "pipeline" alerts — for hours.
+                if (stats.size === 0) {
+                    const emptyDelete = await fileOperations.deleteFileSafely({
+                        cameraId,
+                        filename,
+                        filePath,
+                        reason: 'empty_pending_partial',
+                    });
+                    if (emptyDelete.success) {
+                        result.emptyPartialsDeleted += 1;
+                        logger.log?.(`[Scanner] Deleted empty pending partial: camera${cameraId}/${filename}`);
+                    }
+                    continue;
+                }
+
                 const retryDecision = recoveryService.shouldRetryNow?.({
                     cameraId,
                     filename,
@@ -186,6 +205,7 @@ export function createRecordingRecoveryScanner({
             scannedCameras: 0,
             queuedSegments: 0,
             duplicatePartialsDeleted: 0,
+            emptyPartialsDeleted: 0,
             retrySkipped: 0,
         };
 

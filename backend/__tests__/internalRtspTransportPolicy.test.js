@@ -71,4 +71,27 @@ describe('internalRtspTransportPolicy', () => {
             'rtsp://cam/stream',
         ]);
     });
+
+    it('injects -stimeout before -i when a socket timeout is provided', () => {
+        expect(buildFfmpegRtspInputArgs('rtsp://cam/stream', 'tcp', { socketTimeoutMicros: 20_000_000 })).toEqual([
+            '-rtsp_transport',
+            'tcp',
+            '-stimeout',
+            '20000000',
+            '-i',
+            'rtsp://cam/stream',
+        ]);
+        expect(buildFfmpegRtspInputArgs('rtsp://cam/stream', 'auto', { socketTimeoutMicros: 20_000_000 })).toEqual([
+            '-stimeout',
+            '20000000',
+            '-i',
+            'rtsp://cam/stream',
+        ]);
+    });
+
+    it('omits -stimeout when no/invalid socket timeout is given', () => {
+        expect(buildFfmpegRtspInputArgs('rtsp://cam/stream', 'tcp')).not.toContain('-stimeout');
+        expect(buildFfmpegRtspInputArgs('rtsp://cam/stream', 'tcp', { socketTimeoutMicros: 0 })).not.toContain('-stimeout');
+        expect(buildFfmpegRtspInputArgs('rtsp://cam/stream', 'tcp', { socketTimeoutMicros: null })).not.toContain('-stimeout');
+    });
 });
