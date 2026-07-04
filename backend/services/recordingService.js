@@ -119,6 +119,7 @@ class RecordingService {
     ensureRuntimeHealthState(cameraId) { return this.healthMonitor.ensureState(cameraId); }
     clearRuntimeHealthState(cameraId) { this.healthMonitor.clearState(cameraId); }
     markRecordingRecovered(cameraId, now = Date.now()) { return this.healthMonitor.markRecovered(cameraId, now); }
+    markRecordingStarted(cameraId, now = Date.now()) { return this.healthMonitor.markStarted(cameraId, now); }
     markRecordingFailure(cameraId, reason, now = Date.now()) { return this.healthMonitor.markFailure(cameraId, reason, now); }
     suspendRecordingForOffline(cameraId, now = Date.now()) { return this.healthMonitor.suspendOffline(cameraId, now); }
     async attemptRecordingRecovery(cameraId, reason, now = Date.now()) {
@@ -183,8 +184,11 @@ class RecordingService {
                 return startResult;
             }
 
-            // Initialize stream health
-            this.markRecordingRecovered(cameraId, Date.now());
+            // Initialize stream health. Spawning is not proof of recovery — the
+            // failure counter is only cleared once data has flowed for a sustained
+            // window (see recordingHealthMonitor), so a no-media camera can't reset
+            // the circuit-breaker by restarting.
+            this.markRecordingStarted(cameraId, Date.now());
 
             // Update camera status
             execute(

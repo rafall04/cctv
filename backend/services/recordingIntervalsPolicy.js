@@ -59,6 +59,11 @@ export const RECORDING_PROCESS_GRACEFUL_STOP_MS = 10 * 1000;
 // === Health monitoring ===
 export const RECORDING_HEALTH_TIMEOUT_INTERNAL_MS = 30 * 1000;
 export const RECORDING_HEALTH_TIMEOUT_TUNNEL_MS = 10 * 1000;
+// A (re)started recording only clears its failure counter after it has stayed
+// healthy (data flowing) for this long — spawning the process is NOT proof of
+// recovery. Must exceed the freeze timeout above so a no-media camera can never
+// confirm recovery before its freeze is detected.
+export const RECORDING_RECOVERY_CONFIRM_MS = 45 * 1000;
 
 // === Emergency disk ===
 export const RECORDING_EMERGENCY_DISK_THRESHOLD_BYTES = readPositiveIntEnv(

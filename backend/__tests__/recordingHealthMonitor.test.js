@@ -103,6 +103,18 @@ describe('recordingHealthMonitor — state transitions', () => {
         });
     });
 
+    it('markStarted refreshes data time but preserves the failure counter', () => {
+        const { deps } = createDeps();
+        const monitor = createRecordingHealthMonitor(deps);
+        monitor.markFailure(7, 'stream_frozen', 1000);
+        monitor.markStarted(7, 5000);
+        expect(monitor.getState(7)).toMatchObject({
+            lastDataTime: 5000,
+            consecutiveFailureCount: 1,
+            inFlightAction: false,
+        });
+    });
+
     it('suspendOffline sets cooldown floor and suspended reason without lowering existing cooldown', () => {
         const { deps } = createDeps();
         const monitor = createRecordingHealthMonitor(deps);
@@ -125,13 +137,23 @@ describe('recordingHealthMonitor.attemptRecovery', () => {
         expect(deps.startRecording).not.toHaveBeenCalled();
     });
 
-    it('calls startRecording and marks recovered on success', async () => {
+    it('calls startRecording and marks the process started on success', async () => {
         const { deps } = createDeps();
         const monitor = createRecordingHealthMonitor(deps);
         const result = await monitor.attemptRecovery(7, 'waiting_retry', 1000);
         expect(result).toEqual({ success: true });
         expect(deps.startRecording).toHaveBeenCalledWith(7);
         expect(monitor.getState(7).suspendedReason).toBeNull();
+    });
+
+    it('does NOT clear an existing failure count on start success (recovery is probationary)', async () => {
+        const { deps } = createDeps();
+        const monitor = createRecordingHealthMonitor(deps);
+        monitor.markFailure(7, 'stream_frozen', 1000);
+        monitor.markFailure(7, 'stream_frozen', 2000); // count=2, cooldownUntil=2000+30000
+        await monitor.attemptRecovery(7, 'waiting_retry', 100000);
+        expect(deps.startRecording).toHaveBeenCalledWith(7);
+        expect(monitor.getState(7).consecutiveFailureCount).toBe(2);
     });
 
     it('marks failure when startRecording reports !success', async () => {
@@ -194,6 +216,54 @@ describe('recordingHealthMonitor.tick', () => {
 
         expect(restartRecording).toHaveBeenCalledWith(7, 'stream_frozen');
         expect(monitor.getState(7).restartCount).toBe(1);
+    });
+
+    it('suspends (stops, does not restart) after N consecutive frozen failures', async () => {
+        const { deps, processManager, queryOne, stopRecording, restartRecording } = createDeps();
+        processManager.getStatus.mockReturnValue({ status: 'recording', isRecording: true });
+        queryOne.mockReturnValue({ is_tunnel: 0, is_online: 1, enabled: 1, enable_recording: 1 });
+        const monitor = createRecordingHealthMonitor(deps);
+        const state = monitor.ensureState(7);
+        state.lastDataTime = 0;
+        state.consecutiveFailureCount = 2; // one more freeze reaches the suspend threshold (3)
+
+        await monitor.tick(60_000);
+
+        expect(restartRecording).not.toHaveBeenCalled();
+        expect(stopRecording).toHaveBeenCalledWith(7, { removeHealthState: false, reason: 'stream_frozen' });
+        expect(monitor.getState(7).consecutiveFailureCount).toBe(3);
+        expect(monitor.getState(7).suspendedReason).toBe('waiting_retry');
+    });
+
+    it('clears the failure count after sustained healthy data since the last restart', async () => {
+        const { deps, processManager, queryOne } = createDeps();
+        processManager.getStatus.mockReturnValue({ status: 'recording', isRecording: true });
+        queryOne.mockReturnValue({ is_tunnel: 0, is_online: 1, enabled: 1, enable_recording: 1 });
+        const monitor = createRecordingHealthMonitor(deps);
+        const state = monitor.ensureState(7);
+        state.consecutiveFailureCount = 2;
+        state.lastRestartAt = 1000;
+        state.lastDataTime = 100_000; // data fresh at tick time
+
+        await monitor.tick(100_000); // healthy, and 99_000ms since restart exceeds the confirm window
+
+        expect(monitor.getState(7).consecutiveFailureCount).toBe(0);
+        expect(monitor.getState(7).suspendedReason).toBeNull();
+    });
+
+    it('does not clear the failure count until the recovery-confirm window passes', async () => {
+        const { deps, processManager, queryOne } = createDeps();
+        processManager.getStatus.mockReturnValue({ status: 'recording', isRecording: true });
+        queryOne.mockReturnValue({ is_tunnel: 0, is_online: 1, enabled: 1, enable_recording: 1 });
+        const monitor = createRecordingHealthMonitor(deps);
+        const state = monitor.ensureState(7);
+        state.consecutiveFailureCount = 2;
+        state.lastRestartAt = 90_000;
+        state.lastDataTime = 100_000;
+
+        await monitor.tick(100_000); // only 10_000ms since restart — below the confirm window
+
+        expect(monitor.getState(7).consecutiveFailureCount).toBe(2);
     });
 
     it('stops recording + suspends offline when frozen but camera confirmed offline', async () => {

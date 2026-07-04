@@ -14,6 +14,7 @@ import {
     RECORDING_HEALTH_TIMEOUT_INTERNAL_MS,
     RECORDING_HEALTH_TIMEOUT_TUNNEL_MS,
     RECORDING_OFFLINE_COOLDOWN_MS,
+    RECORDING_RECOVERY_CONFIRM_MS,
     RECORDING_RETRY_BASE_COOLDOWN_MS,
     RECORDING_RETRY_MAX_COOLDOWN_MS,
 } from './recordingIntervalsPolicy.js';
@@ -99,6 +100,19 @@ export function createRecordingHealthMonitor({
         return state;
     }
 
+    // Called when a recording process is (re)spawned. Spawning is NOT proof the
+    // camera is delivering video, so — unlike markRecovered — this preserves the
+    // failure counter/cooldown/suspend reason. Recovery is only confirmed later,
+    // once data has flowed for RECORDING_RECOVERY_CONFIRM_MS (see tick). This is
+    // what lets the circuit-breaker accumulate against a camera that pings but
+    // sends no frames, instead of resetting on every restart.
+    function markStarted(cameraId, nowMs = now()) {
+        const state = ensureState(cameraId);
+        state.lastDataTime = nowMs;
+        state.inFlightAction = false;
+        return state;
+    }
+
     function markFailure(cameraId, reason = 'process_crashed', nowMs = now()) {
         const state = ensureState(cameraId);
         state.consecutiveFailureCount += 1;
@@ -128,7 +142,8 @@ export function createRecordingHealthMonitor({
         try {
             const result = await startRecording(cameraId);
             if (result.success) {
-                markRecovered(cameraId, nowMs);
+                // Process started — recovery stays probationary until data flows.
+                markStarted(cameraId, nowMs);
             } else {
                 markFailure(cameraId, reason, nowMs);
             }
@@ -193,7 +208,16 @@ export function createRecordingHealthMonitor({
                 ? RECORDING_HEALTH_TIMEOUT_TUNNEL_MS
                 : RECORDING_HEALTH_TIMEOUT_INTERNAL_MS;
             const timeSinceData = nowMs - state.lastDataTime;
-            if (timeSinceData <= timeout) continue;
+            if (timeSinceData <= timeout) {
+                // Data is flowing. Confirm recovery only after the stream has stayed
+                // healthy for a sustained window since the last restart — a freshly
+                // spawned process that has not proven itself must not clear the breaker.
+                if (state.consecutiveFailureCount > 0
+                    && (nowMs - (state.lastRestartAt || 0)) >= RECORDING_RECOVERY_CONFIRM_MS) {
+                    api.markRecovered(cameraId, nowMs);
+                }
+                continue;
+            }
 
             if (camera.is_online !== 1) {
                 logger.log?.(`[Recording Health] Camera ${cameraId} confirmed offline, suspending recording recovery`);
@@ -204,9 +228,23 @@ export function createRecordingHealthMonitor({
 
             if (nowMs < (state.cooldownUntil || 0)) continue;
 
-            logger.log?.(`⚠️ Camera ${cameraId} stream frozen (${timeSinceData}ms), restarting...`);
+            // Count the freeze as a failure so the circuit-breaker engages: markFailure
+            // sets an exponential cooldown and, past the threshold, a suspend reason.
+            // Without this, a camera that pings but sends no video would be restarted
+            // every ~35s forever, flooding pending/ with empty partials.
             state.restartCount += 1;
-            state.lastRestartAt = nowMs;
+            api.markFailure(cameraId, 'stream_frozen', nowMs);
+            const failed = streamHealthMap.get(cameraId);
+
+            if (failed && failed.consecutiveFailureCount >= RECORDING_FAILURE_SUSPEND_THRESHOLD) {
+                // Stop hammering: suspend and let the stopped-branch retry on the (now
+                // exponentially longer) cooldown that markFailure already set.
+                logger.log?.(`[Recording Health] Camera ${cameraId} frozen ${failed.consecutiveFailureCount}× (no media) — suspending recording restarts`);
+                await stopRecording(cameraId, { removeHealthState: false, reason: 'stream_frozen' });
+                continue;
+            }
+
+            logger.log?.(`⚠️ Camera ${cameraId} stream frozen (${timeSinceData}ms), restarting (attempt ${failed?.consecutiveFailureCount ?? state.restartCount})...`);
             state.inFlightAction = true;
             try {
                 await restartRecording(cameraId, 'stream_frozen');
@@ -242,6 +280,7 @@ export function createRecordingHealthMonitor({
         getState,
         updateLastDataAt,
         markRecovered,
+        markStarted,
         markFailure,
         suspendOffline,
         attemptRecovery,
