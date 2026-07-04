@@ -69,6 +69,11 @@ export const RECORDING_RECOVERY_CONFIRM_MS = 45 * 1000;
 // normal close→markFailure path. Kept below the internal freeze timeout above so
 // FFmpeg self-exits before the health monitor has to kill it.
 export const RECORDING_RTSP_SOCKET_TIMEOUT_MICROS = 20 * 1000 * 1000;
+// Upper bound on the retry backoff for a camera stuck with NO media (frozen). Unlike
+// a hard crash, a no-media camera usually recovers on its own (its live counterpart
+// streams fine), so we keep retrying briskly instead of backing off to the 5-min
+// general cap — recording resumes within ~1 min of the camera returning.
+export const RECORDING_NO_MEDIA_MAX_COOLDOWN_MS = 60 * 1000;
 
 // === Emergency disk ===
 export const RECORDING_EMERGENCY_DISK_THRESHOLD_BYTES = readPositiveIntEnv(

@@ -13,6 +13,7 @@ import {
     RECORDING_HEALTH_TICK_INTERVAL_MS,
     RECORDING_HEALTH_TIMEOUT_INTERNAL_MS,
     RECORDING_HEALTH_TIMEOUT_TUNNEL_MS,
+    RECORDING_NO_MEDIA_MAX_COOLDOWN_MS,
     RECORDING_OFFLINE_COOLDOWN_MS,
     RECORDING_RECOVERY_CONFIRM_MS,
     RECORDING_RETRY_BASE_COOLDOWN_MS,
@@ -235,6 +236,14 @@ export function createRecordingHealthMonitor({
             state.restartCount += 1;
             api.markFailure(cameraId, 'stream_frozen', nowMs);
             const failed = streamHealthMap.get(cameraId);
+            if (failed) {
+                // No-media backoff is bounded low so a recovered camera resumes
+                // recording within ~1 min, instead of backing off to the 5-min cap.
+                failed.cooldownUntil = Math.min(
+                    failed.cooldownUntil,
+                    nowMs + RECORDING_NO_MEDIA_MAX_COOLDOWN_MS
+                );
+            }
 
             if (failed && failed.consecutiveFailureCount >= RECORDING_FAILURE_SUSPEND_THRESHOLD) {
                 // Stop hammering: suspend and let the stopped-branch retry on the (now

@@ -235,6 +235,21 @@ describe('recordingHealthMonitor.tick', () => {
         expect(monitor.getState(7).suspendedReason).toBe('waiting_retry');
     });
 
+    it('caps the no-media cooldown so a recovered camera resumes quickly', async () => {
+        const { deps, processManager, queryOne } = createDeps();
+        processManager.getStatus.mockReturnValue({ status: 'recording', isRecording: true });
+        queryOne.mockReturnValue({ is_tunnel: 0, is_online: 1, enabled: 1, enable_recording: 1 });
+        const monitor = createRecordingHealthMonitor(deps);
+        const state = monitor.ensureState(7);
+        state.lastDataTime = 0;
+        state.consecutiveFailureCount = 3; // next freeze -> count 4 -> uncapped cooldown would be 120s
+
+        await monitor.tick(1_000_000);
+
+        // computeCooldownMs(4) = 120_000, but capped to RECORDING_NO_MEDIA_MAX_COOLDOWN_MS (60_000).
+        expect(monitor.getState(7).cooldownUntil).toBe(1_000_000 + 60_000);
+    });
+
     it('clears the failure count after sustained healthy data since the last restart', async () => {
         const { deps, processManager, queryOne } = createDeps();
         processManager.getStatus.mockReturnValue({ status: 'recording', isRecording: true });
