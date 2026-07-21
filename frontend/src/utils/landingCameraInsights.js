@@ -42,58 +42,39 @@ function isNewCamera(camera, now) {
     return ageMs >= 0 && ageMs <= NEW_CAMERA_DAYS * 24 * 60 * 60 * 1000;
 }
 
+/*
+ * Returns DATA ONLY — a stable `key` plus its Indonesian `label`.
+ *
+ * This used to also return a `className` string of hardcoded Tailwind colours
+ * (rose / sky / violet / amber / emerald / slate), which meant a pure data
+ * helper was quietly deciding how six more hues entered the palette, out of
+ * reach of the token layer. Callers now map `key` to a semantic token
+ * themselves, so the colour decision lives where colour belongs.
+ */
 export function getPublicCameraQuality(camera, now = new Date()) {
     if (camera?.status === 'maintenance') {
-        return {
-            key: 'maintenance',
-            label: 'Gangguan',
-            className: 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-300',
-        };
+        return { key: 'maintenance', label: 'Gangguan' };
     }
 
     if (isOffline(camera)) {
-        return {
-            key: 'offline',
-            label: 'Offline',
-            className: 'border-gray-200 bg-gray-50 text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300',
-        };
+        return { key: 'offline', label: 'Offline' };
     }
 
     if (getMetric(camera, 'live_viewers') >= BUSY_VIEWER_THRESHOLD) {
-        return {
-            key: 'busy',
-            label: 'Ramai',
-            className: 'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-300',
-        };
+        return { key: 'busy', label: 'Ramai' };
     }
 
     if (isNewCamera(camera, now)) {
-        return {
-            key: 'new',
-            label: 'Baru',
-            className: 'border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-500/20 dark:bg-violet-500/10 dark:text-violet-300',
-        };
+        return { key: 'new', label: 'Baru' };
     }
 
     if (getMetric(camera, 'total_views') >= TOP_VIEW_THRESHOLD) {
-        return {
-            key: 'top',
-            label: 'Sering Dilihat',
-            className: 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300',
-        };
+        return { key: 'top', label: 'Sering Dilihat' };
     }
 
     if (isOnline(camera) && camera?.is_tunnel !== 1) {
-        return {
-            key: 'stable',
-            label: 'Stabil',
-            className: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300',
-        };
+        return { key: 'stable', label: 'Stabil' };
     }
 
-    return {
-        key: 'live',
-        label: 'Live',
-        className: 'border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300',
-    };
+    return { key: 'live', label: 'Live' };
 }

@@ -8,6 +8,18 @@
 
 import { Icons } from '../ui/Icons.jsx';
 
+/*
+ * These panels float over a moving map, so they stay opaque rather than tinted:
+ * a translucent slab over satellite imagery is exactly where text legibility dies.
+ * The previous version leaned on arbitrary values — `bg-white/78`, `border-white/55`
+ * and a bespoke `shadow-[0_14px_30px_rgba(15,23,42,0.12)]` repeated three times —
+ * none of which existed anywhere else in the app.
+ */
+const PANEL_CLASS = 'pointer-events-auto rounded-card border border-edge bg-surface p-1.5 shadow-e2';
+// No hover lift: these sit on top of a draggable map, and controls that jump on
+// hover read as instability right where the user is trying to aim.
+const CONTROL_CLASS = 'rounded-control border border-edge px-3 py-2 text-[11px] font-medium text-content transition-colors hover:border-edge-strong hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-60';
+
 export default function MapTopChrome({
     showAreaFilter,
     selectedAreaValue,
@@ -33,13 +45,12 @@ export default function MapTopChrome({
                 className="pointer-events-none flex max-w-[min(100%,24rem)] flex-col gap-2"
             >
                 {showAreaFilter && (
-                    <div
-                        data-testid="map-area-filter-panel"
-                        className="pointer-events-auto rounded-2xl border border-white/55 bg-white/78 p-1.5 shadow-[0_14px_30px_rgba(15,23,42,0.12)] backdrop-blur-xl dark:border-white/10 dark:bg-gray-900/72"
-                    >
+                    <div data-testid="map-area-filter-panel" className={PANEL_CLASS}>
                         <div className="flex items-center gap-2 px-2 pb-1.5 pt-1">
-                            <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gray-500 dark:text-gray-400">
-                                Area View
+                            {/* Was "Area View" in uppercase with 0.22em tracking — an English
+                                label shouting on an Indonesian UI. */}
+                            <span className="text-[11px] font-medium text-content-muted">
+                                Area
                             </span>
                         </div>
                         <div className="flex items-center gap-2">
@@ -47,7 +58,7 @@ export default function MapTopChrome({
                                 value={selectedAreaValue}
                                 onChange={onAreaChange}
                                 data-testid="map-area-select"
-                                className="min-w-0 flex-1 rounded-xl border-0 bg-transparent px-2.5 py-2 text-xs font-semibold text-gray-900 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:text-white sm:text-sm"
+                                className="min-w-0 flex-1 rounded-control border-0 bg-transparent px-2.5 py-2 text-xs font-medium text-content focus:outline-none focus:ring-2 focus:ring-primary sm:text-sm"
                             >
                                 <option value="all">{mapName || 'Semua Lokasi'} ({camerasWithCoordsCount})</option>
                                 {areaNames.map(area => (
@@ -60,7 +71,7 @@ export default function MapTopChrome({
                                 type="button"
                                 onClick={onResetView}
                                 data-testid="map-reset-view"
-                                className="rounded-xl border border-white/40 bg-white/70 px-3 py-2 text-[11px] font-semibold text-gray-700 shadow-sm transition-all hover:-translate-y-0.5 hover:bg-white dark:border-white/10 dark:bg-gray-800/85 dark:text-gray-200 dark:hover:bg-gray-800"
+                                className={CONTROL_CLASS}
                             >
                                 Reset
                             </button>
@@ -69,10 +80,7 @@ export default function MapTopChrome({
                 )}
 
                 {typeof onLocateMe === 'function' && (
-                    <div
-                        data-testid="map-locate-panel"
-                        className="pointer-events-auto rounded-2xl border border-white/55 bg-white/78 p-1.5 shadow-[0_14px_30px_rgba(15,23,42,0.12)] backdrop-blur-xl dark:border-white/10 dark:bg-gray-900/72"
-                    >
+                    <div data-testid="map-locate-panel" className={PANEL_CLASS}>
                         <button
                             type="button"
                             onClick={onLocateMe}
@@ -80,7 +88,7 @@ export default function MapTopChrome({
                             aria-busy={isLocating}
                             data-testid="map-locate-me"
                             aria-label="Cek CCTV terdekat dari lokasi saya"
-                            className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-white/40 bg-white/70 px-3 py-2 text-[11px] font-semibold text-gray-700 shadow-sm transition-all hover:-translate-y-0.5 hover:bg-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-gray-800/85 dark:text-gray-200 dark:hover:bg-gray-800"
+                            className={`flex w-full items-center justify-center gap-1.5 ${CONTROL_CLASS}`}
                         >
                             <Icons.MapPin />
                             {isLocating ? 'Mencari lokasi…' : 'Cek CCTV terdekat'}
@@ -89,7 +97,7 @@ export default function MapTopChrome({
                             <p
                                 data-testid="map-locate-error"
                                 role="alert"
-                                className="mt-1.5 px-1 text-[11px] font-medium text-red-600 dark:text-red-400"
+                                className="mt-1.5 px-1 text-[11px] font-medium text-status-fault"
                             >
                                 {locateError}
                             </p>
@@ -100,7 +108,7 @@ export default function MapTopChrome({
                                 role="status"
                                 aria-live="polite"
                                 title="Jarak garis lurus (bukan jarak tempuh)"
-                                className="mt-1.5 px-1 text-[11px] font-medium text-gray-600 dark:text-gray-300"
+                                className="mt-1.5 px-1 text-[11px] font-medium text-content-muted"
                             >
                                 {nearbyMessage}
                             </p>
@@ -111,9 +119,9 @@ export default function MapTopChrome({
                 {shouldShowZoomHint && (
                     <div
                         data-testid="map-zoom-hint"
-                        className="pointer-events-none inline-flex max-w-fit items-center gap-2 rounded-full border border-white/55 bg-white/78 px-3 py-1.5 text-[11px] font-medium text-gray-600 shadow-[0_12px_28px_rgba(15,23,42,0.12)] backdrop-blur-xl dark:border-white/10 dark:bg-gray-900/72 dark:text-gray-300"
+                        className="pointer-events-none inline-flex max-w-fit items-center gap-2 rounded-full border border-edge bg-surface px-3 py-1.5 text-[11px] font-medium text-content-muted shadow-e2"
                     >
-                        <span className="inline-flex h-2 w-2 rounded-full bg-sky-500" />
+                        <span className="inline-flex h-1.5 w-1.5 rounded-full bg-primary" />
                         Zoom in untuk lihat kamera individual
                     </div>
                 )}
