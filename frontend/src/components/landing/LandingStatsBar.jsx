@@ -14,29 +14,14 @@ import { Icons } from '../ui/Icons';
 import { shouldDisableAnimations } from '../../utils/animationControl';
 
 function ListModal({ title, items, type, onClose, onCameraClick }) {
-    const getHeaderColor = () => {
+    // One dot instead of a per-type gradient header. Same reasoning as the stats
+    // row: colour should encode state, not decorate a panel.
+    const getStatusDot = () => {
         switch (type) {
-            case 'online': return 'from-emerald-500 to-emerald-600';
-            case 'offline': return 'from-gray-500 to-gray-600';
-            case 'maintenance': return 'from-red-500 to-red-600';
-            case 'areas': return 'from-purple-500 to-purple-600';
-            default: return 'from-primary to-primary-600';
-        }
-    };
-
-    const getStatusIcon = () => {
-        const iconClass = "w-5 h-5 text-white";
-        switch (type) {
-            case 'online':
-                return <svg className={iconClass} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M5 13l4 4L19 7" /></svg>;
-            case 'offline':
-                return <svg className={iconClass} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M6 18L18 6M6 6l12 12" /></svg>;
-            case 'maintenance':
-                return <svg className={iconClass} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877" /></svg>;
-            case 'areas':
-                return <svg className={iconClass} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z" /><circle cx="12" cy="11" r="3" /></svg>;
-            default:
-                return <Icons.Camera />;
+            case 'online': return 'bg-status-live';
+            case 'offline': return 'bg-status-idle';
+            case 'maintenance': return 'bg-status-fault';
+            default: return 'bg-content-subtle';
         }
     };
 
@@ -81,18 +66,16 @@ function ListModal({ title, items, type, onClose, onCameraClick }) {
                 role="dialog"
                 aria-modal="true"
                 aria-label={title}
-                className="max-h-[70vh] w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-gray-900"
+                className="max-h-[70vh] w-full max-w-md overflow-hidden rounded-card border border-edge bg-surface shadow-e2"
                 onClick={e => e.stopPropagation()}
             >
-                <div className={`bg-gradient-to-r ${getHeaderColor()} px-4 sm:px-5 py-3 sm:py-4 flex items-center justify-between`}>
-                    <div className="flex items-center gap-2 sm:gap-3">
-                        {getStatusIcon()}
-                        <h3 className="text-white font-bold text-base sm:text-lg">{title}</h3>
-                        <span className="px-2 py-0.5 bg-white/20 rounded-full text-white text-xs sm:text-sm font-medium">
-                            {items.length}
-                        </span>
+                <div className="flex items-center justify-between border-b border-edge px-4 py-3 sm:px-5 sm:py-4">
+                    <div className="flex items-center gap-2.5">
+                        <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${getStatusDot()}`} aria-hidden="true"></span>
+                        <h3 className="text-base font-semibold text-content">{title}</h3>
+                        <span className="text-sm tabular-nums text-content-muted">{items.length}</span>
                     </div>
-                    <button onClick={onClose} className="p-1.5 hover:bg-white/20 rounded-lg transition-colors text-white">
+                    <button onClick={onClose} className="rounded-control p-1.5 text-content-muted transition-colors hover:bg-surface-raised hover:text-content">
                         <Icons.X />
                     </button>
                 </div>
@@ -116,7 +99,6 @@ function ListModal({ title, items, type, onClose, onCameraClick }) {
                     ) : (
                         <div className="divide-y divide-gray-100 dark:divide-gray-800">
                             {items.map(camera => {
-                                const isTunnel = camera.is_tunnel === 1;
                                 return (
                                     <button
                                         key={camera.id}
@@ -130,14 +112,9 @@ function ListModal({ title, items, type, onClose, onCameraClick }) {
                                             <Icons.Camera />
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-1.5">
-                                                <p className="font-medium text-gray-900 dark:text-white truncate text-sm sm:text-base">{camera.name}</p>
-                                                {isTunnel && type === 'online' && (
-                                                    <span className="shrink-0 px-1.5 py-0.5 text-[9px] font-bold bg-orange-100 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 rounded">
-                                                        TUNNEL
-                                                    </span>
-                                                )}
-                                            </div>
+                                            {/* The TUNNEL badge that used to sit here was internal
+                                                transport jargon with no meaning to the public. */}
+                                            <p className="truncate text-sm font-medium text-content sm:text-base">{camera.name}</p>
                                             {camera.location && (
                                                 <p className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 truncate flex items-center gap-1">
                                                     <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -218,46 +195,41 @@ export default function StatsBar({ onCameraClick }) {
         onCameraClick?.(camera);
     };
 
-    const StatsItem = ({ count, label, sublabel, gradient, shadow, onClick, disabled = false }) => (
+    /*
+     * The count used to sit inside a gradient tile with a coloured drop shadow
+     * (`shadow-emerald-500/30` and friends) and grew on hover. Four gradients —
+     * including a purple one for "Area" that carried no meaning — turned a row of
+     * plain facts into the loudest element on the page. Now the numeral itself is
+     * the emphasis, with a small dot doing the colour-coding, and `tabular-nums`
+     * keeps the row from twitching as counts refresh.
+     */
+    const StatsItem = ({ count, label, dotClass, onClick }) => (
         <button
             onClick={onClick}
-            disabled={disabled}
-            className={`flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 rounded-xl bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm shadow-sm ${disabled
-                ? 'opacity-50 cursor-not-allowed'
-                : disableAnimations
-                    ? 'hover:bg-white/80 dark:hover:bg-gray-800/80 cursor-pointer'
-                    : 'hover:scale-105 hover:shadow-md cursor-pointer transition-all'
+            className={`flex items-center gap-2.5 rounded-control border border-edge bg-surface px-3.5 py-2 hover:border-edge-strong hover:bg-surface-raised ${disableAnimations ? '' : 'transition-colors'
                 }`}
         >
-            <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center shadow-lg ${shadow}`}>
-                <span className="text-white font-bold text-sm sm:text-lg">{count}</span>
-            </div>
-            <div className="text-left">
-                <p className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400">{label}</p>
-                <p className="text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-200">{sublabel}</p>
-            </div>
+            <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dotClass}`} aria-hidden="true"></span>
+            <span className="text-base font-semibold tabular-nums text-content sm:text-lg">{count}</span>
+            <span className="text-xs text-content-muted">{label}</span>
         </button>
     );
 
     return (
         <>
-            <div className="flex flex-wrap justify-center gap-2 sm:gap-4 mt-8 pt-6 border-t border-gray-200/50 dark:border-gray-700/50">
+            <div className="mt-8 flex flex-wrap justify-center gap-2 border-t border-edge pt-6">
                 <StatsItem
                     count={stats.online}
-                    label="Online"
-                    sublabel="Kamera"
-                    gradient="from-emerald-400 to-emerald-600"
-                    shadow="shadow-emerald-500/30"
+                    label="kamera online"
+                    dotClass="bg-status-live"
                     onClick={() => setActiveModal('online')}
                 />
 
                 {stats.offline > 0 && (
                     <StatsItem
                         count={stats.offline}
-                        label="Offline"
-                        sublabel="Kamera"
-                        gradient="from-gray-400 to-gray-600"
-                        shadow="shadow-gray-500/30"
+                        label="kamera offline"
+                        dotClass="bg-status-idle"
                         onClick={() => setActiveModal('offline')}
                     />
                 )}
@@ -265,10 +237,8 @@ export default function StatsBar({ onCameraClick }) {
                 {stats.maintenance > 0 && (
                     <StatsItem
                         count={stats.maintenance}
-                        label="Perbaikan"
-                        sublabel="Kamera"
-                        gradient="from-red-400 to-red-600"
-                        shadow="shadow-red-500/30"
+                        label="kamera perbaikan"
+                        dotClass="bg-status-fault"
                         onClick={() => setActiveModal('maintenance')}
                     />
                 )}
@@ -276,10 +246,8 @@ export default function StatsBar({ onCameraClick }) {
                 {totalAreas > 0 && (
                     <StatsItem
                         count={totalAreas}
-                        label="Monitoring"
-                        sublabel="Area"
-                        gradient="from-purple-400 to-purple-600"
-                        shadow="shadow-purple-500/30"
+                        label="area dipantau"
+                        dotClass="bg-content-subtle"
                         onClick={() => setActiveModal('areas')}
                     />
                 )}

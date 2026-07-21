@@ -373,7 +373,7 @@ describe('MapView area filter visibility', () => {
         });
     });
 
-    it('merender status bar compact dengan tiga label utama', async () => {
+    it('merender status bar compact dan menyebut bahwa hitungannya khusus peta', async () => {
         await act(async () => {
             render(<MapView cameras={statusCameras} areas={[]} showAreaFilter={false} />);
         });
@@ -382,9 +382,12 @@ describe('MapView area filter visibility', () => {
             expect(screen.getByTestId('map-status-bar')).toBeTruthy();
         });
 
-        expect(screen.getByText('Online 1')).toBeTruthy();
-        expect(screen.getByText('Tunnel 1')).toBeTruthy();
-        expect(screen.getByText('Offline 2')).toBeTruthy();
+        // "di peta" must stay: this bar only counts cameras that have coordinates, so
+        // without it the number looks like it contradicts the landing stats bar.
+        expect(screen.getByText('1 online di peta')).toBeTruthy();
+        expect(screen.getByText('2 offline')).toBeTruthy();
+        // Tunnel is internal transport jargon and must not resurface on a public surface.
+        expect(screen.queryByText(/tunnel/i)).toBeNull();
     });
 
     it('tidak lagi merender label perbaikan pada status bar compact', async () => {

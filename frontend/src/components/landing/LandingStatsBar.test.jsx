@@ -30,7 +30,7 @@ describe('LandingStatsBar', () => {
     it('mengunci scroll dan menutup modal dengan Escape', async () => {
         render(<LandingStatsBar onCameraClick={vi.fn()} />);
 
-        fireEvent.click(screen.getByRole('button', { name: /Online Kamera/i }));
+        fireEvent.click(screen.getByRole('button', { name: /kamera online/i }));
 
         await waitFor(() => {
             expect(screen.getByRole('dialog')).toBeTruthy();

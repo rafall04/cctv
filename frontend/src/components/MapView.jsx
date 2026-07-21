@@ -1142,17 +1142,16 @@ const MapView = memo(({
                     className="mx-auto inline-flex max-w-[calc(100%-3rem)] items-center gap-1.5 overflow-hidden rounded-full border border-white/50 bg-white/72 px-2 py-1.5 shadow-[0_16px_36px_rgba(15,23,42,0.16)] backdrop-blur-xl dark:border-white/10 dark:bg-gray-900/72 sm:gap-2 sm:px-3"
                     data-testid="map-status-bar"
                 >
-                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50/90 px-2 py-1 text-[10px] font-semibold leading-none text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">
-                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                        Online {stats.online}
+                    {/* "di peta" is load-bearing: this bar counts only cameras that have coordinates,
+                        so 317 here vs 667 in the stats bar is not a contradiction. Tunnel pill dropped
+                        (internal jargon, and it read 0 publicly anyway). */}
+                    <span className="inline-flex items-center gap-1.5 px-2 py-1 text-[11px] font-medium leading-none tabular-nums text-content">
+                        <span className="h-1.5 w-1.5 rounded-full bg-status-live" />
+                        {stats.online} online di peta
                     </span>
-                    <span className="inline-flex items-center gap-1 rounded-full bg-orange-50/90 px-2 py-1 text-[10px] font-semibold leading-none text-orange-700 dark:bg-orange-500/10 dark:text-orange-400">
-                        <span className="h-1.5 w-1.5 rounded-full bg-orange-500" />
-                        Tunnel {stats.tunnel}
-                    </span>
-                    <span className="inline-flex items-center gap-1 rounded-full bg-gray-100/90 px-2 py-1 text-[10px] font-semibold leading-none text-gray-700 dark:bg-gray-700 dark:text-gray-300">
-                        <span className="h-1.5 w-1.5 rounded-full bg-gray-500" />
-                        Offline {stats.offline}
+                    <span className="inline-flex items-center gap-1.5 px-2 py-1 text-[11px] font-medium leading-none tabular-nums text-content-muted">
+                        <span className="h-1.5 w-1.5 rounded-full bg-status-idle" />
+                        {stats.offline} offline
                     </span>
                 </div>
             </div>

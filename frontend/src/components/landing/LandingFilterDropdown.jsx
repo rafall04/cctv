@@ -112,7 +112,12 @@ export default function FilterDropdown({ selected, onChange, kecamatans = [], ke
                             </span>
                         </button>
 
-                        {filterType === 'area' && areas.map((area, idx) => {
+                        {/*
+                          * Areas with no cameras are dropped. The list shipped entries like
+                          * "DIENG (0)" and "KAB BANYUWANGI (0)" — rows that can only ever
+                          * lead to an empty result, padding the filter with dead options.
+                          */}
+                        {filterType === 'area' && areas.filter((area) => getCameraCount('area', area.id) > 0).map((area, idx) => {
                             const count = getCameraCount('area', area.id);
                             const isSelected = selected?.type === 'area' && selected?.value === area.id;
                             return (
