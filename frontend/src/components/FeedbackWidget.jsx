@@ -96,7 +96,14 @@ export default function FeedbackWidget() {
 
             {/* Widget Panel */}
             <div
-                className={`fixed bottom-24 right-4 z-[99999] w-[calc(100vw-2rem)] max-w-80 transition-all duration-300 sm:bottom-6 sm:right-6 sm:w-96 sm:max-w-none ${
+                /*
+                 * Sized by insets, never by `100vw`. A fixed element is NOT clipped by
+                 * `overflow-x: clip` on <html>, so if its width ever resolves wider than
+                 * the screen it widens the page itself — and `100vw` resolves against the
+                 * initial containing block, which is exactly what grows once a page starts
+                 * overflowing. `left-4 right-4` can only ever be viewport minus its margins.
+                 */
+                className={`fixed bottom-24 left-4 right-4 z-[99999] transition-all duration-300 sm:bottom-6 sm:left-auto sm:right-6 sm:w-96 ${
                     isOpen ? 'scale-100 opacity-100' : 'scale-0 opacity-0 pointer-events-none'
                 }`}
             >

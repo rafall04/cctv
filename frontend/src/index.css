@@ -119,6 +119,16 @@ body {
     
     body {
         @apply antialiased;
+        /*
+         * Paint the canvas itself. Every page puts its themed background on an inner
+         * <div>, which is only as wide as the viewport — so the moment anything
+         * overflowed sideways, the exposed area was the bare white canvas. That is why
+         * a modest layout slip looked like half the screen had broken off. With the
+         * canvas themed, the same slip degrades quietly instead of screaming.
+         */
+        background-color: var(--surface-sunken);
+        /* Second line of defence next to the html rule above. */
+        overflow-x: clip;
     }
 }
 

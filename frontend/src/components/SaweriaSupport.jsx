@@ -193,7 +193,9 @@ const SaweriaSupport = memo(function SaweriaSupport() {
             {showBanner && (
                 <div
                     data-testid="saweria-floating-banner"
-                    className={`fixed bottom-24 left-4 right-auto z-[99998] sm:bottom-24 sm:left-auto sm:right-6 ${bannerMinimized ? 'w-14' : 'w-[calc(100vw-7rem)] max-w-52 sm:w-64 sm:max-w-none'}`}
+                    // Same rule as FeedbackWidget: a fixed element must never be sized with
+                    // `100vw`, because it escapes the root overflow guard and can widen the page.
+                    className={`fixed bottom-24 left-4 z-[99998] sm:bottom-24 sm:left-auto sm:right-6 ${bannerMinimized ? 'w-14' : 'right-[6.5rem] max-w-52 sm:right-6 sm:w-64 sm:max-w-none'}`}
                 >
                     {bannerMinimized ? (
                         <button

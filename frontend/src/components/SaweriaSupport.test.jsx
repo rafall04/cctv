@@ -42,9 +42,14 @@ describe('SaweriaSupport floating layout', () => {
 
         const banner = screen.getByTestId('saweria-floating-banner');
         expect(banner.className).toContain('left-4');
-        expect(banner.className).toContain('right-auto');
         expect(banner.className).toContain('sm:right-6');
         expect(banner.className).toContain('sm:left-auto');
         expect(banner.className).toContain('max-w-52');
+        // The banner is bounded by a right inset on mobile instead of the old
+        // `w-[calc(100vw-7rem)]`. A fixed element is not clipped by the root
+        // overflow guard, so sizing one with a viewport unit can widen the whole
+        // page; insets can only ever resolve to viewport-minus-margins.
+        expect(banner.className).toContain('right-[6.5rem]');
+        expect(banner.className).not.toContain('100vw');
     });
 });
