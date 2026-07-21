@@ -85,7 +85,7 @@ export function Toast({ notification, onDismiss }) {
         <div
             className={`
                 max-w-sm w-full pointer-events-auto
-                border rounded-lg shadow-lg overflow-hidden
+                border rounded-control shadow-e2 overflow-hidden
                 ${config.colorClass}
                 ${isExiting ? 'animate-fade-out' : 'animate-slide-in-right'}
             `}

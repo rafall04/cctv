@@ -38,7 +38,7 @@ export default function ConfirmDialog({
                 role="alertdialog"
                 aria-modal="true"
                 aria-label={title}
-                className="w-full max-w-sm rounded-2xl border border-gray-200 bg-white p-5 shadow-2xl dark:border-gray-800 dark:bg-gray-900"
+                className="w-full max-w-sm rounded-card border border-edge bg-surface p-5 shadow-e2"
                 onClick={(e) => e.stopPropagation()}
             >
                 <h3 className="text-base font-bold text-gray-900 dark:text-white">{title}</h3>
