@@ -15,27 +15,36 @@ const SmartFeedCameraButton = memo(function SmartFeedCameraButton({ camera, onCa
     const liveViewers = Number(camera.live_viewers || camera.viewer_stats?.live_viewers || 0);
     const totalViews = Number(camera.total_views || camera.viewer_stats?.total_views || 0);
     const isSimple = variant === 'simple';
+    // Same rule as the landing card: a chip that lands on every item is decoration.
+    // Only `busy`/`new` actually single a camera out; the default bucket does not.
+    const showQuality = !isSimple && (quality?.key === 'busy' || quality?.key === 'new');
 
     return (
         <button
             type="button"
             onClick={() => onCameraClick?.(camera)}
-            className={`${isSimple ? 'min-h-[56px] w-[min(13rem,calc(100vw-3rem))] rounded-xl px-3 py-2 sm:w-48' : 'min-h-[72px] w-[min(17rem,calc(100vw-3rem))] rounded-2xl px-3 py-3 sm:w-[250px]'} flex shrink-0 flex-col justify-between border border-gray-200 bg-white text-left shadow-sm transition hover:border-primary/50 hover:bg-primary/5 dark:border-gray-800 dark:bg-gray-900 dark:hover:bg-primary/10`}
+            className={`${isSimple ? 'min-h-[56px] w-[min(13rem,calc(100vw-3rem))] rounded-control px-3 py-2 sm:w-48' : 'min-h-[72px] w-[min(17rem,calc(100vw-3rem))] rounded-card px-3 py-3 sm:w-[250px]'} flex shrink-0 flex-col justify-between border border-edge bg-surface text-left transition-colors hover:border-edge-strong hover:bg-primary/5`}
         >
             <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                    <div className="truncate text-sm font-semibold text-gray-900 dark:text-white">{camera.name}</div>
-                    <div className="mt-0.5 truncate text-xs text-gray-500 dark:text-gray-400">{areaLabel}</div>
+                    <div className="truncate text-sm font-semibold text-content">{camera.name}</div>
+                    <div className="mt-0.5 truncate text-xs text-content-muted">{areaLabel}</div>
                 </div>
-                {!isSimple && (
-                    <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold ${quality.className}`}>
+                {showQuality && (
+                    <span className="shrink-0 text-[11px] font-medium text-primary">
                         {quality.label}
                     </span>
                 )}
             </div>
-            <div className={`${isSimple ? 'mt-2' : 'mt-3'} flex items-center gap-3 text-[11px] font-medium text-gray-500 dark:text-gray-400`}>
-                {liveViewers > 0 ? <span>{liveViewers} live</span> : <span>{totalViews} views</span>}
-                {!isSimple && <span>{totalViews} views</span>}
+            {/*
+             * The old markup rendered `{totalViews} views` twice whenever a camera had
+             * no live viewers in full mode — the ternary fell back to total views and
+             * the next line printed it again ("1303 views 1303 views" was live on prod).
+             * Live is now purely additive, and total views renders exactly once.
+             */}
+            <div className={`${isSimple ? 'mt-2' : 'mt-3'} flex items-center gap-3 text-[11px] font-medium tabular-nums text-content-muted`}>
+                {liveViewers > 0 && <span>{liveViewers} live</span>}
+                {(!isSimple || liveViewers === 0) && <span>{totalViews} views</span>}
             </div>
         </button>
     );

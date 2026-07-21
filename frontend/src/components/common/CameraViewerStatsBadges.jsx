@@ -45,23 +45,22 @@ export default function CameraViewerStatsBadges({
 }) {
     const { liveViewers, totalViews } = getCameraViewerStats(camera);
     const isOverlay = tone === 'overlay';
-    const containerClass = isOverlay
-        ? 'text-white/90'
-        : 'text-gray-600 dark:text-gray-300';
-    const liveClass = isOverlay
-        ? 'bg-emerald-400/15 text-emerald-100 ring-1 ring-emerald-300/30'
-        : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300';
-    const viewsClass = isOverlay
-        ? 'bg-white/10 text-white ring-1 ring-white/15'
-        : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300';
+
+    // These were two filled pills with their own background, ring and bold weight,
+    // stacked on a card that already carried several other pills. Counters are
+    // ambient information, so they now read as quiet text and let the thumbnail
+    // stay the loudest thing on the card. `tabular-nums` stops the numbers from
+    // jittering as viewer counts tick up and down in place.
+    const containerClass = isOverlay ? 'text-white/85' : 'text-content-muted';
+    const liveDotClass = liveViewers > 0 ? 'bg-status-live' : 'bg-status-idle';
 
     return (
-        <div className={`flex flex-wrap items-center gap-2 text-[11px] font-semibold ${containerClass} ${className}`}>
-            <span className={`inline-flex items-center gap-1.5 rounded-lg px-2 py-1 ${liveClass}`}>
-                <span className={`h-1.5 w-1.5 rounded-full ${liveViewers > 0 ? 'bg-emerald-500' : 'bg-gray-400'}`}></span>
+        <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-medium tabular-nums ${containerClass} ${className}`}>
+            <span className="inline-flex items-center gap-1.5">
+                <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${liveDotClass}`} aria-hidden="true"></span>
                 {formatCompactCount(liveViewers)} live
             </span>
-            <span className={`inline-flex items-center rounded-lg px-2 py-1 ${viewsClass}`}>
+            <span className="inline-flex items-center">
                 {formatCompactCount(totalViews)} views
             </span>
         </div>

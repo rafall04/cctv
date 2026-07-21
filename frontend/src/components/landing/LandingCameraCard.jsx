@@ -1,58 +1,75 @@
 /*
- * Purpose: Render a public landing camera card with prioritized/lazy thumbnail, status badges, viewer stats, and quick actions.
+ * Purpose: Render a public landing camera card with prioritized/lazy thumbnail, a single status signal, viewer stats, and quick actions.
  * Caller: Landing camera grids and public camera list views.
- * Deps: React memo/ref hooks, Icons, CodecBadge, CameraThumbnail, CameraViewerStatsBadges, animation and availability utilities, video popup preloader.
+ * Deps: React memo/ref hooks, Icons, CameraThumbnail, CameraViewerStatsBadges, codec support, animation and availability utilities, video popup preloader.
  * MainFuncs: CameraCard.
  * SideEffects: Invokes caller-provided click, multiview, favorite callbacks, and preloads the video popup chunk on first user intent.
  */
 
 import { memo, useRef } from 'react';
 import { Icons } from '../ui/Icons';
-import CodecBadge from '../CodecBadge';
 import CameraThumbnail from '../CameraThumbnail';
 import CameraViewerStatsBadges from '../common/CameraViewerStatsBadges.jsx';
 import { shouldDisableAnimations } from '../../utils/animationControl';
 import { isCameraHardOffline, isCameraDegraded } from '../../utils/cameraAvailability.js';
 import { getPublicCameraQuality } from '../../utils/landingCameraInsights';
+import { getCodecWarning } from '../../utils/codecSupport';
 import { preloadPublicVideoPopup } from '../../utils/preloadPublicVideoPopup';
+
+/*
+ * Status is expressed as ONE dot whose colour carries the state, and a text
+ * label ONLY when the state is abnormal.
+ *
+ * Why: ~89% of cameras are healthy, so a "LIVE" label on every card is a label
+ * that carries no information — the eye should be able to scan a 749-card grid
+ * for the exceptions. The old card shouted `LIVE` in a red pill on every tile,
+ * which both buried the real faults and collided with `PERBAIKAN` (also red).
+ * Red is now reserved for genuine trouble; healthy live is a calm green dot.
+ *
+ * `srLabel` keeps the state available to screen readers even when the visual
+ * label is suppressed — the dot alone must never be the only carrier of meaning.
+ */
+const STATUS = {
+    maintenance: { dot: 'bg-status-fault', label: 'Perbaikan', srLabel: 'Sedang perbaikan', ring: 'ring-status-fault/40' },
+    offline: { dot: 'bg-status-idle', label: 'Offline', srLabel: 'Sedang offline', ring: 'ring-edge' },
+    degraded: { dot: 'bg-status-warn', label: 'Tidak stabil', srLabel: 'Sinyal tidak stabil', ring: 'ring-status-warn/40' },
+    live: { dot: 'bg-status-live', label: null, srLabel: 'Siaran langsung', ring: 'ring-edge' },
+};
+
+function resolveStatus(camera) {
+    if (camera.status === 'maintenance') return STATUS.maintenance;
+    if (isCameraHardOffline(camera)) return STATUS.offline;
+    if (isCameraDegraded(camera)) return STATUS.degraded;
+    return STATUS.live;
+}
 
 const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMulti, isFavorite, onToggleFavorite, thumbnailPriority = false, disableHeavyEffects }) {
     const didPrewarmVideoPopupRef = useRef(false);
-    const isMaintenance = camera.status === 'maintenance';
-    const isOffline = isCameraHardOffline(camera);
-    const isDegraded = isCameraDegraded(camera);
-    const isTunnel = camera.is_tunnel === 1;
+    const status = resolveStatus(camera);
+    const isLive = status === STATUS.live;
     // Lite experience (mobile / save-data / low-end / user opt-in) drops expensive paint. Motion is a
     // superset: also off for reduced-motion / low tier via shouldDisableAnimations(). When the prop is
     // omitted (other callers) behaviour is unchanged.
     const liteEffects = disableHeavyEffects === true;
     const disableAnimations = liteEffects || shouldDisableAnimations();
-    // shadow-lg over a grid of cards is a real paint cost on weak GPUs; shadow-sm keeps depth far cheaper.
-    const shadowClass = liteEffects ? 'shadow-sm' : 'shadow-lg';
     // Let the browser skip layout/paint for off-screen cards while scrolling (big win on long grids /
     // weak GPUs); `contain-intrinsic-size` reserves an approximate height so the scrollbar stays stable.
-    const contentVisibilityClass = liteEffects ? '[content-visibility:auto] [contain-intrinsic-size:auto_320px]' : '';
+    const contentVisibilityClass = liteEffects ? '[content-visibility:auto] [contain-intrinsic-size:auto_300px]' : '';
     const isFav = isFavorite?.(camera.id);
+
+    // Only surface a quality chip when it actually distinguishes this camera.
+    // `maintenance`/`offline` duplicate the status dot, and the default bucket
+    // ("Sering Dilihat") landed on every single card — a badge on 100% of items
+    // is decoration, not information.
     const quality = getPublicCameraQuality(camera);
+    const showQuality = quality?.key === 'busy' || quality?.key === 'new';
 
-    const cardStyle = isMaintenance
-        ? 'ring-red-500/50 hover:ring-red-500'
-        : isOffline
-            ? 'ring-gray-400/50 hover:ring-gray-500'
-            : isDegraded
-                ? 'ring-amber-400/50 hover:ring-amber-500'
-            : 'ring-gray-200 dark:ring-gray-800 hover:ring-primary/50';
+    // The public does not care that a stream is H.264 vs H.265 — that badge was
+    // pure technical leakage. Surface it only when this browser genuinely may
+    // fail to play the stream, which is actionable.
+    const codecWarning = camera.video_codec ? getCodecWarning(camera.video_codec) : null;
 
-    const bgStyle = isMaintenance
-        ? 'bg-red-100 dark:bg-red-900/30'
-        : isOffline
-            ? 'bg-gray-200 dark:bg-gray-700'
-            : isDegraded
-                ? 'bg-amber-50 dark:bg-amber-900/20'
-            : 'bg-gray-100 dark:bg-gray-800';
-
-    const transitionClass = disableAnimations ? '' : 'transition-all duration-200';
-    const hoverTransform = disableAnimations ? '' : 'hover:-translate-y-1';
+    const transitionClass = disableAnimations ? '' : 'transition-colors duration-200';
     const prewarmVideoPopup = () => {
         if (didPrewarmVideoPopupRef.current) {
             return;
@@ -71,156 +88,108 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
         }
     };
 
+    const actionButtonClass = `rounded-control border border-white/15 bg-black/45 p-2 text-white/80 backdrop-blur-sm ${disableAnimations ? '' : 'transition-colors'
+        } hover:border-white/30 hover:bg-black/65 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-primary`;
+
     return (
         <div
-            className={`relative rounded-2xl overflow-hidden bg-white dark:bg-gray-900 ${shadowClass} ring-1 ${transitionClass} ${hoverTransform} ${contentVisibilityClass} group/card ${cardStyle}`}
+            className={`group/card relative overflow-hidden rounded-card bg-surface ring-1 ${status.ring} ${transitionClass} ${contentVisibilityClass} hover:ring-edge-strong`}
             onPointerEnter={prewarmVideoPopup}
             onFocus={prewarmVideoPopup}
         >
-            <div className="absolute top-3 right-3 z-30 flex gap-2">
-                {onToggleFavorite && (
-                    <button
-                        onClick={(e) => { e.stopPropagation(); onToggleFavorite(camera.id); }}
-                        className={`p-2.5 rounded-xl shadow-lg ${isFav
-                            ? 'bg-amber-400 text-white'
-                            : 'bg-white/90 dark:bg-gray-800/90 text-gray-400'
-                            } ${disableAnimations ? '' : 'transition-colors hover:bg-amber-400 hover:text-white'}`}
-                        title={isFav ? 'Hapus dari Favorit' : 'Tambah ke Favorit'}
-                    >
-                        <svg className="w-5 h-5" fill={isFav ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-                        </svg>
-                    </button>
-                )}
-                <button
-                    onClick={(e) => { e.stopPropagation(); onAddMulti(); }}
-                    className={`p-2.5 rounded-xl shadow-lg ${inMulti
-                        ? 'bg-emerald-500 text-white'
-                        : 'bg-white/90 dark:bg-gray-800/90 text-gray-600 dark:text-gray-300'
-                        } ${disableAnimations ? '' : 'transition-colors hover:bg-primary hover:text-white'}`}
-                    title={inMulti ? 'Hapus dari Multi-View' : 'Tambah ke Multi-View'}
-                >
-                    {inMulti ? <Icons.Check /> : <Icons.Plus />}
-                </button>
-            </div>
-
             <div
                 role="button"
                 tabIndex={0}
                 aria-label={`Tonton ${camera.name}`}
                 onClick={onClick}
                 onKeyDown={handleOpenKeyDown}
-                className={`aspect-video relative cursor-pointer overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset ${bgStyle}`}
+                className="relative aspect-video cursor-pointer overflow-hidden bg-surface-sunken focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
             >
                 <CameraThumbnail
                     cameraId={camera.id}
                     thumbnailPath={camera.external_snapshot_url || camera.thumbnail_path}
                     cameraName={camera.name}
-                    isMaintenance={isMaintenance}
-                    isOffline={isOffline}
+                    isMaintenance={status === STATUS.maintenance}
+                    isOffline={status === STATUS.offline}
                     priority={thumbnailPriority}
                 />
 
-                {!isMaintenance && !isOffline && !disableAnimations && (
-                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/card:opacity-100 bg-black/40 transition-opacity">
-                        <div className="w-14 h-14 rounded-full bg-white/95 flex items-center justify-center text-primary shadow-xl">
+                {isLive && !disableAnimations && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/35 opacity-0 transition-opacity group-hover/card:opacity-100">
+                        <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white/95 text-primary">
                             <Icons.Play />
-                        </div>
+                        </span>
                     </div>
                 )}
 
-                <div className="absolute top-3 left-3 flex items-center gap-1.5">
-                    {isMaintenance ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-red-600/90 text-white text-[10px] font-bold shadow-lg">
-                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63" />
-                            </svg>
-                            PERBAIKAN
+                <div className="absolute left-2.5 top-2.5 flex items-center gap-1.5 rounded-full bg-black/55 px-2 py-1 backdrop-blur-sm">
+                    <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${status.dot}`} aria-hidden="true"></span>
+                    <span className="sr-only">{status.srLabel}</span>
+                    {status.label && (
+                        <span className="text-[11px] font-medium leading-none text-white/90">{status.label}</span>
+                    )}
+                    {/* REC keeps the conventional red, but it is always paired with its
+                        own label so it cannot be misread as a fault the way the old
+                        unlabelled red LIVE pill could. */}
+                    {isLive && camera.is_recording && (
+                        <span className="flex items-center gap-1 border-l border-white/20 pl-1.5 text-[11px] font-medium leading-none text-white/90">
+                            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-status-fault" aria-hidden="true"></span>
+                            REC
                         </span>
-                    ) : isOffline ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-gray-600/90 text-white text-[10px] font-bold shadow-lg">
-                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M15.536 8.464a5 5 0 010 7.072" />
-                            </svg>
-                            OFFLINE
-                        </span>
-                    ) : isDegraded ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-amber-500/90 text-white text-[10px] font-bold shadow-lg">
-                            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white"></span>
-                            TIDAK STABIL
-                        </span>
-                    ) : (
-                        <>
-                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-red-500/90 text-white text-[10px] font-bold shadow-lg">
-                                <span className="relative flex h-1.5 w-1.5">
-                                    {!disableAnimations && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>}
-                                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white"></span>
-                                </span>
-                                LIVE
-                            </span>
-                            {camera.is_recording && (
-                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-red-600/90 text-white text-[10px] font-bold shadow-lg" title="Sedang merekam">
-                                    <span className="relative flex h-1.5 w-1.5">
-                                        {!disableAnimations && <span className="animate-pulse absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>}
-                                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white"></span>
-                                    </span>
-                                    REC
-                                </span>
-                            )}
-                            {isTunnel && (
-                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-orange-500/90 text-white text-[10px] font-bold shadow-lg" title="Koneksi Tunnel - mungkin kurang stabil">
-                                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0" />
-                                    </svg>
-                                    TUNNEL
-                                </span>
-                            )}
-                        </>
                     )}
                 </div>
 
-                {isOffline && !isMaintenance && (
-                    <div className="absolute bottom-3 left-3">
-                        <span className="px-2 py-1 rounded-lg bg-gray-800/80 text-gray-300 text-[10px] font-medium">
-                            Tidak tersedia
-                        </span>
-                    </div>
-                )}
-
-                {camera.area_name && (
-                    <div className={`absolute bottom-3 ${isOffline && !isMaintenance ? 'right-3' : 'left-3'}`}>
-                        <span className="px-2 py-1 rounded-lg bg-black/60 text-white text-[10px] font-medium">
-                            {camera.area_name}
-                        </span>
-                    </div>
-                )}
+                <div className="absolute right-2 top-2 flex gap-1.5">
+                    {onToggleFavorite && (
+                        <button
+                            onClick={(e) => { e.stopPropagation(); onToggleFavorite(camera.id); }}
+                            className={`${actionButtonClass} ${isFav ? 'border-amber-300/40 text-amber-300' : ''}`}
+                            title={isFav ? 'Hapus dari Favorit' : 'Tambah ke Favorit'}
+                        >
+                            <svg className="h-4 w-4" fill={isFav ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                            </svg>
+                        </button>
+                    )}
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onAddMulti(); }}
+                        className={`${actionButtonClass} ${inMulti ? 'border-status-live/50 text-status-live' : ''}`}
+                        title={inMulti ? 'Hapus dari Multi-View' : 'Tambah ke Multi-View'}
+                    >
+                        {inMulti ? <Icons.Check /> : <Icons.Plus />}
+                    </button>
+                </div>
             </div>
 
-            <div className="p-4 cursor-pointer" onClick={onClick}>
-                <div className="flex items-center justify-between gap-2 mb-1">
-                    <h3 className={`font-bold truncate flex-1 ${isMaintenance
-                        ? 'text-red-600 dark:text-red-400'
-                        : 'text-gray-900 dark:text-white'
-                        } ${!disableAnimations ? 'group-hover/card:text-primary transition-colors' : ''}`}>
+            <div className="cursor-pointer p-3" onClick={onClick}>
+                <div className="flex items-start justify-between gap-2">
+                    <h3 className={`min-w-0 flex-1 truncate text-sm font-semibold text-content ${!disableAnimations ? 'transition-colors group-hover/card:text-primary' : ''}`}>
                         {camera.name}
                     </h3>
-                    {camera.video_codec && (
-                        <CodecBadge codec={camera.video_codec} size="sm" showWarning={true} />
+                    {codecWarning && (
+                        <span
+                            className="mt-0.5 shrink-0 text-status-warn"
+                            title={codecWarning.message}
+                            aria-label={codecWarning.message}
+                        >
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                            </svg>
+                        </span>
                     )}
                 </div>
 
-                {camera.location && (
-                    <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
-                        <Icons.MapPin />
-                        <span className="truncate">{camera.location}</span>
+                {(camera.area_name || camera.location) && (
+                    <p className="mt-0.5 truncate text-xs text-content-muted">
+                        {[camera.area_name, camera.location].filter(Boolean).join(' · ')}
                     </p>
                 )}
 
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                    <span className={`rounded-full border px-2 py-1 text-[10px] font-bold ${quality.className}`}>
-                        {quality.label}
-                    </span>
+                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
                     <CameraViewerStatsBadges camera={camera} />
+                    {showQuality && (
+                        <span className="text-[11px] font-medium text-primary">{quality.label}</span>
+                    )}
                 </div>
             </div>
         </div>
