@@ -11,6 +11,29 @@ export default {
                 sans: ['Inter', 'system-ui', 'sans-serif'],
             },
             colors: {
+                // Semantic roles — prefer these over `dark-*`/`light-*` in new work.
+                // Definitions and usage rules live in src/index.css.
+                surface: {
+                    DEFAULT: 'var(--surface)',
+                    sunken: 'var(--surface-sunken)',
+                    raised: 'var(--surface-raised)',
+                    overlay: 'var(--surface-overlay)',
+                },
+                edge: {
+                    DEFAULT: 'var(--edge)',
+                    strong: 'var(--edge-strong)',
+                },
+                content: {
+                    DEFAULT: 'var(--content)',
+                    muted: 'var(--content-muted)',
+                    subtle: 'var(--content-subtle)',
+                },
+                status: {
+                    live: 'var(--status-live)',
+                    warn: 'var(--status-warn)',
+                    fault: 'var(--status-fault)',
+                    idle: 'var(--status-idle)',
+                },
                 primary: {
                     DEFAULT: 'var(--primary-color)',
                     50: 'rgba(var(--primary-color-rgb), 0.05)',
@@ -22,6 +45,10 @@ export default {
                     600: 'rgba(var(--primary-color-rgb), 0.8)',
                     700: 'rgba(var(--primary-color-rgb), 0.9)',
                 },
+                // Legacy grey ramps. Kept so the existing ~200 usages keep working,
+                // but they are not semantic — `light-700/800/900` are byte-identical
+                // to `dark-700/800/900`. Do not reach for these in new work; use the
+                // `surface` / `edge` / `content` roles above.
                 dark: {
                     200: '#e5e7eb',
                     300: '#d1d5db',
@@ -43,6 +70,16 @@ export default {
                     800: '#1f2937',
                     900: '#111827',
                 },
+            },
+            borderRadius: {
+                control: 'var(--radius-control)',
+                card: 'var(--radius-card)',
+            },
+            boxShadow: {
+                // Two elevation steps total. If a component needs a third, the
+                // layout is doing the work a surface step should be doing.
+                e1: 'var(--elevation-1)',
+                e2: 'var(--elevation-2)',
             },
             animation: {
                 'slide-down': 'slideDown 0.3s ease-out',

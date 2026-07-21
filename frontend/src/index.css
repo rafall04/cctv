@@ -8,6 +8,80 @@
     --primary-color-rgb: 14, 165, 233;
 }
 
+/*
+ * Semantic design tokens (operational-dark system).
+ *
+ * Why these exist: before this layer the whole design system was the two brand
+ * variables above, so every component invented its own greys. `dark-*` and
+ * `light-*` in tailwind.config.js are NOT semantic roles — they are two
+ * overlapping grey ramps (light-700/800/900 are byte-identical to
+ * dark-700/800/900), which is why surfaces and borders drifted per component.
+ *
+ * Rules for using these:
+ *  - Reach for a role (`surface`, `edge`, `content`), never a raw grey.
+ *  - `status-*` is SEMANTIC, never decorative. In particular `status-fault` is
+ *    reserved for a camera that is actually broken. A healthy live stream must
+ *    never be red — that collision (LIVE and PERBAIKAN both red) is the single
+ *    loudest thing that made the old UI read as noise.
+ *  - Solid hex only, no alpha inside the var, so Tailwind opacity modifiers
+ *    (`text-content/60`) stay predictable.
+ *  - Brand colour stays `--primary-color` above: it is overridden at runtime by
+ *    admin branding, so it must not be folded into these fixed tokens.
+ */
+:root {
+    /* Surfaces: page -> card -> hover -> popover */
+    --surface-sunken:  #f6f7f9;
+    --surface:         #ffffff;
+    --surface-raised:  #ffffff;
+    --surface-overlay: #ffffff;
+
+    /* Edges: two weights on purpose */
+    --edge:        #e4e7eb;
+    --edge-strong: #cbd1d9;
+
+    /* Content: three text weights, no more */
+    --content:        #0b0d0f;
+    --content-muted:  #5a626d;
+    --content-subtle: #858d98;
+
+    /* Status: meaning, not decoration */
+    --status-live:  #059669;
+    --status-warn:  #b45309;
+    --status-fault: #dc2626;
+    --status-idle:  #9ca3af;
+
+    /* Radius scale: controls and cards, plus rounded-full for true pills */
+    --radius-control: 0.5rem;
+    --radius-card:    0.75rem;
+
+    /* Elevation: two steps, not one per component */
+    --elevation-1: 0 1px 2px rgb(16 24 40 / 0.06);
+    --elevation-2: 0 8px 24px -6px rgb(16 24 40 / 0.16);
+}
+
+.dark {
+    --surface-sunken:  #08090b;
+    --surface:         #0b0d0f;
+    --surface-raised:  #12151a;
+    --surface-overlay: #171b21;
+
+    --edge:        #1c2024;
+    --edge-strong: #2a3038;
+
+    --content:        #e9ebed;
+    --content-muted:  #9aa0a6;
+    --content-subtle: #6c7278;
+
+    --status-live:  #10b981;
+    --status-warn:  #f59e0b;
+    --status-fault: #ef4444;
+    --status-idle:  #6b7280;
+
+    /* Depth in a dark UI comes from the surface step + edge, not from shadow. */
+    --elevation-1: 0 1px 2px rgb(0 0 0 / 0.4);
+    --elevation-2: 0 8px 24px -6px rgb(0 0 0 / 0.6);
+}
+
 body {
     font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
