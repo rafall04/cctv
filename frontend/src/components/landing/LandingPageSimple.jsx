@@ -133,61 +133,45 @@ function SimpleFooter({ branding, saweriaEnabled, saweriaLink }) {
     );
 }
 
-function SimpleStatusOverview({ disableHeavyEffects = false }) {
+/*
+ * Compact by design. This block used to eat roughly a quarter of a phone screen to
+ * deliver three numbers: a two-gradient panel, a `STATUS KAMERA` pill in 0.22em
+ * uppercase tracking, two lines of prose that only restated the heading
+ * ("Ringkasan cepat kamera publik saat ini." / "Pantau kondisi kamera sebelum
+ * membuka live view."), and three `text-3xl` tiles in emerald/rose/sky.
+ *
+ * The numbers are the entire payload, so they are now one wrapping row: a dot for
+ * state, the figure in tabular-nums, and its noun. Same information, ~44px instead
+ * of ~250px, and the live grid starts above the fold.
+ */
+function SimpleStatusOverview() {
     const { cameras, loading } = useCameras();
 
     const onlineCount = useMemo(() => cameras.reduce((total, camera) => (
         (camera?.is_online === 1 || camera?.is_online === true) ? total + 1 : total
     ), 0), [cameras]);
     const offlineCount = Math.max(cameras.length - onlineCount, 0);
-    const cards = [
-        {
-            label: 'Online',
-            value: loading ? '...' : onlineCount,
-            tone: 'border-emerald-200/60 bg-emerald-50/80 text-emerald-800 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200',
-            accent: 'text-emerald-600 dark:text-emerald-300',
-        },
-        {
-            label: 'Offline',
-            value: loading ? '...' : offlineCount,
-            tone: 'border-rose-200/60 bg-rose-50/80 text-rose-800 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200',
-            accent: 'text-rose-600 dark:text-rose-300',
-        },
-        {
-            label: 'Total',
-            value: loading ? '...' : cameras.length,
-            tone: 'border-sky-200/60 bg-sky-50/80 text-sky-800 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-200',
-            accent: 'text-sky-600 dark:text-sky-300',
-        },
+    const stats = [
+        { label: 'online', value: onlineCount, dot: 'bg-status-live' },
+        { label: 'offline', value: offlineCount, dot: 'bg-status-idle' },
+        { label: 'total', value: cameras.length, dot: null },
     ];
 
     return (
         <div className="mx-auto max-w-7xl px-4 pt-3 sm:px-6 lg:px-8">
-            <div className={`overflow-hidden rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.16),_transparent_35%),linear-gradient(135deg,rgba(15,23,42,0.96),rgba(2,6,23,0.98))] ${disableHeavyEffects ? 'shadow-md' : 'shadow-[0_18px_60px_rgba(2,6,23,0.28)]'}`}>
-                <div className="flex flex-col gap-5 px-5 py-5 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
-                    <div className="max-w-2xl">
-                        <div className="inline-flex items-center gap-2 rounded-full border border-sky-400/20 bg-sky-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-200">
-                            Status Kamera
-                        </div>
-                        <p className="mt-3 text-sm font-medium text-white sm:text-base">
-                            Ringkasan cepat kamera publik saat ini.
-                        </p>
-                        <p className="mt-1 text-xs text-slate-300/80 sm:text-sm">
-                            Pantau kondisi kamera sebelum membuka live view.
-                        </p>
-                    </div>
-                    <div className="grid grid-cols-3 gap-3 lg:min-w-[420px]">
-                        {cards.map((card) => (
-                            <div
-                                key={card.label}
-                                className={`rounded-2xl border px-4 py-3 shadow-inner ${card.tone}`}
-                            >
-                                <div className={`text-[11px] font-semibold uppercase tracking-[0.18em] ${card.accent}`}>{card.label}</div>
-                                <div className="mt-2 text-3xl font-bold leading-none">{card.value}</div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-card border border-edge bg-surface px-4 py-2.5">
+                <h2 className="text-xs font-medium text-content-muted">Status kamera</h2>
+                {stats.map((stat) => (
+                    <span key={stat.label} className="inline-flex items-center gap-1.5 text-sm">
+                        {stat.dot && (
+                            <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${stat.dot}`} aria-hidden="true"></span>
+                        )}
+                        <span className="font-semibold tabular-nums text-content">
+                            {loading ? '…' : stat.value}
+                        </span>
+                        <span className="text-content-muted">{stat.label}</span>
+                    </span>
+                ))}
             </div>
         </div>
     );
@@ -267,7 +251,7 @@ export default function LandingPageSimple({
                 announcement={announcement}
             />
 
-            <SimpleStatusOverview disableHeavyEffects={disableHeavyEffects} />
+            <SimpleStatusOverview />
 
             <LandingDiscoveryStrip
                 discovery={publicDiscovery}

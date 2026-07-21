@@ -99,6 +99,22 @@ body {
 @layer base {
     html {
         scroll-behavior: smooth;
+        /*
+         * Nothing may scroll the page sideways.
+         *
+         * A single overflowing child — a fixed overlay wider than the screen, an
+         * unbreakable string, a flex/grid item that forgot `min-w-0` — widens the
+         * layout viewport, and mobile browsers respond by zooming the WHOLE page out
+         * to fit. That is how one element's mistake ends up shrinking every card on
+         * the screen into a narrow column with dead space beside it.
+         *
+         * `clip`, NOT `hidden`: `overflow-x: hidden` turns <html> into a scroll
+         * container and silently kills `position: sticky` on every descendant — the
+         * simple-mode header and the admin shell both rely on it. `clip` blocks the
+         * scroll without creating that container. Browsers too old for `clip` simply
+         * ignore this line, so they are no worse off than before.
+         */
+        overflow-x: clip;
     }
     
     body {

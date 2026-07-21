@@ -145,12 +145,15 @@ describe('LandingPageSimple', () => {
 
         await screen.findByText('feedback-widget');
 
-        expect(screen.getByText('Status Kamera')).toBeTruthy();
-        expect(screen.getByText('Ringkasan cepat kamera publik saat ini.')).toBeTruthy();
+        expect(screen.getByText('Status kamera')).toBeTruthy();
         expect(screen.queryByText(/dataset publik/i)).toBeNull();
-        expect(screen.getByText('Online')).toBeTruthy();
-        expect(screen.getByText('Offline')).toBeTruthy();
-        expect(screen.getByText('Total')).toBeTruthy();
+        // The status strip is deliberately one compact row now — the three figures and
+        // their nouns, with no restating prose above them. Guard that the numbers
+        // themselves survived the compaction.
+        expect(screen.queryByText('Ringkasan cepat kamera publik saat ini.')).toBeNull();
+        expect(screen.getByText('online')).toBeTruthy();
+        expect(screen.getByText('offline')).toBeTruthy();
+        expect(screen.getByText('total')).toBeTruthy();
         expect(screen.getByText('2')).toBeTruthy();
         expect(screen.getByText('1')).toBeTruthy();
         expect(screen.getByText('3')).toBeTruthy();
