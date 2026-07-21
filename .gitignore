@@ -1,7 +1,7 @@
 # Purpose: Prevent generated dependencies, secrets, local runtime data, and agent worktrees from entering git.
 # Caller: Git status/add/commit workflows for this CCTV repository.
 # Deps: Project build tools, local database/runtime outputs, Codex worktree isolation.
-# MainFuncs: Ignore dependency folders, env files, databases, build outputs, backups, exports, and `.worktrees/`.
+# MainFuncs: Ignore dependency folders, env files, databases, build outputs, backups, exports, `.worktrees/`, and `.claude/`.
 # SideEffects: Keeps local-only files untracked.
 
 # Dependencies
@@ -76,6 +76,12 @@ private_imports/
 /*_catalog_*.json
 /cctv_backup_*.json
 /private_exports/
+
+# Claude Code local artifacts (SECURITY)
+# settings.local.json is machine-specific, and .claude/tmp/ holds throwaway ops scripts that
+# carry live credentials (payment-gateway keys, SSH passwords) — they must never be committed.
+# If something in here ever needs sharing, un-ignore it explicitly (e.g. `!.claude/agents/`).
+.claude/
 
 # Backup files (SECURITY)
 *.bak
