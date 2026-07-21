@@ -26,7 +26,6 @@ import LandingPublicTopStack from '../components/landing/LandingPublicTopStack';
 import LandingDiscoveryStrip from '../components/landing/LandingDiscoveryStrip';
 import LandingQuickAccessStrip from '../components/landing/LandingQuickAccessStrip';
 import LandingMobileDock from '../components/landing/LandingMobileDock';
-import LandingSmartFeed from '../components/landing/LandingSmartFeed';
 import MultiViewButton from '../components/MultiView/MultiViewButton';
 import InlineAdSlot from '../components/ads/InlineAdSlot';
 import GlobalAdScript from '../components/ads/GlobalAdScript';
@@ -200,7 +199,6 @@ function LandingPageContent({ onRefreshPauseChange }) {
                         recentCameras={recentCameraItems}
                         favoriteCameras={favoriteCameras}
                         onQuickCameraOpen={handleGridPopupOpen}
-                        smartFeedCameras={cameras}
                     />
                 </Suspense>
 
@@ -270,14 +268,17 @@ function LandingPageContent({ onRefreshPauseChange }) {
                     onCameraClick={handleGridPopupOpen}
                 />
 
+                {/*
+                  * One ranked discovery surface, not two. LandingSmartFeed used to render
+                  * directly below this strip showing the same cameras again under different
+                  * headings ("Paling Ditonton" here vs "Paling Banyak Ditonton" there), so
+                  * the page repeated its top six cameras across four sections. This strip
+                  * wins because its ranking is backend-aggregated and it also covers areas,
+                  * which the camera-only feed could not.
+                  */}
                 <LandingDiscoveryStrip
                     discovery={publicDiscovery}
                     loading={discoveryLoading}
-                    onCameraClick={handleGridPopupOpen}
-                />
-
-                <LandingSmartFeed
-                    cameras={cameras}
                     onCameraClick={handleGridPopupOpen}
                 />
 

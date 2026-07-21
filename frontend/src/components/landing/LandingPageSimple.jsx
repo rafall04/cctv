@@ -19,7 +19,6 @@ import LayoutModeToggle from './LayoutModeToggle';
 import LandingPublicTopStack from './LandingPublicTopStack';
 import LandingDiscoveryStrip from './LandingDiscoveryStrip';
 import LandingQuickAccessStrip from './LandingQuickAccessStrip';
-import LandingSmartFeed from './LandingSmartFeed';
 import DeferUntilVisible from './DeferUntilVisible';
 import useDeferredMount from '../../hooks/public/useDeferredMount';
 import { GridSkeleton, CameraCardSkeleton } from '../ui/Skeleton';
@@ -231,7 +230,6 @@ export default function LandingPageSimple({
     recentCameras = [],
     favoriteCameras = [],
     onQuickCameraOpen,
-    smartFeedCameras = [],
     disableHeavyEffects = false,
 }) {
     const { branding } = useBranding();
@@ -242,15 +240,8 @@ export default function LandingPageSimple({
     // freeze on weak CPUs. Capable devices mount it synchronously (no skeleton flash).
     const camerasReady = useDeferredMount({ enabled: disableHeavyEffects });
 
-    // Secondary discovery strips below the fold. Under the lite experience they are mounted only when
+    // Secondary discovery strip below the fold. Under the lite experience it is mounted only when
     // scrolled near the viewport, trimming initial mount/paint work on constrained devices.
-    const smartFeedSection = (
-        <LandingSmartFeed
-            cameras={smartFeedCameras}
-            onCameraClick={onQuickCameraOpen || onCameraClick}
-            variant="simple"
-        />
-    );
     const quickAccessSection = (
         <LandingQuickAccessStrip
             recentCameras={recentCameras}
@@ -284,10 +275,6 @@ export default function LandingPageSimple({
                 onCameraClick={onCameraClick}
                 className="pt-2"
             />
-
-            {disableHeavyEffects
-                ? <DeferUntilVisible minHeight={96}>{smartFeedSection}</DeferUntilVisible>
-                : smartFeedSection}
 
             {disableHeavyEffects
                 ? <DeferUntilVisible minHeight={120}>{quickAccessSection}</DeferUntilVisible>

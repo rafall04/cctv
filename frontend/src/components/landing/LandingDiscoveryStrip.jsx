@@ -18,20 +18,19 @@ function DiscoverySkeleton() {
     );
 }
 
+const ITEM_CLASS = 'group flex min-h-[72px] w-[min(18rem,calc(100vw-4rem))] shrink-0 items-center gap-3 rounded-card border border-edge bg-surface px-3 py-2 text-left transition-colors hover:border-edge-strong hover:bg-primary/5 sm:w-[250px]';
+
 function DiscoveryCameraButton({ camera, metricLabel, metricValue, onCameraClick }) {
     return (
-        <button
-            type="button"
-            onClick={() => onCameraClick?.(camera)}
-            className="group flex min-h-[72px] w-[min(18rem,calc(100vw-4rem))] shrink-0 items-center gap-3 rounded-2xl border border-gray-200 bg-white px-3 py-2 text-left transition hover:border-primary/60 hover:bg-primary/5 dark:border-gray-800 dark:bg-gray-900 dark:hover:bg-primary/10 sm:w-[250px]"
-        >
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-50 text-[10px] font-bold text-red-600 dark:bg-red-500/10 dark:text-red-300">
-                LIVE
-            </div>
+        <button type="button" onClick={() => onCameraClick?.(camera)} className={ITEM_CLASS}>
+            {/* Was a red "LIVE" tile. Red is reserved for faults now (see LandingCameraCard),
+                and every card in this strip is live anyway, so the badge said nothing. */}
+            <span className="flex h-2 w-2 shrink-0 rounded-full bg-status-live" aria-hidden="true"></span>
+            <span className="sr-only">Siaran langsung</span>
             <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-semibold text-gray-900 dark:text-white">{camera.name}</div>
-                <div className="mt-0.5 truncate text-xs text-gray-500 dark:text-gray-400">{camera.area_name || camera.location || 'Area publik'}</div>
-                <div className="mt-1 text-xs font-semibold text-primary">
+                <div className="truncate text-sm font-semibold text-content">{camera.name}</div>
+                <div className="mt-0.5 truncate text-xs text-content-muted">{camera.area_name || camera.location || 'Area publik'}</div>
+                <div className="mt-1 text-xs font-medium tabular-nums text-content-subtle">
                     {formatLandingDiscoveryCount(metricValue)} {metricLabel}
                 </div>
             </div>
@@ -41,17 +40,17 @@ function DiscoveryCameraButton({ camera, metricLabel, metricValue, onCameraClick
 
 function DiscoveryAreaLink({ area }) {
     return (
-        <Link
-            to={`/area/${area.slug}`}
-            className="group flex min-h-[72px] w-[min(18rem,calc(100vw-4rem))] shrink-0 items-center gap-3 rounded-2xl border border-gray-200 bg-white px-3 py-2 text-left transition hover:border-primary/60 hover:bg-primary/5 dark:border-gray-800 dark:bg-gray-900 dark:hover:bg-primary/10 sm:w-[250px]"
-        >
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-[10px] font-bold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
-                AREA
-            </div>
+        <Link to={`/area/${area.slug}`} className={ITEM_CLASS}>
+            <span className="shrink-0 text-content-subtle" aria-hidden="true">
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z" />
+                    <circle cx="12" cy="11" r="3" />
+                </svg>
+            </span>
             <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-semibold text-gray-900 dark:text-white">{area.name}</div>
-                <div className="mt-0.5 truncate text-xs text-gray-500 dark:text-gray-400">{formatLandingDiscoveryCount(area.camera_count)} kamera publik</div>
-                <div className="mt-1 text-xs font-semibold text-primary">
+                <div className="truncate text-sm font-semibold text-content">{area.name}</div>
+                <div className="mt-0.5 truncate text-xs text-content-muted tabular-nums">{formatLandingDiscoveryCount(area.camera_count)} kamera publik</div>
+                <div className="mt-1 text-xs font-medium tabular-nums text-content-subtle">
                     {formatLandingDiscoveryCount(area.total_views)}x ditonton
                 </div>
             </div>
@@ -82,34 +81,39 @@ export default function LandingDiscoveryStrip({
 
     return (
         <section id="public-discovery" data-testid="landing-discovery-strip" className={`mx-auto w-full max-w-full overflow-hidden px-3 py-3 sm:max-w-7xl sm:px-6 lg:px-8 ${className}`}>
-            <div className="min-w-0 max-w-full overflow-hidden rounded-2xl border border-gray-200 bg-white/85 p-2 shadow-sm dark:border-gray-800 dark:bg-gray-900/85 sm:p-3">
-                <div className="flex min-w-0 max-w-full items-center gap-2 overflow-x-auto pb-2 [-webkit-overflow-scrolling:touch]" role="tablist" aria-label="Discovery CCTV publik">
-                    {sections.map((section) => {
-                        const active = section.key === activeSection.key;
-                        return (
-                            <button
-                                key={section.key}
-                                type="button"
-                                role="tab"
-                                aria-selected={active}
-                                onClick={() => setActiveKey(section.key)}
-                                className={`shrink-0 rounded-xl px-3 py-2 text-xs font-semibold transition ${
-                                    active
-                                        ? 'bg-primary text-white shadow-sm'
-                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
-                                }`}
-                            >
-                                {section.label}
-                                <span className={`ml-2 rounded-lg px-1.5 py-0.5 text-[10px] ${active ? 'bg-white/20 text-white' : 'bg-white text-gray-500 dark:bg-gray-900 dark:text-gray-400'}`}>
-                                    {formatLandingDiscoveryCount(section.items.length)}
-                                </span>
-                            </button>
-                        );
-                    })}
-                </div>
+            <div className="min-w-0 max-w-full overflow-hidden rounded-card border border-edge bg-surface p-2 sm:p-3">
+                {/* A single tab is not a choice — show its name as a plain heading instead. */}
+                {sections.length > 1 ? (
+                    <div className="flex min-w-0 max-w-full items-center gap-2 overflow-x-auto pb-2 [-webkit-overflow-scrolling:touch]" role="tablist" aria-label="Discovery CCTV publik">
+                        {sections.map((section) => {
+                            const active = section.key === activeSection.key;
+                            return (
+                                <button
+                                    key={section.key}
+                                    type="button"
+                                    role="tab"
+                                    aria-selected={active}
+                                    onClick={() => setActiveKey(section.key)}
+                                    className={`shrink-0 rounded-control px-3 py-2 text-xs font-medium transition-colors ${
+                                        active
+                                            ? 'bg-primary text-white'
+                                            : 'text-content-muted hover:bg-surface-raised hover:text-content'
+                                    }`}
+                                >
+                                    {section.label}
+                                    <span className={`ml-2 tabular-nums ${active ? 'text-white/70' : 'text-content-subtle'}`}>
+                                        {formatLandingDiscoveryCount(section.items.length)}
+                                    </span>
+                                </button>
+                            );
+                        })}
+                    </div>
+                ) : (
+                    <h2 className="px-1 pb-2 text-xs font-medium text-content-muted">{activeSection.label}</h2>
+                )}
 
                 {hiddenItemCount > 0 && (
-                    <div className="px-1 pb-1 text-[11px] font-medium text-gray-500 dark:text-gray-400">
+                    <div className="px-1 pb-1 text-[11px] font-medium tabular-nums text-content-subtle">
                         Menampilkan {formatLandingDiscoveryCount(activeItems.length)} dari {formatLandingDiscoveryCount(activeSection.items.length)}
                     </div>
                 )}

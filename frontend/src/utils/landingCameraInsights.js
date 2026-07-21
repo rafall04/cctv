@@ -1,8 +1,8 @@
 /*
- * Purpose: Derive public-safe camera quality labels and compact smart feed groups from camera payloads.
- * Caller: Public landing cards and smart feed components.
+ * Purpose: Derive public-safe camera quality labels from camera payloads.
+ * Caller: Public landing camera cards and the multiview camera detail panel.
  * Deps: Browser Date and camera viewer/stat fields already returned by public camera APIs.
- * MainFuncs: getPublicCameraQuality, buildPublicSmartFeedSections.
+ * MainFuncs: getPublicCameraQuality.
  * SideEffects: None.
  */
 
@@ -40,27 +40,6 @@ function isNewCamera(camera, now) {
 
     const ageMs = now.getTime() - createdAt.getTime();
     return ageMs >= 0 && ageMs <= NEW_CAMERA_DAYS * 24 * 60 * 60 * 1000;
-}
-
-function sortByMetric(cameras, key) {
-    return [...cameras].sort((left, right) => {
-        const byMetric = getMetric(right, key) - getMetric(left, key);
-        if (byMetric !== 0) {
-            return byMetric;
-        }
-        return (left?.name || '').localeCompare(right?.name || '');
-    });
-}
-
-function sortByNewest(cameras) {
-    return [...cameras].sort((left, right) => {
-        const rightDate = normalizeDate(right?.created_at)?.getTime() || 0;
-        const leftDate = normalizeDate(left?.created_at)?.getTime() || 0;
-        if (rightDate !== leftDate) {
-            return rightDate - leftDate;
-        }
-        return Number(right?.id || 0) - Number(left?.id || 0);
-    });
 }
 
 export function getPublicCameraQuality(camera, now = new Date()) {
@@ -117,36 +96,4 @@ export function getPublicCameraQuality(camera, now = new Date()) {
         label: 'Live',
         className: 'border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300',
     };
-}
-
-export function buildPublicSmartFeedSections(cameras = [], now = new Date(), limit = 6) {
-    const availableCameras = cameras.filter((camera) => camera && camera.status !== 'maintenance' && !isOffline(camera));
-    const usedCameraIds = new Set();
-    const takeUnique = (items) => {
-        const nextItems = [];
-        items.forEach((camera) => {
-            if (nextItems.length >= limit || usedCameraIds.has(camera.id)) {
-                return;
-            }
-            usedCameraIds.add(camera.id);
-            nextItems.push(camera);
-        });
-        return nextItems;
-    };
-
-    const busyCameras = takeUnique(sortByMetric(availableCameras.filter((camera) => getMetric(camera, 'live_viewers') > 0), 'live_viewers'));
-    const recentCreatedCameras = availableCameras.filter((camera) => camera.created_at && isNewCamera(camera, now));
-    const newestSourceCameras = recentCreatedCameras.length > 0
-        ? recentCreatedCameras
-        : availableCameras.filter((camera) => camera.created_at);
-    const newestCameras = takeUnique(sortByNewest(newestSourceCameras));
-    const topCameras = takeUnique(sortByMetric(availableCameras.filter((camera) => getMetric(camera, 'total_views') > 0), 'total_views'));
-    const recommendedCameras = takeUnique(sortByMetric(availableCameras.filter((camera) => camera.is_tunnel !== 1), 'total_views'));
-
-    return [
-        { key: 'busy', title: 'Sedang Ramai', cameras: busyCameras },
-        { key: 'newest', title: 'Kamera Terbaru', cameras: newestCameras },
-        { key: 'top', title: 'Paling Banyak Ditonton', cameras: topCameras },
-        { key: 'recommended', title: 'Rekomendasi Hari Ini', cameras: recommendedCameras },
-    ].filter((section) => section.cameras.length > 0);
 }

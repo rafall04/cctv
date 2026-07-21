@@ -37,7 +37,12 @@ export function buildLandingDiscoverySections(discovery = {}) {
             key: 'live_now',
             label: 'Sedang Ramai',
             metricLabel: 'penonton',
-            items: getItems(discovery, 'live_now'),
+            // "Sedang Ramai" must actually be busy. The backend list was returning
+            // cameras with zero live viewers, so the tab shipped six cards each
+            // reading "0 penonton" — a heading that contradicted its own contents.
+            // Empty sections are dropped by the filter below, so the tab simply
+            // disappears when nothing is genuinely busy.
+            items: getItems(discovery, 'live_now').filter((camera) => Number(camera?.live_viewers) > 0),
             type: 'camera',
             metric: (camera) => camera.live_viewers,
         },
