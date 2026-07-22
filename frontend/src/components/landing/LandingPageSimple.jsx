@@ -159,19 +159,27 @@ function SimpleStatusOverview() {
 
     return (
         <div className="mx-auto max-w-7xl px-4 pt-3 sm:px-6 lg:px-8">
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-card border border-edge bg-surface px-4 py-2.5">
-                <h2 className="text-xs font-medium text-content-muted">Status kamera</h2>
-                {stats.map((stat) => (
-                    <span key={stat.label} className="inline-flex items-center gap-1.5 text-sm">
-                        {stat.dot && (
-                            <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${stat.dot}`} aria-hidden="true"></span>
-                        )}
-                        <span className="font-semibold tabular-nums text-content">
-                            {loading ? '…' : stat.value}
+            {/*
+              * A fixed three-column grid instead of a wrapping flex row. The wrap
+              * looked ragged on narrow phones ("749 total" dangling alone on line
+              * two); three equal columns keep the figures aligned at every width
+              * and can never wrap unevenly.
+              */}
+            <div className="rounded-card border border-edge bg-surface px-4 py-2.5">
+                <h2 className="text-[11px] font-medium uppercase tracking-wide text-content-subtle">Status kamera</h2>
+                <div className="mt-1.5 grid grid-cols-3 gap-2">
+                    {stats.map((stat) => (
+                        <span key={stat.label} className="flex min-w-0 items-baseline gap-1.5 text-sm">
+                            {stat.dot && (
+                                <span className={`h-1.5 w-1.5 shrink-0 self-center rounded-full ${stat.dot}`} aria-hidden="true"></span>
+                            )}
+                            <span className="font-semibold tabular-nums text-content">
+                                {loading ? '…' : stat.value}
+                            </span>
+                            <span className="truncate text-xs text-content-muted">{stat.label}</span>
                         </span>
-                        <span className="text-content-muted">{stat.label}</span>
-                    </span>
-                ))}
+                    ))}
+                </div>
             </div>
         </div>
     );

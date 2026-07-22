@@ -2,7 +2,16 @@
 <html lang="id" class="dark">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      minimum-scale=1.0 is the decisive guard against the "whole page shrinks into a
+      narrow column" bug. In-app WebViews (Telegram, MIUI, …) fit their initial zoom
+      to the WIDEST content on the page, so a single wide element - typically a
+      third-party ad iframe with a fixed pixel width - zooms the entire page out.
+      Forbidding scale < 1 makes that mechanically impossible; the overflow-x guards
+      in index.css then keep any such element clipped instead of pannable.
+      Deliberately NO maximum-scale / user-scalable=no: pinch-zoom IN stays available.
+    -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0" />
     
     <!-- Primary Meta Tags (will be updated by meta-config.js) -->
     <title id="page-title">CCTV Online</title>

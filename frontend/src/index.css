@@ -117,6 +117,19 @@ body {
         overflow-x: clip;
     }
     
+    /*
+     * Tailwind's preflight caps img/video at max-width:100% but NOT iframe/embed/
+     * object/canvas. Third-party ad scripts inject iframes with fixed pixel widths
+     * (728px leaderboards and the like) straight into the page on phones — the one
+     * class of wide element we cannot restyle at the source. Clamp them all here.
+     */
+    iframe,
+    embed,
+    object,
+    canvas {
+        max-width: 100%;
+    }
+
     body {
         @apply antialiased;
         /*
