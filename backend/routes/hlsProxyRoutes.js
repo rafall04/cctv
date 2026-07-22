@@ -22,6 +22,7 @@ import {
     resolveHlsViewerUser,
     propagateTokenInPlaylist,
 } from '../services/hlsProxyService.js';
+import { isTrustedStreamRequest } from '../services/streamHotlinkPolicy.js';
 import {
     getAccessInfo,
     getAccessInfoByStreamKey,
@@ -42,6 +43,20 @@ function resolveHlsAccessInfo(cameraPath) {
 
 export default async function hlsProxyRoutes(fastify, _options) {
     const mediamtxHlsUrl = config.mediamtx?.hlsUrlInternal || 'http://localhost:8888';
+    // Hostnames allowed to hotlink community playlists when a browser omits
+    // Sec-Fetch-Site. Derived from the same ALLOWED_ORIGINS list the origin
+    // validator uses, so there is one source of truth for "our own site".
+    const hlsTrustedHosts = new Set(
+        (config.security?.allowedOrigins || [])
+            .map((origin) => {
+                try {
+                    return new URL(origin).hostname.toLowerCase();
+                } catch {
+                    return null;
+                }
+            })
+            .filter(Boolean)
+    );
     const state = createHlsRouteState();
     state.start();
 
@@ -97,6 +112,20 @@ export default async function hlsProxyRoutes(fastify, _options) {
                 const code = access.statusCode === 402 ? 402 : 403;
                 return reply.code(code).send('');
             }
+        }
+
+        // Anti-hotlink gate for COMMUNITY playlists: a community stream is public
+        // ON OUR SITE but must not be embeddable/playable elsewhere. Gating the
+        // (no-cache) playlist to same-origin/same-site requests kills off-site
+        // playback within seconds — a live stream is dead without its rotating
+        // playlist — while the edge-cacheable segments (untouched below) keep CDN
+        // performance intact. Non-community already required a stream token above,
+        // a stronger gate than any header, so this only hardens community.
+        if (isTextFile && accessInfo?.camera_class === 'community'
+            && !isTrustedStreamRequest(request.headers, hlsTrustedHosts)) {
+            reply.header('Content-Type', 'text/plain');
+            reply.header('Cache-Control', 'no-store');
+            return reply.code(403).send('');
         }
 
         if (cameraId && isTextFile) {

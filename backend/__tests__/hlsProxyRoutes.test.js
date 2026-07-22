@@ -23,6 +23,7 @@ import {
     isTrustedProxy,
     resolveExternalCameraProxyConfig,
 } from '../services/hlsProxyService.js';
+import { isTrustedStreamRequest } from '../services/streamHotlinkPolicy.js';
 
 function createRequest(overrides = {}) {
     return {
@@ -735,5 +736,39 @@ describe('external proxy validation', () => {
             external_use_proxy: 1,
             external_tls_mode: 'strict',
         }, 'https://evil.example.com/live/cam/video1_init.mp4')).toBe(null);
+    });
+});
+
+describe('isTrustedStreamRequest (community-playlist anti-hotlink gate)', () => {
+    const allowed = new Set(['cctv.raf.my.id', '172.17.11.12']);
+
+    it('trusts same-origin and same-site Sec-Fetch-Site (stream lives on a sibling subdomain)', () => {
+        expect(isTrustedStreamRequest({ 'sec-fetch-site': 'same-origin' }, allowed)).toBe(true);
+        // The SPA is cctv.raf.my.id and the stream is api-cctv.raf.my.id — legit playback
+        // is same-site, NOT same-origin. Rejecting same-site would break every viewer.
+        expect(isTrustedStreamRequest({ 'sec-fetch-site': 'same-site' }, allowed)).toBe(true);
+    });
+
+    it('rejects cross-site (off-site embed) and none (address-bar navigation)', () => {
+        expect(isTrustedStreamRequest({ 'sec-fetch-site': 'cross-site' }, allowed)).toBe(false);
+        expect(isTrustedStreamRequest({ 'sec-fetch-site': 'none' }, allowed)).toBe(false);
+    });
+
+    it('falls back to the Origin host allowlist when Sec-Fetch-Site is absent', () => {
+        expect(isTrustedStreamRequest({ origin: 'https://cctv.raf.my.id' }, allowed)).toBe(true);
+        expect(isTrustedStreamRequest({ origin: 'https://evil.example.com' }, allowed)).toBe(false);
+        // Origin is authoritative when present: a disallowed Origin is rejected even if
+        // a spoofed Referer would have passed.
+        expect(isTrustedStreamRequest({ origin: 'https://evil.example.com', referer: 'https://cctv.raf.my.id/' }, allowed)).toBe(false);
+    });
+
+    it('falls back to the Referer host when Origin is absent (same-origin GET omits Origin)', () => {
+        expect(isTrustedStreamRequest({ referer: 'https://cctv.raf.my.id/?camera=5' }, allowed)).toBe(true);
+        expect(isTrustedStreamRequest({ referer: 'https://hotlinker.net/embed' }, allowed)).toBe(false);
+    });
+
+    it('rejects a request with no origin signals at all (curl / scraper signature)', () => {
+        expect(isTrustedStreamRequest({}, allowed)).toBe(false);
+        expect(isTrustedStreamRequest({ referer: 'not a url' }, allowed)).toBe(false);
     });
 });
