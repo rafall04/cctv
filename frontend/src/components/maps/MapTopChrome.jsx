@@ -80,7 +80,12 @@ export default function MapTopChrome({
                 )}
 
                 {typeof onLocateMe === 'function' && (
-                    <div data-testid="map-locate-panel" className={PANEL_CLASS}>
+                    /*
+                     * `w-fit` so the panel hugs its content instead of spanning the whole
+                     * map — after locating, a full-width slab sat on top of the imagery and
+                     * the user's own position dot.
+                     */
+                    <div data-testid="map-locate-panel" className={`${PANEL_CLASS} w-fit max-w-full`}>
                         <button
                             type="button"
                             onClick={onLocateMe}
@@ -97,21 +102,43 @@ export default function MapTopChrome({
                             <p
                                 data-testid="map-locate-error"
                                 role="alert"
-                                className="mt-1.5 px-1 text-[11px] font-medium text-status-fault"
+                                className="mt-1.5 max-w-[16rem] px-1 text-[11px] font-medium leading-4 text-status-fault"
                             >
                                 {locateError}
                             </p>
                         )}
                         {!locateError && nearbyMessage && (
-                            <p
+                            /*
+                             * The summary arrives as one string joined by " · "
+                             * ("8 CCTV dalam 5 km · terdekat NAMA (40 m)") and used to wrap
+                             * mid-parenthesis on phones. Splitting on the separator gives each
+                             * fact its own line, so a long camera name wraps inside its own
+                             * row instead of tearing the distance apart. textContent still
+                             * contains every segment, and the container keeps its status
+                             * role/testid, so behaviour and tests are unchanged.
+                             */
+                            <div
                                 data-testid="map-locate-nearby"
                                 role="status"
                                 aria-live="polite"
                                 title="Jarak garis lurus (bukan jarak tempuh)"
-                                className="mt-1.5 px-1 text-[11px] font-medium text-content-muted"
+                                className="mt-1.5 max-w-[16rem] space-y-0.5 px-1 pb-0.5"
                             >
-                                {nearbyMessage}
-                            </p>
+                                {nearbyMessage.split(' · ').map((segment, index) => (
+                                    <p
+                                        key={segment}
+                                        className={`text-[11px] leading-4 ${index === 0
+                                            ? 'flex items-center gap-1.5 font-semibold tabular-nums text-content'
+                                            : 'font-medium text-content-muted'
+                                            }`}
+                                    >
+                                        {index === 0 && (
+                                            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-status-live" aria-hidden="true"></span>
+                                        )}
+                                        {segment}
+                                    </p>
+                                ))}
+                            </div>
                         )}
                     </div>
                 )}
