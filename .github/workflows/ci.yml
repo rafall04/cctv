@@ -22,6 +22,11 @@ jobs:
         with:
           node-version: '20'
       - run: npm install
+      # The suite expects a real SQLite schema at data/cctv.db (dev machines carry one;
+      # CI starts empty — this was why 18 backend test files failed with "no such table"
+      # on every run since the workflow was created). setup-db is non-interactive.
+      - run: npm run setup-db
+      - run: npm run migrate
       - run: npm test
 
   frontend:
