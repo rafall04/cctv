@@ -38,3 +38,23 @@ jobs:
       - run: npm install
       - run: npm run lint
       - run: npm test
+
+  e2e:
+    # Real-browser overflow smoke (e2e/overflow.spec.js): asserts no public page can
+    # scroll sideways on a phone viewport — the layout class jsdom can never catch
+    # (2026-07 mobile zoom-out incident). API mocked, external hosts blocked, so this
+    # cannot flake on network and never touches production.
+    name: Frontend e2e (mobile overflow smoke)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm install
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e

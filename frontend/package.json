@@ -10,7 +10,8 @@
         "lint": "eslint src --ext js,jsx --report-unused-disable-directives --max-warnings 0 --rule \"react-refresh/only-export-components: off\"",
         "lint:admin": "npm run lint",
         "test": "vitest run",
-        "test:watch": "vitest"
+        "test:watch": "vitest",
+        "test:e2e": "playwright test"
     },
     "dependencies": {
         "axios": "^1.16.1",
@@ -25,6 +26,7 @@
         "react-router-dom": "^6.30.3"
     },
     "devDependencies": {
+        "@playwright/test": "^1.61.1",
         "@testing-library/react": "^16.3.1",
         "@types/react": "^18.3.3",
         "@types/react-dom": "^18.3.0",

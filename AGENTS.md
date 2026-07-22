@@ -100,6 +100,11 @@ npm test -- CameraManagement.test.jsx -t "name"      # single test
   layering, doc-lint). The full suite is the gate; while iterating, add `guardrails` to your filter.
   The ratchet counts every line **including comments** — if a frozen file is at its ceiling, shrink
   your change instead of raising the baseline.
+- **Public-layout changes** additionally run the real-browser overflow smoke:
+  `cd frontend && npm run build && npm run test:e2e` (Playwright, phone viewport, API mocked — also
+  runs in CI). Before declaring the change done, verify once on a **real Android phone via the
+  Telegram in-app browser with ads loading** — desktop engines cannot reproduce WebView zoom-fitting,
+  and ad iframes exist only in the field (both proven by the 2026-07 mobile incident).
 
 ---
 
