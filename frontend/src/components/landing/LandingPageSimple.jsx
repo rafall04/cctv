@@ -44,11 +44,11 @@ function SimpleHeader({ branding, layoutMode, onLayoutToggle, disableHeavyEffect
     };
 
     return (
-        <header className={`sticky top-0 z-[1001] bg-white/90 dark:bg-gray-900/90 ${disableAnimations ? '' : 'backdrop-blur-xl'} border-b border-emerald-200/30 dark:border-emerald-700/30`}>
+        <header className={`sticky top-0 z-[1001] bg-surface ${disableAnimations ? '' : 'supports-[backdrop-filter]:bg-surface/85 supports-[backdrop-filter]:backdrop-blur-lg'} border-b border-edge`}>
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between h-14">
                     <Link to="/" className="flex items-center gap-2 hover:opacity-90 transition-opacity" title={branding.company_name}>
-                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-primary-600 flex items-center justify-center text-white shadow-lg shadow-primary/30">
+                        <div className="w-8 h-8 rounded-control bg-primary flex items-center justify-center text-white">
                             <span className="text-sm font-bold">{branding.logo_text}</span>
                         </div>
                     </Link>
@@ -97,7 +97,7 @@ function SimpleFooter({ branding, saweriaEnabled, saweriaLink }) {
                 <div className="text-center space-y-3">
                     <div className="flex flex-col items-center gap-2">
                         <div className="inline-flex items-center gap-2 rounded-full bg-sky-50 dark:bg-primary/10 px-4 py-2">
-                            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary to-primary-600 flex items-center justify-center text-white shadow-lg shadow-primary/20">
+                            <div className="w-7 h-7 rounded-control bg-primary flex items-center justify-center text-white">
                                 <span className="text-xs font-bold">{branding.logo_text}</span>
                             </div>
                             <span className="text-sm font-bold text-primary-600 dark:text-primary-400">{branding.company_name}</span>

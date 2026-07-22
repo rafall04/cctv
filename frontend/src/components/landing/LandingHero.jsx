@@ -45,7 +45,7 @@ export default function Hero({ branding, landingSettings, disableHeavyEffects, o
                 >
                     {branding.show_powered_by === 'true' && (
                         <div className="flex items-center gap-2 rounded-full bg-sky-100 px-4 py-1.5 text-xs font-semibold text-primary-600 shadow-sm dark:bg-primary/20 dark:text-primary-400">
-                            <div className="flex h-5 w-5 items-center justify-center rounded bg-gradient-to-br from-primary to-primary-600 text-[10px] font-bold text-white">{branding.logo_text}</div>
+                            <div className="flex h-5 w-5 items-center justify-center rounded bg-primary text-[10px] font-bold text-white">{branding.logo_text}</div>
                             <span>Powered by {branding.company_name}</span>
                         </div>
                     )}

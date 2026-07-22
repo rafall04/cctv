@@ -28,7 +28,7 @@ export default function LandingCameraToolbar({
             <LandingSearchBox {...searchProps} />
 
             {contextualControls && (
-                <div className="flex min-h-[4.25rem] flex-col gap-3 rounded-2xl border border-gray-200/70 bg-white/85 px-4 py-3 shadow-sm dark:border-gray-700/60 dark:bg-gray-900/70">
+                <div className="flex min-h-[4.25rem] flex-col gap-3 rounded-card border border-edge bg-surface px-4 py-3">
                     {contextualControls}
                 </div>
             )}

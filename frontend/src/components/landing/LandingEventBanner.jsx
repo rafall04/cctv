@@ -50,12 +50,15 @@ export default function LandingEventBanner({ banner, layoutMode = 'full' }) {
     return (
         <section
             data-testid={`landing-event-banner-${layoutMode}`}
-            className={isSimple ? 'border-b border-gray-200/50 dark:border-gray-800/50' : ''}
+            className={isSimple ? 'border-b border-edge' : ''}
         >
             <div className={`mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 ${isSimple ? 'py-3' : 'pb-2'}`}>
-                <div className={`overflow-hidden rounded-3xl border shadow-sm ${theme.wrapper}`}>
+                {/* The themed gradient wrapper/badge are a deliberate SEASONAL feature
+                    (admin-gated holiday banner), so they stay. Only the structural chrome
+                    is normalised to the token radius scale. */}
+                <div className={`overflow-hidden rounded-card border ${theme.wrapper}`}>
                     <div className={`flex gap-4 ${isSimple ? 'items-start px-4 py-3' : 'items-center px-5 py-4 sm:px-6 sm:py-5'}`}>
-                        <div className={`flex shrink-0 items-center justify-center rounded-2xl bg-white/70 dark:bg-gray-900/40 ${isSimple ? 'h-10 w-10' : 'h-12 w-12'} ${theme.icon}`}>
+                        <div className={`flex shrink-0 items-center justify-center rounded-control bg-white/70 dark:bg-gray-900/40 ${isSimple ? 'h-10 w-10' : 'h-12 w-12'} ${theme.icon}`}>
                             <svg className={isSimple ? 'h-5 w-5' : 'h-6 w-6'} viewBox="0 0 24 24" fill="currentColor">
                                 <path d="M12 2a9.77 9.77 0 00-5.71 1.84A10 10 0 1012 2zm0 18a7.96 7.96 0 01-4.62-1.47 8 8 0 018.07-13.73A8 8 0 0112 20z" />
                             </svg>
@@ -67,7 +70,7 @@ export default function LandingEventBanner({ banner, layoutMode = 'full' }) {
                                     {resolvedBanner.title}
                                 </div>
                             )}
-                            <p className={`event-banner-copy ${resolvedBanner.title ? 'mt-2' : ''} text-sm font-medium leading-relaxed text-gray-900 dark:text-white ${isSimple ? '' : 'sm:text-base'}`}>
+                            <p className={`event-banner-copy ${resolvedBanner.title ? 'mt-2' : ''} text-sm font-medium leading-relaxed text-content ${isSimple ? '' : 'sm:text-base'}`}>
                                 {resolvedBanner.text}
                             </p>
                         </div>
