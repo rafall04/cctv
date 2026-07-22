@@ -125,6 +125,40 @@ export function getRateLimitForType(endpointType) {
 }
 
 /**
+ * Resolve the REAL client IP for rate-limit bucketing.
+ *
+ * Root cause of the "everyone gets 429 on refresh" bug: behind Cloudflare →
+ * cloudflared → nginx, the socket peer the backend sees is a single proxy hop
+ * (e.g. 172.17.11.2), which is NOT in TRUSTED_PROXY_CIDRS, so Fastify uses it
+ * verbatim as request.ip. Every public visitor then shared ONE bucket
+ * (`172.17.11.2:public`) → the 100/min limit was global, not per-user.
+ *
+ * Cloudflare stamps the genuine visitor IP in `CF-Connecting-IP` on every
+ * proxied request, so we prefer it. Fallbacks (request.ip, first XFF hop) keep
+ * direct/LAN/health traffic working. A LAN client hitting the origin directly
+ * could spoof the header, but that only affects rate-limit fairness (no data
+ * exposure), and the origin is firewalled from the internet.
+ *
+ * @param {object} request - Fastify request (headers + ip)
+ * @returns {string} client identifier for the rate-limit key
+ */
+export function resolveClientIp(request) {
+    const headers = request?.headers || {};
+    const cf = headers['cf-connecting-ip'];
+    if (typeof cf === 'string' && cf.trim()) {
+        return cf.trim();
+    }
+    if (request?.ip) {
+        return request.ip;
+    }
+    const xff = headers['x-forwarded-for'];
+    if (typeof xff === 'string' && xff.trim()) {
+        return xff.split(',')[0].trim();
+    }
+    return 'unknown';
+}
+
+/**
  * Generate rate limit key from IP and endpoint type
  * @param {string} ip - Client IP address
  * @param {string} endpointType - Endpoint type
@@ -322,7 +356,9 @@ async function rateLimiterPlugin(fastify, options = {}) {
         }
 
         const url = request.url || '';
-        const ip = request.ip || request.headers['x-forwarded-for'] || 'unknown';
+        // Per-user key: the real visitor IP (CF-Connecting-IP), NOT the proxy hop —
+        // otherwise the whole public site shares one bucket. See resolveClientIp.
+        const ip = resolveClientIp(request);
 
         // Get endpoint type
         const endpointType = getEndpointType(url);

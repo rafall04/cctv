@@ -6,7 +6,13 @@
  * SideEffects: Caches public shell assets and serves an offline fallback for navigation requests.
  */
 
-const RAFNET_CCTV_CACHE = 'rafnet-cctv-public-v1';
+// `__SW_VERSION__` is replaced at build time (vite closeBundle plugin) with a short
+// hash of the built asset filenames. Because the hash changes whenever the app's
+// output changes, each deploy ships a byte-different sw.js → the browser detects a
+// new service worker → install (skipWaiting) → activate (purges old caches + claim)
+// → controllerchange → the page auto-reloads to the new version (registerServiceWorker).
+const SW_VERSION = '__SW_VERSION__';
+const RAFNET_CCTV_CACHE = `rafnet-cctv-public-${SW_VERSION}`;
 const APP_SHELL_URLS = [
     '/',
     '/site.webmanifest',

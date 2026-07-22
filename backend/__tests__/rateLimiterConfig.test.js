@@ -75,3 +75,28 @@ describe('rateLimiter — config wiring', () => {
         await app.close();
     });
 });
+
+describe('resolveClientIp — per-user bucketing behind proxies', () => {
+    it('prefers CF-Connecting-IP (the real visitor) over the proxy socket ip', async () => {
+        const { resolveClientIp } = await loadRateLimiter({});
+        // request.ip is the proxy hop; CF-Connecting-IP is the genuine client.
+        expect(resolveClientIp({ ip: '172.17.11.2', headers: { 'cf-connecting-ip': '203.0.113.9' } }))
+            .toBe('203.0.113.9');
+    });
+
+    it('two different CF-Connecting-IPs get independent buckets (not one global bucket)', async () => {
+        const { resolveClientIp, generateRateLimitKey } = await loadRateLimiter({});
+        const a = generateRateLimitKey(resolveClientIp({ ip: '172.17.11.2', headers: { 'cf-connecting-ip': '1.1.1.1' } }), 'public');
+        const b = generateRateLimitKey(resolveClientIp({ ip: '172.17.11.2', headers: { 'cf-connecting-ip': '2.2.2.2' } }), 'public');
+        expect(a).not.toBe(b);
+    });
+
+    it('falls back to request.ip, then XFF, then unknown', async () => {
+        const { resolveClientIp } = await loadRateLimiter({});
+        expect(resolveClientIp({ ip: '10.0.0.5', headers: {} })).toBe('10.0.0.5');
+        expect(resolveClientIp({ headers: { 'x-forwarded-for': '198.51.100.7, 10.0.0.1' } })).toBe('198.51.100.7');
+        expect(resolveClientIp({ headers: {} })).toBe('unknown');
+        // Blank CF header is ignored (does not become the key).
+        expect(resolveClientIp({ ip: '10.0.0.9', headers: { 'cf-connecting-ip': '  ' } })).toBe('10.0.0.9');
+    });
+});
