@@ -13,6 +13,12 @@ jobs:
   backend:
     name: Backend (test + guardrails)
     runs-on: ubuntu-latest
+    env:
+      # Production runs in WIB, and parts of the suite assert wall-clock SQL strings
+      # (viewer-session history stores local-time values BY DESIGN — see the timestamp
+      # standard in SYSTEM_MAP.md). Pinning the runner timezone makes CI match the
+      # deployment reality; on the default UTC runner those assertions are meaningless.
+      TZ: Asia/Jakarta
     defaults:
       run:
         working-directory: backend

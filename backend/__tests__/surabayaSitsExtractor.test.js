@@ -6,7 +6,7 @@
 
 import { mkdtemp, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { basename, join, resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
     buildPrivateImportPayload,
@@ -103,7 +103,9 @@ describe('surabayaSitsExtractor', () => {
     });
 
     it('writes private and sanitized outputs to allowed paths', async () => {
-        const tempToken = (await mkdtemp(join(tmpdir(), 'surabaya-sits-'))).split('\\').pop();
+        // basename(), not split('\\'): the backslash split only worked on Windows, so on
+        // Linux CI the "token" was the whole absolute path and escaped the allowed dir.
+        const tempToken = basename(await mkdtemp(join(tmpdir(), 'surabaya-sits-')));
         const privateBaseDir = getSurabayaSitsPrivateBaseDir();
         const privatePath = resolve(privateBaseDir, `${tempToken}-private.json`);
         const reportPath = resolve(privateBaseDir, `${tempToken}-report.json`);

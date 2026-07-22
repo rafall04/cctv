@@ -6,8 +6,18 @@
  * SideEffects: Uses mocks only.
  */
 import { EventEmitter } from 'events';
+import path from 'node:path';
 import { promisify } from 'util';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+// Platform-neutral path fixtures. These used to be hardcoded Windows literals
+// ('C:\\recordings\\...'), which made every path assertion fail on the Linux CI
+// runners - path.join builds the native shape on both platforms, and fs is
+// mocked so the base never touches a real disk.
+const RECORDINGS_BASE = path.join('recordings-root');
+const SRC_PARTIAL = path.join(RECORDINGS_BASE, 'camera9', 'pending', '20260511_211000.mp4.partial');
+const TMP_OUTPUT = path.join(RECORDINGS_BASE, 'camera9', '20260511_211000.tmp.mp4');
+const FINAL_OUTPUT = path.join(RECORDINGS_BASE, 'camera9', '20260511_211000.mp4');
 
 const execMock = vi.fn();
 const spawnMock = vi.fn();
@@ -54,7 +64,7 @@ describe('recordingSegmentFinalizer', () => {
     it('finalizes a stable partial into final MP4 and upserts the DB segment', async () => {
         const { createRecordingSegmentFinalizer } = await import('../services/recordingSegmentFinalizer.js');
         const finalizer = createRecordingSegmentFinalizer({
-            recordingsBasePath: 'C:\\recordings',
+            recordingsBasePath: RECORDINGS_BASE,
             repository,
             diagnosticsRepository: diagnostics,
             stabilityDelayMs: 100,
@@ -62,7 +72,7 @@ describe('recordingSegmentFinalizer', () => {
 
         const promise = finalizer.finalizeSegment({
             cameraId: 9,
-            sourcePath: 'C:\\recordings\\camera9\\pending\\20260511_211000.mp4.partial',
+            sourcePath: SRC_PARTIAL,
             filename: '20260511_211000.mp4.partial',
             sourceType: 'partial',
         });
@@ -72,26 +82,26 @@ describe('recordingSegmentFinalizer', () => {
         expect(result).toMatchObject({ success: true, finalFilename: '20260511_211000.mp4' });
         expect(spawnMock).toHaveBeenCalledWith('ffmpeg', expect.arrayContaining([
             '-i',
-            'C:\\recordings\\camera9\\pending\\20260511_211000.mp4.partial',
-            'C:\\recordings\\camera9\\20260511_211000.tmp.mp4',
+            SRC_PARTIAL,
+            TMP_OUTPUT,
         ]));
         expect(spawnMock).toHaveBeenCalledWith('ffmpeg', expect.arrayContaining([
             '-f',
             'mp4',
-            'C:\\recordings\\camera9\\20260511_211000.tmp.mp4',
+            TMP_OUTPUT,
         ]));
         expect(fsPromisesMock.rename).toHaveBeenCalledWith(
-            'C:\\recordings\\camera9\\20260511_211000.tmp.mp4',
-            'C:\\recordings\\camera9\\20260511_211000.mp4'
+            TMP_OUTPUT,
+            FINAL_OUTPUT
         );
         expect(repository.upsertSegment).toHaveBeenCalledWith(expect.objectContaining({
             cameraId: 9,
             filename: '20260511_211000.mp4',
             duration: 240,
-            filePath: 'C:\\recordings\\camera9\\20260511_211000.mp4',
+            filePath: FINAL_OUTPUT,
         }));
         expect(fsPromisesMock.unlink).toHaveBeenCalledWith(
-            'C:\\recordings\\camera9\\pending\\20260511_211000.mp4.partial'
+            SRC_PARTIAL
         );
         expect(diagnostics.clearDiagnostic).toHaveBeenCalledWith({ cameraId: 9, filename: '20260511_211000.mp4' });
     });
@@ -99,7 +109,7 @@ describe('recordingSegmentFinalizer', () => {
     it('serializes duplicate finalization requests for the same camera and final filename', async () => {
         const { createRecordingSegmentFinalizer } = await import('../services/recordingSegmentFinalizer.js');
         const finalizer = createRecordingSegmentFinalizer({
-            recordingsBasePath: 'C:\\recordings',
+            recordingsBasePath: RECORDINGS_BASE,
             repository,
             diagnosticsRepository: diagnostics,
             stabilityDelayMs: 100,
@@ -107,13 +117,13 @@ describe('recordingSegmentFinalizer', () => {
 
         const first = finalizer.finalizeSegment({
             cameraId: 9,
-            sourcePath: 'C:\\recordings\\camera9\\pending\\20260511_211000.mp4.partial',
+            sourcePath: SRC_PARTIAL,
             filename: '20260511_211000.mp4.partial',
             sourceType: 'partial',
         });
         const second = finalizer.finalizeSegment({
             cameraId: 9,
-            sourcePath: 'C:\\recordings\\camera9\\pending\\20260511_211000.mp4.partial',
+            sourcePath: SRC_PARTIAL,
             filename: '20260511_211000.mp4.partial',
             sourceType: 'partial',
         });
@@ -129,7 +139,7 @@ describe('recordingSegmentFinalizer', () => {
         fsPromisesMock.unlink.mockRejectedValueOnce(new Error('busy'));
         const { createRecordingSegmentFinalizer } = await import('../services/recordingSegmentFinalizer.js');
         const finalizer = createRecordingSegmentFinalizer({
-            recordingsBasePath: 'C:\\recordings',
+            recordingsBasePath: RECORDINGS_BASE,
             repository,
             diagnosticsRepository: diagnostics,
             stabilityDelayMs: 100,
@@ -137,7 +147,7 @@ describe('recordingSegmentFinalizer', () => {
 
         const promise = finalizer.finalizeSegment({
             cameraId: 9,
-            sourcePath: 'C:\\recordings\\camera9\\pending\\20260511_211000.mp4.partial',
+            sourcePath: SRC_PARTIAL,
             filename: '20260511_211000.mp4.partial',
             sourceType: 'partial',
         });
@@ -154,7 +164,7 @@ describe('recordingSegmentFinalizer', () => {
         execMock[promisify.custom] = vi.fn(async () => ({ stdout: '0\n', stderr: '' }));
         const { createRecordingSegmentFinalizer } = await import('../services/recordingSegmentFinalizer.js');
         const finalizer = createRecordingSegmentFinalizer({
-            recordingsBasePath: 'C:\\recordings',
+            recordingsBasePath: RECORDINGS_BASE,
             repository,
             diagnosticsRepository: diagnostics,
             stabilityDelayMs: 100,
@@ -162,7 +172,7 @@ describe('recordingSegmentFinalizer', () => {
 
         const promise = finalizer.finalizeSegment({
             cameraId: 9,
-            sourcePath: 'C:\\recordings\\camera9\\pending\\20260511_211000.mp4.partial',
+            sourcePath: SRC_PARTIAL,
             filename: '20260511_211000.mp4.partial',
             sourceType: 'partial',
         });
@@ -183,7 +193,7 @@ describe('recordingSegmentFinalizer', () => {
         spawnMock.mockImplementation(() => createProcess(1));
         const { createRecordingSegmentFinalizer } = await import('../services/recordingSegmentFinalizer.js');
         const finalizer = createRecordingSegmentFinalizer({
-            recordingsBasePath: 'C:\\recordings',
+            recordingsBasePath: RECORDINGS_BASE,
             repository,
             diagnosticsRepository: diagnostics,
             stabilityDelayMs: 100,
@@ -191,7 +201,7 @@ describe('recordingSegmentFinalizer', () => {
 
         const promise = finalizer.finalizeSegment({
             cameraId: 9,
-            sourcePath: 'C:\\recordings\\camera9\\pending\\20260511_211000.mp4.partial',
+            sourcePath: SRC_PARTIAL,
             filename: '20260511_211000.mp4.partial',
             sourceType: 'partial',
         });
@@ -201,10 +211,10 @@ describe('recordingSegmentFinalizer', () => {
         expect(result.success).toBe(false);
         expect(repository.upsertSegment).not.toHaveBeenCalled();
         expect(fsPromisesMock.unlink).not.toHaveBeenCalledWith(
-            'C:\\recordings\\camera9\\pending\\20260511_211000.mp4.partial'
+            SRC_PARTIAL
         );
         expect(fsPromisesMock.unlink).toHaveBeenCalledWith(
-            'C:\\recordings\\camera9\\20260511_211000.tmp.mp4'
+            TMP_OUTPUT
         );
     });
 });

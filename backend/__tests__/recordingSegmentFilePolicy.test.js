@@ -6,6 +6,7 @@
  * SideEffects: None.
  */
 import { describe, expect, it } from 'vitest';
+import path from 'node:path';
 import {
     getFinalRecordingPath,
     getPendingRecordingDir,
@@ -48,16 +49,20 @@ describe('recordingSegmentFilePolicy', () => {
     });
 
     it('builds stable pending and final paths under the camera directory', () => {
-        const basePath = 'C:\\recordings';
-        expect(getPendingRecordingDir(basePath, 3)).toBe('C:\\recordings\\camera3\\pending');
-        expect(getPendingRecordingPattern(basePath, 3)).toBe('C:\\recordings\\camera3\\pending\\%Y%m%d_%H%M%S.mp4.partial');
-        expect(getFinalRecordingPath(basePath, 3, '20260511_211000.mp4')).toBe('C:\\recordings\\camera3\\20260511_211000.mp4');
-        expect(getTempRecordingPath(basePath, 3, '20260511_211000.mp4')).toBe('C:\\recordings\\camera3\\20260511_211000.tmp.mp4');
+        // path.join expectations, not Windows literals: the contract is native-separator
+        // joins under <base>/cameraN, and the hardcoded 'C:\\...' shapes failed on Linux CI.
+        const basePath = path.join('recordings-root');
+        const pendingDir = path.join(basePath, 'camera3', 'pending');
+        expect(getPendingRecordingDir(basePath, 3)).toBe(pendingDir);
+        expect(getPendingRecordingPattern(basePath, 3)).toBe(path.join(pendingDir, '%Y%m%d_%H%M%S.mp4.partial'));
+        expect(getFinalRecordingPath(basePath, 3, '20260511_211000.mp4')).toBe(path.join(basePath, 'camera3', '20260511_211000.mp4'));
+        expect(getTempRecordingPath(basePath, 3, '20260511_211000.mp4')).toBe(path.join(basePath, 'camera3', '20260511_211000.tmp.mp4'));
     });
 
     it('builds MP4-compatible temp remux filenames', () => {
-        expect(getTempRecordingPath('C:\\recordings', 7, '20260512_000005.mp4'))
-            .toBe('C:\\recordings\\camera7\\20260512_000005.tmp.mp4');
+        const basePath = path.join('recordings-root');
+        expect(getTempRecordingPath(basePath, 7, '20260512_000005.mp4'))
+            .toBe(path.join(basePath, 'camera7', '20260512_000005.tmp.mp4'));
     });
 
     it('recognizes current and legacy temp remux filenames', () => {
