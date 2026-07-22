@@ -105,16 +105,16 @@ export default function LandingMobileDock({
     return (
         <nav
             data-testid="landing-mobile-dock"
-            className="fixed inset-x-3 bottom-3 z-[1200] rounded-2xl border border-gray-200 bg-white/95 px-2 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2 shadow-[0_-12px_30px_rgba(15,23,42,0.16)] backdrop-blur-xl dark:border-gray-800 dark:bg-gray-950/95 sm:hidden"
+            className="fixed inset-x-3 bottom-3 z-[1200] rounded-card border border-edge bg-surface px-2 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2 shadow-e2 sm:hidden"
             aria-label="Navigasi publik mobile"
         >
             <div className="mx-auto grid max-w-md grid-cols-5 gap-1 sm:max-w-none">
                 {NAV_ITEMS.map((item) => {
                     const active = item.key === viewMode;
-                    const className = `relative flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 text-[10px] font-semibold leading-none transition sm:text-[11px] ${
+                    const className = `relative flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 rounded-control px-1 py-2 text-[10px] font-medium leading-none transition-colors sm:text-[11px] ${
                         active
                             ? 'bg-primary text-white'
-                            : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'
+                            : 'text-content-muted hover:bg-surface-raised hover:text-content'
                     }`;
                     const ariaLabel = item.key === 'quick' && favoriteCount > 0 ? `${item.label} ${favoriteCount}` : item.label;
                     const content = (
@@ -124,7 +124,7 @@ export default function LandingMobileDock({
                             </span>
                             <span className="truncate">{item.label}</span>
                             {item.key === 'quick' && favoriteCount > 0 && (
-                                <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] text-amber-700 dark:bg-amber-500/20 dark:text-amber-300">
+                                <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[9px] font-medium tabular-nums text-primary">
                                     {favoriteCount}
                                 </span>
                             )}

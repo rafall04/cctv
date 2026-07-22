@@ -82,7 +82,9 @@ export default function LandingResultsGrid({
 
     return (
         <>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
+            {/* xl:4 keeps cards a sane size on wide monitors / tablet landscape — without
+                it the grid capped at 3 columns and cards ballooned with dead space beside them. */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 xl:grid-cols-4">
                 {visibleCameras.map((camera, index) => (
                     <LandingGridCameraCard
                         key={camera.id ?? `grid-${index}`}

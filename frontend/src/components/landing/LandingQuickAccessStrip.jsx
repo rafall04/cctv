@@ -13,14 +13,14 @@ function QuickCameraButton({ camera, label, onCameraClick }) {
         <button
             type="button"
             onClick={() => onCameraClick(camera)}
-            className="flex min-h-[64px] w-[min(16rem,calc(100vw-4rem))] shrink-0 items-center gap-3 rounded-2xl border border-gray-200 bg-white px-3 py-2 text-left shadow-sm transition hover:border-primary/60 hover:bg-primary/5 dark:border-gray-800 dark:bg-gray-900 dark:hover:bg-primary/10 sm:w-[230px]"
+            className="flex min-h-[64px] w-[min(16rem,calc(100vw-4rem))] shrink-0 items-center gap-3 rounded-card border border-edge bg-surface px-3 py-2 text-left transition-colors hover:border-edge-strong hover:bg-primary/5 sm:w-[230px]"
         >
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-[10px] font-bold text-primary dark:bg-primary/10 dark:text-primary-300">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-primary/10 text-[10px] font-semibold text-primary">
                 {label}
             </div>
             <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-semibold text-gray-900 dark:text-white">{camera.name}</div>
-                <div className="mt-0.5 truncate text-xs text-gray-500 dark:text-gray-400">
+                <div className="truncate text-sm font-semibold text-content">{camera.name}</div>
+                <div className="mt-0.5 truncate text-xs text-content-muted">
                     {camera.area_name || camera.location || 'Area publik'}
                 </div>
             </div>
@@ -36,8 +36,8 @@ function QuickGroup({ title, label, cameras, onCameraClick }) {
     return (
         <div className="min-w-0">
             <div className="mb-2 flex items-center justify-between gap-3">
-                <h2 className="text-sm font-semibold text-gray-900 dark:text-white">{title}</h2>
-                <span className="text-xs text-gray-500 dark:text-gray-400">{cameras.length} kamera</span>
+                <h2 className="text-sm font-semibold text-content">{title}</h2>
+                <span className="text-xs tabular-nums text-content-muted">{cameras.length} kamera</span>
             </div>
             <div className="flex min-w-0 max-w-full gap-2 overflow-x-auto pb-1 [-webkit-overflow-scrolling:touch]">
                 {cameras.slice(0, 5).map((camera) => (
@@ -55,7 +55,7 @@ function QuickGroup({ title, label, cameras, onCameraClick }) {
 
 function EmptyFavoriteTarget() {
     return (
-        <div className="rounded-2xl border border-dashed border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+        <div className="rounded-card border border-dashed border-edge-strong bg-surface-sunken px-4 py-3 text-sm text-content-muted">
             Belum ada kamera favorit. Tekan tombol bintang pada kartu CCTV untuk menyimpan akses cepat.
         </div>
     );
@@ -75,7 +75,7 @@ export default function LandingQuickAccessStrip({
 
     return (
         <section id="public-quick-access" data-testid="landing-quick-access" className="mx-auto w-full max-w-full overflow-hidden px-3 py-3 sm:max-w-7xl sm:px-6 lg:px-8">
-            <div className="space-y-4 rounded-2xl border border-gray-200 bg-white/85 p-3 shadow-sm dark:border-gray-800 dark:bg-gray-900/85">
+            <div className="space-y-4 rounded-card border border-edge bg-surface p-3">
                 <QuickGroup
                     title="Favorit"
                     label="FAV"
