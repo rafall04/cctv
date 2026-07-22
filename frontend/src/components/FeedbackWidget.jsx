@@ -86,9 +86,9 @@ export default function FeedbackWidget() {
             {/* Floating Button */}
             <button
                 onClick={() => setIsOpen(true)}
-                className={`fixed bottom-24 right-4 z-[99999] p-4 rounded-full shadow-2xl transition-all duration-300 sm:bottom-6 sm:right-6 ${
+                className={`fixed bottom-24 right-4 z-[99999] p-4 rounded-full shadow-e2 transition-colors sm:bottom-6 sm:right-6 ${
                     isOpen ? 'scale-0 opacity-0' : 'scale-100 opacity-100'
-                } bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white hover:scale-110`}
+                } bg-primary text-white hover:opacity-90`}
                 title="Kritik & Saran"
             >
                 <Icons.Chat />
@@ -107,9 +107,9 @@ export default function FeedbackWidget() {
                     isOpen ? 'scale-100 opacity-100' : 'scale-0 opacity-0 pointer-events-none'
                 }`}
             >
-                <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+                <div className="bg-surface rounded-card shadow-e2 border border-edge overflow-hidden">
                     {/* Header */}
-                    <div className="bg-gradient-to-r from-sky-500 to-blue-600 px-4 py-3 flex items-center justify-between">
+                    <div className="bg-primary px-4 py-3 flex items-center justify-between">
                         <div className="flex items-center gap-2 text-white">
                             <Icons.Chat />
                             <span className="font-semibold">Kritik & Saran</span>
@@ -148,7 +148,7 @@ export default function FeedbackWidget() {
                                         placeholder="Nama (opsional)"
                                         value={form.name}
                                         onChange={(e) => setForm({ ...form, name: e.target.value })}
-                                        className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+                                        className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent"
                                         maxLength={100}
                                     />
                                 </div>
@@ -158,7 +158,7 @@ export default function FeedbackWidget() {
                                         placeholder="Email (opsional)"
                                         value={form.email}
                                         onChange={(e) => setForm({ ...form, email: e.target.value })}
-                                        className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+                                        className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent"
                                         maxLength={100}
                                     />
                                 </div>
@@ -167,7 +167,7 @@ export default function FeedbackWidget() {
                                         placeholder="Tulis kritik atau saran Anda..."
                                         value={form.message}
                                         onChange={(e) => setForm({ ...form, message: e.target.value })}
-                                        className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-sky-500 focus:border-transparent resize-none"
+                                        className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
                                         rows={4}
                                         maxLength={1000}
                                         required
@@ -186,7 +186,7 @@ export default function FeedbackWidget() {
                                 <button
                                     type="submit"
                                     disabled={isSubmitting || form.message.trim().length < 10}
-                                    className="w-full py-2.5 px-4 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white font-medium rounded-lg transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="w-full py-2.5 px-4 bg-primary hover:opacity-90 text-white font-medium rounded-control transition-opacity flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {isSubmitting ? (
                                         <>

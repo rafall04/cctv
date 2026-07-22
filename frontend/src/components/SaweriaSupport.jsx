@@ -148,8 +148,8 @@ const SaweriaSupport = memo(function SaweriaSupport() {
                 <div className="fixed inset-0 z-[999999] flex items-center justify-center p-4 bg-black/70">
                     <div className="absolute inset-0" onClick={handleModalClose} />
 
-                    <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-sm w-full max-h-[90vh] overflow-y-auto">
-                        <div className="bg-gradient-to-r from-orange-500 to-amber-500 p-4 text-center">
+                    <div className="relative bg-surface border border-edge rounded-card shadow-e2 max-w-sm w-full max-h-[90vh] overflow-y-auto">
+                        <div className="bg-amber-500 p-4 text-center">
                             <div className="w-12 h-12 mx-auto mb-2 bg-white/30 rounded-full flex items-center justify-center text-white">
                                 <CoffeeIcon />
                             </div>
@@ -158,21 +158,21 @@ const SaweriaSupport = memo(function SaweriaSupport() {
                         </div>
 
                         <div className="p-4">
-                            <p className="text-gray-700 dark:text-gray-300 text-center text-sm mb-3">
+                            <p className="text-content-muted text-center text-sm mb-3">
                                 Dukungan kamu sangat berarti untuk menjaga server tetap aktif 24/7!
                             </p>
 
                             <div className="flex flex-col gap-2">
                                 <button
                                     onClick={handleSupport}
-                                    className="w-full bg-gradient-to-r from-orange-500 to-amber-500 text-white font-semibold py-2.5 px-4 rounded-xl text-sm"
+                                    className="w-full bg-amber-500 text-white font-semibold py-2.5 px-4 rounded-control text-sm transition-colors hover:bg-amber-600"
                                 >
                                     Traktir Kopi Sekarang
                                 </button>
 
                                 <button
                                     onClick={handleModalClose}
-                                    className="w-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-medium py-2 px-4 rounded-xl text-sm"
+                                    className="w-full border border-edge text-content-muted font-medium py-2 px-4 rounded-control text-sm transition-colors hover:bg-surface-raised"
                                 >
                                     Lain Kali Aja
                                 </button>
@@ -200,13 +200,13 @@ const SaweriaSupport = memo(function SaweriaSupport() {
                     {bannerMinimized ? (
                         <button
                             onClick={handleBannerMaximize}
-                            className="w-14 h-14 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-full shadow-lg flex items-center justify-center"
+                            className="w-14 h-14 bg-amber-500 text-white rounded-full shadow-e2 flex items-center justify-center transition-colors hover:bg-amber-600"
                         >
                             <CoffeeIcon />
                         </button>
                     ) : (
-                        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-lg overflow-hidden border border-orange-200 dark:border-orange-900/30">
-                            <div className="bg-gradient-to-r from-orange-500 to-amber-500 p-3 flex items-center justify-between">
+                        <div className="bg-surface rounded-card shadow-e2 overflow-hidden border border-edge">
+                            <div className="bg-amber-500 p-3 flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                     <CoffeeIcon />
                                     <span className="text-white font-bold text-sm">Dukung Kami</span>
@@ -221,10 +221,10 @@ const SaweriaSupport = memo(function SaweriaSupport() {
                                 </div>
                             </div>
                             <div className="p-3">
-                                <p className="text-gray-600 dark:text-gray-400 text-xs mb-2">Bantu server tetap aktif!</p>
+                                <p className="text-content-muted text-xs mb-2">Bantu server tetap aktif!</p>
                                 <button
                                     onClick={handleBannerSupport}
-                                    className="w-full bg-gradient-to-r from-orange-500 to-amber-500 text-white font-semibold py-2 rounded-lg text-xs"
+                                    className="w-full bg-amber-500 text-white font-semibold py-2 rounded-control text-xs transition-colors hover:bg-amber-600"
                                 >
                                     Traktir Kopi
                                 </button>
