@@ -130,16 +130,48 @@ const getValidationRules = () => ({
 });
 ```
 
-**Styling:**
-- Use Tailwind CSS exclusively
-- Use custom colors from theme: `primary`, `dark-*`, `light-*`
-- Use semantic class names: `text-gray-600 dark:text-gray-300`
+**Styling — the semantic token system (2026-07 reconstruction):**
+
+Tokens are defined in `frontend/src/index.css` (light + dark values) and mapped in
+`frontend/tailwind.config.js`. Reach for a **role**, never a raw grey:
+
+| Role | Classes | Use for |
+|---|---|---|
+| Surfaces | `bg-surface-sunken` → `bg-surface` → `bg-surface-raised` → `bg-surface-overlay` | page → card → hover → popover |
+| Edges | `border-edge`, `border-edge-strong` | the only two border weights |
+| Text | `text-content`, `text-content-muted`, `text-content-subtle` | three text weights, no more |
+| Status | `status-live` `status-warn` `status-fault` `status-idle` | **meaning, never decoration** |
+| Radius | `rounded-control` (inputs/buttons), `rounded-card` (cards), `rounded-full` (true pills) | the whole scale |
+| Elevation | `shadow-e1`, `shadow-e2` | two steps total; in dark mode depth comes from the surface step + edge, not shadow |
 
 ```jsx
-<button className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-600 transition-colors">
-    Save
+<button className="rounded-control border border-edge bg-surface px-3 py-2 text-sm font-medium text-content transition-colors hover:border-edge-strong hover:bg-surface-raised">
+    Simpan
 </button>
 ```
+
+- `--primary-color` stays a runtime CSS variable (admin branding overrides it) — never fold it into fixed tokens.
+- `dark-*` / `light-*` in tailwind.config.js are **deprecated legacy ramps** (kept only for ~200 old usages; `light-700/800/900` are byte-identical to `dark-700/800/900`). Do not use them or raw `gray-*` in new work; migrate touched code to roles as you go.
+- No brand gradients or colored drop shadows (`shadow-primary/30` etc.) — flat `bg-primary` reads better at UI sizes.
+- Numbers that update in place get `tabular-nums`.
+
+**Status semantics (the anti-"AI slop" rules):**
+- One status = **one dot**; a text label appears **only when the state is abnormal**. ~89% of cameras are healthy, so a "LIVE" pill on every tile is a label carrying no information that buries the real faults.
+- **Red = broken, only.** Live is `status-live` (green). REC may stay red but must always carry its own text label.
+- A dot is never the sole carrier of meaning — pair it with `sr-only` text.
+- A badge that would appear on ~100% of items is decoration, not information — gate it to the states that actually distinguish (e.g. quality chip only for `busy`/`new`).
+- No internal jargon on public surfaces: `TUNNEL`, codec names ("H.264"), transport details. Codec surfaces only as a warning icon when this browser genuinely may fail to play.
+- Counts must say **what they count** ("317 online di peta" — the map bar only counts cameras with coordinates; the landing bar counts all). Two true numbers without qualifiers read as a contradiction.
+- One ranked discovery surface on the landing (`LandingDiscoveryStrip`) — do not add feeds that re-list the same top cameras under new headings (`LandingSmartFeed` was deleted for this; don't recreate it).
+- Data utils return `key` + `label` only — colour mapping lives in the presenting component, never inside a util (`getPublicCameraQuality` is the reference).
+
+**Mobile viewport hard rules (each earned by a production bug):**
+- The viewport meta **must keep `minimum-scale=1.0`**. In-app WebViews (Telegram etc.) fit initial zoom to the widest content, so one wide element (typically an ad iframe) shrinks the whole page into a narrow column. This forbids it mechanically. Never add `maximum-scale`/`user-scalable=no` (pinch-zoom-in stays).
+- Never size a `position: fixed` element with `100vw` — fixed elements escape the root `overflow-x: clip` guard and `100vw` grows with the very overflow it causes. Use insets (`left-4 right-4`).
+- The `html`/`body` guards are `overflow-x: clip` — **never change to `hidden`**, which makes `<html>` a scroll container and silently kills `position: sticky` everywhere (simple-mode header + admin shell rely on it).
+- `iframe/embed/object/canvas` are clamped to `max-width: 100%` in `index.css` (Tailwind preflight only covers img/video; third-party ad iframes walk through that gap). Keep the clamp.
+- Flex rows of controls must be able to shrink: `min-w-0` on items + `truncate` on labels, or Android font-scaling (1.3×+) widens the row past the viewport (`LandingViewModeSwitch` is the reference).
+- Floating map chrome: solid `bg-surface` panels (no translucency over imagery), and no hover-lift transforms on controls that sit over a draggable map.
 
 **Error Boundaries:**
 - Wrap components with ErrorBoundary for graceful error handling

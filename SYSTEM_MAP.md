@@ -77,11 +77,12 @@ SideEffects: None; documentation only.
 - Frontend full gate: `cd frontend && npm test && npm run build && npm run lint`.
 - Frontend focused test: `cd frontend && npm test -- <test-file>`.
 - Frontend lint runs against full `src` via `frontend/package.json`.
-- **Anti-"penumpukan" guardrails (run inside `npm test`, fail on regression):** `backend/__tests__/guardrails.test.js` + `frontend/src/__tests__/guardrails.test.js` enforce a file-size ratchet (new files <800 ln; named giants frozen at current size — may shrink, not grow), layering (routes never import the DB; services never import controllers/routes), and data-safety (no NEW `INSERT OR REPLACE`; no NEW `REAL` money column). CI: `.github/workflows/ci.yml` runs lint+test both sides on push/PR. To intentionally change a frozen baseline, edit it in the same PR so growth is a visible decision, not silent drift.
+- **Anti-"penumpukan" guardrails (run inside `npm test`, fail on regression):** `backend/__tests__/guardrails.test.js` + `frontend/src/__tests__/guardrails.test.js` enforce a file-size ratchet (new files <800 ln; named giants frozen at current size — may shrink, not grow), layering (routes never import the DB; services never import controllers/routes), data-safety (no NEW `INSERT OR REPLACE`; no NEW `REAL` money column), an auth test-count floor, and doc-lint (governance docs must reference only existing files). CI: `.github/workflows/ci.yml` runs lint+test both sides on push/PR. To intentionally change a frozen baseline, edit it in the same PR so growth is a visible decision, not silent drift.
+- ⚠️ **Focused runs skip the guardrails**: `npm test -- <file>` filters them out, so a ratchet/doc-lint breach only surfaces in the full suite (or CI). While iterating on a frozen file, add `guardrails` to the filter. The ratchet counts every line **including comments** — `MapView.jsx` sits 1 line under its frozen ceiling, so shrink changes there rather than raising the baseline.
 
 ## Stabilization Priorities
 
-- Create local `.module_map.md` files for `backend/`, `frontend/src/`, and large feature folders before major edits.
+- Local `.module_map.md` files exist for `backend/`, `backend/services/`, `backend/utils/`, and `frontend/src/` — keep them in sync when changing flow (doc-lint fails on references to deleted files); create one for any large feature folder that still lacks it before major edits.
 - Reduce large files before adding feature complexity:
   - `backend/services/cameraHealthService.js`
   - `backend/services/cameraService.js`
@@ -113,8 +114,10 @@ Snapshot from the 2026-06-09 conformance audit — places where code does not ye
 **Partial / lower severity:**
 - Area mutations lack audit logging (camera mutations have it).
 - Prod env template does not set `API_KEY_REQUIRE_KEYS=true` (empty-keys-table bypass stays open).
-- Auth/security services (`authService`, `authController`, `bruteForceProtection`, `sessionManager`, `apiKeyService`, `securityAuditLogger`) have no dedicated tests.
-- vitest coverage has no thresholds (coverage reported, never enforced).
+- ✅ ~~Auth/security services have no dedicated tests~~ — resolved 2026-06 (47-test front-door backfill, commit c6107f5); a test-count floor in `backend/__tests__/guardrails.test.js` now blocks silent deletion (`authService`≥10, `sessionManager`≥10, `bruteForceProtection`≥10, `apiKeyService`≥8). `securityAuditLogger` still has no dedicated tests.
+- `backend/services/backupService.js:111` uses `INSERT OR REPLACE` in its restore path. Pre-dates the data-safety rule (the guardrail only bans NEW occurrences). On any PK/UNIQUE conflict it silently deletes the conflicting row first — acceptable-by-design for restore-over-existing, but never copy this pattern, and audit it before restoring onto a live DB.
+- **Legacy grey styling debt (2026-07 UI reconstruction):** the public surfaces now use the semantic token system (see `docs/frontend-guide.md`), but the admin shell + shared primitives still carry ~229 raw `gray-*` usages (`frontend/src/layouts`, `components/ui`, `components/common`; measured 2026-07-22). Migrate to roles **per page as each is touched** — not as one blind find-replace, because light/dark pairings differ per component.
+- vitest coverage has no thresholds (coverage reported, never enforced; the guardrail test-count floor above is the interim substitute).
 
 ## Local Map Policy
 

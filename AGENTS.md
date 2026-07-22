@@ -96,6 +96,10 @@ npm test -- CameraManagement.test.jsx -t "name"      # single test
 **Verification gates** (run before committing a change in that area):
 - Backend: `cd backend && npm run migrate && npm test`
 - Frontend: `cd frontend && npm test && npm run build && npm run lint`
+- ⚠️ A focused run (`npm test -- <file>`) **skips `__tests__/guardrails.test.js`** (file-size ratchet,
+  layering, doc-lint). The full suite is the gate; while iterating, add `guardrails` to your filter.
+  The ratchet counts every line **including comments** — if a frozen file is at its ceiling, shrink
+  your change instead of raising the baseline.
 
 ---
 
@@ -144,8 +148,12 @@ class CameraService {
 - Functional components + hooks; named exports for pages, default exports for reusable components.
 - **All hooks BEFORE any conditional return** (React Error #310). Import order: React → external → components → hooks/utils → styles.
 - React Context for global state (theme/notifications/branding); local `useState` for component state.
-- Forms via `useFormValidation`. **Tailwind only** — semantic classes, theme colors (`primary`, `dark-*`, `light-*`). Wrap risky trees in `ErrorBoundary`.
-- Full examples + hook/race-condition/URL-param/perf patterns → [docs/frontend-guide.md](docs/frontend-guide.md).
+- Forms via `useFormValidation`. **Tailwind only**, styled through the **semantic design tokens**
+  (`surface/*`, `edge/*`, `content/*`, `status/*`, `rounded-card|control`, `shadow-e1|e2` — defined in
+  `frontend/src/index.css`). The old `dark-*`/`light-*` ramps are deprecated legacy: never reach for
+  them (or raw `gray-*`) in new work. **`status-fault` (red) is reserved for genuine faults** — a
+  healthy live stream is never red. Wrap risky trees in `ErrorBoundary`.
+- Full design-system rules (status dots, public-surface honesty, mobile-viewport hard rules) + hook/race-condition/URL-param/perf patterns → [docs/frontend-guide.md](docs/frontend-guide.md).
 
 ---
 
