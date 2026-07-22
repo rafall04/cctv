@@ -9,11 +9,11 @@ logDestinations: [stdout]
 
 # API for backend management
 api: yes
-apiAddress: :9997
+apiAddress: 127.0.0.1:9997
 
 # HLS settings - OPTIMIZED FOR RAM DISK
 hls: yes
-hlsAddress: :8888
+hlsAddress: 127.0.0.1:8888
 # NO: let per-path sourceOnDemand close idle on_demand cameras; always_on kept warm by backend streamWarmer.
 hlsAlwaysRemux: no
 hlsAllowOrigin: '*'
@@ -40,16 +40,16 @@ writeQueueSize: 512
 
 # WebRTC settings
 webrtc: yes
-webrtcAddress: :8889
+webrtcAddress: 127.0.0.1:8889
 webrtcAllowOrigin: '*'
 
 # RTMP settings
 rtmp: yes
-rtmpAddress: :1935
+rtmpAddress: 127.0.0.1:1935
 
 # RTSP settings
 rtsp: yes
-rtspAddress: :8554
+rtspAddress: 127.0.0.1:8554
 
 # Path configurations managed by backend
 paths:

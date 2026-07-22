@@ -4,13 +4,22 @@
 logLevel: info
 logDestinations: [stdout]
 
-# API for backend management
+# API for backend management.
+# Bound to LOOPBACK ONLY. This control API is AUTHLESS — anyone who can reach it
+# reads /v3/config/paths/list, which contains every camera's RTSP source URL WITH
+# embedded admin credentials, and can mutate paths. The box sits on a shared LAN
+# (172.17.11.0/24, alongside other tenants), so `:9997` (= 0.0.0.0) exposed those
+# credentials to the whole LAN. The backend reaches it via http://localhost:9997,
+# so 127.0.0.1 loses nothing. Same reasoning applies to every address below.
 api: yes
-apiAddress: :9997
+apiAddress: 127.0.0.1:9997
 
 # HLS settings - OPTIMIZED MODE (Stability + Memory Efficiency)
 hls: yes
-hlsAddress: :8888
+# Loopback only: viewers reach HLS through nginx → backend /hls proxy (which enforces
+# canViewLive + the community anti-hotlink gate). A directly-reachable :8888 on the LAN
+# bypassed all of that. Backend/nginx use localhost, so nothing legitimate breaks.
+hlsAddress: 127.0.0.1:8888
 # NO (not yes): let per-path sourceOnDemand actually take effect — idle on_demand cameras
 # (public / Surabaya) close instead of being remuxed 24/7. always_on (local/priority) cameras are
 # kept muxer-warm by the backend streamWarmer (periodic HLS pings) for instant first-viewer TTFF,
@@ -39,18 +48,19 @@ hlsSegmentCount: 10
 # RAM Disk storage for instant access
 hlsDirectory: /dev/shm/mediamtx-live
 
-# WebRTC settings
+# WebRTC settings — loopback only (nginx /webrtc is closed with 403 anyway; player is HLS-only).
 webrtc: yes
-webrtcAddress: :8889
+webrtcAddress: 127.0.0.1:8889
 webrtcAllowOrigin: '*'
 
-# RTMP settings
+# RTMP settings — loopback only. Unused (all 100 cameras are pull rtspSource); no LAN ingest.
 rtmp: yes
-rtmpAddress: :1935
+rtmpAddress: 127.0.0.1:1935
 
-# RTSP settings
+# RTSP settings — loopback only. MediaMTX PULLS from cameras (outbound rtspSource); the :8554
+# ingest server is not used by any LAN client, so exposing it on the LAN was pure attack surface.
 rtsp: yes
-rtspAddress: :8554
+rtspAddress: 127.0.0.1:8554
 
 # Path configurations managed by backend
 # Default path settings (applied to all camera paths)
