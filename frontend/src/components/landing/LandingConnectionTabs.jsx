@@ -24,7 +24,7 @@ export default function LandingConnectionTabs({
                     onClick={() => onChange('all')}
                     className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                         connectionTab === 'all'
-                            ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                            ? 'bg-surface text-content shadow-e1'
                             : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
                     }`}
                 >
@@ -34,7 +34,7 @@ export default function LandingConnectionTabs({
                     onClick={() => onChange('stable')}
                     className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
                         connectionTab === 'stable'
-                            ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                            ? 'bg-surface text-content shadow-e1'
                             : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
                     }`}
                 >
@@ -45,7 +45,7 @@ export default function LandingConnectionTabs({
                     onClick={() => onChange('tunnel')}
                     className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
                         connectionTab === 'tunnel'
-                            ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                            ? 'bg-surface text-content shadow-e1'
                             : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
                     }`}
                 >
@@ -56,7 +56,7 @@ export default function LandingConnectionTabs({
                     onClick={() => onChange('popular')}
                     className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
                         connectionTab === 'popular'
-                            ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                            ? 'bg-surface text-content shadow-e1'
                             : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
                     }`}
                 >
@@ -67,7 +67,7 @@ export default function LandingConnectionTabs({
                     onClick={() => onChange('newest')}
                     className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
                         connectionTab === 'newest'
-                            ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                            ? 'bg-surface text-content shadow-e1'
                             : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
                     }`}
                 >
@@ -79,7 +79,7 @@ export default function LandingConnectionTabs({
                         onClick={() => onChange('favorites')}
                         className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
                             connectionTab === 'favorites'
-                                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                                ? 'bg-surface text-content shadow-e1'
                                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
                         }`}
                     >

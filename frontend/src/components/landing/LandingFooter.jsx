@@ -12,7 +12,7 @@ export default function Footer({ saweriaEnabled, saweriaLink, branding }) {
     const whatsappLink = buildWhatsappLink(branding, { page: 'Beranda' });
 
     return (
-        <footer className="border-t border-gray-200 bg-white py-12 dark:border-gray-800 dark:bg-gray-900">
+        <footer className="border-t border-edge bg-surface py-12">
             <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                 <div className="mb-10 text-center">
                     <div
@@ -27,11 +27,11 @@ export default function Footer({ saweriaEnabled, saweriaLink, branding }) {
                         </div>
                     </div>
 
-                    <h3 className="mb-2 text-lg font-bold text-gray-900 dark:text-white">
+                    <h3 className="mb-2 text-lg font-bold text-content">
                         {branding.copyright_text}
                     </h3>
                     {branding.company_description && (
-                        <p className="mx-auto mb-3 max-w-2xl text-sm text-gray-600 dark:text-gray-400">
+                        <p className="mx-auto mb-3 max-w-2xl text-sm text-content-muted">
                             {branding.company_description}
                         </p>
                     )}
@@ -39,8 +39,8 @@ export default function Footer({ saweriaEnabled, saweriaLink, branding }) {
 
                 <div className="mb-8 grid grid-cols-1 gap-8 md:grid-cols-3">
                     <div className="text-center md:text-left">
-                        <h4 className="mb-3 font-semibold text-gray-900 dark:text-white">Layanan Kami</h4>
-                        <ul className="space-y-1.5 text-sm text-gray-500 dark:text-gray-400">
+                        <h4 className="mb-3 font-semibold text-content">Layanan Kami</h4>
+                        <ul className="space-y-1.5 text-sm text-content-muted">
                             <li>&bull; Pemasangan WiFi rumah & kantor</li>
                             <li>&bull; Instalasi CCTV</li>
                             <li>&bull; Monitoring CCTV online 24 jam</li>
@@ -48,14 +48,14 @@ export default function Footer({ saweriaEnabled, saweriaLink, branding }) {
                     </div>
 
                     <div className="text-center">
-                        <h4 className="mb-3 font-semibold text-gray-900 dark:text-white">Statistik</h4>
+                        <h4 className="mb-3 font-semibold text-content">Statistik</h4>
                         <div className="flex justify-center gap-6">
                             <div>
                                 <p className="text-2xl font-bold text-primary">{cameraCount}</p>
                                 <p className="text-xs text-gray-500 dark:text-gray-400">Kamera</p>
                             </div>
                             <div>
-                                <p className="text-2xl font-bold text-purple-500">{areaCount}</p>
+                                <p className="text-2xl font-bold text-content">{areaCount}</p>
                                 <p className="text-xs text-gray-500 dark:text-gray-400">Lokasi</p>
                             </div>
                             <div>
@@ -66,8 +66,8 @@ export default function Footer({ saweriaEnabled, saweriaLink, branding }) {
                     </div>
 
                     <div className="text-center md:text-right">
-                        <h4 className="mb-2 font-semibold text-gray-900 dark:text-white">Hubungi Kami</h4>
-                        <p className="mb-3 text-sm text-gray-500 dark:text-gray-400">
+                        <h4 className="mb-2 font-semibold text-content">Hubungi Kami</h4>
+                        <p className="mb-3 text-sm text-content-muted">
                             Butuh WiFi atau CCTV?
                         </p>
                         <a
@@ -95,7 +95,7 @@ export default function Footer({ saweriaEnabled, saweriaLink, branding }) {
                             <span className="text-xl">Kopi</span>
                             <span>Traktir Kopi</span>
                         </a>
-                        <p className="max-w-md text-center text-xs text-gray-500 dark:text-gray-400">
+                        <p className="max-w-md text-center text-xs text-content-muted">
                             Dukung kami tambah CCTV di lokasi strategis
                         </p>
                     </div>
@@ -108,8 +108,8 @@ export default function Footer({ saweriaEnabled, saweriaLink, branding }) {
                     network code. */}
                 <SponsorStrip />
 
-                <div className="border-t border-gray-100 pt-4 dark:border-gray-800">
-                    <p className="text-center text-xs text-gray-500 dark:text-gray-400">
+                <div className="border-t border-edge pt-4">
+                    <p className="text-center text-xs text-content-muted">
                         &copy; {new Date().getFullYear()} {branding.company_name} &bull; {branding.copyright_text}
                     </p>
                 </div>

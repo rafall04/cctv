@@ -51,18 +51,18 @@ export default function FilterDropdown({ selected, onChange, kecamatans = [], ke
         <div ref={ref} className="relative">
             <button
                 onClick={() => setOpen(!open)}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-primary transition-colors shadow-sm"
+                className="flex items-center gap-2 px-4 py-2.5 rounded-control bg-surface border border-edge text-content transition-colors hover:border-edge-strong"
             >
                 <Icons.Filter />
                 <span className="text-sm font-medium max-w-[150px] truncate">{getSelectedLabel()}</span>
-                <span className="text-xs px-1.5 py-0.5 rounded-full bg-sky-100 dark:bg-primary/20 text-primary-600 dark:text-primary-400 font-semibold">
+                <span className="text-xs px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-semibold tabular-nums">
                     {selected ? getCameraCount(selected.type, selected.value) : cameras.length}
                 </span>
                 <Icons.ChevronDown />
             </button>
             {open && (
-                <div className="absolute top-full left-0 sm:left-auto sm:right-0 mt-2 w-72 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 py-2 z-50 max-h-96 overflow-hidden flex flex-col">
-                    <div className="px-2 pb-2 border-b border-gray-100 dark:border-gray-700 flex gap-1">
+                <div className="absolute top-full left-0 sm:left-auto sm:right-0 mt-2 w-72 bg-surface-overlay rounded-card shadow-e2 border border-edge py-2 z-50 max-h-96 overflow-hidden flex flex-col">
+                    <div className="px-2 pb-2 border-b border-edge flex gap-1">
                         {showAreaTab && (
                             <button
                                 onClick={() => setFilterType('area')}
@@ -128,7 +128,7 @@ export default function FilterDropdown({ selected, onChange, kecamatans = [], ke
                                 >
                                     <div className="flex-1 min-w-0">
                                         <span className="flex items-center gap-2">
-                                            <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-primary' : 'bg-purple-500'}`}></span>
+                                            <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-primary' : 'bg-content-subtle'}`}></span>
                                             <span className="truncate">{area.name}</span>
                                         </span>
                                         {(area.kelurahan || area.kecamatan) && (

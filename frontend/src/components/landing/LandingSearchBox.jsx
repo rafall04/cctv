@@ -69,7 +69,7 @@ export default function LandingSearchBox({
                     onChange={(event) => onSearchChange(event.target.value)}
                     onFocus={onFocus}
                     placeholder="Cari kamera berdasarkan nama, lokasi, atau area..."
-                    className="w-full rounded-2xl border border-gray-200 bg-white py-3 pl-10 pr-20 text-sm text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:border-primary focus:ring-4 focus:ring-primary/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white dark:placeholder:text-gray-500 sm:pr-24 sm:text-base"
+                    className="w-full rounded-control border border-edge bg-surface py-3 pl-10 pr-20 text-sm text-content outline-none transition-colors placeholder:text-content-subtle focus:border-primary focus:ring-4 focus:ring-primary/10 sm:pr-24 sm:text-base"
                 />
                 <div className="absolute right-2 flex items-center gap-1.5">
                     {searchQuery && (

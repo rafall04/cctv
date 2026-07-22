@@ -122,7 +122,7 @@ describe('guardrail: legacy grey ratchet (design tokens)', () => {
     // replaces raw greys. Existing usages are frozen at the measured baseline: the count
     // may shrink as pages migrate, never grow. When you migrate a page, lower BASELINE
     // in the same PR so the ratchet tightens behind you.
-    const BASELINE = 5865; // measured 2026-07-22 across src (tests excluded)
+    const BASELINE = 5700; // measured 2026-07-22 after public-surface token sweep (was 5865)
 
     it(`-gray-N usage count stays <= ${BASELINE} and shrinks over time`, () => {
         let count = 0;

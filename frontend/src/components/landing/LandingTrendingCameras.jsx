@@ -32,7 +32,7 @@ export default function LandingTrendingCameras({
                         key={camera.id}
                         type="button"
                         onClick={() => onCameraClick?.(camera)}
-                        className="rounded-xl border border-gray-200 bg-white p-3 text-left shadow-sm transition hover:border-primary/60 dark:border-gray-800 dark:bg-gray-900"
+                        className="rounded-card border border-edge bg-surface p-3 text-left transition-colors hover:border-edge-strong"
                     >
                         <div className="truncate text-sm font-semibold text-gray-900 dark:text-white">{camera.name}</div>
                         <div className="mt-1 truncate text-xs text-gray-500 dark:text-gray-400">{camera.area_name || camera.location || 'Area publik'}</div>

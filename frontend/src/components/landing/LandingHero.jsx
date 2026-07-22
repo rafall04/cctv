@@ -20,7 +20,7 @@ export default function Hero({ branding, landingSettings, disableHeavyEffects, o
         : branding.footer_text;
 
     return (
-        <header className="relative overflow-hidden bg-gradient-to-br from-amber-50/80 via-transparent to-emerald-50/80 dark:from-amber-950/30 dark:via-transparent dark:to-emerald-950/30">
+        <header className="relative overflow-hidden bg-surface-sunken">
             {!disableHeavyEffects && (
                 <>
                     <div className="absolute top-0 left-1/4 w-64 h-64 bg-amber-200/30 dark:bg-amber-500/10 rounded-full blur-3xl pointer-events-none"></div>

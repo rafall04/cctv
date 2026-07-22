@@ -13,7 +13,7 @@ import { buildLandingDiscoverySections, formatLandingDiscoveryCount, LANDING_DIS
 function DiscoverySkeleton() {
     return (
         <section data-testid="landing-discovery-strip-loading" className="mx-auto max-w-7xl px-4 py-3 sm:px-6 lg:px-8">
-            <div className="h-[116px] animate-pulse rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900" />
+            <div className="h-[116px] animate-pulse rounded-card border border-edge bg-surface" />
         </section>
     );
 }

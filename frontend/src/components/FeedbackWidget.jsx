@@ -148,7 +148,7 @@ export default function FeedbackWidget() {
                                         placeholder="Nama (opsional)"
                                         value={form.name}
                                         onChange={(e) => setForm({ ...form, name: e.target.value })}
-                                        className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent"
+                                        className="w-full px-3 py-2 text-sm rounded-control border border-edge bg-surface text-content focus:ring-2 focus:ring-primary focus:border-transparent"
                                         maxLength={100}
                                     />
                                 </div>
@@ -158,7 +158,7 @@ export default function FeedbackWidget() {
                                         placeholder="Email (opsional)"
                                         value={form.email}
                                         onChange={(e) => setForm({ ...form, email: e.target.value })}
-                                        className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent"
+                                        className="w-full px-3 py-2 text-sm rounded-control border border-edge bg-surface text-content focus:ring-2 focus:ring-primary focus:border-transparent"
                                         maxLength={100}
                                     />
                                 </div>
@@ -167,7 +167,7 @@ export default function FeedbackWidget() {
                                         placeholder="Tulis kritik atau saran Anda..."
                                         value={form.message}
                                         onChange={(e) => setForm({ ...form, message: e.target.value })}
-                                        className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
+                                        className="w-full px-3 py-2 text-sm rounded-control border border-edge bg-surface text-content focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
                                         rows={4}
                                         maxLength={1000}
                                         required

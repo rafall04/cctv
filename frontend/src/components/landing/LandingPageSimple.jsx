@@ -92,7 +92,7 @@ function SimpleHeader({ branding, layoutMode, onLayoutToggle, disableHeavyEffect
 
 function SimpleFooter({ branding, saweriaEnabled, saweriaLink }) {
     return (
-        <footer className="mt-4 py-6 border-t border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-r from-emerald-50/50 to-green-50/50 dark:from-emerald-950/20 dark:to-green-950/20 sm:mt-6">
+        <footer className="mt-4 py-6 border-t border-edge bg-surface-sunken sm:mt-6">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="text-center space-y-3">
                     <div className="flex flex-col items-center gap-2">

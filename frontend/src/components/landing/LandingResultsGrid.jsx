@@ -108,7 +108,7 @@ export default function LandingResultsGrid({
                     <button
                         type="button"
                         onClick={() => setVisibleCount((current) => Math.min(current + resolvedLoadMoreCount, cameras.length))}
-                        className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-bold text-gray-700 shadow-sm transition hover:border-primary/50 hover:text-primary dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300 dark:hover:border-primary/50 dark:hover:text-primary"
+                        className="rounded-control border border-edge bg-surface px-4 py-2 text-sm font-medium text-content-muted transition-colors hover:border-edge-strong hover:text-content"
                     >
                         Tampilkan {nextLoadCount} kamera lagi
                     </button>
