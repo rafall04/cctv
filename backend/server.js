@@ -670,15 +670,33 @@ process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 process.on('SIGHUP', shutdown);
 
-// Handle uncaught errors
+// Handle uncaught errors.
+//
+// uncaughtException = a synchronous throw escaped every try/catch. The process may
+// genuinely be in an undefined state, so we still shut down gracefully.
 process.on('uncaughtException', (error) => {
     console.error('[Fatal] Uncaught exception:', error);
     shutdown();
 });
 
-process.on('unhandledRejection', (reason, promise) => {
-    console.error('[Fatal] Unhandled rejection at:', promise, 'reason:', reason);
-    shutdown();
+// unhandledRejection: LOG, do NOT tear down the whole server.
+//
+// This used to call shutdown(), which turned a single detached per-request rejection
+// into a full outage — every active HLS viewer dropped and recording interrupted —
+// followed by a pm2 restart (773 restarts observed in ~7h). The dominant rejection
+// here is ERR_HTTP_HEADERS_SENT from a streamed /hls segment whose client disconnects
+// mid-flight (tab close, camera switch): harmless to global state, one request that
+// simply cannot be re-responded to. Crashing the entire media server for that is far
+// worse than logging it. A genuinely fatal, state-corrupting error still surfaces via
+// uncaughtException above. Rejections stay logged here for diagnosis.
+process.on('unhandledRejection', (reason) => {
+    const code = reason && reason.code;
+    if (code === 'ERR_HTTP_HEADERS_SENT') {
+        // Benign, high-frequency streaming-abort artifact — keep it out of the noisy path.
+        console.warn('[UnhandledRejection] streamed reply aborted after headers sent (non-fatal)');
+        return;
+    }
+    console.error('[UnhandledRejection] non-fatal, logged (server stays up):', reason);
 });
 
 start();
