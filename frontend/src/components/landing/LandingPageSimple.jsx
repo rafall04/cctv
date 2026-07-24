@@ -15,8 +15,10 @@ import { isAdsMobileViewport, shouldRenderAdSlot } from '../ads/adsConfig';
 import { shouldDisableAnimations } from '../../utils/animationControl';
 import { setLitePreference } from '../../utils/publicExperienceMode';
 import { getPublicCameraStats } from '../../utils/publicCameraStats';
+import { groupCamerasByCity } from '../../utils/publicCityMapping';
 import lazyWithRetry from '../../utils/lazyWithRetry';
 import LayoutModeToggle from './LayoutModeToggle';
+import LandingBezelTicks from './LandingBezelTicks';
 import LandingPublicTopStack from './LandingPublicTopStack';
 import LandingDiscoveryStrip from './LandingDiscoveryStrip';
 import LandingQuickAccessStrip from './LandingQuickAccessStrip';
@@ -35,9 +37,12 @@ const Icons = {
 
 function SimpleHeader({ branding, layoutMode, onLayoutToggle, disableHeavyEffects = false }) {
     const { isDark, toggleTheme } = useTheme();
+    const { cameras } = useCameras();
     // backdrop-blur on a sticky header re-composites the scrolling content behind it on every frame —
     // the worst scroll-jank offender on weak GPUs. Drop it under the lite experience (or low/reduced-motion).
     const disableAnimations = disableHeavyEffects || shouldDisableAnimations();
+    // Same canonical tally the Full navbar shows, so the operational pulse reads identically in both modes.
+    const onlineCount = useMemo(() => getPublicCameraStats(cameras).online, [cameras]);
     const handleLayoutChange = (nextMode) => {
         if (nextMode !== layoutMode) {
             onLayoutToggle();
@@ -48,13 +53,28 @@ function SimpleHeader({ branding, layoutMode, onLayoutToggle, disableHeavyEffect
         <header className={`sticky top-0 z-[1001] bg-surface ${disableAnimations ? '' : 'supports-[backdrop-filter]:bg-surface/85 supports-[backdrop-filter]:backdrop-blur-lg'} border-b border-edge`}>
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between h-14">
-                    <Link to="/" className="flex items-center gap-2 hover:opacity-90 transition-opacity" title={branding.company_name}>
-                        <div className="w-8 h-8 rounded-control bg-primary flex items-center justify-center text-white">
-                            <span className="text-sm font-bold">{branding.logo_text}</span>
+                    <div className="flex min-w-0 items-center gap-2.5">
+                        <Link to="/" className="flex shrink-0 items-center gap-2 transition-opacity hover:opacity-90" title={branding.company_name}>
+                            <div className="relative">
+                                <div className="flex h-8 w-8 items-center justify-center rounded-control bg-primary text-white">
+                                    <span className="text-sm font-bold">{branding.logo_text}</span>
+                                </div>
+                                {onlineCount > 0 && (
+                                    <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-status-live ring-2 ring-surface" aria-hidden="true"></span>
+                                )}
+                            </div>
+                        </Link>
+                        {/* Operational pulse — the command-deck identity, trimmed for the compact simple
+                            header: live online count in mono. The clock/tagline that ride the Full navbar
+                            are dropped to keep this mode light. */}
+                        <div className="flex min-w-0 items-center gap-1.5 rounded-control border border-edge bg-surface-sunken px-2 py-1" title="Kamera daring sekarang">
+                            <span className={`h-1.5 w-1.5 shrink-0 rounded-full bg-status-live ${disableAnimations ? '' : 'animate-pulse'}`} aria-hidden="true"></span>
+                            <span className="font-mono text-xs font-semibold tabular-nums text-content">{onlineCount}</span>
+                            <span className="hidden font-mono text-[10px] uppercase tracking-[0.12em] text-status-live sm:inline">Online</span>
                         </div>
-                    </Link>
+                    </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex shrink-0 items-center gap-2">
                         <LayoutModeToggle
                             layoutMode={layoutMode}
                             onChange={handleLayoutChange}
@@ -92,16 +112,36 @@ function SimpleHeader({ branding, layoutMode, onLayoutToggle, disableHeavyEffect
 }
 
 function SimpleFooter({ branding, saweriaEnabled, saweriaLink }) {
+    const { cameras } = useCameras();
+    const { online, total } = useMemo(() => getPublicCameraStats(cameras), [cameras]);
+    const cityCount = useMemo(() => groupCamerasByCity(cameras).length, [cameras]);
+    const footerStats = [
+        { key: 'unit', label: 'Unit', value: total, valueClass: 'text-content' },
+        { key: 'kota', label: 'Kota', value: cityCount, valueClass: 'text-content' },
+        { key: 'online', label: 'Online', value: online, valueClass: 'text-status-live' },
+    ];
+
     return (
         <footer className="mt-4 py-6 border-t border-edge bg-surface-sunken sm:mt-6">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="text-center space-y-3">
-                    <div className="flex flex-col items-center gap-2">
+                    <div className="flex flex-col items-center gap-3">
                         <div className="inline-flex items-center gap-2 rounded-full border border-edge bg-surface px-4 py-2">
-                            <div className="w-7 h-7 rounded-control bg-primary flex items-center justify-center text-white">
+                            <div className="flex h-7 w-7 items-center justify-center rounded-control bg-primary text-white">
                                 <span className="text-xs font-bold">{branding.logo_text}</span>
                             </div>
                             <span className="text-sm font-bold text-primary-600 dark:text-primary-400">{branding.company_name}</span>
+                        </div>
+
+                        {/* Operational mono-stat cluster — echoes the Full footer's statistik board in a
+                            compact hairline row: the network payload in three figures. */}
+                        <div className="inline-flex items-stretch gap-px overflow-hidden rounded-control border border-edge bg-edge">
+                            {footerStats.map((stat) => (
+                                <div key={stat.key} className="flex items-baseline gap-1.5 bg-surface px-3 py-1.5">
+                                    <span className={`font-mono text-sm font-bold tabular-nums ${stat.valueClass}`}>{stat.value}</span>
+                                    <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-content-subtle">{stat.label}</span>
+                                </div>
+                            ))}
                         </div>
                     </div>
 
@@ -135,52 +175,78 @@ function SimpleFooter({ branding, saweriaEnabled, saweriaLink }) {
 }
 
 /*
- * Compact by design. This block used to eat roughly a quarter of a phone screen to
- * deliver three numbers: a two-gradient panel, a `STATUS KAMERA` pill in 0.22em
- * uppercase tracking, two lines of prose that only restated the heading
- * ("Ringkasan cepat kamera publik saat ini." / "Pantau kondisi kamera sebelum
- * membuka live view."), and three `text-3xl` tiles in emerald/rose/sky.
- *
- * The numbers are the entire payload, so they are now one wrapping row: a dot for
- * state, the figure in tabular-nums, and its noun. Same information, ~44px instead
- * of ~250px, and the live grid starts above the fold.
+ * The public status deck, Simple-mode cut. Full mode pairs the spotlight thumbnail with
+ * the metric board; Simple keeps only the board — no image, no drill-down modal, no
+ * per-second clock — so it speaks the same command-deck language (mono metric grid,
+ * instrument bezel, cyan "watching now") while staying cheap enough for weak devices.
+ * The figures are the payload and stay honest: the SAME canonical tally as Full, so the
+ * two modes never disagree on how many cameras are online.
  */
-function SimpleStatusOverview() {
+function SimpleStatusOverview({ disableHeavyEffects = false }) {
     const { cameras, loading } = useCameras();
 
-    // Same canonical tally as the Full-mode deck (handles maintenance/degraded) so the
-    // two modes never disagree on how many cameras are online.
     const { online, offline, total } = useMemo(() => getPublicCameraStats(cameras), [cameras]);
-    const stats = [
-        { label: 'online', value: online, dot: 'bg-status-live' },
-        { label: 'offline', value: offline, dot: 'bg-status-idle' },
-        { label: 'total', value: total, dot: null },
+    // Kota (city) rollup — the public identity is a multi-city network, so cities are a
+    // first-class metric here just as on the Full deck.
+    const cities = useMemo(() => groupCamerasByCity(cameras), [cameras]);
+    // Honest "watching now" = summed live viewers; no fabricated time-series sparkline.
+    const liveViewersNow = useMemo(
+        () => cameras.reduce(
+            (sum, camera) => sum + Number(camera.live_viewers ?? camera.viewer_stats?.live_viewers ?? 0),
+            0,
+        ),
+        [cameras],
+    );
+
+    const metrics = [
+        { key: 'online', label: 'Online', value: online, valueClass: 'text-status-live' },
+        { key: 'offline', label: 'Offline', value: offline, valueClass: offline > 0 ? 'text-status-fault' : 'text-content' },
+        { key: 'total', label: 'Total', value: total, valueClass: 'text-content' },
+        { key: 'kota', label: 'Kota', value: cities.length, valueClass: 'text-content' },
     ];
 
     return (
         <div className="mx-auto max-w-7xl px-4 pt-3 sm:px-6 lg:px-8">
-            {/*
-              * A fixed three-column grid instead of a wrapping flex row. The wrap
-              * looked ragged on narrow phones ("749 total" dangling alone on line
-              * two); three equal columns keep the figures aligned at every width
-              * and can never wrap unevenly.
-              */}
-            <div className="rounded-card border border-edge bg-surface px-4 py-2.5">
-                <h2 className="text-[11px] font-medium uppercase tracking-wide text-content-subtle">Status kamera</h2>
-                <div className="mt-1.5 grid grid-cols-3 gap-2">
-                    {stats.map((stat) => (
-                        <span key={stat.label} className="flex min-w-0 items-baseline gap-1.5 text-sm">
-                            {stat.dot && (
-                                <span className={`h-1.5 w-1.5 shrink-0 self-center rounded-full ${stat.dot}`} aria-hidden="true"></span>
-                            )}
-                            <span className="font-mono font-semibold tabular-nums text-content">
-                                {loading ? '…' : stat.value}
+            <section className="relative rounded-card border border-edge bg-surface p-3.5" aria-label="Status jaringan kamera">
+                <LandingBezelTicks />
+                <h2 className="mb-2.5 font-mono text-[10px] font-medium uppercase tracking-[0.12em] text-content-subtle">Status kamera</h2>
+
+                {/* Hairline 2×2 (→ 4-col on sm) metric grid. The numeral is the emphasis
+                    (mono + tabular so it never twitches as counts refresh); colour on the
+                    value encodes state — green online, red offline — not decoration. */}
+                <div className="grid grid-cols-2 gap-px overflow-hidden rounded-control border border-edge bg-edge sm:grid-cols-4">
+                    {metrics.map((metric) => (
+                        <div key={metric.key} className="flex flex-col gap-0.5 bg-surface px-3 py-2.5">
+                            <span className={`font-mono text-xl font-bold leading-none tabular-nums ${metric.valueClass}`}>
+                                {loading ? '…' : metric.value}
                             </span>
-                            <span className="truncate text-xs text-content-muted">{stat.label}</span>
-                        </span>
+                            <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-content-subtle">{metric.label}</span>
+                        </div>
                     ))}
                 </div>
-            </div>
+
+                <div className="mt-2.5 flex items-center justify-between border-t border-edge pt-2.5">
+                    <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-content-subtle">Menonton sekarang</span>
+                    <span className="flex items-center gap-1.5 font-mono text-sm font-semibold tabular-nums text-data">
+                        <span className={`h-1.5 w-1.5 rounded-full bg-data ${disableHeavyEffects ? '' : 'animate-pulse'}`} aria-hidden="true"></span>
+                        {liveViewersNow.toLocaleString('id-ID')}
+                    </span>
+                </div>
+
+                {cities.length > 0 && (
+                    <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                        <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-content-subtle">Cakupan</span>
+                        {cities.slice(0, 3).map((city) => (
+                            <span key={city.key} className="rounded-full border border-edge px-2 py-0.5 font-mono text-[10px] text-content-muted">
+                                {city.label} <span className="text-content-subtle">{city.count}</span>
+                            </span>
+                        ))}
+                        {cities.length > 3 && (
+                            <span className="font-mono text-[10px] text-content-subtle">+{cities.length - 3} kota</span>
+                        )}
+                    </div>
+                )}
+            </section>
         </div>
     );
 }
@@ -259,7 +325,7 @@ export default function LandingPageSimple({
                 announcement={announcement}
             />
 
-            <SimpleStatusOverview />
+            <SimpleStatusOverview disableHeavyEffects={disableHeavyEffects} />
 
             <LandingDiscoveryStrip
                 discovery={publicDiscovery}

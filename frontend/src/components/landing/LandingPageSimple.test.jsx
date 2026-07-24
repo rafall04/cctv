@@ -7,7 +7,7 @@
  * MainFuncs: LandingPageSimple render tests.
  * SideEffects: Renders into jsdom only.
  */
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import LandingPageSimple from './LandingPageSimple';
@@ -121,7 +121,7 @@ describe('LandingPageSimple', () => {
         ).toBeTruthy();
     });
 
-    it('menampilkan ringkasan online dan offline di bagian atas mode simpel', async () => {
+    it('menampilkan papan status command-deck (online/offline/total/kota + menonton) di mode simpel', async () => {
         const CamerasSection = () => <div data-testid="cameras-section">cameras</div>;
 
         renderWithRouter(
@@ -145,18 +145,23 @@ describe('LandingPageSimple', () => {
 
         await screen.findByText('feedback-widget');
 
-        expect(screen.getByText('Status kamera')).toBeTruthy();
         expect(screen.queryByText(/dataset publik/i)).toBeNull();
-        // The status strip is deliberately one compact row now — the three figures and
-        // their nouns, with no restating prose above them. Guard that the numbers
-        // themselves survived the compaction.
+        // The old compact prose strip is gone — it is now the command-deck metric board.
         expect(screen.queryByText('Ringkasan cepat kamera publik saat ini.')).toBeNull();
-        expect(screen.getByText('online')).toBeTruthy();
-        expect(screen.getByText('offline')).toBeTruthy();
-        expect(screen.getByText('total')).toBeTruthy();
-        expect(screen.getByText('2')).toBeTruthy();
-        expect(screen.getByText('1')).toBeTruthy();
-        expect(screen.getByText('3')).toBeTruthy();
+
+        // "Online"/values also appear in the header pulse and footer stats now, so scope the
+        // assertions to the board's labelled region to keep them unambiguous.
+        const board = screen.getByRole('region', { name: 'Status jaringan kamera' });
+        expect(within(board).getByText('Status kamera')).toBeTruthy();
+        expect(within(board).getByText('Online')).toBeTruthy();
+        expect(within(board).getByText('Offline')).toBeTruthy();
+        expect(within(board).getByText('Total')).toBeTruthy();
+        expect(within(board).getByText('Kota')).toBeTruthy();
+        expect(within(board).getByText('Menonton sekarang')).toBeTruthy();
+        // Same canonical tally as Full mode: 2 online, 1 offline, 3 total (mock has 3 cameras).
+        expect(within(board).getByText('2')).toBeTruthy();
+        expect(within(board).getByText('1')).toBeTruthy();
+        expect(within(board).getByText('3')).toBeTruthy();
     });
 
     it('menampilkan discovery compact yang sama di mode simpel', () => {

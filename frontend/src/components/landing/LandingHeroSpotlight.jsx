@@ -9,17 +9,8 @@
  */
 
 import CameraThumbnail from '../CameraThumbnail';
+import LandingBezelTicks from './LandingBezelTicks';
 import { getAreaCity } from '../../utils/publicCityMapping';
-
-// Instrument bezel: four corner registration ticks, the recurring "monitor" motif.
-const CornerTicks = () => (
-    <span className="pointer-events-none absolute inset-0 z-10" aria-hidden="true">
-        <span className="absolute left-0 top-0 h-2 w-2 border-l border-t border-edge-strong"></span>
-        <span className="absolute right-0 top-0 h-2 w-2 border-r border-t border-edge-strong"></span>
-        <span className="absolute bottom-0 left-0 h-2 w-2 border-b border-l border-edge-strong"></span>
-        <span className="absolute bottom-0 right-0 h-2 w-2 border-b border-r border-edge-strong"></span>
-    </span>
-);
 
 export default function LandingHeroSpotlight({ camera, onOpen, disableHeavyEffects = false }) {
     if (!camera) {
@@ -36,7 +27,7 @@ export default function LandingHeroSpotlight({ camera, onOpen, disableHeavyEffec
             aria-label={`Tonton siaran langsung ${camera.name}`}
             className="group relative flex flex-col overflow-hidden rounded-card border border-edge bg-surface text-left transition-colors hover:border-edge-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-data"
         >
-            <CornerTicks />
+            <LandingBezelTicks />
             <div className="relative aspect-video overflow-hidden bg-black">
                 <CameraThumbnail
                     thumbnailPath={camera.external_snapshot_url || camera.thumbnail_path}
