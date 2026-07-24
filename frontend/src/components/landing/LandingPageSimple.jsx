@@ -14,6 +14,7 @@ import InlineAdSlot from '../ads/InlineAdSlot';
 import { isAdsMobileViewport, shouldRenderAdSlot } from '../ads/adsConfig';
 import { shouldDisableAnimations } from '../../utils/animationControl';
 import { setLitePreference } from '../../utils/publicExperienceMode';
+import { getPublicCameraStats } from '../../utils/publicCameraStats';
 import lazyWithRetry from '../../utils/lazyWithRetry';
 import LayoutModeToggle from './LayoutModeToggle';
 import LandingPublicTopStack from './LandingPublicTopStack';
@@ -64,10 +65,10 @@ function SimpleHeader({ branding, layoutMode, onLayoutToggle, disableHeavyEffect
                             onClick={() => setLitePreference(!disableHeavyEffects)}
                             aria-pressed={disableHeavyEffects}
                             aria-label="Mode Hemat"
-                            className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold transition-colors ${
+                            className={`inline-flex items-center gap-1.5 rounded-control border px-2.5 py-2 text-xs font-semibold transition-colors ${
                                 disableHeavyEffects
-                                    ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-300'
-                                    : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                                    ? 'border-status-live/40 bg-status-live/10 text-status-live'
+                                    : 'border-edge bg-surface text-content-muted hover:border-edge-strong hover:text-content'
                             }`}
                             title={disableHeavyEffects
                                 ? 'Mode Hemat aktif — ketuk untuk efek penuh'
@@ -78,7 +79,7 @@ function SimpleHeader({ branding, layoutMode, onLayoutToggle, disableHeavyEffect
                         </button>
                         <button
                             onClick={toggleTheme}
-                            className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                            className="rounded-control border border-edge bg-surface p-2 text-content-muted transition-colors hover:border-edge-strong hover:text-content"
                             title={isDark ? 'Light Mode' : 'Dark Mode'}
                         >
                             {isDark ? <Icons.Sun /> : <Icons.Moon />}
@@ -96,7 +97,7 @@ function SimpleFooter({ branding, saweriaEnabled, saweriaLink }) {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="text-center space-y-3">
                     <div className="flex flex-col items-center gap-2">
-                        <div className="inline-flex items-center gap-2 rounded-full bg-sky-50 dark:bg-primary/10 px-4 py-2">
+                        <div className="inline-flex items-center gap-2 rounded-full border border-edge bg-surface px-4 py-2">
                             <div className="w-7 h-7 rounded-control bg-primary flex items-center justify-center text-white">
                                 <span className="text-xs font-bold">{branding.logo_text}</span>
                             </div>
@@ -104,7 +105,7 @@ function SimpleFooter({ branding, saweriaEnabled, saweriaLink }) {
                         </div>
                     </div>
 
-                    <div className="flex flex-wrap items-center justify-center gap-2 text-xs text-gray-500 dark:text-gray-500">
+                    <div className="flex flex-wrap items-center justify-center gap-2 text-xs text-content-subtle">
                         <span>&copy; {new Date().getFullYear()} {branding.company_name}</span>
                         <a
                             href="#feedback"
@@ -112,7 +113,7 @@ function SimpleFooter({ branding, saweriaEnabled, saweriaLink }) {
                                 e.preventDefault();
                                 document.querySelector('[data-feedback-widget]')?.click();
                             }}
-                            className="hover:text-emerald-500 transition-colors"
+                            className="transition-colors hover:text-content"
                         >
                             Feedback
                         </a>
@@ -121,7 +122,7 @@ function SimpleFooter({ branding, saweriaEnabled, saweriaLink }) {
                                 href={saweriaLink}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="hover:text-emerald-500 transition-colors"
+                                className="transition-colors hover:text-content"
                             >
                                 Dukung
                             </a>
@@ -147,14 +148,13 @@ function SimpleFooter({ branding, saweriaEnabled, saweriaLink }) {
 function SimpleStatusOverview() {
     const { cameras, loading } = useCameras();
 
-    const onlineCount = useMemo(() => cameras.reduce((total, camera) => (
-        (camera?.is_online === 1 || camera?.is_online === true) ? total + 1 : total
-    ), 0), [cameras]);
-    const offlineCount = Math.max(cameras.length - onlineCount, 0);
+    // Same canonical tally as the Full-mode deck (handles maintenance/degraded) so the
+    // two modes never disagree on how many cameras are online.
+    const { online, offline, total } = useMemo(() => getPublicCameraStats(cameras), [cameras]);
     const stats = [
-        { label: 'online', value: onlineCount, dot: 'bg-status-live' },
-        { label: 'offline', value: offlineCount, dot: 'bg-status-idle' },
-        { label: 'total', value: cameras.length, dot: null },
+        { label: 'online', value: online, dot: 'bg-status-live' },
+        { label: 'offline', value: offline, dot: 'bg-status-idle' },
+        { label: 'total', value: total, dot: null },
     ];
 
     return (
@@ -173,7 +173,7 @@ function SimpleStatusOverview() {
                             {stat.dot && (
                                 <span className={`h-1.5 w-1.5 shrink-0 self-center rounded-full ${stat.dot}`} aria-hidden="true"></span>
                             )}
-                            <span className="font-semibold tabular-nums text-content">
+                            <span className="font-mono font-semibold tabular-nums text-content">
                                 {loading ? '…' : stat.value}
                             </span>
                             <span className="truncate text-xs text-content-muted">{stat.label}</span>
@@ -244,7 +244,7 @@ export default function LandingPageSimple({
     );
 
     return (
-        <div className="min-h-screen bg-gray-50 pb-24 dark:bg-gray-950 flex flex-col sm:pb-0">
+        <div className="min-h-screen bg-surface-sunken pb-24 flex flex-col sm:pb-0">
             <SimpleHeader
                 branding={branding}
                 layoutMode={layoutMode}
