@@ -9,6 +9,11 @@ export default {
         extend: {
             fontFamily: {
                 sans: ['Inter', 'system-ui', 'sans-serif'],
+                // Operational redesign: all data (metrics, timestamps, camera
+                // codes, viewer counts) renders in mono for an "instrument"
+                // read. System stack only — zero font downloads, so it stays
+                // light on mobile / Telegram in-app WebView.
+                mono: ['ui-monospace', 'Cascadia Code', 'SFMono-Regular', 'Menlo', 'Consolas', 'Roboto Mono', 'monospace'],
             },
             colors: {
                 // Semantic roles — prefer these over `dark-*`/`light-*` in new work.
@@ -34,6 +39,8 @@ export default {
                     fault: 'var(--status-fault)',
                     idle: 'var(--status-idle)',
                 },
+                // Data accent (not a status). See --data in index.css.
+                data: 'var(--data)',
                 primary: {
                     DEFAULT: 'var(--primary-color)',
                     50: 'rgba(var(--primary-color-rgb), 0.05)',

@@ -50,6 +50,11 @@
     --status-fault: #dc2626;
     --status-idle:  #9ca3af;
 
+    /* Data accent (operational redesign): viewer counts, timelines, interactive
+     * data highlights. NOT a status — it never means health. Cyan reads as
+     * "instrument readout" and stays distinct from brand red + status green. */
+    --data: #0284c7;
+
     /* Radius scale: controls and cards, plus rounded-full for true pills */
     --radius-control: 0.5rem;
     --radius-card:    0.75rem;
@@ -76,6 +81,8 @@
     --status-warn:  #f59e0b;
     --status-fault: #ef4444;
     --status-idle:  #6b7280;
+
+    --data: #38bdf8;
 
     /* Depth in a dark UI comes from the surface step + edge, not from shadow. */
     --elevation-1: 0 1px 2px rgb(0 0 0 / 0.4);
