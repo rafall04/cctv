@@ -19,7 +19,7 @@ export default function Footer({ saweriaEnabled, saweriaLink, branding }) {
                         data-testid="landing-footer-brand-stack"
                         className="mx-auto mb-5 flex max-w-sm flex-col items-center gap-3"
                     >
-                        <div className="flex items-center gap-2 rounded-full bg-sky-50 px-4 py-2 text-sm dark:bg-primary/10">
+                        <div className="flex items-center gap-2 rounded-full border border-edge bg-surface px-4 py-2 text-sm">
                             <div className="flex h-8 w-8 items-center justify-center rounded-control bg-primary text-white">
                                 <span className="text-sm font-bold">{branding.logo_text}</span>
                             </div>
@@ -51,16 +51,16 @@ export default function Footer({ saweriaEnabled, saweriaLink, branding }) {
                         <h4 className="mb-3 font-semibold text-content">Statistik</h4>
                         <div className="flex justify-center gap-6">
                             <div>
-                                <p className="text-2xl font-bold text-primary">{cameraCount}</p>
-                                <p className="text-xs text-gray-500 dark:text-gray-400">Kamera</p>
+                                <p className="font-mono text-2xl font-bold tabular-nums text-content">{cameraCount}</p>
+                                <p className="font-mono text-[10px] uppercase tracking-[0.1em] text-content-subtle">Kamera</p>
                             </div>
                             <div>
-                                <p className="text-2xl font-bold text-content">{areaCount}</p>
-                                <p className="text-xs text-gray-500 dark:text-gray-400">Lokasi</p>
+                                <p className="font-mono text-2xl font-bold tabular-nums text-content">{areaCount}</p>
+                                <p className="font-mono text-[10px] uppercase tracking-[0.1em] text-content-subtle">Lokasi</p>
                             </div>
                             <div>
-                                <p className="text-2xl font-bold text-emerald-500">24/7</p>
-                                <p className="text-xs text-gray-500 dark:text-gray-400">Online</p>
+                                <p className="font-mono text-2xl font-bold tabular-nums text-status-live">24/7</p>
+                                <p className="font-mono text-[10px] uppercase tracking-[0.1em] text-content-subtle">Online</p>
                             </div>
                         </div>
                     </div>
