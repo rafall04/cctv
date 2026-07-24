@@ -171,7 +171,7 @@ function LandingPageContent({ onRefreshPauseChange }) {
         return (
             <div key="simple-mode">
                 {showSocialBar && <GlobalAdScript slotKey="social-bar" script={adsConfig.slots.socialBar.script} />}
-                <Suspense fallback={<div className="min-h-screen bg-gray-50 dark:bg-gray-950" />}>
+                <Suspense fallback={<div className="min-h-screen bg-surface-sunken" />}>
                     <LandingPageSimple
                         onCameraClick={handleGridPopupOpen}
                         onAddMulti={handleAddMulti}
@@ -252,7 +252,7 @@ function LandingPageContent({ onRefreshPauseChange }) {
     return (
         <div key="full-mode">
             {showSocialBar && <GlobalAdScript slotKey="social-bar" script={adsConfig.slots.socialBar.script} />}
-            <div className="min-h-screen bg-gray-50 pb-24 dark:bg-gray-950 flex flex-col sm:pb-0">
+            <div className="min-h-screen bg-surface-sunken pb-24 flex flex-col sm:pb-0">
                 <LandingNavbar branding={branding} layoutMode={layoutMode} onLayoutToggle={toggleLayoutMode} />
                 <LandingPublicTopStack
                     layoutMode="full"

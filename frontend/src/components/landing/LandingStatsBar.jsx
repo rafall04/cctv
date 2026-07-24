@@ -10,6 +10,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { useCameras } from '../../contexts/CameraContext';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { getCameraAvailabilityState } from '../../utils/cameraAvailability.js';
+import { groupCamerasByCity } from '../../utils/publicCityMapping';
 import { Icons } from '../ui/Icons';
 import { shouldDisableAnimations } from '../../utils/animationControl';
 
@@ -152,7 +153,7 @@ function ListModal({ title, items, type, onClose, onCameraClick }) {
 }
 
 export default function StatsBar({ onCameraClick }) {
-    const { cameras, areas } = useCameras();
+    const { cameras } = useCameras();
     const [activeModal, setActiveModal] = useState(null);
     const disableAnimations = shouldDisableAnimations();
 
@@ -186,7 +187,17 @@ export default function StatsBar({ onCameraClick }) {
         }, initialStats);
     }, [cameras]);
 
-    const totalAreas = areas.length;
+    // Kota (city) rollup replaces the old raw "area dipantau" count: the public
+    // identity is a multi-city network, so the headline figure is cities, not areas.
+    const cities = useMemo(() => groupCamerasByCity(cameras), [cameras]);
+    // Honest "watching now" = summed live viewers. No fabricated time-series sparkline.
+    const liveViewersNow = useMemo(
+        () => cameras.reduce(
+            (sum, camera) => sum + Number(camera.live_viewers ?? camera.viewer_stats?.live_viewers ?? 0),
+            0,
+        ),
+        [cameras],
+    );
 
     if (cameras.length === 0) return null;
 
@@ -203,55 +214,82 @@ export default function StatsBar({ onCameraClick }) {
      * the emphasis, with a small dot doing the colour-coding, and `tabular-nums`
      * keeps the row from twitching as counts refresh.
      */
-    const StatsItem = ({ count, label, dotClass, onClick }) => (
-        <button
-            onClick={onClick}
-            className={`flex items-center gap-2.5 rounded-control border border-edge bg-surface px-3.5 py-2 hover:border-edge-strong hover:bg-surface-raised ${disableAnimations ? '' : 'transition-colors'
-                }`}
-        >
-            <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dotClass}`} aria-hidden="true"></span>
-            <span className="text-base font-semibold tabular-nums text-content sm:text-lg">{count}</span>
-            <span className="text-xs text-content-muted">{label}</span>
-        </button>
-    );
+    // One board cell. Clickable cells open the drill-down modal; the numeral is the
+    // emphasis (mono + tabular so it never twitches as counts refresh), colour on the
+    // value encodes state (green up / red offline) — not decoration.
+    const Metric = ({ value, label, ariaLabel, valueClass = 'text-content', onClick }) => {
+        const interactive = typeof onClick === 'function';
+        const Tag = interactive ? 'button' : 'div';
+        return (
+            <Tag
+                {...(interactive ? { type: 'button', onClick, 'aria-label': ariaLabel } : {})}
+                className={`flex flex-col gap-1 bg-surface px-3.5 py-3 text-left ${interactive ? `hover:bg-surface-raised ${disableAnimations ? '' : 'transition-colors'}` : ''}`}
+            >
+                <span className={`font-mono text-2xl font-bold leading-none tabular-nums ${valueClass}`}>{value}</span>
+                <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-content-subtle">{label}</span>
+            </Tag>
+        );
+    };
 
     return (
-        <>
-            <div className="mt-8 flex flex-wrap justify-center gap-2 border-t border-edge pt-6">
-                <StatsItem
-                    count={stats.online}
-                    label="kamera online"
-                    dotClass="bg-status-live"
+        <div className="relative flex h-full flex-col rounded-card border border-edge bg-surface p-4">
+            <div className="mb-3">
+                <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-content-subtle">Status jaringan kamera</span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-px overflow-hidden rounded-control border border-edge bg-edge">
+                <Metric
+                    value={stats.online}
+                    label="Online"
+                    ariaLabel={`${stats.online} kamera online`}
+                    valueClass="text-status-live"
                     onClick={() => setActiveModal('online')}
                 />
-
-                {stats.offline > 0 && (
-                    <StatsItem
-                        count={stats.offline}
-                        label="kamera offline"
-                        dotClass="bg-status-idle"
-                        onClick={() => setActiveModal('offline')}
-                    />
-                )}
-
-                {stats.maintenance > 0 && (
-                    <StatsItem
-                        count={stats.maintenance}
-                        label="kamera perbaikan"
-                        dotClass="bg-status-fault"
-                        onClick={() => setActiveModal('maintenance')}
-                    />
-                )}
-
-                {totalAreas > 0 && (
-                    <StatsItem
-                        count={totalAreas}
-                        label="area dipantau"
-                        dotClass="bg-content-subtle"
-                        onClick={() => setActiveModal('areas')}
-                    />
-                )}
+                <Metric
+                    value={stats.offline}
+                    label="Offline"
+                    ariaLabel={`${stats.offline} kamera offline`}
+                    valueClass={stats.offline > 0 ? 'text-status-fault' : 'text-content'}
+                    onClick={() => setActiveModal('offline')}
+                />
+                <Metric value={stats.total} label="Total unit" />
+                <Metric value={cities.length} label="Kota terpantau" />
             </div>
+
+            {stats.maintenance > 0 && (
+                <button
+                    type="button"
+                    onClick={() => setActiveModal('maintenance')}
+                    aria-label={`${stats.maintenance} kamera perbaikan`}
+                    className="mt-2.5 flex items-center gap-2 self-start text-xs text-content-muted hover:text-content"
+                >
+                    <span className="h-1.5 w-1.5 rounded-full bg-status-fault" aria-hidden="true"></span>
+                    <span className="font-mono tabular-nums">{stats.maintenance}</span>
+                    <span>dalam perbaikan</span>
+                </button>
+            )}
+
+            <div className="mt-3 flex items-center justify-between border-t border-edge pt-3">
+                <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-content-subtle">Menonton sekarang</span>
+                <span className="flex items-center gap-1.5 font-mono text-sm font-semibold tabular-nums text-data">
+                    <span className={`h-1.5 w-1.5 rounded-full bg-data ${disableAnimations ? '' : 'animate-pulse'}`} aria-hidden="true"></span>
+                    {liveViewersNow.toLocaleString('id-ID')}
+                </span>
+            </div>
+
+            {cities.length > 0 && (
+                <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                    <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-content-subtle">Cakupan</span>
+                    {cities.slice(0, 3).map((city) => (
+                        <span key={city.key} className="rounded-full border border-edge px-2 py-0.5 font-mono text-[10px] text-content-muted">
+                            {city.label} <span className="text-content-subtle">{city.count}</span>
+                        </span>
+                    ))}
+                    {cities.length > 3 && (
+                        <span className="font-mono text-[10px] text-content-subtle">+{cities.length - 3} kota</span>
+                    )}
+                </div>
+            )}
 
             {activeModal === 'online' && (
                 <ListModal
@@ -268,6 +306,7 @@ export default function StatsBar({ onCameraClick }) {
                     items={stats.offlineList}
                     type="offline"
                     onClose={() => setActiveModal(null)}
+                    onCameraClick={handleCameraItemClick}
                 />
             )}
             {activeModal === 'maintenance' && (
@@ -276,16 +315,9 @@ export default function StatsBar({ onCameraClick }) {
                     items={stats.maintenanceList}
                     type="maintenance"
                     onClose={() => setActiveModal(null)}
+                    onCameraClick={handleCameraItemClick}
                 />
             )}
-            {activeModal === 'areas' && (
-                <ListModal
-                    title="Area Monitoring"
-                    items={areas}
-                    type="areas"
-                    onClose={() => setActiveModal(null)}
-                />
-            )}
-        </>
+        </div>
     );
 }

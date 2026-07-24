@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
 
 /**
- * Purpose: Verifies landing hero badge layout, default copy simplification, and powered-by visibility.
+ * Purpose: Verifies the rebuilt hero status deck — eyebrow badge, powered-by visibility,
+ *          and default copy simplification — without pulling in the camera context or the
+ *          spotlight's thumbnail/config chain.
  * Caller: Frontend Vitest suite.
- * Deps: mocked LandingStatsBar.
+ * Deps: mocked LandingStatsBar, LandingHeroSpotlight, CameraContext, animation control.
  * MainFuncs: LandingHero render tests.
- * SideEffects: Renders configured coverage HTML into jsdom.
+ * SideEffects: None.
  */
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
@@ -13,6 +15,23 @@ import LandingHero from './LandingHero';
 
 vi.mock('./LandingStatsBar', () => ({
     default: () => <div>stats-bar</div>,
+}));
+
+vi.mock('./LandingHeroSpotlight', () => ({
+    default: () => <div>spotlight</div>,
+}));
+
+vi.mock('../../contexts/CameraContext', () => ({
+    useCameras: () => ({
+        cameras: [
+            { id: 1, area_name: 'KAB SURABAYA', is_online: true },
+            { id: 2, area_name: 'DI YOGYAKARTA', is_online: true },
+        ],
+    }),
+}));
+
+vi.mock('../../utils/animationControl', () => ({
+    shouldDisableAnimations: () => true,
 }));
 
 const baseBranding = {
@@ -30,7 +49,7 @@ const landingSettings = {
 };
 
 describe('LandingHero', () => {
-    it('merender stack badge hero secara vertikal', () => {
+    it('merender eyebrow status deck dengan badge live dan powered-by', () => {
         render(
             <LandingHero
                 branding={baseBranding}
@@ -39,8 +58,7 @@ describe('LandingHero', () => {
             />
         );
 
-        const stack = screen.getByTestId('landing-hero-badge-stack');
-        expect(stack.className).toContain('flex-col');
+        expect(screen.getByTestId('landing-hero-badge-stack')).toBeTruthy();
         expect(screen.getByText('Powered by RAF NET')).not.toBeNull();
         expect(screen.getByText('LIVE STREAMING 24 JAM')).not.toBeNull();
         expect(screen.queryByText('Streaming HD')).toBeNull();

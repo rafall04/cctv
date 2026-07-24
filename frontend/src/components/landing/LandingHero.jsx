@@ -1,85 +1,114 @@
 /**
- * Purpose: Renders the public landing hero with centered brand, status copy, and stats.
+ * Purpose: Public landing hero rebuilt as an operational "status deck" — a live
+ *          spotlight camera beside a mono metric board, instead of a marketing banner.
+ *          The structure is inherently multi-city (city count, spotlight, coverage all
+ *          read live data); only the headline/subtitle copy stays branding-driven.
  * Caller: LandingPage full mode.
- * Deps: LandingStatsBar and public branding/settings payloads.
- * MainFuncs: LandingHero component and default copy simplification helpers.
- * SideEffects: Renders sanitized HTML from configured area coverage.
+ * Deps: useCameras, LandingStatsBar (metric board), LandingHeroSpotlight, city rollup,
+ *       availability + animation helpers.
+ * MainFuncs: LandingHero, pickFeaturedCamera.
+ * SideEffects: None (spotlight opens the shared popup via onCameraClick).
  */
+import { useMemo } from 'react';
+import { useCameras } from '../../contexts/CameraContext';
 import LandingStatsBar from './LandingStatsBar';
-import { sanitizePublicHtml } from '../../utils/sanitizePublicHtml';
+import LandingHeroSpotlight from './LandingHeroSpotlight';
+import { groupCamerasByCity } from '../../utils/publicCityMapping';
+import { getCameraAvailabilityState } from '../../utils/cameraAvailability.js';
+import { shouldDisableAnimations } from '../../utils/animationControl';
+
+// Most-watched up camera that actually has a thumbnail — the "on air" spotlight.
+function pickFeaturedCamera(cameras) {
+    let best = null;
+    let bestViewers = -1;
+    for (const camera of cameras) {
+        const state = getCameraAvailabilityState(camera);
+        if (state === 'offline' || state === 'maintenance') {
+            continue;
+        }
+        if (!(camera.external_snapshot_url || camera.thumbnail_path)) {
+            continue;
+        }
+        const viewers = Number(camera.live_viewers ?? camera.viewer_stats?.live_viewers ?? 0);
+        if (viewers > bestViewers) {
+            bestViewers = viewers;
+            best = camera;
+        }
+    }
+    return best;
+}
 
 export default function Hero({ branding, landingSettings, disableHeavyEffects, onCameraClick }) {
+    const { cameras } = useCameras();
+    const disableAnimations = shouldDisableAnimations();
+
+    // Copy stays branding-driven (admin-configured); only the two shipped defaults are
+    // shortened. Everything structural around it is multi-city by construction.
     const heroTitle = branding.hero_title === 'Pantau CCTV Secara Real-Time'
         ? 'Pantau CCTV Real-Time'
         : branding.hero_title;
     const heroSubtitle = branding.hero_subtitle === 'Pantau CCTV secara real-time dengan sistem CCTV RAF NET. Akses gratis 24 jam untuk memantau berbagai lokasi.'
         ? 'Akses CCTV publik 24 jam dari satu halaman.'
         : branding.hero_subtitle;
-    const footerText = branding.footer_text === 'Layanan pemantauan CCTV publik oleh RAF NET'
-        ? 'Pemantauan publik oleh RAF NET'
-        : branding.footer_text;
+
+    const cityCount = useMemo(() => groupCamerasByCity(cameras).length, [cameras]);
+    const featured = useMemo(() => pickFeaturedCamera(cameras), [cameras]);
 
     return (
-        <header className="relative overflow-hidden bg-surface-sunken">
+        <header className="relative overflow-hidden border-b border-edge bg-surface-sunken">
+            {/* Faint instrument grid, faded out toward the content. Heavy-effect gated. */}
             {!disableHeavyEffects && (
-                <>
-                    <div className="absolute top-0 left-1/4 w-64 h-64 bg-amber-200/30 dark:bg-amber-500/10 rounded-full blur-3xl pointer-events-none"></div>
-                    <div className="absolute bottom-0 right-1/4 w-64 h-64 bg-emerald-200/30 dark:bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
-                    <div className="absolute top-10 right-10 w-20 h-20 opacity-20 dark:opacity-10 pointer-events-none">
-                        <svg viewBox="0 0 100 100" fill="currentColor" className="text-amber-400 w-full h-full">
-                            <path d="M50 5C30.5 5 15 20.5 15 40c0 19.5 15.5 35 35 35 5 0 9-4 9-9 0-3.5-2-6.5-5-8-4-2.5-6.5-7-6.5-12 0-8 6.5-14.5 14.5-14.5H70c13.5 0 24.5-11 24.5-24.5C94.5 18 78.5 5 50 5z"/>
-                        </svg>
-                    </div>
-                    <div className="absolute top-20 left-10 w-12 h-12 opacity-15 dark:opacity-8 pointer-events-none">
-                        <svg viewBox="0 0 100 100" fill="currentColor" className="text-amber-400 w-full h-full">
-                            <path d="M50 5C30.5 5 15 20.5 15 40c0 19.5 15.5 35 35 35 5 0 9-4 9-9 0-3.5-2-6.5-5-8-4-2.5-6.5-7-6.5-12 0-8 6.5-14.5 14.5-14.5H70c13.5 0 24.5-11 24.5-24.5C94.5 18 78.5 5 50 5z"/>
-                        </svg>
-                    </div>
-                </>
+                <div
+                    className="pointer-events-none absolute inset-0"
+                    aria-hidden="true"
+                    style={{
+                        backgroundImage: 'linear-gradient(var(--edge) 1px, transparent 1px), linear-gradient(90deg, var(--edge) 1px, transparent 1px)',
+                        backgroundSize: '34px 34px',
+                        WebkitMaskImage: 'radial-gradient(120% 65% at 25% 0%, #000, transparent 72%)',
+                        maskImage: 'radial-gradient(120% 65% at 25% 0%, #000, transparent 72%)',
+                        opacity: 0.6,
+                    }}
+                />
             )}
 
-            <div className="relative mx-auto flex min-h-[28rem] max-w-7xl flex-col items-center justify-center px-4 py-10 text-center sm:min-h-[31rem] sm:px-6 sm:py-14 lg:px-8">
+            <div className="relative mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
                 <div
                     data-testid="landing-hero-badge-stack"
-                    className="mx-auto mb-5 flex max-w-sm flex-col items-center gap-2.5 sm:gap-3"
+                    className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2"
                 >
-                    {branding.show_powered_by === 'true' && (
-                        <div className="flex items-center gap-2 rounded-full bg-sky-100 px-4 py-1.5 text-xs font-semibold text-primary-600 shadow-sm dark:bg-primary/20 dark:text-primary-400">
-                            <div className="flex h-5 w-5 items-center justify-center rounded bg-primary text-[10px] font-bold text-white">{branding.logo_text}</div>
-                            <span>Powered by {branding.company_name}</span>
-                        </div>
-                    )}
-
-                    <div className="mt-1 flex items-center gap-2 rounded-full bg-emerald-100 px-4 py-1.5 text-xs font-semibold text-emerald-600 shadow-sm dark:bg-emerald-500/20 dark:text-emerald-400">
-                        <span className="relative flex h-2 w-2">
-                            {!disableHeavyEffects && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>}
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    <span className="flex items-center gap-2">
+                        <span className={`h-1.5 w-1.5 rounded-full bg-status-live ${disableAnimations ? '' : 'animate-pulse'}`}></span>
+                        <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-status-live">
+                            {landingSettings.hero_badge}
                         </span>
-                        {landingSettings.hero_badge}
-                    </div>
+                    </span>
+                    <span className="h-3 w-px bg-edge-strong" aria-hidden="true"></span>
+                    <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-content-subtle">
+                        {cityCount} kota · siaran 24 jam
+                    </span>
+                    {branding.show_powered_by === 'true' && (
+                        <span className="flex items-center gap-1.5 rounded-full border border-edge bg-surface px-2.5 py-1 text-[10px] font-semibold text-content-muted sm:ml-auto">
+                            <span className="flex h-4 w-4 items-center justify-center rounded bg-primary text-[9px] font-bold text-white">{branding.logo_text}</span>
+                            <span>Powered by {branding.company_name}</span>
+                        </span>
+                    )}
                 </div>
-                <h1 className="mb-4 max-w-4xl text-balance text-3xl font-bold leading-tight text-gray-900 dark:text-white sm:text-4xl lg:text-5xl">
+
+                <h1 className="max-w-3xl text-balance text-3xl font-bold leading-[1.05] tracking-tight text-content sm:text-4xl lg:text-[2.75rem]">
                     {heroTitle}
                 </h1>
-                <p className="mx-auto mb-3 max-w-xl text-sm leading-6 text-gray-600 dark:text-gray-400 sm:text-base">
+                <p className="mt-3 max-w-xl text-sm leading-6 text-content-muted sm:text-base">
                     {heroSubtitle}
                 </p>
-                <p className="mx-auto mb-6 max-w-lg text-xs text-gray-500 dark:text-gray-500 sm:text-sm">
-                    {footerText}
-                </p>
 
-                <div className="mb-8 inline-flex max-w-full items-center justify-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-center dark:border-amber-500/20 dark:bg-amber-500/10">
-                    <svg className="w-5 h-5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z" />
-                        <circle cx="12" cy="11" r="3" />
-                    </svg>
-                <span
-                    className="text-sm text-amber-700 dark:text-amber-400"
-                    dangerouslySetInnerHTML={{ __html: sanitizePublicHtml(landingSettings.area_coverage) }}
-                />
+                <div className={`mt-6 grid gap-4 ${featured ? 'lg:grid-cols-[1.4fr_1fr] lg:items-stretch' : ''}`}>
+                    <LandingHeroSpotlight
+                        camera={featured}
+                        onOpen={onCameraClick}
+                        disableHeavyEffects={disableHeavyEffects}
+                    />
+                    <LandingStatsBar onCameraClick={onCameraClick} />
                 </div>
-
-                <LandingStatsBar onCameraClick={onCameraClick} />
             </div>
         </header>
     );
