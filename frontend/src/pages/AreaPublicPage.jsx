@@ -17,6 +17,7 @@ import {
     getAreaCameraLiveViewers,
     getAreaCameraTotalViews,
 } from '../utils/areaPublicRanking';
+import { isCameraHardOffline, isCameraDegraded } from '../utils/cameraAvailability.js';
 
 const VideoPopup = lazy(() => import('../components/MultiView/VideoPopup'));
 const AREA_INITIAL_VISIBLE_CAMERAS = 12;
@@ -49,11 +50,32 @@ function formatCount(value) {
     return Number(value || 0).toLocaleString('id-ID');
 }
 
+/*
+ * Honest per-camera status — mirrors LandingCameraCard's semantics so the two public
+ * surfaces read identically: ONE dot carries the state, a label shows only when the
+ * state is abnormal, and red is reserved for genuine faults. The old area card shouted
+ * a red "LIVE" pill on EVERY tile, which both buried real faults and collided with the
+ * red used for problems.
+ */
+const AREA_CAMERA_STATUS = {
+    maintenance: { dot: 'bg-status-fault', label: 'Perbaikan', srLabel: 'Sedang perbaikan' },
+    offline: { dot: 'bg-status-idle', label: 'Offline', srLabel: 'Sedang offline' },
+    degraded: { dot: 'bg-status-warn', label: 'Tidak stabil', srLabel: 'Sinyal tidak stabil' },
+    live: { dot: 'bg-status-live', label: null, srLabel: 'Siaran langsung' },
+};
+
+function resolveAreaCameraStatus(camera) {
+    if (camera.status === 'maintenance') return AREA_CAMERA_STATUS.maintenance;
+    if (isCameraHardOffline(camera)) return AREA_CAMERA_STATUS.offline;
+    if (isCameraDegraded(camera)) return AREA_CAMERA_STATUS.degraded;
+    return AREA_CAMERA_STATUS.live;
+}
+
 function AreaStat({ label, value }) {
     return (
-        <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-            <div className="text-xl font-bold text-gray-900 dark:text-white">{formatCount(value)}</div>
-            <div className="mt-1 text-xs font-medium text-gray-500 dark:text-gray-400">{label}</div>
+        <div className="rounded-card border border-edge bg-surface px-4 py-3">
+            <div className="font-mono text-2xl font-bold leading-none tabular-nums text-content">{formatCount(value)}</div>
+            <div className="mt-1.5 font-mono text-[10px] uppercase tracking-[0.1em] text-content-subtle">{label}</div>
         </div>
     );
 }
@@ -67,12 +89,12 @@ function AreaStatusPanel({ area, cameras, liveViewerCount }) {
         <section className="mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
             <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
                 <div>
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Status Area</h2>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                    <h2 className="text-lg font-semibold text-content">Status Area</h2>
+                    <p className="text-sm text-content-muted">
                         Ringkasan kondisi kamera publik di area ini.
                     </p>
                 </div>
-                <span className="text-xs font-semibold text-primary">{onlinePercent}% online</span>
+                <span className="font-mono text-xs font-semibold tabular-nums text-status-live">{onlinePercent}% online</span>
             </div>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <AreaStat label="Kamera Publik" value={cameraCount} />
@@ -89,13 +111,13 @@ function AreaCameraMiniCard({ camera, metricLabel, metricValue, onClick }) {
         <button
             type="button"
             onClick={() => onClick(camera)}
-            className="rounded-xl border border-gray-200 bg-white p-3 text-left shadow-sm transition hover:border-primary/60 hover:bg-primary/5 dark:border-gray-800 dark:bg-gray-900 dark:hover:bg-primary/10"
+            className="rounded-card border border-edge bg-surface p-3 text-left transition-colors hover:border-edge-strong"
         >
-            <div className="truncate text-sm font-semibold text-gray-900 dark:text-white">{camera.name}</div>
-            <div className="mt-1 truncate text-xs text-gray-500 dark:text-gray-400">
+            <div className="truncate text-sm font-semibold text-content">{camera.name}</div>
+            <div className="mt-1 truncate text-xs text-content-muted">
                 {camera.location || camera.area_name || 'Lokasi publik'}
             </div>
-            <div className="mt-2 text-xs font-semibold text-primary">
+            <div className="mt-2 font-mono text-xs font-semibold tabular-nums text-data">
                 {formatCount(metricValue)} {metricLabel}
             </div>
         </button>
@@ -111,12 +133,12 @@ function AreaCameraSection({ title, description, cameras, metricLabel, metricVal
         <section className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
             <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
                 <div>
-                    <h2 className="text-base font-semibold text-gray-900 dark:text-white">{title}</h2>
+                    <h2 className="text-base font-semibold text-content">{title}</h2>
                     {description && (
-                        <p className="text-sm text-gray-500 dark:text-gray-400">{description}</p>
+                        <p className="text-sm text-content-muted">{description}</p>
                     )}
                 </div>
-                <span className="text-xs text-gray-500 dark:text-gray-400">{cameras.length} kamera</span>
+                <span className="font-mono text-xs tabular-nums text-content-subtle">{cameras.length} kamera</span>
             </div>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 {cameras.map((camera) => (
@@ -134,13 +156,14 @@ function AreaCameraSection({ title, description, cameras, metricLabel, metricVal
 }
 
 function AreaCameraCard({ camera, onClick, thumbnailPriority = false }) {
+    const status = resolveAreaCameraStatus(camera);
     return (
         <button
             type="button"
             onClick={() => onClick(camera)}
-            className="overflow-hidden rounded-xl border border-gray-200 bg-white text-left shadow-sm transition hover:border-primary/60 hover:shadow-md dark:border-gray-800 dark:bg-gray-900"
+            className="group/card overflow-hidden rounded-card border border-edge bg-surface text-left transition-colors hover:border-edge-strong"
         >
-            <div className="relative aspect-video bg-gray-100 dark:bg-gray-800">
+            <div className="relative aspect-video bg-surface-sunken">
                 <CameraThumbnail
                     cameraId={camera.id}
                     thumbnailPath={camera.external_snapshot_url || camera.thumbnail_path}
@@ -149,23 +172,29 @@ function AreaCameraCard({ camera, onClick, thumbnailPriority = false }) {
                     isOffline={camera.availability_state === 'offline'}
                     priority={thumbnailPriority}
                 />
-                <span className="absolute left-3 top-3 rounded-lg bg-red-500/90 px-2 py-1 text-[10px] font-bold text-white">
-                    LIVE
-                </span>
+                {/* One honest status dot; a label appears only when the state is abnormal.
+                    Red is reserved for genuine faults — no more red "LIVE" on every tile. */}
+                <div className="absolute left-2.5 top-2.5 flex items-center gap-1.5 rounded-full bg-black/55 px-2 py-1 backdrop-blur-sm">
+                    <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${status.dot}`} aria-hidden="true"></span>
+                    <span className="sr-only">{status.srLabel}</span>
+                    {status.label && (
+                        <span className="font-mono text-[10px] font-semibold uppercase tracking-wide leading-none text-white/90">{status.label}</span>
+                    )}
+                </div>
             </div>
             <div className="p-4">
-                <div className="truncate text-sm font-semibold text-gray-900 dark:text-white">{camera.name}</div>
-                <div className="mt-1 truncate text-xs text-gray-500 dark:text-gray-400">
+                <div className="truncate text-sm font-semibold text-content">{camera.name}</div>
+                <div className="mt-1 truncate text-xs text-content-muted">
                     {camera.location || camera.area_name || 'Lokasi publik'}
                 </div>
-                    <div className="mt-3 flex gap-2 text-[11px] font-semibold">
-                        <span className="rounded-lg bg-emerald-50 px-2 py-1 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
-                            {formatCount(getAreaCameraLiveViewers(camera))} live
-                        </span>
-                        <span className="rounded-lg bg-gray-100 px-2 py-1 text-gray-600 dark:bg-gray-800 dark:text-gray-300">
-                            {formatCount(getAreaCameraTotalViews(camera))} views
-                        </span>
-                    </div>
+                <div className="mt-3 flex gap-2 text-[11px] font-semibold">
+                    <span className="rounded-lg bg-status-live/10 px-2 py-1 font-mono tabular-nums text-status-live">
+                        {formatCount(getAreaCameraLiveViewers(camera))} live
+                    </span>
+                    <span className="rounded-lg border border-edge px-2 py-1 font-mono tabular-nums text-content-muted">
+                        {formatCount(getAreaCameraTotalViews(camera))} views
+                    </span>
+                </div>
             </div>
         </button>
     );
@@ -326,12 +355,12 @@ export default function AreaPublicPage() {
 
     if (loading) {
         return (
-            <main className="min-h-screen bg-gray-50 text-gray-900 dark:bg-gray-950 dark:text-white">
+            <main className="min-h-screen bg-surface-sunken text-content">
                 <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-                    <div className="h-8 w-56 animate-pulse rounded-lg bg-gray-200 dark:bg-gray-800" />
+                    <div className="h-8 w-56 animate-pulse rounded-card bg-surface-raised" />
                     <div className="mt-6 grid gap-3 sm:grid-cols-3">
                         {[0, 1, 2].map((item) => (
-                            <div key={item} className="h-20 animate-pulse rounded-xl bg-gray-200 dark:bg-gray-800" />
+                            <div key={item} className="h-20 animate-pulse rounded-card bg-surface-raised" />
                         ))}
                     </div>
                 </div>
@@ -341,13 +370,13 @@ export default function AreaPublicPage() {
 
     if (notFound) {
         return (
-            <main className="min-h-screen bg-gray-50 text-gray-900 dark:bg-gray-950 dark:text-white">
+            <main className="min-h-screen bg-surface-sunken text-content">
                 <div className="mx-auto max-w-2xl px-4 py-20 text-center">
                     <h1 className="text-2xl font-bold">Area tidak ditemukan</h1>
-                    <p className="mt-3 text-sm text-gray-500 dark:text-gray-400">
+                    <p className="mt-3 text-sm text-content-muted">
                         Area CCTV yang Anda buka belum tersedia untuk publik.
                     </p>
-                    <Link to="/" className="mt-6 inline-flex rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white">
+                    <Link to="/" className="mt-6 inline-flex rounded-control bg-primary px-4 py-2 text-sm font-semibold text-white">
                         Kembali ke CCTV Publik
                     </Link>
                 </div>
@@ -356,13 +385,13 @@ export default function AreaPublicPage() {
     }
 
     return (
-        <main className="min-h-screen bg-gray-50 text-gray-900 dark:bg-gray-950 dark:text-white">
-            <section className="border-b border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
+        <main className="min-h-screen bg-surface-sunken text-content">
+            <section className="border-b border-edge bg-surface">
                 <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
                     <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <Link
                             to="/"
-                            className="inline-flex w-fit items-center rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-700 transition hover:border-primary/60 hover:text-primary dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:text-primary-300"
+                            className="inline-flex w-fit items-center rounded-control border border-edge bg-surface-sunken px-3 py-2 text-sm font-semibold text-content-muted transition-colors hover:border-edge-strong hover:text-content"
                         >
                             Kembali ke CCTV Publik
                         </Link>
@@ -370,24 +399,24 @@ export default function AreaPublicPage() {
                             <button
                                 type="button"
                                 onClick={handleShare}
-                                className="inline-flex w-fit rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary/90"
+                                className="inline-flex w-fit rounded-control bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-600"
                             >
                                 Share Area
                             </button>
                             {shareMessage && (
-                                <span role="status" className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                                <span role="status" className="text-xs font-medium text-content-muted">
                                     {shareMessage}
                                 </span>
                             )}
                         </div>
                     </div>
                     <div className="flex flex-col gap-2">
-                        <div className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+                        <div className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">
                             Area CCTV
                         </div>
                         <div>
                             <h1 className="text-2xl font-bold sm:text-3xl">{area?.name || 'Area CCTV'}</h1>
-                            <p className="mt-2 max-w-2xl text-sm text-gray-600 dark:text-gray-300">
+                            <p className="mt-2 max-w-2xl text-sm text-content-muted">
                                 {area?.description || 'Pantau CCTV publik area ini secara online melalui RAF NET.'}
                             </p>
                         </div>
@@ -432,13 +461,13 @@ export default function AreaPublicPage() {
             <section className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
                 <div className="mb-4 flex items-center justify-between gap-3">
                     <h2 className="text-lg font-semibold">Semua CCTV Area</h2>
-                    <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{cameras.length} kamera</span>
+                    <span className="font-mono text-xs font-medium tabular-nums text-content-subtle">{cameras.length} kamera</span>
                 </div>
 
                 {cameras.length === 0 ? (
-                    <div className="rounded-xl border border-dashed border-gray-300 bg-white p-10 text-center dark:border-gray-700 dark:bg-gray-900">
+                    <div className="rounded-card border border-dashed border-edge bg-surface p-10 text-center">
                         <h3 className="text-base font-semibold">Belum ada CCTV publik</h3>
-                        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                        <p className="mt-2 text-sm text-content-muted">
                             Kamera area ini akan muncul setelah tersedia untuk publik.
                         </p>
                     </div>
@@ -456,13 +485,13 @@ export default function AreaPublicPage() {
                         </div>
                         {hiddenAreaCameraCount > 0 && (
                             <div className="mt-6 flex flex-col items-center gap-3 text-center">
-                                <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                                <p className="font-mono text-xs font-medium tabular-nums text-content-subtle">
                                     Menampilkan {visibleAreaCameras.length} dari {cameras.length} kamera
                                 </p>
                                 <button
                                     type="button"
                                     onClick={() => setVisibleAreaCameraCount((current) => Math.min(current + AREA_LOAD_MORE_CAMERAS, cameras.length))}
-                                    className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-bold text-gray-700 shadow-sm transition hover:border-primary/50 hover:text-primary dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300 dark:hover:border-primary/50 dark:hover:text-primary"
+                                    className="rounded-control border border-edge bg-surface px-4 py-2 text-sm font-bold text-content-muted transition-colors hover:border-edge-strong hover:text-content"
                                 >
                                     Tampilkan {nextAreaLoadCount} kamera lagi
                                 </button>
