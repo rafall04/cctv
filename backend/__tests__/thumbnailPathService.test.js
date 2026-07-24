@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+    createThumbnailExistenceChecker,
     resolveThumbnailFilePath,
     sanitizeCameraThumbnail,
+    sanitizeCameraThumbnailList,
     sanitizeThumbnailPath,
 } from '../services/thumbnailPathService.js';
 
@@ -41,5 +43,41 @@ describe('thumbnailPathService', () => {
         expect(resolved).toContain('data');
         expect(resolved).toContain('thumbnails');
         expect(resolved).toContain('18.jpg');
+    });
+
+    it('sanitizes a whole list with a single shared existence check (honours caller fileExists)', () => {
+        const checked = [];
+        const fileExists = (filePath) => {
+            checked.push(filePath);
+            return filePath.includes('7');
+        };
+
+        const out = sanitizeCameraThumbnailList(
+            [
+                { id: 7, thumbnail_path: '/api/thumbnails/7.jpg', name: 'A' },
+                { id: 8, thumbnail_path: '/api/thumbnails/8.jpg', name: 'B' },
+                { id: 9, thumbnail_path: 'https://cdn.example.com/9.jpg', name: 'C' },
+            ],
+            fileExists
+        );
+
+        expect(out[0].thumbnail_path).toBe('/api/thumbnails/7.jpg');
+        expect(out[1].thumbnail_path).toBeNull();
+        // http(s) thumbnails never consult the filesystem checker.
+        expect(out[2].thumbnail_path).toBe('https://cdn.example.com/9.jpg');
+        expect(checked).toHaveLength(2);
+    });
+
+    it('returns an empty array for non-array input', () => {
+        expect(sanitizeCameraThumbnailList(null)).toEqual([]);
+        expect(sanitizeCameraThumbnailList(undefined)).toEqual([]);
+    });
+
+    it('createThumbnailExistenceChecker returns a callable checker that keeps http(s) thumbnails', () => {
+        const checker = createThumbnailExistenceChecker();
+        expect(typeof checker).toBe('function');
+        // Directly-called http(s) paths are treated as existing (safety short-circuit).
+        expect(checker('https://cdn.example.com/thumb.jpg')).toBe(true);
+        expect(checker(null)).toBe(false);
     });
 });
