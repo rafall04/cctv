@@ -1184,7 +1184,7 @@ function VideoPopup({
                 // is exactly where we want it to anchor (viewport
                 // top). `w-full` is the mobile fallback. Rounded
                 // corners + border give the centered-card affordance.
-                className={`relative bg-white dark:bg-gray-900 shadow-2xl flex flex-col ${isFullscreen ? 'w-full h-full overflow-hidden' : 'w-full rounded-2xl border border-gray-200 dark:border-gray-800 transition-[width] duration-200 ease-out motion-reduce:transition-none'}`}
+                className={`relative bg-surface shadow-e2 flex flex-col ${isFullscreen ? 'w-full h-full overflow-hidden' : 'w-full rounded-2xl border border-edge transition-[width] duration-200 ease-out motion-reduce:transition-none'}`}
                 style={modalStyle}
                 onClick={(e) => e.stopPropagation()}
             >
@@ -1198,11 +1198,11 @@ function VideoPopup({
                 {!isFullscreen && (
                     <div
                         ref={headerRef}
-                        className="sticky top-0 z-20 p-3 border-b border-gray-200 dark:border-gray-800 bg-gray-50/95 dark:bg-gray-800/95 backdrop-blur-sm"
+                        className="sticky top-0 z-20 p-3 border-b border-edge bg-surface-raised/95 backdrop-blur-sm"
                     >
                         <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-2 flex-1 min-w-0">
-                                <h3 className="text-gray-900 dark:text-white font-bold text-sm sm:text-base truncate">{camera.name}</h3>
+                                <h3 className="text-content font-bold text-sm sm:text-base truncate">{camera.name}</h3>
                                 {camera.video_codec && (
                                     <CodecBadge codec={camera.video_codec} size="sm" showWarning={true} />
                                 )}
@@ -1211,10 +1211,10 @@ function VideoPopup({
                             <div className="flex items-center gap-1 shrink-0">
                                 <button
                                     onClick={handleShare}
-                                    className="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg"
+                                    className="p-1.5 hover:bg-surface-raised rounded-lg"
                                     title="Bagikan link kamera"
                                 >
-                                    <svg className="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <svg className="w-4 h-4 text-content-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                         <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                                     </svg>
                                 </button>
@@ -1230,7 +1230,7 @@ function VideoPopup({
                                 <button
                                     onClick={onClose}
                                     aria-label="Tutup"
-                                    className="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg text-gray-500 dark:text-gray-400"
+                                    className="p-1.5 hover:bg-surface-raised rounded-lg text-content-muted"
                                 >
                                     <Icons.X />
                                 </button>
@@ -1240,7 +1240,7 @@ function VideoPopup({
                         {(camera.location || camera.area_name) && (
                             <div className="flex items-center gap-2 mt-1.5">
                                 {camera.location && (
-                                    <span className="text-gray-600 dark:text-gray-400 text-xs flex items-center gap-1 truncate">
+                                    <span className="text-content-muted text-xs flex items-center gap-1 truncate">
                                         <Icons.MapPin />
                                         <span className="truncate">{camera.location}</span>
                                     </span>
@@ -1359,7 +1359,7 @@ function VideoPopup({
                                     </div>
                                     <div>
                                         <h3 className="text-lg font-semibold">Sumber Eksternal</h3>
-                                        <p className="mt-2 text-sm text-gray-300">
+                                        <p className="mt-2 text-sm text-white/70">
                                             Format stream ini tidak diputar langsung oleh player internal. Buka sumber resmi untuk melihat CCTV dari penyedia asal.
                                         </p>
                                     </div>
@@ -1373,7 +1373,7 @@ function VideoPopup({
                                             Buka Sumber Resmi
                                         </a>
                                     ) : (
-                                        <p className="text-xs text-gray-400 break-all">{effectiveUrl}</p>
+                                        <p className="text-xs text-white/50 break-all">{effectiveUrl}</p>
                                     )}
                                 </div>
                             </div>
@@ -1383,9 +1383,9 @@ function VideoPopup({
                     {/* Snapshot Notification */}
                     {snapshotNotification && (
                         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
-                            <div className={`px-5 py-3 rounded-xl shadow-2xl border-2 ${snapshotNotification.type === 'success'
-                                ? 'bg-green-500 border-green-400'
-                                : 'bg-red-500 border-red-400'
+                            <div className={`px-5 py-3 rounded-xl shadow-e2 border-2 ${snapshotNotification.type === 'success'
+                                ? 'bg-status-live border-status-live'
+                                : 'bg-status-fault border-status-fault'
                                 } text-white animate-slide-down`}>
                                 <div className="flex items-center gap-3">
                                     {snapshotNotification.type === 'success' ? (
@@ -1422,30 +1422,30 @@ function VideoPopup({
                                     <div className="flex items-center gap-2">
                                         <button
                                             onClick={handleShare}
-                                            className="p-2 hover:bg-gray-700/50 dark:hover:bg-white/20 rounded-xl text-white"
+                                            className="p-2 hover:bg-white/20 rounded-xl text-white"
                                             title="Bagikan link kamera"
                                         >
                                             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                                 <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                                             </svg>
                                         </button>
-                                        {renderStatus === 'live' && isHlsCamera && <button onClick={takeSnapshot} className="p-2 hover:bg-gray-700/50 dark:hover:bg-white/20 active:bg-gray-700/70 dark:active:bg-white/30 rounded-xl text-gray-900 dark:text-white bg-gray-200/80 dark:bg-white/10"><Icons.Image /></button>}
-                                        <button onClick={toggleFS} className="p-2 hover:bg-gray-700/50 dark:hover:bg-white/20 active:bg-gray-700/70 dark:active:bg-white/30 rounded-xl text-gray-900 dark:text-white bg-gray-200/80 dark:bg-white/10">
+                                        {renderStatus === 'live' && isHlsCamera && <button onClick={takeSnapshot} className="p-2 hover:bg-white/20 active:bg-white/30 rounded-xl text-white bg-white/10"><Icons.Image /></button>}
+                                        <button onClick={toggleFS} className="p-2 hover:bg-white/20 active:bg-white/30 rounded-xl text-white bg-white/10">
                                             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 9V4.5M9 9H4.5M9 9L3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5l5.25 5.25" />
                                             </svg>
                                         </button>
-                                        <button onClick={handleClose} className="p-2 hover:bg-gray-700/50 dark:hover:bg-white/20 active:bg-gray-700/70 dark:active:bg-white/30 rounded-xl text-gray-900 dark:text-white bg-gray-200/80 dark:bg-white/10"><Icons.X /></button>
+                                        <button onClick={handleClose} className="p-2 hover:bg-white/20 active:bg-white/30 rounded-xl text-white bg-white/10"><Icons.X /></button>
                                     </div>
                                 </div>
                                 {/* Codec info detail - fullscreen mode */}
                                 {camera.video_codec && (
                                     <div className="mt-2 flex items-center gap-2 text-xs">
-                                        <span className="text-gray-300">
+                                        <span className="text-white/70">
                                             Codec: <strong className="text-white">{camera.video_codec.toUpperCase()}</strong>
                                         </span>
                                         {camera.video_codec === 'h265' && (
-                                            <span className="text-yellow-400 text-[10px]">
+                                            <span className="text-amber-400 text-[10px]">
                                                 ⚠ Terbaik di Safari
                                             </span>
                                         )}
@@ -1454,11 +1454,11 @@ function VideoPopup({
                             </div>
 
                             {!isPlaybackLocked && (
-                                <div className="absolute bottom-4 right-4 z-50 flex items-center gap-1 bg-gray-200/90 dark:bg-gray-900/80 rounded-xl p-1 pointer-events-auto">
-                                    <button onClick={() => getZoomableWrapper()?._zoomOut?.()} disabled={zoom <= 1} className="p-2 hover:bg-gray-700/30 dark:hover:bg-white/20 active:bg-gray-700/50 dark:active:bg-white/30 disabled:opacity-30 rounded-lg text-gray-900 dark:text-white"><Icons.ZoomOut /></button>
-                                    <span className="text-gray-900 dark:text-white text-xs font-medium w-12 text-center">{Math.round(zoom * 100)}%</span>
-                                    <button onClick={() => getZoomableWrapper()?._zoomIn?.()} disabled={zoom >= 4} className="p-2 hover:bg-gray-700/30 dark:hover:bg-white/20 active:bg-gray-700/50 dark:active:bg-white/30 disabled:opacity-30 rounded-lg text-gray-900 dark:text-white"><Icons.ZoomIn /></button>
-                                    {zoom > 1 && <button onClick={() => getZoomableWrapper()?._reset?.()} className="p-2 hover:bg-gray-700/30 dark:hover:bg-white/20 active:bg-gray-700/50 dark:active:bg-white/30 rounded-lg text-gray-900 dark:text-white ml-1"><Icons.Reset /></button>}
+                                <div className="absolute bottom-4 right-4 z-50 flex items-center gap-1 bg-black/60 rounded-xl p-1 pointer-events-auto">
+                                    <button onClick={() => getZoomableWrapper()?._zoomOut?.()} disabled={zoom <= 1} className="p-2 hover:bg-white/20 active:bg-white/30 disabled:opacity-30 rounded-lg text-white"><Icons.ZoomOut /></button>
+                                    <span className="text-white text-xs font-medium w-12 text-center">{Math.round(zoom * 100)}%</span>
+                                    <button onClick={() => getZoomableWrapper()?._zoomIn?.()} disabled={zoom >= 4} className="p-2 hover:bg-white/20 active:bg-white/30 disabled:opacity-30 rounded-lg text-white"><Icons.ZoomIn /></button>
+                                    {zoom > 1 && <button onClick={() => getZoomableWrapper()?._reset?.()} className="p-2 hover:bg-white/20 active:bg-white/30 rounded-lg text-white ml-1"><Icons.Reset /></button>}
                                 </div>
                             )}
                         </>
@@ -1491,43 +1491,43 @@ function VideoPopup({
                     header + video + this bar = one screen. Related strip,
                     metadata, codec note, and the ad all move BELOW it so
                     they sit below the fold (the backdrop scrolls to them). */}
-                <div ref={footerRef} className={`shrink-0 border-t border-gray-200 dark:border-gray-800 ${isFullscreen ? 'hidden' : ''}`}>
+                <div ref={footerRef} className={`shrink-0 border-t border-edge ${isFullscreen ? 'hidden' : ''}`}>
                     {/* Controls */}
                     <div className="p-3 flex items-center justify-between">
                         {/* Camera Description - Kiri Bawah */}
-                        <div className="text-xs text-gray-600 dark:text-gray-400 flex-1 min-w-0 mr-3">
+                        <div className="text-xs text-content-muted flex-1 min-w-0 mr-3">
                             {camera.description ? (
                                 <span className="line-clamp-2">{camera.description}</span>
                             ) : (
-                                <span className="text-gray-500 dark:text-gray-500 italic">Tidak ada deskripsi</span>
+                                <span className="text-content-subtle italic">Tidak ada deskripsi</span>
                             )}
                         </div>
 
                         <div className="flex items-center gap-1 shrink-0">
                             {!isPlaybackLocked && (
                                 <>
-                                    <div className="flex items-center gap-0.5 bg-gray-200/90 dark:bg-gray-800 rounded-lg p-0.5">
-                                        <button onClick={() => getZoomableWrapper()?._zoomOut?.()} disabled={zoom <= 1} className="p-1.5 hover:bg-gray-300/50 dark:hover:bg-gray-700 disabled:opacity-30 rounded text-gray-900 dark:text-white transition-colors" title="Zoom Out">
+                                    <div className="flex items-center gap-0.5 bg-surface-raised rounded-lg p-0.5">
+                                        <button onClick={() => getZoomableWrapper()?._zoomOut?.()} disabled={zoom <= 1} className="p-1.5 hover:bg-surface-overlay disabled:opacity-30 rounded text-content transition-colors" title="Zoom Out">
                                             <Icons.ZoomOut />
                                         </button>
-                                        <span className="text-gray-900 dark:text-white text-[10px] font-medium w-8 text-center">{Math.round(zoom * 100)}%</span>
-                                        <button onClick={() => getZoomableWrapper()?._zoomIn?.()} disabled={zoom >= 4} className="p-1.5 hover:bg-gray-300/50 dark:hover:bg-gray-700 disabled:opacity-30 rounded text-gray-900 dark:text-white transition-colors" title="Zoom In">
+                                        <span className="text-content text-[10px] font-medium w-8 text-center">{Math.round(zoom * 100)}%</span>
+                                        <button onClick={() => getZoomableWrapper()?._zoomIn?.()} disabled={zoom >= 4} className="p-1.5 hover:bg-surface-overlay disabled:opacity-30 rounded text-content transition-colors" title="Zoom In">
                                             <Icons.ZoomIn />
                                         </button>
                                         {zoom > 1 && (
-                                            <button onClick={() => getZoomableWrapper()?._reset?.()} className="p-1.5 hover:bg-gray-300/50 dark:hover:bg-gray-700 rounded text-gray-900 dark:text-white transition-colors" title="Reset Zoom">
+                                            <button onClick={() => getZoomableWrapper()?._reset?.()} className="p-1.5 hover:bg-surface-overlay rounded text-content transition-colors" title="Reset Zoom">
                                                 <Icons.Reset />
                                             </button>
                                         )}
                                     </div>
 
                                     {renderStatus === 'live' && isHlsCamera && (
-                                        <button onClick={takeSnapshot} className="p-1.5 bg-gray-200/80 dark:bg-gray-800 hover:bg-gray-300/50 dark:hover:bg-gray-700 rounded-lg text-gray-900 dark:text-white transition-colors" title="Ambil Screenshot">
+                                        <button onClick={takeSnapshot} className="p-1.5 bg-surface-raised hover:bg-surface-overlay rounded-lg text-content transition-colors" title="Ambil Screenshot">
                                             <Icons.Image />
                                         </button>
                                     )}
 
-                                    <button onClick={toggleFS} className="p-1.5 bg-gray-200/80 dark:bg-gray-800 hover:bg-gray-300/50 dark:hover:bg-gray-700 rounded-lg text-gray-900 dark:text-white transition-colors" title={isFullscreen ? "Keluar Fullscreen" : "Fullscreen"}>
+                                    <button onClick={toggleFS} className="p-1.5 bg-surface-raised hover:bg-surface-overlay rounded-lg text-content transition-colors" title={isFullscreen ? "Keluar Fullscreen" : "Fullscreen"}>
                                         <Icons.Fullscreen />
                                     </button>
                                 </>
@@ -1540,7 +1540,7 @@ function VideoPopup({
                             )}
 
                             {/* Close Button */}
-                            <button onClick={onClose} className="p-1.5 bg-gray-200/80 dark:bg-gray-800 hover:bg-gray-300/50 dark:hover:bg-gray-700 rounded-lg text-gray-900 dark:text-white transition-colors" title="Tutup">
+                            <button onClick={onClose} className="p-1.5 bg-surface-raised hover:bg-surface-overlay rounded-lg text-content transition-colors" title="Tutup">
                                 <Icons.X />
                             </button>
                         </div>
@@ -1564,12 +1564,12 @@ function VideoPopup({
                         />
                         {/* Codec Description - Simpel dan Jelas */}
                         {camera.video_codec && camera.video_codec === 'h265' && (
-                            <div className="px-3 py-3 border-t border-gray-200 dark:border-gray-800">
-                                <div className="flex items-start gap-2 px-3 py-2 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
-                                    <svg className="w-4 h-4 text-yellow-400 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                            <div className="px-3 py-3 border-t border-edge">
+                                <div className="flex items-start gap-2 px-3 py-2 bg-status-warn/10 border border-status-warn/20 rounded-lg">
+                                    <svg className="w-4 h-4 text-status-warn shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                                         <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                                     </svg>
-                                    <div className="flex-1 text-xs text-yellow-400">
+                                    <div className="flex-1 text-xs text-status-warn">
                                         <strong>Codec H.265:</strong> Terbaik di Safari. Chrome/Edge tergantung hardware device.
                                     </div>
                                 </div>
@@ -1584,7 +1584,7 @@ function VideoPopup({
                         label="Sponsored"
                         script={adsConfig.slots.popupBottomNative.script}
                         variant="popup-inline"
-                        className="border-t border-gray-200 bg-white/90 px-3 py-3 dark:border-gray-800 dark:bg-gray-900/90"
+                        className="border-t border-edge bg-surface/90 px-3 py-3"
                         minHeightClassName="min-h-[96px]"
                         maxHeight={popupMaxHeight}
                         suppressWhenOversize={false}
@@ -1596,7 +1596,7 @@ function VideoPopup({
                         label="Sponsored"
                         script={adsConfig.slots.popupTopBanner.script}
                         variant="popup-inline"
-                        className="border-t border-gray-200 bg-white/90 px-3 py-3 dark:border-gray-800 dark:bg-gray-900/90"
+                        className="border-t border-edge bg-surface/90 px-3 py-3"
                         minHeightClassName="min-h-[96px]"
                         maxHeight={popupMaxHeight}
                     />

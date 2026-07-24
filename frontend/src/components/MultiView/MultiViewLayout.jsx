@@ -69,17 +69,17 @@ function MultiViewLayout({ cameras, onRemove, onClose }) {
 
     return (
         <div
-            className="fixed inset-0 z-[1300] bg-gray-50 dark:bg-gray-950 flex flex-col"
+            className="fixed inset-0 z-[1300] bg-surface-sunken flex flex-col"
             role="dialog"
             aria-modal="true"
             aria-label="Multi-View kamera"
         >
-            <div className="shrink-0 flex items-center justify-between p-3 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-white/10">
+            <div className="shrink-0 flex items-center justify-between p-3 bg-surface border-b border-edge">
                 <div className="flex items-center gap-3">
                     <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-primary/20 flex items-center justify-center text-primary-400"><Icons.Layout /></div>
                     <div>
-                        <h2 className="text-white font-bold text-sm sm:text-base">Multi-View</h2>
-                        <p className="text-gray-500 text-[10px] sm:text-xs">{count} camera{count !== 1 ? 's' : ''}</p>
+                        <h2 className="text-content font-bold text-sm sm:text-base">Multi-View</h2>
+                        <p className="text-content-muted text-[10px] sm:text-xs">{count} camera{count !== 1 ? 's' : ''}</p>
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -87,7 +87,7 @@ function MultiViewLayout({ cameras, onRemove, onClose }) {
                         onClick={toggleFS}
                         aria-label="Fullscreen Multi-View"
                         title="Fullscreen"
-                        className="p-2 hover:bg-gray-700/30 dark:hover:bg-white/10 rounded-xl text-gray-900 dark:text-white"
+                        className="p-2 hover:bg-surface-raised rounded-xl text-content"
                     >
                         <Icons.Fullscreen />
                     </button>
@@ -95,7 +95,7 @@ function MultiViewLayout({ cameras, onRemove, onClose }) {
                         onClick={onClose}
                         aria-label="Tutup Multi-View"
                         title="Tutup (Esc)"
-                        className="p-2 hover:bg-gray-700/30 dark:hover:bg-white/10 rounded-xl text-gray-900 dark:text-white"
+                        className="p-2 hover:bg-surface-raised rounded-xl text-content"
                     >
                         <Icons.X />
                     </button>

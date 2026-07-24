@@ -8,55 +8,26 @@ function WrenchIcon() {
     );
 }
 
-const OVERLAY_STYLES = {
-    maintenance: {
-        container: 'bg-red-950/80',
-        iconCircle: 'bg-red-500/20 text-red-400',
-        title: 'text-red-300',
-        description: 'text-gray-300',
-    },
-    offline: {
-        container: 'bg-gray-100/95 dark:bg-gray-900/90',
-        iconCircle: 'bg-gray-700 text-gray-400',
-        title: 'text-gray-200',
-        description: 'text-gray-400',
-    },
-    timeout: {
-        container: 'bg-gray-100/95 dark:bg-black/90',
-        iconCircle: 'bg-amber-500/20 text-amber-400',
-        title: 'text-white',
-        description: 'text-gray-400',
-    },
-    codec: {
-        container: 'bg-gray-100/95 dark:bg-black/90',
-        iconCircle: 'bg-yellow-500/20 text-yellow-400',
-        title: 'text-white',
-        description: 'text-gray-400',
-    },
-    network: {
-        container: 'bg-gray-100/95 dark:bg-black/90',
-        iconCircle: 'bg-orange-500/20 text-orange-400',
-        title: 'text-white',
-        description: 'text-gray-400',
-    },
-    media: {
-        container: 'bg-gray-100/95 dark:bg-black/90',
-        iconCircle: 'bg-purple-500/20 text-purple-400',
-        title: 'text-white',
-        description: 'text-gray-400',
-    },
-    cors: {
-        container: 'bg-gray-100/95 dark:bg-black/90',
-        iconCircle: 'bg-blue-500/20 text-blue-400',
-        title: 'text-white',
-        description: 'text-gray-400',
-    },
-    unknown: {
-        container: 'bg-gray-100/95 dark:bg-black/90',
-        iconCircle: 'bg-red-500/20 text-red-400',
-        title: 'text-white',
-        description: 'text-gray-400',
-    },
+/*
+ * This overlay always sits over the black <video> body, so it is a permanently-dark
+ * surface. We scope it to `.dark` and use the semantic tokens, which then resolve to
+ * their bright dark-theme values in EITHER page theme — fixing the old light-mode bug
+ * where `text-white` titles sat on a near-white light-mode scrim (invisible).
+ *
+ * Tone encodes severity (data/warn/idle/fault); the per-variant icon carries the
+ * specific reason. Red (`status-fault`) is reserved for genuine faults — offline and
+ * unknown — matching the public red-discipline rule; recoverable playback problems are
+ * amber (`status-warn`), loading is cyan data.
+ */
+const VARIANT_TONE = {
+    maintenance: 'text-status-warn',
+    offline:     'text-content-muted',
+    timeout:     'text-status-warn',
+    codec:       'text-status-warn',
+    network:     'text-status-warn',
+    media:       'text-status-warn',
+    cors:        'text-status-warn',
+    unknown:     'text-status-fault',
 };
 
 function renderIcon(variant) {
@@ -94,24 +65,24 @@ export default function PublicStreamStatusOverlay({
 
     if (state.variant === 'loading') {
         return (
-            <div className={`${className} bg-gradient-to-br from-gray-800 via-gray-900 to-gray-800 flex flex-col items-center justify-center gap-3`}>
+            <div className={`${className} dark flex flex-col items-center justify-center gap-3 bg-black/80`}>
                 {!disableAnimations && (
                     <div className="absolute inset-0 overflow-hidden pointer-events-none">
                         <div className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite] bg-gradient-to-r from-transparent via-white/5 to-transparent" />
                     </div>
                 )}
                 <div className="relative">
-                    <div className={`w-12 h-12 border-2 border-gray-700 rounded-full ${disableAnimations ? '' : 'animate-pulse'}`} />
+                    <div className={`h-12 w-12 rounded-full border-2 border-white/15 ${disableAnimations ? '' : 'animate-pulse'}`} />
                     <div
-                        className={`absolute inset-0 w-12 h-12 border-2 border-transparent border-t-sky-500 rounded-full ${disableAnimations ? '' : 'animate-spin'}`}
+                        className={`absolute inset-0 h-12 w-12 rounded-full border-2 border-transparent border-t-data ${disableAnimations ? '' : 'animate-spin'}`}
                         style={disableAnimations ? { animation: 'spin 1.5s linear infinite' } : undefined}
                     />
                 </div>
-                <div className="text-center px-4">
-                    <p className="text-white font-medium text-sm">{state.title}</p>
-                    <p className="text-gray-400 text-xs mt-1">{state.description}</p>
+                <div className="px-4 text-center">
+                    <p className="text-sm font-medium text-content">{state.title}</p>
+                    <p className="mt-1 text-xs text-content-muted">{state.description}</p>
                     {autoRetryCount > 0 && (
-                        <p className="text-sky-300 text-xs mt-1 font-medium">
+                        <p className="mt-1 font-mono text-xs font-medium tabular-nums text-data">
                             Mencoba menyambungkan ulang… (percobaan {Math.min(autoRetryCount, maxAutoRetries)} dari {maxAutoRetries})
                         </p>
                     )}
@@ -120,21 +91,21 @@ export default function PublicStreamStatusOverlay({
         );
     }
 
-    const style = OVERLAY_STYLES[state.variant] || OVERLAY_STYLES.unknown;
+    const tone = VARIANT_TONE[state.variant] || 'text-status-fault';
 
     return (
-        <div className={`${className} ${style.container} flex flex-col items-center justify-center px-4 py-6`}>
-            <div className={`w-20 h-20 rounded-full flex items-center justify-center mb-4 ${style.iconCircle}`}>
+        <div className={`${className} dark flex flex-col items-center justify-center bg-black/85 px-4 py-6`}>
+            <div className={`mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-white/5 ring-1 ring-inset ring-current ${tone}`}>
                 {renderIcon(state.variant)}
             </div>
-            <div className="text-center max-w-md">
-                <h3 className={`font-bold text-xl mb-2 ${style.title}`}>{state.title}</h3>
-                <p className={`text-sm ${style.description}`}>{state.description}</p>
+            <div className="max-w-md text-center">
+                <h3 className="mb-2 text-xl font-bold text-content">{state.title}</h3>
+                <p className="text-sm text-content-muted">{state.description}</p>
             </div>
             {showTroubleshooting && state.variant === 'timeout' && consecutiveFailures >= 3 && (
-                <div className="mt-4 bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 max-w-sm text-left">
-                    <p className="text-amber-400 text-xs font-medium mb-1">Tips Mengatasi:</p>
-                    <ul className="text-gray-400 text-xs list-disc list-inside space-y-1">
+                <div className="mt-4 max-w-sm rounded-control border border-status-warn/30 bg-status-warn/10 p-3 text-left">
+                    <p className="mb-1 font-mono text-[10px] font-medium uppercase tracking-[0.1em] text-status-warn">Tips Mengatasi</p>
+                    <ul className="list-inside list-disc space-y-1 text-xs text-content-muted">
                         <li>Periksa koneksi internet Anda</li>
                         <li>Kamera mungkin sedang offline</li>
                         <li>Coba muat ulang halaman</li>
@@ -144,7 +115,7 @@ export default function PublicStreamStatusOverlay({
             {state.canRetry && onRetry && (
                 <button
                     onClick={onRetry}
-                    className="mt-5 inline-flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-600 text-white rounded-lg font-medium transition-colors"
+                    className="mt-5 inline-flex items-center gap-2 rounded-control bg-primary px-4 py-2 font-medium text-white transition-colors hover:bg-primary-600"
                 >
                     <Icons.Reset />
                     Coba Lagi
