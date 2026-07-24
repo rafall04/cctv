@@ -55,7 +55,7 @@ export default function CameraViewerStatsBadges({
     const liveDotClass = liveViewers > 0 ? 'bg-status-live' : 'bg-status-idle';
 
     return (
-        <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-medium tabular-nums ${containerClass} ${className}`}>
+        <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[11px] font-medium tabular-nums ${containerClass} ${className}`}>
             <span className="inline-flex items-center gap-1.5">
                 <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${liveDotClass}`} aria-hidden="true"></span>
                 {formatCompactCount(liveViewers)} live

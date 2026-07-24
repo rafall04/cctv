@@ -126,13 +126,13 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
                     <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${status.dot}`} aria-hidden="true"></span>
                     <span className="sr-only">{status.srLabel}</span>
                     {status.label && (
-                        <span className="text-[11px] font-medium leading-none text-white/90">{status.label}</span>
+                        <span className="font-mono text-[10px] font-semibold uppercase tracking-wide leading-none text-white/90">{status.label}</span>
                     )}
                     {/* REC keeps the conventional red, but it is always paired with its
                         own label so it cannot be misread as a fault the way the old
                         unlabelled red LIVE pill could. */}
                     {isLive && camera.is_recording && (
-                        <span className="flex items-center gap-1 border-l border-white/20 pl-1.5 text-[11px] font-medium leading-none text-white/90">
+                        <span className="flex items-center gap-1 border-l border-white/20 pl-1.5 font-mono text-[10px] font-semibold leading-none text-white/90">
                             <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-status-fault" aria-hidden="true"></span>
                             REC
                         </span>
@@ -143,7 +143,7 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
                     {onToggleFavorite && (
                         <button
                             onClick={(e) => { e.stopPropagation(); onToggleFavorite(camera.id); }}
-                            className={`${actionButtonClass} ${isFav ? 'border-amber-300/40 text-amber-300' : ''}`}
+                            className={`${actionButtonClass} ${isFav ? 'border-status-warn/50 text-status-warn' : ''}`}
                             title={isFav ? 'Hapus dari Favorit' : 'Tambah ke Favorit'}
                         >
                             <svg className="h-4 w-4" fill={isFav ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -188,7 +188,7 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
                 <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
                     <CameraViewerStatsBadges camera={camera} />
                     {showQuality && (
-                        <span className="text-[11px] font-medium text-primary">{quality.label}</span>
+                        <span className="rounded-full border border-edge px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-wide text-data">{quality.label}</span>
                     )}
                 </div>
             </div>
