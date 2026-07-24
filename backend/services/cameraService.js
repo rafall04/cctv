@@ -21,6 +21,7 @@ import { cacheGetOrSetSync, cacheInvalidate, cacheKey, CacheNamespace } from './
 import { invalidateCameraAccessCache } from './cameraAccessService.js';
 import { PUBLIC_LIVE_SQL } from '../utils/cameraVisibility.js';
 import { sanitizeCameraThumbnail, sanitizeCameraThumbnailList } from './thumbnailPathService.js';
+import { stripInternalLandingFields } from './publicLandingProjection.js';
 import cameraHealthService from './cameraHealthService.js';
 import cameraRuntimeStateService from './cameraRuntimeStateService.js';
 import cameraSourceLifecycleService from './cameraSourceLifecycleService.js';
@@ -138,7 +139,6 @@ const PUBLIC_LANDING_CAMERA_PROJECTION = `
     c.enabled,
     c.enable_recording,
     c.video_codec,
-    c.stream_key,
     c.thumbnail_path,
     c.thumbnail_updated_at,
     c.stream_source,
@@ -987,7 +987,7 @@ class CameraService {
             ORDER BY c.is_tunnel ASC, c.id ASC
         `))
             .map(sanitizePublicLandingCamera)
-            .map((camera) => cameraHealthService.enrichCameraAvailability(camera)), CAMERA_READ_MODEL_TTL_MS);
+            .map((camera) => cameraHealthService.enrichCameraAvailability(camera)).map(stripInternalLandingFields), CAMERA_READ_MODEL_TTL_MS);
     }
 
     getAdminCameraList() {

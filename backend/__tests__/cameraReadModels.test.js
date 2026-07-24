@@ -87,6 +87,50 @@ describe('cameraService read models', () => {
         });
     });
 
+    it('strips internal health/runtime fields and never selects stream_key for the public landing list', async () => {
+        const querySpy = vi.spyOn(connectionPool, 'query').mockReturnValue([
+            {
+                id: 3,
+                name: 'Cam C',
+                is_online: 1,
+                monitoring_state: 'online',
+                monitoring_reason: 'runtime_signal',
+                last_runtime_signal_at: '2026-05-05 10:00:00',
+                last_runtime_signal_type: 'frame',
+                last_health_check_at: '2026-05-05 09:59:00',
+                runtime_state_updated_at: '2026-05-05 10:00:00',
+                external_health_mode: 'hybrid_probe',
+                area_external_health_mode_override: 'default',
+                thumbnail_path: '/thumb-c.jpg',
+            },
+        ]);
+
+        const { default: cameraService } = await import('../services/cameraService.js');
+        const rows = cameraService.getPublicLandingCameraList();
+
+        // stream_key must never even be selected for the public landing list.
+        expect(querySpy.mock.calls[0][0]).not.toContain('stream_key');
+
+        const row = rows[0];
+        // Public signal is kept (is_online for stats, availability_state for the card/popup).
+        expect(row).toMatchObject({ id: 3, name: 'Cam C', is_online: 1, availability_state: 'online' });
+        // Internal monitoring/health/runtime policy is stripped from the public payload.
+        for (const field of [
+            'stream_key',
+            'monitoring_state',
+            'monitoring_reason',
+            'last_runtime_signal_at',
+            'last_runtime_signal_type',
+            'last_health_check_at',
+            'runtime_state_updated_at',
+            'health_mode',
+            'external_health_mode',
+            'area_external_health_mode_override',
+        ]) {
+            expect(row).not.toHaveProperty(field);
+        }
+    });
+
     it('loads camera detail with full config plus runtime state', async () => {
         const queryOneSpy = vi.spyOn(connectionPool, 'queryOne').mockReturnValue({
             id: 9,
