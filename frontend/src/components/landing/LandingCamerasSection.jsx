@@ -36,11 +36,11 @@ export function renderSearchDropdown({
     if (searchQuery.trim() && cameras.length === 0) {
         return (
             <div className="absolute left-0 right-0 top-full z-[1100] mt-2 rounded-card border border-edge bg-surface-overlay p-6 text-center shadow-e2">
-                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-gray-100 text-gray-400 dark:bg-gray-700">
+                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-surface-sunken text-content-subtle">
                     <Icons.Search />
                 </div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                    Tidak ditemukan kamera untuk &quot;<span className="font-medium text-gray-700 dark:text-gray-300">{searchQuery}</span>&quot;
+                <p className="text-sm text-content-muted">
+                    Tidak ditemukan kamera untuk &quot;<span className="font-medium text-content">{searchQuery}</span>&quot;
                 </p>
             </div>
         );
@@ -55,14 +55,13 @@ export function renderSearchDropdown({
 
     return (
         <div className="absolute left-0 right-0 top-full z-[1100] mt-2 max-h-[300px] overflow-y-auto rounded-card border border-edge bg-surface-overlay shadow-e2 sm:max-h-[400px]">
-            <div className="sticky top-0 border-b border-gray-200 bg-gray-50 px-3 py-2 dark:border-gray-700 dark:bg-gray-900/50">
-                <span className="text-xs text-gray-500 dark:text-gray-400">
+            <div className="sticky top-0 border-b border-edge bg-surface-sunken px-3 py-2">
+                <span className="font-mono text-[11px] tabular-nums text-content-muted">
                     {hasHiddenResults ? `${visibleCameras.length} dari ${cameras.length}` : cameras.length} hasil pencarian
                 </span>
             </div>
             {visibleCameras.map((camera, index) => {
                 const isMaintenance = camera.status === 'maintenance';
-                const isTunnel = camera.is_tunnel === 1;
                 const hasCoords = camera.latitude && camera.longitude;
                 const isDisabled = viewMode === 'map' && !hasCoords;
 
@@ -71,18 +70,16 @@ export function renderSearchDropdown({
                         key={camera.id ?? `search-${index}`}
                         onClick={() => onSelect(camera)}
                         disabled={isDisabled}
-                        className={`flex w-full items-center gap-3 border-b border-gray-100 px-4 py-3 text-left transition-colors last:border-b-0 dark:border-gray-700/50 ${
+                        className={`flex w-full items-center gap-3 border-b border-edge px-4 py-3 text-left transition-colors last:border-b-0 ${
                             !isDisabled
-                                ? 'cursor-pointer hover:bg-sky-50 dark:hover:bg-primary/10'
+                                ? 'cursor-pointer hover:bg-surface-raised'
                                 : 'cursor-not-allowed opacity-50'
                         }`}
                     >
                         <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
                             isMaintenance
-                                ? 'bg-red-100 text-red-500 dark:bg-red-500/20'
-                                : isTunnel
-                                    ? 'bg-orange-100 text-orange-500 dark:bg-orange-500/20'
-                                    : 'bg-emerald-100 text-emerald-500 dark:bg-emerald-500/20'
+                                ? 'bg-status-fault/10 text-status-fault'
+                                : 'bg-status-live/10 text-status-live'
                         }`}>
                             {isMaintenance ? (
                                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -98,28 +95,23 @@ export function renderSearchDropdown({
                         <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2">
                                 <span className={`truncate font-medium ${
-                                    isMaintenance ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'
+                                    isMaintenance ? 'text-status-fault' : 'text-content'
                                 }`}>
                                     {camera.name}
                                 </span>
                                 {isMaintenance && (
-                                    <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-600 dark:bg-red-500/20 dark:text-red-400">
+                                    <span className="rounded-full bg-status-fault/10 px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-wide text-status-fault">
                                         Perbaikan
                                     </span>
                                 )}
-                                {isTunnel && !isMaintenance && (
-                                    <span className="rounded-full bg-orange-100 px-1.5 py-0.5 text-[10px] font-medium text-orange-600 dark:bg-orange-500/20 dark:text-orange-400">
-                                        Tunnel
-                                    </span>
-                                )}
                             </div>
-                            <p className="mt-0.5 truncate text-xs text-gray-500 dark:text-gray-400">
+                            <p className="mt-0.5 truncate text-xs text-content-muted">
                                 {[camera.area_name, camera.location].filter(Boolean).join(' / ') || 'Lokasi tidak tersedia'}
                             </p>
                         </div>
 
                         {isDisabled && (
-                            <span className="shrink-0 text-[10px] text-gray-400 dark:text-gray-500">
+                            <span className="shrink-0 font-mono text-[10px] text-content-subtle">
                                 Tanpa koordinat
                             </span>
                         )}
@@ -265,13 +257,13 @@ export default function CamerasSection({
                         />
                     ) : (
                         <div className="py-16 text-center">
-                            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gray-100 text-gray-400 dark:bg-gray-800">
+                            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-surface-raised text-content-subtle">
                                 <Icons.Camera />
                             </div>
-                            <h3 className="mb-2 text-lg font-semibold text-gray-900 dark:text-white">
+                            <h3 className="mb-2 text-lg font-semibold text-content">
                                 Belum Ada Kamera
                             </h3>
-                            <p className="text-gray-500 dark:text-gray-400">
+                            <p className="text-content-muted">
                                 Kamera CCTV akan segera tersedia untuk ditonton.
                             </p>
                         </div>

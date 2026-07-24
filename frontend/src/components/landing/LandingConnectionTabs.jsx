@@ -1,6 +1,9 @@
 /*
- * Purpose: Render grid camera filter/ranking tabs for public landing area results.
- * Caller: LandingCamerasSection contextual controls.
+ * Purpose: Grid ranking/quality filter chips for the public landing (Semua / Stabil /
+ *          Paling Ramai / Terbaru / Favorit). "Tunnel" was removed — it is internal
+ *          transport jargon and must never surface on a public page (same rule the card
+ *          and MapView already enforce).
+ * Caller: LandingCamerasSection contextual controls (grid view).
  * Deps: Camera viewer stats and favorites arrays.
  * MainFuncs: LandingConnectionTabs.
  * SideEffects: Invokes caller-provided tab change handler.
@@ -14,91 +17,40 @@ export default function LandingConnectionTabs({
     favoritesInAreaCount,
 }) {
     const stableCount = areaFilteredCameras.filter((camera) => camera.is_tunnel !== 1).length;
-    const tunnelCount = areaFilteredCameras.filter((camera) => camera.is_tunnel === 1).length;
     const newestCount = areaFilteredCameras.filter((camera) => camera.created_at).length || areaFilteredCameras.length;
 
+    const tabs = [
+        { key: 'all', label: 'Semua', count: areaFilteredCameras.length, dot: null },
+        { key: 'stable', label: 'Stabil', count: stableCount, dot: 'bg-status-live' },
+        { key: 'popular', label: 'Paling Ramai', count: areaFilteredCameras.length, dot: 'bg-data' },
+        { key: 'newest', label: 'Terbaru', count: newestCount, dot: 'bg-content-subtle' },
+    ];
+    if (favorites.length > 0) {
+        tabs.push({ key: 'favorites', label: 'Favorit', count: favoritesInAreaCount, dot: 'bg-status-warn' });
+    }
+
     return (
-        <div>
-            <div className="flex w-fit flex-wrap gap-2 rounded-xl bg-gray-100 p-1.5 dark:bg-gray-800">
-                <button
-                    onClick={() => onChange('all')}
-                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                        connectionTab === 'all'
-                            ? 'bg-surface text-content shadow-e1'
-                            : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-                    }`}
-                >
-                    Semua ({areaFilteredCameras.length})
-                </button>
-                <button
-                    onClick={() => onChange('stable')}
-                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
-                        connectionTab === 'stable'
-                            ? 'bg-surface text-content shadow-e1'
-                            : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-                    }`}
-                >
-                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                    Stabil ({stableCount})
-                </button>
-                <button
-                    onClick={() => onChange('tunnel')}
-                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
-                        connectionTab === 'tunnel'
-                            ? 'bg-surface text-content shadow-e1'
-                            : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-                    }`}
-                >
-                    <span className="w-2 h-2 rounded-full bg-orange-500"></span>
-                    Tunnel ({tunnelCount})
-                </button>
-                <button
-                    onClick={() => onChange('popular')}
-                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
-                        connectionTab === 'popular'
-                            ? 'bg-surface text-content shadow-e1'
-                            : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-                    }`}
-                >
-                    <span className="w-2 h-2 rounded-full bg-sky-500"></span>
-                    Paling Ramai ({areaFilteredCameras.length})
-                </button>
-                <button
-                    onClick={() => onChange('newest')}
-                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
-                        connectionTab === 'newest'
-                            ? 'bg-surface text-content shadow-e1'
-                            : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-                    }`}
-                >
-                    <span className="w-2 h-2 rounded-full bg-violet-500"></span>
-                    Terbaru ({newestCount})
-                </button>
-                {favorites.length > 0 && (
+        <div className="flex w-fit flex-wrap gap-1 rounded-control border border-edge bg-surface-sunken p-1">
+            {tabs.map((tab) => {
+                const active = connectionTab === tab.key;
+                return (
                     <button
-                        onClick={() => onChange('favorites')}
-                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
-                            connectionTab === 'favorites'
+                        key={tab.key}
+                        type="button"
+                        onClick={() => onChange(tab.key)}
+                        aria-pressed={active}
+                        className={`flex items-center gap-1.5 rounded-[calc(var(--radius-control)-0.25rem)] px-3 py-1.5 text-sm font-medium transition-colors ${
+                            active
                                 ? 'bg-surface text-content shadow-e1'
-                                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                                : 'text-content-muted hover:text-content'
                         }`}
                     >
-                        <svg className="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-                        </svg>
-                        Favorit ({favoritesInAreaCount})
+                        {tab.dot && <span className={`h-1.5 w-1.5 rounded-full ${tab.dot}`} aria-hidden="true"></span>}
+                        {tab.label}
+                        <span className="font-mono tabular-nums text-content-subtle">({tab.count})</span>
                     </button>
-                )}
-            </div>
-
-            {connectionTab === 'tunnel' && (
-                <div className="mt-3 flex items-start gap-2 rounded-xl border border-orange-200 bg-orange-50 p-3 text-sm text-orange-700 dark:border-orange-500/20 dark:bg-orange-500/10 dark:text-orange-400">
-                    <svg className="w-5 h-5 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                    </svg>
-                    <span>Kamera tunnel mungkin kurang stabil. Refresh jika stream tidak muncul.</span>
-                </div>
-            )}
+                );
+            })}
         </div>
     );
 }
