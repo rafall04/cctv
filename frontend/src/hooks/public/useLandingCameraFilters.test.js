@@ -1,8 +1,9 @@
 /*
- * Purpose: Verify public landing camera filter search index keeps large lists cheap and stable.
+ * Purpose: Verify public landing camera filter search index keeps large lists cheap and stable,
+ *          and that the city (kota) facet scopes results and rolls sub-areas up.
  * Caller: Frontend focused landing filter test gate.
  * Deps: Vitest, useLandingCameraFilters pure helpers.
- * MainFuncs: buildLandingCameraSearchIndex tests.
+ * MainFuncs: buildLandingCameraSearchIndex tests, city facet tests.
  * SideEffects: None.
  */
 
@@ -25,6 +26,15 @@ function FilterProbe({ cameras, favorites }) {
             },
             'favorites'
         ),
+        filters.cityOptions.map((city) => createElement(
+            'button',
+            {
+                key: city.key,
+                type: 'button',
+                onClick: () => filters.handleCityChange(city.key),
+            },
+            `city-${city.key}`
+        )),
         createElement(
             'output',
             { 'data-testid': 'filtered-ids' },
@@ -34,6 +44,16 @@ function FilterProbe({ cameras, favorites }) {
             'output',
             { 'data-testid': 'favorite-count' },
             filters.favoritesInAreaCount
+        ),
+        createElement(
+            'output',
+            { 'data-testid': 'selected-city' },
+            filters.selectedCity
+        ),
+        createElement(
+            'output',
+            { 'data-testid': 'city-options' },
+            filters.cityOptions.map((city) => `${city.key}:${city.count}`).join(',')
         )
     );
 }
@@ -74,5 +94,25 @@ describe('landing camera filter search index', () => {
 
         expect(screen.getByTestId('filtered-ids').textContent).toBe('2,4');
         expect(screen.getByTestId('favorite-count').textContent).toBe('2');
+    });
+
+    it('scopes cameras to the selected city and rolls village sub-areas up', () => {
+        render(createElement(FilterProbe, {
+            cameras: [
+                { id: 1, name: 'Sby A', area_name: 'KAB SURABAYA' },
+                { id: 2, name: 'Sby B', area_name: 'KAB SURABAYA' },
+                { id: 3, name: 'Dander', area_name: 'DS DANDER' },
+                { id: 4, name: 'Tanjung', area_name: 'DS TANJUNGHARJO' },
+            ],
+            favorites: [],
+        }));
+
+        // Dander + Tanjungharjo roll up to one Bojonegoro city; equal counts sort by label.
+        expect(screen.getByTestId('city-options').textContent).toBe('bojonegoro:2,surabaya:2');
+
+        fireEvent.click(screen.getByRole('button', { name: 'city-bojonegoro' }));
+
+        expect(screen.getByTestId('selected-city').textContent).toBe('bojonegoro');
+        expect(screen.getByTestId('filtered-ids').textContent).toBe('3,4');
     });
 });

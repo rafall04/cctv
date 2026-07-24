@@ -15,6 +15,7 @@ import { Icons } from '../ui/Icons';
 import LandingCameraToolbar from './LandingCameraToolbar';
 import LandingAreaFilter from './LandingAreaFilter';
 import LandingConnectionTabs from './LandingConnectionTabs';
+import LandingCitySwitch from './LandingCitySwitch';
 import LandingResultsGrid from './LandingResultsGrid';
 import LandingMapPanel from './LandingMapPanel';
 import LandingPlaybackPanel from './LandingPlaybackPanel';
@@ -151,12 +152,16 @@ export default function CamerasSection({
         setConnectionTab,
         searchQuery,
         setSearchQuery,
+        selectedCity,
+        cityOptions,
+        handleCityChange,
         selectedArea,
         showSearchDropdown,
         setShowSearchDropdown,
         focusedCameraId,
         areaOptions,
         searchFilteredCameras,
+        cityFilteredCameras,
         areaFilteredCameras,
         filteredForGrid,
         favoritesInAreaCount,
@@ -177,25 +182,35 @@ export default function CamerasSection({
     });
 
     const contextualControls = (
-        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3">
             {(viewMode === 'map' || viewMode === 'grid') && (
-                <LandingAreaFilter
-                    selectedArea={selectedArea}
-                    onChange={handleAreaChange}
-                    areaOptions={areaOptions}
-                    searchFilteredCameras={searchFilteredCameras}
+                <LandingCitySwitch
+                    selectedCity={selectedCity}
+                    onChange={handleCityChange}
+                    cityOptions={cityOptions}
+                    totalCount={searchFilteredCameras.length}
                 />
             )}
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                {(viewMode === 'map' || viewMode === 'grid') && (
+                    <LandingAreaFilter
+                        selectedArea={selectedArea}
+                        onChange={handleAreaChange}
+                        areaOptions={areaOptions}
+                        searchFilteredCameras={cityFilteredCameras}
+                    />
+                )}
 
-            {viewMode === 'grid' && (
-                <LandingConnectionTabs
-                    connectionTab={connectionTab}
-                    onChange={setConnectionTab}
-                    areaFilteredCameras={areaFilteredCameras}
-                    favorites={favorites}
-                    favoritesInAreaCount={favoritesInAreaCount}
-                />
-            )}
+                {viewMode === 'grid' && (
+                    <LandingConnectionTabs
+                        connectionTab={connectionTab}
+                        onChange={setConnectionTab}
+                        areaFilteredCameras={areaFilteredCameras}
+                        favorites={favorites}
+                        favoritesInAreaCount={favoritesInAreaCount}
+                    />
+                )}
+            </div>
         </div>
     );
 
@@ -272,7 +287,7 @@ export default function CamerasSection({
                 ) : viewMode === 'map' ? (
                     <LandingMapPanel
                         MapView={MapView}
-                        cameras={searchFilteredCameras}
+                        cameras={cityFilteredCameras}
                         areas={areas}
                         selectedArea={selectedArea}
                         onAreaChange={handleAreaChange}

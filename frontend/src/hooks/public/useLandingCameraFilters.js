@@ -7,6 +7,7 @@
  */
 
 import { useCallback, useMemo, useRef, useState } from 'react';
+import { getCameraCityKey, groupCamerasByCity, getAreaCity } from '../../utils/publicCityMapping';
 
 export function normalizeSearchText(value = '') {
     return String(value)
@@ -68,6 +69,7 @@ function sortGridCameras(cameras, connectionTab) {
 export function useLandingCameraFilters(cameras, areas, favorites, viewMode, onCameraClick) {
     const [connectionTab, setConnectionTab] = useState('all');
     const [searchQuery, setSearchQuery] = useState('');
+    const [selectedCity, setSelectedCity] = useState('all');
     const [selectedArea, setSelectedArea] = useState('all');
     const [showSearchDropdown, setShowSearchDropdown] = useState(false);
     const [focusedCameraId, setFocusedCameraId] = useState(null);
@@ -75,20 +77,25 @@ export function useLandingCameraFilters(cameras, areas, favorites, viewMode, onC
     const searchContainerRef = useRef(null);
     const favoriteIds = useMemo(() => new Set(favorites), [favorites]);
 
+    // City (kota) options for the switcher — total per city, stable across search.
+    const cityOptions = useMemo(() => groupCamerasByCity(cameras), [cameras]);
+
     const areaOptions = useMemo(() => {
+        // Areas are scoped to the selected city so the two facets stay consistent.
+        const inSelectedCity = (name) => selectedCity === 'all' || getAreaCity(name).key === selectedCity;
         const names = new Set();
         areas.forEach((area) => {
-            if (area?.name) {
+            if (area?.name && inSelectedCity(area.name)) {
                 names.add(area.name);
             }
         });
         cameras.forEach((camera) => {
-            if (camera?.area_name) {
+            if (camera?.area_name && inSelectedCity(camera.area_name)) {
                 names.add(camera.area_name);
             }
         });
         return Array.from(names).sort((left, right) => left.localeCompare(right));
-    }, [areas, cameras]);
+    }, [areas, cameras, selectedCity]);
 
     const cameraSearchIndex = useMemo(() => buildLandingCameraSearchIndex(cameras), [cameras]);
 
@@ -103,12 +110,21 @@ export function useLandingCameraFilters(cameras, areas, favorites, viewMode, onC
             .map(({ camera }) => camera);
     }, [cameraSearchIndex, cameras, searchQuery]);
 
-    const areaFilteredCameras = useMemo(() => {
-        if (selectedArea === 'all') {
+    // City is the outer geographic filter (public-facing primary facet), applied
+    // between search and the finer area filter. selectedCity 'all' is a no-op.
+    const cityFilteredCameras = useMemo(() => {
+        if (selectedCity === 'all') {
             return searchFilteredCameras;
         }
-        return searchFilteredCameras.filter((camera) => camera.area_name === selectedArea);
-    }, [searchFilteredCameras, selectedArea]);
+        return searchFilteredCameras.filter((camera) => getCameraCityKey(camera) === selectedCity);
+    }, [searchFilteredCameras, selectedCity]);
+
+    const areaFilteredCameras = useMemo(() => {
+        if (selectedArea === 'all') {
+            return cityFilteredCameras;
+        }
+        return cityFilteredCameras.filter((camera) => camera.area_name === selectedArea);
+    }, [cityFilteredCameras, selectedArea]);
 
     const defaultGridAreaConfigs = useMemo(() => {
         const configs = new Map();
@@ -217,8 +233,18 @@ export function useLandingCameraFilters(cameras, areas, favorites, viewMode, onC
         setFocusedCameraId(null);
     }, []);
 
+    const handleCityChange = useCallback((cityKey) => {
+        setSelectedCity(cityKey || 'all');
+        // Area options are city-scoped, so a stale area from another city must reset.
+        setSelectedArea('all');
+        setFocusedCameraId(null);
+    }, []);
+
     const handleCameraSelect = useCallback((camera) => {
         if (viewMode === 'map') {
+            if (selectedCity !== 'all' && getCameraCityKey(camera) !== selectedCity) {
+                setSelectedCity('all');
+            }
             if (selectedArea !== 'all' && camera.area_name && camera.area_name !== selectedArea) {
                 setSelectedArea('all');
             }
@@ -228,7 +254,7 @@ export function useLandingCameraFilters(cameras, areas, favorites, viewMode, onC
         }
         setSearchQuery('');
         setShowSearchDropdown(false);
-    }, [onCameraClick, selectedArea, viewMode]);
+    }, [onCameraClick, selectedArea, selectedCity, viewMode]);
 
     const handleFocusHandled = useCallback(() => {
         setFocusedCameraId(null);
@@ -239,6 +265,10 @@ export function useLandingCameraFilters(cameras, areas, favorites, viewMode, onC
         setConnectionTab,
         searchQuery,
         setSearchQuery: handleSearchChange,
+        selectedCity,
+        setSelectedCity,
+        handleCityChange,
+        cityOptions,
         selectedArea,
         setSelectedArea,
         showSearchDropdown,
@@ -246,6 +276,7 @@ export function useLandingCameraFilters(cameras, areas, favorites, viewMode, onC
         focusedCameraId,
         areaOptions,
         searchFilteredCameras,
+        cityFilteredCameras,
         areaFilteredCameras,
         filteredForGrid,
         favoritesInAreaCount,
