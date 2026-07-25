@@ -28,10 +28,10 @@ function ListModal({ title, items, type, onClose, onCameraClick }) {
 
     const getIconColor = () => {
         switch (type) {
-            case 'online': return 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400';
-            case 'offline': return 'bg-gray-100 dark:bg-gray-500/20 text-gray-600 dark:text-gray-400';
-            case 'maintenance': return 'bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400';
-            default: return 'bg-sky-100 dark:bg-primary/20 text-primary-600 dark:text-primary-400';
+            case 'online': return 'bg-status-live/10 text-status-live';
+            case 'offline': return 'bg-surface-sunken text-content-subtle';
+            case 'maintenance': return 'bg-status-fault/10 text-status-fault';
+            default: return 'bg-primary/10 text-primary';
         }
     };
 
@@ -83,30 +83,30 @@ function ListModal({ title, items, type, onClose, onCameraClick }) {
 
                 <div className="overflow-y-auto max-h-[calc(70vh-80px)]">
                     {items.length === 0 ? (
-                        <div className="p-8 text-center text-gray-500 dark:text-gray-400">
+                        <div className="p-8 text-center text-content-muted">
                             Tidak ada data
                         </div>
                     ) : type === 'areas' ? (
-                        <div className="divide-y divide-gray-100 dark:divide-gray-800">
+                        <div className="divide-y divide-edge">
                             {items.map(area => (
-                                <div key={area.id} className="px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                                    <p className="font-medium text-gray-900 dark:text-white text-sm sm:text-base">{area.name}</p>
-                                    <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+                                <div key={area.id} className="px-4 py-3 hover:bg-surface-raised">
+                                    <p className="font-medium text-content text-sm sm:text-base">{area.name}</p>
+                                    <p className="text-xs sm:text-sm text-content-muted">
                                         {[area.kelurahan, area.kecamatan].filter(Boolean).join(', ') || 'Lokasi tidak tersedia'}
                                     </p>
                                 </div>
                             ))}
                         </div>
                     ) : (
-                        <div className="divide-y divide-gray-100 dark:divide-gray-800">
+                        <div className="divide-y divide-edge">
                             {items.map(camera => {
                                 return (
                                     <button
                                         key={camera.id}
                                         onClick={() => onCameraClick?.(camera)}
-                                        className={`w-full px-4 py-3 text-left flex items-center gap-3 ${disableAnimations
-                                            ? 'hover:bg-gray-100 dark:hover:bg-gray-800'
-                                            : 'hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors'
+                                        className={`w-full px-4 py-3 text-left flex items-center gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary ${disableAnimations
+                                            ? 'hover:bg-surface-raised'
+                                            : 'hover:bg-surface-raised transition-colors'
                                             }`}
                                     >
                                         <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center shrink-0 ${getIconColor()}`}>
@@ -117,7 +117,7 @@ function ListModal({ title, items, type, onClose, onCameraClick }) {
                                                 transport jargon with no meaning to the public. */}
                                             <p className="truncate text-sm font-medium text-content sm:text-base">{camera.name}</p>
                                             {camera.location && (
-                                                <p className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 truncate flex items-center gap-1">
+                                                <p className="text-[11px] sm:text-xs text-content-muted truncate flex items-center gap-1">
                                                     <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                                         <path d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z" /><circle cx="12" cy="11" r="3" />
                                                     </svg>
@@ -125,7 +125,7 @@ function ListModal({ title, items, type, onClose, onCameraClick }) {
                                                 </p>
                                             )}
                                             {camera.area_name && (
-                                                <p className="text-[11px] sm:text-xs text-gray-400 dark:text-gray-500 truncate flex items-center gap-1 mt-0.5">
+                                                <p className="text-[11px] sm:text-xs text-content-subtle truncate flex items-center gap-1 mt-0.5">
                                                     <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                                         <path d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l5.447 2.724A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
                                                     </svg>
@@ -133,11 +133,11 @@ function ListModal({ title, items, type, onClose, onCameraClick }) {
                                                 </p>
                                             )}
                                             {!camera.location && !camera.area_name && (
-                                                <p className="text-[11px] sm:text-xs text-gray-400 dark:text-gray-500">Lokasi tidak tersedia</p>
+                                                <p className="text-[11px] sm:text-xs text-content-subtle">Lokasi tidak tersedia</p>
                                             )}
                                         </div>
                                         {type === 'online' && (
-                                            <div className="shrink-0 text-emerald-500 w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center">
+                                            <div className="shrink-0 text-status-live w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center">
                                                 <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
                                             </div>
                                         )}

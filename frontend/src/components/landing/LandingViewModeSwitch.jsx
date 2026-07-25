@@ -33,7 +33,7 @@ export default function LandingViewModeSwitch({ viewMode, onChange }) {
                 <button
                     key={button.key}
                     onClick={() => onChange(button.key)}
-                    className={`flex min-w-0 items-center justify-center gap-1.5 rounded-control px-3 py-2 text-xs font-medium transition-colors sm:text-sm ${
+                    className={`flex min-w-0 items-center justify-center gap-1.5 rounded-control px-3 py-2 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary sm:text-sm ${
                         viewMode === button.key
                             ? 'bg-primary text-white'
                             : 'text-content-muted hover:bg-surface-raised hover:text-content'

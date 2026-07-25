@@ -102,7 +102,7 @@ export default function LandingResultsGrid({
 
             {hiddenCount > 0 && (
                 <div className="mt-6 flex flex-col items-center gap-3 text-center">
-                    <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                    <p className="font-mono text-xs font-medium tabular-nums text-content-subtle">
                         Menampilkan {visibleCameras.length} dari {cameras.length} kamera
                     </p>
                     <button

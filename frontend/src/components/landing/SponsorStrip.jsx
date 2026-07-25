@@ -75,13 +75,13 @@ function SponsorEntry({ sponsor, color }) {
             className={`${heightClass} max-w-[160px] object-contain transition-transform duration-200 group-hover:scale-105`}
         />
     ) : (
-        <span className="text-sm font-semibold text-gray-700 dark:text-gray-200 group-hover:text-primary-500">
+        <span className="text-sm font-semibold text-content group-hover:text-primary">
             {sponsor.name}
         </span>
     );
 
     const wrapperClass =
-        'group flex items-center justify-center rounded-xl bg-white px-4 py-3 shadow-sm transition-shadow hover:shadow-md dark:bg-gray-800';
+        'group flex items-center justify-center rounded-card border border-edge bg-surface-raised px-4 py-3 shadow-e1 transition-shadow hover:shadow-e2';
 
     if (!sponsor.url) {
         return (
@@ -129,15 +129,15 @@ export default function SponsorStrip() {
     return (
         <section
             data-testid="landing-sponsor-strip"
-            className="mb-8 border-t border-gray-100 pt-8 dark:border-gray-800"
+            className="mb-8 border-t border-edge pt-8"
         >
-            <h4 className="mb-5 text-center text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+            <h4 className="mb-5 text-center text-sm font-semibold uppercase tracking-wide text-content-muted">
                 Sponsor Kami
             </h4>
             <div className="space-y-6">
                 {tiers.map((tier) => (
                     <div key={tier.key} className="space-y-3">
-                        <p className="text-center text-xs font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                        <p className="text-center text-xs font-medium uppercase tracking-wider text-content-subtle">
                             {tier.label}
                         </p>
                         <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-5">

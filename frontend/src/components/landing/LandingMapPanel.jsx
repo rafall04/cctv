@@ -14,8 +14,8 @@ export default function LandingMapPanel({
     return (
         <Suspense
             fallback={
-                <div className="h-[450px] bg-gray-100 dark:bg-gray-800 rounded-xl flex items-center justify-center">
-                    <div className="w-6 h-6 border-2 border-gray-300 border-t-primary rounded-full animate-spin" />
+                <div className="h-[450px] bg-surface-sunken rounded-card flex items-center justify-center">
+                    <div className="w-6 h-6 border-2 border-edge border-t-primary rounded-full animate-spin" />
                 </div>
             }
         >

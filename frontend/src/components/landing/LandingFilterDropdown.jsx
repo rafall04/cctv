@@ -51,11 +51,11 @@ export default function FilterDropdown({ selected, onChange, kecamatans = [], ke
         <div ref={ref} className="relative">
             <button
                 onClick={() => setOpen(!open)}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-control bg-surface border border-edge text-content transition-colors hover:border-edge-strong"
+                className="flex items-center gap-2 px-4 py-2.5 rounded-control bg-surface border border-edge text-content transition-colors hover:border-edge-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
                 <Icons.Filter />
                 <span className="text-sm font-medium max-w-[150px] truncate">{getSelectedLabel()}</span>
-                <span className="text-xs px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-semibold tabular-nums">
+                <span className="text-xs px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-mono font-semibold tabular-nums">
                     {selected ? getCameraCount(selected.type, selected.value) : cameras.length}
                 </span>
                 <Icons.ChevronDown />
@@ -66,9 +66,9 @@ export default function FilterDropdown({ selected, onChange, kecamatans = [], ke
                         {showAreaTab && (
                             <button
                                 onClick={() => setFilterType('area')}
-                                className={`flex-1 px-2 py-1.5 text-xs font-medium rounded-lg transition-colors ${filterType === 'area'
-                                    ? 'bg-sky-100 dark:bg-primary/20 text-primary-600 dark:text-primary-400'
-                                    : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                className={`flex-1 px-2 py-1.5 text-xs font-medium rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary ${filterType === 'area'
+                                    ? 'bg-primary/10 text-primary'
+                                    : 'text-content-muted hover:bg-surface-raised hover:text-content'
                                     }`}
                             >
                                 Area ({areas.length})
@@ -77,9 +77,9 @@ export default function FilterDropdown({ selected, onChange, kecamatans = [], ke
                         {showKecamatanTab && (
                             <button
                                 onClick={() => setFilterType('kecamatan')}
-                                className={`flex-1 px-2 py-1.5 text-xs font-medium rounded-lg transition-colors ${filterType === 'kecamatan'
-                                    ? 'bg-sky-100 dark:bg-primary/20 text-primary-600 dark:text-primary-400'
-                                    : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                className={`flex-1 px-2 py-1.5 text-xs font-medium rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary ${filterType === 'kecamatan'
+                                    ? 'bg-primary/10 text-primary'
+                                    : 'text-content-muted hover:bg-surface-raised hover:text-content'
                                     }`}
                             >
                                 Kecamatan ({kecamatans.length})
@@ -88,9 +88,9 @@ export default function FilterDropdown({ selected, onChange, kecamatans = [], ke
                         {showKelurahanTab && (
                             <button
                                 onClick={() => setFilterType('kelurahan')}
-                                className={`flex-1 px-2 py-1.5 text-xs font-medium rounded-lg transition-colors ${filterType === 'kelurahan'
-                                    ? 'bg-sky-100 dark:bg-primary/20 text-primary-600 dark:text-primary-400'
-                                    : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                className={`flex-1 px-2 py-1.5 text-xs font-medium rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary ${filterType === 'kelurahan'
+                                    ? 'bg-primary/10 text-primary'
+                                    : 'text-content-muted hover:bg-surface-raised hover:text-content'
                                     }`}
                             >
                                 Kelurahan ({kelurahans.length})
@@ -101,13 +101,13 @@ export default function FilterDropdown({ selected, onChange, kecamatans = [], ke
                     <div className="overflow-y-auto flex-1">
                         <button
                             onClick={() => handleSelect(null, null)}
-                            className={`w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-700/50 flex items-center justify-between transition-colors ${!selected ? 'bg-sky-50 dark:bg-primary/10 text-primary-600 dark:text-primary-400 font-medium' : 'text-gray-700 dark:text-gray-200'}`}
+                            className={`w-full text-left px-4 py-2.5 text-sm hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary flex items-center justify-between transition-colors ${!selected ? 'bg-primary/10 text-primary font-medium' : 'text-content'}`}
                         >
                             <span className="flex items-center gap-2">
-                                <span className="w-2 h-2 rounded-full bg-gray-400"></span>
+                                <span className="w-2 h-2 rounded-full bg-content-subtle"></span>
                                 All Cameras
                             </span>
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-surface-raised text-content-muted font-mono tabular-nums">
                                 {cameras.length}
                             </span>
                         </button>
@@ -124,7 +124,7 @@ export default function FilterDropdown({ selected, onChange, kecamatans = [], ke
                                 <button
                                     key={area.id ?? `area-${idx}`}
                                     onClick={() => handleSelect('area', area.id)}
-                                    className={`w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-700/50 flex items-center justify-between transition-colors ${isSelected ? 'bg-sky-50 dark:bg-primary/10 text-primary-600 dark:text-primary-400 font-medium' : 'text-gray-700 dark:text-gray-200'}`}
+                                    className={`w-full text-left px-4 py-2.5 text-sm hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary flex items-center justify-between transition-colors ${isSelected ? 'bg-primary/10 text-primary font-medium' : 'text-content'}`}
                                 >
                                     <div className="flex-1 min-w-0">
                                         <span className="flex items-center gap-2">
@@ -132,12 +132,12 @@ export default function FilterDropdown({ selected, onChange, kecamatans = [], ke
                                             <span className="truncate">{area.name}</span>
                                         </span>
                                         {(area.kelurahan || area.kecamatan) && (
-                                            <span className="text-[10px] text-gray-500 dark:text-gray-400 ml-4 block truncate">
+                                            <span className="text-[10px] text-content-subtle ml-4 block truncate">
                                                 {[area.rt && `RT ${area.rt}`, area.rw && `RW ${area.rw}`, area.kelurahan, area.kecamatan].filter(Boolean).join(', ')}
                                             </span>
                                         )}
                                     </div>
-                                    <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ml-2 ${count > 0 ? 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300' : 'bg-gray-50 dark:bg-gray-800 text-gray-400'}`}>
+                                    <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ml-2 ${count > 0 ? 'bg-surface-raised text-content-muted font-mono tabular-nums' : 'bg-surface-sunken text-content-subtle font-mono tabular-nums'}`}>
                                         {count}
                                     </span>
                                 </button>
@@ -151,13 +151,13 @@ export default function FilterDropdown({ selected, onChange, kecamatans = [], ke
                                 <button
                                     key={kec ?? `kec-${idx}`}
                                     onClick={() => handleSelect('kecamatan', kec)}
-                                    className={`w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-700/50 flex items-center justify-between transition-colors ${isSelected ? 'bg-sky-50 dark:bg-primary/10 text-primary-600 dark:text-primary-400 font-medium' : 'text-gray-700 dark:text-gray-200'}`}
+                                    className={`w-full text-left px-4 py-2.5 text-sm hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary flex items-center justify-between transition-colors ${isSelected ? 'bg-primary/10 text-primary font-medium' : 'text-content'}`}
                                 >
                                     <span className="flex items-center gap-2">
-                                        <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-primary' : 'bg-primary'}`}></span>
+                                        <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-primary' : 'bg-content-subtle'}`}></span>
                                         <span className="truncate">{kec}</span>
                                     </span>
-                                    <span className={`text-xs px-2 py-0.5 rounded-full ${count > 0 ? 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300' : 'bg-gray-50 dark:bg-gray-800 text-gray-400'}`}>
+                                    <span className={`text-xs px-2 py-0.5 rounded-full ${count > 0 ? 'bg-surface-raised text-content-muted font-mono tabular-nums' : 'bg-surface-sunken text-content-subtle font-mono tabular-nums'}`}>
                                         {count}
                                     </span>
                                 </button>
@@ -172,16 +172,16 @@ export default function FilterDropdown({ selected, onChange, kecamatans = [], ke
                                 <button
                                     key={kel ?? `kel-${idx}`}
                                     onClick={() => handleSelect('kelurahan', kel)}
-                                    className={`w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-700/50 flex items-center justify-between transition-colors ${isSelected ? 'bg-sky-50 dark:bg-primary/10 text-primary-600 dark:text-primary-400 font-medium' : 'text-gray-700 dark:text-gray-200'}`}
+                                    className={`w-full text-left px-4 py-2.5 text-sm hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary flex items-center justify-between transition-colors ${isSelected ? 'bg-primary/10 text-primary font-medium' : 'text-content'}`}
                                 >
                                     <div className="flex-1 min-w-0">
                                         <span className="flex items-center gap-2">
-                                            <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-primary' : 'bg-green-500'}`}></span>
+                                            <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-primary' : 'bg-content-subtle'}`}></span>
                                             <span className="truncate">{kel}</span>
                                         </span>
-                                        {kec && <span className="text-[10px] text-gray-500 dark:text-gray-400 ml-4 block">{kec}</span>}
+                                        {kec && <span className="text-[10px] text-content-subtle ml-4 block">{kec}</span>}
                                     </div>
-                                    <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ml-2 ${count > 0 ? 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300' : 'bg-gray-50 dark:bg-gray-800 text-gray-400'}`}>
+                                    <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ml-2 ${count > 0 ? 'bg-surface-raised text-content-muted font-mono tabular-nums' : 'bg-surface-sunken text-content-subtle font-mono tabular-nums'}`}>
                                         {count}
                                     </span>
                                 </button>

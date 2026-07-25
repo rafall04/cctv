@@ -15,8 +15,8 @@ const THEME_STYLES = {
         icon: 'text-rose-500 dark:text-rose-300',
     },
     neutral: {
-        wrapper: 'border-gray-200/70 bg-gradient-to-r from-white via-gray-50 to-sky-50 dark:border-gray-700/60 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800',
-        badge: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200',
+        wrapper: 'border-edge bg-surface-raised',
+        badge: 'bg-surface-sunken text-content-muted',
         icon: 'text-primary dark:text-primary-400',
     },
 };
@@ -58,7 +58,7 @@ export default function LandingEventBanner({ banner, layoutMode = 'full' }) {
                     is normalised to the token radius scale. */}
                 <div className={`overflow-hidden rounded-card border ${theme.wrapper}`}>
                     <div className={`flex gap-4 ${isSimple ? 'items-start px-4 py-3' : 'items-center px-5 py-4 sm:px-6 sm:py-5'}`}>
-                        <div className={`flex shrink-0 items-center justify-center rounded-control bg-white/70 dark:bg-gray-900/40 ${isSimple ? 'h-10 w-10' : 'h-12 w-12'} ${theme.icon}`}>
+                        <div className={`flex shrink-0 items-center justify-center rounded-control bg-surface/70 ${isSimple ? 'h-10 w-10' : 'h-12 w-12'} ${theme.icon}`}>
                             <svg className={isSimple ? 'h-5 w-5' : 'h-6 w-6'} viewBox="0 0 24 24" fill="currentColor">
                                 <path d="M12 2a9.77 9.77 0 00-5.71 1.84A10 10 0 1012 2zm0 18a7.96 7.96 0 01-4.62-1.47 8 8 0 018.07-13.73A8 8 0 0112 20z" />
                             </svg>

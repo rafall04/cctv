@@ -20,7 +20,7 @@ export default function LandingCitySwitch({ selectedCity, onChange, cityOptions,
             type="button"
             onClick={() => onChange(key)}
             aria-pressed={active}
-            className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 font-mono text-[11px] tracking-tight transition-colors ${
+            className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 font-mono text-[11px] tracking-tight transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                 active
                     ? 'border-primary bg-primary/10 text-content'
                     : 'border-edge bg-surface text-content-muted hover:border-edge-strong hover:text-content'

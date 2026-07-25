@@ -39,7 +39,7 @@ export default function LandingConnectionTabs({
                         type="button"
                         onClick={() => onChange(tab.key)}
                         aria-pressed={active}
-                        className={`flex items-center gap-1.5 rounded-[calc(var(--radius-control)-0.25rem)] px-3 py-1.5 text-sm font-medium transition-colors ${
+                        className={`flex items-center gap-1.5 rounded-[calc(var(--radius-control)-0.25rem)] px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary ${
                             active
                                 ? 'bg-surface text-content shadow-e1'
                                 : 'text-content-muted hover:text-content'

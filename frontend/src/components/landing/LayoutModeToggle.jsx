@@ -36,7 +36,7 @@ export default function LayoutModeToggle({ layoutMode, onChange, compact = false
                                 onChange(mode.value);
                             }
                         }}
-                        className={`inline-flex items-center justify-center rounded-[calc(var(--radius-control)-0.125rem)] px-3 py-1.5 text-xs font-medium transition-colors ${
+                        className={`inline-flex items-center justify-center rounded-[calc(var(--radius-control)-0.125rem)] px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary ${
                             isActive
                                 ? 'bg-primary text-white'
                                 : 'text-content-muted hover:bg-surface-raised hover:text-content'

@@ -59,7 +59,7 @@ export default function LandingSearchBox({
     return (
         <div className="relative" ref={searchContainerRef}>
             <div className="relative flex items-center">
-                <div className="absolute left-3 text-gray-400 dark:text-gray-500 pointer-events-none">
+                <div className="absolute left-3 text-content-subtle pointer-events-none">
                     <Icons.Search />
                 </div>
                 <input
@@ -75,7 +75,7 @@ export default function LandingSearchBox({
                     {searchQuery && (
                         <button
                             onClick={onClear}
-                            className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                            className="p-1.5 text-content-subtle hover:text-content hover:bg-surface-raised rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                             title="Hapus pencarian (Esc)"
                         >
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -83,7 +83,7 @@ export default function LandingSearchBox({
                             </svg>
                         </button>
                     )}
-                    <span className="hidden sm:flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] text-gray-400 dark:text-gray-500 bg-gray-200 dark:bg-gray-700 rounded">
+                    <span className="hidden sm:flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] text-content-subtle bg-surface-raised rounded">
                         <kbd className="font-sans">Ctrl</kbd>
                         <kbd className="font-sans">K</kbd>
                     </span>
