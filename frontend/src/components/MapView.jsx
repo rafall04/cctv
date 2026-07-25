@@ -472,7 +472,7 @@ const CameraMarker = memo(({ camera, onClick }) => {
 
     return (
         <Marker
-            position={[lat, lng]}
+            position={[lat, lng]} title={camera.name}
             icon={createCameraIcon(status, isTunnel, isOnline, availabilityState)}
             eventHandlers={{ click: () => onClick(camera) }}
         />
@@ -484,7 +484,7 @@ const AggregateMarker = memo(({ marker, onClick }) => (
     (Number.isFinite(marker?.latitude) && Number.isFinite(marker?.longitude))
         ? (
             <Marker
-                position={[marker.latitude, marker.longitude]}
+                position={[marker.latitude, marker.longitude]} title={`${marker.count} kamera`}
                 icon={createGroupIcon(marker.count, marker.cameras, marker.kind)}
                 eventHandlers={{ click: () => onClick(marker) }}
             />
@@ -539,7 +539,7 @@ const ImperativeMarkerLayer = memo(({ cameras = [], onClick }) => {
             nextIds.add(camera.id);
             let marker = markersRef.current.get(camera.id);
             if (!marker) {
-                marker = L.marker([lat, lng], { icon });
+                marker = L.marker([lat, lng], { icon, title: camera.name });
                 marker.on?.('click', () => {
                     const currentCamera = cameraLookupRef.current.get(camera.id);
                     if (currentCamera) {

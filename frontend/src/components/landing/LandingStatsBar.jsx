@@ -76,7 +76,7 @@ function ListModal({ title, items, type, onClose, onCameraClick }) {
                         <h3 className="text-base font-semibold text-content">{title}</h3>
                         <span className="text-sm tabular-nums text-content-muted">{items.length}</span>
                     </div>
-                    <button onClick={onClose} className="rounded-control p-1.5 text-content-muted transition-colors hover:bg-surface-raised hover:text-content">
+                    <button onClick={onClose} aria-label="Tutup" className="rounded-control p-1.5 text-content-muted transition-colors hover:bg-surface-raised hover:text-content">
                         <Icons.X />
                     </button>
                 </div>

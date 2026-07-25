@@ -16,6 +16,7 @@ export default function LandingAreaFilter({
             <select
                 value={selectedArea}
                 onChange={onChange}
+                aria-label="Filter kamera berdasarkan area"
                 className="min-w-[180px] rounded-control border border-edge bg-surface px-3 py-2.5 text-sm text-content outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
             >
                 <option value="all">Semua Area ({searchFilteredCameras.length})</option>

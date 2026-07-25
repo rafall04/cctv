@@ -144,6 +144,7 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
                         <button
                             onClick={(e) => { e.stopPropagation(); onToggleFavorite(camera.id); }}
                             className={`${actionButtonClass} ${isFav ? 'border-status-warn/50 text-status-warn' : ''}`}
+                            aria-label={isFav ? 'Hapus dari Favorit' : 'Tambah ke Favorit'}
                             title={isFav ? 'Hapus dari Favorit' : 'Tambah ke Favorit'}
                         >
                             <svg className="h-4 w-4" fill={isFav ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -154,6 +155,7 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
                     <button
                         onClick={(e) => { e.stopPropagation(); onAddMulti(); }}
                         className={`${actionButtonClass} ${inMulti ? 'border-status-live/50 text-status-live' : ''}`}
+                        aria-label={inMulti ? 'Hapus dari Multi-View' : 'Tambah ke Multi-View'}
                         title={inMulti ? 'Hapus dari Multi-View' : 'Tambah ke Multi-View'}
                     >
                         {inMulti ? <Icons.Check /> : <Icons.Plus />}

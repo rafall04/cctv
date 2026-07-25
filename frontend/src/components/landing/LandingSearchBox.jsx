@@ -76,6 +76,7 @@ export default function LandingSearchBox({
                         <button
                             onClick={onClear}
                             className="p-1.5 text-content-subtle hover:text-content hover:bg-surface-raised rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                            aria-label="Hapus pencarian"
                             title="Hapus pencarian (Esc)"
                         >
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

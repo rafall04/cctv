@@ -42,7 +42,7 @@
     /* Content: three text weights, no more */
     --content:        #0b0d0f;
     --content-muted:  #5a626d;
-    --content-subtle: #858d98;
+    --content-subtle: #656c78; /* WCAG AA 4.5:1 even at 10px on white/surface-sunken (was #858d98 = 3.4:1, failed) */
 
     /* Status: meaning, not decoration */
     --status-live:  #059669;
@@ -75,7 +75,7 @@
 
     --content:        #e9ebed;
     --content-muted:  #9aa0a6;
-    --content-subtle: #6c7278;
+    --content-subtle: #868c93; /* WCAG AA 4.5:1 on dark surfaces incl. surface-overlay (was #6c7278 = 4.0:1, failed) */
 
     --status-live:  #10b981;
     --status-warn:  #f59e0b;

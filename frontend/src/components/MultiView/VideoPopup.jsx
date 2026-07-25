@@ -1212,7 +1212,7 @@ function VideoPopup({
                                 <button
                                     onClick={handleShare}
                                     className="p-1.5 hover:bg-surface-raised rounded-lg"
-                                    title="Bagikan link kamera"
+                                    aria-label="Bagikan link kamera" title="Bagikan link kamera"
                                 >
                                     <svg className="w-4 h-4 text-content-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                         <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
@@ -1423,19 +1423,19 @@ function VideoPopup({
                                         <button
                                             onClick={handleShare}
                                             className="p-2 hover:bg-white/20 rounded-xl text-white"
-                                            title="Bagikan link kamera"
+                                            aria-label="Bagikan link kamera" title="Bagikan link kamera"
                                         >
                                             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                                 <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                                             </svg>
                                         </button>
-                                        {renderStatus === 'live' && isHlsCamera && <button onClick={takeSnapshot} className="p-2 hover:bg-white/20 active:bg-white/30 rounded-xl text-white bg-white/10"><Icons.Image /></button>}
-                                        <button onClick={toggleFS} className="p-2 hover:bg-white/20 active:bg-white/30 rounded-xl text-white bg-white/10">
+                                        {renderStatus === 'live' && isHlsCamera && <button onClick={takeSnapshot} aria-label="Ambil Screenshot" className="p-2 hover:bg-white/20 active:bg-white/30 rounded-xl text-white bg-white/10"><Icons.Image /></button>}
+                                        <button onClick={toggleFS} aria-label="Keluar Fullscreen" className="p-2 hover:bg-white/20 active:bg-white/30 rounded-xl text-white bg-white/10">
                                             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 9V4.5M9 9H4.5M9 9L3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5l5.25 5.25" />
                                             </svg>
                                         </button>
-                                        <button onClick={handleClose} className="p-2 hover:bg-white/20 active:bg-white/30 rounded-xl text-white bg-white/10"><Icons.X /></button>
+                                        <button onClick={handleClose} aria-label="Tutup" className="p-2 hover:bg-white/20 active:bg-white/30 rounded-xl text-white bg-white/10"><Icons.X /></button>
                                     </div>
                                 </div>
                                 {/* Codec info detail - fullscreen mode */}
@@ -1455,10 +1455,10 @@ function VideoPopup({
 
                             {!isPlaybackLocked && (
                                 <div className="absolute bottom-4 right-4 z-50 flex items-center gap-1 bg-black/60 rounded-xl p-1 pointer-events-auto">
-                                    <button onClick={() => getZoomableWrapper()?._zoomOut?.()} disabled={zoom <= 1} className="p-2 hover:bg-white/20 active:bg-white/30 disabled:opacity-30 rounded-lg text-white"><Icons.ZoomOut /></button>
+                                    <button onClick={() => getZoomableWrapper()?._zoomOut?.()} disabled={zoom <= 1} aria-label="Zoom Out" className="p-2 hover:bg-white/20 active:bg-white/30 disabled:opacity-30 rounded-lg text-white"><Icons.ZoomOut /></button>
                                     <span className="text-white text-xs font-medium w-12 text-center">{Math.round(zoom * 100)}%</span>
-                                    <button onClick={() => getZoomableWrapper()?._zoomIn?.()} disabled={zoom >= 4} className="p-2 hover:bg-white/20 active:bg-white/30 disabled:opacity-30 rounded-lg text-white"><Icons.ZoomIn /></button>
-                                    {zoom > 1 && <button onClick={() => getZoomableWrapper()?._reset?.()} className="p-2 hover:bg-white/20 active:bg-white/30 rounded-lg text-white ml-1"><Icons.Reset /></button>}
+                                    <button onClick={() => getZoomableWrapper()?._zoomIn?.()} disabled={zoom >= 4} aria-label="Zoom In" className="p-2 hover:bg-white/20 active:bg-white/30 disabled:opacity-30 rounded-lg text-white"><Icons.ZoomIn /></button>
+                                    {zoom > 1 && <button onClick={() => getZoomableWrapper()?._reset?.()} aria-label="Reset Zoom" className="p-2 hover:bg-white/20 active:bg-white/30 rounded-lg text-white ml-1"><Icons.Reset /></button>}
                                 </div>
                             )}
                         </>
@@ -1507,40 +1507,40 @@ function VideoPopup({
                             {!isPlaybackLocked && (
                                 <>
                                     <div className="flex items-center gap-0.5 bg-surface-raised rounded-lg p-0.5">
-                                        <button onClick={() => getZoomableWrapper()?._zoomOut?.()} disabled={zoom <= 1} className="p-1.5 hover:bg-surface-overlay disabled:opacity-30 rounded text-content transition-colors" title="Zoom Out">
+                                        <button onClick={() => getZoomableWrapper()?._zoomOut?.()} disabled={zoom <= 1} aria-label="Zoom Out" className="p-1.5 hover:bg-surface-overlay disabled:opacity-30 rounded text-content transition-colors" title="Zoom Out">
                                             <Icons.ZoomOut />
                                         </button>
                                         <span className="text-content text-[10px] font-medium w-8 text-center">{Math.round(zoom * 100)}%</span>
-                                        <button onClick={() => getZoomableWrapper()?._zoomIn?.()} disabled={zoom >= 4} className="p-1.5 hover:bg-surface-overlay disabled:opacity-30 rounded text-content transition-colors" title="Zoom In">
+                                        <button onClick={() => getZoomableWrapper()?._zoomIn?.()} disabled={zoom >= 4} aria-label="Zoom In" className="p-1.5 hover:bg-surface-overlay disabled:opacity-30 rounded text-content transition-colors" title="Zoom In">
                                             <Icons.ZoomIn />
                                         </button>
                                         {zoom > 1 && (
-                                            <button onClick={() => getZoomableWrapper()?._reset?.()} className="p-1.5 hover:bg-surface-overlay rounded text-content transition-colors" title="Reset Zoom">
+                                            <button onClick={() => getZoomableWrapper()?._reset?.()} aria-label="Reset Zoom" className="p-1.5 hover:bg-surface-overlay rounded text-content transition-colors" title="Reset Zoom">
                                                 <Icons.Reset />
                                             </button>
                                         )}
                                     </div>
 
                                     {renderStatus === 'live' && isHlsCamera && (
-                                        <button onClick={takeSnapshot} className="p-1.5 bg-surface-raised hover:bg-surface-overlay rounded-lg text-content transition-colors" title="Ambil Screenshot">
+                                        <button onClick={takeSnapshot} aria-label="Ambil Screenshot" className="p-1.5 bg-surface-raised hover:bg-surface-overlay rounded-lg text-content transition-colors" title="Ambil Screenshot">
                                             <Icons.Image />
                                         </button>
                                     )}
 
-                                    <button onClick={toggleFS} className="p-1.5 bg-surface-raised hover:bg-surface-overlay rounded-lg text-content transition-colors" title={isFullscreen ? "Keluar Fullscreen" : "Fullscreen"}>
+                                    <button onClick={toggleFS} aria-label={isFullscreen ? "Keluar Fullscreen" : "Fullscreen"} className="p-1.5 bg-surface-raised hover:bg-surface-overlay rounded-lg text-content transition-colors" title={isFullscreen ? "Keluar Fullscreen" : "Fullscreen"}>
                                         <Icons.Fullscreen />
                                     </button>
                                 </>
                             )}
 
                             {canRetry && (
-                                <button onClick={handleRetry} className="p-1.5 bg-primary/90 hover:bg-primary text-white rounded-lg transition-colors" title="Coba Lagi">
+                                <button onClick={handleRetry} aria-label="Coba Lagi" className="p-1.5 bg-primary/90 hover:bg-primary text-white rounded-lg transition-colors" title="Coba Lagi">
                                     <Icons.Reset />
                                 </button>
                             )}
 
                             {/* Close Button */}
-                            <button onClick={onClose} className="p-1.5 bg-surface-raised hover:bg-surface-overlay rounded-lg text-content transition-colors" title="Tutup">
+                            <button onClick={onClose} aria-label="Tutup" className="p-1.5 bg-surface-raised hover:bg-surface-overlay rounded-lg text-content transition-colors" title="Tutup">
                                 <Icons.X />
                             </button>
                         </div>

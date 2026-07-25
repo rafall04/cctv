@@ -100,6 +100,7 @@ function SimpleHeader({ branding, layoutMode, onLayoutToggle, disableHeavyEffect
                         <button
                             onClick={toggleTheme}
                             className="rounded-control border border-edge bg-surface p-2 text-content-muted transition-colors hover:border-edge-strong hover:text-content"
+                            aria-label={isDark ? 'Aktifkan mode terang' : 'Aktifkan mode gelap'}
                             title={isDark ? 'Light Mode' : 'Dark Mode'}
                         >
                             {isDark ? <Icons.Sun /> : <Icons.Moon />}
@@ -198,6 +199,9 @@ function SimpleStatusOverview({ disableHeavyEffects = false }) {
         [cameras],
     );
 
+    // Motion gate: lite experience OR OS reduce-motion preference (a11y).
+    const disableAnimations = disableHeavyEffects || shouldDisableAnimations();
+
     const metrics = [
         { key: 'online', label: 'Online', value: online, valueClass: 'text-status-live' },
         { key: 'offline', label: 'Offline', value: offline, valueClass: offline > 0 ? 'text-status-fault' : 'text-content' },
@@ -228,7 +232,7 @@ function SimpleStatusOverview({ disableHeavyEffects = false }) {
                 <div className="mt-2.5 flex items-center justify-between border-t border-edge pt-2.5">
                     <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-content-subtle">Menonton sekarang</span>
                     <span className="flex items-center gap-1.5 font-mono text-sm font-semibold tabular-nums text-data">
-                        <span className={`h-1.5 w-1.5 rounded-full bg-data ${disableHeavyEffects ? '' : 'animate-pulse'}`} aria-hidden="true"></span>
+                        <span className={`h-1.5 w-1.5 rounded-full bg-data ${disableAnimations ? '' : 'animate-pulse'}`} aria-hidden="true"></span>
                         {liveViewersNow.toLocaleString('id-ID')}
                     </span>
                 </div>
@@ -311,6 +315,9 @@ export default function LandingPageSimple({
 
     return (
         <div className="min-h-screen bg-surface-sunken pb-24 flex flex-col sm:pb-0">
+            {/* sr-only page title so the Simple shell has a proper h1 (heading hierarchy) —
+                the visible chrome is a compact logo/pulse with no visual h1. */}
+            <h1 className="sr-only">CCTV Publik {branding.company_name}</h1>
             <SimpleHeader
                 branding={branding}
                 layoutMode={layoutMode}
