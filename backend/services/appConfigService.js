@@ -97,7 +97,7 @@ export function getPublicRuntimeConfig({ protocol, hostname } = {}) {
 export function getVersionInfo() {
     const versionInfo = getAppVersionInfo();
     return {
-        name: 'RAF NET CCTV',
+        name: 'RAF CCTV',
         version: versionInfo.appVersion,
         buildId: versionInfo.buildId,
         environment: config.server.env,

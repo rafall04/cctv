@@ -81,7 +81,7 @@ describe('PwaInstallPrompt', () => {
         });
 
         expect(screen.getByTestId('pwa-install-prompt').className).toContain('bottom-24');
-        expect(screen.getByText('Install RAF NET Admin')).toBeTruthy();
+        expect(screen.getByText('Install RAF Admin')).toBeTruthy();
 
         await act(async () => {
             fireEvent.click(screen.getByRole('button', { name: /Install/i }));

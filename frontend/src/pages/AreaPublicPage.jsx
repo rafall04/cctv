@@ -36,8 +36,8 @@ function updateAreaMetadata(area) {
         return;
     }
 
-    const title = `CCTV Online ${area.name} - RAF NET`;
-    const description = area.description || `Pantau CCTV publik area ${area.name} secara online melalui RAF NET.`;
+    const title = `CCTV Online ${area.name} - RAF`;
+    const description = area.description || `Pantau CCTV publik area ${area.name} secara online melalui RAF.`;
 
     document.title = title;
     setMetaContent('meta[name="description"]', description);
@@ -327,7 +327,7 @@ export default function AreaPublicPage() {
         try {
             const result = await sharePublicText({
                 text: shareText,
-                title: `CCTV Online ${area?.name || 'Area'} - RAF NET`,
+                title: `CCTV Online ${area?.name || 'Area'} - RAF`,
             });
 
             if (result.status === 'native') {
@@ -417,7 +417,7 @@ export default function AreaPublicPage() {
                         <div>
                             <h1 className="text-2xl font-bold sm:text-3xl">{area?.name || 'Area CCTV'}</h1>
                             <p className="mt-2 max-w-2xl text-sm text-content-muted">
-                                {area?.description || 'Pantau CCTV publik area ini secara online melalui RAF NET.'}
+                                {area?.description || 'Pantau CCTV publik area ini secara online melalui RAF.'}
                             </p>
                         </div>
                     </div>

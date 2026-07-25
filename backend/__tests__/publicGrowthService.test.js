@@ -44,7 +44,7 @@ describe('publicGrowthService', () => {
             camera_count: 2,
             online_count: 1,
             total_views: 12,
-            description: 'Pantau CCTV publik area KAB SURABAYA secara online melalui RAF NET.',
+            description: 'Pantau CCTV publik area KAB SURABAYA secara online melalui RAF.',
         });
     });
 

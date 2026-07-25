@@ -62,16 +62,16 @@ export function buildCameraUrl(camera, origin = window.location.origin) {
 
 export function buildAreaShareText(area, origin = window.location.origin) {
     const url = buildAreaUrl(area.slug, origin);
-    return `CCTV Online ${area.name} - RAF NET\nPantau kamera publik area ${area.name}:\n${url}`;
+    return `CCTV Online ${area.name} - RAF\nPantau kamera publik area ${area.name}:\n${url}`;
 }
 
 export function buildCameraShareText(camera, origin = window.location.origin) {
     const url = buildCameraUrl(camera, origin);
     const areaName = camera.area_name || camera.areaName || 'Area publik';
-    return `CCTV ${camera.name} - RAF NET\nArea: ${areaName}\nLive: ${url}`;
+    return `CCTV ${camera.name} - RAF\nArea: ${areaName}\nLive: ${url}`;
 }
 
-export async function sharePublicText({ text, title = 'RAF NET CCTV', navigatorRef = window.navigator }) {
+export async function sharePublicText({ text, title = 'RAF CCTV', navigatorRef = window.navigator }) {
     if (!text) {
         return { ok: false, status: 'empty' };
     }

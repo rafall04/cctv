@@ -111,7 +111,7 @@ describe('AreaPublicPage', () => {
         expect(screen.getAllByText(/5 live/i).length).toBeGreaterThan(0);
         expect(screen.getAllByText(/CCTV A/i).length).toBeGreaterThan(0);
         expect(screen.getAllByText(/CCTV B/i).length).toBeGreaterThan(0);
-        expect(document.title).toBe('CCTV Online KAB SURABAYA - RAF NET');
+        expect(document.title).toBe('CCTV Online KAB SURABAYA - RAF');
     });
 
     it('merender daftar semua CCTV area secara bertahap untuk area besar', async () => {

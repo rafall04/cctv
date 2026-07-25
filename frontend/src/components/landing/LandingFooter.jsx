@@ -39,11 +39,11 @@ export default function Footer({ saweriaEnabled, saweriaLink, branding }) {
 
                 <div className="mb-8 grid grid-cols-1 gap-8 md:grid-cols-3">
                     <div className="text-center md:text-left">
-                        <h4 className="mb-3 font-semibold text-content">Layanan Kami</h4>
+                        <h4 className="mb-3 font-semibold text-content">Fitur</h4>
                         <ul className="space-y-1.5 text-sm text-content-muted">
-                            <li>&bull; Pemasangan WiFi rumah & kantor</li>
-                            <li>&bull; Instalasi CCTV</li>
                             <li>&bull; Monitoring CCTV online 24 jam</li>
+                            <li>&bull; Peta & grid multi-lokasi</li>
+                            <li>&bull; Akses gratis tanpa login</li>
                         </ul>
                     </div>
 
@@ -68,7 +68,7 @@ export default function Footer({ saweriaEnabled, saweriaLink, branding }) {
                     <div className="text-center md:text-right">
                         <h4 className="mb-2 font-semibold text-content">Hubungi Kami</h4>
                         <p className="mb-3 text-sm text-content-muted">
-                            Butuh WiFi atau CCTV?
+                            Ada pertanyaan atau masukan?
                         </p>
                         <a
                             href={whatsappLink}

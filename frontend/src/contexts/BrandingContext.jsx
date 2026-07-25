@@ -5,15 +5,15 @@ const BrandingContext = createContext();
 
 export function BrandingProvider({ children }) {
     const [branding, setBranding] = useState({
-        company_name: 'RAF NET',
-        company_tagline: 'CCTV Bojonegoro Online',
-        company_description: 'RAF NET melayani pemasangan WiFi dan CCTV di wilayah Bojonegoro.',
+        company_name: 'RAF',
+        company_tagline: 'Pemantauan CCTV Publik',
+        company_description: 'Platform pemantauan CCTV publik secara real-time.',
         city_name: 'Bojonegoro',
         province_name: 'Jawa Timur',
-        hero_title: 'Pantau CCTV Bojonegoro Secara Real-Time',
+        hero_title: 'Pantau CCTV Publik Secara Real-Time',
         hero_subtitle: 'Pantau keamanan wilayah secara real-time.',
         footer_text: 'Layanan pemantauan CCTV publik',
-        copyright_text: 'Penyedia Internet & CCTV',
+        copyright_text: 'Pemantauan CCTV Publik',
         meta_title: 'CCTV Online',
         meta_description: 'Pantau CCTV secara online',
         meta_keywords: 'cctv online',

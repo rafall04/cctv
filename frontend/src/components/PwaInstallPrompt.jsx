@@ -25,13 +25,13 @@ export default function PwaInstallPrompt({ delayMs = DEFAULT_DELAY_MS }) {
     const config = isAdminRoute
         ? {
             dismissKey: ADMIN_DISMISS_KEY,
-            title: 'Install RAF NET Admin',
+            title: 'Install RAF Admin',
             body: 'Buka admin lebih cepat untuk cek kamera, health, analytics, dan token playback.',
             className: 'bottom-24 sm:bottom-6',
         }
         : {
             dismissKey: PUBLIC_DISMISS_KEY,
-            title: 'Install RAF NET CCTV',
+            title: 'Install RAF CCTV',
             body: 'Buka lebih cepat dari layar utama tanpa mencari browser lagi.',
             className: 'top-20',
         };

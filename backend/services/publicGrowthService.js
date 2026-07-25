@@ -144,7 +144,7 @@ export function getPublicAreaBySlug(areaSlug) {
         online_count: Number(row.online_count || 0),
         total_views: Number(row.total_views || 0),
         latest_camera_at: row.latest_camera_at,
-        description: `Pantau CCTV publik area ${row.name} secara online melalui RAF NET.`,
+        description: `Pantau CCTV publik area ${row.name} secara online melalui RAF.`,
     };
 }
 

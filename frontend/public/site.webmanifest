@@ -51,7 +51,7 @@
     {
       "name": "Admin Dashboard",
       "short_name": "Admin",
-      "description": "Buka dashboard admin RAF NET",
+      "description": "Buka dashboard admin RAF",
       "url": "/admin/dashboard",
       "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
     },
