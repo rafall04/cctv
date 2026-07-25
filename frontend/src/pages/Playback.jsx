@@ -966,7 +966,7 @@ function Playback({
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-950">
+            <div className="flex items-center justify-center min-h-screen bg-surface-sunken">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
             </div>
         );
@@ -974,15 +974,15 @@ function Playback({
 
     if (cameras.length === 0) {
         return (
-            <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-950">
+            <div className="flex items-center justify-center min-h-screen bg-surface-sunken">
                 <div className="text-center max-w-md mx-auto px-4">
-                    <svg className="w-20 h-20 mx-auto mb-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-20 h-20 mx-auto mb-6 text-content-subtle" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                     </svg>
-                    <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+                    <h3 className="text-xl font-semibold text-content mb-2">
                         Belum Ada Recording Tersedia
                     </h3>
-                    <p className="text-gray-600 dark:text-gray-400 mb-4">
+                    <p className="text-content-muted mb-4">
                         Fitur recording sedang dalam proses aktivasi. Silakan cek kembali nanti.
                     </p>
                     <a href="/" className="inline-flex items-center gap-2 text-primary-500 hover:text-primary-600 font-medium">
@@ -998,15 +998,15 @@ function Playback({
 
     if (!isAdminPlayback && playbackDeniedMessage) {
         return (
-            <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-950">
+            <div className="flex items-center justify-center min-h-screen bg-surface-sunken">
                 <div className="text-center max-w-xl mx-auto px-4">
                     <svg className="w-20 h-20 mx-auto mb-6 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01M5.071 19h13.858c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                     </svg>
-                    <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+                    <h3 className="text-xl font-semibold text-content mb-2">
                         Playback Publik Tidak Tersedia
                     </h3>
-                    <p className="text-gray-600 dark:text-gray-400 mb-4">
+                    <p className="text-content-muted mb-4">
                         {playbackDeniedMessage}
                     </p>
                     {branding?.whatsapp_number && (
@@ -1048,7 +1048,7 @@ function Playback({
                     script={adsConfig.slots.playbackPopunder.script}
                 />
             )}
-            <div className="min-h-screen bg-gray-50 dark:bg-gray-950 py-2 sm:py-6 md:py-8 px-2 sm:px-4">
+            <div className="min-h-screen bg-surface-sunken py-2 sm:py-6 md:py-8 px-2 sm:px-4">
             <div className="max-w-7xl mx-auto space-y-3 sm:space-y-4 md:space-y-6">
                 <PlaybackHeader
                     cameras={visiblePlaybackCameras}
@@ -1113,7 +1113,7 @@ function Playback({
                     <div className="flex justify-center">
                         <button
                             onClick={handleShare}
-                            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-content bg-surface-raised border border-edge hover:bg-surface-overlay rounded-control transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                             title="Bagikan tautan playback ini"
                         >
                             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

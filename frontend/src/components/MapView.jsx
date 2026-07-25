@@ -1051,12 +1051,12 @@ const MapView = memo(({
 
     if (cameras.length === 0 || camerasWithCoords.length === 0) {
         return (
-            <div className={`flex items-center justify-center bg-gray-100 dark:bg-gray-800 rounded-xl min-h-[400px] ${className}`}>
+            <div className={`flex items-center justify-center bg-surface-sunken rounded-card min-h-[400px] ${className}`}>
                 <div className="text-center p-6">
-                    <svg className="w-12 h-12 mx-auto text-gray-400 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-12 h-12 mx-auto text-content-subtle mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeWidth={1.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                     </svg>
-                    <p className="text-gray-500 dark:text-gray-400 text-sm">
+                    <p className="text-content-muted text-sm">
                         {cameras.length === 0 ? 'Belum ada kamera' : 'Koordinat kamera belum diatur'}
                     </p>
                 </div>
@@ -1065,7 +1065,7 @@ const MapView = memo(({
     }
 
     return (
-        <div className={`relative w-full h-full min-h-[450px] rounded-xl overflow-hidden ${className}`}>
+        <div className={`relative w-full h-full min-h-[450px] rounded-card overflow-hidden ${className}`}>
             {/* Map */}
             <MapContainer
                 center={defaultCenter}
@@ -1139,7 +1139,7 @@ const MapView = memo(({
 
             <div className="pointer-events-none absolute bottom-3 left-1/2 z-[1000] w-full -translate-x-1/2 px-3">
                 <div
-                    className="mx-auto inline-flex max-w-[calc(100%-3rem)] items-center gap-1.5 overflow-hidden rounded-full border border-white/50 bg-white/72 px-2 py-1.5 shadow-[0_16px_36px_rgba(15,23,42,0.16)] backdrop-blur-xl dark:border-white/10 dark:bg-gray-900/72 sm:gap-2 sm:px-3"
+                    className="mx-auto inline-flex max-w-[calc(100%-3rem)] items-center gap-1.5 overflow-hidden rounded-full border border-edge bg-surface/80 px-2 py-1.5 shadow-e2 backdrop-blur-xl sm:gap-2 sm:px-3"
                     data-testid="map-status-bar"
                 >
                     {/* "di peta" is load-bearing: this bar counts only cameras that have coordinates,
