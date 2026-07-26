@@ -1,0 +1,31 @@
+[Unit]
+Description=RAF CCTV -> Telegram archive uploader (local Bot API sidecar)
+Documentation=file:/opt/tg-archive/README.md
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/tg-archive
+EnvironmentFile=/opt/tg-archive/.env
+ExecStartPre=/usr/bin/docker compose -f /opt/tg-archive/docker-compose.yml up -d
+ExecStart=/usr/bin/python3 /opt/tg-archive/uploader.py
+Restart=always
+RestartSec=15
+# archiving must never outbid live streaming / recording ffmpeg for CPU or disk
+Nice=15
+IOSchedulingClass=idle
+CPUQuota=50%
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=tg-archive
+
+# hardening — it only ever needs to read recordings and write its own state
+NoNewPrivileges=true
+ProtectSystem=full
+ReadWritePaths=/opt/tg-archive
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
