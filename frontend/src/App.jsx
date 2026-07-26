@@ -47,6 +47,7 @@ const RecordingDashboard = lazyWithRetry(() => import('./pages/RecordingDashboar
 const AreaPublicPage = lazyWithRetry(() => import('./pages/AreaPublicPage'), 'area-public-page');
 const BillingManagement = lazyWithRetry(() => import('./pages/BillingManagement'), 'billing-management');
 const VoucherManagement = lazyWithRetry(() => import('./pages/VoucherManagement'), 'voucher-management');
+const RondaSettings = lazyWithRetry(() => import('./pages/RondaSettings'), 'ronda-settings');
 const CustomerCameraIPs = lazyWithRetry(() => import('./pages/CustomerCameraIPs'), 'customer-camera-ips');
 const CustomerLayout = lazyWithRetry(() => import('./layouts/CustomerLayout'), 'customer-layout');
 const MyCameras = lazyWithRetry(() => import('./pages/customer/MyCameras'), 'my-cameras');
@@ -324,6 +325,14 @@ function App() {
                     element={
                         <AdminPageRoute adminOnly>
                             <VoucherManagement />
+                        </AdminPageRoute>
+                    }
+                />
+                <Route
+                    path="/admin/ronda"
+                    element={
+                        <AdminPageRoute adminOnly>
+                            <RondaSettings />
                         </AdminPageRoute>
                     }
                 />
