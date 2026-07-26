@@ -1,0 +1,23 @@
+{
+  "_comment": [
+    "Routing arsip rekaman ke grup Telegram.",
+    "scope: 'camera' (paling spesifik) > 'area' > 'all'.",
+    "Grup paling spesifik yang mengunggah; grup lain yang ikut cocok dapat salinan",
+    "lewat copyMessage sehingga TIDAK memakan bandwidth upload tambahan.",
+    "File ini dibaca ulang otomatis saat berubah — tidak perlu restart service.",
+    "Kamera yang tidak cocok route mana pun tidak dikirim (status 'no_route').",
+    "",
+    "Area: 2 = DS DANDER (cam 1,5,9,1168,1169,1170,1435,1441)",
+    "      3 = DS TANJUNGHARJO (cam 2,7,8)"
+  ],
+  "routes": [
+    {
+      "id": "selatan-ahass",
+      "enabled": true,
+      "scope": "camera",
+      "cameraId": 1441,
+      "chatId": "-5510674082",
+      "label": "Arsip Selatan AHASS"
+    }
+  ]
+}
