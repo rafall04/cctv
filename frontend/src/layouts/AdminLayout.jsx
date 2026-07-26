@@ -135,6 +135,7 @@ export default function AdminLayout({ children }) {
         { label: 'Billing Pelanggan', path: '/admin/billing', icon: <Icons.Users />, adminOnly: true },
         { label: 'Voucher Akses', path: '/admin/voucher', icon: <Icons.Shield />, adminOnly: true },
         { label: 'Pengaturan Ronda', path: '/admin/ronda', icon: <Icons.Bell />, adminOnly: true },
+        { label: 'Arsip ke Telegram', path: '/admin/telegram-archive', icon: <Icons.Playback />, adminOnly: true },
         { label: 'IP Kamera (Routing)', path: '/admin/customer-ips', icon: <Icons.Camera />, adminOnly: true },
         { label: 'Ads', path: '/admin/ads', icon: <Icons.Settings />, adminOnly: true },
         { label: 'Users', path: '/admin/users', icon: <Icons.Users />, adminOnly: true },

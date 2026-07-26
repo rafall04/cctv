@@ -68,6 +68,7 @@ import voucherRoutes from './routes/voucherRoutes.js';
 import voucherWebhookRoutes from './routes/voucherWebhookRoutes.js';
 import voucherAdminRoutes from './routes/voucherAdminRoutes.js';
 import rondaAdminRoutes from './routes/rondaAdminRoutes.js';
+import telegramArchiveRoutes from './routes/telegramArchiveRoutes.js';
 import recordingRoutes from './routes/recordingRoutes.js';
 import playbackTokenRoutes from './routes/playbackTokenRoutes.js';
 import brandingRoutes from './routes/brandingRoutes.js';
@@ -361,6 +362,7 @@ await fastify.register(customerRoutes, { prefix: '/api/customer' });
 await fastify.register(billingAdminRoutes, { prefix: '/api/admin/billing' });
 await fastify.register(voucherAdminRoutes, { prefix: '/api/admin/voucher' });
 await fastify.register(rondaAdminRoutes, { prefix: '/api/admin/ronda' });
+await fastify.register(telegramArchiveRoutes, { prefix: '/api/admin/telegram-archive' });
 await fastify.register(billingWebhookRoutes, { prefix: '/api/billing' });
 // thumbnailRoutes removed - @fastify/static handles /api/thumbnails/* automatically
 
