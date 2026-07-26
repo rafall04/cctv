@@ -11,10 +11,11 @@
  * "perlu nyalakan ulang" only apply when the container is recreated, and the save response says so.
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNotification } from '../contexts/NotificationContext';
 import { useConfirm } from '../contexts/ConfirmContext';
 import rondaAdminService from '../services/rondaAdminService';
+import RondaZoneEditor from '../components/admin/ronda/RondaZoneEditor';
 import { TableSkeleton } from '../components/ui/Skeleton';
 
 const HOUR_PRESETS = [
@@ -76,46 +77,17 @@ function parseZones(draft) {
     return out;
 }
 
-function CameraPreview({ name, refreshKey }) {
-    const [url, setUrl] = useState(null);
-    const [failed, setFailed] = useState(false);
-    const urlRef = useRef(null);
-
-    useEffect(() => {
-        let cancelled = false;
-        (async () => {
-            try {
-                const blob = await rondaAdminService.getPreviewBlob(name);
-                if (cancelled) return;
-                if (urlRef.current) URL.revokeObjectURL(urlRef.current);
-                urlRef.current = URL.createObjectURL(blob);
-                setUrl(urlRef.current);
-                setFailed(false);
-            } catch {
-                if (!cancelled) setFailed(true);
-            }
-        })();
-        return () => { cancelled = true; };
-    }, [name, refreshKey]);
-
-    useEffect(() => () => { if (urlRef.current) URL.revokeObjectURL(urlRef.current); }, []);
-
-    if (failed) {
-        return (
-            <div className="flex h-40 items-center justify-center rounded-control border border-edge bg-surface-sunken text-xs text-content-subtle">
-                Belum ada gambar
-            </div>
-        );
-    }
-    return url ? (
-        <img
-            src={url}
-            alt={`Tampilan terkini ${name}`}
-            className="w-full rounded-control border border-edge"
-        />
-    ) : (
-        <div className="h-40 animate-pulse rounded-control bg-surface-sunken" />
-    );
+/** Parse the JSON text fields, tolerating a half-typed value so the editor keeps rendering. */
+function safeZones(draft) {
+    const read = (raw) => {
+        try {
+            const parsed = JSON.parse(raw || '[]');
+            return Array.isArray(parsed) ? parsed : [];
+        } catch {
+            return [];
+        }
+    };
+    return { roi: read(draft?.roi), ignore: read(draft?.ignore) };
 }
 
 export function RondaSettings() {
@@ -367,9 +339,17 @@ export function RondaSettings() {
 
                         <div className="mt-3 grid gap-4 lg:grid-cols-[minmax(0,320px)_1fr]">
                             <div>
-                                <CameraPreview name={cam.name} refreshKey={previewKey} />
+                                <RondaZoneEditor
+                                    name={cam.name}
+                                    refreshKey={previewKey}
+                                    {...safeZones(draft)}
+                                    onChange={({ roi, ignore }) => {
+                                        setField(cam.name, 'roi', JSON.stringify(roi));
+                                        setField(cam.name, 'ignore', JSON.stringify(ignore));
+                                    }}
+                                />
                                 <p className={hintClass}>
-                                    Kotak abu-abu = zona diabaikan, garis kuning = area pantau.
+                                    Merah = zona diabaikan · Kuning = area pantau. Tekan Simpan setelah mengubah.
                                 </p>
                             </div>
 
