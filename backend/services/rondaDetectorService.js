@@ -15,7 +15,7 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
 import path from 'path';
-import { query } from '../database/connectionPool.js';
+import { query, queryOne } from '../database/connectionPool.js';
 import rondaConfigService from './rondaConfigService.js';
 
 const run = promisify(execFile);
@@ -60,6 +60,24 @@ function slugFor(cameraName, taken) {
     let n = 2;
     while (taken.has(candidate)) candidate = `motion-${base}-${n++}`;
     return candidate;
+}
+
+/**
+ * The detectors need the Telegram bot token at container-creation time. Prefer a sibling's stored
+ * value, then the environment, then `settings.telegram_config` — the same record the Node
+ * telegramService reads, so a new detector uses the bot the rest of the system already uses. Without
+ * this fallback a camera added from the UI would run but never send an alert.
+ */
+function resolveBotToken() {
+    const fromConfig = rondaConfigService.anyBotToken();
+    if (fromConfig) return fromConfig;
+    try {
+        const row = queryOne("SELECT value FROM settings WHERE key = 'telegram_config'");
+        if (row?.value) return JSON.parse(row.value).botToken || '';
+    } catch (error) {
+        console.error('Ronda bot token lookup error:', error);
+    }
+    return '';
 }
 
 class RondaDetectorService {
@@ -154,10 +172,12 @@ class RondaDetectorService {
             crop_limit: '0,0,1,1',
             retention_days: 7,
             max_snaps: 50,
-            // The bot token is shared by every detector; reuse whatever a sibling already has so the
-            // operator never has to paste a secret into the browser.
-            bot_token: rondaConfigService.anyBotToken(),
+            // Shared secret, resolved server-side so it is never typed into (or returned to) the browser.
+            bot_token: resolveBotToken(),
         };
+        if (!cfg.bot_token) {
+            throw fail('Token bot Telegram belum tersetel di Pengaturan Telegram, jadi kamera baru tidak bisa mengirim peringatan', 400);
+        }
 
         fs.mkdirSync(path.join(WORK_DIR, 'live', name, 'snaps'), { recursive: true });
         rondaConfigService.writeRaw(name, cfg);
@@ -170,10 +190,43 @@ class RondaDetectorService {
         return rondaConfigService.getCamera(name);
     }
 
+    /**
+     * Detectors created before this admin page existed were configured entirely through container
+     * env vars, so their JSON has no stream key or token. Recover both from the running container
+     * before it is destroyed — otherwise a restart would rebuild them with a broken RTSP URL and no
+     * Telegram credentials.
+     */
+    async #healConfig(name, config) {
+        if (config.stream_key && config.bot_token) return config;
+        let env = [];
+        try {
+            env = JSON.parse(await docker(['inspect', '-f', '{{json .Config.Env}}', name]) || '[]');
+        } catch {
+            env = [];
+        }
+        const pick = (key) => {
+            const hit = env.find((e) => e.startsWith(`${key}=`));
+            return hit ? hit.slice(key.length + 1) : '';
+        };
+        const healed = { ...config };
+        if (!healed.stream_key) {
+            const rtsp = pick('RTSP_URL');
+            const key = rtsp.split('/').pop() || '';
+            if (KEY_RE.test(key)) healed.stream_key = key;
+        }
+        if (!healed.bot_token) healed.bot_token = pick('TELEGRAM_BOT_TOKEN') || resolveBotToken();
+        if (!healed.out_dir) healed.out_dir = pick('OUT_DIR') || `/work/live/${name}`;
+        if (!healed.stream_key) {
+            throw fail('Sumber kamera tidak diketahui, jadi belum bisa dinyalakan ulang dari sini', 400);
+        }
+        rondaConfigService.writeRaw(name, healed);
+        return healed;
+    }
+
     /** Recreate the container so structural settings (source, resolution, fps) take effect. */
     async restartDetector(name) {
         assertName(name);
-        const config = rondaConfigService.getRaw(name);   // needs the token + stream key
+        const config = await this.#healConfig(name, rondaConfigService.getRaw(name));
         await docker(['rm', '-f', name]).catch(() => {});
         await docker(this.#runArgs(name, config));
         return rondaConfigService.getCamera(name);
