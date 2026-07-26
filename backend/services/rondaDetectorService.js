@@ -1,0 +1,200 @@
+/**
+ * Purpose: Lifecycle for the Ronda Digital motion-detector containers — list candidate cameras,
+ *          create/restart/remove a detector, and locate its preview frame.
+ * Caller: controllers/rondaAdminController.js.
+ * Deps: node:child_process (execFile), node:fs, database/connectionPool.
+ * MainFuncs: listAvailableCameras, createDetector, restartDetector, removeDetector, previewFile.
+ * SideEffects: runs `docker` on the host; writes JSON under RONDA_CONFIG_DIR.
+ *
+ * SECURITY: every docker call goes through execFile with an argv ARRAY — never a shell string — and
+ * every value that reaches it is validated first (container name, stream key, numeric ranges). That
+ * combination is what keeps an admin form from turning into command execution.
+ */
+
+import { execFile } from 'child_process';
+import { promisify } from 'util';
+import fs from 'fs';
+import path from 'path';
+import { query } from '../database/connectionPool.js';
+import rondaConfigService from './rondaConfigService.js';
+
+const run = promisify(execFile);
+
+const CONFIG_DIR = process.env.RONDA_CONFIG_DIR || '/opt/yolo-poc/config';
+const WORK_DIR = process.env.RONDA_WORK_DIR || '/opt/yolo-poc';
+const IMAGE = process.env.RONDA_IMAGE || 'motion-ai:latest';
+const MODEL = process.env.RONDA_MODEL || '/work/yolo11n320_openvino_model';
+const RTSP_BASE = process.env.RONDA_RTSP_BASE || 'rtsp://127.0.0.1:8554';
+
+const NAME_RE = /^motion-[a-z0-9][a-z0-9-]{0,30}$/;
+const KEY_RE = /^[A-Za-z0-9-]{8,64}$/;
+
+function fail(message, statusCode) {
+    const err = new Error(message);
+    err.statusCode = statusCode;
+    return err;
+}
+
+function assertName(name) {
+    if (!NAME_RE.test(name || '')) throw fail('Nama detektor tidak valid', 400);
+    return name;
+}
+
+async function docker(args) {
+    try {
+        const { stdout } = await run('docker', args, { timeout: 60000, maxBuffer: 1024 * 1024 });
+        return stdout.trim();
+    } catch (error) {
+        const detail = (error.stderr || error.message || '').split('\n')[0];
+        throw fail(`Perintah docker gagal: ${detail}`, 500);
+    }
+}
+
+function slugFor(cameraName, taken) {
+    const base = String(cameraName || 'cam')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 24) || 'cam';
+    let candidate = `motion-${base}`;
+    let n = 2;
+    while (taken.has(candidate)) candidate = `motion-${base}-${n++}`;
+    return candidate;
+}
+
+class RondaDetectorService {
+    /** Community cameras that have a stream key and no detector yet. */
+    listAvailableCameras() {
+        const monitored = new Set(
+            rondaConfigService.listRaw().map((c) => String(c.config?.stream_key || '')).filter(Boolean),
+        );
+        const rows = query(
+            `SELECT c.id, c.name, c.stream_key, a.name AS area
+             FROM cameras c LEFT JOIN areas a ON a.id = c.area_id
+             WHERE c.stream_key IS NOT NULL AND c.stream_key != '' AND c.camera_class = 'community'
+             ORDER BY c.name`,
+        );
+        return rows
+            .filter((r) => !monitored.has(String(r.stream_key)))
+            .map((r) => ({ id: r.id, name: r.name, area: r.area || '', stream_key: r.stream_key }));
+    }
+
+    /** Build the docker argv for a detector from its stored settings. */
+    #runArgs(name, cfg) {
+        const env = (k, v) => ['-e', `${k}=${v}`];
+        return [
+            'run', '-d', '--name', name, '--restart', 'unless-stopped', '--network', 'host',
+            '--cpus', String(cfg.cpus || 2), '--memory', `${cfg.memory_mb || 2048}m`,
+            ...env('TZ', 'Asia/Jakarta'),
+            ...env('RTSP_URL', `${RTSP_BASE}/${cfg.stream_key}`),
+            ...env('CAM_LABEL', cfg.label || name),
+            ...env('AREA_LABEL', cfg.area || '-'),
+            ...env('OUT_DIR', cfg.out_dir),
+            ...env('CONFIG_PATH', `/work/config/${name}.json`),
+            ...env('CONFIG_EVERY', '15'),
+            ...env('PROC_W', String(cfg.proc_w || 960)),
+            ...env('TARGET_FPS', String(cfg.target_fps || 5)),
+            ...env('VAR_THRESH', '50'),
+            ...env('MIN_AREA', String(cfg.min_area || 700)),
+            ...env('CONFIRM', '2.5'),
+            ...env('DEBOUNCE', '3'),
+            ...env('DETECT_SHADOW', '1'),
+            ...env('GLOBAL_FRAC', '0.6'),
+            ...env('IGNORE_ZONES', JSON.stringify(cfg.ignore || [])),
+            ...env('ROI_JSON', JSON.stringify(cfg.roi || [])),
+            ...env('CROP_LIMIT', cfg.crop_limit || '0,0,1,1'),
+            ...env('CONFIRM_MODEL', MODEL),
+            ...env('CONFIRM_CONF', String(cfg.confirm_conf ?? 0.15)),
+            ...env('CONFIRM_IMGSZ', '320'),
+            ...env('CONFIRM_CLASSES', cfg.confirm_classes || 'person,bicycle,car,motorcycle,bus,truck'),
+            ...env('GATE_COOLDOWN', '10'),
+            ...env('GATE_CROP', '0.55'),
+            ...env('RETENTION_DAYS', String(cfg.retention_days || 7)),
+            ...env('MAX_SNAPS', String(cfg.max_snaps || 50)),
+            ...env('MAX_EVENTS', '20000'),
+            ...env('TELEGRAM_BOT_TOKEN', cfg.bot_token || ''),
+            ...env('TELEGRAM_CHAT_ID', cfg.chat_id || ''),
+            ...env('TG_COOLDOWN', String(cfg.tg_cooldown ?? 12)),
+            ...env('ALERT_HOURS', cfg.alert_hours || ''),
+            ...env('TG_COOLDOWN_OFF', String(cfg.tg_cooldown_off ?? 300)),
+            ...env('TG_TEST', '0'),
+            '-v', `${WORK_DIR}:/work`, '-w', '/work', IMAGE, 'python', 'motion.py',
+        ];
+    }
+
+    async createDetector(input) {
+        const { camera_id: cameraId, area, chat_id: chatId } = input || {};
+        const row = query('SELECT id, name, stream_key FROM cameras WHERE id = ?', [cameraId])[0];
+        if (!row) throw fail('Kamera tidak ditemukan', 404);
+        if (!KEY_RE.test(String(row.stream_key || ''))) throw fail('Kamera ini belum punya stream key yang valid', 400);
+
+        const taken = new Set(rondaConfigService.listNames());
+        const name = assertName(slugFor(row.name, taken));
+
+        const cfg = {
+            label: input.label?.trim() || row.name,
+            area: String(area || '').trim(),
+            stream_key: row.stream_key,
+            camera_id: row.id,
+            out_dir: `/work/live/${name}`,
+            enabled: true,
+            alert_hours: input.alert_hours || '21:00-05:00',
+            tg_cooldown: Number(input.tg_cooldown) || 12,
+            tg_cooldown_off: Number(input.tg_cooldown_off ?? 300),
+            chat_id: String(chatId || '').trim(),
+            min_area: Number(input.min_area) || 700,
+            confirm_conf: 0.15,
+            confirm_classes: input.confirm_classes || 'person,bicycle,car,motorcycle,bus,truck',
+            proc_w: Number(input.proc_w) || 960,
+            target_fps: Number(input.target_fps) || 5,
+            cpus: 2,
+            memory_mb: 2048,
+            ignore: [],
+            roi: [],
+            crop_limit: '0,0,1,1',
+            retention_days: 7,
+            max_snaps: 50,
+            // The bot token is shared by every detector; reuse whatever a sibling already has so the
+            // operator never has to paste a secret into the browser.
+            bot_token: rondaConfigService.anyBotToken(),
+        };
+
+        fs.mkdirSync(path.join(WORK_DIR, 'live', name, 'snaps'), { recursive: true });
+        rondaConfigService.writeRaw(name, cfg);
+        try {
+            await docker(this.#runArgs(name, cfg));
+        } catch (error) {
+            rondaConfigService.deleteRaw(name);           // don't leave a config for a container that never started
+            throw error;
+        }
+        return rondaConfigService.getCamera(name);
+    }
+
+    /** Recreate the container so structural settings (source, resolution, fps) take effect. */
+    async restartDetector(name) {
+        assertName(name);
+        const config = rondaConfigService.getRaw(name);   // needs the token + stream key
+        await docker(['rm', '-f', name]).catch(() => {});
+        await docker(this.#runArgs(name, config));
+        return rondaConfigService.getCamera(name);
+    }
+
+    async removeDetector(name) {
+        assertName(name);
+        rondaConfigService.getRaw(name);                  // 404s if unknown
+        await docker(['rm', '-f', name]).catch(() => {});
+        rondaConfigService.deleteRaw(name);
+        return { name, removed: true };
+    }
+
+    /** Latest annotated frame — used by the admin page to show masks/zones as the detector sees them. */
+    previewFile(name) {
+        assertName(name);
+        const config = rondaConfigService.getRaw(name);
+        const file = path.join(String(config.out_dir || '').replace(/^\/work/, WORK_DIR), 'latest.jpg');
+        if (!fs.existsSync(file)) throw fail('Belum ada gambar dari kamera ini', 404);
+        return file;
+    }
+}
+
+export default new RondaDetectorService();

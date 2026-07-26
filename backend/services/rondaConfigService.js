@@ -19,6 +19,7 @@ const LIVE_ROOT = process.env.RONDA_LIVE_ROOT || '/opt/yolo-poc';
 
 // Only these keys may be written. Anything structural (RTSP URL, resolution, output dir) stays a
 // deploy-time concern so a mistyped form can never point a detector at the wrong stream.
+// Applied live by the detector (it re-reads this file every ~15 s).
 const EDITABLE = new Set([
     'enabled',
     'alert_hours',
@@ -28,7 +29,15 @@ const EDITABLE = new Set([
     'min_area',
     'confirm_conf',
     'confirm_classes',
+    'label',
+    'area',
+    'ignore',
+    'roi',
 ]);
+
+// Stored the same way, but only read when the container is (re)created — the UI flags these so the
+// operator knows a restart is needed rather than wondering why nothing changed.
+const STRUCTURAL = new Set(['proc_w', 'target_fps', 'crop_limit', 'retention_days', 'max_snaps']);
 
 const HOURS_RE = /^([01]\d|2[0-3]):([0-5]\d)-([01]\d|2[0-3]):([0-5]\d)$/;
 const NAME_RE = /^[A-Za-z0-9_-]+$/;
@@ -56,6 +65,14 @@ function readJson(file) {
     }
 }
 
+// Never let secrets reach the browser: the Telegram bot token is shared infrastructure, and the
+// stream key is effectively the camera's private address (the same leak that was closed on the
+// public landing payload). The UI needs neither to do its job.
+function redact(config) {
+    const { bot_token: _token, stream_key: _key, ...safe } = config || {};
+    return safe;
+}
+
 function statusOf(cfg) {
     const outDir = String(cfg?.out_dir || '');
     if (!outDir) return { online: false, ageSeconds: null, eventsToday: null, lastSeen: null };
@@ -75,7 +92,40 @@ function statusOf(cfg) {
     }
 }
 
+function validateZones(value, label) {
+    if (!Array.isArray(value)) throw fail(`${label} harus berupa daftar`, 400);
+    value.forEach((entry) => {
+        if (!Array.isArray(entry)) throw fail(`${label} berisi data yang bukan daftar`, 400);
+        entry.forEach((n) => {
+            if (!Number.isFinite(Number(n)) || Number(n) < 0 || Number(n) > 1) {
+                throw fail(`${label} harus berisi angka 0 sampai 1 (proporsi lebar/tinggi gambar)`, 400);
+            }
+        });
+    });
+}
+
 function validate(patch) {
+    if (patch.ignore !== undefined) {
+        validateZones(patch.ignore, 'Zona abaikan');
+        patch.ignore.forEach((z) => {
+            if (z.length !== 4) throw fail('Setiap zona abaikan harus berisi 4 angka: x1,y1,x2,y2', 400);
+        });
+    }
+    if (patch.roi !== undefined) {
+        validateZones(patch.roi, 'Area pantau');
+        if (patch.roi.length > 0 && patch.roi.length < 3) {
+            throw fail('Area pantau harus kosong atau berisi minimal 3 titik', 400);
+        }
+        patch.roi.forEach((p) => {
+            if (p.length !== 2) throw fail('Setiap titik area pantau harus berisi 2 angka: x,y', 400);
+        });
+    }
+    if (patch.crop_limit !== undefined && String(patch.crop_limit).trim()) {
+        const parts = String(patch.crop_limit).split(',').map((v) => Number(v.trim()));
+        if (parts.length !== 4 || parts.some((n) => !Number.isFinite(n) || n < 0 || n > 1)) {
+            throw fail('Batas bingkai harus 4 angka 0-1, contoh 0,0,0.88,1', 400);
+        }
+    }
     if (patch.alert_hours !== undefined) {
         const v = String(patch.alert_hours || '').trim();
         if (v && !HOURS_RE.test(v)) {
@@ -87,6 +137,10 @@ function validate(patch) {
         tg_cooldown_off: [0, 86400],
         min_area: [100, 200000],
         confirm_conf: [0.05, 0.9],
+        proc_w: [320, 1920],
+        target_fps: [1, 25],
+        retention_days: [1, 90],
+        max_snaps: [5, 5000],
     };
     for (const [key, [min, max]] of Object.entries(ranges)) {
         if (patch[key] === undefined) continue;
@@ -105,24 +159,44 @@ class RondaConfigService {
         return fs.existsSync(CONFIG_DIR);
     }
 
-    listCameras() {
+    /** Names of every configured detector. */
+    listNames() {
         if (!this.isAvailable()) return [];
         return fs
             .readdirSync(CONFIG_DIR)
             .filter((f) => f.endsWith('.json'))
             .map((f) => f.slice(0, -5))
             .filter((name) => NAME_RE.test(name))
-            .sort()
+            .sort();
+    }
+
+    /** Raw documents including secrets — internal callers only. */
+    listRaw() {
+        return this.listNames().map((name) => ({
+            name,
+            config: readJson(path.join(CONFIG_DIR, `${name}.json`)) || {},
+        }));
+    }
+
+    listCameras() {
+        return this.listNames()
             .map((name) => {
                 const config = readJson(path.join(CONFIG_DIR, `${name}.json`)) || {};
-                return { name, config, status: statusOf(config) };
+                return { name, config: redact(config), status: statusOf(config) };
             });
     }
 
     getCamera(name) {
         const config = readJson(configPath(name));
         if (!config) throw fail('Kamera tidak ditemukan', 404);
-        return { name, config, status: statusOf(config) };
+        return { name, config: redact(config), status: statusOf(config) };
+    }
+
+    /** Full document including secrets — internal callers only (container creation/restart). */
+    getRaw(name) {
+        const config = readJson(configPath(name));
+        if (!config) throw fail('Kamera tidak ditemukan', 404);
+        return config;
     }
 
     updateCamera(name, patch) {
@@ -132,17 +206,47 @@ class RondaConfigService {
         validate(patch);
 
         const next = { ...current };
+        let needsRestart = false;
+        const strings = new Set(['chat_id', 'alert_hours', 'confirm_classes', 'label', 'area', 'crop_limit']);
         for (const [key, value] of Object.entries(patch)) {
-            if (!EDITABLE.has(key)) continue;
+            const editable = EDITABLE.has(key);
+            const structural = STRUCTURAL.has(key);
+            if (!editable && !structural) continue;
             if (key === 'enabled') next[key] = Boolean(value);
-            else if (key === 'chat_id' || key === 'alert_hours' || key === 'confirm_classes') next[key] = String(value).trim();
+            else if (key === 'ignore' || key === 'roi') next[key] = value;
+            else if (strings.has(key)) next[key] = String(value).trim();
             else next[key] = Number(value);
+            if (structural && JSON.stringify(current[key]) !== JSON.stringify(next[key])) needsRestart = true;
         }
 
+        this.writeRaw(name, next);
+        return { name, config: redact(next), status: statusOf(next), needsRestart };
+    }
+
+    /** Write a full config document (used when creating a detector). */
+    writeRaw(name, config) {
+        const file = configPath(name);
         const tmp = `${file}.tmp`;
-        fs.writeFileSync(tmp, `${JSON.stringify(next, null, 1)}\n`);
+        fs.mkdirSync(CONFIG_DIR, { recursive: true });
+        fs.writeFileSync(tmp, `${JSON.stringify(config, null, 1)}\n`);
         fs.renameSync(tmp, file);
-        return { name, config: next, status: statusOf(next) };
+        return config;
+    }
+
+    deleteRaw(name) {
+        try {
+            fs.unlinkSync(configPath(name));
+        } catch {
+            /* already gone */
+        }
+    }
+
+    /** The Telegram bot token is shared across detectors; reuse it so it never has to be re-entered. */
+    anyBotToken() {
+        for (const cam of this.listRaw()) {
+            if (cam.config?.bot_token) return cam.config.bot_token;
+        }
+        return process.env.TELEGRAM_BOT_TOKEN || '';
     }
 }
 

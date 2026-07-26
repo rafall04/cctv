@@ -12,6 +12,11 @@ import {
     listRondaCameras,
     getRondaCamera,
     updateRondaCamera,
+    listAvailableCameras,
+    createRondaCamera,
+    restartRondaCamera,
+    deleteRondaCamera,
+    getRondaPreview,
 } from '../controllers/rondaAdminController.js';
 import { authMiddleware, requireAdmin } from '../middleware/authMiddleware.js';
 
@@ -27,7 +32,36 @@ export default async function rondaAdminRoutes(fastify) {
     const guard = [authMiddleware, requireAdmin];
 
     fastify.get('/cameras', { onRequest: guard }, listRondaCameras);
+    fastify.get('/available', { onRequest: guard }, listAvailableCameras);
     fastify.get('/cameras/:name', { onRequest: guard, schema: nameParamSchema }, getRondaCamera);
+    fastify.get('/cameras/:name/preview.jpg', { onRequest: guard, schema: nameParamSchema }, getRondaPreview);
+
+    fastify.post('/cameras', {
+        onRequest: guard,
+        schema: {
+            body: {
+                type: 'object',
+                required: ['camera_id'],
+                properties: {
+                    camera_id: { type: 'integer' },
+                    label: { type: 'string', maxLength: 80 },
+                    area: { type: 'string', maxLength: 80 },
+                    chat_id: { type: 'string', maxLength: 32 },
+                    alert_hours: { type: 'string', maxLength: 11 },
+                    tg_cooldown: { type: 'number' },
+                    tg_cooldown_off: { type: 'number' },
+                    min_area: { type: 'number' },
+                    confirm_classes: { type: 'string', maxLength: 120 },
+                    proc_w: { type: 'number' },
+                    target_fps: { type: 'number' },
+                },
+                additionalProperties: false,
+            },
+        },
+    }, createRondaCamera);
+
+    fastify.post('/cameras/:name/restart', { onRequest: guard, schema: nameParamSchema }, restartRondaCamera);
+    fastify.delete('/cameras/:name', { onRequest: guard, schema: nameParamSchema }, deleteRondaCamera);
     fastify.put('/cameras/:name', {
         onRequest: guard,
         schema: {
@@ -43,6 +77,15 @@ export default async function rondaAdminRoutes(fastify) {
                     min_area: { type: 'number' },
                     confirm_conf: { type: 'number' },
                     confirm_classes: { type: 'string', maxLength: 120 },
+                    label: { type: 'string', maxLength: 80 },
+                    area: { type: 'string', maxLength: 80 },
+                    ignore: { type: 'array', maxItems: 12 },
+                    roi: { type: 'array', maxItems: 40 },
+                    proc_w: { type: 'number' },
+                    target_fps: { type: 'number' },
+                    crop_limit: { type: 'string', maxLength: 40 },
+                    retention_days: { type: 'number' },
+                    max_snaps: { type: 'number' },
                 },
                 additionalProperties: false,
             },
