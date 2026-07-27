@@ -15,12 +15,18 @@ Measured on this box (2026-07-26, 11 recording cameras):
 | Cloud Bot API limit | 50 MB → only 2 of 11 cameras would fit |
 | Local Bot API limit | 2000 MB → all fit, zero CPU |
 | Volume | 899 files/day, 91.1 GB/day |
-| Sustained egress needed | ~9.1 Mbps |
-| Real upload throughput to Telegram | **~40 Mbps** (measured 42.5 / 39.5 Mbps on live 128 MB segments) |
+| Sustained egress **needed** (all 11 cameras) | ~9.1 Mbps — a demand figure, not a limit |
+| Real upload throughput to Telegram | **median 43.7, peak 60.4 Mbps** (103 live uploads) |
+| Duty cycle at 11 cameras | 648 MB per 10-min window ÷ 43.7 Mbps ≈ **2 min of every 10** |
 
-Note the generic Cloudflare speed test reported only 25.6 Mbps on this uplink; the
-path to Telegram's DCs is materially better. Trust the measured upload log line, not
-the speed test, when sizing how many cameras this can carry.
+**Do not size this from a generic speed test.** On this box `speed.cloudflare.com` reports
+4.5 Mbps on one stream and 30 Mbps across four, while single-stream uploads to Telegram
+sustain 43–60 Mbps. The Cloudflare path is the bottleneck, not the uplink. The only
+trustworthy number is the `Mbps` field the uploader logs for each real segment:
+
+```bash
+journalctl -u tg-archive --since "24 hours ago" | grep -oE '[0-9.]+ Mbps'
+```
 
 Transcoding to fit 50 MB was measured at 0.78 CPU cores per camera = 8.6 cores for the
 fleet, on an 8-core box already running at load 6. That is why we raise the limit
@@ -140,8 +146,10 @@ rm -rf /opt/tg-archive
 
 - **`routes.json`** — the real on/off switch and the coverage control. Start with a
   few cameras; all 11 is ~9 Mbps sustained.
-- `MAX_AVG_MBPS` — average egress cap; the uploader sleeps between files to hold it.
-  Lower this first if live streams start buffering.
+- `MAX_AVG_MBPS` — long-run average cap, enforced by sleeping **between** files. The transfer
+  itself always runs at line rate, so this does not soften a burst; it only bounds a backfill.
+  Must sit above the observed per-file rate or it throttles every single upload — at 14 against a
+  41.5 Mbps transfer rate it slept 66% of the time and delayed archives for no benefit.
 - `TG_CHAT_ID` — optional fallback group used only when a segment matches no route.
   Leave it empty to make `routes.json` the sole authority.
 - `BACKFILL=0` — on first run the watermark jumps to the newest segment. Setting

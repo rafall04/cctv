@@ -40,7 +40,9 @@ class Config:
         self.routes_file = env('ROUTES_FILE', '/opt/tg-archive/routes.json')
         self.poll_interval = int(env('POLL_INTERVAL_SEC', '60'))
         self.max_file_mb = int(env('MAX_FILE_MB', '1900'))
-        self.max_mbps = float(env('MAX_AVG_MBPS', '14'))
+        # 45 sits just above the measured per-file rate (median 43.7 Mbps over 103 real uploads),
+        # so it never fires in normal operation and only bounds a backfill storm. See pace().
+        self.max_mbps = float(env('MAX_AVG_MBPS', '45'))
         self.batch_size = int(env('BATCH_SIZE', '40'))
         self.max_attempts = int(env('MAX_ATTEMPTS', '4'))
         self.timeout = int(env('REQUEST_TIMEOUT_SEC', '1800'))
@@ -427,8 +429,15 @@ def record(state, seg, status, detail=None, targets=None):
 
 
 def pace(cfg, size_bytes, elapsed, log):
-    """Cap the *average* egress so archiving never starves live streaming.
-    Uplink measured at ~25 Mbps; default target 14 Mbps average."""
+    """Bound the LONG-RUN average egress by sleeping between files.
+
+    Be clear about what this does not do: the sleep happens *after* a transfer, so the transfer
+    itself always runs at full line rate. It therefore does nothing to soften a burst against live
+    streaming — its only real job is stopping a backfill (or a long catch-up) from running flat out
+    for hours. Set it above the observed per-file rate or it fires on every single file: at 14 Mbps
+    against a measured 41.5 Mbps transfer rate it slept 4775 s out of 7210 s, delaying archives 66%
+    for no benefit.
+    """
     if cfg.max_mbps <= 0:
         return
     sleep_for = size_bytes * 8 / (cfg.max_mbps * 1e6) - elapsed
