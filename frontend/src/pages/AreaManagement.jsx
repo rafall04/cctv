@@ -12,7 +12,8 @@ import { areaService } from '../services/areaService';
 import { cameraService } from '../services/cameraService';
 import { settingsService } from '../services/settingsService';
 import { useNotification } from '../contexts/NotificationContext';
-import { StatCardSkeleton, CameraCardSkeleton, NoAreasEmptyState, Alert } from '../components/ui';
+import { StatCardSkeleton, CameraCardSkeleton, NoAreasEmptyState, Alert, Button, Field, Modal } from '../components/ui';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 import AreaCard from '../components/admin/areas/AreaCard';
 import AreaFormModal from '../components/admin/areas/AreaFormModal';
 import BulkPolicyPreview from '../components/admin/areas/BulkPolicyPreview';
@@ -24,6 +25,7 @@ import { buildBulkPayload, defaultBulkConfig, getEffectiveTargetFilter, requires
 const LocationPicker = lazyWithRetry(() => import('../components/LocationPicker'), 'location-picker');
 
 export default function AreaManagement() {
+    const bulkDialogRef = useRef(null);
     const [areas, setAreas] = useState([]);
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState(null);
@@ -39,6 +41,8 @@ export default function AreaManagement() {
     
     // Bulk Config Modal
     const [bulkConfigArea, setBulkConfigArea] = useState(null);
+    // Declared here, not at the top: the trap reads bulkConfigArea, so it must come after it.
+    useFocusTrap(bulkDialogRef, { active: Boolean(bulkConfigArea), onEscape: () => setBulkConfigArea(null) });
     const [bulkConfig, setBulkConfig] = useState(defaultBulkConfig);
     const [bulkPreview, setBulkPreview] = useState(null);
     const [bulkPreviewLoading, setBulkPreviewLoading] = useState(false);
@@ -512,8 +516,14 @@ export default function AreaManagement() {
 
             {/* Bulk Config Modal */}
             {bulkConfigArea && (
-                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-                    <div className="bg-surface w-full max-w-3xl rounded-2xl shadow-2xl border border-edge max-h-[90vh] flex flex-col">
+                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-modal p-4">
+                    <div
+                        ref={bulkDialogRef}
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label="Bulk Policy Center"
+                        className="bg-surface w-full max-w-3xl rounded-card shadow-e2 border border-edge max-h-[90vh] flex flex-col"
+                    >
                         <div className="p-6 border-b border-edge flex justify-between items-center bg-amber-50 dark:bg-amber-900/20 rounded-t-2xl shrink-0">
                             <div>
                                 <h3 className="text-lg font-bold text-content">Bulk Policy Center</h3>
@@ -723,124 +733,112 @@ export default function AreaManagement() {
 
             {/* Map Center Settings Modal */}
             {showMapCenterModal && (
-                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-                    <div className="bg-surface w-full max-w-lg rounded-2xl shadow-2xl border border-edge">
-                        <div className="p-6 border-b border-edge flex justify-between items-center">
-                            <div>
-                                <h3 className="text-lg font-bold text-content">Lokasi Default Peta</h3>
-                                <p className="text-sm text-content-muted">Titik tengah saat &quot;Semua Lokasi&quot; dipilih</p>
-                            </div>
-                            <button onClick={() => setShowMapCenterModal(false)} className="p-2 rounded-lg hover:bg-surface-sunken text-content-muted">
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M6 18L18 6M6 6l12 12"/></svg>
-                            </button>
-                        </div>
-                        <div className="p-6 space-y-5">
-                            <div>
-                                <label className="block text-sm font-medium text-content-muted mb-1.5">Nama Lokasi</label>
-                                <input type="text" value={mapCenter.name} onChange={(e) => setMapCenter({...mapCenter, name: e.target.value})}
-                                    className="w-full px-4 py-2.5 bg-surface-sunken border border-edge rounded-xl text-content focus:outline-none focus:ring-2 focus:ring-primary"
-                                    placeholder="Contoh: Kabupaten Bojonegoro" />
-                                <p className="text-xs text-content-muted mt-1">Nama ini akan ditampilkan di filter &quot;Semua Lokasi&quot;</p>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-content-muted mb-1.5">Zoom Level</label>
-                                <select value={mapCenter.zoom} onChange={(e) => setMapCenter({...mapCenter, zoom: parseInt(e.target.value)})}
-                                    className="w-full px-4 py-2.5 bg-surface-sunken border border-edge rounded-xl text-content focus:outline-none focus:ring-2 focus:ring-primary">
-                                    <option value={10}>10 - Kabupaten/Kota</option>
-                                    <option value={11}>11 - Kecamatan Luas</option>
-                                    <option value={12}>12 - Kecamatan</option>
-                                    <option value={13}>13 - Kelurahan/Desa</option>
-                                    <option value={14}>14 - Detail Desa</option>
-                                    <option value={15}>15 - Jalan</option>
-                                </select>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-content-muted mb-3">Pilih Titik Tengah</label>
-                                <Suspense fallback={<div className="text-sm text-content-muted">Loading map...</div>}>
-                                    <LocationPicker 
-                                        latitude={mapCenter.latitude} 
-                                        longitude={mapCenter.longitude} 
-                                        onLocationChange={handleMapCenterChange}
-                                    />
-                                </Suspense>
-                            </div>
-
-                            <div className="flex gap-3 pt-2">
-                                <button type="button" onClick={() => setShowMapCenterModal(false)} className="flex-1 px-4 py-2.5 bg-surface-sunken text-content-muted font-medium rounded-xl hover:bg-surface-sunken" disabled={savingMapCenter}>Batal</button>
-                                <button onClick={saveMapCenter} className="flex-[2] px-4 py-2.5 bg-gradient-to-r from-primary to-primary-600 text-white font-medium rounded-xl shadow-lg shadow-primary/30 hover:from-primary-600 hover:to-blue-700 disabled:opacity-50 flex items-center justify-center gap-2" disabled={savingMapCenter || !mapCenter.latitude || !mapCenter.longitude}>
-                                    {savingMapCenter && <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>}
-                                    {savingMapCenter ? 'Menyimpan...' : 'Simpan'}
-                                </button>
-                            </div>
+                <Modal
+                    title="Lokasi Default Peta"
+                    description={'Titik tengah saat "Semua Lokasi" dipilih'}
+                    size="md"
+                    onClose={() => setShowMapCenterModal(false)}
+                    footer={(
+                        <>
+                            <Button onClick={() => setShowMapCenterModal(false)} disabled={savingMapCenter}>Batal</Button>
+                            <Button
+                                variant="primary"
+                                onClick={saveMapCenter}
+                                loading={savingMapCenter}
+                                disabled={!mapCenter.latitude || !mapCenter.longitude}
+                            >
+                                Simpan
+                            </Button>
+                        </>
+                    )}
+                >
+                    <div className="space-y-4">
+                        <Field
+                            label="Nama Lokasi"
+                            value={mapCenter.name}
+                            onChange={(e) => setMapCenter({ ...mapCenter, name: e.target.value })}
+                            placeholder="Contoh: Kabupaten Bojonegoro"
+                            hint={'Nama ini akan ditampilkan di filter "Semua Lokasi"'}
+                        />
+                        <Field
+                            as="select"
+                            label="Zoom Level"
+                            value={mapCenter.zoom}
+                            onChange={(e) => setMapCenter({ ...mapCenter, zoom: parseInt(e.target.value) })}
+                        >
+                            <option value={10}>10 - Kabupaten/Kota</option>
+                            <option value={11}>11 - Kecamatan Luas</option>
+                            <option value={12}>12 - Kecamatan</option>
+                            <option value={13}>13 - Kelurahan/Desa</option>
+                            <option value={14}>14 - Detail Desa</option>
+                            <option value={15}>15 - Jalan</option>
+                        </Field>
+                        <div>
+                            <p className="mb-2 text-xs font-semibold text-content-muted">Pilih Titik Tengah</p>
+                            <Suspense fallback={<div className="text-sm text-content-muted">Loading map...</div>}>
+                                <LocationPicker
+                                    latitude={mapCenter.latitude}
+                                    longitude={mapCenter.longitude}
+                                    onLocationChange={handleMapCenterChange}
+                                />
+                            </Suspense>
                         </div>
                     </div>
-                </div>
+                </Modal>
             )}
 
             {/* Bulk Delete Area Cameras Modal */}
             {bulkDeleteAreaConfirm && (
-                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-                    <div className="bg-surface w-full max-w-md rounded-2xl shadow-2xl border border-red-500/50">
-                        <div className="p-6">
-                            <div className="w-16 h-16 bg-red-100 dark:bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-white dark:border-gray-800 -mt-12 shadow-lg">
-                                <svg className="w-8 h-8 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                </svg>
-                            </div>
-                            <h3 className="text-xl font-bold text-content text-center mb-2">Hapus Semua Kamera?</h3>
-                            <p className="text-content-muted text-center mb-4">
-                                Anda akan menghapus <span className="font-bold text-red-500 border-b border-red-500">{bulkDeleteAreaConfirm.cameraCount || 0} kamera</span> dari area <span className="font-bold text-content">&quot;{bulkDeleteAreaConfirm.name}&quot;</span>.
-                            </p>
-                            <div className="p-4 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded-xl mb-2">
-                                <p className="text-red-800 dark:text-red-400 text-xs font-semibold uppercase tracking-wider mb-1">PERINGATAN BAHAYA</p>
-                                <p className="text-red-700 dark:text-red-300 text-sm">Tindakan ini permanen. Semua data streaming, proxy, rekaman, dan riwayat kamera akan musnah terbawa angin dan tidak bisa dikembalikan.</p>
-                            </div>
-                        </div>
-                        <div className="flex gap-3 p-6 pt-0">
-                            <button onClick={() => setBulkDeleteAreaConfirm(null)} className="flex-1 px-4 py-2.5 bg-surface-sunken text-content-muted font-bold rounded-xl hover:bg-surface-sunken transition-colors" disabled={applyingBulkDelete}>BATALKAN</button>
-                            <button onClick={handleBulkDelete} className="flex-[2] px-4 py-2.5 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-red-500/30 transition-colors" disabled={applyingBulkDelete}>
-                                {applyingBulkDelete && <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>}
-                                {applyingBulkDelete ? 'MENGHAPUS...' : 'YA, MUSNAHKAN'}
-                            </button>
-                        </div>
+                <Modal
+                    title="Hapus Semua Kamera?"
+                    size="sm"
+                    onClose={() => setBulkDeleteAreaConfirm(null)}
+                    footer={(
+                        <>
+                            <Button onClick={() => setBulkDeleteAreaConfirm(null)} disabled={applyingBulkDelete}>Batalkan</Button>
+                            <Button variant="danger" onClick={handleBulkDelete} loading={applyingBulkDelete}>
+                                Ya, hapus permanen
+                            </Button>
+                        </>
+                    )}
+                >
+                    <p className="text-sm text-content-muted">
+                        Anda akan menghapus <span className="font-semibold text-status-fault">{bulkDeleteAreaConfirm.cameraCount || 0} kamera</span> dari
+                        area <span className="font-semibold text-content">&quot;{bulkDeleteAreaConfirm.name}&quot;</span>.
+                    </p>
+                    <div className="mt-4 rounded-card border border-status-fault/30 bg-status-fault/10 p-3">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-status-fault">Tidak bisa dibatalkan</p>
+                        <p className="mt-1 text-sm text-content-muted">
+                            Semua data streaming, proxy, rekaman, dan riwayat kamera ikut terhapus permanen.
+                        </p>
                     </div>
-                </div>
+                </Modal>
             )}
 
             {/* Delete Confirmation Modal */}
             {deleteConfirm && (
-                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-                    <div className="bg-surface w-full max-w-md rounded-2xl shadow-2xl border border-edge">
-                        <div className="p-6">
-                            <div className="w-12 h-12 bg-red-100 dark:bg-red-500/20 rounded-xl flex items-center justify-center mx-auto mb-4">
-                                <svg className="w-6 h-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                </svg>
-                            </div>
-                            <h3 className="text-lg font-bold text-content text-center mb-2">Hapus Area</h3>
-                            <p className="text-content-muted text-center mb-4">
-                                Yakin ingin menghapus <span className="font-semibold text-content">&quot;{deleteConfirm.name}&quot;</span>?
+                <Modal
+                    title="Hapus Area"
+                    size="sm"
+                    onClose={() => setDeleteConfirm(null)}
+                    footer={(
+                        <>
+                            <Button onClick={() => setDeleteConfirm(null)} disabled={deleting}>Batal</Button>
+                            <Button variant="danger" onClick={handleDelete} loading={deleting}>Hapus</Button>
+                        </>
+                    )}
+                >
+                    <p className="text-sm text-content-muted">
+                        Yakin ingin menghapus <span className="font-semibold text-content">&quot;{deleteConfirm.name}&quot;</span>?
+                    </p>
+                    {deleteConfirm.cameraCount > 0 && (
+                        <div className="mt-4 rounded-card border border-status-warn/30 bg-status-warn/10 p-3">
+                            <p className="text-sm text-content-muted">
+                                Area ini memiliki {deleteConfirm.cameraCount} kamera. Menghapus area akan melepas kamera dari area ini.
                             </p>
-                            {deleteConfirm.cameraCount > 0 && (
-                                <div className="flex items-start gap-3 p-4 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-xl mb-4">
-                                    <svg className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                    </svg>
-                                    <p className="text-amber-800 dark:text-amber-400 text-sm">Area ini memiliki {deleteConfirm.cameraCount} kamera. Menghapus area akan melepas kamera dari area ini.</p>
-                                </div>
-                            )}
                         </div>
-                        <div className="flex gap-3 p-6 pt-0">
-                            <button onClick={() => setDeleteConfirm(null)} className="flex-1 px-4 py-2.5 bg-surface-sunken text-content-muted font-medium rounded-xl hover:bg-surface-sunken" disabled={deleting}>Batal</button>
-                            <button onClick={handleDelete} className="flex-1 px-4 py-2.5 bg-red-500 hover:bg-red-600 text-white font-medium rounded-xl flex items-center justify-center gap-2" disabled={deleting}>
-                                {deleting && <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>}
-                                {deleting ? 'Menghapus...' : 'Hapus'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
+                    )}
+                </Modal>
             )}
         </div>
     );
