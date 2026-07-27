@@ -21,6 +21,12 @@ import { Badge, Button, Field, Modal, PageHeader } from '../components/ui';
 import { TableSkeleton } from '../components/ui/Skeleton';
 import { buildTimeline, findSegmentAt, formatDuration, segmentWindow } from '../utils/admin/archiveTimeline';
 
+const DownloadIcon = () => (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden="true">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
+    </svg>
+);
+
 function formatSize(bytes) {
     if (!bytes) return '0 B';
     const units = ['B', 'KB', 'MB', 'GB', 'TB'];
@@ -248,23 +254,51 @@ export default function TelegramArchiveLibrary() {
                     })()}
                     size="xl"
                     onClose={() => setPlaying(null)}
+                    bodyClassName=""
                     footer={(
-                        <Button
-                            variant="primary"
-                            onClick={() => window.open(archiveLibrary.streamUrl(playing.segmentId), '_blank', 'noopener')}
-                        >
-                            Buka di tab baru
-                        </Button>
+                        <>
+                            {/*
+                              * Both actions are SUBORDINATE. The primary action on this screen is
+                              * watching, and that is the video itself — a full-width brand-red bar
+                              * for an escape hatch competed with the footage it sits under.
+                              */}
+                            <Button
+                                size="sm"
+                                onClick={() => window.open(archiveLibrary.streamUrl(playing.segmentId), '_blank', 'noopener')}
+                            >
+                                Tab baru
+                            </Button>
+                            <Button
+                                size="sm"
+                                icon={<DownloadIcon />}
+                                onClick={() => {
+                                    // Evidence work means keeping a copy, not just viewing one.
+                                    const a = document.createElement('a');
+                                    a.href = archiveLibrary.streamUrl(playing.segmentId);
+                                    a.download = playing.filename || 'rekaman.mp4';
+                                    a.click();
+                                }}
+                            >
+                                Unduh
+                            </Button>
+                        </>
                     )}
                 >
-                    <video
-                        key={playing.segmentId}
-                        src={archiveLibrary.streamUrl(playing.segmentId)}
-                        controls
-                        playsInline
-                        preload="metadata"
-                        className="w-full rounded-control bg-black"
-                    />
+                    {/*
+                      * aspect-video reserves the box BEFORE metadata arrives, so the sheet does not
+                      * resize under the finger the moment the first frame decodes.
+                      */}
+                    <div className="aspect-video w-full bg-black">
+                        <video
+                            key={playing.segmentId}
+                            src={archiveLibrary.streamUrl(playing.segmentId)}
+                            controls
+                            autoPlay
+                            playsInline
+                            preload="metadata"
+                            className="h-full w-full"
+                        />
+                    </div>
                 </Modal>
             )}
         </div>

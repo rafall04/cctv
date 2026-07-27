@@ -37,6 +37,8 @@ function CloseIcon() {
  * @param {'sm'|'md'|'lg'|'xl'} [size='md']
  * @param {React.ReactNode} [footer] action row pinned below the scrollable body
  * @param {boolean} [dismissible=true] set false for a step the user must resolve explicitly
+ * @param {string} [bodyClassName] override the body padding — pass '' so media can bleed to the
+ *   edges. On a phone the default px-4 costs 32px of width from the one thing that matters.
  */
 export function Modal({
     title,
@@ -46,6 +48,7 @@ export function Modal({
     footer = null,
     dismissible = true,
     className = '',
+    bodyClassName = 'px-4 py-4',
     children,
 }) {
     const dialogRef = useRef(null);
@@ -92,7 +95,7 @@ export function Modal({
                     )}
                 </div>
 
-                <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">{children}</div>
+                <div className={`min-h-0 flex-1 overflow-y-auto ${bodyClassName}`}>{children}</div>
 
                 {footer && (
                     <div className="flex flex-wrap items-center justify-end gap-2 border-t border-edge bg-surface px-4 py-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] sm:pb-3">
