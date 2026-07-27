@@ -82,6 +82,27 @@ export default {
                 control: 'var(--radius-control)',
                 card: 'var(--radius-card)',
             },
+            // Named layering scale. Before this, 18 different z values were in
+            // play — including `z-[1000000]` and `z-[999999]` — because every
+            // surface guessed a number big enough to win. Worse, admin dialogs
+            // and the admin sidebar BOTH sat at 50, so which one covered the
+            // other depended on DOM order rather than intent.
+            //
+            // The numbers below are the existing effective layers, just named.
+            // The four-digit-and-up tiers exist because Leaflet paints its own
+            // controls at 1000: anything floating over a map has to clear that.
+            zIndex: {
+                raised: '10',      // lift inside a panel (sticky column, hover chip)
+                sticky: '20',      // sticky sub-header inside page content
+                dock: '30',        // mobile bottom dock
+                scrim: '40',       // dim layer behind the shell drawer
+                shell: '50',       // app shell: sidebar, mobile top bar, net banner
+                modal: '60',       // dialogs — deliberately ABOVE the shell
+                toast: '70',       // transient feedback outranks everything local
+                'map-chrome': '1100', // floating chrome over Leaflet (its controls: 1000)
+                popup: '1000000',  // full-screen video popup
+                dialog: '1000010', // confirm/alert — the last word, over the popup
+            },
             boxShadow: {
                 // Two elevation steps total. If a component needs a third, the
                 // layout is doing the work a surface step should be doing.
