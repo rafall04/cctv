@@ -137,3 +137,38 @@ describe('guardrail: legacy grey ratchet (design tokens)', () => {
         ).toBeLessThanOrEqual(BASELINE);
     });
 });
+
+describe('guardrail: only real semantic tokens (typo-proofing)', () => {
+    // Tailwind silently drops a class whose token does not exist, so `text-status-ok` rendered as
+    // *no colour at all* — invisible success text shipped to production before anyone noticed.
+    // These lists mirror tailwind.config.js; extend both together when a token is genuinely added.
+    const VALID = {
+        status: ['live', 'warn', 'fault', 'idle'],
+        surface: ['sunken', 'raised', 'overlay'],
+        content: ['muted', 'subtle'],
+        edge: ['strong'],
+    };
+    const PREFIX = '(?:text|bg|border|ring|fill|stroke|divide|from|to|via|decoration|outline|shadow|accent|caret|placeholder)';
+
+    it('every status/surface/content/edge modifier used in JSX is defined', () => {
+        const offenders = [];
+        for (const role of Object.keys(VALID)) {
+            const re = new RegExp(`${PREFIX}-${role}-([a-z][a-z0-9-]*)`, 'g');
+            for (const f of walk(SRC_ROOT)) {
+                const src = fs.readFileSync(f, 'utf8');
+                for (const m of src.matchAll(re)) {
+                    // strip Tailwind opacity/state suffixes: status-live/30, content-muted
+                    const modifier = m[1].split('/')[0];
+                    if (!VALID[role].includes(modifier)) {
+                        offenders.push(`${rel(f)}: ${m[0]} — no such token (${role}: ${VALID[role].join(', ')})`);
+                    }
+                }
+            }
+        }
+        expect(
+            [...new Set(offenders)],
+            `\nUndefined design token used — Tailwind drops these silently, so the element renders unstyled:\n  ${
+                [...new Set(offenders)].join('\n  ')}\n`,
+        ).toEqual([]);
+    });
+});

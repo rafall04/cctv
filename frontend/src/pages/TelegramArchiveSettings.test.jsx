@@ -92,15 +92,22 @@ describe('loading and empty states', () => {
     });
 
     it('summarises how many cameras are actually archived', async () => {
-        renderPage();
-        expect(await screen.findByText(/1 dari 2 kamera perekam sedang diarsipkan/i)).toBeTruthy();
+        const { container } = renderPage();
+        await waitForLoaded();
+        const header = container.querySelector('header');
+        expect(within(header).getByText('1/2')).toBeTruthy();
+        expect(within(header).getByText(/kamera perekam sedang diarsipkan/i)).toBeTruthy();
     });
 
     it('marks an unrouted camera as not being sent', async () => {
         renderPage();
         await waitForLoaded();
-        const row = screen.getByText('CCTV LAPANGAN DANDER BARAT').closest('tr');
-        expect(within(row).getByText('tidak dikirim')).toBeTruthy();
+        // rendered twice on purpose: card list for phones, table for md+ (CSS picks one)
+        const rows = screen.getAllByText('CCTV LAPANGAN DANDER BARAT')
+            .map((node) => node.closest('li') || node.closest('tr'))
+            .filter(Boolean);
+        expect(rows).toHaveLength(2);
+        rows.forEach((row) => expect(within(row).getByText('tidak dikirim')).toBeTruthy());
     });
 });
 
@@ -138,7 +145,7 @@ describe('chat id verification', () => {
         fireEvent.change(screen.getByLabelText('ID grup Telegram'), { target: { value: '-5510674082' } });
         fireEvent.click(screen.getByRole('button', { name: 'Periksa' }));
 
-        expect(await screen.findByText(/bot bisa mengirim file ke sini/i)).toBeTruthy();
+        expect(await screen.findByText(/bot bisa mengirim file ke grup ini/i)).toBeTruthy();
         expect(verifyChat).toHaveBeenCalledWith('-5510674082');
     });
 
@@ -338,8 +345,9 @@ describe('activity panel', () => {
         renderPage();
 
         expect(await screen.findByText('Aktivitas pengiriman')).toBeTruthy();
-        expect(screen.getByText('12')).toBeTruthy();
-        expect(screen.getByText(/ok · 1\.5 GB/)).toBeTruthy();
+        const tile = screen.getByText('1.5 GB').closest('div');
+        expect(within(tile).getByText('terkirim')).toBeTruthy();
+        expect(within(tile).getByText('12')).toBeTruthy();
         expect(screen.getByText('20260727_061000.mp4')).toBeTruthy();
     });
 });
