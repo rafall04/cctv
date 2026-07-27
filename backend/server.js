@@ -12,6 +12,7 @@ import fastifyStatic from '@fastify/static';
 import { config, assertSecureConfig } from './config/config.js';
 import dns from 'node:dns';
 import net from 'node:net';
+import fs from 'node:fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
@@ -550,12 +551,7 @@ const start = async () => {
         console.log('[Recording] Recording service initialized');
         
         // Start thumbnail generation service
-        await thumbnailService.// Archive transit directory: sweep at boot and hourly, so expired segments free their disk even
-// when nobody opens the archive page. Timers are unref'd — they never hold the process open.
-archiveCache.scheduleSweep(60_000);
-setInterval(() => archiveCache.scheduleSweep(0), 60 * 60_000).unref();
-
-start();
+        await thumbnailService.start();
         console.log('[Thumbnail] Thumbnail generation service started (5min interval)');
 
         // Prepaid billing: hourly tick, idempotent per local day (suspends empty
@@ -570,17 +566,20 @@ start();
         // only: NODE_APP_INSTANCE is unset in fork mode and '0' on the first cluster worker.
         const botWorker = process.env.NODE_APP_INSTANCE;
         if (botWorker === undefined || botWorker === '0') {
-            telegramBotService.// Archive transit directory: sweep at boot and hourly, so expired segments free their disk even
-// when nobody opens the archive page. Timers are unref'd — they never hold the process open.
-archiveCache.scheduleSweep(60_000);
-setInterval(() => archiveCache.scheduleSweep(0), 60 * 60_000).unref();
-
-start();
+            telegramBotService.start();
             console.log('[TelegramBot] Customer-management bot started (long-polling)');
         } else {
             console.log(`[TelegramBot] Not started on cluster worker #${botWorker} (poller runs only on worker 0)`);
         }
     } catch (err) {
+        // fastify.log/console write to a PIPE under pm2, which Node buffers asynchronously —
+        // process.exit() below discards anything still queued. A boot crash then shows up as a
+        // silently truncated log and an unexplained exit-code-1 restart loop (observed in prod:
+        // a TypeError in this block crash-looped the server every ~70s with zero error output,
+        // shredding every in-flight recording segment). fs.writeSync bypasses the buffer.
+        try {
+            fs.writeSync(2, `[Fatal] Startup failed: ${err?.stack || err}\n`);
+        } catch { /* stderr unavailable — nothing more we can do */ }
         fastify.log.error(err);
         process.exit(1);
     }

@@ -303,6 +303,48 @@ else
     exit 1
 fi
 
+# ---------------------------------------------------------------------------
+# Stability gate — a single 200 from /health is NOT proof the deploy is good.
+#
+# The server binds the port EARLY and finishes booting (stream warm, recording
+# auto-start, thumbnails, telegram) for another ~60s afterwards. A crash in that
+# tail leaves a backend that answers /health, then dies, restarts, answers again —
+# a loop this script used to report as "DEPLOY COMPLETE". That is not academic:
+# a typo shipped in 0413b4b crash-looped prod every ~70s and every restart
+# orphaned the recording ffmpeg, destroying every in-flight segment for hours.
+#
+# So: watch pm2's restart counter across the full boot tail. If it moves, the new
+# code is crash-looping and we fail the deploy loudly instead of walking away.
+# ---------------------------------------------------------------------------
+pm2_restart_count() {
+    pm2 jlist 2>/dev/null \
+        | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{const a=JSON.parse(s).find(p=>p.name==='$BACKEND_PM2');process.stdout.write(String(a?a.pm2_env.restart_time:'ERR'))}catch(e){process.stdout.write('ERR')}})" \
+        2>/dev/null || echo "ERR"
+}
+
+STABILITY_WINDOW=90
+info "Stability gate: watching for crash-restarts over ${STABILITY_WINDOW}s (boot tail runs long after /health goes green)"
+RESTARTS_BEFORE="$(pm2_restart_count)"
+if [ "$RESTARTS_BEFORE" = "ERR" ]; then
+    warn "Could not read pm2 restart counter — skipping stability gate. Watch 'pm2 logs ${BACKEND_PM2}' yourself."
+else
+    sleep "$STABILITY_WINDOW"
+    RESTARTS_AFTER="$(pm2_restart_count)"
+    if [ "$RESTARTS_AFTER" != "ERR" ] && [ "$RESTARTS_AFTER" -gt "$RESTARTS_BEFORE" ]; then
+        hr
+        err "DEPLOY FAILED — backend restarted $((RESTARTS_AFTER - RESTARTS_BEFORE))× during the ${STABILITY_WINDOW}s stability window."
+        echo "  The new code boots, serves /health, then crashes. Every restart also kills"
+        echo "  in-flight recording segments, so do NOT leave this running."
+        echo ""
+        echo "  Real reason (startup crashes now print synchronously):"
+        echo "    pm2 logs ${BACKEND_PM2} --err --lines 80 | grep -A20 '\[Fatal\]'"
+        echo ""
+        echo "  Rollback:  git -C ${APP_DIR} reset --hard ${ROLLBACK_COMMIT} && bash deployment/safe-deploy.sh deploy"
+        exit 1
+    fi
+    ok "Stability gate passed — no crash-restarts in ${STABILITY_WINDOW}s."
+fi
+
 # ===========================================================================
 # PHASE 8 — Next steps
 # ===========================================================================
