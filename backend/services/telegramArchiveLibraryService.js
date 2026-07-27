@@ -19,6 +19,7 @@
 import fs from 'fs';
 import path from 'path';
 import { query, queryOne } from '../database/connectionPool.js';
+import archiveCache from './archiveCacheService.js';
 
 /*
  * The bot token lives in the SIDECAR's .env, not the backend's. Read it from there rather than
@@ -188,6 +189,18 @@ export async function openSegmentStream(segmentId, range = null) {
         throw err;
     }
 
+    /*
+     * Make room BEFORE getFile, because getFile is what makes the Bot API server download the
+     * segment. Doing it afterwards would let a fresh 200 MB arrival evict itself — the classic way
+     * a cache deletes exactly what was just asked for.
+     *
+     * Only when the recording is no longer on local disk: while it is, getFile just points back at
+     * our own recordings folder and nothing is cached at all.
+     */
+    if (row.file_size) {
+        archiveCache.makeRoom(row.file_size);
+    }
+
     const response = await fetch(`${apiBase}/bot${token}/getFile?file_id=${encodeURIComponent(row.file_id)}`);
     const body = await response.json().catch(() => ({}));
     if (!body?.ok || !body.result?.file_path) {
@@ -215,6 +228,22 @@ export async function openSegmentStream(segmentId, range = null) {
             const stream = wanted
                 ? fs.createReadStream(filePath, { start: wanted.start, end: wanted.end })
                 : fs.createReadStream(filePath);
+
+            // Pin for the life of the stream so eviction can never pull the file out from under a
+            // viewer. Released on every terminal event — a missed release would pin it forever.
+            if (filePath.startsWith(archiveCache.CACHE_DIR)) {
+                archiveCache.pin(filePath);
+                let done = false;
+                const unpin = () => {
+                    if (done) return;
+                    done = true;
+                    archiveCache.release(filePath);
+                };
+                stream.once('close', unpin);
+                stream.once('end', unpin);
+                stream.once('error', unpin);
+            }
+
             return { stream, size: wanted ? wanted.end - wanted.start + 1 : size, filename: row.filename, range: wanted, totalSize: size };
         }
         // Path is real but not visible from this process — ask the local server to serve it, and
