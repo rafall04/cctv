@@ -101,13 +101,30 @@ export default async function telegramArchiveRoutes(fastify) {
         },
     }, async (request, reply) => {
         try {
-            const { stream, size, filename } = await archiveLibrary.openSegmentStream(
-                Number(request.params.segmentId),
-            );
+            /*
+             * Range support is what makes the player seekable. Without `Accept-Ranges` and a 206,
+             * a browser can only ever fetch the file from byte zero — so dragging the scrubber or
+             * skipping 10 seconds silently did nothing. The player asks; the server has to answer.
+             */
+            const segmentId = Number(request.params.segmentId);
+            const meta = archiveLibrary.getUpload(segmentId);
+            const requested = archiveLibrary.parseRange(request.headers.range, meta.file_size);
+
+            const { stream, size, filename, range, totalSize } =
+                await archiveLibrary.openSegmentStream(segmentId, requested);
+
             reply.header('Content-Type', 'video/mp4');
-            if (size) reply.header('Content-Length', String(size));
-            // inline: the archive page plays it in place; a download is still one click away.
+            reply.header('Accept-Ranges', 'bytes');
+            // Archive segments never change once written, so let the browser keep what it fetched.
+            reply.header('Cache-Control', 'private, max-age=3600');
             reply.header('Content-Disposition', `inline; filename="${filename.replace(/"/g, '')}"`);
+
+            if (range && totalSize) {
+                reply.code(206);
+                reply.header('Content-Range', `bytes ${range.start}-${range.end}/${totalSize}`);
+            }
+            if (size) reply.header('Content-Length', String(size));
+
             return reply.send(stream);
         } catch (error) {
             const code = error.statusCode || 500;

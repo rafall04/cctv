@@ -136,10 +136,43 @@ export function getUpload(segmentId) {
 }
 
 /**
- * Resolve a stored file_id to a readable stream.
- * @returns {Promise<{stream: import('stream').Readable, size: number, filename: string}>}
+ * Parse an HTTP Range header. Only the single-range form is supported, which is the only form a
+ * <video> element ever sends.
+ * @returns {{start: number, end: number}|null} null when absent or unusable
  */
-export async function openSegmentStream(segmentId) {
+export function parseRange(header, size) {
+    if (!header || !size) return null;
+    const match = /^bytes=(\d*)-(\d*)$/.exec(String(header).trim());
+    if (!match) return null;
+    const [, rawStart, rawEnd] = match;
+    let start;
+    let end;
+    if (rawStart === '') {
+        // Suffix form ("bytes=-500"): the LAST n bytes. Players use it to read the moov atom of a
+        // file whose index sits at the end.
+        const suffix = Number(rawEnd);
+        if (!suffix) return null;
+        start = Math.max(size - suffix, 0);
+        end = size - 1;
+    } else {
+        start = Number(rawStart);
+        end = rawEnd === '' ? size - 1 : Math.min(Number(rawEnd), size - 1);
+    }
+    if (!Number.isFinite(start) || !Number.isFinite(end) || start > end || start >= size) return null;
+    return { start, end };
+}
+
+/**
+ * Resolve a stored file_id to a readable stream.
+ *
+ * `range` is what makes the player seekable. Without it the endpoint could only ever hand back the
+ * whole file from byte zero, so dragging the scrubber or skipping 10 seconds did nothing — the
+ * browser has no way to ask for the middle of a file unless the server answers 206.
+ *
+ * @param {{start:number,end:number}|null} [range]
+ * @returns {Promise<{stream, size: number, filename: string, range: object|null, totalSize: number}>}
+ */
+export async function openSegmentStream(segmentId, range = null) {
     const row = getUpload(segmentId);
     if (!row.file_id) {
         // Segments uploaded before the sidecar recorded file_id cannot be fetched back: Telegram
@@ -172,21 +205,32 @@ export async function openSegmentStream(segmentId) {
      *   - a copy inside the server's own --dir, when the recording was pruned and the server
      *     RE-DOWNLOADED it from Telegram. Verified on prod with a 120 MB file, far past the cloud
      *     API's 20 MB getFile ceiling — which is exactly why this feature is possible at all.
-     *
-     * Read from disk when the host can see the path (zero copy), and fall back to fetching it over
-     * HTTP from the local server when it cannot. The fallback matters: the server's --dir must be
-     * bind-mounted to the same host path (see sidecar/tg-archive/docker-compose.yml), and if that
-     * mount is ever missing we serve the file slowly rather than not at all.
      */
+    const wanted = range && range.end < size ? range : (range && size ? { start: range.start, end: size - 1 } : null);
+
     if (filePath.startsWith('/') || /^[A-Za-z]:[\/]/.test(filePath)) {
         if (fs.existsSync(filePath)) {
-            return { stream: fs.createReadStream(filePath), size, filename: row.filename };
+            // Slice on disk: the player gets exactly the bytes it asked for, and a seek costs one
+            // short read instead of re-sending the whole segment.
+            const stream = wanted
+                ? fs.createReadStream(filePath, { start: wanted.start, end: wanted.end })
+                : fs.createReadStream(filePath);
+            return { stream, size: wanted ? wanted.end - wanted.start + 1 : size, filename: row.filename, range: wanted, totalSize: size };
         }
-        // Path is real but not visible from this process — ask the local server to serve it.
+        // Path is real but not visible from this process — ask the local server to serve it, and
+        // pass the range along so seeking keeps working on that path too.
         const relative = filePath.replace(/^.*\/var\/lib\/telegram-bot-api\//, '');
-        const viaHttp = await fetch(`${apiBase}/file/bot${token}/${relative}`);
+        const viaHttp = await fetch(`${apiBase}/file/bot${token}/${relative}`, {
+            headers: wanted ? { Range: `bytes=${wanted.start}-${wanted.end}` } : {},
+        });
         if (viaHttp.ok && viaHttp.body) {
-            return { stream: viaHttp.body, size, filename: row.filename };
+            return {
+                stream: viaHttp.body,
+                size: wanted ? wanted.end - wanted.start + 1 : size,
+                filename: row.filename,
+                range: viaHttp.status === 206 ? wanted : null,
+                totalSize: size,
+            };
         }
         const err = new Error(
             `Berkas ada di server Bot API tapi tidak terbaca dari backend (${filePath}). `
@@ -196,13 +240,21 @@ export async function openSegmentStream(segmentId) {
         throw err;
     }
 
-    const download = await fetch(`${apiBase}/file/bot${token}/${filePath}`);
+    const download = await fetch(`${apiBase}/file/bot${token}/${filePath}`, {
+        headers: wanted ? { Range: `bytes=${wanted.start}-${wanted.end}` } : {},
+    });
     if (!download.ok || !download.body) {
         const err = new Error('Gagal mengunduh berkas dari Telegram');
         err.statusCode = 502;
         throw err;
     }
-    return { stream: download.body, size, filename: row.filename };
+    return {
+        stream: download.body,
+        size: wanted ? wanted.end - wanted.start + 1 : size,
+        filename: row.filename,
+        range: download.status === 206 ? wanted : null,
+        totalSize: size,
+    };
 }
 
 function safeTargets(raw) {
@@ -214,4 +266,4 @@ function safeTargets(raw) {
     }
 }
 
-export default { listUploads, getSummary, getUpload, openSegmentStream };
+export default { listUploads, getSummary, getUpload, openSegmentStream, parseRange };
