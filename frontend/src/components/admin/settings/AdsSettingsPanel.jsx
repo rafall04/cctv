@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNotification } from '../../../contexts/NotificationContext';
 import { settingsService } from '../../../services/settingsService';
+import { Button } from '../../ui';
 
 const DEFAULT_SETTINGS = {
     ads_enabled: false,
@@ -164,14 +165,14 @@ function mapSettingsResponse(data = {}) {
 
 function CheckboxField({ id, name, checked, onChange, label }) {
     return (
-        <label className="flex items-center gap-3 rounded-xl border border-edge bg-gray-50 px-4 py-3 text-sm text-content-muted dark:bg-gray-900/60">
+        <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm text-content-muted">
             <input
                 id={id}
                 name={name}
                 type="checkbox"
                 checked={checked}
                 onChange={onChange}
-                className="h-4 w-4 rounded border-gray-300 text-sky-500 focus:ring-sky-500"
+                className="h-4 w-4 shrink-0 rounded accent-primary"
             />
             <span>{label}</span>
         </label>
@@ -180,12 +181,12 @@ function CheckboxField({ id, name, checked, onChange, label }) {
 
 function SectionCard({ title, description, children }) {
     return (
-        <section className="rounded-2xl border border-edge bg-surface-sunken p-5">
-            <div className="mb-5">
-                <h4 className="text-base font-semibold text-content">{title}</h4>
-                <p className="mt-1 text-sm text-content-muted">{description}</p>
+        <section className="rounded-card border border-edge bg-surface p-4">
+            <div className="mb-4">
+                <h2 className="text-sm font-semibold text-content">{title}</h2>
+                <p className="mt-1 text-xs text-content-muted">{description}</p>
             </div>
-            <div className="space-y-5">{children}</div>
+            <div className="space-y-4">{children}</div>
         </section>
     );
 }
@@ -318,15 +319,10 @@ export default function AdsSettingsPanel() {
     }
 
     return (
-        <div className="rounded-xl border border-edge bg-surface shadow-sm">
-            <div className="border-b border-edge p-6">
-                <h3 className="text-lg font-semibold text-content">Ads Settings</h3>
-                <p className="mt-1 text-sm text-content-muted">
-                    Kelola script iklan pihak ketiga per placement. Hanya admin tepercaya yang boleh mengubah field ini.
-                </p>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-6 p-6">
+        <div>
+            {/* No card shell and no second heading here: the route already titles this page, and a
+              * card wrapping cards just costs another 24px of gutter on a phone. */}
+            <form onSubmit={handleSubmit} className="space-y-4">
                 <SectionCard
                     title="Master Controls"
                     description="Kontrol global untuk mengaktifkan iklan dan target device."
@@ -543,7 +539,7 @@ export default function AdsSettingsPanel() {
                     </SectionCard>
                 ))}
 
-                <div className="rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 p-4 text-sm text-content-muted dark:border-amber-500/20 dark:from-amber-500/10 dark:to-orange-500/10">
+                <div className="rounded-card border border-status-warn/30 bg-status-warn/10 p-4 text-sm text-content-muted">
                     Script pihak ketiga akan dijalankan langsung di browser pengunjung. Pastikan hanya domain dan script monetisasi yang sudah Anda percaya yang dimasukkan di sini.
                 </div>
 
@@ -556,13 +552,7 @@ export default function AdsSettingsPanel() {
                     >
                         Reset Form
                     </button>
-                    <button
-                        type="submit"
-                        disabled={saving}
-                        className="rounded-xl bg-sky-500 px-4 py-2.5 text-white transition-colors hover:bg-sky-600 disabled:opacity-60"
-                    >
-                        {saving ? 'Menyimpan...' : 'Simpan'}
-                    </button>
+                    <Button type="submit" variant="primary" loading={saving}>Simpan</Button>
                 </div>
             </form>
         </div>

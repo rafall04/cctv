@@ -46,11 +46,11 @@ export default function PlaybackTokenTable({
                 <button onClick={onRefresh} className="rounded-lg bg-surface-sunken px-3 py-2 text-sm font-semibold text-content">Refresh</button>
             </div>
             {loading ? (
-                <div className="py-8 text-center text-sm text-gray-500">Loading...</div>
+                <div className="py-8 text-center text-sm text-content-muted">Loading...</div>
             ) : (
                 <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
-                        <thead className="text-left text-xs uppercase tracking-wide text-gray-500">
+                        <thead className="text-left text-xs uppercase tracking-wide text-content-muted">
                             <tr>
                                 <th className="px-3 py-2">Nama</th>
                                 <th className="px-3 py-2">Scope</th>
@@ -69,7 +69,7 @@ export default function PlaybackTokenTable({
                                         ) : (
                                             <>
                                                 <div className="font-medium">{token.label}</div>
-                                                <div className="text-xs text-gray-500">{token.token_prefix}...</div>
+                                                <div className="text-xs text-content-muted">{token.token_prefix}...</div>
                                             </>
                                         )}
                                     </td>
@@ -124,7 +124,7 @@ export default function PlaybackTokenTable({
                                         ) : (
                                             <>
                                                 <div>{formatPlaybackTokenSessionPolicy(token)}</div>
-                                                <div className="text-xs text-gray-500">TTL {token.session_timeout_seconds || 60}s</div>
+                                                <div className="text-xs text-content-muted">TTL {token.session_timeout_seconds || 60}s</div>
                                             </>
                                         )}
                                     </td>
@@ -140,7 +140,7 @@ export default function PlaybackTokenTable({
                                                 {editingTokenId === token.id ? (
                                                     <>
                                                         <button onClick={() => onUpdateToken(token.id)} disabled={updatingTokenId === token.id || !editForm.label.trim()} className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-600 disabled:opacity-60">{updatingTokenId === token.id ? 'Menyimpan...' : 'Simpan'}</button>
-                                                        <button onClick={onCancelEdit} className="rounded-lg bg-surface-sunken px-3 py-1.5 text-xs font-semibold text-content hover:bg-gray-200">Batal</button>
+                                                        <button onClick={onCancelEdit} className="rounded-lg bg-surface-sunken px-3 py-1.5 text-xs font-semibold text-content hover:bg-surface-sunken">Batal</button>
                                                     </>
                                                 ) : (
                                                     <>

@@ -10,7 +10,7 @@ export default function FeedbackFilterBar({ filter, onChange }) {
                     className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                         filter === status
                             ? 'bg-primary text-white'
-                            : 'bg-gray-100 dark:bg-gray-800 text-content-muted hover:bg-gray-200 dark:hover:bg-gray-700'
+                            : 'bg-surface-sunken text-content-muted hover:bg-surface-sunken'
                     }`}
                 >
                     {status === '' ? 'Semua' : feedbackStatusConfig[status].label}

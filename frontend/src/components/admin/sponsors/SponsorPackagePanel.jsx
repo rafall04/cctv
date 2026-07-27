@@ -184,7 +184,7 @@ export default function SponsorPackagePanel({ packages = [], onChanged }) {
                                             {pkg.key}
                                         </span>
                                     </div>
-                                    <p className="text-xs text-gray-500 mt-0.5">
+                                    <p className="text-xs text-content-muted mt-0.5">
                                         Urutan: {pkg.sort_order} &middot; {pkg.sponsor_count || 0} sponsor pakai
                                     </p>
                                 </div>
@@ -296,7 +296,7 @@ export default function SponsorPackagePanel({ packages = [], onChanged }) {
                                 <div>
                                     <label className="mb-1.5 block text-xs font-semibold text-content-muted">
                                         Limit Kamera
-                                        <span className="text-xs text-gray-500 ml-1">(kosong = tanpa batas)</span>
+                                        <span className="text-xs text-content-muted ml-1">(kosong = tanpa batas)</span>
                                     </label>
                                     <input
                                         type="number"

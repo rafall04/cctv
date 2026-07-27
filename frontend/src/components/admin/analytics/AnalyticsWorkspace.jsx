@@ -36,7 +36,7 @@ export function AnalyticsTabNav({ tabs = DEFAULT_TABS, activeTab, onChange }) {
                         className={`rounded-xl px-4 py-2 text-sm font-medium transition-colors ${
                             activeTab === tab.id
                                 ? 'bg-primary text-white shadow-lg shadow-primary/20'
-                                : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'
+                                : 'text-gray-600 hover:bg-surface-sunken dark:text-gray-300'
                         }`}
                     >
                         {tab.label}

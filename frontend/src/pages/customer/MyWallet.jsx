@@ -25,9 +25,9 @@ const TYPE_LABELS = {
 const STATUS_LABELS = {
     pending: { text: 'Menunggu pembayaran', className: 'text-amber-600 dark:text-amber-400' },
     paid: { text: 'Berhasil', className: 'text-emerald-600 dark:text-emerald-400' },
-    expired: { text: 'Kedaluwarsa', className: 'text-gray-500' },
+    expired: { text: 'Kedaluwarsa', className: 'text-content-muted' },
     failed: { text: 'Gagal', className: 'text-red-600 dark:text-red-400' },
-    cancelled: { text: 'Dibatalkan', className: 'text-gray-500' },
+    cancelled: { text: 'Dibatalkan', className: 'text-content-muted' },
 };
 
 function TopupPanel({ onCompleted, resumable = [] }) {
@@ -303,7 +303,7 @@ function TopupPanel({ onCompleted, resumable = [] }) {
                                 <dd className="font-bold text-content">{formatRupiah(pending.amount + (pending.promo_bonus || 0))}</dd>
                             </div>
                             {pending.paid_at && (
-                                <p className="pt-1 text-xs text-gray-400">{String(pending.paid_at).replace('T', ' ').slice(0, 19)} · #{pending.id}</p>
+                                <p className="pt-1 text-xs text-content-subtle">{String(pending.paid_at).replace('T', ' ').slice(0, 19)} · #{pending.id}</p>
                             )}
                         </dl>
                         <p className="mt-2 text-xs text-emerald-600 dark:text-emerald-400">Kamera yang ditangguhkan otomatis aktif kembali.</p>
@@ -368,7 +368,7 @@ function TopupPanel({ onCompleted, resumable = [] }) {
                         onClick={() => { setAmount(preset); setCustomAmount(''); }}
                         className={`rounded-xl border px-3 py-2 text-sm font-medium transition-colors ${!customAmount && amount === preset
                             ? 'border-primary bg-primary text-white'
-                            : 'border-gray-300 text-content-muted hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800'
+                            : 'border-edge-strong text-content-muted hover:bg-surface-sunken'
                         }`}
                     >
                         {formatRupiah(preset)}
@@ -378,7 +378,7 @@ function TopupPanel({ onCompleted, resumable = [] }) {
             {/* Thousand-separator display: store raw digits, render "10000" as "10.000" (id-ID)
                 so the customer reads the nominal at a glance. inputMode=numeric → numeric keypad. */}
             <div className="relative mt-2">
-                <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm text-gray-400">Rp</span>
+                <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm text-content-subtle">Rp</span>
                 <input
                     type="text"
                     inputMode="numeric"
@@ -583,7 +583,7 @@ export default function MyWallet() {
                         <p className="mt-2 text-sm text-content-muted">Belum ada transaksi.</p>
                     )}
                     {wallet?.transactions?.length >= walletLimit && (
-                        <button onClick={() => setWalletLimit((n) => n + 50)} className="mt-2 w-full rounded-lg border border-edge py-1.5 text-xs text-gray-500 transition-colors hover:bg-surface-sunken">
+                        <button onClick={() => setWalletLimit((n) => n + 50)} className="mt-2 w-full rounded-lg border border-edge py-1.5 text-xs text-content-muted transition-colors hover:bg-surface-sunken">
                             Muat lebih banyak
                         </button>
                     )}
@@ -594,7 +594,7 @@ export default function MyWallet() {
                     {payments.length ? (
                         <div className="mt-2 divide-y divide-edge">
                             {payments.map((p) => {
-                                const st = STATUS_LABELS[p.status] || { text: p.status, className: 'text-gray-500' };
+                                const st = STATUS_LABELS[p.status] || { text: p.status, className: 'text-content-muted' };
                                 return (
                                     <div key={p.id} className="flex items-center justify-between py-2 text-sm">
                                         <div className="min-w-0">
@@ -610,7 +610,7 @@ export default function MyWallet() {
                         <p className="mt-2 text-sm text-content-muted">Belum ada pembayaran.</p>
                     )}
                     {payments.length >= paymentsLimit && (
-                        <button onClick={() => setPaymentsLimit((n) => n + 20)} className="mt-2 w-full rounded-lg border border-edge py-1.5 text-xs text-gray-500 transition-colors hover:bg-surface-sunken">
+                        <button onClick={() => setPaymentsLimit((n) => n + 20)} className="mt-2 w-full rounded-lg border border-edge py-1.5 text-xs text-content-muted transition-colors hover:bg-surface-sunken">
                             Muat lebih banyak
                         </button>
                     )}

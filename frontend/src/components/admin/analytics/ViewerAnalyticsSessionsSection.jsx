@@ -78,7 +78,7 @@ export default function ViewerAnalyticsSessionsSection({
                                             <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium ${
                                                 session.device_type === 'mobile' ? 'bg-blue-100 dark:bg-primary/20 text-primary-600 dark:text-blue-400' :
                                                 session.device_type === 'tablet' ? 'bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400' :
-                                                'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
+                                                'bg-gray-100 dark:bg-gray-700 text-gray-600'
                                             }`}>
                                                 <DeviceIcon type={session.device_type} className="w-3 h-3" />
                                                 {session.device_type || 'desktop'}

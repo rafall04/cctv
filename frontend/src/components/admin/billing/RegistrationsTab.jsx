@@ -10,7 +10,7 @@ import { DesktopTable, formatDateTime } from './billingFormat';
 import { useConfirm } from '../../../contexts/ConfirmContext';
 
 function PlanTag({ reg }) {
-    if (!reg.plan_name) return <span className="text-gray-400">—</span>;
+    if (!reg.plan_name) return <span className="text-content-subtle">—</span>;
     return (
         <span>
             {reg.plan_name}
@@ -93,7 +93,7 @@ export default function RegistrationsTab({ registrations, run, busy }) {
                                 <p className="mt-0.5 text-sm text-content-muted">{reg.phone || reg.email || '—'}</p>
                                 <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-sm text-content-muted">
                                     <PlanTag reg={reg} />
-                                    <span className="text-xs text-gray-400">{formatDateTime(reg.created_at)}</span>
+                                    <span className="text-xs text-content-subtle">{formatDateTime(reg.created_at)}</span>
                                 </div>
                                 <div className="mt-3"><ActionButtons reg={reg} full /></div>
                             </div>

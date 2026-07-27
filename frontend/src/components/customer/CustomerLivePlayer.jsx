@@ -132,12 +132,12 @@ export default function CustomerLivePlayer({ camera, onClose }) {
                     <div>
                         <h3 className="font-semibold text-white">{camera.name}</h3>
                         {camera.area_name && (
-                            <p className="text-xs text-gray-400">{camera.area_name}</p>
+                            <p className="text-xs text-content-subtle">{camera.area_name}</p>
                         )}
                     </div>
                     <button
                         onClick={onClose}
-                        className="rounded-lg px-3 py-1.5 text-sm text-gray-300 transition-colors hover:bg-gray-800 hover:text-white"
+                        className="rounded-lg px-3 py-1.5 text-sm text-content-subtle transition-colors hover:bg-gray-800 hover:text-white"
                     >
                         Tutup ✕
                     </button>
@@ -151,7 +151,7 @@ export default function CustomerLivePlayer({ camera, onClose }) {
                         controls
                     />
                     {state.status === 'loading' && (
-                        <div className="absolute inset-0 flex items-center justify-center text-sm text-gray-300">
+                        <div className="absolute inset-0 flex items-center justify-center text-sm text-content-subtle">
                             Memuat stream…
                         </div>
                     )}

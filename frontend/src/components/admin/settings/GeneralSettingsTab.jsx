@@ -202,7 +202,7 @@ export default function GeneralSettingsTab() {
                         type="button"
                         onClick={fetchSettings}
                         disabled={saving}
-                        className="px-6 py-2.5 bg-surface border border-edge-strong text-content-muted rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                        className="px-6 py-2.5 bg-surface border border-edge-strong text-content-muted rounded-xl hover:bg-surface-sunken transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
                     >
                         Reset
                     </button>

@@ -15,7 +15,7 @@ export default function ThemeSwitcher({ className = '' }) {
             className={`relative inline-flex items-center justify-center w-10 h-10 rounded-lg transition-all duration-200 ${
                 isDark 
                     ? 'bg-gray-800 hover:bg-gray-700 text-yellow-400' 
-                    : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                    : 'bg-surface-sunken hover:bg-surface-sunken text-content-muted'
             } ${className}`}
             aria-label={`Switch to ${isDark ? 'light' : 'dark'} mode`}
             title={`Switch to ${isDark ? 'light' : 'dark'} mode`}
@@ -75,7 +75,7 @@ export function ThemeSwitcherWithLabel({ className = '' }) {
             className={`inline-flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${
                 isDark 
                     ? 'bg-gray-800 hover:bg-gray-700 text-white' 
-                    : 'bg-gray-100 hover:bg-gray-200 text-gray-900'
+                    : 'bg-surface-sunken hover:bg-surface-sunken text-content'
             } ${className}`}
             aria-label={`Switch to ${isDark ? 'light' : 'dark'} mode`}
         >
@@ -154,7 +154,7 @@ export function ThemeToggleSwitch({ className = '' }) {
                 }`}
             >
                 {isDark ? (
-                    <svg className="w-3 h-3 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <svg className="w-3 h-3 text-content-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
                     </svg>
                 ) : (

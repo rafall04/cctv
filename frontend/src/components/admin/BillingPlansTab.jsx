@@ -91,7 +91,7 @@ export default function BillingPlansTab({ plans, regSettings, run, busy }) {
                                 <tr key={plan.id} className="bg-surface">
                                     <td className="px-3 py-2">
                                         <p className="font-medium text-content">{plan.name}</p>
-                                        <p className="text-xs text-gray-400">{plan.key}</p>
+                                        <p className="text-xs text-content-subtle">{plan.key}</p>
                                     </td>
                                     <td className="px-3 py-2 text-right">
                                         {plan.is_trial === 1 ? 'Gratis' : formatRupiah(plan.price_per_camera)}

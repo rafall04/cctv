@@ -84,9 +84,9 @@ export default function RegisterPage() {
     const plan = info?.default_plan;
 
     return (
-        <div className="flex min-h-screen items-center justify-center bg-gray-100 px-4 py-8 dark:bg-gray-950">
+        <div className="flex min-h-screen items-center justify-center bg-gray-100 px-4 py-8">
             <div className="w-full max-w-md">
-                <div className="rounded-2xl border border-edge bg-white p-6 shadow-xl dark:bg-gray-900">
+                <div className="rounded-2xl border border-edge bg-white p-6 shadow-xl">
                     <h1 className="text-xl font-bold text-gray-900 dark:text-white">Daftar Sewa CCTV</h1>
 
                     {submitted ? (

@@ -52,7 +52,7 @@ export default function SubscriptionsTab({ subscriptions, assignableCameras, cus
     };
 
     const Actions = ({ sub, full }) => {
-        if (sub.status === 'cancelled') return <span className="text-xs text-gray-400">—</span>;
+        if (sub.status === 'cancelled') return <span className="text-xs text-content-subtle">—</span>;
         return (
             <div className={`flex gap-1 ${full ? 'w-full' : 'justify-end'}`}>
                 <button onClick={() => toggleStatus(sub)} disabled={busy} className={`whitespace-nowrap rounded-lg border border-edge px-3 py-1.5 text-xs text-content-muted transition-colors hover:bg-surface-sunken disabled:opacity-50 ${full ? 'flex-1' : ''}`}>
@@ -132,12 +132,12 @@ export default function SubscriptionsTab({ subscriptions, assignableCameras, cus
                                     <tr key={sub.id} className="bg-surface">
                                         <td className="px-3 py-2">
                                             <p className="font-medium text-content">{sub.camera_name}</p>
-                                            <p className="text-xs text-gray-400">
+                                            <p className="text-xs text-content-subtle">
                                                 {sub.area_name || 'Tanpa area'} · {sub.camera_is_online === 1 ? 'online' : 'offline'}{sub.camera_is_public ? ' · publik' : ''}
                                             </p>
                                         </td>
                                         <td className="px-3 py-2 text-content-muted">
-                                            {sub.customer_username}<span className="ml-1 text-xs text-gray-400">({formatRupiah(sub.wallet_balance || 0)})</span>
+                                            {sub.customer_username}<span className="ml-1 text-xs text-content-subtle">({formatRupiah(sub.wallet_balance || 0)})</span>
                                         </td>
                                         <td className="px-3 py-2 text-right">{formatRupiah(sub.monthly_price)}</td>
                                         <td className="px-3 py-2 text-center"><StatusBadge className={SUB_STATUS_BADGES[sub.status] || ''}>{sub.status}</StatusBadge></td>
@@ -154,7 +154,7 @@ export default function SubscriptionsTab({ subscriptions, assignableCameras, cus
                                     <div className="flex items-start justify-between gap-2">
                                         <div className="min-w-0">
                                             <p className="truncate font-semibold text-content">{sub.camera_name}</p>
-                                            <p className="truncate text-xs text-gray-400">
+                                            <p className="truncate text-xs text-content-subtle">
                                                 {sub.area_name || 'Tanpa area'} · {sub.camera_is_online === 1 ? 'online' : 'offline'}
                                             </p>
                                             <p className="truncate text-sm text-content-muted">

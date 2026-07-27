@@ -13,19 +13,15 @@ exactly which concern lives where.
 */
 
 import AdsSettingsPanel from '../components/admin/settings/AdsSettingsPanel';
+import { PageHeader } from '../components/ui';
 
 export default function AdsManagement() {
     return (
         <div className="space-y-5">
-            <div>
-                <h1 className="text-2xl font-bold text-content">Manajemen Iklan</h1>
-                <p className="text-content-muted text-sm mt-1">
-                    Konfigurasi script iklan eksternal (AdSense / Adsterra / PropellerAds dsb).
-                    <span className="ml-1 text-content-subtle">
-                        Sponsor lokal — logo yang kita render sendiri — diatur di halaman Sponsors, terpisah.
-                    </span>
-                </p>
-            </div>
+            <PageHeader
+                title="Iklan"
+                description="Script iklan pihak ketiga (AdSense / Adsterra / PropellerAds) per placement. Sponsor lokal diatur terpisah di halaman Sponsor."
+            />
             <AdsSettingsPanel />
         </div>
     );

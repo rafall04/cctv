@@ -133,7 +133,7 @@ export default function PromoTab() {
                                         <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-medium text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">{p.type}</span>
                                     </div>
                                     <p className="mt-0.5 text-sm text-content-muted">{promoValueLabel(p)}</p>
-                                    <p className="text-xs text-gray-400">
+                                    <p className="text-xs text-content-subtle">
                                         Terpakai {p.used_count}{p.max_uses ? `/${p.max_uses}` : ''} · maks {p.per_user_limit}/akun
                                         {p.min_topup > 0 ? ` · min top-up ${rupiah(p.min_topup)}` : ''}
                                         {p.expires_at ? ` · s/d ${String(p.expires_at).slice(0, 10)}` : ''}

@@ -592,7 +592,7 @@ export default function TelegramSettingsPanel() {
                                                                 aria-label={`${eventName === 'offline' ? 'Offline' : 'Online'} ${rule.id}`}
                                                                 checked={(rule.events || []).includes(eventName)}
                                                                 onChange={() => toggleRuleEvent(index, eventName)}
-                                                                className="rounded border-gray-300 text-primary focus:ring-primary"
+                                                                className="rounded border-edge-strong text-primary focus:ring-primary"
                                                             />
                                                             {eventName === 'offline' ? 'Offline' : 'Online'}
                                                         </label>
@@ -659,7 +659,7 @@ export default function TelegramSettingsPanel() {
                                             </button>
                                         </div>
                                     ) : (
-                                        <p className="text-xs text-gray-500">Belum dikonfigurasi</p>
+                                        <p className="text-xs text-content-muted">Belum dikonfigurasi</p>
                                     )}
                                 </div>
                             ))}

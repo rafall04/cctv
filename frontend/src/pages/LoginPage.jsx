@@ -342,7 +342,7 @@ export default function LoginPage() {
             {/* Theme Toggle */}
             <button
                 onClick={toggleTheme}
-                className="fixed top-4 right-4 p-3 rounded-xl bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm shadow-lg border border-gray-200/50 text-content-muted hover:bg-surface transition-all z-50"
+                className="fixed top-4 right-4 p-3 rounded-xl bg-white/80 backdrop-blur-sm shadow-lg border border-gray-200/50 text-content-muted hover:bg-surface transition-all z-50"
             >
                 {isDark ? <Icons.Sun /> : <Icons.Moon />}
             </button>
@@ -356,7 +356,7 @@ export default function LoginPage() {
                     <h1 className="text-3xl font-bold text-content mb-2">
                         Welcome Back
                     </h1>
-                    <p className="text-gray-500 dark:text-gray-400">
+                    <p className="text-content-muted">
                         Sign in to {branding.company_name || 'CCTV System'} Admin Panel
                     </p>
                 </div>
@@ -438,7 +438,7 @@ export default function LoginPage() {
                                 Username
                             </label>
                             <div className="relative">
-                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400 dark:text-gray-500">
+                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-content-subtle">
                                     <Icons.User />
                                 </div>
                                 <input
@@ -471,7 +471,7 @@ export default function LoginPage() {
                                 Password
                             </label>
                             <div className="relative">
-                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400 dark:text-gray-500">
+                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400">
                                     <Icons.Key />
                                 </div>
                                 <input
@@ -535,7 +535,7 @@ export default function LoginPage() {
 
                     {/* Register + Back Links */}
                     <div className="mt-6 pt-6 border-t border-edge space-y-3">
-                        <p className="text-center text-sm text-gray-500 dark:text-gray-400">
+                        <p className="text-center text-sm text-gray-500">
                             Mau sewa CCTV?{' '}
                             <a href="/daftar" className="font-semibold text-primary hover:underline">
                                 Daftar pelanggan baru

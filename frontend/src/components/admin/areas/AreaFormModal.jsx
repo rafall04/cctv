@@ -40,12 +40,12 @@ export default function AreaFormModal({
                 aria-label={editingArea ? 'Edit Area' : 'Tambah Area'}
                 className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-edge max-h-[90vh] overflow-y-auto"
             >
-                <div className="p-6 border-b border-edge flex justify-between items-center sticky top-0 bg-surface dark:bg-gray-800">
+                <div className="p-6 border-b border-edge flex justify-between items-center sticky top-0 bg-surface">
                     <div>
                         <h3 className="text-lg font-bold text-gray-900 dark:text-white">{editingArea ? 'Edit Area' : 'Tambah Area'}</h3>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">Isi detail lokasi</p>
+                        <p className="text-sm text-content-muted">Isi detail lokasi</p>
                     </div>
-                    <button type="button" onClick={onClose} className="p-2 rounded-lg hover:bg-surface-sunken text-gray-600 dark:text-gray-300">
+                    <button type="button" onClick={onClose} className="p-2 rounded-lg hover:bg-surface-sunken text-content-muted">
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M6 18L18 6M6 6l12 12"/></svg>
                     </button>
                 </div>
@@ -110,7 +110,7 @@ export default function AreaFormModal({
                                 <option key={option.value} value={option.value}>{option.label}</option>
                             ))}
                         </select>
-                        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                        <p className="mt-2 text-xs text-gray-500">
                             Override ini menjadi default steady-state untuk kamera external di area ini. Kamera dengan override sendiri tetap menang.
                         </p>
                     </div>
@@ -128,7 +128,7 @@ export default function AreaFormModal({
                                     <option key={option.value} value={option.value}>{option.label}</option>
                                 ))}
                             </select>
-                            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                            <p className="mt-2 text-xs text-gray-500">
                                 Menjelaskan skala area ini, misalnya titik kecil, kelurahan, kecamatan, atau kabupaten/kota.
                             </p>
                         </div>
@@ -144,7 +144,7 @@ export default function AreaFormModal({
                                 className="w-full px-4 py-2.5 bg-surface-sunken border border-edge rounded-xl text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                                 placeholder="Kosongkan untuk auto"
                             />
-                            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                            <p className="mt-2 text-xs text-gray-500">
                                 Jika diisi, zoom ini akan dipakai saat area difokuskan di map view.
                             </p>
                         </div>
@@ -161,7 +161,7 @@ export default function AreaFormModal({
                             />
                             <span>
                                 <span className="block text-sm font-medium text-content dark:text-white">Tampilkan di Grid Default</span>
-                                <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">
+                                <span className="mt-1 block text-xs text-gray-500">
                                     Saat Grid View masih di &quot;Semua Lokasi&quot;, hanya area yang dicentang di sini yang dimuat default. Jika user memilih area tertentu, area itu tetap tampil walau opsi ini dimatikan.
                                 </span>
                             </span>
@@ -180,7 +180,7 @@ export default function AreaFormModal({
                                 <option key={`form-${option.value || 'unlimited'}`} value={option.value}>{option.label}</option>
                             ))}
                         </select>
-                        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                        <p className="mt-2 text-xs text-gray-500">
                             Untuk area padat, batasi jumlah kamera default seperti 10 atau 15 agar Grid View tetap ringan. Saat user memilih area tertentu, limit ini diabaikan.
                         </p>
                     </div>
@@ -188,7 +188,7 @@ export default function AreaFormModal({
                     <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-4 dark:border-emerald-500/20 dark:bg-emerald-500/10">
                         <div className="mb-3">
                             <h4 className="text-sm font-semibold text-content dark:text-white">Internal RTSP / MediaMTX Policy</h4>
-                            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            <p className="mt-1 text-xs text-gray-500">
                                 Default area ini hanya dipakai oleh kamera internal yang tidak punya override sendiri di form kamera.
                             </p>
                         </div>
@@ -240,16 +240,16 @@ export default function AreaFormModal({
                         </div>
                     </div>
 
-                    <div className="pt-4 border-t border-edge dark:border-gray-700/50">
+                    <div className="pt-4 border-t border-edge">
                         <label className="block text-sm font-medium text-content-muted mb-3">Koordinat Area (untuk Map View)</label>
-                        <Suspense fallback={<div className="text-sm text-content-muted dark:text-gray-300">Loading map...</div>}>
+                        <Suspense fallback={<div className="text-sm text-content-muted">Loading map...</div>}>
                             <LocationPickerComponent latitude={formData.latitude} longitude={formData.longitude} onLocationChange={onLocationChange} />
                         </Suspense>
-                        <p className="text-xs text-gray-500 mt-2">Koordinat digunakan untuk memindahkan peta saat filter area dipilih</p>
+                        <p className="text-xs text-content-muted mt-2">Koordinat digunakan untuk memindahkan peta saat filter area dipilih</p>
                     </div>
 
                     <div className="flex gap-3 pt-2">
-                        <button type="button" onClick={onClose} className="flex-1 px-4 py-2.5 bg-surface-sunken text-content-muted font-medium rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700" disabled={submitting}>Batal</button>
+                        <button type="button" onClick={onClose} className="flex-1 px-4 py-2.5 bg-surface-sunken text-content-muted font-medium rounded-xl hover:bg-surface-sunken" disabled={submitting}>Batal</button>
                         <button type="submit" className="flex-[2] px-4 py-2.5 bg-gradient-to-r from-primary to-primary-600 text-white font-medium rounded-xl shadow-lg shadow-primary/30 hover:from-primary-600 hover:to-blue-700 disabled:opacity-50 flex items-center justify-center gap-2" disabled={submitting}>
                             {submitting && <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>}
                             {submitting ? 'Menyimpan...' : (editingArea ? 'Perbarui' : 'Simpan')}

@@ -117,7 +117,7 @@ function CheckboxField({ id, name, checked, onChange, label }) {
                 type="checkbox"
                 checked={checked}
                 onChange={onChange}
-                className="h-4 w-4 rounded border-gray-300 text-sky-500 focus:ring-sky-500"
+                className="h-4 w-4 rounded border-edge-strong text-sky-500 focus:ring-sky-500"
             />
             <span>{label}</span>
         </label>

@@ -156,7 +156,7 @@ export default function AreaCard({
                     className={`w-full rounded-2xl border px-4 py-3 text-left transition-colors ${
                         gridDefaultEnabled
                             ? 'border-sky-200 bg-sky-50 text-sky-900 hover:bg-sky-100 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-100 dark:hover:bg-sky-500/20'
-                            : 'border-gray-200 bg-surface-sunken text-content hover:bg-gray-100 dark:border-gray-700/60 dark:hover:bg-gray-800/70'
+                            : 'border-gray-200 bg-surface-sunken text-content hover:bg-gray-100 dark:border-gray-700/60'
                     } ${gridDefaultBusy ? 'cursor-wait opacity-70' : ''}`}
                 >
                     <div className="flex items-center justify-between gap-4">

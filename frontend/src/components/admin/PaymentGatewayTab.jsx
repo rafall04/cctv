@@ -174,7 +174,7 @@ export default function PaymentGatewayTab() {
                                 onClick={() => setGateway(g)}
                                 className={`rounded-xl border px-3 py-2 text-sm font-medium capitalize transition-colors ${gateway === g
                                     ? 'border-primary bg-primary text-white'
-                                    : 'border-gray-300 text-content-muted hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800'
+                                    : 'border-edge-strong text-content-muted hover:bg-surface-sunken'
                                 }`}
                             >
                                 {g === 'manual' ? 'Manual (konfirmasi admin)' : g}

@@ -17,7 +17,7 @@ export default function FeedbackDetailPanel({
                                 {selectedFeedback.name || 'Anonim'}
                             </h3>
                             {selectedFeedback.email && (
-                                <p className="text-sm text-gray-500">{selectedFeedback.email}</p>
+                                <p className="text-sm text-content-muted">{selectedFeedback.email}</p>
                             )}
                         </div>
                         <span className={`px-3 py-1 rounded-full text-sm font-medium ${feedbackStatusConfig[selectedFeedback.status].color}`}>
@@ -25,7 +25,7 @@ export default function FeedbackDetailPanel({
                         </span>
                     </div>
 
-                    <div className="text-sm text-gray-400 flex items-center gap-4">
+                    <div className="text-sm text-content-subtle flex items-center gap-4">
                         <span className="flex items-center gap-1">
                             <FeedbackIcons.Clock />
                             {formatDate(selectedFeedback.created_at)}
@@ -66,7 +66,7 @@ export default function FeedbackDetailPanel({
                     </div>
                 </div>
             ) : (
-                <div className="h-full flex items-center justify-center text-gray-400">
+                <div className="h-full flex items-center justify-center text-content-subtle">
                     <p>Pilih feedback untuk melihat detail</p>
                 </div>
             )}

@@ -181,10 +181,10 @@ export default function NotificationDiagnostics() {
                     <div className="rounded-lg border border-edge bg-surface p-4">
                         <h2 className="text-sm font-bold text-content">Camera Health</h2>
                         <dl className="mt-3 space-y-2 text-sm">
-                            <div className="flex justify-between gap-3"><dt className="text-gray-500">Camera</dt><dd className="font-semibold text-content">{preview.camera.name}</dd></div>
-                            <div className="flex justify-between gap-3"><dt className="text-gray-500">Area</dt><dd className="text-content">{preview.camera.areaName}</dd></div>
-                            <div className="flex justify-between gap-3"><dt className="text-gray-500">Status</dt><dd className="text-content">{preview.health.status}</dd></div>
-                            <div className="flex justify-between gap-3"><dt className="text-gray-500">Last Check ({timezoneLabel})</dt><dd className="text-content">{formatRuntimeTimestamp(preview.health.lastCheckedAt)}</dd></div>
+                            <div className="flex justify-between gap-3"><dt className="text-content-muted">Camera</dt><dd className="font-semibold text-content">{preview.camera.name}</dd></div>
+                            <div className="flex justify-between gap-3"><dt className="text-content-muted">Area</dt><dd className="text-content">{preview.camera.areaName}</dd></div>
+                            <div className="flex justify-between gap-3"><dt className="text-content-muted">Status</dt><dd className="text-content">{preview.health.status}</dd></div>
+                            <div className="flex justify-between gap-3"><dt className="text-content-muted">Last Check ({timezoneLabel})</dt><dd className="text-content">{formatRuntimeTimestamp(preview.health.lastCheckedAt)}</dd></div>
                         </dl>
                     </div>
 
@@ -197,7 +197,7 @@ export default function NotificationDiagnostics() {
                                 {preview.routing.matchedTargets.map((target) => (
                                     <li key={target.id} className="rounded-md bg-surface-sunken p-2 text-sm">
                                         <span className="font-semibold text-content">{target.name}</span>
-                                        <span className="ml-2 text-gray-500">{target.chatIdMasked}</span>
+                                        <span className="ml-2 text-content-muted">{target.chatIdMasked}</span>
                                     </li>
                                 ))}
                             </ul>
@@ -212,7 +212,7 @@ export default function NotificationDiagnostics() {
                                     {rule.id} - {rule.targetName} - {rule.scope}
                                 </li>
                             ))}
-                            {preview.routing.matchedRules.length === 0 && <li className="text-gray-500">Tidak ada rule match.</li>}
+                            {preview.routing.matchedRules.length === 0 && <li className="text-content-muted">Tidak ada rule match.</li>}
                         </ul>
                     </div>
                 </section>
@@ -223,7 +223,7 @@ export default function NotificationDiagnostics() {
                 <div className="mt-3 overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
                         <thead>
-                            <tr className="text-left text-xs uppercase text-gray-500">
+                            <tr className="text-left text-xs uppercase text-content-muted">
                                 <th className="py-2 pr-4">Time ({timezoneLabel})</th>
                                 <th className="py-2 pr-4">Camera</th>
                                 <th className="py-2 pr-4">Event</th>
@@ -234,7 +234,7 @@ export default function NotificationDiagnostics() {
                         <tbody className="divide-y divide-edge">
                             {runs.map((run) => (
                                 <tr key={run.id}>
-                                    <td className="py-2 pr-4 text-gray-500">{formatAuditTimestamp(run.createdAt)}</td>
+                                    <td className="py-2 pr-4 text-content-muted">{formatAuditTimestamp(run.createdAt)}</td>
                                     <td className="py-2 pr-4 text-content">{run.cameraName}</td>
                                     <td className="py-2 pr-4 text-content-muted">{run.eventType}</td>
                                     <td className="py-2 pr-4 text-content-muted">{run.sentCount}/{run.targetCount}</td>
@@ -245,7 +245,7 @@ export default function NotificationDiagnostics() {
                             ))}
                             {runs.length === 0 && (
                                 <tr>
-                                    <td colSpan={5} className="py-6 text-center text-gray-500">Belum ada diagnostic run.</td>
+                                    <td colSpan={5} className="py-6 text-center text-content-muted">Belum ada diagnostic run.</td>
                                 </tr>
                             )}
                         </tbody>

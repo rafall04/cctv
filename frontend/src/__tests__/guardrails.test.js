@@ -160,7 +160,7 @@ describe('guardrail: legacy grey ratchet (design tokens)', () => {
     // then page by page as each moved onto the components/ui primitives — never by collapsing a
     // lone grey, since an unpaired grey is a judgement call about which role was meant. What is
     // left is exactly those singletons; resolve them by hand and lower this again.
-    const BASELINE = 1212;
+    const BASELINE = 1021;
 
     it(`-gray-N usage count stays <= ${BASELINE} and shrinks over time`, () => {
         let count = 0;

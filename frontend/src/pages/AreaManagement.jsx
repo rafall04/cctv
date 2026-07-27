@@ -704,7 +704,7 @@ export default function AreaManagement() {
                                         type="checkbox"
                                         checked={bulkConfig.clear_internal_rtsp}
                                         onChange={(e) => setBulkConfig({ ...bulkConfig, clear_internal_rtsp: e.target.checked })}
-                                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                        className="h-4 w-4 rounded border-edge-strong text-primary focus:ring-primary"
                                     />
                                     <div>
                                         <div className="text-sm font-semibold text-content">Clear internal RTSP saat normalisasi</div>

@@ -397,7 +397,7 @@ export default function CameraSourceFields({
                                             checked={formData.external_tls_mode === 'insecure' ? true : formData.external_use_proxy}
                                             onChange={onChange}
                                             disabled={formData.external_tls_mode === 'insecure' || isSubmitting}
-                                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary disabled:cursor-not-allowed disabled:opacity-50"
+                                            className="h-4 w-4 rounded border-edge-strong text-primary focus:ring-primary disabled:cursor-not-allowed disabled:opacity-50"
                                         />
                                         {formData.external_tls_mode === 'insecure' ? 'Wajib Aktif' : (formData.external_use_proxy ? 'Aktif' : 'Nonaktif')}
                                     </label>

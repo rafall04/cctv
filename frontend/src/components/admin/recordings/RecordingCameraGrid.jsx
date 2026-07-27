@@ -210,7 +210,7 @@ function RecordingQuickEditCard({
                                     type="button"
                                     onClick={handleCancel}
                                     disabled={isSaving}
-                                    className="flex-1 rounded-lg border border-edge-strong bg-surface px-4 py-2 text-sm font-medium text-content transition-colors hover:bg-gray-50 disabled:opacity-50 dark:hover:bg-gray-700"
+                                    className="flex-1 rounded-lg border border-edge-strong bg-surface px-4 py-2 text-sm font-medium text-content transition-colors hover:bg-surface-sunken disabled:opacity-50"
                                 >
                                     Batal
                                 </button>

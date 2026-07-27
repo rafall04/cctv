@@ -137,7 +137,7 @@ export default function PlaybackSettingsPanel() {
                             name="public_playback_enabled"
                             checked={settings.public_playback_enabled}
                             onChange={handleChange}
-                            className="h-4 w-4 rounded border-gray-300 text-sky-500 focus:ring-sky-500"
+                            className="h-4 w-4 rounded border-edge-strong text-sky-500 focus:ring-sky-500"
                         />
                         <span>Aktifkan playback publik sebagai preview terbatas</span>
                     </label>
@@ -169,7 +169,7 @@ export default function PlaybackSettingsPanel() {
                             name="public_playback_notice_enabled"
                             checked={settings.public_playback_notice_enabled}
                             onChange={handleChange}
-                            className="h-4 w-4 rounded border-gray-300 text-sky-500 focus:ring-sky-500"
+                            className="h-4 w-4 rounded border-edge-strong text-sky-500 focus:ring-sky-500"
                         />
                         <span>Tampilkan notice privasi di playback publik</span>
                     </label>

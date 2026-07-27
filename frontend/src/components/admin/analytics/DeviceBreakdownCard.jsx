@@ -12,7 +12,7 @@ export default function DeviceBreakdownCard({ deviceBreakdown }) {
                             <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
                                 device.device_type === 'mobile' ? 'bg-blue-100 dark:bg-primary/20 text-primary' :
                                 device.device_type === 'tablet' ? 'bg-purple-100 dark:bg-purple-500/20 text-purple-500' :
-                                'bg-gray-100 dark:bg-gray-700 text-gray-500'
+                                'bg-gray-100 dark:bg-gray-700 text-content-muted'
                             }`}>
                                 <DeviceIcon type={device.device_type} className="w-6 h-6" />
                             </div>

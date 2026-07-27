@@ -172,7 +172,7 @@ export default function CustomerCameraIPs() {
                                         <div className="flex items-start justify-between gap-2">
                                             <div className="min-w-0">
                                                 <p className="truncate font-semibold text-content">{e.camera_name}</p>
-                                                <p className="text-xs text-gray-400">{e.owner}</p>
+                                                <p className="text-xs text-content-subtle">{e.owner}</p>
                                             </div>
                                             <Badge kind={e.kind} />
                                         </div>

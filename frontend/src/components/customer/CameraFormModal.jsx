@@ -138,7 +138,7 @@ export default function CameraFormModal({ camera = null, areas = [], onClose, on
                     </label>
                     <div>
                         <label htmlFor="cam-rtsp" className="mb-1 block text-sm font-medium text-content-muted">
-                            URL RTSP {isEdit && <span className="font-normal text-gray-400">(kosongkan jika tidak diganti)</span>}
+                            URL RTSP {isEdit && <span className="font-normal text-content-subtle">(kosongkan jika tidak diganti)</span>}
                         </label>
                         <input id="cam-rtsp" name="private_rtsp_url" value={form.private_rtsp_url} onChange={handleChange} maxLength={500} className={inputClass} placeholder="rtsp://user:pass@ip-kamera:554/stream" />
                         <p className="mt-1 text-xs text-content-muted">

@@ -435,10 +435,10 @@ export default function ImportExport() {
             </div>
 
             <div className="flex space-x-1 border-b border-edge">
-                <button onClick={() => setActiveTab('import')} className={`px-4 py-2 font-medium text-sm transition-colors ${activeTab === 'import' ? 'text-primary border-b-2 border-primary' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'}`}>
+                <button onClick={() => setActiveTab('import')} className={`px-4 py-2 font-medium text-sm transition-colors ${activeTab === 'import' ? 'text-primary border-b-2 border-primary' : 'text-content-muted hover:text-content-muted'}`}>
                     Import Center
                 </button>
-                <button onClick={() => setActiveTab('export')} className={`px-4 py-2 font-medium text-sm transition-colors ${activeTab === 'export' ? 'text-primary border-b-2 border-primary' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'}`}>
+                <button onClick={() => setActiveTab('export')} className={`px-4 py-2 font-medium text-sm transition-colors ${activeTab === 'export' ? 'text-primary border-b-2 border-primary' : 'text-content-muted hover:text-content-muted'}`}>
                     Export Database
                 </button>
             </div>
@@ -472,7 +472,7 @@ export default function ImportExport() {
                                             if (option.value === 'remote_preset') setSourceProfile('jombang_mjpeg');
                                             setPreviewResult(null);
                                         }}
-                                        className={`rounded-xl px-3 py-2 text-sm font-medium transition ${importMode === option.value ? 'bg-primary text-white' : 'bg-gray-100 text-content-muted hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700'}`}
+                                        className={`rounded-xl px-3 py-2 text-sm font-medium transition ${importMode === option.value ? 'bg-primary text-white' : 'bg-surface-sunken text-content-muted hover:bg-surface-sunken'}`}
                                     >
                                         {option.label}
                                     </button>
@@ -489,7 +489,7 @@ export default function ImportExport() {
                             {importMode === 'upload_json' ? (
                                 <div>
                                     <label htmlFor="import-json-file" className="block text-sm font-medium text-content-muted mb-1">Upload JSON</label>
-                                    <input id="import-json-file" type="file" accept=".json" onChange={handleFileUpload} ref={fileInputRef} className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100" />
+                                    <input id="import-json-file" type="file" accept=".json" onChange={handleFileUpload} ref={fileInputRef} className="w-full text-sm text-content-muted file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100" />
                                     {rawPayload.length > 0 && <p className="mt-3 text-sm text-green-600 dark:text-green-400 font-medium">Loaded {rawPayload.length} rows from {rawFileName || 'JSON'}.</p>}
                                 </div>
                             ) : (
@@ -603,7 +603,7 @@ export default function ImportExport() {
                             )}
                             <div className="p-4 space-y-4">
                                 {!previewResult ? (
-                                    <div className="h-64 flex flex-col items-center justify-center text-gray-400 space-y-3 font-medium">
+                                    <div className="h-64 flex flex-col items-center justify-center text-content-subtle space-y-3 font-medium">
                                         <svg className="w-12 h-12 stroke-current opacity-30" viewBox="0 0 24 24" fill="none" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg>
                                         <p>Jalankan preview untuk melihat hasil validasi server-side.</p>
                                     </div>
@@ -683,7 +683,7 @@ export default function ImportExport() {
                                                     ))}
                                                     {previewRows.length > 80 && (
                                                         <tr>
-                                                            <td colSpan="7" className="px-4 py-4 text-center text-xs text-gray-400">... and {previewRows.length - 80} more rows hidden for performance.</td>
+                                                            <td colSpan="7" className="px-4 py-4 text-center text-xs text-content-subtle">... and {previewRows.length - 80} more rows hidden for performance.</td>
                                                         </tr>
                                                     )}
                                                 </tbody>

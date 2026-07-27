@@ -41,7 +41,7 @@ export default function FeedbackListPanel({
                                     <p className="text-sm text-content-muted line-clamp-2">
                                         {feedback.message}
                                     </p>
-                                    <div className="flex items-center gap-3 mt-2 text-xs text-gray-400">
+                                    <div className="flex items-center gap-3 mt-2 text-xs text-content-subtle">
                                         <span className="flex items-center gap-1">
                                             <FeedbackIcons.Clock />
                                             {formatDate(feedback.created_at)}
@@ -66,7 +66,7 @@ export default function FeedbackListPanel({
                     >
                         <FeedbackIcons.ChevronLeft />
                     </button>
-                    <span className="text-sm text-gray-500">
+                    <span className="text-sm text-content-muted">
                         {pagination.page} / {pagination.totalPages}
                     </span>
                     <button

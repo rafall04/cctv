@@ -326,7 +326,7 @@ export default function VoucherManagement() {
                     </p>
                 </div>
                 {areas.length === 0 ? (
-                    <div className="p-6 text-center text-sm text-gray-500">Belum ada area. Buat area dulu di menu Areas.</div>
+                    <div className="p-6 text-center text-sm text-content-muted">Belum ada area. Buat area dulu di menu Areas.</div>
                 ) : (
                     <ul className="divide-y divide-edge max-h-72 overflow-y-auto">
                         {areas.map((area) => {
@@ -341,7 +341,7 @@ export default function VoucherManagement() {
                                         disabled={areaBusyId === area.id}
                                         className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50 ${
                                             gated ? 'bg-primary-600 text-white hover:bg-primary-700'
-                                                  : 'bg-gray-100 dark:bg-gray-700/60 text-content-muted hover:bg-gray-200'
+                                                  : 'bg-surface-sunken text-content-muted hover:bg-surface-sunken'
                                         }`}
                                     >
                                         {gated ? '🔒 Berbayar' : 'Gratis'}
@@ -362,7 +362,7 @@ export default function VoucherManagement() {
                     </button>
                 </div>
                 {profiles.length === 0 ? (
-                    <div className="p-6 text-center text-sm text-gray-500">Belum ada profil. Tambah profil pertama (mis. “RW Dander — 1 hari”).</div>
+                    <div className="p-6 text-center text-sm text-content-muted">Belum ada profil. Tambah profil pertama (mis. “RW Dander — 1 hari”).</div>
                 ) : (
                     <div className="overflow-x-auto">
                         <table className="w-full">
@@ -378,14 +378,14 @@ export default function VoucherManagement() {
                                     <tr key={p.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
                                         <td className="px-4 py-3">
                                             <p className="text-sm font-medium text-content">{p.name}</p>
-                                            {p.description && <p className="text-xs text-gray-500">{p.description}</p>}
+                                            {p.description && <p className="text-xs text-content-muted">{p.description}</p>}
                                         </td>
                                         <td className="px-4 py-3 text-sm text-content-muted">{formatDuration(p.duration_minutes)}</td>
                                         <td className="px-4 py-3 text-sm text-content">
                                             {p.price > 0 ? `Rp ${Number(p.price).toLocaleString('id-ID')}` : 'Gratis'}
                                         </td>
                                         <td className="px-4 py-3 text-sm text-content-muted">{p.max_uses_per_code}</td>
-                                        <td className="px-4 py-3 text-xs text-gray-500">
+                                        <td className="px-4 py-3 text-xs text-content-muted">
                                             {(p.area_ids || []).map((id) => areas.find((a) => a.id === id)?.name || `#${id}`).join(', ') || '—'}
                                         </td>
                                         <td className="px-4 py-3">
@@ -395,7 +395,7 @@ export default function VoucherManagement() {
                                                 </span>
                                                 {p.online_purchasable
                                                     ? <span className="px-2 py-0.5 rounded text-xs font-medium bg-sky-500/15 text-sky-500">Online</span>
-                                                    : <span className="px-2 py-0.5 rounded text-xs font-medium bg-gray-200 dark:bg-gray-700/50 text-gray-500">Khusus admin</span>}
+                                                    : <span className="px-2 py-0.5 rounded text-xs font-medium bg-gray-200 dark:bg-gray-700/50 text-content-muted">Khusus admin</span>}
                                             </div>
                                         </td>
                                         <td className="px-4 py-3">
@@ -429,7 +429,7 @@ export default function VoucherManagement() {
                     </div>
                 </div>
                 {filteredCodes.length === 0 ? (
-                    <div className="p-6 text-center text-sm text-gray-500">Belum ada kode. Generate dari profil di atas.</div>
+                    <div className="p-6 text-center text-sm text-content-muted">Belum ada kode. Generate dari profil di atas.</div>
                 ) : (
                     <div className="overflow-x-auto max-h-96 overflow-y-auto">
                         <table className="w-full">
@@ -444,11 +444,11 @@ export default function VoucherManagement() {
                                 {filteredCodes.map((c) => (
                                     <tr key={c.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
                                         <td className="px-4 py-3 font-mono text-sm text-content">{c.code}</td>
-                                        <td className="px-4 py-3 text-xs text-gray-500">{profilesById[c.profile_id]?.name || `#${c.profile_id}`}</td>
+                                        <td className="px-4 py-3 text-xs text-content-muted">{profilesById[c.profile_id]?.name || `#${c.profile_id}`}</td>
                                         <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded text-xs font-medium ${codeStatusBadge(c.status)}`}>{c.status}</span></td>
-                                        <td className="px-4 py-3 text-xs text-gray-500">{c.redeemed_count ?? 0}</td>
-                                        <td className="px-4 py-3 text-xs text-gray-500">{c.expires_at ? new Date(c.expires_at).toLocaleString('id-ID') : '—'}</td>
-                                        <td className="px-4 py-3 text-xs text-gray-500">{c.buyer_name || c.buyer_phone || '—'}</td>
+                                        <td className="px-4 py-3 text-xs text-content-muted">{c.redeemed_count ?? 0}</td>
+                                        <td className="px-4 py-3 text-xs text-content-muted">{c.expires_at ? new Date(c.expires_at).toLocaleString('id-ID') : '—'}</td>
+                                        <td className="px-4 py-3 text-xs text-content-muted">{c.buyer_name || c.buyer_phone || '—'}</td>
                                         <td className="px-4 py-3">
                                             {c.status !== 'revoked' && c.status !== 'expired' && (
                                                 <button onClick={() => revokeCode(c)} className="text-red-500 hover:text-red-400 text-sm">Cabut</button>

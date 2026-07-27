@@ -158,7 +158,7 @@ export default function CustomersTab({ customers, plans, run, busy }) {
                                         <td className="px-3 py-2">
                                             {planSelect(customer)}
                                             {customer.plan_is_trial === 1 && customer.trial_ends_at && (
-                                                <p className="mt-0.5 text-[10px] text-gray-400">trial s/d {String(customer.trial_ends_at).slice(0, 10)}</p>
+                                                <p className="mt-0.5 text-[10px] text-content-subtle">trial s/d {String(customer.trial_ends_at).slice(0, 10)}</p>
                                             )}
                                         </td>
                                         <td className="px-3 py-2 text-right font-semibold text-content">{formatRupiah(customer.balance)}</td>

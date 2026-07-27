@@ -371,7 +371,7 @@ function SponsorManagement() {
                  *  - "Pendapatan/Bulan" used `text-primary-400`, which is not a darker brand shade
                  *    but the brand at 40% ALPHA — so the figure rendered washed out, and on this
                  *    deployment (red brand) "Rp 0" read as an error.
-                 *  - "Akan Berakhir" had `text-gray-600` with no dark twin, leaving the label
+                 *  - "Akan Berakhir" had `text-content-muted` with no dark twin, leaving the label
                  *    almost invisible in dark mode.
                  *  - each tile re-declared its own shell instead of using StatTile.
                  */
@@ -396,11 +396,11 @@ function SponsorManagement() {
 
             {/* Sponsor list */}
             <div className="bg-white dark:bg-gray-800/90 rounded-xl border border-edge overflow-hidden">
-                <div className="p-4 border-b border-edge dark:border-gray-700/50">
+                <div className="p-4 border-b border-edge">
                     <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Daftar Sponsor</h2>
                 </div>
                 {sponsors.length === 0 ? (
-                    <div className="p-8 text-center text-content-muted dark:text-gray-400">
+                    <div className="p-8 text-center text-content-muted">
                         <p>Belum ada sponsor</p>
                         <button onClick={openCreate} disabled={packages.length === 0}
                             className="mt-4 text-primary-400 hover:text-primary-300 disabled:opacity-50">
@@ -429,7 +429,7 @@ function SponsorManagement() {
                                     const cap = limit === null || limit === undefined ? '∞' : limit;
                                     const over = typeof limit === 'number' && used > limit;
                                     return (
-                                        <tr key={sponsor.id} className="hover:bg-gray-50 dark:bg-gray-700/30 transition-colors">
+                                        <tr key={sponsor.id} className="hover:bg-surface-sunken transition-colors">
                                             <td className="px-4 py-3">
                                                 <div className="flex items-center gap-3">
                                                     {sponsor.logo ? (
@@ -656,7 +656,7 @@ function SponsorManagement() {
                                 </div>
                                 <div>
                                     <label className="mb-1.5 block text-xs font-semibold text-content-muted">
-                                        Limit Kamera <span className="text-xs text-gray-500">(kosong = tanpa batas)</span>
+                                        Limit Kamera <span className="text-xs text-content-muted">(kosong = tanpa batas)</span>
                                     </label>
                                     <input type="number" min="0" value={form.camera_limit}
                                         onChange={(e) => setForm({ ...form, camera_limit: e.target.value })}
@@ -704,17 +704,17 @@ function SponsorManagement() {
                                         <input type="checkbox" checked={form.active}
                                             onChange={(e) => setForm({ ...form, active: e.target.checked })}
                                             className="w-4 h-4 text-primary-600 bg-surface border-edge-strong rounded focus:ring-primary-500" />
-                                        <span className="text-sm text-content-muted dark:text-gray-300">Sponsor Aktif</span>
+                                        <span className="text-sm text-content-muted">Sponsor Aktif</span>
                                     </label>
                                 </div>
                             </div>
 
                             {/* Camera picker */}
-                            <div className="bg-gray-50 dark:bg-gray-900/40 rounded-lg p-4 space-y-3">
+                            <div className="bg-surface-sunken rounded-lg p-4 space-y-3">
                                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
                                     <div>
-                                        <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Tugaskan ke Kamera</p>
-                                        <p className="text-xs text-gray-500">
+                                        <p className="text-sm font-medium text-content">Tugaskan ke Kamera</p>
+                                        <p className="text-xs text-content-muted">
                                             Pilih kamera yang akan menampilkan logo sponsor ini.{' '}
                                             <span className={overCameraLimit ? 'text-red-400' : 'text-gray-500'}>
                                                 {selectedCameraIds.size}{cameraLimitValue === null ? '' : ` / ${cameraLimitValue}`} dipilih
@@ -736,7 +736,7 @@ function SponsorManagement() {
                                 )}
                                 <div className="max-h-64 overflow-y-auto border border-gray-200 dark:border-gray-700/40 rounded-lg divide-y divide-gray-200 dark:divide-gray-700/40">
                                     {camerasForModal.length === 0 ? (
-                                        <p className="text-xs text-gray-500 p-3">Tidak ada kamera cocok.</p>
+                                        <p className="text-xs text-content-muted p-3">Tidak ada kamera cocok.</p>
                                     ) : (
                                         camerasForModal.map((camera) => {
                                             const isSelected = selectedCameraIds.has(camera.id);
@@ -755,7 +755,7 @@ function SponsorManagement() {
                                                     />
                                                     <div className="flex-1 min-w-0">
                                                         <p className="text-sm text-content truncate">{camera.name || `Kamera #${camera.id}`}</p>
-                                                        <p className="text-xs text-gray-500 truncate">
+                                                        <p className="text-xs text-content-muted truncate">
                                                             {camera.location || camera.area_name || `#${camera.id}`}
                                                             {heldByOtherSponsor && (
                                                                 <span className="ml-2 text-amber-400">

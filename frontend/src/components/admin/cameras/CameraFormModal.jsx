@@ -50,7 +50,7 @@ export default function CameraFormModal({
                         <h3 className="text-lg font-bold text-gray-900 dark:text-white">
                             {editingCamera ? 'Edit Camera' : 'Add Camera'}
                         </h3>
-                        <p className="text-sm text-content-muted dark:text-gray-300">Configure stream source</p>
+                        <p className="text-sm text-content-muted">Configure stream source</p>
                     </div>
                     <button
                         onClick={onClose}
