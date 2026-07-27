@@ -26,7 +26,7 @@ export default function CameraFormModal({
     // Called before the early-return below to obey the Rules of Hooks; `active`
     // tracks `show` so the trap only engages while the modal is open. No
     // ESC-to-close (modal isn't backdrop-dismissible).
-    useFocusTrap(dialogRef, { active: show });
+    useFocusTrap(dialogRef, { active: show, onEscape: onClose });
 
     if (!show) {
         return null;
@@ -37,7 +37,7 @@ export default function CameraFormModal({
     const submitDisabled = isSubmitting || loadingDetail;
 
     return (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-modal p-4 overflow-y-auto">
             <div
                 ref={dialogRef}
                 role="dialog"

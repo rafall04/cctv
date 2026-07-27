@@ -1,24 +1,34 @@
+import { useRef } from 'react';
 import { EmptyState } from '../../ui/EmptyState';
+import { useFocusTrap } from '../../../hooks/useFocusTrap';
 import { DeviceIcon, Pagination, formatDuration, formatWatchTime } from './AnalyticsPrimitives';
 
 function SummaryPill({ label, value }) {
     return (
-        <div className="rounded-xl border border-edge bg-gray-50 px-3 py-2 dark:bg-gray-950/60">
-            <div className="text-[11px] font-semibold uppercase tracking-wide text-content-muted">{label}</div>
+        <div className="rounded-control border border-edge bg-surface-sunken px-3 py-2">
+            <div className="text-xs font-semibold uppercase tracking-wide text-content-muted">{label}</div>
             <div className="mt-1 text-sm font-semibold text-content">{value}</div>
         </div>
     );
 }
 
 export function AnalyticsHistoryDrawer({ open, session, title, fields, onClose }) {
+    const panelRef = useRef(null);
+    // Hooks before any conditional return (React #310); the trap idles while closed.
+    useFocusTrap(panelRef, { active: open && Boolean(session), onEscape: onClose });
+
     if (!open || !session) {
         return null;
     }
 
     return (
-        <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-sm" onClick={onClose}>
+        <div className="fixed inset-0 z-modal flex justify-end bg-black/60" onClick={onClose}>
             <div
-                className="h-full w-full max-w-lg overflow-y-auto bg-surface p-6 shadow-2xl"
+                ref={panelRef}
+                role="dialog"
+                aria-modal="true"
+                aria-label={title}
+                className="h-full w-full max-w-lg overflow-y-auto border-l border-edge bg-surface-overlay p-6 shadow-e2"
                 onClick={(event) => event.stopPropagation()}
             >
                 <div className="mb-6 flex items-start justify-between gap-4">

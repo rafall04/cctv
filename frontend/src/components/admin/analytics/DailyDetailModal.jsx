@@ -11,6 +11,7 @@ import { EmptyState } from '../../ui/EmptyState';
 import { DeviceIcon, formatDuration, formatWatchTime } from './AnalyticsPrimitives';
 import { formatDate } from '../../../utils/admin/viewerAnalyticsAdapter';
 import { TIMESTAMP_STORAGE, useTimezone } from '../../../contexts/TimezoneContext';
+import { Modal } from '../../ui/Modal';
 
 function getSessionLocalDate(startedAt) {
     if (typeof startedAt === 'string' && /^\d{4}-\d{2}-\d{2}[ T]/.test(startedAt)) {
@@ -46,24 +47,13 @@ export default function DailyDetailModal({ date, sessions, onClose }) {
     }
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={onClose}>
-            <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-4xl max-h-[80vh] overflow-hidden" onClick={(event) => event.stopPropagation()}>
-                <div className="p-6 border-b border-edge">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <h2 className="text-xl font-bold text-content">Detail Tanggal: {formatDate(date, { year: true })}</h2>
-                            <p className="text-sm text-content-muted mt-1">
-                                {stats.totalSessions} sesi • {stats.uniqueVisitors} pengunjung unik • {formatWatchTime(stats.totalWatchTime)} total
-                            </p>
-                        </div>
-                        <button onClick={onClose} className="p-2 hover:bg-surface-sunken rounded-lg transition-colors">
-                            <svg className="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </button>
-                    </div>
-                </div>
-                <div className="p-6 overflow-y-auto max-h-[60vh]">
+        <Modal
+            title={`Detail Tanggal: ${formatDate(date, { year: true })}`}
+            description={`${stats.totalSessions} sesi • ${stats.uniqueVisitors} pengunjung unik • ${formatWatchTime(stats.totalWatchTime)} total`}
+            size="xl"
+            onClose={onClose}
+        >
+                <div>
                     {filteredSessions.length > 0 ? (
                         <table className="w-full">
                             <thead>
@@ -107,7 +97,6 @@ export default function DailyDetailModal({ date, sessions, onClose }) {
                         <EmptyState illustration="NoActivity" title="Tidak ada sesi" description="Tidak ada sesi pada tanggal ini" />
                     )}
                 </div>
-            </div>
-        </div>
+        </Modal>
     );
 }
