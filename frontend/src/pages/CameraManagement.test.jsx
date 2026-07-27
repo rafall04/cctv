@@ -89,7 +89,7 @@ describe('CameraManagement', () => {
     it('mewajibkan RTSP untuk kamera internal', async () => {
         render(<CameraManagement />);
 
-        fireEvent.click(await screen.findByText('Add Camera'));
+        fireEvent.click(await screen.findByRole('button', { name: 'Tambah Kamera' }));
         fireEvent.change(screen.getByLabelText(/Name/i), { target: { value: 'Lobby Cam' } });
         fireEvent.submit(screen.getByRole('button', { name: 'Create' }).closest('form'));
 
@@ -103,7 +103,7 @@ describe('CameraManagement', () => {
     it('mengirim payload external tanpa RTSP saat stream source eksternal dipilih', async () => {
         render(<CameraManagement />);
 
-        fireEvent.click(await screen.findByText('Add Camera'));
+        fireEvent.click(await screen.findByRole('button', { name: 'Tambah Kamera' }));
         fireEvent.change(screen.getByLabelText(/Name/i), { target: { value: 'Dishub Cam' } });
         fireEvent.click(screen.getByRole('button', { name: /External HLS/i }));
         fireEvent.change(screen.getByLabelText(/External Stream URL/i), {
@@ -162,7 +162,7 @@ describe('CameraManagement', () => {
     it('tidak lagi menampilkan health diagnostics di halaman camera management', async () => {
         render(<CameraManagement />);
 
-        await screen.findByText('Add Camera');
+        await screen.findByRole('button', { name: 'Tambah Kamera' });
         expect(screen.queryByText('Camera health diagnostics')).toBeNull();
     });
 

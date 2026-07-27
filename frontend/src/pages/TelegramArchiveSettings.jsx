@@ -195,7 +195,7 @@ export function TelegramArchiveSettings() {
 
     if (loading) {
         return (
-            <div className="mx-auto max-w-4xl space-y-5">
+            <div className="space-y-5">
                 <h1 className="text-xl font-semibold text-content">Arsip Rekaman ke Telegram</h1>
                 <TableSkeleton rows={5} />
             </div>
@@ -204,7 +204,7 @@ export function TelegramArchiveSettings() {
 
     if (overview && overview.available === false) {
         return (
-            <div className="mx-auto max-w-4xl space-y-5">
+            <div className="space-y-5">
                 <h1 className="text-xl font-semibold text-content">Arsip Rekaman ke Telegram</h1>
                 <div className={`${card} p-6`}>
                     <p className="text-sm leading-relaxed text-content-muted">
@@ -217,7 +217,7 @@ export function TelegramArchiveSettings() {
     }
 
     return (
-        <div className="mx-auto max-w-4xl space-y-5">
+        <div className="space-y-5">
             <header>
                 <h1 className="text-xl font-semibold text-content sm:text-2xl">
                     Arsip Rekaman ke Telegram

@@ -16,7 +16,7 @@ import AdsSettingsPanel from '../components/admin/settings/AdsSettingsPanel';
 
 export default function AdsManagement() {
     return (
-        <div className="p-6 space-y-6">
+        <div className="space-y-5">
             <div>
                 <h1 className="text-2xl font-bold text-content">Manajemen Iklan</h1>
                 <p className="text-content-muted text-sm mt-1">

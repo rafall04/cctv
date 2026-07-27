@@ -117,6 +117,39 @@ describe('guardrail: mobile viewport regressions', () => {
     });
 });
 
+describe('guardrail: one owner for the page gutter', () => {
+    /*
+     * AdminLayout wraps every route in `px-4 lg:px-8` + `mx-auto max-w-7xl`. A page that pads its
+     * own root is inset TWICE, and the result is visible on a phone: Kamera rendered flush at 16px
+     * while Sponsor/Iklan/Voucher sat at 40px, so the content column changed width page to page.
+     * TelegramArchive did the opposite and capped itself narrower than every other route.
+     *
+     * Vertical rhythm (space-y-*) is the page's business. Horizontal gutters and max width are the
+     * shell's, and only the shell's.
+     */
+    const ADMIN_PAGE_RE = /^pages\//;
+    const ROOT_RETURN_RE = /\n {4}return \(\s*\n\s*<div className="([^"]*)"/;
+    const BAD_ROOT = /(^|\s)(p|px)-\d|(^|\s)max-w-/;
+    // Auth screens render OUTSIDE AdminLayout, so they legitimately own their full-screen frame.
+    const STANDALONE = /(LoginPage|RegisterPage)\.jsx$/;
+    // A root that IS a card carries card padding, not a page gutter.
+    const isCard = (cls) => /\brounded-/.test(cls) && /\bborder\b/.test(cls);
+
+    it('no admin page pads or width-caps its own root — the shell owns that', () => {
+        const offenders = [];
+        for (const f of walk(SRC_ROOT)) {
+            const r = rel(f);
+            if (!ADMIN_PAGE_RE.test(r) || r.includes('Landing') || r.includes('AreaPublic')) continue;
+            if (STANDALONE.test(r)) continue;
+            const m = fs.readFileSync(f, 'utf8').match(ROOT_RETURN_RE);
+            if (m && BAD_ROOT.test(m[1]) && !isCard(m[1])) {
+                offenders.push(`${r}: root <div class="${m[1]}"> — drop the gutter/max-width, AdminLayout supplies it`);
+            }
+        }
+        expect(offenders, `\nDouble page gutter:\n  ${offenders.join('\n  ')}\n`).toEqual([]);
+    });
+});
+
 describe('guardrail: legacy grey ratchet (design tokens)', () => {
     // The 2026-07 token layer (surface/edge/content/status — see docs/frontend-guide.md)
     // replaces raw greys. Existing usages are frozen at the measured baseline: the count

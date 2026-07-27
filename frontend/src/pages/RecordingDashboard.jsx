@@ -20,7 +20,7 @@ import RecordingRestartLogs from '../components/admin/recordings/RecordingRestar
 
 function RecordingLoadingState() {
     return (
-        <div className="space-y-4 p-4 md:space-y-6 md:p-6">
+        <div className="space-y-5">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-4 md:gap-6">
                 <StatCardSkeleton />
                 <StatCardSkeleton />

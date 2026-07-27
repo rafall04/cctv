@@ -14,7 +14,7 @@ import sponsorPackageService from '../services/sponsorPackageService';
 import { cameraService } from '../services/cameraService';
 import { TableSkeleton, StatCardSkeleton } from '../components/ui/Skeleton';
 import SponsorPackagePanel from '../components/admin/sponsors/SponsorPackagePanel.jsx';
-import { Button, Modal, inputClasses } from '../components/ui';
+import { Button, Modal, StatTile, inputClasses } from '../components/ui';
 
 // Pre-bound Tailwind color classes — using template literals against the
 // `color` field would silently get purged by the JIT compiler. The list
@@ -333,7 +333,7 @@ function SponsorManagement() {
 
     if (loading) {
         return (
-            <div className="p-6 space-y-6">
+            <div className="space-y-5">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <StatCardSkeleton /><StatCardSkeleton /><StatCardSkeleton />
                 </div>
@@ -343,7 +343,7 @@ function SponsorManagement() {
     }
 
     return (
-        <div className="p-6 space-y-6">
+        <div className="space-y-5">
             {/* Header */}
             <div className="flex justify-between items-center">
                 <div>
@@ -366,25 +366,28 @@ function SponsorManagement() {
 
             {/* Stats */}
             {stats && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div className="bg-white dark:bg-gray-800/90 rounded-xl p-4 border border-gray-200 dark:border-gray-700/50">
-                        <p className="text-gray-600 dark:text-gray-400 text-sm">Total Sponsor</p>
-                        <p className="text-2xl font-bold text-content mt-1">{stats.total_sponsors}</p>
-                    </div>
-                    <div className="bg-white dark:bg-gray-800/90 rounded-xl p-4 border border-gray-200 dark:border-gray-700/50">
-                        <p className="text-gray-600 dark:text-gray-400 text-sm">Sponsor Aktif</p>
-                        <p className="text-2xl font-bold text-green-400 mt-1">{stats.active_sponsors}</p>
-                    </div>
-                    <div className="bg-white dark:bg-gray-800/90 rounded-xl p-4 border border-gray-200 dark:border-gray-700/50">
-                        <p className="text-gray-600 dark:text-gray-400 text-sm">Pendapatan/Bulan</p>
-                        <p className="text-2xl font-bold text-primary-400 mt-1">
-                            Rp {(stats.monthly_revenue || 0).toLocaleString('id-ID')}
-                        </p>
-                    </div>
-                    <div className="bg-white dark:bg-gray-800/90 rounded-xl p-4 border border-edge dark:border-gray-700/50">
-                        <p className="text-gray-600 text-sm">Akan Berakhir</p>
-                        <p className="text-2xl font-bold text-yellow-400 mt-1">{stats.expiring_soon?.length || 0}</p>
-                    </div>
+                /*
+                 * Three separate bugs lived in this row and all three were visible on a phone:
+                 *  - "Pendapatan/Bulan" used `text-primary-400`, which is not a darker brand shade
+                 *    but the brand at 40% ALPHA — so the figure rendered washed out, and on this
+                 *    deployment (red brand) "Rp 0" read as an error.
+                 *  - "Akan Berakhir" had `text-gray-600` with no dark twin, leaving the label
+                 *    almost invisible in dark mode.
+                 *  - each tile re-declared its own shell instead of using StatTile.
+                 */
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <StatTile label="Total Sponsor" value={stats.total_sponsors ?? 0} />
+                    <StatTile label="Sponsor Aktif" value={stats.active_sponsors ?? 0} tone="live" />
+                    <StatTile
+                        label="Pendapatan/Bulan"
+                        value={`Rp ${(stats.monthly_revenue || 0).toLocaleString('id-ID')}`}
+                        tone="data"
+                    />
+                    <StatTile
+                        label="Akan Berakhir"
+                        value={stats.expiring_soon?.length || 0}
+                        tone={(stats.expiring_soon?.length || 0) > 0 ? 'warn' : 'default'}
+                    />
                 </div>
             )}
 

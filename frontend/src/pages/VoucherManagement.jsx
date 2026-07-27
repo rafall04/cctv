@@ -284,11 +284,11 @@ export default function VoucherManagement() {
     }, [codes, codeProfileFilter, codeStatusFilter]);
 
     if (loading) {
-        return <div className="p-6 space-y-6"><TableSkeleton rows={6} columns={5} /></div>;
+        return <div className="space-y-5"><TableSkeleton rows={6} columns={5} /></div>;
     }
 
     return (
-        <div className="p-6 space-y-6">
+        <div className="space-y-5">
             {/* Header + global flag */}
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div>
