@@ -14,7 +14,23 @@ import { useConfirm } from '../contexts/ConfirmContext';
 import { TableSkeleton } from '../components/ui/Skeleton';
 import { NoUsersEmptyState } from '../components/ui/EmptyState';
 import { Alert } from '../components/ui/Alert';
+import {
+    Badge, Button, Card, Field, IconButton, Modal, PageHeader,
+    Table, TBody, TD, TH, THead, TR,
+} from '../components/ui';
 import { TIMESTAMP_STORAGE, useTimezone } from '../contexts/TimezoneContext';
+
+const icon = (d) => function RowIcon() {
+    return (
+        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" d={d} />
+        </svg>
+    );
+};
+const PlusIcon = icon('M12 4v16m8-8H4');
+const EditIcon = icon('M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z');
+const KeyIcon = icon('M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z');
+const TrashIcon = icon('M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16');
 
 /**
  * Password validation requirements
@@ -401,333 +417,241 @@ export default function UserManagement() {
         });
     };
 
-    return (
-        <div className="space-y-8">
-            {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-                <div>
-                    <p className="text-sm font-semibold text-primary mb-1">Access Control</p>
-                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">User Management</h1>
-                    <p className="text-gray-500 dark:text-gray-400 mt-1">Manage administrator accounts</p>
-                </div>
-                <button
-                    onClick={openAddModal}
-                    className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary to-primary-600 hover:from-primary-600 hover:to-blue-700 text-white font-semibold rounded-xl shadow-lg shadow-primary/25 transition-all"
-                >
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                    </svg>
-                    Add User
-                </button>
-            </div>
+    const roleTone = (role) => (role === 'admin' ? 'brand' : role === 'customer' ? 'data' : 'neutral');
 
-            {/* Content */}
+    return (
+        <div className="space-y-5">
+            <PageHeader
+                title="Pengguna"
+                description="Kelola akun administrator, viewer, dan pelanggan."
+                actions={(
+                    <Button variant="primary" onClick={openAddModal} icon={<PlusIcon />}>
+                        Tambah Pengguna
+                    </Button>
+                )}
+            />
+
             {loading ? (
                 <TableSkeleton rows={5} columns={4} />
             ) : loadError ? (
-                <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl p-8">
-                    <Alert 
-                        type="error" 
-                        title="Failed to Load Users" 
-                        message={loadError}
-                        className="mb-4"
-                    />
-                    <button
-                        onClick={loadUsers}
-                        className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-600 text-white font-medium rounded-lg transition-colors"
-                    >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                        </svg>
-                        Retry
-                    </button>
-                </div>
+                <Card padding="lg">
+                    <Alert type="error" title="Gagal memuat pengguna" message={loadError} className="mb-4" />
+                    <Button onClick={loadUsers}>Coba lagi</Button>
+                </Card>
             ) : users.length === 0 ? (
-                <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl">
+                <Card padding="none">
                     <NoUsersEmptyState onAddUser={openAddModal} />
-                </div>
+                </Card>
             ) : (
-                <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl overflow-hidden">
-                    <div className="overflow-x-auto">
-                        <table className="w-full">
-                            <thead>
-                                <tr className="border-b border-gray-200 dark:border-gray-700/50 bg-gray-50 dark:bg-gray-800/50">
-                                    <th className="px-6 py-4 text-left text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">User</th>
-                                    <th className="px-6 py-4 text-left text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Role</th>
-                                    <th className="px-6 py-4 text-left text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Created</th>
-                                    <th className="px-6 py-4 text-right text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-200 dark:divide-gray-700/50">
-                                {users.map((user) => (
-                                    <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
-                                        <td className="px-6 py-4">
+                <div className="overflow-x-auto rounded-card border border-edge bg-surface">
+                    <Table>
+                        <THead>
+                            <TR>
+                                <TH>Pengguna</TH>
+                                <TH>Peran</TH>
+                                <TH>Dibuat</TH>
+                                <TH align="right">Aksi</TH>
+                            </TR>
+                        </THead>
+                        <TBody>
+                            {users.map((user) => {
+                                const isSelf = user.id === currentUser?.id;
+                                return (
+                                    <TR key={user.id} interactive>
+                                        <TD>
                                             <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-primary-600 flex items-center justify-center text-white font-bold text-sm shadow-lg shadow-primary/20">
+                                                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-white">
                                                     {user.username.charAt(0).toUpperCase()}
-                                                </div>
-                                                <div>
-                                                    <p className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                                                        {user.username}
-                                                        {user.id === currentUser?.id && (
-                                                            <span className="text-[10px] px-1.5 py-0.5 bg-sky-100 dark:bg-primary/20 text-primary-600 dark:text-primary-400 rounded font-bold">YOU</span>
-                                                        )}
+                                                </span>
+                                                <div className="min-w-0">
+                                                    <p className="flex items-center gap-2 font-semibold text-content">
+                                                        <span className="truncate">{user.username}</span>
+                                                        {isSelf && <Badge tone="brand">Anda</Badge>}
                                                     </p>
-                                                    <p className="text-xs text-gray-500 dark:text-gray-400">ID: {user.id}</p>
+                                                    <p className="font-mono text-xs tabular-nums text-content-subtle">ID {user.id}</p>
                                                 </div>
                                             </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${
-                                                user.role === 'admin'
-                                                    ? 'bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400'
-                                                    : user.role === 'customer'
-                                                        ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
-                                                        : 'bg-blue-100 dark:bg-primary/20 text-primary-600 dark:text-blue-400'
-                                            }`}>
-                                                {user.role}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">
+                                        </TD>
+                                        <TD>
+                                            <Badge tone={roleTone(user.role)}>{user.role}</Badge>
+                                        </TD>
+                                        <TD mono className="text-xs text-content-muted">
                                             {formatDate(user.created_at)}
-                                        </td>
-                                        <td className="px-6 py-4">
+                                        </TD>
+                                        <TD align="right">
                                             <div className="flex items-center justify-end gap-1">
-                                                <button onClick={() => openEditModal(user)} className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700/50 text-gray-600 dark:text-gray-300 hover:text-primary hover:bg-sky-50 dark:hover:bg-primary/10 transition-all" title="Edit">
-                                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                                    </svg>
-                                                </button>
-                                                <button onClick={() => openPasswordModal(user)} className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700/50 text-gray-600 dark:text-gray-300 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-500/10 transition-all" title="Change Password">
-                                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                                                    </svg>
-                                                </button>
-                                                <button 
-                                                    onClick={() => handleDeleteAttempt(user)} 
-                                                    className={`p-2 rounded-lg transition-all ${
-                                                        user.id === currentUser?.id 
-                                                            ? 'bg-gray-100 dark:bg-gray-700/50 text-content-subtle cursor-not-allowed'
-                                                            : 'bg-gray-100 dark:bg-gray-700/50 text-content-muted hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10'
-                                                    }`} 
-                                                    title={user.id === currentUser?.id ? "Cannot delete your own account" : "Delete"}
+                                                <IconButton label={'Ubah ' + user.username} size="sm" onClick={() => openEditModal(user)}>
+                                                    <EditIcon />
+                                                </IconButton>
+                                                <IconButton label={'Ganti kata sandi ' + user.username} size="sm" onClick={() => openPasswordModal(user)}>
+                                                    <KeyIcon />
+                                                </IconButton>
+                                                <IconButton
+                                                    label={isSelf ? 'Tidak bisa menghapus akun sendiri' : 'Hapus ' + user.username}
+                                                    size="sm"
+                                                    variant={isSelf ? 'ghost' : 'dangerGhost'}
+                                                    disabled={isSelf}
+                                                    onClick={() => handleDeleteAttempt(user)}
                                                 >
-                                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                    </svg>
-                                                </button>
+                                                    <TrashIcon />
+                                                </IconButton>
                                             </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                                        </TD>
+                                    </TR>
+                                );
+                            })}
+                        </TBody>
+                    </Table>
                 </div>
             )}
 
-            {/* Self-Deletion Warning Modal - Requirements: 6.5 */}
             {showSelfDeleteWarning && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-white dark:bg-gray-800 w-full max-w-md rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700/50">
-                        <div className="p-6">
-                            <div className="flex items-center gap-4 mb-4">
-                                <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-500/20 flex items-center justify-center">
-                                    <svg className="w-6 h-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                    </svg>
-                                </div>
-                                <div>
-                                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">Cannot Delete Own Account</h3>
-                                    <p className="text-sm text-gray-500 dark:text-gray-400">This action is not allowed</p>
-                                </div>
-                            </div>
-                            <p className="text-gray-600 dark:text-gray-300 mb-6">
-                                You cannot delete your own account while logged in. If you need to remove this account, please ask another administrator to do so.
-                            </p>
-                            <button
-                                onClick={() => setShowSelfDeleteWarning(false)}
-                                className="w-full px-4 py-2.5 bg-gray-100 dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 font-medium rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-                            >
-                                I Understand
-                            </button>
-                        </div>
-                    </div>
-                </div>
+                <Modal
+                    title="Tidak bisa menghapus akun sendiri"
+                    description="Tindakan ini tidak diizinkan"
+                    size="sm"
+                    onClose={() => setShowSelfDeleteWarning(false)}
+                    footer={<Button variant="primary" onClick={() => setShowSelfDeleteWarning(false)}>Saya mengerti</Button>}
+                >
+                    <p className="text-sm text-content-muted">
+                        Anda tidak bisa menghapus akun yang sedang dipakai untuk login. Minta administrator lain
+                        melakukannya jika akun ini memang harus dihapus.
+                    </p>
+                </Modal>
             )}
 
-            {/* Add/Edit Modal */}
             {showModal && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-white dark:bg-gray-800 w-full max-w-md rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700/50">
-                        <div className="p-6 border-b border-gray-200 dark:border-gray-700/50 flex justify-between items-center">
-                            <div>
-                                <h3 className="text-lg font-bold text-gray-900 dark:text-white">{editingUser ? 'Edit User' : 'Add User'}</h3>
-                                <p className="text-sm text-gray-500 dark:text-gray-400">{editingUser ? 'Update user info' : 'Create new admin'}</p>
-                            </div>
-                            <button onClick={() => setShowModal(false)} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700/50 text-gray-500 dark:text-gray-400 transition-colors">
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            </button>
-                        </div>
+                <Modal
+                    title={editingUser ? 'Ubah Pengguna' : 'Tambah Pengguna'}
+                    description={editingUser ? 'Perbarui data pengguna' : 'Buat akun baru'}
+                    size="md"
+                    onClose={() => setShowModal(false)}
+                    footer={(
+                        <>
+                            <Button onClick={() => setShowModal(false)} disabled={submitting}>Batal</Button>
+                            <Button type="submit" form="user-form" variant="primary" loading={submitting}>
+                                {editingUser ? 'Simpan' : 'Buat'}
+                            </Button>
+                        </>
+                    )}
+                >
+                    <form id="user-form" onSubmit={handleSubmit} className="space-y-4">
+                        {error && <Alert type="error" message={error} dismissible onDismiss={() => setError('')} />}
 
-                        <form onSubmit={handleSubmit} className="p-6 space-y-5">
-                            {error && (
-                                <Alert type="error" message={error} dismissible onDismiss={() => setError('')} />
-                            )}
+                        <Field
+                            label="Nama pengguna"
+                            name="username"
+                            value={formData.username}
+                            onChange={handleChange}
+                            error={fieldErrors.username}
+                            hint="Huruf, angka, dan garis bawah saja"
+                            placeholder="Masukkan nama pengguna"
+                            required
+                            minLength={3}
+                        />
 
+                        {!editingUser && (
                             <div>
-                                <label htmlFor="user-username" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Username</label>
-                                <input 
-                                    id="user-username"
-                                    type="text" 
-                                    name="username" 
-                                    value={formData.username} 
-                                    onChange={handleChange} 
-                                    className={`w-full px-4 py-2.5 bg-surface-sunken border rounded-xl text-content placeholder-content-subtle focus:outline-none focus:ring-2 focus:ring-primary ${
-                                        fieldErrors.username 
-                                            ? 'border-red-500 dark:border-red-500' 
-                                            : 'border-gray-200 dark:border-gray-700/50'
-                                    }`} 
-                                    placeholder="Enter username" 
-                                    required 
-                                    minLength={3} 
+                                <Field
+                                    label="Kata sandi"
+                                    name="password"
+                                    type="password"
+                                    value={formData.password}
+                                    onChange={handleChange}
+                                    error={fieldErrors.password}
+                                    placeholder="Masukkan kata sandi"
+                                    required
                                 />
-                                {fieldErrors.username && (
-                                    <p className="mt-1 text-sm text-red-500">{fieldErrors.username}</p>
-                                )}
-                                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Letters, numbers, and underscores only</p>
+                                <PasswordRequirementsDisplay password={formData.password} username={formData.username} />
                             </div>
+                        )}
 
-                            {!editingUser && (
-                                <div>
-                                    <label htmlFor="user-password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Password</label>
-                                    <input 
-                                        id="user-password"
-                                        type="password" 
-                                        name="password" 
-                                        value={formData.password} 
-                                        onChange={handleChange} 
-                                        className={`w-full px-4 py-2.5 bg-surface-sunken border rounded-xl text-content placeholder-content-subtle focus:outline-none focus:ring-2 focus:ring-primary ${
-                                            fieldErrors.password 
-                                                ? 'border-red-500 dark:border-red-500' 
-                                                : 'border-gray-200 dark:border-gray-700/50'
-                                        }`} 
-                                        placeholder="Enter password" 
-                                        required 
-                                    />
-                                    {fieldErrors.password && (
-                                        <p className="mt-1 text-sm text-red-500">{fieldErrors.password}</p>
-                                    )}
-                                    <PasswordRequirementsDisplay password={formData.password} username={formData.username} />
-                                </div>
-                            )}
+                        <Field
+                            as="select"
+                            label="Peran"
+                            name="role"
+                            value={formData.role}
+                            onChange={handleChange}
+                            hint={formData.role === 'customer'
+                                ? 'Pelanggan hanya bisa mengakses portal /my (kamera miliknya + saldo), tidak bisa membuka halaman admin.'
+                                : undefined}
+                        >
+                            <option value="admin">Admin</option>
+                            <option value="viewer">Viewer</option>
+                            <option value="customer">Customer (Pelanggan Sewa)</option>
+                        </Field>
 
-                            <div>
-                                <label htmlFor="user-role" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Role</label>
-                                <select id="user-role" name="role" value={formData.role} onChange={handleChange} className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary">
-                                    <option value="admin">Admin</option>
-                                    <option value="viewer">Viewer</option>
-                                    <option value="customer">Customer (Pelanggan Sewa)</option>
-                                </select>
-                                {formData.role === 'customer' && (
-                                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                        Pelanggan hanya bisa mengakses portal /my (kamera miliknya + saldo), tidak bisa membuka halaman admin.
-                                    </p>
-                                )}
-                            </div>
-
-                            {formData.role === 'customer' && (
-                                <>
-                                    <div>
-                                        <label htmlFor="user-phone" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">No. HP (untuk tagihan)</label>
-                                        <input id="user-phone" name="phone" type="text" value={formData.phone} onChange={handleChange} placeholder="08xxxxxxxxxx" className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary" />
-                                    </div>
-                                    <div>
-                                        <label htmlFor="user-email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Email (opsional)</label>
-                                        <input id="user-email" name="email" type="email" value={formData.email} onChange={handleChange} placeholder="pelanggan@email.com" className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary" />
-                                    </div>
-                                </>
-                            )}
-
-                            <div className="flex gap-3 pt-2">
-                                <button type="button" onClick={() => setShowModal(false)} className="flex-1 px-4 py-2.5 bg-gray-100 dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 font-medium rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors" disabled={submitting}>Cancel</button>
-                                <button type="submit" className="flex-[2] px-4 py-2.5 bg-gradient-to-r from-primary to-primary-600 text-white font-medium rounded-xl shadow-lg shadow-primary/30 hover:from-primary-600 hover:to-blue-700 disabled:opacity-50 transition-all" disabled={submitting}>
-                                    {submitting ? 'Saving...' : (editingUser ? 'Update' : 'Create')}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
+                        {formData.role === 'customer' && (
+                            <>
+                                <Field
+                                    label="No. HP (untuk tagihan)"
+                                    name="phone"
+                                    type="tel"
+                                    value={formData.phone}
+                                    onChange={handleChange}
+                                    placeholder="08xxxxxxxxxx"
+                                />
+                                <Field
+                                    label="Email (opsional)"
+                                    name="email"
+                                    type="email"
+                                    value={formData.email}
+                                    onChange={handleChange}
+                                    placeholder="pelanggan@email.com"
+                                />
+                            </>
+                        )}
+                    </form>
+                </Modal>
             )}
 
-            {/* Password Modal */}
             {showPasswordModal && passwordUser && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-white dark:bg-gray-800 w-full max-w-md rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700/50">
-                        <div className="p-6 border-b border-gray-200 dark:border-gray-700/50 flex justify-between items-center">
-                            <div>
-                                <h3 className="text-lg font-bold text-gray-900 dark:text-white">Change Password</h3>
-                                <p className="text-sm text-gray-500 dark:text-gray-400">For {passwordUser.username}</p>
-                            </div>
-                            <button onClick={() => setShowPasswordModal(false)} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700/50 text-gray-500 dark:text-gray-400 transition-colors">
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            </button>
+                <Modal
+                    title="Ganti Kata Sandi"
+                    description={'Untuk ' + passwordUser.username}
+                    size="md"
+                    onClose={() => setShowPasswordModal(false)}
+                    footer={(
+                        <>
+                            <Button onClick={() => setShowPasswordModal(false)} disabled={submitting}>Batal</Button>
+                            <Button type="submit" form="password-form" variant="primary" loading={submitting}>
+                                Ganti Kata Sandi
+                            </Button>
+                        </>
+                    )}
+                >
+                    <form id="password-form" onSubmit={handlePasswordSubmit} className="space-y-4">
+                        {passwordError && (
+                            <Alert type="error" message={passwordError} dismissible onDismiss={() => setPasswordError('')} />
+                        )}
+
+                        <div>
+                            <Field
+                                label="Kata sandi baru"
+                                name="password"
+                                type="password"
+                                value={passwordData.password}
+                                onChange={handlePasswordChange}
+                                placeholder="Masukkan kata sandi baru"
+                                required
+                            />
+                            <PasswordRequirementsDisplay password={passwordData.password} username={passwordUser?.username} />
                         </div>
 
-                        <form onSubmit={handlePasswordSubmit} className="p-6 space-y-5">
-                            {passwordError && (
-                                <Alert type="error" message={passwordError} dismissible onDismiss={() => setPasswordError('')} />
-                            )}
-
-                            <div>
-                                <label htmlFor="user-new-password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">New Password</label>
-                                <input 
-                                    id="user-new-password"
-                                    type="password" 
-                                    name="password" 
-                                    value={passwordData.password} 
-                                    onChange={handlePasswordChange} 
-                                    className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary" 
-                                    placeholder="Enter new password" 
-                                    required 
-                                />
-                                <PasswordRequirementsDisplay password={passwordData.password} username={passwordUser?.username} />
-                            </div>
-
-                            <div>
-                                <label htmlFor="user-confirm-password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Confirm Password</label>
-                                <input 
-                                    id="user-confirm-password"
-                                    type="password" 
-                                    name="confirmPassword" 
-                                    value={passwordData.confirmPassword} 
-                                    onChange={handlePasswordChange} 
-                                    className={`w-full px-4 py-2.5 bg-surface-sunken border rounded-xl text-content placeholder-content-subtle focus:outline-none focus:ring-2 focus:ring-primary ${
-                                        passwordData.confirmPassword && passwordData.password !== passwordData.confirmPassword
-                                            ? 'border-red-500 dark:border-red-500'
-                                            : 'border-gray-200 dark:border-gray-700/50'
-                                    }`} 
-                                    placeholder="Confirm password" 
-                                    required 
-                                />
-                                {passwordData.confirmPassword && passwordData.password !== passwordData.confirmPassword && (
-                                    <p className="mt-1 text-sm text-red-500">Passwords do not match</p>
-                                )}
-                            </div>
-
-                            <div className="flex gap-3 pt-2">
-                                <button type="button" onClick={() => setShowPasswordModal(false)} className="flex-1 px-4 py-2.5 bg-gray-100 dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 font-medium rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors" disabled={submitting}>Cancel</button>
-                                <button type="submit" className="flex-[2] px-4 py-2.5 bg-gradient-to-r from-amber-500 to-orange-600 text-white font-medium rounded-xl shadow-lg shadow-amber-500/30 hover:from-amber-600 hover:to-orange-700 disabled:opacity-50 transition-all" disabled={submitting}>
-                                    {submitting ? 'Saving...' : 'Change Password'}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
+                        <Field
+                            label="Konfirmasi kata sandi"
+                            name="confirmPassword"
+                            type="password"
+                            value={passwordData.confirmPassword}
+                            onChange={handlePasswordChange}
+                            error={passwordData.confirmPassword && passwordData.password !== passwordData.confirmPassword
+                                ? 'Kata sandi tidak cocok'
+                                : undefined}
+                            placeholder="Ulangi kata sandi"
+                            required
+                        />
+                    </form>
+                </Modal>
             )}
         </div>
     );

@@ -48,16 +48,16 @@ describe('UserManagement', () => {
         render(<UserManagement />);
 
         await waitFor(() => {
-            expect(screen.getByText('Add User')).toBeTruthy();
+            expect(screen.getByRole('button', { name: 'Tambah Pengguna' })).toBeTruthy();
         });
 
-        fireEvent.click(screen.getByText('Add User'));
-        fireEvent.change(screen.getByLabelText('Username'), { target: { value: 'operator_1' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Tambah Pengguna' }));
+        fireEvent.change(screen.getByLabelText('Nama pengguna'), { target: { value: 'operator_1' } });
         // Password must satisfy the client policy (12+ chars, upper/lower/number/special, not
         // containing the username), else validateForm() blocks submit before createUser() runs
         // and the duplicate-username path under test is never reached.
-        fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'StrongPass123!' } });
-        fireEvent.submit(screen.getByLabelText('Username').closest('form'));
+        fireEvent.change(screen.getByLabelText('Kata sandi'), { target: { value: 'StrongPass123!' } });
+        fireEvent.submit(screen.getByLabelText('Nama pengguna').closest('form'));
 
         await waitFor(() => {
             expect(screen.getByText('Username already taken')).toBeTruthy();

@@ -59,10 +59,16 @@ export function Field({
 
     return (
         <div className={className}>
-            <label htmlFor={id} className="mb-1.5 block text-xs font-semibold text-content-muted">
-                {label}
-                {required && <span className="ml-0.5 text-status-fault" aria-hidden="true">*</span>}
-            </label>
+            {/*
+              * The required marker sits OUTSIDE <label>. Inside, it becomes part of the label's
+              * text content, so the control's accessible name turns into "Nama pengguna *" —
+              * `aria-hidden` does not strip it from a label association. Requiredness is already
+              * carried to assistive tech by the `required` attribute on the control itself.
+              */}
+            <span className="mb-1.5 flex items-baseline gap-0.5">
+                <label htmlFor={id} className="text-xs font-semibold text-content-muted">{label}</label>
+                {required && <span className="text-status-fault" aria-hidden="true">*</span>}
+            </span>
 
             {as === 'select' && <select {...shared}>{children}</select>}
             {as === 'textarea' && <textarea {...shared} />}

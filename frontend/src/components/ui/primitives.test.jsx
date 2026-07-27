@@ -123,6 +123,13 @@ describe('Field', () => {
         expect(input.getAttribute('aria-describedby')).toContain(screen.getByRole('alert').id);
     });
 
+    it('keeps the required marker out of the accessible name', () => {
+        render(<Field label="Nama kamera" required value="" onChange={vi.fn()} />);
+        // Not `Nama kamera *` — an asterisk inside <label> becomes part of the control's name.
+        expect(screen.getByLabelText('Nama kamera')).toBeTruthy();
+        expect(screen.getByLabelText('Nama kamera').required).toBe(true);
+    });
+
     it('renders select and textarea through the same labelled wiring', () => {
         render(
             <>
