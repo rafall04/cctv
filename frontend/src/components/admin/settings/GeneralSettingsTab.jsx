@@ -121,7 +121,7 @@ export default function GeneralSettingsTab() {
                         value={settings.landing_hero_badge}
                         onChange={handleChange}
                         placeholder="LIVE STREAMING 24 JAM"
-                        className="w-full px-4 py-2.5 bg-surface-sunken border border-edge-strong rounded-xl text-content focus:ring-2 focus:ring-sky-500 focus:border-transparent outline-none transition-all"
+                        className="w-full px-4 py-2.5 bg-surface-sunken border border-edge-strong rounded-xl text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary focus:border-transparent outline-none transition-all"
                     />
                     <p className="text-xs text-content-muted mt-1">
                         Badge displayed above hero title
@@ -140,7 +140,7 @@ export default function GeneralSettingsTab() {
                         value={settings.landing_section_title}
                         onChange={handleChange}
                         placeholder="CCTV Publik"
-                        className="w-full px-4 py-2.5 bg-surface-sunken border border-edge-strong rounded-xl text-content focus:ring-2 focus:ring-sky-500 focus:border-transparent outline-none transition-all"
+                        className="w-full px-4 py-2.5 bg-surface-sunken border border-edge-strong rounded-xl text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary focus:border-transparent outline-none transition-all"
                     />
                     <p className="text-xs text-content-muted mt-1">
                         Main section title for camera list
@@ -159,7 +159,7 @@ export default function GeneralSettingsTab() {
                         onChange={handleChange}
                         rows={3}
                         placeholder="Saat ini area coverage kami baru mencakup <strong>Dander</strong> dan <strong>Tanjungharjo</strong>"
-                        className="w-full px-4 py-2.5 bg-surface-sunken border border-edge-strong rounded-xl text-content focus:ring-2 focus:ring-sky-500 focus:border-transparent outline-none transition-all resize-none"
+                        className="w-full px-4 py-2.5 bg-surface-sunken border border-edge-strong rounded-xl text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary focus:border-transparent outline-none transition-all resize-none"
                     />
                     <p className="text-xs text-content-muted mt-1">
                         Supports HTML tags like &lt;strong&gt; for bold text

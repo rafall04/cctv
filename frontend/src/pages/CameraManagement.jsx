@@ -74,12 +74,12 @@ export default function CameraManagement() {
                             value={filters.search}
                             onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
                             placeholder="Cari nama, area, mode health..."
-                            className="xl:col-span-2 rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-sm text-content outline-none transition focus:border-transparent focus:ring-2 focus:ring-sky-500"
+                            className="xl:col-span-2 rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-sm text-content transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                         />
                         <select
                             value={filters.areaId}
                             onChange={(event) => setFilters((current) => ({ ...current, areaId: event.target.value }))}
-                            className="rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-sm text-content outline-none transition focus:border-transparent focus:ring-2 focus:ring-sky-500"
+                            className="rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-sm text-content transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                         >
                             <option value="all">Semua Area</option>
                             {areas.map((area) => (
@@ -89,7 +89,7 @@ export default function CameraManagement() {
                         <select
                             value={filters.cameraClass}
                             onChange={(event) => setFilters((current) => ({ ...current, cameraClass: event.target.value }))}
-                            className="rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-sm text-content outline-none transition focus:border-transparent focus:ring-2 focus:ring-sky-500"
+                            className="rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-sm text-content transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                         >
                             <option value="all">Semua Kelas</option>
                             <option value="community">Community (Publik)</option>
@@ -99,7 +99,7 @@ export default function CameraManagement() {
                         <select
                             value={filters.deliveryType}
                             onChange={(event) => setFilters((current) => ({ ...current, deliveryType: event.target.value }))}
-                            className="rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-sm text-content outline-none transition focus:border-transparent focus:ring-2 focus:ring-sky-500"
+                            className="rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-sm text-content transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                         >
                             <option value="all">Semua Delivery</option>
                             <option value="internal_hls">Internal HLS</option>
@@ -113,7 +113,7 @@ export default function CameraManagement() {
                         <select
                             value={filters.healthMode}
                             onChange={(event) => setFilters((current) => ({ ...current, healthMode: event.target.value }))}
-                            className="rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-sm text-content outline-none transition focus:border-transparent focus:ring-2 focus:ring-sky-500"
+                            className="rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-sm text-content transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                         >
                             <option value="all">Semua Health Mode</option>
                             <option value="default">Default</option>
@@ -125,7 +125,7 @@ export default function CameraManagement() {
                         <select
                             value={filters.availabilityState}
                             onChange={(event) => setFilters((current) => ({ ...current, availabilityState: event.target.value }))}
-                            className="rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-sm text-content outline-none transition focus:border-transparent focus:ring-2 focus:ring-sky-500"
+                            className="rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-sm text-content transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                         >
                             <option value="all">Semua Availability</option>
                             <option value="online">Online</option>
@@ -136,7 +136,7 @@ export default function CameraManagement() {
                         <select
                             value={filters.monitoringState}
                             onChange={(event) => setFilters((current) => ({ ...current, monitoringState: event.target.value }))}
-                            className="rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-sm text-content outline-none transition focus:border-transparent focus:ring-2 focus:ring-sky-500"
+                            className="rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-sm text-content transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                         >
                             <option value="all">Semua Monitoring</option>
                             <option value="passive">Passive</option>

@@ -137,7 +137,7 @@ export default function PlaybackSettingsPanel() {
                             name="public_playback_enabled"
                             checked={settings.public_playback_enabled}
                             onChange={handleChange}
-                            className="h-4 w-4 rounded border-edge-strong text-sky-500 focus:ring-sky-500"
+                            className="h-4 w-4 rounded border-edge-strong text-primary focus-visible:outline-primary"
                         />
                         <span>Aktifkan playback publik sebagai preview terbatas</span>
                     </label>
@@ -151,7 +151,7 @@ export default function PlaybackSettingsPanel() {
                             name="public_playback_preview_minutes"
                             value={settings.public_playback_preview_minutes}
                             onChange={handleChange}
-                            className="w-full rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-sm text-content focus:border-sky-500 focus:ring-2 focus:ring-sky-500"
+                            className="w-full rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-sm text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                         >
                             {PREVIEW_OPTIONS.map((value) => (
                                 <option key={value} value={value}>
@@ -169,7 +169,7 @@ export default function PlaybackSettingsPanel() {
                             name="public_playback_notice_enabled"
                             checked={settings.public_playback_notice_enabled}
                             onChange={handleChange}
-                            className="h-4 w-4 rounded border-edge-strong text-sky-500 focus:ring-sky-500"
+                            className="h-4 w-4 rounded border-edge-strong text-primary focus-visible:outline-primary"
                         />
                         <span>Tampilkan notice privasi di playback publik</span>
                     </label>
@@ -183,7 +183,7 @@ export default function PlaybackSettingsPanel() {
                             name="public_playback_notice_title"
                             value={settings.public_playback_notice_title}
                             onChange={handleChange}
-                            className="w-full rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-sm text-content focus:border-sky-500 focus:ring-2 focus:ring-sky-500"
+                            className="w-full rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-sm text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                         />
                     </div>
 
@@ -197,7 +197,7 @@ export default function PlaybackSettingsPanel() {
                             value={settings.public_playback_notice_text}
                             onChange={handleChange}
                             rows={4}
-                            className="w-full rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-sm text-content focus:border-sky-500 focus:ring-2 focus:ring-sky-500"
+                            className="w-full rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-sm text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                         />
                     </div>
 
@@ -210,7 +210,7 @@ export default function PlaybackSettingsPanel() {
                             name="public_playback_contact_mode"
                             value={settings.public_playback_contact_mode}
                             onChange={handleChange}
-                            className="w-full rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-sm text-content focus:border-sky-500 focus:ring-2 focus:ring-sky-500"
+                            className="w-full rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-sm text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                         >
                             <option value="branding_whatsapp">WhatsApp dari branding</option>
                         </select>
@@ -224,7 +224,7 @@ export default function PlaybackSettingsPanel() {
                     <button
                         type="submit"
                         disabled={saving}
-                        className="inline-flex items-center gap-2 rounded-xl bg-sky-500 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-sky-600 disabled:opacity-60"
+                        className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-sky-600 disabled:opacity-60"
                     >
                         {saving ? 'Menyimpan...' : 'Simpan Pengaturan Playback'}
                     </button>

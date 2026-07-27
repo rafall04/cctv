@@ -493,7 +493,7 @@ export default function ImportExport() {
                                     {rawPayload.length > 0 && <p className="mt-3 text-sm text-green-600 dark:text-green-400 font-medium">Loaded {rawPayload.length} rows from {rawFileName || 'JSON'}.</p>}
                                 </div>
                             ) : (
-                                <div className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm text-sky-800 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-200">
+                                <div className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm text-sky-800 dark:border-sky-500/20 dark:bg-primary/10 dark:text-sky-200">
                                     Backend akan fetch source preset saat preview. Saat ini preset remote yang aktif adalah Jombang v2 dan Surakarta FLV.
                                 </div>
                             )}

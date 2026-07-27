@@ -150,7 +150,7 @@ export default function AreaFormModal({
                         </div>
                     </div>
 
-                    <div className="rounded-2xl border border-sky-100 bg-sky-50/70 px-4 py-3 dark:border-sky-500/20 dark:bg-sky-500/10">
+                    <div className="rounded-2xl border border-sky-100 bg-sky-50/70 px-4 py-3 dark:border-sky-500/20 dark:bg-primary/10">
                         <label className="flex items-start gap-3">
                             <input
                                 type="checkbox"

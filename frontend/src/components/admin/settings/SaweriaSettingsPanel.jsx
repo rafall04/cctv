@@ -77,7 +77,7 @@ export default function SaweriaSettingsPanel() {
     return (
         <div className="space-y-8">
             <div>
-                <p className="text-sm font-semibold text-sky-500 mb-1">Integrasi Donasi</p>
+                <p className="text-sm font-semibold text-primary mb-1">Integrasi Donasi</p>
                 <h2 className="text-2xl font-bold text-content">Pengaturan Saweria</h2>
                 <p className="text-content-muted mt-1">Kelola link donasi Saweria untuk website Anda.</p>
             </div>
@@ -105,7 +105,7 @@ export default function SaweriaSettingsPanel() {
                             onChange={handleChange}
                             placeholder="https://saweria.co/username"
                             required
-                            className="w-full px-4 py-3 bg-surface-sunken border border-edge-strong rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-transparent text-content"
+                            className="w-full px-4 py-3 bg-surface-sunken border border-edge-strong rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary focus:border-transparent text-content"
                         />
                     </div>
 
@@ -120,7 +120,7 @@ export default function SaweriaSettingsPanel() {
                             value={settings.leaderboard_link}
                             onChange={handleChange}
                             placeholder="https://saweria.co/overlays/leaderboard/username"
-                            className="w-full px-4 py-3 bg-surface-sunken border border-edge-strong rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-transparent text-content"
+                            className="w-full px-4 py-3 bg-surface-sunken border border-edge-strong rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary focus:border-transparent text-content"
                         />
                     </div>
 
@@ -138,7 +138,7 @@ export default function SaweriaSettingsPanel() {
                                 onChange={handleChange}
                                 className="sr-only peer"
                             />
-                            <div className="w-14 h-7 bg-gray-300 peer-focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary peer-focus:ring-4 peer-focus:ring-sky-300 dark:peer-focus:ring-sky-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all dark:border-gray-600 peer-checked:bg-sky-500"></div>
+                            <div className="w-14 h-7 bg-gray-300 peer-focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary peer-focus:ring-4 peer-focus:ring-sky-300 dark:peer-focus:ring-sky-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
                         </label>
                     </div>
 
@@ -168,7 +168,7 @@ export default function SaweriaSettingsPanel() {
                         <button
                             type="submit"
                             disabled={saving}
-                            className="px-4 py-2.5 bg-sky-500 hover:bg-sky-600 text-white rounded-xl transition-colors disabled:opacity-60"
+                            className="px-4 py-2.5 bg-primary hover:opacity-90 text-white rounded-xl transition-colors disabled:opacity-60"
                         >
                             {saving ? 'Menyimpan...' : 'Simpan'}
                         </button>

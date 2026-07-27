@@ -134,7 +134,7 @@ export default function StreamHealthSettingsPanel() {
                                     ...current,
                                     [field.key]: event.target.value,
                                 }))}
-                                className="w-full rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-content outline-none transition-all focus:border-transparent focus:ring-2 focus:ring-sky-500"
+                                className="w-full rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-content transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                             >
                                 {HEALTH_MODE_OPTIONS.map((option) => (
                                     <option key={option.value} value={option.value}>{option.label}</option>
@@ -145,7 +145,7 @@ export default function StreamHealthSettingsPanel() {
                     ))}
                 </div>
 
-                <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-200">
+                <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800 dark:border-sky-500/20 dark:bg-primary/10 dark:text-sky-200">
                     Gunakan area override untuk kebijakan steady-state per lokasi, lalu pakai camera override hanya untuk kamera khusus yang memang perlu perlakuan berbeda.
                 </div>
 

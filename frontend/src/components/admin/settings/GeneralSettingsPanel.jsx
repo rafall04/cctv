@@ -117,7 +117,7 @@ function CheckboxField({ id, name, checked, onChange, label }) {
                 type="checkbox"
                 checked={checked}
                 onChange={onChange}
-                className="h-4 w-4 rounded border-edge-strong text-sky-500 focus:ring-sky-500"
+                className="h-4 w-4 rounded border-edge-strong text-primary focus-visible:outline-primary"
             />
             <span>{label}</span>
         </label>
@@ -218,7 +218,7 @@ export default function GeneralSettingsPanel() {
                             value={settings.landing_hero_badge}
                             onChange={handleChange}
                             placeholder="LIVE STREAMING 24 JAM"
-                            className="w-full rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-content outline-none transition-all focus:border-transparent focus:ring-2 focus:ring-sky-500"
+                            className="w-full rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-content transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                         />
                     </Field>
 
@@ -230,7 +230,7 @@ export default function GeneralSettingsPanel() {
                             value={settings.landing_section_title}
                             onChange={handleChange}
                             placeholder="CCTV Publik"
-                            className="w-full rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-content outline-none transition-all focus:border-transparent focus:ring-2 focus:ring-sky-500"
+                            className="w-full rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-content transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                         />
                     </Field>
 
@@ -242,7 +242,7 @@ export default function GeneralSettingsPanel() {
                             onChange={handleChange}
                             rows={3}
                             placeholder="Saat ini area coverage kami baru mencakup <strong>Dander</strong> dan <strong>Tanjungharjo</strong>"
-                            className="w-full resize-none rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-content outline-none transition-all focus:border-transparent focus:ring-2 focus:ring-sky-500"
+                            className="w-full resize-none rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-content transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                         />
                     </Field>
                 </SectionCard>
@@ -268,7 +268,7 @@ export default function GeneralSettingsPanel() {
                                 value={settings.event_banner_title}
                                 onChange={handleChange}
                                 placeholder="Ramadan Kareem"
-                                className="w-full rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-content outline-none transition-all focus:border-transparent focus:ring-2 focus:ring-sky-500"
+                                className="w-full rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-content transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                             />
                         </Field>
 
@@ -278,7 +278,7 @@ export default function GeneralSettingsPanel() {
                                 name="event_banner_theme"
                                 value={settings.event_banner_theme}
                                 onChange={handleChange}
-                                className="w-full rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-content outline-none transition-all focus:border-transparent focus:ring-2 focus:ring-sky-500"
+                                className="w-full rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-content transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                             >
                                 {EVENT_THEMES.map((theme) => (
                                     <option key={theme.value} value={theme.value}>
@@ -297,7 +297,7 @@ export default function GeneralSettingsPanel() {
                             onChange={handleChange}
                             rows={3}
                             placeholder="Sambut momen spesial bersama RAF NET CCTV publik."
-                            className="w-full resize-none rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-content outline-none transition-all focus:border-transparent focus:ring-2 focus:ring-sky-500"
+                            className="w-full resize-none rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-content transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                         />
                     </Field>
 
@@ -309,7 +309,7 @@ export default function GeneralSettingsPanel() {
                                 name="event_banner_start_at"
                                 value={settings.event_banner_start_at}
                                 onChange={handleChange}
-                                className="w-full rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-content outline-none transition-all focus:border-transparent focus:ring-2 focus:ring-sky-500"
+                                className="w-full rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-content transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                             />
                         </Field>
 
@@ -320,7 +320,7 @@ export default function GeneralSettingsPanel() {
                                 name="event_banner_end_at"
                                 value={settings.event_banner_end_at}
                                 onChange={handleChange}
-                                className="w-full rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-content outline-none transition-all focus:border-transparent focus:ring-2 focus:ring-sky-500"
+                                className="w-full rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-content transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                             />
                         </Field>
                     </div>
@@ -364,7 +364,7 @@ export default function GeneralSettingsPanel() {
                                 value={settings.announcement_title}
                                 onChange={handleChange}
                                 placeholder="Info Layanan"
-                                className="w-full rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-content outline-none transition-all focus:border-transparent focus:ring-2 focus:ring-sky-500"
+                                className="w-full rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-content transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                             />
                         </Field>
 
@@ -374,7 +374,7 @@ export default function GeneralSettingsPanel() {
                                 name="announcement_style"
                                 value={settings.announcement_style}
                                 onChange={handleChange}
-                                className="w-full rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-content outline-none transition-all focus:border-transparent focus:ring-2 focus:ring-sky-500"
+                                className="w-full rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-content transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                             >
                                 {ANNOUNCEMENT_STYLES.map((style) => (
                                     <option key={style.value} value={style.value}>
@@ -393,7 +393,7 @@ export default function GeneralSettingsPanel() {
                             onChange={handleChange}
                             rows={3}
                             placeholder="Pemeliharaan jaringan akan dilakukan malam ini pukul 23.00."
-                            className="w-full resize-none rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-content outline-none transition-all focus:border-transparent focus:ring-2 focus:ring-sky-500"
+                            className="w-full resize-none rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-content transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                         />
                     </Field>
 
@@ -405,7 +405,7 @@ export default function GeneralSettingsPanel() {
                                 name="announcement_start_at"
                                 value={settings.announcement_start_at}
                                 onChange={handleChange}
-                                className="w-full rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-content outline-none transition-all focus:border-transparent focus:ring-2 focus:ring-sky-500"
+                                className="w-full rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-content transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                             />
                         </Field>
 
@@ -416,7 +416,7 @@ export default function GeneralSettingsPanel() {
                                 name="announcement_end_at"
                                 value={settings.announcement_end_at}
                                 onChange={handleChange}
-                                className="w-full rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-content outline-none transition-all focus:border-transparent focus:ring-2 focus:ring-sky-500"
+                                className="w-full rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-content transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                             />
                         </Field>
                     </div>
@@ -472,7 +472,7 @@ export default function GeneralSettingsPanel() {
                     <button
                         type="submit"
                         disabled={saving}
-                        className="px-4 py-2.5 bg-sky-500 hover:bg-sky-600 text-white rounded-xl transition-colors disabled:opacity-60"
+                        className="px-4 py-2.5 bg-primary hover:opacity-90 text-white rounded-xl transition-colors disabled:opacity-60"
                     >
                         {saving ? 'Menyimpan...' : 'Simpan'}
                     </button>

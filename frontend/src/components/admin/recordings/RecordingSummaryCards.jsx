@@ -1,3 +1,5 @@
+import { StatTile } from '../../ui';
+
 function formatFileSize(bytes) {
     if (bytes === 0) {
         return '0 B';
@@ -9,45 +11,29 @@ function formatFileSize(bytes) {
 }
 
 export default function RecordingSummaryCards({ summary }) {
+    /*
+     * None of these four is a health reading — they are counts. "Kamera Recording" wore the fault
+     * red, which made a perfectly healthy fleet look alarmed; storage wore green, which implied
+     * "good" about a number that is only ever "how much". All four now use the data accent, with
+     * the plain surface for the neutral total.
+     */
     const items = [
-        {
-            label: 'Kamera Recording',
-            value: summary.recordingCount,
-            accent: 'text-red-500 dark:text-red-400',
-            tone: 'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-200',
-        },
-        {
-            label: 'Total Kamera',
-            value: summary.cameras,
-            accent: 'text-content',
-            tone: 'bg-gray-100 text-content dark:bg-gray-700/80',
-        },
-        {
-            label: 'Total Segmen',
-            value: summary.totalSegments,
-            accent: 'text-primary-600 dark:text-primary-300',
-            tone: 'bg-sky-50 text-sky-700 dark:bg-sky-500/15 dark:text-sky-200',
-        },
-        {
-            label: 'Total Storage',
-            value: formatFileSize(summary.totalSize),
-            accent: 'text-emerald-600 dark:text-emerald-300',
-            tone: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200',
-        },
+        { label: 'Kamera Recording', value: summary.recordingCount, tone: 'data' },
+        { label: 'Total Kamera', value: summary.cameras, tone: 'default' },
+        { label: 'Total Segmen', value: summary.totalSegments, tone: 'data' },
+        { label: 'Total Storage', value: formatFileSize(summary.totalSize), tone: 'data' },
     ];
 
     return (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {items.map((item) => (
-                <div key={item.label} className="rounded-2xl border border-gray-200 bg-surface p-5 shadow-sm dark:border-gray-700/70 md:p-6">
-                    <div
-                        data-testid={`summary-label-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
-                        className={`mb-3 inline-flex rounded-xl px-3 py-1 text-xs font-semibold tracking-wide ${item.tone}`}
-                    >
-                        {item.label}
-                    </div>
-                    <div className={`text-2xl font-bold ${item.accent}`}>{item.value}</div>
-                </div>
+                <StatTile
+                    key={item.label}
+                    label={item.label}
+                    value={item.value}
+                    tone={item.tone}
+                    data-testid={`summary-label-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
+                />
             ))}
         </div>
     );

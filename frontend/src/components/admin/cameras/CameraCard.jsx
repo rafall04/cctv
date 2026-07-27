@@ -53,7 +53,7 @@ function getIngestBadge(camera) {
         label: policy === 'always_on' ? 'Ingest: Always On' : 'Ingest: On Demand',
         className: policy === 'always_on'
             ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-200'
-            : 'bg-sky-500/15 text-sky-700 dark:text-sky-200',
+            : 'bg-primary/15 text-sky-700 dark:text-sky-200',
         title: 'Resolved internal RTSP ingest policy',
     };
 }
@@ -179,7 +179,7 @@ function CameraCard({
                         <p className="text-[10px] font-semibold text-content-subtle uppercase tracking-wider">Location</p>
                         <p className="text-sm font-medium text-content">{camera.location || 'Not specified'}</p>
                         <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
-                            <span className="rounded-full bg-sky-50 px-2.5 py-1 font-medium text-sky-700 dark:bg-sky-500/10 dark:text-sky-300">
+                            <span className="rounded-full bg-sky-50 px-2.5 py-1 font-medium text-sky-700 dark:bg-primary/10 dark:text-sky-300">
                                 Public: {camera.availability_state || 'offline'}
                             </span>
                             <span className="rounded-full bg-surface-sunken px-2.5 py-1 font-medium text-content">

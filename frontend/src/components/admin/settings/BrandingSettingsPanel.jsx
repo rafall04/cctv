@@ -123,7 +123,7 @@ export default function BrandingSettingsPanel() {
                     <button
                         onClick={handleSave}
                         disabled={saving}
-                        className="px-4 py-2 bg-sky-500 text-white rounded-lg hover:bg-sky-600 disabled:opacity-50"
+                        className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-sky-600 disabled:opacity-50"
                     >
                         {saving ? 'Saving...' : 'Save Changes'}
                     </button>

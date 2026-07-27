@@ -24,7 +24,7 @@ function badgeClass(color) {
         case 'yellow': return 'bg-yellow-500/20 text-yellow-400';
         case 'gray': return 'bg-gray-400/20 text-content-muted';
         case 'orange': return 'bg-orange-500/20 text-orange-400';
-        case 'sky': return 'bg-sky-500/20 text-sky-400';
+        case 'sky': return 'bg-primary/20 text-sky-400';
         case 'emerald': return 'bg-emerald-500/20 text-emerald-400';
         case 'rose': return 'bg-rose-500/20 text-rose-400';
         case 'purple': return 'bg-purple-500/20 text-purple-400';

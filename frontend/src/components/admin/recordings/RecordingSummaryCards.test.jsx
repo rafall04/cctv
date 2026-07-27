@@ -17,14 +17,12 @@ describe('RecordingSummaryCards', () => {
             />
         );
 
-        const recordingLabel = screen.getByTestId('summary-label-kamera-recording');
-        const segmentsLabel = screen.getByTestId('summary-label-total-segmen');
-        const storageLabel = screen.getByTestId('summary-label-total-storage');
+        // These four are counts, not health readings — none of them may wear the fault token.
+        // "Kamera Recording" used to render red, which made a healthy fleet look alarmed.
+        const cardText = document.body.textContent;
+        expect(cardText).toContain('Kamera Recording');
+        expect(document.body.innerHTML).not.toContain('status-fault');
 
-        expect(recordingLabel.className).toContain('dark:text-red-200');
-        expect(segmentsLabel.className).toContain('dark:bg-sky-500/15');
-        expect(segmentsLabel.className).toContain('dark:text-sky-200');
-        expect(storageLabel.className).toContain('dark:text-emerald-200');
         expect(screen.getByText('385')).toBeTruthy();
     });
 });

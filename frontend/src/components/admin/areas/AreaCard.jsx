@@ -99,7 +99,7 @@ export default function AreaCard({
                     {getAreaCoverageLabel(area.coverage_scope)}
                 </span>
                 {gridDefaultEnabled ? (
-                    <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-sky-100 dark:bg-sky-500/20 text-sky-700 dark:text-sky-300">
+                    <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-sky-100 dark:bg-primary/20 text-sky-700 dark:text-sky-300">
                         Grid Default On
                     </span>
                 ) : (
@@ -155,7 +155,7 @@ export default function AreaCard({
                     disabled={gridDefaultBusy}
                     className={`w-full rounded-2xl border px-4 py-3 text-left transition-colors ${
                         gridDefaultEnabled
-                            ? 'border-sky-200 bg-sky-50 text-sky-900 hover:bg-sky-100 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-100 dark:hover:bg-sky-500/20'
+                            ? 'border-sky-200 bg-sky-50 text-sky-900 hover:bg-sky-100 dark:border-sky-500/20 dark:bg-primary/10 dark:text-sky-100 dark:hover:bg-primary/20'
                             : 'border-gray-200 bg-surface-sunken text-content hover:bg-gray-100 dark:border-gray-700/60'
                     } ${gridDefaultBusy ? 'cursor-wait opacity-70' : ''}`}
                 >
@@ -171,7 +171,7 @@ export default function AreaCard({
                             </div>
                         </div>
                         <span className={`inline-flex h-7 w-12 items-center rounded-full px-1 transition-colors ${
-                            gridDefaultEnabled ? 'bg-sky-500' : 'bg-gray-300 dark:bg-gray-600'
+                            gridDefaultEnabled ? 'bg-primary' : 'bg-gray-300 dark:bg-gray-600'
                         }`}>
                             <span className={`h-5 w-5 rounded-full bg-white shadow transition-transform ${
                                 gridDefaultEnabled ? 'translate-x-5' : 'translate-x-0'

@@ -405,8 +405,8 @@ export default function LoginPage() {
 
                         {/* Account approval notice (pending / rejected) — calm info/warning, not an error */}
                         {accountNotice && (
-                            <div className={`flex items-start gap-3 p-4 rounded-xl border ${accountNotice.tone === 'info' ? 'bg-sky-50 dark:bg-sky-500/10 border-sky-200 dark:border-sky-500/30' : 'bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/30'}`}>
-                                <div className={`flex-shrink-0 ${accountNotice.tone === 'info' ? 'text-sky-500' : 'text-amber-500'}`}>
+                            <div className={`flex items-start gap-3 p-4 rounded-xl border ${accountNotice.tone === 'info' ? 'bg-sky-50 dark:bg-primary/10 border-sky-200 dark:border-sky-500/30' : 'bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/30'}`}>
+                                <div className={`flex-shrink-0 ${accountNotice.tone === 'info' ? 'text-primary' : 'text-amber-500'}`}>
                                     {accountNotice.tone === 'info' ? <Icons.Clock /> : <Icons.Warning />}
                                 </div>
                                 <div className="flex-1">

@@ -394,7 +394,7 @@ export default function VoucherManagement() {
                                                     {p.active ? 'Aktif' : 'Nonaktif'}
                                                 </span>
                                                 {p.online_purchasable
-                                                    ? <span className="px-2 py-0.5 rounded text-xs font-medium bg-sky-500/15 text-sky-500">Online</span>
+                                                    ? <span className="px-2 py-0.5 rounded text-xs font-medium bg-primary/15 text-primary">Online</span>
                                                     : <span className="px-2 py-0.5 rounded text-xs font-medium bg-gray-200 dark:bg-gray-700/50 text-content-muted">Khusus admin</span>}
                                             </div>
                                         </td>

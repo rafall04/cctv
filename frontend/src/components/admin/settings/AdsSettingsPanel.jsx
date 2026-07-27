@@ -201,7 +201,7 @@ function ScriptField({ id, name, value, onChange }) {
             rows={5}
             spellCheck={false}
             placeholder="<script src=&quot;https://...&quot;></script>"
-            className="w-full resize-y rounded-xl border border-edge-strong bg-surface px-4 py-3 font-mono text-xs text-content outline-none transition-all focus:border-transparent focus:ring-2 focus:ring-sky-500"
+            className="w-full resize-y rounded-xl border border-edge-strong bg-surface px-4 py-3 font-mono text-xs text-content transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
         />
     );
 }
@@ -217,7 +217,7 @@ function SelectField({ id, name, value, onChange, options, label }) {
                 name={name}
                 value={value}
                 onChange={onChange}
-                className="w-full rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-content outline-none transition-all focus:border-transparent focus:ring-2 focus:ring-sky-500"
+                className="w-full rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-content transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
             >
                 {options.map((option) => (
                     <option key={option.value} value={option.value}>
@@ -242,7 +242,7 @@ function NumberField({ id, name, value, onChange, label, min = 1 }) {
                 min={min}
                 value={value}
                 onChange={onChange}
-                className="w-full rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-content outline-none transition-all focus:border-transparent focus:ring-2 focus:ring-sky-500"
+                className="w-full rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-content transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
             />
         </div>
     );
@@ -362,7 +362,7 @@ export default function AdsSettingsPanel() {
                             type="text"
                             value={settings.ads_provider}
                             onChange={handleChange}
-                            className="w-full rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-content outline-none transition-all focus:border-transparent focus:ring-2 focus:ring-sky-500"
+                            className="w-full rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-content transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                         />
                     </div>
                 </SectionCard>
@@ -424,7 +424,7 @@ export default function AdsSettingsPanel() {
                         />
                     </div>
 
-                    <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-100">
+                    <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900 dark:border-sky-500/20 dark:bg-primary/10 dark:text-sky-100">
                         Gunakan creative compact atau vertikal untuk slot popup. Pada desktop, hanya satu slot popup yang diprioritaskan agar player tetap terbaca.
                     </div>
                 </SectionCard>
