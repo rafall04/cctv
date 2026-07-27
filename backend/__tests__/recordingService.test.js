@@ -555,6 +555,26 @@ describe('recordingService external recording support', () => {
         expect(executeMock.mock.calls.some(([sql]) => String(sql).includes('recording_restart_logs'))).toBe(false);
     });
 
+    it('exposes pid/streamSource/adopted in runtime status', async () => {
+        // The recording worker publishes this object for the API to read. When these
+        // fields were dropped here, the admin surface reported "pid: null, adopted:
+        // false" for recorders that had a pid and were adopted.
+        const { recordingService } = await import('../services/recordingService.js');
+        const child = createSpawnProcess();
+        child.pid = 909;
+        spawnMock.mockReturnValue(child);
+        queryOneMock.mockImplementation((sql, params) => createCamera({ id: params?.[0] ?? 1 }));
+
+        await recordingService.startRecording(90);
+
+        expect(recordingService.getRecordingStatus(90)).toMatchObject({
+            isRecording: true,
+            pid: 909,
+            adopted: false,
+        });
+        expect(recordingService.getActiveRecordingCameraIds()).toContain(90);
+    });
+
     it('DETACHES active recordings on server shutdown instead of killing them', async () => {
         // The load-bearing guarantee of this change: a backend restart must not
         // interrupt recording. Signalling ffmpeg here is what used to cost an

@@ -490,6 +490,14 @@ class RecordingService {
         return {
             isRecording: recording.isRecording,
             status: recording.status,
+            // pid/streamSource/adopted come straight from the process manager. They used
+            // to be dropped here, which was invisible while everything ran in one process
+            // — but the recording worker publishes THIS object for the API to read, so
+            // dropping them meant the admin surface showed "pid: null, adopted: false"
+            // for recorders that very much had a pid and were very much adopted.
+            pid: recording.pid ?? null,
+            streamSource: recording.streamSource ?? null,
+            adopted: !!recording.adopted,
             startTime: recording.startTime,
             duration: recording.startTime ? Math.floor((Date.now() - recording.startTime.getTime()) / 1000) : 0,
             restartCount: health ? health.restartCount : 0,

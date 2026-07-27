@@ -80,7 +80,16 @@ module.exports = {
             exec_mode: 'fork',
             autorestart: true,
             watch: false,
-            max_memory_restart: '512M',
+            // 1G, same as the backend used to get when it owned recording too.
+            //
+            // 512M was the first guess and it was wrong: measured on prod the worker sits
+            // around 490MB and peaks past 570MB while the recovery queue chews through a
+            // backlog of partials, so pm2 restarted it on a ~90s cycle. Those restarts were
+            // harmless — recorders detach and get re-adopted, which is the whole design —
+            // but memory thrash is not something to leave running. If this app ever
+            // genuinely approaches 1G at idle, that is a leak worth chasing, not a limit
+            // worth raising again.
+            max_memory_restart: '1G',
             wait_ready: true,
             listen_timeout: 30000,
             // Same reason as the backend: pm2's default treekill walks the process tree
