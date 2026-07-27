@@ -17,7 +17,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNotification } from '../contexts/NotificationContext';
 import archiveLibrary from '../services/telegramArchiveLibraryService';
-import { Badge, Button, Field, Modal, PageHeader, StatTile } from '../components/ui';
+import { Badge, Button, Field, Modal, PageHeader } from '../components/ui';
 import { TableSkeleton } from '../components/ui/Skeleton';
 import { buildTimeline, findSegmentAt, formatDuration, segmentWindow } from '../utils/admin/archiveTimeline';
 
@@ -48,19 +48,21 @@ function SegmentRow({ row, win, highlighted, onPlay }) {
     return (
         <li
             id={`seg-${row.segmentId}`}
-            className={`flex flex-wrap items-center gap-x-4 gap-y-2 rounded-card border p-3 transition-colors ${
+            className={`flex items-center gap-3 rounded-card border p-3 transition-colors ${
                 highlighted ? 'border-primary bg-primary-100' : 'border-edge bg-surface'
             }`}
         >
-            <div className="min-w-0 flex-1 basis-40">
-                <p className="truncate text-sm font-semibold text-content">{row.cameraName}</p>
-                {row.areaName && <p className="truncate text-xs text-content-subtle">{row.areaName}</p>}
-            </div>
-
-            <div className="shrink-0 text-right">
+            {/*
+              * The time leads. It is what the operator is scanning for, and mono/tabular keeps the
+              * digits in one column down the whole list so the eye can run straight down it.
+              */}
+            <div className="min-w-0 flex-1">
                 <p className="font-mono text-sm font-semibold tabular-nums text-content">{win.range}</p>
-                <p className="font-mono text-xs tabular-nums text-content-subtle">
-                    {[win.duration, formatSize(row.fileSize)].filter(Boolean).join(' · ')}
+                {/* Name on its own line: it was truncating at "CCTV ALANG ALANG KE…" while the row
+                  * still had room. A phone has height to spend, not width. */}
+                <p className="mt-0.5 truncate text-xs text-content-muted">{row.cameraName}</p>
+                <p className="mt-0.5 truncate font-mono text-xs tabular-nums text-content-subtle">
+                    {[win.duration, formatSize(row.fileSize), row.areaName].filter(Boolean).join(' · ')}
                 </p>
             </div>
 
@@ -70,7 +72,7 @@ function SegmentRow({ row, win, highlighted, onPlay }) {
                         Putar
                     </Button>
                 ) : (
-                    <Badge tone="neutral">Hanya di Telegram</Badge>
+                    <Badge tone="neutral">Telegram</Badge>
                 )}
             </div>
         </li>
@@ -128,18 +130,32 @@ export default function TelegramArchiveLibrary() {
     };
 
     return (
-        <div className="space-y-5">
+        <div className="space-y-4">
             <PageHeader
                 title="Arsip Rekaman"
-                description="Rekaman yang sudah dikirim ke Telegram, bisa ditonton langsung di sini tanpa membuka Telegram."
+                description="Tersimpan di Telegram, diputar dari sini."
                 actions={<Button onClick={load} disabled={loading}>Muat ulang</Button>}
             />
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                <StatTile label="Segmen terarsip" value={summary?.total ?? 0} />
-                <StatTile label="Bisa diputar di web" value={summary?.playable ?? 0} tone="data" />
-                <StatTile label="Total ukuran" value={formatSize(summary?.bytes)} tone="data" />
-            </div>
+            {/*
+              * One strip, not three stacked tiles. Full-size StatTiles put ~700px of chrome above
+              * the first record on a phone — 65% of the screen spent before any content. These
+              * three numbers are context for the list, so they get one line of it.
+              */}
+            <dl className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-card border border-edge bg-surface px-4 py-3">
+                {[
+                    { label: 'Segmen', value: summary?.total ?? 0 },
+                    { label: 'Bisa diputar', value: summary?.playable ?? 0, tone: 'text-data' },
+                    { label: 'Ukuran', value: formatSize(summary?.bytes), tone: 'text-data' },
+                ].map((stat) => (
+                    <div key={stat.label} className="flex items-baseline gap-2">
+                        <dt className="text-xs text-content-subtle">{stat.label}</dt>
+                        <dd className={`font-mono text-base font-bold tabular-nums ${stat.tone || 'text-content'}`}>
+                            {stat.value}
+                        </dd>
+                    </div>
+                ))}
+            </dl>
 
             {notPlayable > 0 && (
                 <div className="rounded-card border border-status-warn/30 bg-status-warn/10 p-4">
@@ -154,19 +170,18 @@ export default function TelegramArchiveLibrary() {
                 </div>
             )}
 
-            <div className="flex flex-wrap items-end gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
                 <Field
                     as="select"
                     label="Kamera"
                     value={cameraId}
                     onChange={(e) => { setCameraId(e.target.value); setHighlighted(null); }}
-                    className="min-w-0 flex-1 sm:max-w-xs"
-                    hint={singleCamera ? undefined : 'Pilih satu kamera untuk melihat celah rekaman'}
+                    className="min-w-0 sm:flex-1 sm:max-w-sm"
                 >
-                    <option value="">Semua kamera ({summary?.total ?? 0} segmen)</option>
+                    <option value="">Semua kamera · {summary?.total ?? 0} segmen</option>
                     {cameras.map((camera) => (
                         <option key={camera.id} value={camera.id}>
-                            {camera.name} ({camera.segments})
+                            {camera.name} · {camera.segments}
                         </option>
                     ))}
                 </Field>
@@ -178,11 +193,19 @@ export default function TelegramArchiveLibrary() {
                         onChange={(e) => setJumpTo(e.target.value)}
                         placeholder="19:36"
                         inputMode="numeric"
-                        className="w-28"
+                        className="w-24 shrink-0"
                     />
                     <Button type="submit" disabled={!jumpTo.trim()}>Cari</Button>
                 </form>
             </div>
+
+            {!singleCamera && !loading && days.length > 0 && (
+                // Said HERE, where the absence of gap markers is what needs explaining — not as a
+                // hint under a select, where it pushed the two controls off a shared baseline.
+                <p className="text-xs text-content-subtle">
+                    Celah rekaman hanya ditandai saat satu kamera dipilih.
+                </p>
+            )}
 
             {loading ? (
                 <TableSkeleton rows={6} columns={4} />
