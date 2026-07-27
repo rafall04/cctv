@@ -171,7 +171,21 @@ class TelegramArchiveService {
             routes: doc.routes,
             cameras,
             areas,
+            groups: this.groups(),
         };
+    }
+
+    /**
+     * Groups the bot has been added to, learned by the sidecar from Telegram's `my_chat_member`
+     * updates. This is what lets the admin form offer a picker instead of asking someone to copy
+     * a chat id by hand.
+     */
+    groups() {
+        return this.#readState((db) => db.prepare(
+            `SELECT chat_id AS chatId, title, type, status, can_send AS canSend, updated_at AS updatedAt
+             FROM chats WHERE status IS NULL OR status IN ('member','administrator','creator')
+             ORDER BY title COLLATE NOCASE`,
+        ).all().map((row) => ({ ...row, canSend: row.canSend === null ? null : row.canSend === 1 })), []);
     }
 
     createRoute(payload) {
@@ -206,6 +220,21 @@ class TelegramArchiveService {
         doc.routes = remaining;
         writeRoutesFile(doc);
         return { id };
+    }
+
+    /** Run a read-only query against the sidecar's own state DB, or return `fallback`. */
+    #readState(fn, fallback) {
+        if (!fs.existsSync(STATE_DB)) return fallback;
+        let db;
+        try {
+            db = new Database(STATE_DB, { readonly: true, fileMustExist: true });
+            return fn(db);
+        } catch (error) {
+            console.error('Read tg-archive state error:', error);
+            return fallback;
+        } finally {
+            db?.close();
+        }
     }
 
     /** Upload activity straight from the sidecar's own state DB. Opened read-only on purpose. */

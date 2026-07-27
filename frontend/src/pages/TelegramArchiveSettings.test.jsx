@@ -63,6 +63,11 @@ const OVERVIEW = {
         { id: 1435, name: 'CCTV LAPANGAN DANDER BARAT', areaId: 2, areaName: 'DS DANDER', targets: [] },
     ],
     areas: [{ id: 2, name: 'DS DANDER' }, { id: 3, name: 'DS TANJUNGHARJO' }],
+    groups: [
+        { chatId: '-5510674082', title: 'CCTV SELATAN AHASS DANDER', type: 'group', status: 'member', canSend: true },
+        { chatId: '-5562560753', title: 'CCTV LAPANGAN DANDER BARAT', type: 'group', status: 'member', canSend: true },
+        { chatId: '-5599990000', title: 'GRUP TERKUNCI', type: 'group', status: 'member', canSend: false },
+    ],
 };
 
 function renderPage() {
@@ -72,6 +77,9 @@ function renderPage() {
 async function waitForLoaded() {
     await screen.findByText('Tambah rute baru');
 }
+
+/** The picker is the default path; these switch to the plain id field. */
+const goManual = () => fireEvent.click(screen.getByRole('button', { name: 'Ketik ID manual' }));
 
 beforeEach(() => {
     vi.clearAllMocks();
@@ -133,7 +141,75 @@ describe('scope switching', () => {
     });
 });
 
-describe('chat id verification', () => {
+describe('group picker (discovered groups)', () => {
+    it('offers every discovered group instead of asking for an id', async () => {
+        renderPage();
+        await waitForLoaded();
+
+        const picker = screen.getByLabelText('Grup Telegram');
+        expect(picker.tagName).toBe('SELECT');
+        expect([...picker.options].map((o) => o.value)).toEqual(
+            ['', '-5510674082', '-5562560753', '-5599990000'],
+        );
+    });
+
+    it('flags a group the bot may not post files to, right in the option', async () => {
+        renderPage();
+        await waitForLoaded();
+        const locked = [...screen.getByLabelText('Grup Telegram').options]
+            .find((o) => o.value === '-5599990000');
+        expect(locked.textContent).toMatch(/bot tak boleh kirim file/i);
+    });
+
+    it('picking a group fills the route name and confirms permission without a server call', async () => {
+        renderPage();
+        await waitForLoaded();
+
+        fireEvent.change(screen.getByLabelText('Grup Telegram'), { target: { value: '-5562560753' } });
+
+        expect(screen.getByLabelText('Nama rute').value).toBe('CCTV LAPANGAN DANDER BARAT');
+        expect(await screen.findByText(/bot bisa mengirim file ke grup ini/i)).toBeTruthy();
+        expect(verifyChat).not.toHaveBeenCalled();
+    });
+
+    it('does not overwrite a route name the operator already typed', async () => {
+        renderPage();
+        await waitForLoaded();
+
+        fireEvent.change(screen.getByLabelText('Nama rute'), { target: { value: 'Punya Saya' } });
+        fireEvent.change(screen.getByLabelText('Grup Telegram'), { target: { value: '-5562560753' } });
+
+        expect(screen.getByLabelText('Nama rute').value).toBe('Punya Saya');
+    });
+
+    it('saves the picked group id', async () => {
+        renderPage();
+        await waitForLoaded();
+
+        fireEvent.change(screen.getByLabelText('Kamera'), { target: { value: '1435' } });
+        fireEvent.change(screen.getByLabelText('Grup Telegram'), { target: { value: '-5562560753' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Tambah rute' }));
+
+        await waitFor(() => expect(createRoute).toHaveBeenCalledWith(expect.objectContaining({
+            cameraId: 1435, chatId: '-5562560753',
+        })));
+    });
+
+    it('falls back to a plain id field when no group has been discovered yet', async () => {
+        getOverview.mockResolvedValue({
+            success: true,
+            data: { ...structuredClone(OVERVIEW), groups: [] },
+        });
+        renderPage();
+        await waitForLoaded();
+
+        expect(screen.getByLabelText('Grup Telegram').tagName).toBe('INPUT');
+        expect(screen.getByText(/Belum ada grup terdeteksi/i)).toBeTruthy();
+        expect(screen.queryByRole('button', { name: 'Ketik ID manual' })).toBeNull();
+    });
+});
+
+describe('chat id verification (manual fallback)', () => {
     it('resolves the group and reports that the bot may post', async () => {
         verifyChat.mockResolvedValue({
             success: true,
@@ -142,7 +218,8 @@ describe('chat id verification', () => {
         renderPage();
         await waitForLoaded();
 
-        fireEvent.change(screen.getByLabelText('ID grup Telegram'), { target: { value: '-5510674082' } });
+        goManual();
+        fireEvent.change(screen.getByLabelText('Grup Telegram'), { target: { value: '-5510674082' } });
         fireEvent.click(screen.getByRole('button', { name: 'Periksa' }));
 
         expect(await screen.findByText(/bot bisa mengirim file ke grup ini/i)).toBeTruthy();
@@ -157,7 +234,8 @@ describe('chat id verification', () => {
         renderPage();
         await waitForLoaded();
 
-        fireEvent.change(screen.getByLabelText('ID grup Telegram'), { target: { value: '-5510674082' } });
+        goManual();
+        fireEvent.change(screen.getByLabelText('Grup Telegram'), { target: { value: '-5510674082' } });
         fireEvent.click(screen.getByRole('button', { name: 'Periksa' }));
 
         expect(await screen.findByText(/TIDAK diizinkan mengirim file/i)).toBeTruthy();
@@ -168,7 +246,8 @@ describe('chat id verification', () => {
         renderPage();
         await waitForLoaded();
 
-        fireEvent.change(screen.getByLabelText('ID grup Telegram'), { target: { value: '-9999999999' } });
+        goManual();
+        fireEvent.change(screen.getByLabelText('Grup Telegram'), { target: { value: '-9999999999' } });
         fireEvent.click(screen.getByRole('button', { name: 'Periksa' }));
 
         await waitFor(() => expect(showNotification)
@@ -184,7 +263,8 @@ describe('chat id verification', () => {
         renderPage();
         await waitForLoaded();
 
-        const input = screen.getByLabelText('ID grup Telegram');
+        goManual();
+        const input = screen.getByLabelText('Grup Telegram');
         fireEvent.change(input, { target: { value: '-5510674082' } });
         fireEvent.click(screen.getByRole('button', { name: 'Periksa' }));
         expect(await screen.findByText(/Grup A/)).toBeTruthy();
@@ -196,6 +276,7 @@ describe('chat id verification', () => {
     it('does not call the server with an empty chat id', async () => {
         renderPage();
         await waitForLoaded();
+        goManual();
         fireEvent.click(screen.getByRole('button', { name: 'Periksa' }));
         expect(verifyChat).not.toHaveBeenCalled();
         expect(showNotification).toHaveBeenCalledWith('Isi ID grup dulu', 'warning');
@@ -208,7 +289,8 @@ describe('creating a route', () => {
         await waitForLoaded();
 
         fireEvent.change(screen.getByLabelText('Kamera'), { target: { value: '1435' } });
-        fireEvent.change(screen.getByLabelText('ID grup Telegram'), { target: { value: '-5562560753' } });
+        goManual();
+        fireEvent.change(screen.getByLabelText('Grup Telegram'), { target: { value: '-5562560753' } });
         fireEvent.change(screen.getByLabelText('Nama rute'), { target: { value: 'Arsip Lapangan Dander Barat' } });
         fireEvent.click(screen.getByRole('button', { name: 'Tambah rute' }));
 
@@ -228,7 +310,8 @@ describe('creating a route', () => {
 
         fireEvent.change(screen.getByLabelText('Cakupan'), { target: { value: 'area' } });
         fireEvent.change(screen.getByLabelText('Area'), { target: { value: '3' } });
-        fireEvent.change(screen.getByLabelText('ID grup Telegram'), { target: { value: '-5510674082' } });
+        goManual();
+        fireEvent.change(screen.getByLabelText('Grup Telegram'), { target: { value: '-5510674082' } });
         fireEvent.click(screen.getByRole('button', { name: 'Tambah rute' }));
 
         await waitFor(() => expect(createRoute).toHaveBeenCalled());
@@ -242,7 +325,8 @@ describe('creating a route', () => {
         await waitForLoaded();
 
         fireEvent.change(screen.getByLabelText('Kamera'), { target: { value: '1435' } });
-        fireEvent.change(screen.getByLabelText('ID grup Telegram'), { target: { value: '  -5562560753  ' } });
+        goManual();
+        fireEvent.change(screen.getByLabelText('Grup Telegram'), { target: { value: '  -5562560753  ' } });
         fireEvent.click(screen.getByRole('button', { name: 'Tambah rute' }));
 
         await waitFor(() => expect(createRoute).toHaveBeenCalled());
@@ -255,7 +339,8 @@ describe('creating a route', () => {
         await waitForLoaded();
 
         fireEvent.change(screen.getByLabelText('Kamera'), { target: { value: '1441' } });
-        fireEvent.change(screen.getByLabelText('ID grup Telegram'), { target: { value: '-5510674082' } });
+        goManual();
+        fireEvent.change(screen.getByLabelText('Grup Telegram'), { target: { value: '-5510674082' } });
         fireEvent.click(screen.getByRole('button', { name: 'Tambah rute' }));
 
         await waitFor(() => expect(showNotification)
@@ -270,7 +355,7 @@ describe('editing, toggling, deleting', () => {
 
         fireEvent.click(screen.getByRole('button', { name: 'Ubah' }));
         expect(screen.getByLabelText('Nama rute').value).toBe('Arsip Selatan AHASS');
-        expect(screen.getByLabelText('ID grup Telegram').value).toBe('-5510674082');
+        expect(screen.getByLabelText('Grup Telegram').value).toBe('-5510674082');
 
         fireEvent.change(screen.getByLabelText('Nama rute'), { target: { value: 'Nama Baru' } });
         fireEvent.click(screen.getByRole('button', { name: 'Simpan perubahan' }));
@@ -281,6 +366,29 @@ describe('editing, toggling, deleting', () => {
         ));
     });
 
+    it('keeps the picker when the route points at a known group', async () => {
+        renderPage();
+        await waitForLoaded();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Ubah' }));
+        const control = screen.getByLabelText('Grup Telegram');
+        expect(control.tagName).toBe('SELECT');
+        expect(control.value).toBe('-5510674082');
+    });
+
+    it('falls back to the id field when the route points at a group the bot has left', async () => {
+        const data = structuredClone(OVERVIEW);
+        data.routes[0].chatId = '-5544332211';       // no longer among the discovered groups
+        getOverview.mockResolvedValue({ success: true, data });
+        renderPage();
+        await waitForLoaded();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Ubah' }));
+        const control = screen.getByLabelText('Grup Telegram');
+        expect(control.tagName).toBe('INPUT');
+        expect(control.value).toBe('-5544332211');   // never silently reset
+    });
+
     it('cancels an edit without saving', async () => {
         renderPage();
         await waitForLoaded();
@@ -288,7 +396,7 @@ describe('editing, toggling, deleting', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Ubah' }));
         fireEvent.click(screen.getByRole('button', { name: 'Batal' }));
 
-        expect(screen.getByLabelText('ID grup Telegram').value).toBe('');
+        expect(screen.getByLabelText('Grup Telegram').value).toBe('');
         expect(updateRoute).not.toHaveBeenCalled();
     });
 

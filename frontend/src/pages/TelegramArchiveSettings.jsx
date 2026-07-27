@@ -38,6 +38,7 @@ export function TelegramArchiveSettings() {
     const [verified, setVerified] = useState(null);
     const [saving, setSaving] = useState(false);
     const [busyId, setBusyId] = useState(null);
+    const [manualChat, setManualChat] = useState(false);
 
     const load = useCallback(async () => {
         try {
@@ -66,7 +67,20 @@ export function TelegramArchiveSettings() {
     const cameras = overview?.cameras ?? [];
     const areas = overview?.areas ?? [];
     const routes = overview?.routes ?? [];
+    const groups = overview?.groups ?? [];
     const routedCount = cameras.filter((camera) => camera.targets.length > 0).length;
+
+    // Picking a known group already tells us the title and whether the bot may post, so the
+    // manual "check this id" step exists only for the fallback path.
+    const handlePickGroup = (chatId) => {
+        const group = groups.find((g) => g.chatId === chatId);
+        setDraft((prev) => ({
+            ...prev,
+            chatId,
+            label: prev.label || group?.title || '',
+        }));
+        setVerified(group ? { title: group.title, canSendDocuments: group.canSend !== false } : null);
+    };
 
     const handleVerify = async () => {
         if (!draft.chatId.trim()) {
@@ -117,6 +131,10 @@ export function TelegramArchiveSettings() {
     const handleEdit = (route) => {
         setEditingId(route.id);
         setVerified(null);
+        // A route pointing at a group the bot has since left (or was configured before discovery
+        // existed) has no matching option — fall back to the text field so the id stays visible
+        // instead of silently resetting to "— pilih grup —".
+        setManualChat(!groups.some((group) => group.chatId === route.chatId));
         setDraft({
             scope: route.scope,
             cameraId: route.cameraId ?? '',
@@ -132,6 +150,7 @@ export function TelegramArchiveSettings() {
         setEditingId(null);
         setDraft(EMPTY_DRAFT);
         setVerified(null);
+        setManualChat(false);
     };
 
     const handleToggle = async (route) => {
@@ -222,7 +241,11 @@ export function TelegramArchiveSettings() {
                 setField={setField}
                 cameras={cameras}
                 areas={areas}
+                groups={groups}
                 editing={Boolean(editingId)}
+                manual={manualChat}
+                onToggleManual={() => { setManualChat((v) => !v); setVerified(null); }}
+                onPickGroup={handlePickGroup}
                 onSubmit={handleSubmit}
                 onCancel={handleCancelEdit}
                 onVerify={handleVerify}

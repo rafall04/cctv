@@ -36,9 +36,11 @@ function WarnIcon() {
 }
 
 export function RouteForm({
-    draft, setField, cameras, areas, editing,
+    draft, setField, cameras, areas, groups, editing, manual, onToggleManual, onPickGroup,
     onSubmit, onCancel, onVerify, verifying, verified, saving,
 }) {
+    const usePicker = groups.length > 0 && !manual;
+
     return (
         <section className={card}>
             <div className="border-b border-edge px-4 py-3 sm:px-5">
@@ -109,27 +111,70 @@ export function RouteForm({
                 </p>
 
                 <div>
-                    <label className={label} htmlFor="tga-chat">ID grup Telegram</label>
-                    <div className="flex gap-2">
-                        <input
-                            id="tga-chat"
-                            className={`${input} flex-1 font-mono tabular-nums`}
-                            value={draft.chatId}
-                            onChange={(e) => setField('chatId', e.target.value)}
-                            placeholder="-5510674082"
-                            autoComplete="off"
-                            spellCheck="false"
-                            required
-                        />
-                        <button
-                            type="button"
-                            className={`${btnGhost} shrink-0 px-4`}
-                            onClick={onVerify}
-                            disabled={verifying}
-                        >
-                            {verifying ? 'Memeriksa…' : 'Periksa'}
-                        </button>
+                    <div className="mb-1.5 flex items-baseline justify-between gap-3">
+                        {/* The label must follow whichever control is actually rendered — with no
+                            groups discovered yet the picker never mounts, so pointing at it left
+                            the field unlabelled for screen readers. */}
+                        <label className={`${label} mb-0`} htmlFor={usePicker ? 'tga-group' : 'tga-chat'}>
+                            Grup Telegram
+                        </label>
+                        {groups.length > 0 && (
+                            <button
+                                type="button"
+                                className="text-xs text-content-muted underline underline-offset-2
+                                    hover:text-content focus:outline-none focus-visible:ring-2
+                                    focus-visible:ring-primary-500"
+                                onClick={onToggleManual}
+                            >
+                                {manual ? 'Pilih dari daftar' : 'Ketik ID manual'}
+                            </button>
+                        )}
                     </div>
+
+                    {usePicker ? (
+                        <>
+                            <select
+                                id="tga-group"
+                                className={input}
+                                value={draft.chatId}
+                                onChange={(e) => onPickGroup(e.target.value)}
+                                required
+                            >
+                                <option value="">— pilih grup —</option>
+                                {groups.map((group) => (
+                                    <option key={group.chatId} value={group.chatId}>
+                                        {group.title}
+                                        {group.canSend === false ? ' (bot tak boleh kirim file)' : ''}
+                                    </option>
+                                ))}
+                            </select>
+                            <p className={hint}>
+                                Daftar ini terisi sendiri: tambahkan bot ke sebuah grup, lalu grup itu
+                                langsung muncul di sini.
+                            </p>
+                        </>
+                    ) : (
+                        <div className="flex gap-2">
+                            <input
+                                id="tga-chat"
+                                className={`${input} flex-1 font-mono tabular-nums`}
+                                value={draft.chatId}
+                                onChange={(e) => setField('chatId', e.target.value)}
+                                placeholder="-5510674082"
+                                autoComplete="off"
+                                spellCheck="false"
+                                required
+                            />
+                            <button
+                                type="button"
+                                className={`${btnGhost} shrink-0 px-4`}
+                                onClick={onVerify}
+                                disabled={verifying}
+                            >
+                                {verifying ? 'Memeriksa…' : 'Periksa'}
+                            </button>
+                        </div>
+                    )}
 
                     <div aria-live="polite">
                         {verified ? (
@@ -154,10 +199,12 @@ export function RouteForm({
                                         : ' — bot TIDAK diizinkan mengirim file di grup ini.'}
                                 </span>
                             </p>
-                        ) : (
+                        ) : (manual || groups.length === 0) && (
                             <p className={hint}>
-                                Tambahkan bot ke grup, lalu tekan Periksa untuk memastikan ID-nya benar
-                                sebelum disimpan.
+                                {groups.length === 0
+                                    ? 'Belum ada grup terdeteksi. Tambahkan bot ke grup — grupnya akan '
+                                      + 'muncul di daftar dalam beberapa detik, tanpa perlu ID.'
+                                    : 'Tekan Periksa untuk memastikan ID-nya benar sebelum disimpan.'}
                             </p>
                         )}
                     </div>

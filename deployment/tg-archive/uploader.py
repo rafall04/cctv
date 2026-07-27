@@ -13,6 +13,7 @@ import json
 import time
 import sqlite3
 import logging
+import threading
 from datetime import datetime, timezone, timedelta
 
 import requests
@@ -46,6 +47,9 @@ class Config:
         self.backfill = env('BACKFILL', '0') == '1'
         self.stability_sec = int(env('STABILITY_SEC', '3'))
         self.dry_run = env('DRY_RUN', '0') == '1'
+        # Set to 0 only if some OTHER process ever needs to consume this bot's updates —
+        # Telegram allows a single getUpdates consumer per token (a second one gets 409).
+        self.discover_chats = env('DISCOVER_CHATS', '1') == '1'
 
     def api(self, method):
         return '%s/bot%s/%s' % (self.api_base, self.token, method)
@@ -157,6 +161,16 @@ def open_state(path):
         targets     TEXT,
         uploaded_at TEXT    NOT NULL DEFAULT (datetime('now')))''')
     conn.execute('CREATE INDEX IF NOT EXISTS idx_uploaded_status ON uploaded(status)')
+    # Groups the bot has been added to, learned from Telegram itself — the admin UI reads this so
+    # nobody has to copy a chat id by hand.
+    conn.execute('''CREATE TABLE IF NOT EXISTS chats (
+        chat_id       TEXT PRIMARY KEY,
+        title         TEXT,
+        type          TEXT,
+        status        TEXT,
+        can_send      INTEGER,
+        discovered_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at    TEXT NOT NULL DEFAULT (datetime('now')))''')
     conn.commit()
     return conn
 
@@ -175,6 +189,107 @@ def meta_set(state, key, value):
 def resolve_chat(state, chat_id):
     """Groups upgraded to supergroups get a new id; honour any recorded migration."""
     return meta_get(state, 'chat_migrate:%s' % chat_id) or chat_id
+
+
+# ------------------------------------------------------ group discovery (my_chat_member)
+
+def record_chat(state, chat, status=None, can_send=None):
+    """Upsert one known chat. Fields absent from this update keep their stored value."""
+    state.execute(
+        '''INSERT INTO chats (chat_id, title, type, status, can_send)
+           VALUES (?,?,?,?,?)
+           ON CONFLICT(chat_id) DO UPDATE SET
+             title      = COALESCE(excluded.title, chats.title),
+             type       = COALESCE(excluded.type, chats.type),
+             status     = COALESCE(excluded.status, chats.status),
+             can_send   = COALESCE(excluded.can_send, chats.can_send),
+             updated_at = datetime('now')''',
+        (str(chat.get('id')), chat.get('title') or chat.get('username'),
+         chat.get('type'), status, can_send))
+    state.commit()
+
+
+def refresh_chat(cfg, state, chat_id, log):
+    """Ask Telegram for the current title and whether the bot may post files there."""
+    try:
+        resp = requests.post(cfg.api('getChat'), data={'chat_id': chat_id}, timeout=20)
+        body = resp.json()
+    except (requests.RequestException, ValueError) as exc:
+        log.debug('refresh_chat %s failed: %s', chat_id, exc)
+        return
+    if not body.get('ok'):
+        # left/kicked/deleted — keep the row so the UI can explain why it stopped working
+        record_chat(state, {'id': chat_id}, status='unreachable')
+        return
+    result = body['result']
+    permissions = result.get('permissions') or {}
+    record_chat(state, result, status='member',
+                can_send=0 if permissions.get('can_send_documents') is False else 1)
+
+
+def seed_chats_from_routes(cfg, state, log):
+    """Groups added before this poller existed never emitted my_chat_member, so resolve the ones
+    already referenced by routes.json on start-up."""
+    try:
+        with open(cfg.routes_file) as fh:
+            routes = json.load(fh).get('routes', [])
+    except (OSError, ValueError):
+        return
+    for chat_id in {str(r.get('chatId')) for r in routes if r.get('chatId')}:
+        refresh_chat(cfg, state, chat_id, log)
+
+
+def handle_update(cfg, state, update, log):
+    membership = update.get('my_chat_member')
+    if membership:
+        chat = membership.get('chat') or {}
+        status = (membership.get('new_chat_member') or {}).get('status')
+        record_chat(state, chat, status=status)
+        log.info('grup %s (%s) -> %s', chat.get('title'), chat.get('id'), status)
+        if status in ('member', 'administrator'):
+            refresh_chat(cfg, state, chat.get('id'), log)
+        return
+
+    message = update.get('message') or update.get('channel_post')
+    if message:
+        chat = message.get('chat') or {}
+        if chat.get('type') in ('group', 'supergroup', 'channel'):
+            record_chat(state, chat)
+
+
+def discovery_loop(cfg, log):
+    """Long-polls getUpdates so a group becomes selectable in the admin UI the moment the bot is
+    invited. Runs in its own thread with its own SQLite connection; a failure here must never take
+    the uploader down. Only ONE consumer per bot token is allowed — nothing else polls this one."""
+    state = open_state(cfg.state_db)
+    seed_chats_from_routes(cfg, state, log)
+    log.info('penemuan grup aktif (getUpdates long-poll)')
+
+    while True:
+        try:
+            offset = int(meta_get(state, 'updates_offset') or 0)
+            params = {
+                'timeout': 25,
+                'allowed_updates': json.dumps(['my_chat_member', 'message']),
+            }
+            if offset:
+                params['offset'] = offset
+            body = requests.get(cfg.api('getUpdates'), params=params, timeout=45).json()
+
+            if not body.get('ok'):
+                log.warning('getUpdates ditolak: %s', body.get('description'))
+                time.sleep(30)
+                continue
+
+            for update in body.get('result', []):
+                handle_update(cfg, state, update, log)
+                meta_set(state, 'updates_offset', update['update_id'] + 1)
+        except (requests.RequestException, ValueError) as exc:
+            log.warning('penemuan grup: %s', exc)
+            time.sleep(20)
+        except sqlite3.Error as exc:
+            log.error('penemuan grup (sqlite): %s', exc)
+            time.sleep(30)
 
 
 # ------------------------------------------------------------- app DB (READ-ONLY)
@@ -417,6 +532,10 @@ def run(cfg, log):
     log.info('started: watermark=%s routes=%d cap=%.0f Mbps',
              watermark, len(router.routes), cfg.max_mbps)
 
+    if cfg.discover_chats:
+        threading.Thread(target=discovery_loop, args=(cfg, log),
+                         name='chat-discovery', daemon=True).start()
+
     while True:
         try:
             if time.time() - refreshed > 900:
@@ -480,6 +599,21 @@ def cmd_routes(cfg, log):
         print('%-6s %-38s %-16s %s' % (row['id'], cam['name'][:38], cam['area_name'][:16], label))
 
 
+def cmd_chats(cfg):
+    state = open_state(cfg.state_db)
+    rows = state.execute(
+        'SELECT chat_id, title, type, status, can_send, updated_at '
+        'FROM chats ORDER BY title').fetchall()
+    if not rows:
+        print('Belum ada grup terdeteksi. Tambahkan bot ke grup — datanya masuk otomatis.')
+        return
+    print('%-16s %-34s %-8s %-12s %s' % ('CHAT_ID', 'JUDUL', 'TIPE', 'STATUS', 'BISA KIRIM'))
+    for chat_id, title, ctype, status, can_send, _ in rows:
+        can = '-' if can_send is None else ('ya' if can_send else 'TIDAK')
+        print('%-16s %-34s %-8s %-12s %s' % (chat_id, (title or '-')[:34], ctype or '-',
+                                             status or '-', can))
+
+
 def cmd_status(cfg):
     state = open_state(cfg.state_db)
     print('watermark:', meta_get(state, 'last_segment_id'))
@@ -510,6 +644,8 @@ def main():
         return cmd_routes(cfg, log)
     if '--status' in sys.argv:
         return cmd_status(cfg)
+    if '--chats' in sys.argv:
+        return cmd_chats(cfg)
 
     if not cfg.token:
         sys.exit('FATAL: TG_BOT_TOKEN is required (set it in /opt/tg-archive/.env)')

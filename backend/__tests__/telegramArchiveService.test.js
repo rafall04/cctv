@@ -8,6 +8,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import Database from 'better-sqlite3';
 
 const CAMERAS = [
     { id: 1435, name: 'CCTV LAPANGAN DANDER BARAT', areaId: 2, areaName: 'DS DANDER' },
@@ -252,5 +253,47 @@ describe('verifyChat', () => {
 describe('activity', () => {
     it('reports unavailable rather than throwing when the sidecar never ran', () => {
         expect(service.activity()).toEqual({ available: false, totals: [], recent: [] });
+    });
+});
+
+describe('discovered groups', () => {
+    function seedChats(rows) {
+        const db = new Database(process.env.TG_ARCHIVE_STATE_DB);
+        db.exec(`CREATE TABLE chats (chat_id TEXT PRIMARY KEY, title TEXT, type TEXT,
+                 status TEXT, can_send INTEGER, discovered_at TEXT, updated_at TEXT)`);
+        const stmt = db.prepare('INSERT INTO chats VALUES (?,?,?,?,?,?,?)');
+        rows.forEach((r) => stmt.run(r.chatId, r.title, r.type, r.status, r.canSend, '', ''));
+        db.close();
+    }
+
+    it('returns nothing when the sidecar has not run yet', () => {
+        expect(service.groups()).toEqual([]);
+        expect(service.overview().groups).toEqual([]);
+    });
+
+    it('lists groups the bot is still in, with permission resolved to a boolean', () => {
+        seedChats([
+            { chatId: '-5510674082', title: 'CCTV SELATAN AHASS', type: 'group', status: 'member', canSend: 1 },
+            { chatId: '-5599990000', title: 'Grup Terkunci', type: 'group', status: 'member', canSend: 0 },
+        ]);
+        const groups = service.groups();
+        expect(groups).toHaveLength(2);
+        expect(groups.find((g) => g.chatId === '-5510674082').canSend).toBe(true);
+        expect(groups.find((g) => g.chatId === '-5599990000').canSend).toBe(false);
+    });
+
+    it('hides groups the bot was removed from, so they cannot be picked', () => {
+        seedChats([
+            { chatId: '-1', title: 'Masih Ikut', type: 'group', status: 'member', canSend: 1 },
+            { chatId: '-2', title: 'Sudah Keluar', type: 'group', status: 'left', canSend: 1 },
+            { chatId: '-3', title: 'Dikeluarkan', type: 'group', status: 'kicked', canSend: 1 },
+            { chatId: '-4', title: 'Tak Terjangkau', type: 'group', status: 'unreachable', canSend: 1 },
+        ]);
+        expect(service.groups().map((g) => g.title)).toEqual(['Masih Ikut']);
+    });
+
+    it('keeps an unknown permission as null rather than guessing', () => {
+        seedChats([{ chatId: '-1', title: 'Baru', type: 'group', status: 'member', canSend: null }]);
+        expect(service.groups()[0].canSend).toBeNull();
     });
 });
