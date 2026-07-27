@@ -27,8 +27,8 @@ describe('RecordingCameraGrid', () => {
         );
 
         expect(screen.getByText('CCTV LAPANGAN DANDER')).toBeTruthy();
-        expect(screen.getByText('Dander').className).toContain('dark:text-gray-200');
-        expect(screen.getByText('Duration:').className).toContain('dark:text-gray-200');
+        expect(screen.getByText('Dander').className).toMatch(/text-content/);
+        expect(screen.getByText('Duration:').className).toMatch(/text-content/);
         expect(screen.getByText('Recording Enabled:')).toBeTruthy();
         expect(screen.getByTestId('recording-status-7').className).toContain('dark:text-red-100');
     });
@@ -135,6 +135,6 @@ describe('RecordingCameraGrid', () => {
             />
         );
 
-        expect(screen.getByText('Tidak ada kamera dengan recording enabled').className).toContain('dark:text-gray-300');
+        expect(screen.getByText('Tidak ada kamera dengan recording enabled').className).toMatch(/text-content/);
     });
 });

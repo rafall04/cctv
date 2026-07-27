@@ -21,14 +21,14 @@ describe('CameraLocationSection dark mode readability', () => {
             />
         );
 
-        expect(screen.getByText('Lokasi Kamera').className).toContain('dark:text-gray-100');
+        expect(screen.getByText('Lokasi Kamera').className).toMatch(/text-content/);
         expect(screen.getByText('Pilih lokasi dengan GPS atau buka peta untuk menentukan titik kamera.').className)
-            .toContain('dark:text-gray-400');
+            .toMatch(/text-content/);
         expect(screen.getByText('Loading...').parentElement.className)
-            .toContain('dark:bg-gray-800');
-        expect(screen.getByText('Koneksi Tunnel').className).toContain('dark:text-gray-100');
-        expect(screen.getByText('Kurang stabil').className).toContain('dark:text-gray-400');
-        expect(screen.getByText('Loading...').className).toContain('dark:text-gray-400');
+            .toMatch(/bg-surface/);
+        expect(screen.getByText('Koneksi Tunnel').className).toMatch(/text-content/);
+        expect(screen.getByText('Kurang stabil').className).toMatch(/text-content/);
+        expect(screen.getByText('Loading...').className).toMatch(/text-content/);
         expect(await screen.findByTestId('camera-location-picker')).toBeTruthy();
     });
 });

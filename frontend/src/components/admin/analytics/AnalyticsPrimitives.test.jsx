@@ -32,8 +32,8 @@ describe('AnalyticsPrimitives dark mode readability', () => {
             </div>
         );
 
-        expect(screen.getByText('Viewers').className).toContain('dark:text-gray-400');
-        expect(screen.getByDisplayValue('2026-03-08').className).toContain('dark:text-white');
+        expect(screen.getByText('Viewers').className).toMatch(/text-content/);
+        expect(screen.getByDisplayValue('2026-03-08').className).toMatch(/text-content/);
     });
 
     it('memberi tone dark mode eksplisit pada empty state dan pagination', () => {
@@ -44,8 +44,8 @@ describe('AnalyticsPrimitives dark mode readability', () => {
             </div>
         );
 
-        expect(screen.getByText('Tidak ada data').className).toContain('dark:text-gray-400');
-        expect(screen.getAllByText('...')[0].className).toContain('dark:text-gray-400');
-        expect(container.querySelector('button').className).toContain('dark:text-gray-300');
+        expect(screen.getByText('Tidak ada data').className).toMatch(/text-content/);
+        expect(screen.getAllByText('...')[0].className).toMatch(/text-content/);
+        expect(container.querySelector('button').className).toMatch(/text-content/);
     });
 });
