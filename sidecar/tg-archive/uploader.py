@@ -446,6 +446,8 @@ def mirror_to_app_db(cfg, seg, status, detail, targets, payload, log=None):
     write failure here can never cost an upload or cause one to be retried. Rows are tiny and rare
     (~15/hour), so the extra connection costs nothing.
     """
+    # NOTE: `seg` is a sqlite3.Row — it indexes like a dict but has NO .get(). Its SELECT always
+    # includes start_time, so ['start_time'] is safe. `targets` entries ARE plain dicts.
     file_id = None
     if targets:
         file_id = (targets[0] or {}).get('fileId')
@@ -459,7 +461,7 @@ def mirror_to_app_db(cfg, seg, status, detail, targets, payload, log=None):
             ' recorded_at,uploaded_at) '
             "VALUES(?,?,?,?,?,?,?,?,?,datetime('now'))",
             (seg['id'], seg['camera_id'], seg['filename'], seg['file_size'],
-             status, detail, payload, file_id, seg.get('start_time')))
+             status, detail, payload, file_id, seg['start_time']))
         conn.commit()
     except Exception as exc:  # noqa: BLE001 - never let bookkeeping break an upload
         if log:
