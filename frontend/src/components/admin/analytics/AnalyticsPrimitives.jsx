@@ -86,7 +86,7 @@ export function PeriodSelector({ value, onChange, customDate, onCustomDateChange
                                 setShowDatePicker(false);
                             }
                         }}
-                        className={`px-3 py-2 text-sm font-medium rounded-lg transition-all ${value === period.value ? 'bg-white dark:bg-gray-700 text-content shadow-sm' : 'text-gray-600 hover:text-gray-800 dark:hover:text-white'}`}
+                        className={`px-3 py-2 text-sm font-medium rounded-lg transition-all ${value === period.value ? 'bg-surface text-content shadow-sm' : 'text-content-muted hover:text-content'}`}
                     >
                         {period.label}
                     </button>
@@ -131,7 +131,7 @@ export function ActiveViewerCard({ session }) {
             <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
                 session.deviceType === 'mobile' ? 'bg-blue-100 dark:bg-primary/20 text-primary' :
                 session.deviceType === 'tablet' ? 'bg-purple-100 dark:bg-purple-500/20 text-purple-500' :
-                'bg-gray-100 dark:bg-gray-700 text-content-muted'
+                'bg-surface-sunken text-content-muted'
             }`}>
                 <DeviceIcon type={session.deviceType} className="w-5 h-5" />
             </div>
@@ -235,7 +235,7 @@ export function Pagination({ currentPage, totalPages, onPageChange }) {
                 <button
                     key={page}
                     onClick={() => onPageChange(page)}
-                    className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${page === currentPage ? 'bg-primary text-white' : 'hover:bg-surface-sunken text-gray-700 dark:text-gray-300'}`}
+                    className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${page === currentPage ? 'bg-primary text-white' : 'hover:bg-surface-sunken text-content-muted'}`}
                 >
                     {page}
                 </button>

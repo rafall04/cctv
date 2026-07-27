@@ -208,8 +208,8 @@ function TopupPanel({ onCompleted, resumable = [] }) {
     if (pending) {
         const statusLabel = STATUS_LABELS[pending.status] || STATUS_LABELS.pending;
         return (
-            <div className="rounded-2xl border border-edge bg-white p-4 dark:bg-gray-900">
-                <h3 className="font-semibold text-gray-900 dark:text-white">Top-up {formatRupiah(pending.amount)}</h3>
+            <div className="rounded-2xl border border-edge bg-surface p-4">
+                <h3 className="font-semibold text-content">Top-up {formatRupiah(pending.amount)}</h3>
                 <p className={`mt-1 text-sm font-medium ${statusLabel.className}`}>{statusLabel.text}</p>
                 {pending.promo_bonus > 0 && (
                     <p className="mt-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
@@ -572,7 +572,7 @@ export default function MyWallet() {
                                     </div>
                                     <p className={`font-semibold ${trx.amount >= 0
                                         ? 'text-emerald-600 dark:text-emerald-400'
-                                        : 'text-gray-700 dark:text-gray-300'
+                                        : 'text-content-muted'
                                     }`}>
                                         {trx.amount >= 0 ? '+' : ''}{formatRupiah(trx.amount)}
                                     </p>

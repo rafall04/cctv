@@ -77,7 +77,7 @@ function RecordingQuickEditCard({
     };
 
     return (
-        <div key={cameraId} className="rounded-2xl border border-gray-200 bg-surface p-5 shadow-sm dark:border-gray-700/70 md:p-6">
+        <div key={cameraId} className="rounded-2xl border border-edge bg-surface p-5 shadow-sm md:p-6">
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
@@ -102,7 +102,7 @@ function RecordingQuickEditCard({
                     className={`inline-flex shrink-0 self-start rounded-full px-3 py-1 text-xs font-semibold ${
                         isRecording
                             ? 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-100'
-                            : 'bg-gray-100 text-gray-700 dark:bg-gray-700/90 dark:text-gray-100'
+                            : 'bg-gray-100 text-content dark:bg-gray-700/90'
                     }`}
                 >
                     {isRecording ? 'Recording' : 'Stopped'}

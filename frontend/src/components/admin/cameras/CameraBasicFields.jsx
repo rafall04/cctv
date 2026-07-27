@@ -21,7 +21,7 @@ export default function CameraBasicFields({
                         onChange={onChange}
                         onBlur={onBlur}
                         disabled={isSubmitting}
-                        className={`w-full px-3 py-2 bg-surface-sunken border rounded-xl text-content placeholder-content-subtle focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50 text-sm ${getFieldError('name') ? 'border-red-500 focus:ring-red-500' : 'border-gray-200 dark:border-gray-700/50'}`}
+                        className={`w-full px-3 py-2 bg-surface-sunken border rounded-xl text-content placeholder-content-subtle focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50 text-sm ${getFieldError('name') ? 'border-red-500 focus:ring-red-500' : 'border-edge'}`}
                         placeholder="Front Entrance"
                     />
                     {getFieldError('name') && (

@@ -102,7 +102,7 @@ function renderRecovery(log) {
 
 export default function RecordingRestartLogs({ logs }) {
     return (
-        <div className="rounded-2xl border border-gray-200 bg-surface p-5 shadow-sm dark:border-gray-700/70 md:p-6">
+        <div className="rounded-2xl border border-edge bg-surface p-5 shadow-sm md:p-6">
             <h2 className="mb-4 text-xl font-bold text-content">Auto-Restart Logs</h2>
 
             {logs.length > 0 ? (

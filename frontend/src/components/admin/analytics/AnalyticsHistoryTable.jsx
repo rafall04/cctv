@@ -141,7 +141,7 @@ export default function AnalyticsHistoryTable({
                                 {items.map((item, index) => (
                                     <tr
                                         key={rowKey(item, index)}
-                                        className={`transition-colors ${onRowClick ? 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50' : ''}`}
+                                        className={`transition-colors ${onRowClick ? 'cursor-pointer hover:bg-surface-sunken' : ''}`}
                                         onClick={() => onRowClick?.(item)}
                                     >
                                         {columns.map((column) => (

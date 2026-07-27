@@ -43,11 +43,11 @@ export default function CameraFormModal({
                 role="dialog"
                 aria-modal="true"
                 aria-label={editingCamera ? 'Edit Camera' : 'Add Camera'}
-                className="bg-white dark:bg-gray-800 w-full max-w-lg rounded-2xl shadow-2xl border border-edge my-auto max-h-[90vh] flex flex-col"
+                className="bg-surface w-full max-w-lg rounded-2xl shadow-2xl border border-edge my-auto max-h-[90vh] flex flex-col"
             >
                 <div className="p-4 sm:p-6 border-b border-edge flex justify-between items-center shrink-0">
                     <div>
-                        <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                        <h3 className="text-lg font-bold text-content">
                             {editingCamera ? 'Edit Camera' : 'Add Camera'}
                         </h3>
                         <p className="text-sm text-content-muted">Configure stream source</p>

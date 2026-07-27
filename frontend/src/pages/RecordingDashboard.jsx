@@ -101,7 +101,7 @@ export default function RecordingDashboard() {
 
     return (
         <div className="space-y-4 md:space-y-6">
-            <div className="rounded-2xl border border-gray-200 bg-surface p-5 shadow-sm dark:border-gray-700/70 md:p-6">
+            <div className="rounded-2xl border border-edge bg-surface p-5 shadow-sm md:p-6">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                     <div>
                         <p className="text-sm font-semibold text-primary">Recording Overview</p>

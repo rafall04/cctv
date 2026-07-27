@@ -424,7 +424,7 @@ export default function AdsSettingsPanel() {
                         />
                     </div>
 
-                    <div className="rounded-xl border border-primary-300 bg-primary-100 px-4 py-3 text-sm text-primary border-primary-300 dark:bg-primary/10 dark:text-sky-100">
+                    <div className="rounded-xl border border-primary-300 bg-primary-100 px-4 py-3 text-sm text-primary border-primary-300 dark:bg-primary/10 text-primary">
                         Gunakan creative compact atau vertikal untuk slot popup. Pada desktop, hanya satu slot popup yang diprioritaskan agar player tetap terbaca.
                     </div>
                 </SectionCard>

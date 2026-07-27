@@ -42,7 +42,7 @@ export default function AreaFormModal({
             >
                 <div className="p-6 border-b border-edge flex justify-between items-center sticky top-0 bg-surface">
                     <div>
-                        <h3 className="text-lg font-bold text-gray-900 dark:text-white">{editingArea ? 'Edit Area' : 'Tambah Area'}</h3>
+                        <h3 className="text-lg font-bold text-content">{editingArea ? 'Edit Area' : 'Tambah Area'}</h3>
                         <p className="text-sm text-content-muted">Isi detail lokasi</p>
                     </div>
                     <button type="button" onClick={onClose} className="p-2 rounded-lg hover:bg-surface-sunken text-content-muted">
@@ -157,7 +157,7 @@ export default function AreaFormModal({
                                 name="show_on_grid_default"
                                 checked={Boolean(formData.show_on_grid_default)}
                                 onChange={onChange}
-                                className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                className="mt-1 h-4 w-4 rounded border-edge-strong text-primary focus:ring-primary"
                             />
                             <span>
                                 <span className="block text-sm font-medium text-content dark:text-white">Tampilkan di Grid Default</span>

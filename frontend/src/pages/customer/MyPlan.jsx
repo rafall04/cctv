@@ -77,7 +77,7 @@ export default function MyPlan() {
     };
 
     if (loading) {
-        return <div className="py-16 text-center text-gray-500 dark:text-gray-400">Memuat paket…</div>;
+        return <div className="py-16 text-center text-content-muted">Memuat paket…</div>;
     }
 
     const current = state?.plan;
@@ -85,11 +85,11 @@ export default function MyPlan() {
 
     return (
         <div className="space-y-4">
-            <div className="rounded-2xl border border-edge bg-white p-4 dark:bg-gray-900">
-                <h2 className="font-semibold text-gray-900 dark:text-white">Paket Saya</h2>
+            <div className="rounded-2xl border border-edge bg-surface p-4">
+                <h2 className="font-semibold text-content">Paket Saya</h2>
                 {current ? (
-                    <div className="mt-2 flex flex-wrap items-center gap-x-6 gap-y-1 text-sm text-gray-600 dark:text-gray-300">
-                        <span className="text-lg font-bold text-gray-900 dark:text-white">{current.name}</span>
+                    <div className="mt-2 flex flex-wrap items-center gap-x-6 gap-y-1 text-sm text-content-muted">
+                        <span className="text-lg font-bold text-content">{current.name}</span>
                         <span>{current.is_trial ? 'Gratis (trial)' : `${formatRupiah(current.price_per_camera)}/kamera/bulan`}</span>
                         <span>Kamera: {state.used_cameras}/{state.max_cameras}</span>
                         {state.trial_active && (
@@ -132,18 +132,18 @@ export default function MyPlan() {
                             }`}
                         >
                             <div className="flex items-center justify-between">
-                                <h3 className="font-bold text-gray-900 dark:text-white">{plan.name}</h3>
+                                <h3 className="font-bold text-content">{plan.name}</h3>
                                 {isCurrent && (
                                     <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">Aktif</span>
                                 )}
                             </div>
-                            <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">
+                            <p className="mt-1 text-2xl font-bold text-content">
                                 {plan.is_trial === 1 ? 'Gratis' : formatRupiah(plan.price_per_camera)}
-                                <span className="text-sm font-normal text-gray-500 dark:text-gray-400">
+                                <span className="text-sm font-normal text-content-muted">
                                     {plan.is_trial === 1 ? ` / ${plan.trial_days} hari` : '/kamera/bulan'}
                                 </span>
                             </p>
-                            <ul className="mt-2 space-y-1 text-sm text-gray-600 dark:text-gray-300">
+                            <ul className="mt-2 space-y-1 text-sm text-content-muted">
                                 <li>✓ Maks. {plan.max_cameras} kamera</li>
                                 <li>✓ Live streaming 24 jam</li>
                                 {plan.description && <li>✓ {plan.description}</li>}

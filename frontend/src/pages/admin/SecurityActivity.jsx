@@ -66,9 +66,9 @@ function summarizeDetails(rawDetails) {
 
 function StatTile({ label, value, tone }) {
     return (
-        <div className="rounded-2xl border border-gray-200 bg-surface p-4 shadow-sm dark:border-gray-700/70">
+        <div className="rounded-2xl border border-edge bg-surface p-4 shadow-sm">
             <div className="text-xs font-medium text-content-muted">{label}</div>
-            <div className={`mt-1 text-2xl font-bold ${tone || 'text-gray-900 dark:text-white'}`}>{value}</div>
+            <div className={`mt-1 text-2xl font-bold ${tone || 'text-content'}`}>{value}</div>
         </div>
     );
 }
@@ -200,7 +200,7 @@ export default function SecurityActivity() {
             {/* Filters */}
             <form
                 onSubmit={applySearch}
-                className="flex flex-col gap-3 rounded-2xl border border-gray-200 bg-surface p-4 shadow-sm dark:border-gray-700/70 sm:flex-row sm:items-center"
+                className="flex flex-col gap-3 rounded-2xl border border-edge bg-surface p-4 shadow-sm sm:flex-row sm:items-center"
             >
                 <select
                     aria-label="Filter tipe event"
@@ -229,7 +229,7 @@ export default function SecurityActivity() {
             </form>
 
             {/* Table */}
-            <div className="overflow-hidden rounded-2xl border border-gray-200 bg-surface shadow-sm dark:border-gray-700/70">
+            <div className="overflow-hidden rounded-2xl border border-edge bg-surface shadow-sm">
                 <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-700/60">
                         <thead className="bg-surface-sunken text-left text-xs uppercase tracking-wider text-content-muted">

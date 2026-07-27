@@ -24,7 +24,7 @@ export default function FeedbackListPanel({
                         <div
                             key={feedback.id}
                             onClick={() => onSelect(feedback)}
-                            className={`p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors ${
+                            className={`p-4 cursor-pointer hover:bg-gray-50 transition-colors ${
                                 selectedFeedback?.id === feedback.id ? 'bg-primary-100 dark:bg-sky-900/20' : ''
                             }`}
                         >

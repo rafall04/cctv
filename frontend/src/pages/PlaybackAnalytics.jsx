@@ -514,7 +514,7 @@ export default function PlaybackAnalytics() {
                     <SectionCard title="Top Kamera Playback">
                         <div className="space-y-3">
                             {topCameras.map((camera) => (
-                                <div key={`${camera.camera_id}-${camera.camera_name}`} className="rounded-xl bg-gray-50 px-4 py-3 dark:bg-gray-950/60">
+                                <div key={`${camera.camera_id}-${camera.camera_name}`} className="rounded-xl bg-surface-sunken px-4 py-3">
                                     <div className="font-semibold text-content">{camera.camera_name}</div>
                                     <div className="mt-1 text-sm text-content-muted">
                                         {camera.total_sessions} sesi • {camera.unique_viewers} unique • {formatWatchTime(camera.total_watch_time)}
@@ -527,7 +527,7 @@ export default function PlaybackAnalytics() {
                     <SectionCard title="Top Segment Playback">
                         <div className="space-y-3">
                             {topSegments.map((segment) => (
-                                <div key={`${segment.camera_id}-${segment.segment_filename}-${segment.playback_access_mode}`} className="rounded-xl bg-gray-50 px-4 py-3 dark:bg-gray-950/60">
+                                <div key={`${segment.camera_id}-${segment.segment_filename}-${segment.playback_access_mode}`} className="rounded-xl bg-surface-sunken px-4 py-3">
                                     <div className="font-semibold text-content">{segment.camera_name}</div>
                                     <div className="text-xs text-content-muted">{segment.segment_filename}</div>
                                     <div className="mt-1 text-sm text-content-muted">
@@ -541,7 +541,7 @@ export default function PlaybackAnalytics() {
                     <SectionCard title="Top Access Mode">
                         <div className="space-y-3">
                             {accessBreakdown.map((item) => (
-                                <div key={item.playback_access_mode} className="rounded-xl bg-gray-50 px-4 py-3 dark:bg-gray-950/60">
+                                <div key={item.playback_access_mode} className="rounded-xl bg-surface-sunken px-4 py-3">
                                     <div className="font-semibold text-content">{item.playback_access_mode}</div>
                                     <div className="mt-1 text-sm text-content-muted">{item.count} sesi</div>
                                 </div>
@@ -556,7 +556,7 @@ export default function PlaybackAnalytics() {
                     <SectionCard title="Device Breakdown">
                         <div className="space-y-3">
                             {deviceBreakdown.map((item) => (
-                                <div key={item.device_type} className="flex items-center justify-between rounded-xl bg-gray-50 px-4 py-3 dark:bg-gray-950/60">
+                                <div key={item.device_type} className="flex items-center justify-between rounded-xl bg-surface-sunken px-4 py-3">
                                     <div>{renderDeviceBadge(item.device_type)}</div>
                                     <div className="text-right text-sm text-content-muted">
                                         <div className="font-semibold text-content">{item.count}</div>
@@ -573,7 +573,7 @@ export default function PlaybackAnalytics() {
                     <SectionCard title="Top Viewer Playback">
                         <div className="space-y-3">
                             {topViewers.map((viewer) => (
-                                <div key={viewer.ip_address} className="rounded-xl bg-gray-50 px-4 py-3 dark:bg-gray-950/60">
+                                <div key={viewer.ip_address} className="rounded-xl bg-surface-sunken px-4 py-3">
                                     <div className="font-mono text-sm font-semibold text-content">{viewer.ip_address}</div>
                                     <div className="mt-1 text-sm text-content-muted">
                                         {viewer.total_sessions} sesi • {viewer.cameras_watched} kamera • {formatWatchTime(viewer.total_watch_time)}

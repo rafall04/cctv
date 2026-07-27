@@ -375,7 +375,7 @@ export default function ViewerAnalytics() {
                         <TopMetricCard title="Active by Camera">
                             <div className="space-y-3">
                                 {Object.entries(activeByCamera).map(([cameraName, count]) => (
-                                    <div key={cameraName} className="flex items-center justify-between rounded-xl bg-gray-50 px-4 py-3 dark:bg-gray-950/60">
+                                    <div key={cameraName} className="flex items-center justify-between rounded-xl bg-surface-sunken px-4 py-3">
                                         <span className="font-medium text-content">{cameraName}</span>
                                         <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary dark:bg-primary/20 dark:text-primary-300">
                                             {count} aktif
@@ -391,7 +391,7 @@ export default function ViewerAnalytics() {
                         <TopMetricCard title="Active by Device">
                             <div className="space-y-3">
                                 {deviceBreakdown.map((item) => (
-                                    <div key={item.device_type} className="flex items-center justify-between rounded-xl bg-gray-50 px-4 py-3 dark:bg-gray-950/60">
+                                    <div key={item.device_type} className="flex items-center justify-between rounded-xl bg-surface-sunken px-4 py-3">
                                         <div>{renderDeviceBadge(item.device_type)}</div>
                                         <span className="text-sm font-semibold text-content">{item.count}</span>
                                     </div>
@@ -481,7 +481,7 @@ export default function ViewerAnalytics() {
                     <TopMetricCard title="Top Kamera">
                         <div className="space-y-3">
                             {topCameras.map((camera) => (
-                                <div key={camera.camera_id} className="rounded-xl bg-gray-50 px-4 py-3 dark:bg-gray-950/60">
+                                <div key={camera.camera_id} className="rounded-xl bg-surface-sunken px-4 py-3">
                                     <div className="font-semibold text-content">{camera.camera_name}</div>
                                     <div className="mt-1 text-sm text-content-muted">
                                         {camera.total_views} sesi • {camera.unique_viewers} unique • {formatWatchTime(camera.total_watch_time)}
@@ -494,7 +494,7 @@ export default function ViewerAnalytics() {
                     <TopMetricCard title="Top Visitor">
                         <div className="space-y-3">
                             {topVisitors.map((visitor) => (
-                                <div key={visitor.ip_address} className="rounded-xl bg-gray-50 px-4 py-3 dark:bg-gray-950/60">
+                                <div key={visitor.ip_address} className="rounded-xl bg-surface-sunken px-4 py-3">
                                     <div className="font-mono text-sm font-semibold text-content">{visitor.ip_address}</div>
                                     <div className="mt-1 text-sm text-content-muted">
                                         {visitor.total_sessions} sesi • {visitor.cameras_watched} kamera • {formatWatchTime(visitor.total_watch_time)}
@@ -507,7 +507,7 @@ export default function ViewerAnalytics() {
                     <TopMetricCard title="Peak Hours">
                         <div className="space-y-3">
                             {peakHours.map((hour) => (
-                                <div key={hour.hour} className="rounded-xl bg-gray-50 px-4 py-3 dark:bg-gray-950/60">
+                                <div key={hour.hour} className="rounded-xl bg-surface-sunken px-4 py-3">
                                     <div className="font-semibold text-content">{hour.hour}:00</div>
                                     <div className="mt-1 text-sm text-content-muted">
                                         {hour.sessions} sesi • {hour.unique_visitors} unique

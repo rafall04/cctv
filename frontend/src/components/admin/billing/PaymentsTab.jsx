@@ -74,7 +74,7 @@ export default function PaymentsTab({ payments, run, busy }) {
 
     if (payments.length === 0) {
         return (
-            <div className="rounded-2xl border border-dashed border-edge px-4 py-12 text-center text-sm text-gray-500 dark:text-gray-400">
+            <div className="rounded-2xl border border-dashed border-edge px-4 py-12 text-center text-sm text-content-muted">
                 Belum ada pembayaran.
             </div>
         );
@@ -85,7 +85,7 @@ export default function PaymentsTab({ payments, run, busy }) {
             {FilterBar}
 
             {filtered.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-edge px-4 py-10 text-center text-sm text-gray-500 dark:text-gray-400">
+                <div className="rounded-2xl border border-dashed border-edge px-4 py-10 text-center text-sm text-content-muted">
                     Tidak ada pembayaran berstatus ini.
                 </div>
             ) : (
@@ -93,7 +93,7 @@ export default function PaymentsTab({ payments, run, busy }) {
             {/* Desktop: table */}
             <DesktopTable minWidth="min-w-[680px]">
                 <thead>
-                    <tr className="text-left text-xs uppercase text-gray-500 dark:text-gray-400">
+                    <tr className="text-left text-xs uppercase text-content-muted">
                         <th className="px-3 py-2">ID</th>
                         <th className="px-3 py-2">Pelanggan</th>
                         <th className="px-3 py-2">Gateway</th>
@@ -103,22 +103,22 @@ export default function PaymentsTab({ payments, run, busy }) {
                         <th className="px-3 py-2 text-right">Aksi</th>
                     </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                <tbody className="divide-y divide-edge">
                     {filtered.map((payment) => (
-                        <tr key={payment.id} className="bg-white dark:bg-gray-900">
-                            <td className="px-3 py-2 text-gray-500 dark:text-gray-400">#{payment.id}</td>
+                        <tr key={payment.id} className="bg-surface">
+                            <td className="px-3 py-2 text-content-muted">#{payment.id}</td>
                             <td className="px-3 py-2">
-                                <span className="font-medium text-gray-900 dark:text-white">{payment.username || payment.user_id}</span>
+                                <span className="font-medium text-content">{payment.username || payment.user_id}</span>
                                 {payment.failure_reason && (
                                     <p className="mt-0.5 max-w-[220px] truncate text-[11px] text-red-500" title={payment.failure_reason}>
                                         ⚠ {payment.failure_reason}
                                     </p>
                                 )}
                             </td>
-                            <td className="px-3 py-2 text-gray-600 dark:text-gray-300">{payment.gateway}</td>
+                            <td className="px-3 py-2 text-content-muted">{payment.gateway}</td>
                             <td className="px-3 py-2 text-right font-semibold">{formatRupiah(payment.amount)}</td>
                             <td className="px-3 py-2 text-center"><StatusBadge className={PAY_STATUS_BADGES[payment.status] || ''}>{payment.status}</StatusBadge></td>
-                            <td className="px-3 py-2 whitespace-nowrap text-gray-500 dark:text-gray-400">{formatDateTime(payment.created_at)}</td>
+                            <td className="px-3 py-2 whitespace-nowrap text-content-muted">{formatDateTime(payment.created_at)}</td>
                             <td className="px-3 py-2 text-right"><ConfirmBtn payment={payment} /></td>
                         </tr>
                     ))}
@@ -128,11 +128,11 @@ export default function PaymentsTab({ payments, run, busy }) {
             {/* Mobile: cards */}
             <div className="space-y-3 md:hidden">
                 {filtered.map((payment) => (
-                    <div key={payment.id} className="rounded-2xl border border-edge bg-white p-4 dark:bg-gray-900">
+                    <div key={payment.id} className="rounded-2xl border border-edge bg-surface p-4">
                         <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0">
-                                <p className="truncate font-semibold text-gray-900 dark:text-white">{payment.username || payment.user_id}</p>
-                                <p className="text-xs text-gray-400">#{payment.id} · {payment.gateway} · {formatDateTime(payment.created_at)}</p>
+                                <p className="truncate font-semibold text-content">{payment.username || payment.user_id}</p>
+                                <p className="text-xs text-content-subtle">#{payment.id} · {payment.gateway} · {formatDateTime(payment.created_at)}</p>
                             </div>
                             <StatusBadge className={PAY_STATUS_BADGES[payment.status] || ''}>{payment.status}</StatusBadge>
                         </div>

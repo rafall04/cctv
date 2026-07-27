@@ -141,7 +141,7 @@ export default function MyAccount() {
     };
 
     if (loading) {
-        return <div className="py-16 text-center text-gray-500 dark:text-gray-400">Memuat akun…</div>;
+        return <div className="py-16 text-center text-content-muted">Memuat akun…</div>;
     }
 
     const memberSince = profile?.created_at ? String(profile.created_at).slice(0, 10) : '—';
@@ -151,11 +151,11 @@ export default function MyAccount() {
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             {/* Profil */}
             <form onSubmit={submitProfile} className={cardClass}>
-                <h2 className="text-lg font-bold text-gray-900 dark:text-white">Profil Akun</h2>
-                <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">Data kontak akun Anda.</p>
+                <h2 className="text-lg font-bold text-content">Profil Akun</h2>
+                <p className="mt-0.5 text-xs text-content-muted">Data kontak akun Anda.</p>
                 <div className="mt-4 space-y-3">
                     <div>
-                        <label htmlFor="acc-username" className={labelClass}>Username <span className="font-normal text-gray-400">(untuk login)</span></label>
+                        <label htmlFor="acc-username" className={labelClass}>Username <span className="font-normal text-content-subtle">(untuk login)</span></label>
                         <input id="acc-username" value={form.username} onChange={(e) => { setForm({ ...form, username: e.target.value }); setProfileMsg(null); }} minLength={3} maxLength={50} className={inputClass} />
                     </div>
                     <div>
@@ -165,7 +165,7 @@ export default function MyAccount() {
                     <div>
                         <label htmlFor="acc-email" className={labelClass}>Email</label>
                         <input id="acc-email" type="email" value={form.email} onChange={(e) => { setForm({ ...form, email: e.target.value }); setProfileMsg(null); }} maxLength={120} placeholder="nama@email.com" className={inputClass} />
-                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Dipakai untuk notifikasi &amp; verifikasi pembayaran. Pastikan email valid &amp; aktif.</p>
+                        <p className="mt-1 text-xs text-content-muted">Dipakai untuk notifikasi &amp; verifikasi pembayaran. Pastikan email valid &amp; aktif.</p>
                     </div>
                 </div>
                 <Msg msg={profileMsg} />
@@ -176,8 +176,8 @@ export default function MyAccount() {
 
             {/* Ubah Password */}
             <form onSubmit={submitPassword} className={cardClass}>
-                <h2 className="text-lg font-bold text-gray-900 dark:text-white">Ubah Password</h2>
-                <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">Demi keamanan, masukkan password lama untuk konfirmasi.</p>
+                <h2 className="text-lg font-bold text-content">Ubah Password</h2>
+                <p className="mt-0.5 text-xs text-content-muted">Demi keamanan, masukkan password lama untuk konfirmasi.</p>
                 <div className="mt-4 space-y-3">
                     <div>
                         <label htmlFor="acc-curpwd" className={labelClass}>Password lama</label>
@@ -193,8 +193,8 @@ export default function MyAccount() {
                     </div>
                 </div>
                 {requirements.length > 0 && (
-                    <ul className="mt-3 space-y-0.5 rounded-xl bg-surface-sunken p-3 text-xs text-gray-500 dark:text-gray-400">
-                        <li className="font-medium text-gray-600 dark:text-gray-300">Syarat password baru:</li>
+                    <ul className="mt-3 space-y-0.5 rounded-xl bg-surface-sunken p-3 text-xs text-content-muted">
+                        <li className="font-medium text-content-muted">Syarat password baru:</li>
                         {requirements.map((r) => (<li key={r}>• {r}</li>))}
                     </ul>
                 )}

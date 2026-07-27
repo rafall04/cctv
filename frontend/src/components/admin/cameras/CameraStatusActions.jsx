@@ -54,7 +54,7 @@ export default function CameraStatusActions({
                     <svg className={`w-3.5 h-3.5 ${camera.status === 'maintenance' ? 'text-red-500' : 'text-content-subtle'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63" />
                     </svg>
-                    <span className={`text-xs ${camera.status === 'maintenance' ? 'text-red-500 font-medium' : 'text-gray-400 dark:text-gray-500'}`}>
+                    <span className={`text-xs ${camera.status === 'maintenance' ? 'text-red-500 font-medium' : 'text-content-subtle'}`}>
                         {camera.status === 'maintenance' ? 'Perbaikan' : 'Normal'}
                     </span>
                 </div>

@@ -329,10 +329,10 @@ export default function BackupRestore() {
                                 <p className="text-sm text-content-muted">Tinjau kamera yang cocok, butuh perbaikan, atau masih ambigu.</p>
                             </div>
                             <div className="flex flex-wrap gap-2">
-                                <button type="button" onClick={() => setRowFilter('all')} className={`px-3 py-2 rounded-xl text-sm ${rowFilter === 'all' ? 'bg-primary text-white' : 'bg-surface-sunken text-gray-700 dark:text-gray-300'}`}>Semua</button>
-                                <button type="button" onClick={() => setRowFilter('repairable')} className={`px-3 py-2 rounded-xl text-sm ${rowFilter === 'repairable' ? 'bg-primary text-white' : 'bg-surface-sunken text-gray-700 dark:text-gray-300'}`}>Repairable</button>
-                                <button type="button" onClick={() => setRowFilter('external_only')} className={`px-3 py-2 rounded-xl text-sm ${rowFilter === 'external_only' ? 'bg-primary text-white' : 'bg-surface-sunken text-gray-700 dark:text-gray-300'}`}>External Only</button>
-                                <button type="button" onClick={() => setRowFilter('issues')} className={`px-3 py-2 rounded-xl text-sm ${rowFilter === 'issues' ? 'bg-primary text-white' : 'bg-surface-sunken text-gray-700 dark:text-gray-300'}`}>Isu</button>
+                                <button type="button" onClick={() => setRowFilter('all')} className={`px-3 py-2 rounded-xl text-sm ${rowFilter === 'all' ? 'bg-primary text-white' : 'bg-surface-sunken text-content-muted'}`}>Semua</button>
+                                <button type="button" onClick={() => setRowFilter('repairable')} className={`px-3 py-2 rounded-xl text-sm ${rowFilter === 'repairable' ? 'bg-primary text-white' : 'bg-surface-sunken text-content-muted'}`}>Repairable</button>
+                                <button type="button" onClick={() => setRowFilter('external_only')} className={`px-3 py-2 rounded-xl text-sm ${rowFilter === 'external_only' ? 'bg-primary text-white' : 'bg-surface-sunken text-content-muted'}`}>External Only</button>
+                                <button type="button" onClick={() => setRowFilter('issues')} className={`px-3 py-2 rounded-xl text-sm ${rowFilter === 'issues' ? 'bg-primary text-white' : 'bg-surface-sunken text-content-muted'}`}>Isu</button>
                             </div>
                         </div>
 
@@ -365,7 +365,7 @@ export default function BackupRestore() {
                                                     row.status === 'matched_repairable'
                                                         ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300'
                                                         : row.status === 'matched_no_changes'
-                                                            ? 'bg-gray-100 text-gray-700 dark:bg-gray-700/50 dark:text-gray-300'
+                                                            ? 'bg-surface-sunken text-content-muted'
                                                             : 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300'
                                                 }`}>
                                                     {row.status}

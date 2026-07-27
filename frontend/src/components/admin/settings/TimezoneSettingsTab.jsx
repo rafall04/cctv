@@ -78,7 +78,7 @@ export default function TimezoneSettingsTab() {
                         onChange={(e) => setTimezone(e.target.value)}
                         disabled={saving}
                         className="w-full px-4 py-2 border border-edge-strong rounded-lg 
-                                 bg-surface text-gray-900 dark:text-white
+                                 bg-surface text-content
                                  focus:ring-2 focus:ring-blue-500 focus:border-transparent
                                  disabled:opacity-50 disabled:cursor-not-allowed"
                     >

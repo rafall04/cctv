@@ -147,7 +147,7 @@ export default function CameraFormModal({ camera = null, areas = [], onClose, on
                         <details className="mt-2 rounded-xl border border-edge bg-surface-sunken p-3 text-xs">
                             <summary className="cursor-pointer font-medium text-primary">Tidak tahu URL RTSP? Klik di sini</summary>
                             <div className="mt-2 space-y-2 text-content-muted">
-                                <p>Format umum: <code className="rounded bg-gray-200 px-1 dark:bg-gray-800">rtsp://user:password@IP-kamera:554/jalur</code></p>
+                                <p>Format umum: <code className="rounded bg-surface-sunken px-1">rtsp://user:password@IP-kamera:554/jalur</code></p>
                                 <ul className="ml-4 list-disc space-y-1">
                                     <li><b>Hikvision:</b> <code>rtsp://user:pass@IP:554/Streaming/Channels/101</code></li>
                                     <li><b>Dahua/Imou:</b> <code>rtsp://user:pass@IP:554/cam/realmonitor?channel=1&amp;subtype=0</code></li>

@@ -59,13 +59,13 @@ export default function CustomerLayout({ children }) {
 
     return (
         <div className="min-h-screen bg-gray-100 transition-colors dark:bg-gray-950">
-            <header className="border-b border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
+            <header className="border-b border-edge bg-surface">
                 <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
                     <div className="min-w-0">
-                        <h1 className="truncate text-lg font-bold text-gray-900 dark:text-white">
+                        <h1 className="truncate text-lg font-bold text-content">
                             {branding?.company_name || 'RAF NET CCTV'}
                         </h1>
-                        <p className="truncate text-xs text-gray-500 dark:text-gray-400">
+                        <p className="truncate text-xs text-content-muted">
                             Portal Pelanggan{user?.username ? ` — ${user.username}` : ''}
                         </p>
                     </div>
@@ -83,7 +83,7 @@ export default function CustomerLayout({ children }) {
                         )}
                         <button
                             onClick={handleLogout}
-                            className="rounded-xl px-3 py-1.5 text-sm text-gray-600 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                            className="rounded-xl px-3 py-1.5 text-sm text-content-muted transition-colors hover:bg-surface-sunken"
                         >
                             Keluar
                         </button>

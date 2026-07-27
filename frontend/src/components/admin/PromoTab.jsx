@@ -127,7 +127,7 @@ export default function PromoTab() {
                                 <div className="min-w-0 flex-1">
                                     <div className="flex items-center gap-2">
                                         <span className="font-mono font-semibold text-content">{p.code}</span>
-                                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${p.active === 1 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'}`}>
+                                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${p.active === 1 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-surface-sunken text-content-muted'}`}>
                                             {p.active === 1 ? 'Aktif' : 'Nonaktif'}
                                         </span>
                                         <span className="rounded-full bg-primary-100 px-2 py-0.5 text-[10px] font-medium text-primary dark:bg-sky-900/40 text-primary">{p.type}</span>

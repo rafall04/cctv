@@ -198,7 +198,7 @@ export default function MyCameras() {
                             >
                                 <button
                                     onClick={() => setActiveCamera(camera)}
-                                    className="relative block aspect-video w-full bg-gray-200 text-left dark:bg-gray-800"
+                                    className="relative block aspect-video w-full bg-surface-sunken text-left"
                                 >
                                     {camera.thumbnail_path ? (
                                         <img

@@ -49,7 +49,7 @@ function formatDuration(ms) {
 
 function MiniStat({ label, value, tone = 'text-content' }) {
     return (
-        <div className="rounded-xl border border-gray-200 bg-surface-sunken px-3 py-2.5 dark:border-gray-700/70">
+        <div className="rounded-xl border border-edge bg-surface-sunken px-3 py-2.5">
             <div className="text-xs font-medium text-content-muted">{label}</div>
             <div className={`mt-0.5 text-lg font-bold ${tone}`}>{value}</div>
         </div>
@@ -84,7 +84,7 @@ export default function RecordingHealthPanel() {
 
     if (loading) {
         return (
-            <div className="rounded-2xl border border-gray-200 bg-surface p-5 shadow-sm dark:border-gray-700/70 md:p-6">
+            <div className="rounded-2xl border border-edge bg-surface p-5 shadow-sm md:p-6">
                 <div className="h-5 w-48 animate-pulse rounded bg-surface-sunken" />
                 <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-5">
                     {[1, 2, 3, 4, 5].map((i) => (
@@ -114,7 +114,7 @@ export default function RecordingHealthPanel() {
     const restarts = health.restarts?.last24h || { total: 0, succeeded: 0, failed: 0 };
 
     return (
-        <div className="rounded-2xl border border-gray-200 bg-surface p-5 shadow-sm dark:border-gray-700/70 md:p-6">
+        <div className="rounded-2xl border border-edge bg-surface p-5 shadow-sm md:p-6">
             {/* Header */}
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>

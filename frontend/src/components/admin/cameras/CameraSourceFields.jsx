@@ -125,7 +125,7 @@ export default function CameraSourceFields({
                                 }`}
                         >
                             <div className="text-xs font-semibold">{option.label}</div>
-                            <div className={`mt-1 text-[11px] ${deliveryType === option.value ? 'text-blue-50/90' : 'text-gray-500 dark:text-gray-400'}`}>
+                            <div className={`mt-1 text-[11px] ${deliveryType === option.value ? 'text-blue-50/90' : 'text-content-muted'}`}>
                                 {option.description}
                             </div>
                         </button>
@@ -147,7 +147,7 @@ export default function CameraSourceFields({
                             onChange={onChange}
                             onBlur={onBlur}
                             disabled={isSubmitting}
-                            className={`w-full px-3 py-2 bg-surface-sunken border rounded-xl text-content font-mono text-xs placeholder-content-subtle focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50 ${getFieldError('private_rtsp_url') ? 'border-red-500 focus:ring-red-500' : 'border-gray-200 dark:border-gray-700/50'}`}
+                            className={`w-full px-3 py-2 bg-surface-sunken border rounded-xl text-content font-mono text-xs placeholder-content-subtle focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50 ${getFieldError('private_rtsp_url') ? 'border-red-500 focus:ring-red-500' : 'border-edge'}`}
                             placeholder="rtsp://user:pass@ip:port/path"
                         />
                         {getFieldError('private_rtsp_url') ? (
@@ -316,7 +316,7 @@ export default function CameraSourceFields({
                                 onChange={onChange}
                                 onBlur={onBlur}
                                 disabled={isSubmitting}
-                                className={`w-full px-3 py-2 bg-surface-sunken border rounded-xl text-content font-mono text-xs placeholder-content-subtle focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50 ${getFieldError('external_stream_url') ? 'border-red-500 focus:ring-red-500' : 'border-gray-200 dark:border-gray-700/50'}`}
+                                className={`w-full px-3 py-2 bg-surface-sunken border rounded-xl text-content font-mono text-xs placeholder-content-subtle focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50 ${getFieldError('external_stream_url') ? 'border-red-500 focus:ring-red-500' : 'border-edge'}`}
                                 placeholder={deliveryType.includes('ws') || deliveryType.includes('jsmpeg') ? 'wss://example.com/stream' : 'https://example.com/live.m3u8'}
                             />
                             {getFieldError('external_stream_url') ? (
@@ -346,7 +346,7 @@ export default function CameraSourceFields({
                                 onChange={onChange}
                                 onBlur={onBlur}
                                 disabled={isSubmitting}
-                                className={`w-full px-3 py-2 bg-surface-sunken border rounded-xl text-content font-mono text-xs placeholder-content-subtle focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50 ${getFieldError('external_embed_url') ? 'border-red-500 focus:ring-red-500' : 'border-gray-200 dark:border-gray-700/50'}`}
+                                className={`w-full px-3 py-2 bg-surface-sunken border rounded-xl text-content font-mono text-xs placeholder-content-subtle focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50 ${getFieldError('external_embed_url') ? 'border-red-500 focus:ring-red-500' : 'border-edge'}`}
                                 placeholder="https://source.example.com/player?id=cam-1"
                             />
                             {getFieldError('external_embed_url') ? (
@@ -389,7 +389,7 @@ export default function CameraSourceFields({
                                                 : 'Nonaktifkan untuk direct browser HLS. Pastikan sumber mengizinkan CORS dan sertifikat TLS valid.'}
                                         </p>
                                     </div>
-                                    <label className={`inline-flex items-center gap-2 text-xs font-semibold ${formData.external_tls_mode === 'insecure' ? 'text-amber-700 dark:text-amber-300' : 'text-gray-700 dark:text-gray-300'}`}>
+                                    <label className={`inline-flex items-center gap-2 text-xs font-semibold ${formData.external_tls_mode === 'insecure' ? 'text-amber-700 dark:text-amber-300' : 'text-content-muted'}`}>
                                         <input
                                             type="checkbox"
                                             name="external_use_proxy"
@@ -422,7 +422,7 @@ export default function CameraSourceFields({
                                     onChange={onChange}
                                     onBlur={onBlur}
                                     disabled={isSubmitting}
-                                    className={`w-full px-3 py-2 bg-surface-sunken border rounded-xl text-content text-sm focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50 ${getFieldError('external_tls_mode') ? 'border-red-500 focus:ring-red-500' : 'border-gray-200 dark:border-gray-700/50'}`}
+                                    className={`w-full px-3 py-2 bg-surface-sunken border rounded-xl text-content text-sm focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50 ${getFieldError('external_tls_mode') ? 'border-red-500 focus:ring-red-500' : 'border-edge'}`}
                                 >
                                     <option value="strict">Strict (Default)</option>
                                     <option value="insecure">Insecure (Darurat)</option>

@@ -171,7 +171,7 @@ function PasswordRequirementsDisplay({ password, username = '' }) {
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                             </svg>
                         )}
-                        <span className={item.met ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-500 dark:text-gray-400'}>
+                        <span className={item.met ? 'text-emerald-600 dark:text-emerald-400' : 'text-content-muted'}>
                             {item.label}
                         </span>
                     </li>

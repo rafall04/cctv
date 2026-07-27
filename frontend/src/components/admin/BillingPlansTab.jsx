@@ -103,7 +103,7 @@ export default function BillingPlansTab({ plans, regSettings, run, busy }) {
                                     <td className="px-3 py-2 text-center">
                                         <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${plan.active === 1
                                             ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
-                                            : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
+                                            : 'bg-surface-sunken text-content-muted'
                                         }`}>
                                             {plan.active === 1 ? 'Aktif' : 'Nonaktif'}
                                         </span>

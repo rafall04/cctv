@@ -56,7 +56,7 @@ function formatSeconds(seconds) {
 export default function RecordingAssuranceTable({ cameras = [] }) {
     if (!cameras.length) {
         return (
-            <div className="rounded-2xl border border-gray-200 bg-surface p-5 shadow-sm dark:border-gray-700/70 md:p-6">
+            <div className="rounded-2xl border border-edge bg-surface p-5 shadow-sm md:p-6">
                 <h2 className="text-xl font-bold text-content">Recording Assurance</h2>
                 <p className="mt-4 text-sm text-content-muted">Belum ada kamera recording yang dipantau.</p>
             </div>
@@ -64,7 +64,7 @@ export default function RecordingAssuranceTable({ cameras = [] }) {
     }
 
     return (
-        <div className="rounded-2xl border border-gray-200 bg-surface p-5 shadow-sm dark:border-gray-700/70 md:p-6">
+        <div className="rounded-2xl border border-edge bg-surface p-5 shadow-sm md:p-6">
             <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
                 <div>
                     <h2 className="text-xl font-bold text-content">Recording Assurance</h2>

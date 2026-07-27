@@ -174,7 +174,7 @@ export default function BackupSettingsTab() {
                                 accept=".json"
                                 onChange={handleFileSelect}
                                 disabled={importing}
-                                className="block w-full text-sm text-gray-900 dark:text-white
+                                className="block w-full text-sm text-content
                                          border border-edge-strong rounded-lg
                                          cursor-pointer bg-gray-50 dark:bg-gray-700
                                          focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50"
@@ -191,7 +191,7 @@ export default function BackupSettingsTab() {
                                 onChange={(e) => setImportMode(e.target.value)}
                                 disabled={importing}
                                 className="w-full px-4 py-2 border border-edge-strong rounded-lg 
-                                         bg-surface text-gray-900 dark:text-white
+                                         bg-surface text-content
                                          focus:ring-2 focus:ring-purple-500 focus:border-transparent
                                          disabled:opacity-50"
                             >

@@ -175,7 +175,7 @@ export default function SponsorPackagePanel({ packages = [], onChanged }) {
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 p-4">
                     {packages.map((pkg) => (
-                        <div key={pkg.id} className="bg-surface-sunken border border-gray-200 dark:border-gray-700/40 rounded-lg p-4 space-y-3">
+                        <div key={pkg.id} className="bg-surface-sunken border border-edge rounded-lg p-4 space-y-3">
                             <div className="flex items-start justify-between gap-2">
                                 <div>
                                     <div className="flex items-center gap-2">

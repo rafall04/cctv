@@ -15,12 +15,12 @@ import { Alert } from '../../ui/Alert';
 
 function FeatureItem({ title, description, enabled }) {
     return (
-        <div className={`flex items-start gap-3 p-3 rounded-xl ${enabled ? 'bg-gray-50 dark:bg-gray-800/50' : 'bg-gray-50/50 dark:bg-gray-800/30 opacity-60'}`}>
+        <div className={`flex items-start gap-3 p-3 rounded-xl ${enabled ? 'bg-surface-sunken' : 'bg-gray-50/50 opacity-60'}`}>
             <div className={`mt-1 h-2.5 w-2.5 rounded-full ${enabled ? 'bg-emerald-500' : 'bg-gray-400'}`}></div>
             <div>
                 <div className="flex items-center gap-2">
                     <span className="font-semibold text-content">{title}</span>
-                    <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded ${enabled ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400' : 'bg-gray-100 dark:bg-gray-700 text-gray-500'}`}>
+                    <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded ${enabled ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400' : 'bg-surface-sunken text-gray-500'}`}>
                         {enabled ? 'AKTIF' : 'NONAKTIF'}
                     </span>
                 </div>
@@ -640,7 +640,7 @@ export default function TelegramSettingsPanel() {
                             ].map((item) => (
                                 <div
                                     key={item.key}
-                                    className={`p-4 rounded-xl border ${item.configured ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/30' : 'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700'}`}
+                                    className={`p-4 rounded-xl border ${item.configured ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/30' : 'bg-surface-sunken border-edge'}`}
                                 >
                                     <div className="flex items-center gap-3 mb-2">
                                         <div className={`w-3 h-3 rounded-full ${item.configured ? 'bg-emerald-500' : 'bg-gray-400'}`}></div>

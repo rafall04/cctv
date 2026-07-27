@@ -155,8 +155,8 @@ export default function AreaCard({
                     disabled={gridDefaultBusy}
                     className={`w-full rounded-2xl border px-4 py-3 text-left transition-colors ${
                         gridDefaultEnabled
-                            ? 'border-primary-300 bg-primary-100 text-primary hover:bg-primary-100 border-primary-300 dark:bg-primary/10 dark:text-sky-100 dark:hover:bg-primary/20'
-                            : 'border-gray-200 bg-surface-sunken text-content hover:bg-gray-100 dark:border-gray-700/60'
+                            ? 'border-primary-300 bg-primary-100 text-primary hover:bg-primary-100 border-primary-300 dark:bg-primary/10 text-primary dark:hover:bg-primary/20'
+                            : 'border-edge bg-surface-sunken text-content hover:bg-gray-100'
                     } ${gridDefaultBusy ? 'cursor-wait opacity-70' : ''}`}
                 >
                     <div className="flex items-center justify-between gap-4">
@@ -171,7 +171,7 @@ export default function AreaCard({
                             </div>
                         </div>
                         <span className={`inline-flex h-7 w-12 items-center rounded-full px-1 transition-colors ${
-                            gridDefaultEnabled ? 'bg-primary' : 'bg-gray-300 dark:bg-gray-600'
+                            gridDefaultEnabled ? 'bg-primary' : 'bg-gray-300'
                         }`}>
                             <span className={`h-5 w-5 rounded-full bg-white shadow transition-transform ${
                                 gridDefaultEnabled ? 'translate-x-5' : 'translate-x-0'

@@ -347,10 +347,10 @@ function SponsorManagement() {
             {/* Header */}
             <div className="flex justify-between items-center">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Manajemen Sponsor</h1>
-                    <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">
+                    <h1 className="text-2xl font-bold text-content">Manajemen Sponsor</h1>
+                    <p className="text-content-muted text-sm mt-1">
                         Kelola profil paket, sponsor lokal, & penugasan kamera-nya.
-                        <span className="ml-1 text-gray-500">(Ads-network di halaman Ads, terpisah.)</span>
+                        <span className="ml-1 text-content-muted">(Ads-network di halaman Ads, terpisah.)</span>
                     </p>
                 </div>
                 <button
@@ -395,9 +395,9 @@ function SponsorManagement() {
             <SponsorPackagePanel packages={packages} onChanged={loadData} />
 
             {/* Sponsor list */}
-            <div className="bg-white dark:bg-gray-800/90 rounded-xl border border-edge overflow-hidden">
+            <div className="bg-surface rounded-xl border border-edge overflow-hidden">
                 <div className="p-4 border-b border-edge">
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Daftar Sponsor</h2>
+                    <h2 className="text-lg font-semibold text-content">Daftar Sponsor</h2>
                 </div>
                 {sponsors.length === 0 ? (
                     <div className="p-8 text-center text-content-muted">
@@ -410,7 +410,7 @@ function SponsorManagement() {
                 ) : (
                     <div className="overflow-x-auto">
                         <table className="w-full">
-                            <thead className="bg-gray-100 dark:bg-gray-900/50">
+                            <thead className="bg-surface-sunken">
                                 <tr>
                                     <th className="px-4 py-3 text-left text-xs font-medium text-content-muted uppercase">Sponsor</th>
                                     <th className="px-4 py-3 text-left text-xs font-medium text-content-muted uppercase">Paket</th>
@@ -422,7 +422,7 @@ function SponsorManagement() {
                                     <th className="px-4 py-3 text-right text-xs font-medium text-content-muted uppercase">Aksi</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-200 dark:divide-gray-700/50">
+                            <tbody className="divide-y divide-edge">
                                 {sponsors.map((sponsor) => {
                                     const limit = sponsor.camera_limit;
                                     const used = sponsor.camera_count || 0;
@@ -436,11 +436,11 @@ function SponsorManagement() {
                                                         <img src={sponsor.logo} alt={sponsor.name} className="w-12 h-12 object-contain bg-surface rounded" />
                                                     ) : (
                                                         <div className="w-12 h-12 bg-surface rounded flex items-center justify-center">
-                                                            <span className="text-gray-500 text-xs">No Logo</span>
+                                                            <span className="text-content-muted text-xs">No Logo</span>
                                                         </div>
                                                     )}
                                                     <div>
-                                                        <p className="text-gray-900 dark:text-white font-medium">{sponsor.name}</p>
+                                                        <p className="text-content font-medium">{sponsor.name}</p>
                                                         {sponsor.url && (
                                                             <a href={sponsor.url} target="_blank" rel="noopener noreferrer"
                                                                 className="text-xs text-primary-400 hover:text-primary-300">
@@ -455,7 +455,7 @@ function SponsorManagement() {
                                                     {sponsor.package_name || packagesByKey[sponsor.package]?.name || sponsor.package || '—'}
                                                 </span>
                                             </td>
-                                            <td className="px-4 py-3 text-gray-900 dark:text-white">Rp {(sponsor.price || 0).toLocaleString('id-ID')}</td>
+                                            <td className="px-4 py-3 text-content">Rp {(sponsor.price || 0).toLocaleString('id-ID')}</td>
                                             <td className="px-4 py-3 text-content-muted text-sm">
                                                 {sponsor.start_date && (
                                                     <div>
@@ -503,7 +503,7 @@ function SponsorManagement() {
             </div>
 
             {/* Penugasan Kamera quick swap */}
-            <div className="bg-white dark:bg-gray-800/90 rounded-xl border border-edge overflow-hidden">
+            <div className="bg-surface rounded-xl border border-edge overflow-hidden">
                 <div className="p-4 border-b border-edge flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <div>
                         <h2 className="text-lg font-semibold text-content dark:text-white">Penugasan Kamera (Quick Swap)</h2>
@@ -516,7 +516,7 @@ function SponsorManagement() {
                         value={assignmentSearch}
                         onChange={(e) => setAssignmentSearch(e.target.value)}
                         placeholder="Cari kamera / area / sponsor"
-                        className="bg-white dark:bg-gray-700 border border-edge-strong rounded-lg px-3 py-2 text-sm text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary md:w-72"
+                        className="bg-surface border border-edge-strong rounded-lg px-3 py-2 text-sm text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary md:w-72"
                     />
                 </div>
                 {recordingCameras.length === 0 ? (
@@ -526,7 +526,7 @@ function SponsorManagement() {
                 ) : (
                     <div className="overflow-x-auto">
                         <table className="w-full">
-                            <thead className="bg-gray-100 dark:bg-gray-900/50">
+                            <thead className="bg-surface-sunken">
                                 <tr>
                                     <th className="px-4 py-3 text-left text-xs font-medium text-content-muted uppercase">Kamera</th>
                                     <th className="px-4 py-3 text-left text-xs font-medium text-content-muted uppercase">Lokasi</th>
@@ -535,11 +535,11 @@ function SponsorManagement() {
                                     <th className="px-4 py-3 text-right text-xs font-medium text-content-muted uppercase">Aksi</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-200 dark:divide-gray-700/50">
+                            <tbody className="divide-y divide-edge">
                                 {filteredCamerasForAssignment.map((camera) => {
                                     const isBusy = pendingCameraId === camera.id;
                                     return (
-                                        <tr key={camera.id} className="hover:bg-gray-50 dark:bg-gray-700/30 transition-colors">
+                                        <tr key={camera.id} className="hover:bg-surface-sunken transition-colors">
                                             <td className="px-4 py-3 text-content text-sm">
                                                 <p className="font-medium">{camera.name || `Kamera ${camera.id}`}</p>
                                                 <p className="text-xs text-gray-500">#{camera.id}</p>
@@ -547,9 +547,9 @@ function SponsorManagement() {
                                             <td className="px-4 py-3 text-content-muted text-sm">{camera.location || camera.area_name || '—'}</td>
                                             <td className="px-4 py-3 text-sm">
                                                 {camera.sponsor_name ? (
-                                                    <span className="text-gray-900 dark:text-white">{camera.sponsor_name}</span>
+                                                    <span className="text-content">{camera.sponsor_name}</span>
                                                 ) : (
-                                                    <span className="text-gray-500">—</span>
+                                                    <span className="text-content-muted">—</span>
                                                 )}
                                             </td>
                                             <td className="px-4 py-3">
@@ -565,7 +565,7 @@ function SponsorManagement() {
                                                         if (target === camera.sponsor_name) return;
                                                         handleQuickAssign(camera.id, target);
                                                     }}
-                                                    className="bg-white dark:bg-gray-700 border border-edge-strong rounded-lg px-3 py-1.5 text-sm text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50"
+                                                    className="bg-surface border border-edge-strong rounded-lg px-3 py-1.5 text-sm text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50"
                                                 >
                                                     <option value="">— Tanpa sponsor —</option>
                                                     {activeSponsorOptions.map((sponsor) => (
@@ -734,7 +734,7 @@ function SponsorManagement() {
                                         Melebihi limit paket. Naikkan limit kamera atau hapus pilihan.
                                     </p>
                                 )}
-                                <div className="max-h-64 overflow-y-auto border border-gray-200 dark:border-gray-700/40 rounded-lg divide-y divide-gray-200 dark:divide-gray-700/40">
+                                <div className="max-h-64 overflow-y-auto border border-edge rounded-lg divide-y divide-gray-200 dark:divide-gray-700/40">
                                     {camerasForModal.length === 0 ? (
                                         <p className="text-xs text-content-muted p-3">Tidak ada kamera cocok.</p>
                                     ) : (
