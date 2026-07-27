@@ -3,8 +3,11 @@
 #          via a self-hosted local Bot API server (2000 MB limit, not the cloud 50 MB),
 #          routed per-camera / per-area so one group never mixes sources.
 # Caller:  systemd unit tg-archive.service (long-running loop).
-# Deps:    stdlib + requests. Reads the app DB READ-ONLY; own state in state.db.
-# SideEffects: network upload to Telegram; writes only to its own state.db.
+# Deps:    stdlib + requests. Reads recording segments from the app DB; own state in state.db.
+# SideEffects: network upload to Telegram; writes state.db, and MIRRORS each outcome into the app
+#          DB table telegram_archive_uploads so the admin archive page reads its own data instead
+#          of opening this sidecar's state.db across processes. The mirror is best-effort: it can
+#          never fail an upload (see mirror_to_app_db).
 
 import os
 import re
@@ -418,14 +421,52 @@ def copy_to(cfg, state, chat_id, from_chat_id, message_id, log):
     }, log)
 
 
-def record(state, seg, status, detail=None, targets=None):
+def record(state, seg, status, detail=None, targets=None, cfg=None, log=None):
+    payload = json.dumps(targets) if targets else None
     state.execute(
         'INSERT OR REPLACE INTO uploaded'
         '(segment_id,camera_id,filename,file_size,status,detail,targets,uploaded_at) '
         "VALUES(?,?,?,?,?,?,?,datetime('now'))",
         (seg['id'], seg['camera_id'], seg['filename'], seg['file_size'],
-         status, detail, json.dumps(targets) if targets else None))
+         status, detail, payload))
     state.commit()
+    if cfg is not None:
+        mirror_to_app_db(cfg, seg, status, detail, targets, payload, log)
+
+
+def mirror_to_app_db(cfg, seg, status, detail, targets, payload, log=None):
+    """Mirror the outcome into the APPLICATION database.
+
+    The uploader stays a separate process on purpose (see sidecar/.module_map.md), but its data
+    should not be foreign: the admin archive page reads telegram_archive_uploads with an ordinary
+    query and can join it against cameras/areas, instead of the backend opening this sidecar's
+    state.db read-only across processes while it is mid-WAL-write.
+
+    Deliberately a MIRROR, not a move: state.db stays the uploader's own source of truth, so a
+    write failure here can never cost an upload or cause one to be retried. Rows are tiny and rare
+    (~15/hour), so the extra connection costs nothing.
+    """
+    file_id = None
+    if targets:
+        file_id = (targets[0] or {}).get('fileId')
+    conn = None
+    try:
+        conn = sqlite3.connect(cfg.app_db, timeout=30)
+        conn.execute('PRAGMA busy_timeout=5000')
+        conn.execute(
+            'INSERT OR REPLACE INTO telegram_archive_uploads'
+            '(segment_id,camera_id,filename,file_size,status,detail,targets,file_id,'
+            ' recorded_at,uploaded_at) '
+            "VALUES(?,?,?,?,?,?,?,?,?,datetime('now'))",
+            (seg['id'], seg['camera_id'], seg['filename'], seg['file_size'],
+             status, detail, payload, file_id, seg.get('start_time')))
+        conn.commit()
+    except Exception as exc:  # noqa: BLE001 - never let bookkeeping break an upload
+        if log:
+            log.warning('mirror to app db failed for seg %s: %s', seg['id'], exc)
+    finally:
+        if conn is not None:
+            conn.close()
 
 
 def pace(cfg, size_bytes, elapsed, log):
@@ -455,12 +496,12 @@ def process_one(cfg, state, router, seg, cam_meta, log):
 
     targets = router.targets(seg['camera_id'], cam['area_id'])
     if not targets:
-        record(state, seg, 'no_route', 'no group configured for this camera/area')
+        record(state, seg, 'no_route', 'no group configured for this camera/area', cfg=cfg, log=log)
         return True
 
     path = seg['file_path']
     if not os.path.isfile(path):
-        record(state, seg, 'missing', 'file gone (retention cleanup?)')
+        record(state, seg, 'missing', 'file gone (retention cleanup?)', cfg=cfg, log=log)
         log.info('seg %s cam%s: file gone, skipping', seg['id'], seg['camera_id'])
         return True
 
@@ -470,7 +511,7 @@ def process_one(cfg, state, router, seg, cam_meta, log):
         return False
 
     if size > cfg.max_file_mb * 1048576:
-        record(state, seg, 'too_big', '%d bytes > MAX_FILE_MB' % size)
+        record(state, seg, 'too_big', '%d bytes > MAX_FILE_MB' % size, cfg=cfg, log=log)
         log.warning('seg %s cam%s: %.1f MB exceeds limit, skipping',
                     seg['id'], seg['camera_id'], size / 1048576.0)
         return True
@@ -482,7 +523,7 @@ def process_one(cfg, state, router, seg, cam_meta, log):
         log.info('[dry-run] seg %s %s (%s, %.1f MB) -> %s',
                  seg['id'], seg['filename'], cam['name'], size / 1048576.0,
                  ', '.join('%s(%s)' % (t['label'], t['chatId']) for t in targets))
-        record(state, seg, 'dry_run', None, targets)
+        record(state, seg, 'dry_run', None, targets, cfg=cfg, log=log)
         return True
 
     err = None
@@ -514,7 +555,7 @@ def process_one(cfg, state, router, seg, cam_meta, log):
                 else:
                     log.warning('seg %s copy to %s failed: %s', seg['id'], extra['label'], err2)
 
-            record(state, seg, 'ok', None, sent)
+            record(state, seg, 'ok', None, sent, cfg=cfg, log=log)
             pace(cfg, size, elapsed, log)
             return True
 
@@ -524,7 +565,7 @@ def process_one(cfg, state, router, seg, cam_meta, log):
             time.sleep(min(30 * attempt, 180))
 
     # Give up on this one rather than wedging the queue behind it forever.
-    record(state, seg, 'failed', err, targets)
+    record(state, seg, 'failed', err, targets, cfg=cfg, log=log)
     log.error('seg %s cam%s permanently failed, advancing past it', seg['id'], seg['camera_id'])
     return True
 

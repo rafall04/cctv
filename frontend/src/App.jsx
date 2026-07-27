@@ -49,6 +49,7 @@ const BillingManagement = lazyWithRetry(() => import('./pages/BillingManagement'
 const VoucherManagement = lazyWithRetry(() => import('./pages/VoucherManagement'), 'voucher-management');
 const RondaSettings = lazyWithRetry(() => import('./pages/RondaSettings'), 'ronda-settings');
 const TelegramArchiveSettings = lazyWithRetry(() => import('./pages/TelegramArchiveSettings'), 'telegram-archive-settings');
+const TelegramArchiveLibrary = lazyWithRetry(() => import('./pages/TelegramArchiveLibrary'), 'telegram-archive-library');
 const CustomerCameraIPs = lazyWithRetry(() => import('./pages/CustomerCameraIPs'), 'customer-camera-ips');
 const CustomerLayout = lazyWithRetry(() => import('./layouts/CustomerLayout'), 'customer-layout');
 const MyCameras = lazyWithRetry(() => import('./pages/customer/MyCameras'), 'my-cameras');
@@ -342,6 +343,14 @@ function App() {
                     element={
                         <AdminPageRoute adminOnly>
                             <TelegramArchiveSettings />
+                        </AdminPageRoute>
+                    }
+                />
+                <Route
+                    path="/admin/arsip"
+                    element={
+                        <AdminPageRoute adminOnly>
+                            <TelegramArchiveLibrary />
                         </AdminPageRoute>
                     }
                 />

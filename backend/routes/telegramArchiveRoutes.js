@@ -17,6 +17,7 @@ import {
     postVerifyChat,
 } from '../controllers/telegramArchiveController.js';
 import { authMiddleware, requireAdmin } from '../middleware/authMiddleware.js';
+import archiveLibrary from '../services/telegramArchiveLibraryService.js';
 
 const idParamSchema = {
     params: {
@@ -68,4 +69,52 @@ export default async function telegramArchiveRoutes(fastify) {
             },
         },
     }, postVerifyChat);
+
+    // ---- Archive library: read what was uploaded, and play it back through US ------------------
+    // The stream is proxied on purpose. A Telegram file URL embeds the bot token and is fetchable
+    // by anyone holding the string, so handing one to a browser would leak the token AND give
+    // unrestricted access to every archived recording.
+
+    fastify.get('/library', { onRequest: guard }, async (request, reply) => {
+        const { cameraId, status, limit, offset } = request.query || {};
+        const data = archiveLibrary.listUploads({
+            cameraId: cameraId ? Number(cameraId) : null,
+            status: status || 'ok',
+            limit: limit ? Number(limit) : 100,
+            offset: offset ? Number(offset) : 0,
+        });
+        return reply.send({ success: true, data });
+    });
+
+    fastify.get('/library/summary', { onRequest: guard }, async (request, reply) => {
+        return reply.send({ success: true, data: archiveLibrary.getSummary() });
+    });
+
+    fastify.get('/library/:segmentId/stream', {
+        onRequest: guard,
+        schema: {
+            params: {
+                type: 'object',
+                required: ['segmentId'],
+                properties: { segmentId: { type: 'integer', minimum: 1 } },
+            },
+        },
+    }, async (request, reply) => {
+        try {
+            const { stream, size, filename } = await archiveLibrary.openSegmentStream(
+                Number(request.params.segmentId),
+            );
+            reply.header('Content-Type', 'video/mp4');
+            if (size) reply.header('Content-Length', String(size));
+            // inline: the archive page plays it in place; a download is still one click away.
+            reply.header('Content-Disposition', `inline; filename="${filename.replace(/"/g, '')}"`);
+            return reply.send(stream);
+        } catch (error) {
+            const code = error.statusCode || 500;
+            return reply.code(code).send({
+                success: false,
+                message: code === 500 ? 'Internal server error' : error.message,
+            });
+        }
+    });
 }
