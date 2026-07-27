@@ -166,10 +166,36 @@ export async function openSegmentStream(segmentId) {
     const filePath = body.result.file_path;
     const size = body.result.file_size || row.file_size || 0;
 
-    // Local Bot API server: an absolute path on disk. Cloud API: a relative path to download.
-    if (filePath.startsWith('/') || /^[A-Za-z]:[\\/]/.test(filePath)) {
-        return { stream: fs.createReadStream(filePath), size, filename: row.filename };
+    /*
+     * Two shapes come back here, and BOTH are absolute paths in local mode:
+     *   - the original recording, when it is still on disk (we uploaded it by file:// reference);
+     *   - a copy inside the server's own --dir, when the recording was pruned and the server
+     *     RE-DOWNLOADED it from Telegram. Verified on prod with a 120 MB file, far past the cloud
+     *     API's 20 MB getFile ceiling — which is exactly why this feature is possible at all.
+     *
+     * Read from disk when the host can see the path (zero copy), and fall back to fetching it over
+     * HTTP from the local server when it cannot. The fallback matters: the server's --dir must be
+     * bind-mounted to the same host path (see sidecar/tg-archive/docker-compose.yml), and if that
+     * mount is ever missing we serve the file slowly rather than not at all.
+     */
+    if (filePath.startsWith('/') || /^[A-Za-z]:[\/]/.test(filePath)) {
+        if (fs.existsSync(filePath)) {
+            return { stream: fs.createReadStream(filePath), size, filename: row.filename };
+        }
+        // Path is real but not visible from this process — ask the local server to serve it.
+        const relative = filePath.replace(/^.*\/var\/lib\/telegram-bot-api\//, '');
+        const viaHttp = await fetch(`${apiBase}/file/bot${token}/${relative}`);
+        if (viaHttp.ok && viaHttp.body) {
+            return { stream: viaHttp.body, size, filename: row.filename };
+        }
+        const err = new Error(
+            `Berkas ada di server Bot API tapi tidak terbaca dari backend (${filePath}). `
+            + 'Pastikan --dir server Bot API di-bind ke path host yang sama.',
+        );
+        err.statusCode = 502;
+        throw err;
     }
+
     const download = await fetch(`${apiBase}/file/bot${token}/${filePath}`);
     if (!download.ok || !download.body) {
         const err = new Error('Gagal mengunduh berkas dari Telegram');

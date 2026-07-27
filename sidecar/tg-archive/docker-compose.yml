@@ -19,7 +19,12 @@ services:
       # bind loopback only — never expose the bot token surface to the LAN
       - "127.0.0.1:8092:8092"
     volumes:
-      - tg-archive-data:/var/lib/telegram-bot-api
+      # A HOST bind, not a named volume. When a segment's local recording has been pruned, the
+      # server re-downloads it from Telegram into this directory (verified on prod: a 120 MB file,
+      # far past the cloud API's 20 MB getFile ceiling). getFile then returns a path inside the
+      # CONTAINER — so the backend, which runs on the host, can only read it if the same path
+      # resolves there too. A named volume left it invisible and every playback failed.
+      - /var/lib/telegram-bot-api:/var/lib/telegram-bot-api
       # recordings mounted READ-ONLY at the SAME absolute path the app uses,
       # so --local file paths resolve identically inside the container.
       - /var/www/rafnet-cctv/recordings:/var/www/rafnet-cctv/recordings:ro
@@ -31,6 +36,3 @@ services:
     logging:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }
-
-volumes:
-  tg-archive-data:
