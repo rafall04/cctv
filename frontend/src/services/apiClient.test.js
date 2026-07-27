@@ -10,7 +10,7 @@
  * SideEffects: None (only invokes the registered request interceptor directly).
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 
 const apiUrlRef = { current: 'https://first.example' };
 
@@ -53,6 +53,17 @@ describe('network-error retry (tunnel re-dial)', () => {
     beforeEach(() => {
         vi.resetModules();
         vi.useFakeTimers();
+    });
+
+    /*
+     * Hand the timers back. Fake timers are installed process-wide, so without this every test
+     * that runs after this file in the same process — anything using waitFor/findBy, which drive
+     * themselves off timers — waits forever and dies on the suite timeout. It stayed hidden only
+     * because the default runner gives each file its own worker; it surfaces the moment files
+     * share a process.
+     */
+    afterEach(() => {
+        vi.useRealTimers();
     });
 
     /**

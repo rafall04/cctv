@@ -1,93 +1,97 @@
 /*
 Purpose: Sidebar widgets for top cameras, recent activity, and dashboard health indicators.
 Caller: pages/Dashboard.jsx.
-Deps: ../../TopCamerasWidget, ../../ui/EmptyState.
+Deps: ../../TopCamerasWidget, ../../ui/EmptyState, ../../ui Card/Badge.
 MainFuncs: DashboardSidebar.
 SideEffects: None.
+
+Honesty note: the old System Health panel listed three rows but only ONE was measured. "Database:
+Optimal" and "API Gateway: Online" were hardcoded strings — they said the same thing whether the
+system was healthy or not, which is exactly the decorative-status pattern the token rules ban. The
+panel now reports only what it actually knows: the media-server connection, and when the dashboard
+last got a good poll.
 */
 
 import { TopCamerasWidget } from '../../TopCamerasWidget';
 import { NoActivityEmptyState } from '../../ui/EmptyState';
+import { Card, CardTitle } from '../../ui/Card';
+import { Badge } from '../../ui/Badge';
+
+/** Log entries are colour-coded by what the action did, so the timeline scans without reading. */
+function logTone(action = '') {
+    if (action.includes('DELETE')) return 'bg-status-fault';
+    if (action.includes('CREATE')) return 'bg-status-live';
+    return 'bg-primary';
+}
 
 function ActivityLog({ logs = [] }) {
     return (
-        <div>
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Aktivitas Terkini</h2>
-            <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl p-6">
-                <div className="space-y-6">
-                    {logs.length === 0 ? (
-                        <NoActivityEmptyState />
-                    ) : (
-                        logs.map((log, idx) => (
-                            <div key={log.id} className="relative flex gap-4">
-                                {idx !== logs.length - 1 && (
-                                    <div className="absolute left-[9px] top-6 bottom-[-24px] w-px bg-gray-200 dark:bg-gray-700"></div>
-                                )}
-                                <div className={`relative z-10 w-[18px] h-[18px] rounded-full mt-0.5 border-4 border-white dark:border-gray-800 ${
-                                    log.action.includes('CREATE') ? 'bg-emerald-500' :
-                                        log.action.includes('DELETE') ? 'bg-red-500' : 'bg-primary'
-                                }`}></div>
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium text-gray-900 dark:text-white">{log.details}</p>
-                                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
-                                        <span className="text-xs text-gray-500 dark:text-gray-400">{log.username}</span>
-                                        <span className="text-xs text-gray-400 dark:text-gray-500">&bull;</span>
-                                        <span className="text-xs text-primary font-medium break-words">{log.created_at_wib}</span>
-                                    </div>
+        <Card>
+            <CardTitle>Aktivitas Terkini</CardTitle>
+            <div className="mt-4 space-y-5">
+                {logs.length === 0 ? (
+                    <NoActivityEmptyState />
+                ) : (
+                    logs.map((log, idx) => (
+                        <div key={log.id} className="relative flex gap-3">
+                            {idx !== logs.length - 1 && (
+                                <div className="absolute bottom-[-20px] left-[7px] top-5 w-px bg-edge" />
+                            )}
+                            <div className={`relative z-raised mt-1 h-3.5 w-3.5 shrink-0 rounded-full ring-4 ring-surface ${logTone(log.action)}`} />
+                            <div className="min-w-0 flex-1">
+                                <p className="text-sm font-medium text-content">{log.details}</p>
+                                <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+                                    <span className="text-xs text-content-muted">{log.username}</span>
+                                    <span className="text-xs text-content-subtle" aria-hidden="true">&bull;</span>
+                                    <span className="break-words font-mono text-xs tabular-nums text-content-muted">{log.created_at_wib}</span>
                                 </div>
                             </div>
-                        ))
-                    )}
-                </div>
+                        </div>
+                    ))
+                )}
             </div>
+        </Card>
+    );
+}
+
+function HealthRow({ label, tone, state }) {
+    return (
+        <div className="flex items-center justify-between gap-3">
+            <span className="text-sm text-content-muted">{label}</span>
+            <Badge tone={tone} dot>{state}</Badge>
         </div>
     );
 }
 
-function SystemHealth({ mtxConnected }) {
+function SystemHealth({ mtxConnected, lastUpdateLabel, refreshFailed }) {
     return (
-        <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl p-6 shadow-sm">
-            <h4 className="text-sm font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                </svg>
-                System Health
-            </h4>
-            <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                        <span className="text-sm text-gray-700 dark:text-gray-300">Database</span>
-                    </div>
-                    <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-500/10 px-2 py-0.5 rounded-lg">Optimal</span>
-                </div>
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <span className={`w-2 h-2 rounded-full ${mtxConnected ? 'bg-emerald-500' : 'bg-red-500'}`}></span>
-                        <span className="text-sm text-gray-700 dark:text-gray-300">Media Server</span>
-                    </div>
-                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-lg ${mtxConnected ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-500/10' : 'text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-500/10'}`}>
-                        {mtxConnected ? 'Stable' : 'Offline'}
-                    </span>
-                </div>
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                        <span className="text-sm text-gray-700 dark:text-gray-300">API Gateway</span>
-                    </div>
-                    <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-500/10 px-2 py-0.5 rounded-lg">Online</span>
-                </div>
+        <Card>
+            <CardTitle as="h3">Status Sistem</CardTitle>
+            <div className="mt-4 space-y-3">
+                <HealthRow
+                    label="Media server"
+                    tone={mtxConnected ? 'live' : 'fault'}
+                    state={mtxConnected ? 'Terhubung' : 'Terputus'}
+                />
+                <HealthRow
+                    label="Data dashboard"
+                    tone={refreshFailed ? 'warn' : 'live'}
+                    state={refreshFailed ? 'Tertunda' : 'Terkini'}
+                />
             </div>
-        </div>
+            <p className="mt-3 border-t border-edge pt-3 text-xs text-content-subtle">
+                Pembaruan terakhir <span className="font-mono tabular-nums text-content-muted">{lastUpdateLabel}</span>
+            </p>
+        </Card>
     );
 }
 
-export function DashboardSidebar({ topCameras = [], recentLogs = [], mtxConnected }) {
+export function DashboardSidebar({ topCameras = [], recentLogs = [], mtxConnected, lastUpdateLabel = '—', refreshFailed = false }) {
     return (
-        <div className="space-y-6">
+        <div className="space-y-4">
             <TopCamerasWidget cameras={topCameras} />
             <ActivityLog logs={recentLogs} />
-            <SystemHealth mtxConnected={mtxConnected} />
+            <SystemHealth mtxConnected={mtxConnected} lastUpdateLabel={lastUpdateLabel} refreshFailed={refreshFailed} />
         </div>
     );
 }

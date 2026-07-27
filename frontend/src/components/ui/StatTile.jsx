@@ -73,6 +73,8 @@ export function SegmentedBar({ segments, className = '' }) {
  * @param {React.ReactNode} value the headline number
  * @param {string} [unit] rendered next to the value at body size
  * @param {'default'|'live'|'warn'|'fault'|'data'} [tone='default'] colours the VALUE only
+ * @param {React.ReactNode} [icon] DECORATIVE glyph — hidden from assistive tech
+ * @param {React.ReactNode} [meta] meaningful header content (a trend chip); stays announced
  * @param {React.ReactNode} [footnote] one line of context under the tile
  * @param {Function} [onClick] makes the whole tile a button
  */
@@ -82,6 +84,7 @@ export function StatTile({
     unit = null,
     tone = 'default',
     icon = null,
+    meta = null,
     footnote = null,
     onClick,
     className = '',
@@ -91,7 +94,8 @@ export function StatTile({
         <>
             <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-semibold uppercase tracking-wide text-content-subtle">{label}</span>
-                {icon && <span className="shrink-0 text-content-subtle" aria-hidden="true">{icon}</span>}
+                {meta && <span className="shrink-0">{meta}</span>}
+                {!meta && icon && <span className="shrink-0 text-content-subtle" aria-hidden="true">{icon}</span>}
             </div>
             <div className="mt-2 flex items-baseline gap-1.5">
                 <span className={`font-mono text-2xl font-bold tabular-nums leading-none ${VALUE_TONE[tone] ?? VALUE_TONE.default}`}>

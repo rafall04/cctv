@@ -105,7 +105,7 @@ describe('Dashboard', () => {
         });
     });
 
-    it('menampilkan timestamp log lengkap dan card system health yang konsisten di dark mode', async () => {
+    it('menampilkan timestamp log lengkap dan hanya melaporkan status sistem yang benar-benar diukur', async () => {
         getStats.mockResolvedValueOnce({
             success: true,
             data: {
@@ -155,10 +155,37 @@ describe('Dashboard', () => {
         expect(screen.getByText('aldi')).toBeTruthy();
         expect(screen.getByText('08/03/2026 18.06.05')).toBeTruthy();
 
-        const systemHealthCard = screen.getByText('System Health').closest('div');
-        expect(systemHealthCard?.className).toContain('dark:bg-gray-800/50');
-        expect(systemHealthCard?.className).toContain('dark:border-gray-700/50');
-        expect(screen.getByText('Optimal').className).toContain('dark:bg-emerald-500/10');
+        // The panel used to list three rows but measured only one: "Database: Optimal" and
+        // "API Gateway: Online" were hardcoded and said the same thing however sick the box was.
+        const systemHealthCard = screen.getByText('Status Sistem').closest('div');
+        expect(systemHealthCard?.className).toContain('bg-surface');
+        expect(systemHealthCard?.className).not.toContain('gray-');
+        expect(screen.getByText('Media server')).toBeTruthy();
+        expect(screen.getByText('Terhubung').parentElement.className).toContain('status-live');
+        expect(screen.queryByText('Database')).toBeNull();
+        expect(screen.queryByText('API Gateway')).toBeNull();
+    });
+
+    it('mewarnai maintenance sebagai warn, bukan fault — merah hanya untuk yang benar-benar rusak', async () => {
+        getStats.mockResolvedValueOnce({
+            success: true,
+            data: {
+                summary: { totalCameras: 3, activeCameras: 2, disabledCameras: 0, totalAreas: 1, activeViewers: 0 },
+                system: { cpuLoad: 5, cpuModel: 'Test CPU', totalMem: 16000, freeMem: 8000 },
+                streams: [],
+                recentLogs: [],
+                mtxConnected: true,
+                cameraStatusBreakdown: { online: 2, offline: 0, maintenance: 1 },
+                topCameras: [],
+                allSessions: [],
+            },
+        });
+
+        renderWithRouter(<Dashboard />);
+
+        const notice = await screen.findByText('1 kamera maintenance');
+        expect(notice.closest('div').className).not.toContain('status-fault');
+        expect(screen.getByText('maintenance', { selector: 'span' }).closest('span').className).not.toContain('status-fault');
     });
 
     it('meringkas stream aktif menjadi top 8 dan membuka drawer untuk daftar penuh', async () => {

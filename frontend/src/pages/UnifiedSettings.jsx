@@ -1,128 +1,74 @@
-import { useState } from 'react';
-import TelegramSettingsPanel from '../components/admin/settings/TelegramSettingsPanel';
-import SaweriaSettingsPanel from '../components/admin/settings/SaweriaSettingsPanel';
-import BrandingSettingsPanel from '../components/admin/settings/BrandingSettingsPanel';
-import GeneralSettingsPanel from '../components/admin/settings/GeneralSettingsPanel';
-// Ads-network config lives on its own admin page (/admin/ads) so it sits
-// as a sibling of Sponsors in the sidebar. AdsSettingsPanel is still the
-// underlying component — only the entry point moved. See pages/AdsManagement.
-import StreamHealthSettingsPanel from '../components/admin/settings/StreamHealthSettingsPanel';
-import PlaybackSettingsPanel from '../components/admin/settings/PlaybackSettingsPanel';
-import ApiKeySettings from '../components/admin/settings/ApiKeySettings';
-import TimezoneSettingsTab from '../components/admin/settings/TimezoneSettingsTab';
-import BackupSettingsTab from '../components/admin/settings/BackupSettingsTab';
+/*
+Purpose: Admin settings route — one panel at a time, each loaded on demand.
+Caller: App.jsx protected /admin/settings route.
+Deps: React lazy/Suspense, components/ui (PageHeader, Tabs, TabPanel, Skeleton), settings panels.
+MainFuncs: UnifiedSettings.
+SideEffects: Loads the selected panel's chunk on first visit to that tab.
 
-const Icons = {
-    General: () => (
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-        </svg>
-    ),
-    Telegram: () => (
-        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.14.18-.357.295-.6.295-.002 0-.003 0-.005 0l.213-3.054 5.56-5.022c.24-.213-.054-.334-.373-.121l-6.869 4.326-2.96-.924c-.64-.203-.658-.64.135-.954l11.566-4.458c.538-.196 1.006.128.832.941z"/>
-        </svg>
-    ),
-    Saweria: () => (
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-    ),
-    Branding: () => (
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
-        </svg>
-    ),
-    Health: () => (
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.382A9 9 0 1112 3a9 9 0 019 9c0 1.61-.423 3.122-1.162 4.43M15 19l-3 2-3-2" />
-        </svg>
-    ),
-    Playback: () => (
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M14.752 11.168l-5.197-3.03A1 1 0 008 9v6a1 1 0 001.555.832l5.197-3.03a1 1 0 000-1.664z" />
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-    ),
-    ApiKey: () => (
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-        </svg>
-    ),
-    Timezone: () => (
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-    ),
-    Backup: () => (
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
-        </svg>
-    ),
-};
+Two problems fixed here:
+
+  - WEIGHT. All nine panels were imported statically, so opening Settings pulled every panel —
+    Telegram, Ads, General, Branding, Backup, the lot — into one 84 KB chunk, the largest in the
+    admin build, to render ONE of them. They are lazy now: the route ships the shell, and each tab
+    fetches its own panel the first time it is opened. Ads config already lives on its own page
+    (/admin/ads); only the entry point moved, AdsSettingsPanel is still the component.
+
+  - SEMANTICS. The strip was nine plain <button>s — no role="tab", no aria-selected — so a screen
+    reader announced "nine buttons" with no indication which panel was showing. The active tab was
+    also hardcoded to sky-500, which meant the one colour an operator can rebrand at runtime was
+    the one colour this page ignored. Both are handled by the shared Tabs primitive.
+*/
+
+import { lazy, Suspense, useState } from 'react';
+import { PageHeader, Tabs, TabPanel } from '../components/ui';
+import { FormSkeleton } from '../components/ui/Skeleton';
+
+const GeneralSettingsPanel = lazy(() => import('../components/admin/settings/GeneralSettingsPanel'));
+const TimezoneSettingsTab = lazy(() => import('../components/admin/settings/TimezoneSettingsTab'));
+const BackupSettingsTab = lazy(() => import('../components/admin/settings/BackupSettingsTab'));
+const StreamHealthSettingsPanel = lazy(() => import('../components/admin/settings/StreamHealthSettingsPanel'));
+const PlaybackSettingsPanel = lazy(() => import('../components/admin/settings/PlaybackSettingsPanel'));
+const TelegramSettingsPanel = lazy(() => import('../components/admin/settings/TelegramSettingsPanel'));
+const SaweriaSettingsPanel = lazy(() => import('../components/admin/settings/SaweriaSettingsPanel'));
+const BrandingSettingsPanel = lazy(() => import('../components/admin/settings/BrandingSettingsPanel'));
+const ApiKeySettings = lazy(() => import('../components/admin/settings/ApiKeySettings'));
+
+const TABS = [
+    { id: 'general', label: 'Umum', Panel: GeneralSettingsPanel },
+    { id: 'timezone', label: 'Zona Waktu', Panel: TimezoneSettingsTab },
+    { id: 'backup', label: 'Cadangan', Panel: BackupSettingsTab },
+    { id: 'health', label: 'Kesehatan Stream', Panel: StreamHealthSettingsPanel },
+    { id: 'playback', label: 'Putar Ulang', Panel: PlaybackSettingsPanel },
+    { id: 'telegram', label: 'Bot Telegram', Panel: TelegramSettingsPanel },
+    { id: 'saweria', label: 'Saweria', Panel: SaweriaSettingsPanel },
+    { id: 'branding', label: 'Branding', Panel: BrandingSettingsPanel },
+    { id: 'apikey', label: 'Kunci API', Panel: ApiKeySettings },
+];
 
 export default function UnifiedSettings() {
     const [activeTab, setActiveTab] = useState('general');
-
-    const tabs = [
-        { id: 'general', label: 'General', icon: <Icons.General /> },
-        { id: 'timezone', label: 'Timezone', icon: <Icons.Timezone /> },
-        { id: 'backup', label: 'Backup', icon: <Icons.Backup /> },
-        { id: 'health', label: 'Health', icon: <Icons.Health /> },
-        { id: 'playback', label: 'Playback', icon: <Icons.Playback /> },
-        { id: 'telegram', label: 'Telegram Bot', icon: <Icons.Telegram /> },
-        { id: 'saweria', label: 'Saweria', icon: <Icons.Saweria /> },
-        { id: 'branding', label: 'Branding', icon: <Icons.Branding /> },
-        { id: 'apikey', label: 'API Keys', icon: <Icons.ApiKey /> },
-    ];
+    const active = TABS.find((tab) => tab.id === activeTab) ?? TABS[0];
+    const ActivePanel = active.Panel;
 
     return (
-        <div className="space-y-6">
-            {/* Header */}
-            <div>
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-                    System Settings
-                </h1>
-                <p className="text-gray-600 dark:text-gray-300 mt-1">
-                    Manage your CCTV system configuration and integrations
-                </p>
-            </div>
+        <div className="space-y-5">
+            <PageHeader
+                title="Pengaturan Sistem"
+                description="Konfigurasi dan integrasi sistem CCTV."
+            />
 
-            {/* Tabs */}
-            <div className="border-b border-gray-200 dark:border-gray-700">
-                <nav className="-mb-px flex space-x-8 overflow-x-auto">
-                    {tabs.map((tab) => (
-                        <button
-                            key={tab.id}
-                            onClick={() => setActiveTab(tab.id)}
-                            className={`
-                                flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap
-                                ${activeTab === tab.id
-                                    ? 'border-sky-500 text-sky-600 dark:text-sky-400'
-                                    : 'border-transparent text-gray-600 hover:text-gray-800 hover:border-gray-300 dark:text-gray-300 dark:hover:text-white'
-                                }
-                            `}
-                        >
-                            {tab.icon}
-                            {tab.label}
-                        </button>
-                    ))}
-                </nav>
-            </div>
+            <Tabs
+                tabs={TABS.map(({ id, label }) => ({ id, label }))}
+                activeId={active.id}
+                onChange={setActiveTab}
+                idPrefix="settings"
+            />
 
-            {/* Tab Content */}
-            <div className="mt-6">
-                {activeTab === 'general' && <GeneralSettingsPanel />}
-                {activeTab === 'timezone' && <TimezoneSettingsTab />}
-                {activeTab === 'backup' && <BackupSettingsTab />}
-                {activeTab === 'health' && <StreamHealthSettingsPanel />}
-                {activeTab === 'playback' && <PlaybackSettingsPanel />}
-                {activeTab === 'telegram' && <TelegramSettingsPanel />}
-                {activeTab === 'saweria' && <SaweriaSettingsPanel />}
-                {activeTab === 'branding' && <BrandingSettingsPanel />}
-                {activeTab === 'apikey' && <ApiKeySettings />}
-            </div>
+            <TabPanel id={active.id} idPrefix="settings">
+                <Suspense fallback={<FormSkeleton />}>
+                    <ActivePanel />
+                </Suspense>
+            </TabPanel>
         </div>
     );
 }
