@@ -653,12 +653,14 @@ const shutdown = async () => {
             console.error('[Shutdown] Playback session cleanup error:', error.message);
         }
 
-        console.log('[Shutdown] Stopping active recordings...');
+        // Recorders are DETACHED, not stopped — ffmpeg keeps writing across the
+        // restart and the next instance adopts it. See recordingService.shutdown().
+        console.log('[Shutdown] Detaching active recordings (they keep running)...');
         try {
             const results = await recordingService.shutdown();
-            console.log(`[Shutdown] Stopped ${results.length} active recording processes`);
+            console.log(`[Shutdown] Detached ${results.length} recorder(s) — still running, next boot will adopt them`);
         } catch (error) {
-            console.error('[Shutdown] Recording cleanup error:', error.message);
+            console.error('[Shutdown] Recording detach error:', error.message);
         }
         
         // Close database connections

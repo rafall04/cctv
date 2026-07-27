@@ -43,6 +43,20 @@ module.exports = {
             max_memory_restart: '1G',
             wait_ready: true,
             listen_timeout: 10000,
+            // treekill:false — signal ONLY the backend, never its children.
+            //
+            // pm2 defaults to treekill:true, which enumerates the process tree by PPID
+            // and kills everything under the app. That reaches the recording ffmpeg even
+            // though they are spawned `detached` — detaching wins its own process GROUP,
+            // which stops group-wide signals, but does nothing against pm2 explicitly
+            // hunting children by parent pid. Measured on prod: with treekill on, every
+            // recorder pid changed across a restart despite the detach; the recordings
+            // are only actually continuous with this off.
+            //
+            // Safe here because the only other children are thumbnail ffmpeg, which are
+            // short-lived and self-terminating — briefly orphaning one is harmless, and
+            // recordingOrphanReaper cleans up anything genuinely unwanted at next boot.
+            treekill: false,
             env_production: {
                 NODE_ENV: 'production',
                 PORT: 3000

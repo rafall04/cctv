@@ -165,9 +165,17 @@ export function prepareRecordingStart({ camera, recordingsBasePath }) {
         env: buildRecordingProcessEnv(process.env, recordingTimezone),
         // detached: put ffmpeg in its OWN process group so a signal aimed at the
         // backend's group (and the backend's own death) never reaches the recorder.
-        // This is half of "a backend restart must not interrupt recording" — the
-        // other half is stdio, wired by recordingProcessManager to the log file
-        // below, because a child holding a pipe to a dead parent dies on EPIPE.
+        //
+        // This is one of THREE things that all have to hold, or recordings still break
+        // on restart — verified the hard way on prod:
+        //   1. detached (here)          — survives group-wide signals
+        //   2. stderr on a FILE         — recordingProcessManager; a pipe to a dead
+        //                                 parent kills ffmpeg on its next write
+        //   3. treekill:false in pm2    — deployment/ecosystem.config.cjs; pm2 otherwise
+        //                                 walks the process tree by PPID and kills our
+        //                                 children regardless of what group they're in
+        // Missing #3 alone was enough to change every recorder pid across a restart
+        // while 1 and 2 were already in place.
         detached: true,
     };
 
