@@ -36,12 +36,32 @@ import fs from 'fs';
 import path from 'path';
 
 const CACHE_DIR = process.env.TG_ARCHIVE_CACHE_DIR || '/var/lib/telegram-bot-api';
-/** Default 20 GB. Comfortably under the free space measured on prod (47 GB) with room to spare. */
-const MAX_BYTES = Number(process.env.TG_ARCHIVE_CACHE_MAX_BYTES || 20 * 1024 * 1024 * 1024);
+/*
+ * 3 GB, deliberately small. This box is shared with several other projects, so the archive has no
+ * business holding tens of gigabytes — and it does not need to. This directory is TRANSIT, not
+ * storage: a segment lands here only long enough to reach the person who asked for it, then goes.
+ * Sized to hold a handful of concurrent transfers (segments run 8-200 MB), nothing more.
+ */
+const MAX_BYTES = Number(process.env.TG_ARCHIVE_CACHE_MAX_BYTES || 3 * 1024 * 1024 * 1024);
 /** A file touched this recently is assumed to still be downloading. */
 const WRITE_GRACE_MS = Number(process.env.TG_ARCHIVE_CACHE_WRITE_GRACE_MS || 120_000);
-/** Even idle, keep a file this long so a viewer who seeks back does not re-download it. */
-const MIN_AGE_MS = Number(process.env.TG_ARCHIVE_CACHE_MIN_AGE_MS || 10 * 60_000);
+/*
+ * Short on purpose. A longer window would be right for a cache people re-seek inside, but transit
+ * only has to outlive the transfer itself plus a moment for a retry. Anything kept beyond that is
+ * disk taken from the other projects on this box for no one's benefit.
+ */
+const MIN_AGE_MS = Number(process.env.TG_ARCHIVE_CACHE_MIN_AGE_MS || 3 * 60_000);
+/*
+ * Hard expiry, independent of how much space is left. The size cap only fires when the directory
+ * fills; without a TTL a segment fetched once could sit there for months simply because nothing
+ * else came along to push it out. 24h rather than 48h on purpose: this is transit on a SHARED box,
+ * so holding a file costs the other projects disk continuously, while letting it expire costs one
+ * re-download to whoever comes back for it. A day already covers "I looked this morning, I want it
+ * again tonight".
+ *
+ * A pinned file is still never touched — someone mid-download at hour 24 finishes first.
+ */
+const TTL_MS = Number(process.env.TG_ARCHIVE_CACHE_TTL_MS || 24 * 60 * 60_000);
 
 /** filePath -> number of active streams. Only ever mutated through pin()/release(). */
 const pinned = new Map();
@@ -54,8 +74,36 @@ export function pin(filePath) {
 export function release(filePath) {
     if (!filePath) return;
     const next = (pinned.get(filePath) || 0) - 1;
-    if (next > 0) pinned.set(filePath, next);
-    else pinned.delete(filePath);
+    if (next > 0) {
+        pinned.set(filePath, next);
+        return;
+    }
+    pinned.delete(filePath);
+    /*
+     * Give the space back soon after the last reader leaves, rather than waiting for the next
+     * request to notice. The delay is MIN_AGE plus a second: sweeping immediately would always be
+     * a no-op, since the file it just released is still inside its own minimum age.
+     */
+    scheduleSweep(MIN_AGE_MS + 1000);
+}
+
+let sweepTimer = null;
+
+/** Debounced background sweep. Never keeps the process alive on its own (unref). */
+export function scheduleSweep(delayMs = 60_000) {
+    if (sweepTimer) return;
+    sweepTimer = setTimeout(() => {
+        sweepTimer = null;
+        try {
+            const result = sweep();
+            if (result.deleted) {
+                console.log(`[archiveCache] released ${(result.freed / 1e6).toFixed(0)} MB from ${result.deleted} file(s)`);
+            }
+        } catch {
+            // Housekeeping must never take the process with it.
+        }
+    }, delayMs);
+    sweepTimer.unref?.();
 }
 
 export function isPinned(filePath) {
@@ -105,6 +153,36 @@ function evictable(file, now) {
     return true;
 }
 
+/** Delete one file only after re-proving it is safe. Returns bytes freed, or 0. */
+function safeUnlink(file, now) {
+    if (isPinned(file.path)) return 0;
+    try {
+        const fresh = fs.statSync(file.path);
+        // In flight: still being written, or changed since we listed it.
+        if (now - fresh.mtimeMs < WRITE_GRACE_MS || fresh.size !== file.size) return 0;
+        fs.unlinkSync(file.path);
+        return fresh.size;
+    } catch {
+        return 0; // already gone, or not ours to delete
+    }
+}
+
+/**
+ * Drop everything past its TTL, whatever the free space. Pinned files are skipped, so a viewer who
+ * is mid-transfer when the clock runs out still finishes.
+ */
+export function expire(now = Date.now()) {
+    let freed = 0;
+    let deleted = 0;
+    for (const file of listCacheFiles()) {
+        const lastUse = Math.max(file.mtimeMs, file.atimeMs);
+        if (now - lastUse < TTL_MS) continue;
+        const bytes = safeUnlink(file, now);
+        if (bytes) { freed += bytes; deleted += 1; }
+    }
+    return { freed, deleted };
+}
+
 /**
  * Free enough space for `incomingBytes` BEFORE the download starts.
  *
@@ -113,34 +191,31 @@ function evictable(file, now) {
  */
 export function makeRoom(incomingBytes = 0) {
     const now = Date.now();
+    // Expired files are free wins — take them before considering anything still inside its TTL.
+    const expired = expire(now);
+
     const files = listCacheFiles();
     let used = files.reduce((sum, f) => sum + f.size, 0);
     const budget = MAX_BYTES - Number(incomingBytes || 0);
 
-    if (used <= budget) return { freed: 0, deleted: 0, used };
+    if (used <= budget) return { freed: expired.freed, deleted: expired.deleted, used };
 
     // Oldest use first — a segment nobody has touched in a week goes before today's.
     const candidates = files
         .filter((f) => evictable(f, now))
         .sort((a, b) => Math.max(a.mtimeMs, a.atimeMs) - Math.max(b.mtimeMs, b.atimeMs));
 
-    let freed = 0;
-    let deleted = 0;
+    let freed = expired.freed;
+    let deleted = expired.deleted;
     for (const file of candidates) {
         if (used <= budget) break;
-        // Re-check immediately before unlink: the file may have been pinned or re-downloaded in the
-        // time this loop has been running.
-        if (isPinned(file.path)) continue;
-        try {
-            const fresh = fs.statSync(file.path);
-            if (now - fresh.mtimeMs < WRITE_GRACE_MS || fresh.size !== file.size) continue; // in flight
-            fs.unlinkSync(file.path);
-            used -= fresh.size;
-            freed += fresh.size;
-            deleted += 1;
-        } catch {
-            // Already gone, or not ours to delete — either way, move on.
-        }
+        // Re-checked inside safeUnlink: the file may have been pinned or re-downloaded in the time
+        // this loop has been running.
+        const bytes = safeUnlink(file, now);
+        if (!bytes) continue;
+        used -= bytes;
+        freed += bytes;
+        deleted += 1;
     }
 
     if (used > budget) {

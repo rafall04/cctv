@@ -24,6 +24,7 @@ async function loadCache(maxBytes, extra = {}) {
     process.env.TG_ARCHIVE_CACHE_MAX_BYTES = String(maxBytes);
     process.env.TG_ARCHIVE_CACHE_WRITE_GRACE_MS = String(extra.writeGrace ?? 0);
     process.env.TG_ARCHIVE_CACHE_MIN_AGE_MS = String(extra.minAge ?? 0);
+    process.env.TG_ARCHIVE_CACHE_TTL_MS = String(extra.ttl ?? 24 * 60 * 60_000);
     return import('../services/archiveCacheService.js');
 }
 
@@ -47,6 +48,7 @@ afterEach(() => {
     delete process.env.TG_ARCHIVE_CACHE_MAX_BYTES;
     delete process.env.TG_ARCHIVE_CACHE_WRITE_GRACE_MS;
     delete process.env.TG_ARCHIVE_CACHE_MIN_AGE_MS;
+    delete process.env.TG_ARCHIVE_CACHE_TTL_MS;
 });
 
 describe('archive cache eviction', () => {
@@ -132,6 +134,29 @@ describe('archive cache eviction', () => {
         try { cache.makeRoom(0); } catch { /* full is fine here */ }
 
         expect(fs.existsSync(binlog)).toBe(true);
+    });
+
+    it('expires a file past its TTL even when there is plenty of space left', async () => {
+        // The size cap only fires when the directory fills. Without a TTL a segment fetched once
+        // could sit there for months simply because nothing pushed it out.
+        cache = await loadCache(10_000, { ttl: 60_000 });
+        const stale = write('stale.mp4', 100, 120_000);
+        const fresh = write('fresh.mp4', 100, 10_000);
+
+        const result = cache.expire();
+
+        expect(result.deleted).toBe(1);
+        expect(fs.existsSync(stale)).toBe(false);
+        expect(fs.existsSync(fresh)).toBe(true);
+    });
+
+    it('will not expire a file someone is still watching, even past the TTL', async () => {
+        cache = await loadCache(10_000, { ttl: 60_000 });
+        const watching = write('watching.mp4', 100, 999_999);
+        cache.pin(watching);
+
+        expect(cache.expire().deleted).toBe(0);
+        expect(fs.existsSync(watching)).toBe(true);
     });
 
     it('does nothing when the cache already fits', async () => {

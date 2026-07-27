@@ -89,6 +89,7 @@ import recordingHealthAlertService from './services/recordingHealthAlertService.
 import { reapStrayRecordingProcesses } from './services/recordingOrphanReaper.js';
 import thumbnailService from './services/thumbnailService.js';
 import telegramBotService from './services/telegramBotService.js';
+import archiveCache from './services/archiveCacheService.js';
 
 recordingService.attachScheduler(recordingScheduler);
 
@@ -549,7 +550,12 @@ const start = async () => {
         console.log('[Recording] Recording service initialized');
         
         // Start thumbnail generation service
-        await thumbnailService.start();
+        await thumbnailService.// Archive transit directory: sweep at boot and hourly, so expired segments free their disk even
+// when nobody opens the archive page. Timers are unref'd — they never hold the process open.
+archiveCache.scheduleSweep(60_000);
+setInterval(() => archiveCache.scheduleSweep(0), 60 * 60_000).unref();
+
+start();
         console.log('[Thumbnail] Thumbnail generation service started (5min interval)');
 
         // Prepaid billing: hourly tick, idempotent per local day (suspends empty
@@ -564,7 +570,12 @@ const start = async () => {
         // only: NODE_APP_INSTANCE is unset in fork mode and '0' on the first cluster worker.
         const botWorker = process.env.NODE_APP_INSTANCE;
         if (botWorker === undefined || botWorker === '0') {
-            telegramBotService.start();
+            telegramBotService.// Archive transit directory: sweep at boot and hourly, so expired segments free their disk even
+// when nobody opens the archive page. Timers are unref'd — they never hold the process open.
+archiveCache.scheduleSweep(60_000);
+setInterval(() => archiveCache.scheduleSweep(0), 60 * 60_000).unref();
+
+start();
             console.log('[TelegramBot] Customer-management bot started (long-polling)');
         } else {
             console.log(`[TelegramBot] Not started on cluster worker #${botWorker} (poller runs only on worker 0)`);
@@ -702,5 +713,10 @@ process.on('unhandledRejection', (reason) => {
     }
     console.error('[UnhandledRejection] non-fatal, logged (server stays up):', reason);
 });
+
+// Archive transit directory: sweep at boot and hourly, so expired segments free their disk even
+// when nobody opens the archive page. Timers are unref'd — they never hold the process open.
+archiveCache.scheduleSweep(60_000);
+setInterval(() => archiveCache.scheduleSweep(0), 60 * 60_000).unref();
 
 start();
