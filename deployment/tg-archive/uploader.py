@@ -30,7 +30,9 @@ def env(name, default=None, required=False):
 class Config:
     def __init__(self):
         self.api_base = env('TG_API_BASE', 'http://127.0.0.1:8092').rstrip('/')
-        self.token = env('TG_BOT_TOKEN', required=True)
+        # Not required up front: --status and --routes are pure local reads, and demanding the token
+        # made them exit silently when run without sourcing .env first.
+        self.token = env('TG_BOT_TOKEN')
         self.default_chat_id = env('TG_CHAT_ID', '') or None
         self.app_db = env('APP_DB', '/var/www/rafnet-cctv/backend/data/cctv.db')
         self.state_db = env('STATE_DB', '/opt/tg-archive/state.db')
@@ -504,12 +506,15 @@ def main():
     log = logging.getLogger('tg-archive')
     cfg = Config()
 
-    if '--discover-chat' in sys.argv:
-        return cmd_discover_chat(cfg, log)
     if '--routes' in sys.argv:
         return cmd_routes(cfg, log)
     if '--status' in sys.argv:
         return cmd_status(cfg)
+
+    if not cfg.token:
+        sys.exit('FATAL: TG_BOT_TOKEN is required (set it in /opt/tg-archive/.env)')
+    if '--discover-chat' in sys.argv:
+        return cmd_discover_chat(cfg, log)
     run(cfg, log)
 
 
