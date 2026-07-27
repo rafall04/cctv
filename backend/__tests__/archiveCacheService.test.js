@@ -51,6 +51,17 @@ afterEach(() => {
     delete process.env.TG_ARCHIVE_CACHE_TTL_MS;
 });
 
+describe('archive cache module surface', () => {
+    it('exposes every function through the DEFAULT export too', async () => {
+        // server.js imports the default object. A function added only as a named export throws
+        // "not a function" at boot — which is exactly how the hourly sweep shipped dead once.
+        const mod = await loadCache(1000);
+        for (const name of ['pin', 'release', 'isPinned', 'makeRoom', 'sweep', 'scheduleSweep', 'expire', 'stats']) {
+            expect(typeof mod.default[name], `default.${name}`).toBe('function');
+        }
+    });
+});
+
 describe('archive cache eviction', () => {
     it('frees the oldest files when a new segment would not fit', async () => {
         cache = await loadCache(1000);

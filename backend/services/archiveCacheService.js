@@ -240,4 +240,7 @@ export function sweep() {
     }
 }
 
-export default { pin, release, isPinned, makeRoom, sweep, stats, CACHE_DIR, MAX_BYTES };
+export default {
+    pin, release, isPinned, makeRoom, sweep, scheduleSweep, expire, stats,
+    CACHE_DIR, MAX_BYTES, TTL_MS,
+};
