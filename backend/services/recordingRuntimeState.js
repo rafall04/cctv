@@ -11,11 +11,14 @@ export class RecordingRuntimeState {
         this.shutdownInFlight = false;
     }
 
-    setActive(cameraId, { process, streamSource, startedAt = new Date(), camera = null }) {
+    // `pid` is passed explicitly for ADOPTED recorders: we hold no child handle for
+    // a process we did not spawn, so the pid is the only handle that exists.
+    setActive(cameraId, { process, pid = null, streamSource, startedAt = new Date(), camera = null }) {
         const record = {
             cameraId,
             process,
-            pid: process?.pid ?? null,
+            pid: process?.pid ?? pid,
+            adopted: !process,
             camera,
             streamSource,
             status: 'recording',

@@ -555,7 +555,10 @@ describe('recordingService external recording support', () => {
         expect(executeMock.mock.calls.some(([sql]) => String(sql).includes('recording_restart_logs'))).toBe(false);
     });
 
-    it('stops all active recordings during service shutdown', async () => {
+    it('DETACHES active recordings on server shutdown instead of killing them', async () => {
+        // The load-bearing guarantee of this change: a backend restart must not
+        // interrupt recording. Signalling ffmpeg here is what used to cost an
+        // in-flight segment per camera on every single deploy.
         const { recordingService } = await import('../services/recordingService.js');
         const first = createSpawnProcess();
         const second = createSpawnProcess();
@@ -567,14 +570,30 @@ describe('recordingService external recording support', () => {
         await recordingService.startRecording(81);
         await recordingService.startRecording(82);
 
-        const shutdownPromise = recordingService.shutdown();
-        expect(first.kill).toHaveBeenCalledWith('SIGINT');
-        expect(second.kill).toHaveBeenCalledWith('SIGINT');
+        const detached = await recordingService.shutdown();
 
-        first.emit('close', 255, null);
-        second.emit('close', 255, null);
+        expect(first.kill).not.toHaveBeenCalled();
+        expect(second.kill).not.toHaveBeenCalled();
+        expect(detached).toHaveLength(2);
+        expect(detached.map((entry) => entry.pid).sort()).toEqual([801, 802]);
+    });
 
-        await expect(shutdownPromise).resolves.toHaveLength(2);
+    it('still stops recorders when the box itself is going down', async () => {
+        // Explicit opt-in: nothing is coming back to adopt them, so a clean SIGINT
+        // (segment closes properly) beats leaving orphans behind.
+        const { recordingService } = await import('../services/recordingService.js');
+        const child = createSpawnProcess();
+        child.pid = 803;
+        spawnMock.mockReturnValue(child);
+        queryOneMock.mockImplementation((sql, params) => createCamera({ id: params?.[0] ?? 1 }));
+
+        await recordingService.startRecording(83);
+
+        const shutdownPromise = recordingService.shutdown({ stopRecorders: true });
+        expect(child.kill).toHaveBeenCalledWith('SIGINT');
+
+        child.emit('close', 255, null);
+        await expect(shutdownPromise).resolves.toHaveLength(1);
     });
 
     it('drains segment finalizer during shutdown after stopping ffmpeg', async () => {

@@ -121,6 +121,61 @@ describe('RecordingProcessManager', () => {
         expect(manager.getActiveCameraIds()).toEqual([]);
     });
 
+    it('detachAll leaves recorders RUNNING and only releases our side', async () => {
+        // The point of the whole detached-recorder design: a backend restart must
+        // not signal ffmpeg. Killing here is what used to truncate a segment per
+        // camera on every deploy.
+        const first = createProcess(901);
+        const second = createProcess(902);
+        spawnMock.mockReturnValueOnce(first).mockReturnValueOnce(second);
+        const { RecordingProcessManager } = await import('../services/recordingProcessManager.js');
+        const manager = new RecordingProcessManager();
+
+        await manager.start(91, { ffmpegArgs: ['a'], camera: { id: 91 }, streamSource: 'internal' });
+        await manager.start(92, { ffmpegArgs: ['b'], camera: { id: 92 }, streamSource: 'internal' });
+
+        const detached = manager.detachAll();
+
+        expect(first.kill).not.toHaveBeenCalled();
+        expect(second.kill).not.toHaveBeenCalled();
+        expect(detached).toEqual([{ cameraId: 91, pid: 901 }, { cameraId: 92, pid: 902 }]);
+        expect(manager.getActiveCameraIds()).toEqual([]);
+    });
+
+    it('adopts a recorder it did not spawn, tracked by pid alone', async () => {
+        const { RecordingProcessManager } = await import('../services/recordingProcessManager.js');
+        const manager = new RecordingProcessManager();
+
+        const result = manager.adopt(10, { pid: 4242, camera: { id: 10 }, streamSource: 'internal' });
+
+        expect(result).toMatchObject({ success: true, pid: 4242 });
+        expect(manager.getStatus(10)).toMatchObject({ isRecording: true, pid: 4242, adopted: true });
+        expect(spawnMock).not.toHaveBeenCalled();
+        manager.detachAll();
+    });
+
+    it('rejects adoption of an invalid pid', async () => {
+        const { RecordingProcessManager } = await import('../services/recordingProcessManager.js');
+        const manager = new RecordingProcessManager();
+
+        expect(manager.adopt(11, { pid: 0 })).toMatchObject({ success: false });
+        expect(manager.adopt(11, { pid: undefined })).toMatchObject({ success: false });
+        expect(manager.getStatus(11)).toEqual({ isRecording: false, status: 'stopped' });
+    });
+
+    it('signals an adopted recorder by pid, since there is no child handle', async () => {
+        const { RecordingProcessManager } = await import('../services/recordingProcessManager.js');
+        const manager = new RecordingProcessManager({ gracefulStopTimeoutMs: 5000 });
+        const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => true);
+
+        manager.adopt(12, { pid: 5150, camera: { id: 12 }, streamSource: 'internal' });
+        manager.stop(12, 'stop_disabled');
+
+        expect(killSpy).toHaveBeenCalledWith(5150, 'SIGINT');
+        killSpy.mockRestore();
+        manager.detachAll();
+    });
+
     it('passes explicit spawn options to FFmpeg', async () => {
         const child = createProcess(777);
         spawnMock.mockReturnValue(child);

@@ -19,6 +19,7 @@ import {
     getPendingRecordingPattern,
 } from './recordingSegmentFilePolicy.js';
 import { RECORDING_RTSP_SOCKET_TIMEOUT_MICROS } from './recordingIntervalsPolicy.js';
+import { getFfmpegLogPath } from './recordingFfmpegLog.js';
 
 const EXTERNAL_RECORDING_PROTOCOL_WHITELIST = 'file,http,https,tcp,tls,crypto';
 
@@ -162,6 +163,12 @@ export function prepareRecordingStart({ camera, recordingsBasePath }) {
     const recordingTimezone = getRecordingProcessTimezone();
     const spawnOptions = {
         env: buildRecordingProcessEnv(process.env, recordingTimezone),
+        // detached: put ffmpeg in its OWN process group so a signal aimed at the
+        // backend's group (and the backend's own death) never reaches the recorder.
+        // This is half of "a backend restart must not interrupt recording" — the
+        // other half is stdio, wired by recordingProcessManager to the log file
+        // below, because a child holding a pipe to a dead parent dies on EPIPE.
+        detached: true,
     };
 
     return {
@@ -171,5 +178,6 @@ export function prepareRecordingStart({ camera, recordingsBasePath }) {
         spawnOptions,
         cameraDir,
         recordingTimezone,
+        stderrLogPath: getFfmpegLogPath(recordingsBasePath, camera.id),
     };
 }

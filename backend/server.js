@@ -87,7 +87,6 @@ import playbackViewerSessionService from './services/playbackViewerSessionServic
 import { recordingService } from './services/recordingService.js';
 import recordingScheduler from './services/recordingScheduler.js';
 import recordingHealthAlertService from './services/recordingHealthAlertService.js';
-import { reapStrayRecordingProcesses } from './services/recordingOrphanReaper.js';
 import thumbnailService from './services/thumbnailService.js';
 import telegramBotService from './services/telegramBotService.js';
 import archiveCache from './services/archiveCacheService.js';
@@ -525,12 +524,18 @@ const start = async () => {
         console.log('[Recording] Waiting for MediaMTX paths to be ready...');
         await new Promise(resolve => setTimeout(resolve, 5000)); // Reduced from 10s to 5s
         
-        // Reap stray recording ffmpeg left by a previous instance (crash/OOM/pm2
-        // restart orphans children to init). Must run BEFORE we start any recorder:
-        // at this point every ffmpeg writing to our recordings dir is an orphan.
-        const reaped = await reapStrayRecordingProcesses();
-        if (reaped.killed?.length) {
-            console.log(`[Recording] Reaped ${reaped.killed.length} stray ffmpeg from a previous instance`);
+        // Re-attach to recorders the previous instance left running, instead of
+        // killing them. Recorders are spawned detached with stderr on a file
+        // precisely so they survive a restart — adopting them here is what turns
+        // "every deploy punches a hole in the recordings" into "a deploy is
+        // invisible to recording". Must run BEFORE auto-start, so adopted cameras
+        // are already known to be recording and don't get a second ffmpeg.
+        const adoption = await recordingService.adoptExistingRecordings();
+        if (adoption.adopted?.length) {
+            console.log(`[Recording] Adopted ${adoption.adopted.length} running recorder(s) — no segment interrupted by this restart`);
+        }
+        if (adoption.retired?.length) {
+            console.log(`[Recording] Retired ${adoption.retired.length} recorder(s) with no matching camera`);
         }
 
         // Auto-start recordings untuk cameras yang enable_recording = 1

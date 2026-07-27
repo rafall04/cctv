@@ -4,10 +4,16 @@
 // MainFuncs: RecordingProcessManager.start, stop, restart, shutdownAll, getStatus.
 // SideEffects: Spawns and stops FFmpeg child processes; writes lifecycle logs.
 
+import { closeSync } from 'fs';
 import { spawn } from 'child_process';
 import { RecordingRuntimeState } from './recordingRuntimeState.js';
 import { classifyRecordingExit } from './recordingFailureClassifier.js';
 import { RECORDING_PROCESS_GRACEFUL_STOP_MS } from './recordingIntervalsPolicy.js';
+import { createLogTailer, openFfmpegLog } from './recordingFfmpegLog.js';
+
+// How often an ADOPTED recorder is checked for liveness. We are not its parent, so
+// there is no 'close' event to wait on — kill(pid, 0) is the only signal available.
+const ADOPTED_LIVENESS_POLL_MS = 5000;
 
 export class RecordingProcessManager {
     constructor({ gracefulStopTimeoutMs = RECORDING_PROCESS_GRACEFUL_STOP_MS, binary = 'ffmpeg' } = {}) {
@@ -17,29 +23,53 @@ export class RecordingProcessManager {
         this.outputBuffers = new Map();
         this.closeWaiters = new Map();
         this.callbacks = new Map();
+        this.tailers = new Map();
+        this.livenessTimers = new Map();
     }
 
-    async start(cameraId, { ffmpegArgs, camera, streamSource, spawnOptions, onStdout, onStderr, onClose, onError }) {
+    async start(cameraId, { ffmpegArgs, camera, streamSource, spawnOptions, stderrLogPath, onStdout, onStderr, onClose, onError }) {
         if (this.state.has(cameraId)) {
             return { success: false, message: 'Already recording' };
         }
 
-        const child = spawn(this.binary, ffmpegArgs, spawnOptions);
+        // With a log path we hand ffmpeg a FILE for stderr instead of a pipe to us.
+        // That is what lets the recorder outlive this process (a pipe to a dead
+        // parent kills it on the next write). Without one — unit tests, and any
+        // caller that has not been migrated — keep the original pipe wiring.
+        let logFd = null;
+        let effectiveSpawnOptions = spawnOptions;
+        if (stderrLogPath) {
+            try {
+                logFd = openFfmpegLog(stderrLogPath);
+                effectiveSpawnOptions = { ...spawnOptions, stdio: ['ignore', 'ignore', logFd] };
+            } catch (error) {
+                console.warn(`[Recording] Could not open ffmpeg log for camera ${cameraId} (${error.message}); falling back to pipes`);
+                logFd = null;
+            }
+        }
+
+        const child = spawn(this.binary, ffmpegArgs, effectiveSpawnOptions);
         this.state.setActive(cameraId, { process: child, camera, streamSource });
         this.outputBuffers.set(cameraId, []);
         this.callbacks.set(cameraId, { onStdout, onStderr, onClose, onError });
 
-        child.stdout.on('data', (data) => {
-            this.state.updateLastDataAt(cameraId);
-            onStdout?.(data);
-        });
+        if (logFd !== null) {
+            // The child holds its own duplicate of the fd; keeping ours open would
+            // pin the file and leak a descriptor per restart.
+            try { closeSync(logFd); } catch { /* already closed */ }
+            // Don't hold the event loop open for a process that is meant to outlive us.
+            child.unref?.();
+            this.startTailer(cameraId, stderrLogPath, { fromEnd: false });
+        } else {
+            child.stdout?.on('data', (data) => {
+                this.state.updateLastDataAt(cameraId);
+                onStdout?.(data);
+            });
 
-        child.stderr.on('data', (data) => {
-            const output = data.toString();
-            this.state.updateLastDataAt(cameraId);
-            this.pushOutput(cameraId, output);
-            onStderr?.(output);
-        });
+            child.stderr?.on('data', (data) => {
+                this.feedOutput(cameraId, data.toString());
+            });
+        }
 
         child.on('close', (exitCode, exitSignal) => {
             this.handleClose(cameraId, exitCode, exitSignal);
@@ -55,6 +85,89 @@ export class RecordingProcessManager {
         return { success: true, message: 'Recording started', pid: child.pid };
     }
 
+    /**
+     * Take ownership of an ffmpeg this process did NOT spawn — a recorder left
+     * running by the previous backend instance. The whole point of detaching
+     * recorders is that a deploy no longer interrupts them, which is only true if
+     * the incoming instance re-attaches instead of killing and respawning.
+     *
+     * We get no 'close' event (we are not the parent), so liveness is polled and
+     * the stderr log is tailed from its CURRENT end — replaying old history would
+     * re-fire stale segment-completion events and falsify freshness.
+     */
+    adopt(cameraId, { pid, camera, streamSource, stderrLogPath, startedAt, onStderr, onClose, onError }) {
+        if (this.state.has(cameraId)) {
+            return { success: false, message: 'Already tracked' };
+        }
+        if (!Number.isInteger(pid) || pid <= 0) {
+            return { success: false, message: 'Invalid pid' };
+        }
+
+        this.state.setActive(cameraId, { process: null, pid, camera, streamSource, startedAt });
+        this.outputBuffers.set(cameraId, []);
+        this.callbacks.set(cameraId, { onStderr, onClose, onError });
+
+        if (stderrLogPath) {
+            this.startTailer(cameraId, stderrLogPath, { fromEnd: true });
+        }
+        this.startLivenessPoll(cameraId, pid);
+
+        this.logLifecycle(cameraId, 'adopt', { pid, reason: 'adopted_from_previous_instance' });
+        return { success: true, message: 'Recording adopted', pid };
+    }
+
+    startTailer(cameraId, logPath, { fromEnd }) {
+        this.stopTailer(cameraId);
+        const tailer = createLogTailer({
+            logPath,
+            fromEnd,
+            onData: (output) => this.feedOutput(cameraId, output),
+        });
+        this.tailers.set(cameraId, tailer);
+    }
+
+    stopTailer(cameraId) {
+        this.tailers.get(cameraId)?.stop();
+        this.tailers.delete(cameraId);
+    }
+
+    startLivenessPoll(cameraId, pid) {
+        this.stopLivenessPoll(cameraId);
+        const timer = setInterval(() => {
+            if (this.isPidAlive(pid)) {
+                return;
+            }
+            this.stopLivenessPoll(cameraId);
+            this.handleClose(cameraId, null, null);
+        }, ADOPTED_LIVENESS_POLL_MS);
+        timer.unref?.();
+        this.livenessTimers.set(cameraId, timer);
+    }
+
+    stopLivenessPoll(cameraId) {
+        const timer = this.livenessTimers.get(cameraId);
+        if (timer) {
+            clearInterval(timer);
+            this.livenessTimers.delete(cameraId);
+        }
+    }
+
+    isPidAlive(pid) {
+        try {
+            process.kill(pid, 0);
+            return true;
+        } catch (error) {
+            // EPERM means it exists but belongs to someone else — still alive.
+            return error?.code === 'EPERM';
+        }
+    }
+
+    feedOutput(cameraId, output) {
+        this.state.updateLastDataAt(cameraId);
+        this.pushOutput(cameraId, output);
+        this.callbacks.get(cameraId)?.onStderr?.(output);
+    }
+
     async stop(cameraId, reason = 'manual_stop', { signal = 'SIGINT', timeoutMs = this.gracefulStopTimeoutMs } = {}) {
         const record = this.state.get(cameraId);
         if (!record) {
@@ -63,14 +176,14 @@ export class RecordingProcessManager {
 
         this.state.markStopping(cameraId, reason);
         const closePromise = this.waitForClose(cameraId);
-        record.process.kill(signal);
-        this.logLifecycle(cameraId, 'stop_signal', { pid: record.pid, reason, signal });
+        this.signalRecord(record, signal);
+        this.logLifecycle(cameraId, 'stop_signal', { pid: record.pid, reason, signal, adopted: !!record.adopted });
 
         const timeout = setTimeout(() => {
             const latest = this.state.get(cameraId);
             if (latest && latest.status !== 'exited') {
                 this.state.markForcedKill(cameraId);
-                latest.process.kill('SIGKILL');
+                this.signalRecord(latest, 'SIGKILL');
                 this.logLifecycle(cameraId, 'force_kill', { pid: latest.pid, reason, signal: 'SIGKILL' });
             }
         }, timeoutMs);
@@ -95,10 +208,75 @@ export class RecordingProcessManager {
         }
     }
 
+    /**
+     * Send a signal to a record whether or not we own a child handle for it.
+     * Adopted recorders only have a pid. Note that ffmpeg is spawned detached, so
+     * the signal must target the pid itself — never the negated process group,
+     * which would also hit whatever else shares it.
+     */
+    signalRecord(record, signal) {
+        if (!record) {
+            return false;
+        }
+        try {
+            if (record.process) {
+                record.process.kill(signal);
+            } else if (record.pid) {
+                process.kill(record.pid, signal);
+            } else {
+                return false;
+            }
+            return true;
+        } catch (error) {
+            // ESRCH = already gone; nothing left to signal.
+            if (error?.code !== 'ESRCH') {
+                console.warn(`[Recording] Failed to signal camera ${record.cameraId} pid ${record.pid}: ${error.message}`);
+            }
+            return false;
+        }
+    }
+
     async shutdownAll(reason = 'server_shutdown') {
         this.state.beginShutdown();
         const stops = this.getActiveCameraIds().map((cameraId) => this.stop(cameraId, reason));
         return Promise.all(stops);
+    }
+
+    /**
+     * Server shutdown path: let every recorder KEEP RUNNING and just release our
+     * side of it (tailers, liveness polls, in-memory state).
+     *
+     * This is the behaviour change that makes a backend deploy safe. Stopping the
+     * recorders here is what used to truncate an in-flight segment on every single
+     * restart — and when the process died hard instead of gracefully, the next
+     * instance SIGKILLed the leftovers before ffmpeg could write the moov atom,
+     * turning a truncated segment into an unplayable one. The incoming instance
+     * calls adopt() and picks these same processes back up.
+     */
+    detachAll(reason = 'server_shutdown_detach') {
+        const cameraIds = this.getActiveCameraIds();
+        const detached = [];
+
+        for (const cameraId of cameraIds) {
+            const record = this.state.get(cameraId);
+            if (!record) {
+                continue;
+            }
+            this.stopTailer(cameraId);
+            this.stopLivenessPoll(cameraId);
+            // Drop our 'close'/'error' listeners so a child exiting during shutdown
+            // cannot drive lifecycle work against a half-torn-down service.
+            record.process?.removeAllListeners?.('close');
+            record.process?.removeAllListeners?.('error');
+            this.logLifecycle(cameraId, 'detach', { pid: record.pid, reason });
+            detached.push({ cameraId, pid: record.pid });
+            this.outputBuffers.delete(cameraId);
+            this.callbacks.delete(cameraId);
+            this.closeWaiters.delete(cameraId);
+            this.state.remove(cameraId);
+        }
+
+        return detached;
     }
 
     getStatus(cameraId) {
@@ -114,6 +292,7 @@ export class RecordingProcessManager {
             streamSource: record.streamSource,
             stopReason: record.stopReason,
             forcedKill: record.forcedKill,
+            adopted: !!record.adopted,
         };
     }
 
@@ -188,6 +367,8 @@ export class RecordingProcessManager {
         this.closeWaiters.delete(cameraId);
         this.outputBuffers.delete(cameraId);
         this.callbacks.delete(cameraId);
+        this.stopTailer(cameraId);
+        this.stopLivenessPoll(cameraId);
         this.state.remove(cameraId);
 
         for (const resolve of waiters) {

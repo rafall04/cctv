@@ -19,6 +19,7 @@ import { createRecordingLifecycleReconciler } from './recordingLifecycleReconcil
 import recordingDiskSpaceService from './recordingDiskSpaceService.js';
 import { createRecordingMaintenanceCoordinator } from './recordingMaintenanceCoordinator.js';
 import { createRecordingAutoStarter } from './recordingAutoStarter.js';
+import { createRecordingAdopter } from './recordingAdopter.js';
 import { resolveSegmentSource } from './recordingSegmentFilePolicy.js';
 import { RECORDINGS_BASE_PATH } from './recordingPaths.js';
 import { createRecordingHealthMonitor, computeCooldownMs } from './recordingHealthMonitor.js';
@@ -94,6 +95,24 @@ class RecordingService {
             logger: console,
         });
 
+        this.adopter = createRecordingAdopter({
+            query,
+            processManager: recordingProcessManager,
+            recordingsBasePath: RECORDINGS_BASE_PATH,
+            // Adopted recorders must land in exactly the same callback wiring as
+            // ones we spawned ourselves, or freshness/segment events would silently
+            // stop flowing for them.
+            buildCallbacks: (cameraId, camera) => ({
+                onStderr: (output) => this.handleRecordingStderr(cameraId, output),
+                onError: (error) => {
+                    console.error(`FFmpeg error for adopted camera ${cameraId}:`, error);
+                    this.markRecordingFailure(cameraId, 'adopted_process_error');
+                },
+                onClose: (result) => this.handleRecordingClosed(cameraId, result, camera?.stream_source || 'internal'),
+            }),
+            logger: console,
+        });
+
         this.maintenanceCoordinator = createRecordingMaintenanceCoordinator({
             recordingsBasePath: RECORDINGS_BASE_PATH,
             cleanupService,
@@ -158,7 +177,7 @@ class RecordingService {
                 }
                 return prepared;
             }
-            const { sourceConfig, ffmpegArgs, spawnOptions, recordingTimezone } = prepared;
+            const { sourceConfig, ffmpegArgs, spawnOptions, recordingTimezone, stderrLogPath } = prepared;
 
             console.log(`Starting recording for camera ${cameraId} (${camera.name})`);
             console.log(`[Recording] Source type: ${sourceConfig.streamSource}`);
@@ -171,6 +190,7 @@ class RecordingService {
                 camera,
                 streamSource: sourceConfig.streamSource,
                 spawnOptions,
+                stderrLogPath,
                 onStdout: () => this.updateRecordingDataTime(cameraId),
                 onStderr: (output) => this.handleRecordingStderr(cameraId, output),
                 onError: (error) => {
@@ -350,11 +370,21 @@ class RecordingService {
         return this.lifecycleReconciler.reconcileAll(reason, now);
     }
 
-    async shutdown() {
+    /**
+     * Server shutdown. Recorders are DETACHED, not stopped: ffmpeg keeps writing
+     * across the restart and the next instance adopts it (see adoptExistingRecordings).
+     *
+     * Stopping them here is what made every deploy cost an in-flight segment per
+     * camera. Pass { stopRecorders: true } only when the whole box is genuinely
+     * going down and nothing will come back to adopt them.
+     */
+    async shutdown({ stopRecorders = false } = {}) {
         this.isShuttingDown = true;
         this.healthMonitor?.stop();
         this.scheduler?.stop();
-        const results = await recordingProcessManager.shutdownAll('server_shutdown');
+        const results = stopRecorders
+            ? await recordingProcessManager.shutdownAll('server_shutdown')
+            : recordingProcessManager.detachAll('server_shutdown_detach');
         await recordingRecoveryService.drain(30000);
         const drainResult = await recordingSegmentFinalizer.drain(30000);
         if (!drainResult.drained) {
@@ -495,6 +525,15 @@ class RecordingService {
 
     async autoStartRecordings() {
         return this.autoStarter.autoStart();
+    }
+
+    /**
+     * Boot: re-attach to recorders the previous instance left running, BEFORE
+     * auto-start so those cameras are seen as already recording and are not
+     * respawned (which would kill the segment this whole mechanism protects).
+     */
+    async adoptExistingRecordings() {
+        return this.adopter.adoptExisting();
     }
 }
 
