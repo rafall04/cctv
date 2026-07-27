@@ -45,18 +45,18 @@ export function StatsCard({ icon, label, value, subValue, color = 'sky', trend }
     };
 
     return (
-        <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl p-6 hover:shadow-lg transition-all group">
+        <div className="bg-surface border border-edge rounded-2xl p-6 hover:shadow-lg transition-all group">
             <div className="flex items-center justify-between mb-4">
                 <div className={`w-12 h-12 bg-gradient-to-br ${colorClasses[color]} rounded-xl flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform`}>
                     {icon}
                 </div>
-                <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">{label}</span>
+                <span className="text-[10px] font-bold text-content-muted uppercase tracking-wider">{label}</span>
             </div>
             <div className="flex items-baseline gap-2 mb-1">
-                <h3 className="text-3xl font-bold text-gray-900 dark:text-white">{value}</h3>
+                <h3 className="text-3xl font-bold text-content">{value}</h3>
                 {trend !== null && trend !== undefined && <TrendBadge value={trend} />}
             </div>
-            {subValue && <p className="text-sm text-gray-500 dark:text-gray-400">{subValue}</p>}
+            {subValue && <p className="text-sm text-content-muted">{subValue}</p>}
         </div>
     );
 }
@@ -74,7 +74,7 @@ export function PeriodSelector({ value, onChange, customDate, onCustomDateChange
 
     return (
         <div className="flex flex-wrap items-center gap-2">
-            <div className="flex bg-gray-100 dark:bg-gray-800 rounded-xl p-1">
+            <div className="flex bg-surface-sunken rounded-xl p-1">
                 {periods.map((period) => (
                     <button
                         key={period.value}
@@ -86,7 +86,7 @@ export function PeriodSelector({ value, onChange, customDate, onCustomDateChange
                                 setShowDatePicker(false);
                             }
                         }}
-                        className={`px-3 py-2 text-sm font-medium rounded-lg transition-all ${value === period.value ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white'}`}
+                        className={`px-3 py-2 text-sm font-medium rounded-lg transition-all ${value === period.value ? 'bg-white dark:bg-gray-700 text-content shadow-sm' : 'text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white'}`}
                     >
                         {period.label}
                     </button>
@@ -101,7 +101,7 @@ export function PeriodSelector({ value, onChange, customDate, onCustomDateChange
                         onChange('custom');
                     }}
                     max={getLocalDateInputValue(new Date(), timezone)}
-                    className="px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent"
+                    className="px-3 py-2 text-sm bg-surface border border-edge rounded-lg text-content focus:ring-2 focus:ring-primary focus:border-transparent"
                 />
             )}
         </div>
@@ -113,7 +113,7 @@ export function CameraFilter({ cameras, value, onChange }) {
         <select
             value={value}
             onChange={(event) => onChange(event.target.value)}
-            className="px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent"
+            className="px-3 py-2 text-sm bg-surface border border-edge rounded-lg text-content focus:ring-2 focus:ring-primary focus:border-transparent"
         >
             <option value="">Semua Kamera</option>
             {cameras.map((camera) => (
@@ -127,7 +127,7 @@ export function CameraFilter({ cameras, value, onChange }) {
 
 export function ActiveViewerCard({ session }) {
     return (
-        <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl">
+        <div className="flex items-center gap-3 p-3 bg-surface-sunken rounded-xl">
             <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
                 session.deviceType === 'mobile' ? 'bg-blue-100 dark:bg-primary/20 text-primary' :
                 session.deviceType === 'tablet' ? 'bg-purple-100 dark:bg-purple-500/20 text-purple-500' :
@@ -137,13 +137,13 @@ export function ActiveViewerCard({ session }) {
             </div>
             <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                    <span className="font-mono text-sm font-semibold text-gray-900 dark:text-white truncate">{session.ipAddress}</span>
+                    <span className="font-mono text-sm font-semibold text-content truncate">{session.ipAddress}</span>
                     <span className="flex items-center gap-1">
                         <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                         <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400">LIVE</span>
                     </span>
                 </div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                <p className="text-xs text-content-muted truncate">
                     Kamera {session.cameraName} • Durasi {formatDuration(session.durationSeconds)}
                 </p>
             </div>
@@ -153,7 +153,7 @@ export function ActiveViewerCard({ session }) {
 
 export function InteractiveBarChart({ data, maxValue, onBarClick, selectedDate }) {
     if (!data || data.length === 0) {
-        return <div className="flex items-center justify-center h-48 text-gray-500 dark:text-gray-400">Tidak ada data</div>;
+        return <div className="flex items-center justify-center h-48 text-content-muted">Tidak ada data</div>;
     }
 
     const max = maxValue || Math.max(...data.map((item) => item.value), 1);
@@ -163,17 +163,17 @@ export function InteractiveBarChart({ data, maxValue, onBarClick, selectedDate }
             {data.map((item, index) => (
                 <div
                     key={`${item.rawDate}-${index}`}
-                    className={`flex items-center gap-3 p-1 rounded-lg cursor-pointer transition-all hover:bg-gray-50 dark:hover:bg-gray-800/50 ${selectedDate === item.rawDate ? 'bg-sky-50 dark:bg-primary/10 ring-1 ring-primary/30' : ''}`}
+                    className={`flex items-center gap-3 p-1 rounded-lg cursor-pointer transition-all hover:bg-surface-sunken ${selectedDate === item.rawDate ? 'bg-sky-50 dark:bg-primary/10 ring-1 ring-primary/30' : ''}`}
                     onClick={() => onBarClick(item)}
                 >
-                    <span className="text-xs text-gray-600 dark:text-gray-300 w-16 text-right truncate">{item.label}</span>
-                    <div className="flex-1 h-6 bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden">
+                    <span className="text-xs text-content-muted w-16 text-right truncate">{item.label}</span>
+                    <div className="flex-1 h-6 bg-surface-sunken rounded-lg overflow-hidden">
                         <div
                             className={`h-full rounded-lg transition-all duration-500 ${selectedDate === item.rawDate ? 'bg-gradient-to-r from-primary-400 to-primary' : 'bg-gradient-to-r from-primary to-primary-600'}`}
                             style={{ width: `${Math.max((item.value / max) * 100, 2)}%` }}
                         />
                     </div>
-                    <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 w-12">{item.value}</span>
+                    <span className="text-xs font-semibold text-content-muted w-12">{item.value}</span>
                 </div>
             ))}
         </div>
@@ -182,7 +182,7 @@ export function InteractiveBarChart({ data, maxValue, onBarClick, selectedDate }
 
 export function SimpleBarChart({ data, maxValue }) {
     if (!data || data.length === 0) {
-        return <div className="flex items-center justify-center h-48 text-gray-500 dark:text-gray-400">Tidak ada data</div>;
+        return <div className="flex items-center justify-center h-48 text-content-muted">Tidak ada data</div>;
     }
 
     const max = maxValue || Math.max(...data.map((item) => item.value), 1);
@@ -191,11 +191,11 @@ export function SimpleBarChart({ data, maxValue }) {
         <div className="space-y-2">
             {data.map((item, index) => (
                 <div key={`${item.label}-${index}`} className="flex items-center gap-3">
-                    <span className="text-xs text-gray-600 dark:text-gray-300 w-16 text-right truncate">{item.label}</span>
-                    <div className="flex-1 h-6 bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden">
+                    <span className="text-xs text-content-muted w-16 text-right truncate">{item.label}</span>
+                    <div className="flex-1 h-6 bg-surface-sunken rounded-lg overflow-hidden">
                         <div className="h-full bg-gradient-to-r from-primary to-primary-600 rounded-lg transition-all duration-500" style={{ width: `${Math.max((item.value / max) * 100, 2)}%` }} />
                     </div>
-                    <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 w-12">{item.value}</span>
+                    <span className="text-xs font-semibold text-content-muted w-12">{item.value}</span>
                 </div>
             ))}
         </div>
@@ -222,13 +222,13 @@ export function Pagination({ currentPage, totalPages, onPageChange }) {
 
     return (
         <div className="flex items-center justify-center gap-1 mt-4">
-            <button onClick={() => onPageChange(currentPage - 1)} disabled={currentPage === 1} className="p-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed">
+            <button onClick={() => onPageChange(currentPage - 1)} disabled={currentPage === 1} className="p-2 rounded-lg text-content-muted hover:bg-surface-sunken disabled:opacity-50 disabled:cursor-not-allowed">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
             </button>
             {start > 1 && (
                 <>
-                    <button onClick={() => onPageChange(1)} className="px-3 py-1 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800">1</button>
-                    {start > 2 && <span className="px-2 text-gray-500 dark:text-gray-400">...</span>}
+                    <button onClick={() => onPageChange(1)} className="px-3 py-1 rounded-lg text-sm text-content-muted hover:bg-surface-sunken">1</button>
+                    {start > 2 && <span className="px-2 text-content-muted">...</span>}
                 </>
             )}
             {pages.map((page) => (
@@ -242,11 +242,11 @@ export function Pagination({ currentPage, totalPages, onPageChange }) {
             ))}
             {end < totalPages && (
                 <>
-                    {end < totalPages - 1 && <span className="px-2 text-gray-500 dark:text-gray-400">...</span>}
-                    <button onClick={() => onPageChange(totalPages)} className="px-3 py-1 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800">{totalPages}</button>
+                    {end < totalPages - 1 && <span className="px-2 text-content-muted">...</span>}
+                    <button onClick={() => onPageChange(totalPages)} className="px-3 py-1 rounded-lg text-sm text-content-muted hover:bg-surface-sunken">{totalPages}</button>
                 </>
             )}
-            <button onClick={() => onPageChange(currentPage + 1)} disabled={currentPage === totalPages} className="p-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed">
+            <button onClick={() => onPageChange(currentPage + 1)} disabled={currentPage === totalPages} className="p-2 rounded-lg text-content-muted hover:bg-surface-sunken disabled:opacity-50 disabled:cursor-not-allowed">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
             </button>
         </div>

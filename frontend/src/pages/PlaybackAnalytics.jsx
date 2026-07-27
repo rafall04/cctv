@@ -55,17 +55,17 @@ function StatCard({ label, value, tone = 'blue' }) {
     };
 
     return (
-        <div className={`rounded-2xl border bg-gradient-to-br ${tones[tone]} bg-white p-5 dark:bg-gray-900`}>
-            <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{label}</div>
-            <div className="mt-2 text-2xl font-bold text-gray-900 dark:text-white">{value}</div>
+        <div className={`rounded-2xl border bg-gradient-to-br ${tones[tone]} bg-surface p-5`}>
+            <div className="text-xs font-semibold uppercase tracking-wide text-content-muted">{label}</div>
+            <div className="mt-2 text-2xl font-bold text-content">{value}</div>
         </div>
     );
 }
 
 function SectionCard({ title, children }) {
     return (
-        <section className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{title}</h2>
+        <section className="rounded-2xl border border-edge bg-surface p-5">
+            <h2 className="text-lg font-semibold text-content">{title}</h2>
             <div className="mt-4">{children}</div>
         </section>
     );
@@ -76,13 +76,13 @@ function renderPlaybackHistoryCell(session, column, formatDateTime) {
         case 'camera_name':
             return (
                 <div>
-                    <div className="font-semibold text-gray-900 dark:text-white">{session.camera_name}</div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">{session.segment_filename}</div>
+                    <div className="font-semibold text-content">{session.camera_name}</div>
+                    <div className="text-xs text-content-muted">{session.segment_filename}</div>
                 </div>
             );
         case 'playback_access_mode':
             return (
-                <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700 dark:bg-gray-800 dark:text-gray-200">
+                <span className="rounded-full bg-surface-sunken px-2.5 py-1 text-xs font-medium text-content">
                     {session.playback_access_mode}
                 </span>
             );
@@ -91,7 +91,7 @@ function renderPlaybackHistoryCell(session, column, formatDateTime) {
                 <div>
                     <div className="font-mono text-xs">{session.ip_address}</div>
                     {session.admin_username && (
-                        <div className="text-xs text-gray-500 dark:text-gray-400">{session.admin_username}</div>
+                        <div className="text-xs text-content-muted">{session.admin_username}</div>
                     )}
                 </div>
             );
@@ -310,10 +310,10 @@ export default function PlaybackAnalytics() {
                 description="Pantau siapa yang menonton playback publik dan admin secara terpisah dari live."
                 lastUpdate={lastUpdate}
                 filters={(
-                    <div className="grid gap-3 rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900 lg:grid-cols-3">
+                    <div className="grid gap-3 rounded-2xl border border-edge bg-surface p-4 lg:grid-cols-3">
                         <label className="space-y-1 text-sm">
-                            <span className="font-medium text-gray-700 dark:text-gray-200">Periode</span>
-                            <select value={period} onChange={(event) => setPeriod(event.target.value)} className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950 dark:text-white">
+                            <span className="font-medium text-content">Periode</span>
+                            <select value={period} onChange={(event) => setPeriod(event.target.value)} className="w-full rounded-xl border border-edge bg-surface px-3 py-2 dark:text-white">
                                 {PERIOD_OPTIONS.map((option) => (
                                     <option key={option.value} value={option.value}>{option.label}</option>
                                 ))}
@@ -321,8 +321,8 @@ export default function PlaybackAnalytics() {
                         </label>
 
                         <label className="space-y-1 text-sm">
-                            <span className="font-medium text-gray-700 dark:text-gray-200">Kamera</span>
-                            <select value={cameraId} onChange={(event) => setCameraId(event.target.value)} className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950 dark:text-white">
+                            <span className="font-medium text-content">Kamera</span>
+                            <select value={cameraId} onChange={(event) => setCameraId(event.target.value)} className="w-full rounded-xl border border-edge bg-surface px-3 py-2 dark:text-white">
                                 <option value="">Semua Kamera</option>
                                 {cameraOptions.map((camera) => (
                                     <option key={camera.id} value={camera.id}>{camera.name}</option>
@@ -331,8 +331,8 @@ export default function PlaybackAnalytics() {
                         </label>
 
                         <label className="space-y-1 text-sm">
-                            <span className="font-medium text-gray-700 dark:text-gray-200">Akses</span>
-                            <select value={accessMode} onChange={(event) => setAccessMode(event.target.value)} className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950 dark:text-white">
+                            <span className="font-medium text-content">Akses</span>
+                            <select value={accessMode} onChange={(event) => setAccessMode(event.target.value)} className="w-full rounded-xl border border-edge bg-surface px-3 py-2 dark:text-white">
                                 {ACCESS_MODE_OPTIONS.map((option) => (
                                     <option key={option.value} value={option.value}>{option.label}</option>
                                 ))}
@@ -367,7 +367,7 @@ export default function PlaybackAnalytics() {
                     <SectionCard title="Preview Riwayat Playback">
                         <div className="space-y-3">
                             {recentSessions.length === 0 && (
-                                <div className="rounded-xl border border-dashed border-gray-200 px-4 py-6 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
+                                <div className="rounded-xl border border-dashed border-edge px-4 py-6 text-sm text-content-muted">
                                     Belum ada preview playback.
                                 </div>
                             )}
@@ -375,18 +375,18 @@ export default function PlaybackAnalytics() {
                                 <button
                                     key={session.id}
                                     onClick={() => setSelectedHistorySession(session)}
-                                    className="w-full rounded-xl border border-gray-200 p-3 text-left transition-colors hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800/50"
+                                    className="w-full rounded-xl border border-edge p-3 text-left transition-colors hover:bg-surface-sunken"
                                 >
                                     <div className="flex items-start justify-between gap-3">
                                         <div>
-                                            <div className="font-semibold text-gray-900 dark:text-white">{session.camera_name}</div>
-                                            <div className="text-xs text-gray-500 dark:text-gray-400">{session.segment_filename}</div>
+                                            <div className="font-semibold text-content">{session.camera_name}</div>
+                                            <div className="text-xs text-content-muted">{session.segment_filename}</div>
                                         </div>
-                                        <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700 dark:bg-gray-800 dark:text-gray-200">
+                                        <span className="rounded-full bg-surface-sunken px-2.5 py-1 text-xs font-medium text-content">
                                             {session.playback_access_mode}
                                         </span>
                                     </div>
-                                    <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                                    <div className="mt-2 text-xs text-content-muted">
                                         {session.ip_address} • {formatDateTime(session.started_at, { storage: TIMESTAMP_STORAGE.LOCAL_SQL })} • {formatWatchTime(session.duration_seconds)}
                                     </div>
                                 </button>
@@ -400,23 +400,23 @@ export default function PlaybackAnalytics() {
                 <div className="space-y-6">
                     <SectionCard title="Viewer Playback Aktif">
                         {activeSessions.length === 0 ? (
-                            <div className="rounded-xl border border-dashed border-gray-200 px-4 py-6 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
+                            <div className="rounded-xl border border-dashed border-edge px-4 py-6 text-sm text-content-muted">
                                 Tidak ada viewer playback aktif untuk filter ini.
                             </div>
                         ) : (
                             <div className="grid gap-3 xl:grid-cols-2">
                                 {activeSessions.map((session) => (
-                                    <div key={session.session_id || session.sessionId} className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+                                    <div key={session.session_id || session.sessionId} className="rounded-xl border border-edge p-4">
                                         <div className="flex items-start justify-between gap-3">
                                             <div>
-                                                <div className="font-semibold text-gray-900 dark:text-white">{session.camera_name || session.cameraName}</div>
-                                                <div className="text-xs text-gray-500 dark:text-gray-400">{session.segment_filename || session.segmentFilename}</div>
+                                                <div className="font-semibold text-content">{session.camera_name || session.cameraName}</div>
+                                                <div className="text-xs text-content-muted">{session.segment_filename || session.segmentFilename}</div>
                                             </div>
-                                            <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700 dark:bg-gray-800 dark:text-gray-200">
+                                            <span className="rounded-full bg-surface-sunken px-2.5 py-1 text-xs font-medium text-content">
                                                 {session.playback_access_mode || session.playbackAccessMode}
                                             </span>
                                         </div>
-                                        <div className="mt-3 grid gap-1 text-sm text-gray-600 dark:text-gray-300">
+                                        <div className="mt-3 grid gap-1 text-sm text-content-muted">
                                             <div>IP: {session.ip_address || session.ipAddress}</div>
                                             <div>Device: {session.device_type || session.deviceType}</div>
                                             <div>Durasi: {formatWatchTime(session.duration_seconds || session.durationSeconds || 0)}</div>
@@ -469,16 +469,16 @@ export default function PlaybackAnalytics() {
                         filters={(
                             <div className="grid gap-3 lg:grid-cols-4">
                                 <label className="space-y-1 text-sm">
-                                    <span className="font-medium text-gray-700 dark:text-gray-200">Akses</span>
-                                    <select value={accessMode} onChange={(event) => setAccessMode(event.target.value)} className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950 dark:text-white">
+                                    <span className="font-medium text-content">Akses</span>
+                                    <select value={accessMode} onChange={(event) => setAccessMode(event.target.value)} className="w-full rounded-xl border border-edge bg-surface px-3 py-2 dark:text-white">
                                         {ACCESS_MODE_OPTIONS.map((option) => (
                                             <option key={option.value} value={option.value}>{option.label}</option>
                                         ))}
                                     </select>
                                 </label>
                                 <label className="space-y-1 text-sm">
-                                    <span className="font-medium text-gray-700 dark:text-gray-200">Perangkat</span>
-                                    <select value={historyDeviceType} onChange={(event) => setHistoryDeviceType(event.target.value)} className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950 dark:text-white">
+                                    <span className="font-medium text-content">Perangkat</span>
+                                    <select value={historyDeviceType} onChange={(event) => setHistoryDeviceType(event.target.value)} className="w-full rounded-xl border border-edge bg-surface px-3 py-2 dark:text-white">
                                         <option value="">Semua Perangkat</option>
                                         <option value="desktop">Desktop</option>
                                         <option value="mobile">Mobile</option>
@@ -487,20 +487,20 @@ export default function PlaybackAnalytics() {
                                     </select>
                                 </label>
                                 <label className="space-y-1 text-sm">
-                                    <span className="font-medium text-gray-700 dark:text-gray-200">Urutkan</span>
-                                    <select value={historySort} onChange={(event) => setHistorySort(event.target.value)} className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950 dark:text-white">
+                                    <span className="font-medium text-content">Urutkan</span>
+                                    <select value={historySort} onChange={(event) => setHistorySort(event.target.value)} className="w-full rounded-xl border border-edge bg-surface px-3 py-2 dark:text-white">
                                         {SORT_OPTIONS.map((option) => (
                                             <option key={option.value} value={option.value}>{option.label}</option>
                                         ))}
                                     </select>
                                 </label>
                                 <label className="space-y-1 text-sm">
-                                    <span className="font-medium text-gray-700 dark:text-gray-200">Cari</span>
+                                    <span className="font-medium text-content">Cari</span>
                                     <input
                                         value={historySearch}
                                         onChange={(event) => setHistorySearch(event.target.value)}
                                         placeholder="IP, segment, admin"
-                                        className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950 dark:text-white"
+                                        className="w-full rounded-xl border border-edge bg-surface px-3 py-2 dark:text-white"
                                     />
                                 </label>
                             </div>
@@ -515,8 +515,8 @@ export default function PlaybackAnalytics() {
                         <div className="space-y-3">
                             {topCameras.map((camera) => (
                                 <div key={`${camera.camera_id}-${camera.camera_name}`} className="rounded-xl bg-gray-50 px-4 py-3 dark:bg-gray-950/60">
-                                    <div className="font-semibold text-gray-900 dark:text-white">{camera.camera_name}</div>
-                                    <div className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                                    <div className="font-semibold text-content">{camera.camera_name}</div>
+                                    <div className="mt-1 text-sm text-content-muted">
                                         {camera.total_sessions} sesi • {camera.unique_viewers} unique • {formatWatchTime(camera.total_watch_time)}
                                     </div>
                                 </div>
@@ -528,9 +528,9 @@ export default function PlaybackAnalytics() {
                         <div className="space-y-3">
                             {topSegments.map((segment) => (
                                 <div key={`${segment.camera_id}-${segment.segment_filename}-${segment.playback_access_mode}`} className="rounded-xl bg-gray-50 px-4 py-3 dark:bg-gray-950/60">
-                                    <div className="font-semibold text-gray-900 dark:text-white">{segment.camera_name}</div>
-                                    <div className="text-xs text-gray-500 dark:text-gray-400">{segment.segment_filename}</div>
-                                    <div className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                                    <div className="font-semibold text-content">{segment.camera_name}</div>
+                                    <div className="text-xs text-content-muted">{segment.segment_filename}</div>
+                                    <div className="mt-1 text-sm text-content-muted">
                                         {segment.playback_access_mode} • {segment.total_sessions} sesi • {formatWatchTime(segment.total_watch_time)}
                                     </div>
                                 </div>
@@ -542,8 +542,8 @@ export default function PlaybackAnalytics() {
                         <div className="space-y-3">
                             {accessBreakdown.map((item) => (
                                 <div key={item.playback_access_mode} className="rounded-xl bg-gray-50 px-4 py-3 dark:bg-gray-950/60">
-                                    <div className="font-semibold text-gray-900 dark:text-white">{item.playback_access_mode}</div>
-                                    <div className="mt-1 text-sm text-gray-500 dark:text-gray-400">{item.count} sesi</div>
+                                    <div className="font-semibold text-content">{item.playback_access_mode}</div>
+                                    <div className="mt-1 text-sm text-content-muted">{item.count} sesi</div>
                                 </div>
                             ))}
                         </div>
@@ -558,14 +558,14 @@ export default function PlaybackAnalytics() {
                             {deviceBreakdown.map((item) => (
                                 <div key={item.device_type} className="flex items-center justify-between rounded-xl bg-gray-50 px-4 py-3 dark:bg-gray-950/60">
                                     <div>{renderDeviceBadge(item.device_type)}</div>
-                                    <div className="text-right text-sm text-gray-600 dark:text-gray-300">
-                                        <div className="font-semibold text-gray-900 dark:text-white">{item.count}</div>
+                                    <div className="text-right text-sm text-content-muted">
+                                        <div className="font-semibold text-content">{item.count}</div>
                                         <div>{item.percentage || 0}%</div>
                                     </div>
                                 </div>
                             ))}
                             {deviceBreakdown.length === 0 && (
-                                <div className="text-sm text-gray-500 dark:text-gray-400">Belum ada distribusi perangkat.</div>
+                                <div className="text-sm text-content-muted">Belum ada distribusi perangkat.</div>
                             )}
                         </div>
                     </SectionCard>
@@ -574,14 +574,14 @@ export default function PlaybackAnalytics() {
                         <div className="space-y-3">
                             {topViewers.map((viewer) => (
                                 <div key={viewer.ip_address} className="rounded-xl bg-gray-50 px-4 py-3 dark:bg-gray-950/60">
-                                    <div className="font-mono text-sm font-semibold text-gray-900 dark:text-white">{viewer.ip_address}</div>
-                                    <div className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                                    <div className="font-mono text-sm font-semibold text-content">{viewer.ip_address}</div>
+                                    <div className="mt-1 text-sm text-content-muted">
                                         {viewer.total_sessions} sesi • {viewer.cameras_watched} kamera • {formatWatchTime(viewer.total_watch_time)}
                                     </div>
                                 </div>
                             ))}
                             {topViewers.length === 0 && (
-                                <div className="text-sm text-gray-500 dark:text-gray-400">Belum ada viewer playback dominan.</div>
+                                <div className="text-sm text-content-muted">Belum ada viewer playback dominan.</div>
                             )}
                         </div>
                     </SectionCard>

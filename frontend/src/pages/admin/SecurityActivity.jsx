@@ -35,7 +35,7 @@ function eventTone(eventType) {
     if (ADMIN_EVENTS.includes(eventType)) {
         return 'bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300';
     }
-    return 'bg-gray-100 text-gray-600 dark:bg-gray-700/70 dark:text-gray-300';
+    return 'bg-surface-sunken text-content-muted';
 }
 
 /** Pick the most operator-meaningful field out of the JSON details blob. */
@@ -66,8 +66,8 @@ function summarizeDetails(rawDetails) {
 
 function StatTile({ label, value, tone }) {
     return (
-        <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700/70 dark:bg-gray-800/70">
-            <div className="text-xs font-medium text-gray-500 dark:text-gray-400">{label}</div>
+        <div className="rounded-2xl border border-gray-200 bg-surface p-4 shadow-sm dark:border-gray-700/70">
+            <div className="text-xs font-medium text-content-muted">{label}</div>
             <div className={`mt-1 text-2xl font-bold ${tone || 'text-gray-900 dark:text-white'}`}>{value}</div>
         </div>
     );
@@ -160,15 +160,15 @@ export default function SecurityActivity() {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                 <div>
                     <p className="text-sm font-semibold text-primary">Keamanan</p>
-                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Aktivitas Keamanan</h1>
-                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    <h1 className="text-2xl font-bold text-content">Aktivitas Keamanan</h1>
+                    <p className="mt-1 text-sm text-content-muted">
                         Login gagal, lockout, rate-limit, CSRF, penolakan akses, dan aksi admin.
                     </p>
                 </div>
                 <button
                     type="button"
                     onClick={refresh}
-                    className="inline-flex items-center gap-2 self-start rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                    className="inline-flex items-center gap-2 self-start rounded-xl border border-edge bg-surface px-4 py-2.5 text-sm font-medium text-content shadow-sm transition-colors hover:bg-gray-50 dark:hover:bg-gray-700"
                 >
                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -200,13 +200,13 @@ export default function SecurityActivity() {
             {/* Filters */}
             <form
                 onSubmit={applySearch}
-                className="flex flex-col gap-3 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700/70 dark:bg-gray-800/70 sm:flex-row sm:items-center"
+                className="flex flex-col gap-3 rounded-2xl border border-gray-200 bg-surface p-4 shadow-sm dark:border-gray-700/70 sm:flex-row sm:items-center"
             >
                 <select
                     aria-label="Filter tipe event"
                     value={eventType}
                     onChange={(event) => { setEventType(event.target.value); setPage(1); }}
-                    className="rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                    className="rounded-xl border border-edge-strong bg-surface px-3 py-2 text-sm text-content"
                 >
                     <option value="">Semua Event</option>
                     {ALL_EVENT_TYPES.map((type) => (
@@ -218,7 +218,7 @@ export default function SecurityActivity() {
                     value={search}
                     onChange={(event) => setSearch(event.target.value)}
                     placeholder="Cari IP, user, endpoint, detail..."
-                    className="flex-1 rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                    className="flex-1 rounded-xl border border-edge-strong bg-surface px-3 py-2 text-sm text-content"
                 />
                 <button
                     type="submit"
@@ -229,10 +229,10 @@ export default function SecurityActivity() {
             </form>
 
             {/* Table */}
-            <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700/70 dark:bg-gray-800/70">
+            <div className="overflow-hidden rounded-2xl border border-gray-200 bg-surface shadow-sm dark:border-gray-700/70">
                 <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-700/60">
-                        <thead className="bg-gray-50 text-left text-xs uppercase tracking-wider text-gray-500 dark:bg-gray-900/40 dark:text-gray-400">
+                        <thead className="bg-surface-sunken text-left text-xs uppercase tracking-wider text-content-muted">
                             <tr>
                                 <th className="px-4 py-3">Waktu</th>
                                 <th className="px-4 py-3">Event</th>
@@ -244,22 +244,22 @@ export default function SecurityActivity() {
                         </thead>
                         <tbody className="divide-y divide-gray-100 dark:divide-gray-700/40">
                             {loading ? (
-                                <tr><td colSpan={6} className="px-4 py-10 text-center text-gray-500 dark:text-gray-400">Memuat...</td></tr>
+                                <tr><td colSpan={6} className="px-4 py-10 text-center text-content-muted">Memuat...</td></tr>
                             ) : logs.length === 0 ? (
-                                <tr><td colSpan={6} className="px-4 py-10 text-center text-gray-500 dark:text-gray-400">Tidak ada event yang cocok.</td></tr>
+                                <tr><td colSpan={6} className="px-4 py-10 text-center text-content-muted">Tidak ada event yang cocok.</td></tr>
                             ) : (
                                 logs.map((log) => (
                                     <tr key={log.id} className="align-top">
-                                        <td className="whitespace-nowrap px-4 py-3 text-gray-500 dark:text-gray-400">{formatTimestamp(log.timestamp)}</td>
+                                        <td className="whitespace-nowrap px-4 py-3 text-content-muted">{formatTimestamp(log.timestamp)}</td>
                                         <td className="px-4 py-3">
                                             <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${eventTone(log.event_type)}`}>
                                                 {log.event_type}
                                             </span>
                                         </td>
-                                        <td className="px-4 py-3 text-gray-800 dark:text-gray-100">{log.username || '—'}</td>
-                                        <td className="whitespace-nowrap px-4 py-3 text-gray-600 dark:text-gray-300">{log.ip_address || '—'}</td>
-                                        <td className="max-w-[16rem] truncate px-4 py-3 text-gray-600 dark:text-gray-300" title={log.endpoint || ''}>{log.endpoint || '—'}</td>
-                                        <td className="max-w-[20rem] px-4 py-3 text-xs text-gray-500 dark:text-gray-400">{summarizeDetails(log.details)}</td>
+                                        <td className="px-4 py-3 text-content">{log.username || '—'}</td>
+                                        <td className="whitespace-nowrap px-4 py-3 text-content-muted">{log.ip_address || '—'}</td>
+                                        <td className="max-w-[16rem] truncate px-4 py-3 text-content-muted" title={log.endpoint || ''}>{log.endpoint || '—'}</td>
+                                        <td className="max-w-[20rem] px-4 py-3 text-xs text-content-muted">{summarizeDetails(log.details)}</td>
                                     </tr>
                                 ))
                             )}
@@ -268,8 +268,8 @@ export default function SecurityActivity() {
                 </div>
 
                 {/* Pagination */}
-                <div className="flex items-center justify-between gap-3 border-t border-gray-200 px-4 py-3 text-sm dark:border-gray-700/60">
-                    <span className="text-gray-500 dark:text-gray-400">
+                <div className="flex items-center justify-between gap-3 border-t border-edge px-4 py-3 text-sm">
+                    <span className="text-content-muted">
                         {pagination.total} event · halaman {pagination.page} dari {Math.max(pagination.totalPages, 1)}
                     </span>
                     <div className="flex gap-2">
@@ -277,7 +277,7 @@ export default function SecurityActivity() {
                             type="button"
                             onClick={() => setPage((current) => Math.max(1, current - 1))}
                             disabled={loading || pagination.page <= 1}
-                            className="rounded-lg border border-gray-200 px-3 py-1.5 font-medium text-gray-700 disabled:opacity-50 dark:border-gray-700 dark:text-gray-200"
+                            className="rounded-lg border border-edge px-3 py-1.5 font-medium text-content disabled:opacity-50"
                         >
                             Sebelumnya
                         </button>
@@ -285,7 +285,7 @@ export default function SecurityActivity() {
                             type="button"
                             onClick={() => setPage((current) => current + 1)}
                             disabled={loading || pagination.page >= pagination.totalPages}
-                            className="rounded-lg border border-gray-200 px-3 py-1.5 font-medium text-gray-700 disabled:opacity-50 dark:border-gray-700 dark:text-gray-200"
+                            className="rounded-lg border border-edge px-3 py-1.5 font-medium text-content disabled:opacity-50"
                         >
                             Berikutnya
                         </button>

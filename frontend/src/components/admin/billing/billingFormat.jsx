@@ -19,15 +19,15 @@ export function formatDateTime(raw) {
 export const SUB_STATUS_BADGES = {
     active: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
     suspended: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
-    cancelled: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
+    cancelled: 'bg-surface-sunken text-content-muted',
 };
 
 export const PAY_STATUS_BADGES = {
     pending: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
     paid: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
-    expired: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
+    expired: 'bg-surface-sunken text-content-muted',
     failed: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
-    cancelled: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
+    cancelled: 'bg-surface-sunken text-content-muted',
 };
 
 export function StatusBadge({ className = '', children }) {
@@ -38,8 +38,8 @@ export function StatusBadge({ className = '', children }) {
     );
 }
 
-export const cardClass = 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-4';
-export const inputClass = 'w-full px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary';
+export const cardClass = 'bg-surface border border-edge rounded-2xl p-4';
+export const inputClass = 'w-full px-3 py-2 bg-surface-sunken border border-edge rounded-xl text-sm text-content focus:outline-none focus:ring-2 focus:ring-primary';
 
 // Wrapper for the desktop table half of each tab: horizontal scroll is a safety net for
 // tablet widths; `min-w` on the inner <table> is what actually lets it scroll instead of

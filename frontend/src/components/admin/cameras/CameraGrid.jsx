@@ -59,8 +59,8 @@ export default function CameraGrid({
             </div>
 
             {totalPages > 1 && (
-                <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm shadow-sm dark:border-gray-700 dark:bg-gray-800/60">
-                    <span className="text-gray-500 dark:text-gray-400">
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-edge bg-white px-4 py-3 text-sm shadow-sm dark:bg-gray-800/60">
+                    <span className="text-content-muted">
                         Halaman {page} dari {totalPages} · {cameras.length} kamera
                     </span>
                     <div className="flex items-center gap-2">
@@ -68,7 +68,7 @@ export default function CameraGrid({
                             type="button"
                             onClick={() => setPage((current) => Math.max(1, current - 1))}
                             disabled={page <= 1}
-                            className="rounded-lg border border-gray-300 px-3 py-1.5 text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700/60"
+                            className="rounded-lg border border-edge-strong px-3 py-1.5 text-content transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-gray-700/60"
                         >
                             ← Sebelumnya
                         </button>
@@ -76,7 +76,7 @@ export default function CameraGrid({
                             type="button"
                             onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
                             disabled={page >= totalPages}
-                            className="rounded-lg border border-gray-300 px-3 py-1.5 text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700/60"
+                            className="rounded-lg border border-edge-strong px-3 py-1.5 text-content transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-gray-700/60"
                         >
                             Berikutnya →
                         </button>

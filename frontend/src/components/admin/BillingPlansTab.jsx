@@ -10,8 +10,8 @@
 import { useState } from 'react';
 import billingAdminService from '../../services/billingAdminService';
 
-const inputClass = 'w-full px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary';
-const cardClass = 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-4';
+const inputClass = 'w-full px-3 py-2 bg-surface-sunken border border-edge rounded-xl text-sm text-content focus:outline-none focus:ring-2 focus:ring-primary';
+const cardClass = 'bg-surface border border-edge rounded-2xl p-4';
 
 function formatRupiah(value) {
     return `Rp${Number(value || 0).toLocaleString('id-ID')}`;
@@ -66,7 +66,7 @@ export default function BillingPlansTab({ plans, regSettings, run, busy }) {
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
             <div className="lg:col-span-2 space-y-3">
                 <div className="flex items-center justify-between">
-                    <h3 className="font-semibold text-gray-900 dark:text-white">Katalog Paket</h3>
+                    <h3 className="font-semibold text-content">Katalog Paket</h3>
                     <button
                         onClick={openNew}
                         className="rounded-xl bg-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-600"
@@ -77,7 +77,7 @@ export default function BillingPlansTab({ plans, regSettings, run, busy }) {
                 <div className="overflow-x-auto">
                     <table className="w-full min-w-[560px] text-sm">
                         <thead>
-                            <tr className="text-left text-xs uppercase text-gray-500 dark:text-gray-400">
+                            <tr className="text-left text-xs uppercase text-content-muted">
                                 <th className="px-3 py-2">Paket</th>
                                 <th className="px-3 py-2 text-right">Harga/kamera</th>
                                 <th className="px-3 py-2 text-center">Maks kamera</th>
@@ -86,11 +86,11 @@ export default function BillingPlansTab({ plans, regSettings, run, busy }) {
                                 <th className="px-3 py-2 text-right">Aksi</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                        <tbody className="divide-y divide-edge">
                             {plans.map((plan) => (
-                                <tr key={plan.id} className="bg-white dark:bg-gray-900">
+                                <tr key={plan.id} className="bg-surface">
                                     <td className="px-3 py-2">
-                                        <p className="font-medium text-gray-900 dark:text-white">{plan.name}</p>
+                                        <p className="font-medium text-content">{plan.name}</p>
                                         <p className="text-xs text-gray-400">{plan.key}</p>
                                     </td>
                                     <td className="px-3 py-2 text-right">
@@ -113,7 +113,7 @@ export default function BillingPlansTab({ plans, regSettings, run, busy }) {
                                             <button
                                                 onClick={() => openEdit(plan)}
                                                 disabled={busy}
-                                                className="rounded-lg px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 disabled:opacity-50 dark:text-gray-300 dark:hover:bg-gray-800"
+                                                className="rounded-lg px-2 py-1 text-xs text-content-muted hover:bg-surface-sunken disabled:opacity-50"
                                             >
                                                 Edit
                                             </button>
@@ -123,7 +123,7 @@ export default function BillingPlansTab({ plans, regSettings, run, busy }) {
                                                     plan.active === 1 ? 'Paket dinonaktifkan' : 'Paket diaktifkan'
                                                 )}
                                                 disabled={busy}
-                                                className="rounded-lg px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 disabled:opacity-50 dark:text-gray-300 dark:hover:bg-gray-800"
+                                                className="rounded-lg px-2 py-1 text-xs text-content-muted hover:bg-surface-sunken disabled:opacity-50"
                                             >
                                                 {plan.active === 1 ? 'Nonaktifkan' : 'Aktifkan'}
                                             </button>
@@ -138,11 +138,11 @@ export default function BillingPlansTab({ plans, regSettings, run, busy }) {
 
             <div className="space-y-4">
                 <div className={cardClass}>
-                    <h3 className="font-semibold text-gray-900 dark:text-white">Registrasi Mandiri</h3>
-                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    <h3 className="font-semibold text-content">Registrasi Mandiri</h3>
+                    <p className="mt-1 text-xs text-content-muted">
                         Pelanggan baru daftar sendiri lewat halaman <code>/daftar</code>.
                     </p>
-                    <label className="mt-3 flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                    <label className="mt-3 flex items-center gap-2 text-sm text-content-muted">
                         <input
                             type="checkbox"
                             checked={!!regSettings?.enabled}
@@ -154,7 +154,7 @@ export default function BillingPlansTab({ plans, regSettings, run, busy }) {
                         />
                         Izinkan pendaftaran mandiri
                     </label>
-                    <label className="mt-3 block text-sm text-gray-700 dark:text-gray-300">
+                    <label className="mt-3 block text-sm text-content-muted">
                         Paket default pendaftar baru
                         <select
                             value={regSettings?.default_plan_key || ''}
@@ -176,7 +176,7 @@ export default function BillingPlansTab({ plans, regSettings, run, busy }) {
 
                 {editing !== null && (
                     <form onSubmit={handleSubmit} className={cardClass}>
-                        <h3 className="font-semibold text-gray-900 dark:text-white">
+                        <h3 className="font-semibold text-content">
                             {editing === 'new' ? 'Paket Baru' : `Edit Paket: ${editing.name}`}
                         </h3>
                         <div className="mt-3 space-y-2">
@@ -185,26 +185,26 @@ export default function BillingPlansTab({ plans, regSettings, run, busy }) {
                             )}
                             <input name="name" value={form.name} onChange={handleChange} required minLength={2} className={inputClass} placeholder="Nama paket" />
                             <input name="description" value={form.description} onChange={handleChange} className={inputClass} placeholder="Deskripsi singkat (opsional)" />
-                            <label className="block text-xs text-gray-500 dark:text-gray-400">
+                            <label className="block text-xs text-content-muted">
                                 Harga per kamera per bulan (rupiah)
                                 <input name="price_per_camera" type="number" min="0" step="1000" value={form.price_per_camera} onChange={handleChange} required className={`mt-1 ${inputClass}`} />
                             </label>
-                            <label className="block text-xs text-gray-500 dark:text-gray-400">
+                            <label className="block text-xs text-content-muted">
                                 Maksimal kamera
                                 <input name="max_cameras" type="number" min="1" max="100" value={form.max_cameras} onChange={handleChange} required className={`mt-1 ${inputClass}`} />
                             </label>
-                            <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                            <label className="flex items-center gap-2 text-sm text-content-muted">
                                 <input name="is_trial" type="checkbox" checked={form.is_trial} onChange={handleChange} />
                                 Paket trial (gratis, berbatas waktu)
                             </label>
                             {form.is_trial && (
-                                <label className="block text-xs text-gray-500 dark:text-gray-400">
+                                <label className="block text-xs text-content-muted">
                                     Durasi trial (hari)
                                     <input name="trial_days" type="number" min="1" max="90" value={form.trial_days} onChange={handleChange} required className={`mt-1 ${inputClass}`} />
                                 </label>
                             )}
                             <div className="flex gap-2 pt-1">
-                                <button type="button" onClick={() => setEditing(null)} disabled={busy} className="flex-1 rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800">
+                                <button type="button" onClick={() => setEditing(null)} disabled={busy} className="flex-1 rounded-xl border border-edge-strong px-3 py-2 text-sm text-content-muted hover:bg-surface-sunken">
                                     Batal
                                 </button>
                                 <button type="submit" disabled={busy} className="flex-[2] rounded-xl bg-primary px-3 py-2 text-sm font-medium text-white hover:bg-primary-600 disabled:opacity-50">

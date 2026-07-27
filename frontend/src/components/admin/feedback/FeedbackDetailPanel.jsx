@@ -8,12 +8,12 @@ export default function FeedbackDetailPanel({
     onDelete,
 }) {
     return (
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+        <div className="bg-surface rounded-xl border border-edge p-6">
             {selectedFeedback ? (
                 <div className="space-y-4">
                     <div className="flex items-start justify-between">
                         <div>
-                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                            <h3 className="text-lg font-semibold text-content">
                                 {selectedFeedback.name || 'Anonim'}
                             </h3>
                             {selectedFeedback.email && (
@@ -33,13 +33,13 @@ export default function FeedbackDetailPanel({
                         <span>ID: #{selectedFeedback.id}</span>
                     </div>
 
-                    <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
-                        <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                    <div className="bg-surface-sunken rounded-lg p-4">
+                        <p className="text-content-muted whitespace-pre-wrap">
                             {selectedFeedback.message}
                         </p>
                     </div>
 
-                    <div className="flex flex-wrap gap-2 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <div className="flex flex-wrap gap-2 pt-4 border-t border-edge">
                         <button
                             onClick={onMarkRead}
                             disabled={selectedFeedback.status === 'read'}

@@ -190,14 +190,14 @@ export default function BackupRestore() {
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                 <div>
                     <p className="text-sm font-semibold text-primary mb-1">Pemulihan Metadata Kamera</p>
-                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Backup Restore</h1>
-                    <p className="text-gray-500 dark:text-gray-400 mt-1">
+                    <h1 className="text-2xl font-bold text-content">Backup Restore</h1>
+                    <p className="text-content-muted mt-1">
                         Cocokkan backup lama ke kamera existing lalu pulihkan URL source yang hilang tanpa membuat duplikat baru.
                     </p>
                 </div>
                 <Link
                     to="/admin/import-export"
-                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-surface-sunken text-content-muted hover:bg-surface-sunken transition-colors"
                 >
                     Kembali ke Import/Export
                 </Link>
@@ -211,10 +211,10 @@ export default function BackupRestore() {
             </div>
 
             <div className="grid grid-cols-1 xl:grid-cols-[1.2fr_0.8fr] gap-6">
-                <section className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl p-6 space-y-5">
+                <section className="bg-surface border border-edge rounded-2xl p-6 space-y-5">
                     <div>
-                        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">1. Unggah Backup JSON</h2>
-                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">File backup lama akan dibaca di browser lalu dikirim ke backend untuk preview restore.</p>
+                        <h2 className="text-lg font-semibold text-content">1. Unggah Backup JSON</h2>
+                        <p className="text-sm text-content-muted mt-1">File backup lama akan dibaca di browser lalu dikirim ke backend untuk preview restore.</p>
                     </div>
 
                     <div className="flex flex-col md:flex-row gap-3">
@@ -223,46 +223,46 @@ export default function BackupRestore() {
                             type="file"
                             accept=".json,application/json"
                             onChange={handleFileUpload}
-                            className="block w-full text-sm text-gray-700 dark:text-gray-200 file:mr-4 file:rounded-xl file:border-0 file:bg-primary file:px-4 file:py-2.5 file:font-semibold file:text-white hover:file:bg-primary-600"
+                            className="block w-full text-sm text-content file:mr-4 file:rounded-xl file:border-0 file:bg-primary file:px-4 file:py-2.5 file:font-semibold file:text-white hover:file:bg-primary-600"
                         />
                         <button
                             type="button"
                             onClick={clearBackup}
-                            className="px-4 py-2.5 rounded-xl bg-gray-100 dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+                            className="px-4 py-2.5 rounded-xl bg-surface-sunken text-content-muted hover:bg-surface-sunken"
                         >
                             Bersihkan
                         </button>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-4">
-                            <p className="text-sm text-gray-500 dark:text-gray-400">File</p>
-                            <p className="mt-1 font-semibold text-gray-900 dark:text-white">{fileName || 'Belum ada file'}</p>
+                        <div className="rounded-xl border border-edge p-4">
+                            <p className="text-sm text-content-muted">File</p>
+                            <p className="mt-1 font-semibold text-content">{fileName || 'Belum ada file'}</p>
                         </div>
-                        <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-4">
-                            <p className="text-sm text-gray-500 dark:text-gray-400">Total Item Backup</p>
-                            <p className="mt-1 font-semibold text-gray-900 dark:text-white">{backupItems.length}</p>
+                        <div className="rounded-xl border border-edge p-4">
+                            <p className="text-sm text-content-muted">Total Item Backup</p>
+                            <p className="mt-1 font-semibold text-content">{backupItems.length}</p>
                         </div>
-                        <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-4">
-                            <p className="text-sm text-gray-500 dark:text-gray-400">Mode Restore</p>
-                            <p className="mt-1 font-semibold text-gray-900 dark:text-white">Repair Existing</p>
+                        <div className="rounded-xl border border-edge p-4">
+                            <p className="text-sm text-content-muted">Mode Restore</p>
+                            <p className="mt-1 font-semibold text-content">Repair Existing</p>
                         </div>
                     </div>
                 </section>
 
-                <section className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl p-6 space-y-5">
+                <section className="bg-surface border border-edge rounded-2xl p-6 space-y-5">
                     <div>
-                        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">2. Scope & Matching</h2>
-                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Default pencocokan menggunakan ID lalu fallback `name + area_name`.</p>
+                        <h2 className="text-lg font-semibold text-content">2. Scope & Matching</h2>
+                        <p className="text-sm text-content-muted mt-1">Default pencocokan menggunakan ID lalu fallback `name + area_name`.</p>
                     </div>
 
                     <div className="space-y-4">
                         <label className="block">
-                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Scope</span>
+                            <span className="text-sm font-medium text-content-muted">Scope</span>
                             <select
                                 value={scopeMode}
                                 onChange={(event) => updateQuickScope(event.target.value, selectedAreaId)}
-                                className="mt-2 w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-2.5 text-gray-900 dark:text-white"
+                                className="mt-2 w-full rounded-xl border border-edge bg-surface px-4 py-2.5 text-content"
                             >
                                 <option value="all">Semua kamera existing</option>
                                 <option value="unresolved_only">Hanya kamera unresolved</option>
@@ -271,12 +271,12 @@ export default function BackupRestore() {
                         </label>
 
                         <label className="block">
-                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Area Filter</span>
+                            <span className="text-sm font-medium text-content-muted">Area Filter</span>
                             <select
                                 value={selectedAreaId}
                                 disabled={scopeMode !== 'area_ids' || loadingAreas}
                                 onChange={(event) => updateQuickScope('area_ids', event.target.value)}
-                                className="mt-2 w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-2.5 text-gray-900 dark:text-white disabled:opacity-60"
+                                className="mt-2 w-full rounded-xl border border-edge bg-surface px-4 py-2.5 text-content disabled:opacity-60"
                             >
                                 <option value="">Pilih area</option>
                                 {areas.map((area) => (
@@ -300,33 +300,33 @@ export default function BackupRestore() {
             {preview && (
                 <section className="space-y-6">
                     <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-                        <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50 p-4">
-                            <p className="text-sm text-gray-500 dark:text-gray-400">Repairable</p>
+                        <div className="rounded-xl border border-edge bg-surface p-4">
+                            <p className="text-sm text-content-muted">Repairable</p>
                             <p className="mt-1 text-2xl font-bold text-emerald-600">{preview.counts?.matched_repairable || 0}</p>
                         </div>
-                        <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50 p-4">
-                            <p className="text-sm text-gray-500 dark:text-gray-400">Sudah Sinkron</p>
-                            <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">{preview.counts?.matched_no_changes || 0}</p>
+                        <div className="rounded-xl border border-edge bg-surface p-4">
+                            <p className="text-sm text-content-muted">Sudah Sinkron</p>
+                            <p className="mt-1 text-2xl font-bold text-content">{preview.counts?.matched_no_changes || 0}</p>
                         </div>
-                        <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50 p-4">
-                            <p className="text-sm text-gray-500 dark:text-gray-400">Ambigu</p>
+                        <div className="rounded-xl border border-edge bg-surface p-4">
+                            <p className="text-sm text-content-muted">Ambigu</p>
                             <p className="mt-1 text-2xl font-bold text-amber-500">{preview.counts?.ambiguous_matches || 0}</p>
                         </div>
-                        <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50 p-4">
-                            <p className="text-sm text-gray-500 dark:text-gray-400">Target Hilang</p>
+                        <div className="rounded-xl border border-edge bg-surface p-4">
+                            <p className="text-sm text-content-muted">Target Hilang</p>
                             <p className="mt-1 text-2xl font-bold text-rose-500">{preview.counts?.missing_target || 0}</p>
                         </div>
-                        <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50 p-4">
-                            <p className="text-sm text-gray-500 dark:text-gray-400">Backup Invalid</p>
+                        <div className="rounded-xl border border-edge bg-surface p-4">
+                            <p className="text-sm text-content-muted">Backup Invalid</p>
                             <p className="mt-1 text-2xl font-bold text-rose-500">{preview.counts?.invalid_backup_row || 0}</p>
                         </div>
                     </div>
 
-                    <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl p-6 space-y-4">
+                    <div className="bg-surface border border-edge rounded-2xl p-6 space-y-4">
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
                             <div>
-                                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">3. Review Hasil Preview</h2>
-                                <p className="text-sm text-gray-500 dark:text-gray-400">Tinjau kamera yang cocok, butuh perbaikan, atau masih ambigu.</p>
+                                <h2 className="text-lg font-semibold text-content">3. Review Hasil Preview</h2>
+                                <p className="text-sm text-content-muted">Tinjau kamera yang cocok, butuh perbaikan, atau masih ambigu.</p>
                             </div>
                             <div className="flex flex-wrap gap-2">
                                 <button type="button" onClick={() => setRowFilter('all')} className={`px-3 py-2 rounded-xl text-sm ${rowFilter === 'all' ? 'bg-primary text-white' : 'bg-gray-100 dark:bg-gray-700/50 text-gray-700 dark:text-gray-300'}`}>Semua</button>
@@ -339,7 +339,7 @@ export default function BackupRestore() {
                         <div className="overflow-x-auto">
                             <table className="min-w-full text-sm">
                                 <thead>
-                                    <tr className="text-left text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700">
+                                    <tr className="text-left text-content-muted border-b border-edge">
                                         <th className="py-3 pr-4">Backup</th>
                                         <th className="py-3 pr-4">Target</th>
                                         <th className="py-3 pr-4">Status</th>
@@ -349,16 +349,16 @@ export default function BackupRestore() {
                                 </thead>
                                 <tbody>
                                     {filteredRows.slice(0, 120).map((row, index) => (
-                                        <tr key={`${row.backupId || row.backupName}-${index}`} className="border-b border-gray-100 dark:border-gray-800 align-top">
+                                        <tr key={`${row.backupId || row.backupName}-${index}`} className="border-b border-edge align-top">
                                             <td className="py-3 pr-4">
-                                                <div className="font-medium text-gray-900 dark:text-white">{row.backupName}</div>
-                                                <div className="text-xs text-gray-500 dark:text-gray-400">ID backup: {row.backupId ?? '-'}</div>
-                                                <div className="text-xs text-gray-500 dark:text-gray-400">{row.backupAreaName || 'Tanpa area backup'}</div>
+                                                <div className="font-medium text-content">{row.backupName}</div>
+                                                <div className="text-xs text-content-muted">ID backup: {row.backupId ?? '-'}</div>
+                                                <div className="text-xs text-content-muted">{row.backupAreaName || 'Tanpa area backup'}</div>
                                             </td>
                                             <td className="py-3 pr-4">
-                                                <div className="font-medium text-gray-900 dark:text-white">{row.targetCameraName || '-'}</div>
-                                                <div className="text-xs text-gray-500 dark:text-gray-400">ID target: {row.targetCameraId ?? '-'}</div>
-                                                <div className="text-xs text-gray-500 dark:text-gray-400">{row.targetAreaName || '-'}</div>
+                                                <div className="font-medium text-content">{row.targetCameraName || '-'}</div>
+                                                <div className="text-xs text-content-muted">ID target: {row.targetCameraId ?? '-'}</div>
+                                                <div className="text-xs text-content-muted">{row.targetAreaName || '-'}</div>
                                             </td>
                                             <td className="py-3 pr-4">
                                                 <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
@@ -371,11 +371,11 @@ export default function BackupRestore() {
                                                     {row.status}
                                                 </span>
                                                 {row.reason && (
-                                                    <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">{row.reason}</div>
+                                                    <div className="mt-2 text-xs text-content-muted">{row.reason}</div>
                                                 )}
                                             </td>
-                                            <td className="py-3 pr-4 text-xs text-gray-500 dark:text-gray-400">{row.matchReason || '-'}</td>
-                                            <td className="py-3 pr-4 text-xs text-gray-500 dark:text-gray-400">
+                                            <td className="py-3 pr-4 text-xs text-content-muted">{row.matchReason || '-'}</td>
+                                            <td className="py-3 pr-4 text-xs text-content-muted">
                                                 {row.changedFields?.length ? row.changedFields.join(', ') : '-'}
                                             </td>
                                         </tr>
@@ -385,7 +385,7 @@ export default function BackupRestore() {
                         </div>
 
                         <div className="flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
-                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                            <p className="text-sm text-content-muted">
                                 Menampilkan {Math.min(filteredRows.length, 120)} dari {filteredRows.length} baris preview.
                             </p>
                             <button

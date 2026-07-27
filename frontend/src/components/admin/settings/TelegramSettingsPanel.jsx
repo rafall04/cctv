@@ -19,12 +19,12 @@ function FeatureItem({ title, description, enabled }) {
             <div className={`mt-1 h-2.5 w-2.5 rounded-full ${enabled ? 'bg-emerald-500' : 'bg-gray-400'}`}></div>
             <div>
                 <div className="flex items-center gap-2">
-                    <span className="font-semibold text-gray-900 dark:text-white">{title}</span>
+                    <span className="font-semibold text-content">{title}</span>
                     <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded ${enabled ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400' : 'bg-gray-100 dark:bg-gray-700 text-gray-500'}`}>
                         {enabled ? 'AKTIF' : 'NONAKTIF'}
                     </span>
                 </div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">{description}</p>
+                <p className="text-sm text-content-muted">{description}</p>
             </div>
         </div>
     );
@@ -48,18 +48,18 @@ function AlertTimingSummary() {
 
     return (
         <div className="mt-6 rounded-xl border border-blue-100 bg-blue-50/70 p-4 dark:border-blue-500/20 dark:bg-blue-500/10">
-            <h4 className="text-sm font-bold text-gray-900 dark:text-white">Timing Alert Telegram</h4>
+            <h4 className="text-sm font-bold text-content">Timing Alert Telegram</h4>
             <div className="mt-3 space-y-2">
                 {timingRows.map((row) => (
                     <div key={row.label} className="flex items-start gap-3">
-                        <span className="min-w-20 rounded-md bg-white px-2 py-1 text-xs font-bold text-blue-700 shadow-sm dark:bg-gray-900/70 dark:text-blue-300">
+                        <span className="min-w-20 rounded-md bg-surface px-2 py-1 text-xs font-bold text-blue-700 shadow-sm dark:text-blue-300">
                             {row.label}
                         </span>
-                        <p className="text-sm text-gray-700 dark:text-gray-300">{row.description}</p>
+                        <p className="text-sm text-content-muted">{row.description}</p>
                     </div>
                 ))}
             </div>
-            <p className="mt-3 text-xs font-medium text-gray-600 dark:text-gray-400">
+            <p className="mt-3 text-xs font-medium text-content-muted">
                 Status di Map/Grid tetap mengikuti runtime kamera; delay ini hanya berlaku untuk pesan Telegram.
             </p>
         </div>
@@ -288,7 +288,7 @@ export default function TelegramSettingsPanel() {
                     <Skeleton variant="text" className="h-8 w-48 mb-2" />
                     <Skeleton variant="text" className="h-4 w-64" />
                 </div>
-                <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl p-6">
+                <div className="bg-surface border border-edge rounded-2xl p-6">
                     <Skeleton variant="text" className="h-6 w-40 mb-4" />
                     <div className="space-y-4">
                         <Skeleton variant="rectangular" className="h-20 w-full rounded-xl" />
@@ -320,24 +320,24 @@ export default function TelegramSettingsPanel() {
                 />
             )}
 
-            <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl overflow-hidden">
-                <div className="p-6 border-b border-gray-200 dark:border-gray-700/50">
+            <div className="bg-surface border border-edge rounded-2xl overflow-hidden">
+                <div className="p-6 border-b border-edge">
                     <div className="flex items-center justify-between">
                         <div>
-                            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Telegram Bot</h2>
-                            <p className="text-sm text-gray-500 dark:text-gray-400">Notifikasi status kamera dan kritik saran</p>
+                            <h2 className="text-xl font-bold text-content">Telegram Bot</h2>
+                            <p className="text-sm text-content-muted">Notifikasi status kamera dan kritik saran</p>
                         </div>
                         {!isEditing && (
                             <div className="flex flex-wrap items-center justify-end gap-2">
                                 <Link
                                     to="/admin/notification-diagnostics"
-                                    className="inline-flex items-center rounded-xl border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+                                    className="inline-flex items-center rounded-xl border border-edge-strong px-3 py-2 text-sm font-semibold text-content hover:bg-surface-sunken"
                                 >
                                     Buka Notification Diagnostics
                                 </Link>
                                 <button
                                     onClick={() => setIsEditing(true)}
-                                    className="px-4 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-medium rounded-xl transition-colors"
+                                    className="px-4 py-2 bg-surface-sunken hover:bg-surface-sunken text-content-muted font-medium rounded-xl transition-colors"
                                 >
                                     Edit
                                 </button>
@@ -350,42 +350,42 @@ export default function TelegramSettingsPanel() {
                     {isEditing ? (
                         <div className="space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Bot Token</label>
+                                <label className="block text-sm font-medium text-content-muted mb-2">Bot Token</label>
                                 <input
                                     type="text"
                                     value={formData.botToken}
                                     onChange={(event) => setFormData((prev) => ({ ...prev, botToken: event.target.value }))}
                                     placeholder="123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
-                                    className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                                    className="w-full px-4 py-3 bg-surface-sunken border border-edge rounded-xl text-content placeholder-gray-400 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Chat ID Monitoring Kamera</label>
+                                <label className="block text-sm font-medium text-content-muted mb-2">Chat ID Monitoring Kamera</label>
                                 <input
                                     type="text"
                                     value={formData.monitoringChatId}
                                     onChange={(event) => setFormData((prev) => ({ ...prev, monitoringChatId: event.target.value }))}
                                     placeholder="-1001234567890"
-                                    className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                                    className="w-full px-4 py-3 bg-surface-sunken border border-edge rounded-xl text-content placeholder-gray-400 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Chat ID Kritik dan Saran</label>
+                                <label className="block text-sm font-medium text-content-muted mb-2">Chat ID Kritik dan Saran</label>
                                 <input
                                     type="text"
                                     value={formData.feedbackChatId}
                                     onChange={(event) => setFormData((prev) => ({ ...prev, feedbackChatId: event.target.value }))}
                                     placeholder="-1009876543210"
-                                    className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                                    className="w-full px-4 py-3 bg-surface-sunken border border-edge rounded-xl text-content placeholder-gray-400 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                                 />
                             </div>
 
                             <div className="border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50/40 dark:bg-emerald-500/5 rounded-xl p-4 space-y-3">
                                 <div>
-                                    <h3 className="font-semibold text-gray-900 dark:text-white">Bot Pengelola Pelanggan</h3>
-                                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                                    <h3 className="font-semibold text-content">Bot Pengelola Pelanggan</h3>
+                                    <p className="text-sm text-content-muted">
                                         Chat ID yang boleh memberi perintah ke bot dan menekan tombol <b>Setujui / Tolak</b> pendaftaran, top-up, suspend/resume, dan ubah paket. Pendaftaran baru otomatis dikirim ke sini.
                                     </p>
                                 </div>
@@ -401,20 +401,20 @@ export default function TelegramSettingsPanel() {
                                             .filter(Boolean),
                                     }))}
                                     placeholder={'-1001234567890\n123456789'}
-                                    className="w-full px-3 py-2 font-mono text-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                                    className="w-full px-3 py-2 font-mono text-sm bg-surface border border-edge rounded-lg text-content placeholder-gray-400 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                                 />
-                                <p className="text-xs text-gray-500 dark:text-gray-400">
-                                    Satu Chat ID per baris. Kosongkan untuk memakai <b>Chat ID Monitoring Kamera</b> sebagai default. Kirim <code className="px-1 bg-gray-100 dark:bg-gray-700 rounded">/id</code> ke bot untuk tahu Chat ID Anda.
+                                <p className="text-xs text-content-muted">
+                                    Satu Chat ID per baris. Kosongkan untuk memakai <b>Chat ID Monitoring Kamera</b> sebagai default. Kirim <code className="px-1 bg-surface-sunken rounded">/id</code> ke bot untuk tahu Chat ID Anda.
                                 </p>
                             </div>
 
-                            <div className="border border-gray-200 dark:border-gray-700 rounded-xl p-4 space-y-4">
+                            <div className="border border-edge rounded-xl p-4 space-y-4">
                                 <div className="flex items-center justify-between gap-3">
                                     <div>
-                                        <h3 className="font-semibold text-gray-900 dark:text-white">Target Grup Monitoring</h3>
-                                        <p className="text-sm text-gray-500 dark:text-gray-400">Tambahkan grup Telegram untuk NOC, area, atau teknisi.</p>
+                                        <h3 className="font-semibold text-content">Target Grup Monitoring</h3>
+                                        <p className="text-sm text-content-muted">Tambahkan grup Telegram untuk NOC, area, atau teknisi.</p>
                                     </div>
-                                    <button type="button" onClick={addTarget} className="px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium">
+                                    <button type="button" onClick={addTarget} className="px-3 py-2 bg-surface-sunken text-content-muted rounded-lg text-sm font-medium">
                                         Tambah Grup
                                     </button>
                                 </div>
@@ -423,22 +423,22 @@ export default function TelegramSettingsPanel() {
                                     {(formData.notificationTargets || []).map((target, index) => (
                                         <div key={target.id || index} className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-3 items-end">
                                             <div>
-                                                <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Nama Grup</label>
+                                                <label className="block text-xs font-semibold text-content-muted mb-1">Nama Grup</label>
                                                 <input
                                                     type="text"
                                                     value={target.name || ''}
                                                     onChange={(event) => updateTarget(index, { name: event.target.value, id: target.id || `target-${Date.now()}` })}
-                                                    className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white"
+                                                    className="w-full px-3 py-2 bg-surface-sunken border border-edge rounded-lg text-content"
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Chat ID</label>
+                                                <label className="block text-xs font-semibold text-content-muted mb-1">Chat ID</label>
                                                 <input
                                                     type="text"
                                                     value={target.chatId || ''}
                                                     onChange={(event) => updateTarget(index, { chatId: event.target.value })}
                                                     placeholder="-1001234567890"
-                                                    className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white"
+                                                    className="w-full px-3 py-2 bg-surface-sunken border border-edge rounded-lg text-content"
                                                 />
                                             </div>
                                             <button type="button" onClick={() => removeTarget(index)} className="px-3 py-2 bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 rounded-lg text-sm font-medium">
@@ -447,21 +447,21 @@ export default function TelegramSettingsPanel() {
                                         </div>
                                     ))}
                                     {(formData.notificationTargets || []).length === 0 && (
-                                        <p className="text-sm text-gray-500 dark:text-gray-400">Belum ada grup tambahan. Chat ID monitoring utama tetap menjadi fallback.</p>
+                                        <p className="text-sm text-content-muted">Belum ada grup tambahan. Chat ID monitoring utama tetap menjadi fallback.</p>
                                     )}
                                 </div>
                             </div>
 
-                            <div className="border border-gray-200 dark:border-gray-700 rounded-xl p-4 space-y-3">
+                            <div className="border border-edge rounded-xl p-4 space-y-3">
                                 <div>
-                                    <h3 className="font-semibold text-gray-900 dark:text-white">Alert Kesehatan Recording</h3>
-                                    <p className="text-sm text-gray-500 dark:text-gray-400">Grup tujuan alert pipeline recording (scheduler / recovery). Sinyal ini global, bukan per-area.</p>
+                                    <h3 className="font-semibold text-content">Alert Kesehatan Recording</h3>
+                                    <p className="text-sm text-content-muted">Grup tujuan alert pipeline recording (scheduler / recovery). Sinyal ini global, bukan per-area.</p>
                                 </div>
                                 <select
                                     aria-label="Grup Alert Kesehatan Recording"
                                     value={formData.healthAlertTargetId || ''}
                                     onChange={(event) => setFormData((prev) => ({ ...prev, healthAlertTargetId: event.target.value }))}
-                                    className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white"
+                                    className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-content"
                                 >
                                     <option value="">Default — Monitoring Utama</option>
                                     {(formData.notificationTargets || []).map((target) => (
@@ -470,14 +470,14 @@ export default function TelegramSettingsPanel() {
                                 </select>
                             </div>
 
-                            <div className="border border-gray-200 dark:border-gray-700 rounded-xl p-4 space-y-3">
+                            <div className="border border-edge rounded-xl p-4 space-y-3">
                                 <div>
-                                    <h3 className="font-semibold text-gray-900 dark:text-white">Window Konfirmasi Alert (Anti-Flap)</h3>
-                                    <p className="text-sm text-gray-500 dark:text-gray-400">Alert DOWN/UP baru dikirim setelah status bertahan stabil selama waktu ini. Naikkan untuk meredam gangguan singkat; turunkan agar lebih cepat. Rentang 10–1800 detik.</p>
+                                    <h3 className="font-semibold text-content">Window Konfirmasi Alert (Anti-Flap)</h3>
+                                    <p className="text-sm text-content-muted">Alert DOWN/UP baru dikirim setelah status bertahan stabil selama waktu ini. Naikkan untuk meredam gangguan singkat; turunkan agar lebih cepat. Rentang 10–1800 detik.</p>
                                 </div>
                                 <div className="grid grid-cols-2 gap-3">
                                     <div>
-                                        <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Konfirmasi DOWN (detik)</label>
+                                        <label className="block text-xs font-semibold text-content-muted mb-1">Konfirmasi DOWN (detik)</label>
                                         <input
                                             type="number"
                                             min="10"
@@ -487,11 +487,11 @@ export default function TelegramSettingsPanel() {
                                                 ...prev,
                                                 alertConfirmation: { ...prev.alertConfirmation, downMs: Math.round((Number(event.target.value) || 0) * 1000) },
                                             }))}
-                                            className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white"
+                                            className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-content"
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Konfirmasi UP (detik)</label>
+                                        <label className="block text-xs font-semibold text-content-muted mb-1">Konfirmasi UP (detik)</label>
                                         <input
                                             type="number"
                                             min="10"
@@ -501,32 +501,32 @@ export default function TelegramSettingsPanel() {
                                                 ...prev,
                                                 alertConfirmation: { ...prev.alertConfirmation, upMs: Math.round((Number(event.target.value) || 0) * 1000) },
                                             }))}
-                                            className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white"
+                                            className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-content"
                                         />
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="border border-gray-200 dark:border-gray-700 rounded-xl p-4 space-y-4">
+                            <div className="border border-edge rounded-xl p-4 space-y-4">
                                 <div className="flex items-center justify-between gap-3">
                                     <div>
-                                        <h3 className="font-semibold text-gray-900 dark:text-white">Routing Notifikasi CCTV</h3>
-                                        <p className="text-sm text-gray-500 dark:text-gray-400">Rule baru default-nya &quot;Semua Mode&quot; agar kamera on-demand maupun always-on sama-sama dialerti. Pilih mode tertentu hanya jika ingin mempersempit.</p>
+                                        <h3 className="font-semibold text-content">Routing Notifikasi CCTV</h3>
+                                        <p className="text-sm text-content-muted">Rule baru default-nya &quot;Semua Mode&quot; agar kamera on-demand maupun always-on sama-sama dialerti. Pilih mode tertentu hanya jika ingin mempersempit.</p>
                                     </div>
-                                    <button type="button" onClick={addRule} className="px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium">
+                                    <button type="button" onClick={addRule} className="px-3 py-2 bg-surface-sunken text-content-muted rounded-lg text-sm font-medium">
                                         Tambah Rule
                                     </button>
                                 </div>
 
                                 <div className="space-y-3">
                                     {(formData.notificationRules || []).map((rule, index) => (
-                                        <div key={rule.id || index} className="grid grid-cols-1 lg:grid-cols-[1fr_1fr_1fr_1fr_1fr_auto] gap-3 items-end p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl">
+                                        <div key={rule.id || index} className="grid grid-cols-1 lg:grid-cols-[1fr_1fr_1fr_1fr_1fr_auto] gap-3 items-end p-3 bg-surface-sunken rounded-xl">
                                             <div>
-                                                <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Kirim Ke</label>
+                                                <label className="block text-xs font-semibold text-content-muted mb-1">Kirim Ke</label>
                                                 <select
                                                     value={rule.targetId || 'legacy-monitoring'}
                                                     onChange={(event) => updateRule(index, { targetId: event.target.value })}
-                                                    className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white"
+                                                    className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-content"
                                                 >
                                                     {formData.monitoringChatId && <option value="legacy-monitoring">Monitoring Utama (Chat ID Monitoring Kamera)</option>}
                                                     {(formData.notificationTargets || []).map((target) => (
@@ -535,11 +535,11 @@ export default function TelegramSettingsPanel() {
                                                 </select>
                                             </div>
                                             <div>
-                                                <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Scope</label>
+                                                <label className="block text-xs font-semibold text-content-muted mb-1">Scope</label>
                                                 <select
                                                     value={rule.scope || 'global'}
                                                     onChange={(event) => updateRule(index, { scope: event.target.value })}
-                                                    className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white"
+                                                    className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-content"
                                                 >
                                                     <option value="global">Global</option>
                                                     <option value="area">Per Area</option>
@@ -547,12 +547,12 @@ export default function TelegramSettingsPanel() {
                                                 </select>
                                             </div>
                                             <div>
-                                                <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">{rule.scope === 'camera' ? 'Camera ID' : 'Area'}</label>
+                                                <label className="block text-xs font-semibold text-content-muted mb-1">{rule.scope === 'camera' ? 'Camera ID' : 'Area'}</label>
                                                 {rule.scope === 'area' ? (
                                                     <select
                                                         value={rule.areaId || ''}
                                                         onChange={(event) => updateRule(index, { areaId: event.target.value })}
-                                                        className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white"
+                                                        className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-content"
                                                     >
                                                         <option value="">Pilih Area</option>
                                                         {areas.map((area) => (
@@ -565,16 +565,16 @@ export default function TelegramSettingsPanel() {
                                                         value={rule.scope === 'camera' ? (rule.cameraId || '') : ''}
                                                         disabled={rule.scope !== 'camera'}
                                                         onChange={(event) => updateRule(index, { cameraId: event.target.value })}
-                                                        className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white disabled:opacity-50"
+                                                        className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-content disabled:opacity-50"
                                                     />
                                                 )}
                                             </div>
                                             <div>
-                                                <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Ingest</label>
+                                                <label className="block text-xs font-semibold text-content-muted mb-1">Ingest</label>
                                                 <select
                                                     value={rule.ingestModes?.[0] || 'any'}
                                                     onChange={(event) => updateRule(index, { ingestModes: [event.target.value] })}
-                                                    className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white"
+                                                    className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-content"
                                                 >
                                                     <option value="any">Semua Mode</option>
                                                     <option value="always_on">Always On</option>
@@ -583,10 +583,10 @@ export default function TelegramSettingsPanel() {
                                                 </select>
                                             </div>
                                             <div>
-                                                <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Event</label>
+                                                <label className="block text-xs font-semibold text-content-muted mb-1">Event</label>
                                                 <div className="flex flex-wrap gap-2">
                                                     {['offline', 'online'].map((eventName) => (
-                                                        <label key={eventName} className="inline-flex items-center gap-1 text-xs text-gray-700 dark:text-gray-300">
+                                                        <label key={eventName} className="inline-flex items-center gap-1 text-xs text-content-muted">
                                                             <input
                                                                 type="checkbox"
                                                                 aria-label={`${eventName === 'offline' ? 'Offline' : 'Online'} ${rule.id}`}
@@ -605,7 +605,7 @@ export default function TelegramSettingsPanel() {
                                         </div>
                                     ))}
                                     {(formData.notificationRules || []).length === 0 && (
-                                        <p className="text-sm text-gray-500 dark:text-gray-400">Jika kosong, sistem memakai fallback: Monitoring Utama untuk internal always-on saja.</p>
+                                        <p className="text-sm text-content-muted">Jika kosong, sistem memakai fallback: Monitoring Utama untuk internal always-on saja.</p>
                                     )}
                                 </div>
                             </div>
@@ -614,7 +614,7 @@ export default function TelegramSettingsPanel() {
                                 <button onClick={handleSave} disabled={saving} className="px-6 py-2.5 bg-primary hover:bg-primary-600 disabled:bg-blue-400 text-white font-medium rounded-xl transition-colors">
                                     {saving ? 'Menyimpan...' : 'Simpan'}
                                 </button>
-                                <button onClick={handleCancel} disabled={saving} className="px-6 py-2.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-medium rounded-xl transition-colors">
+                                <button onClick={handleCancel} disabled={saving} className="px-6 py-2.5 bg-surface-sunken hover:bg-surface-sunken text-content-muted font-medium rounded-xl transition-colors">
                                     Batal
                                 </button>
                             </div>
@@ -644,9 +644,9 @@ export default function TelegramSettingsPanel() {
                                 >
                                     <div className="flex items-center gap-3 mb-2">
                                         <div className={`w-3 h-3 rounded-full ${item.configured ? 'bg-emerald-500' : 'bg-gray-400'}`}></div>
-                                        <span className="font-semibold text-gray-900 dark:text-white">{item.title}</span>
+                                        <span className="font-semibold text-content">{item.title}</span>
                                     </div>
-                                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">{item.description}</p>
+                                    <p className="text-sm text-content-muted mb-2">{item.description}</p>
                                     {item.configured ? (
                                         <div className="flex items-center justify-between gap-3">
                                             <p className="text-xs text-emerald-600 dark:text-emerald-400 truncate">Chat ID: {item.chatId}</p>
@@ -677,16 +677,16 @@ export default function TelegramSettingsPanel() {
                                 />
                             </div>
                             {(telegramStatus?.notificationTargets || []).length > 0 && (
-                                <div className="mt-6 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
-                                    <h3 className="font-semibold text-gray-900 dark:text-white mb-3">Target Grup Aktif</h3>
+                                <div className="mt-6 border border-edge rounded-xl p-4">
+                                    <h3 className="font-semibold text-content mb-3">Target Grup Aktif</h3>
                                     <div className="space-y-2">
                                         {(telegramStatus.notificationTargets || []).map((target) => {
                                             const loadingKey = `target:${target.id}`;
                                             return (
-                                                <div key={target.id} className="flex items-center justify-between gap-3 rounded-lg bg-gray-50 dark:bg-gray-800/50 px-3 py-2">
+                                                <div key={target.id} className="flex items-center justify-between gap-3 rounded-lg bg-surface-sunken px-3 py-2">
                                                     <div className="min-w-0">
-                                                        <p className="font-medium text-gray-900 dark:text-white truncate">{target.name}</p>
-                                                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{target.chatId}</p>
+                                                        <p className="font-medium text-content truncate">{target.name}</p>
+                                                        <p className="text-xs text-content-muted truncate">{target.chatId}</p>
                                                     </div>
                                                     <button
                                                         type="button"
@@ -703,24 +703,24 @@ export default function TelegramSettingsPanel() {
                                     </div>
                                 </div>
                             )}
-                            <div className="mt-6 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
-                                <h3 className="font-semibold text-gray-900 dark:text-white">Alert Kesehatan Recording</h3>
-                                <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                            <div className="mt-6 rounded-xl border border-edge p-4">
+                                <h3 className="font-semibold text-content">Alert Kesehatan Recording</h3>
+                                <p className="mt-1 text-sm text-content-muted">
                                     Alert pipeline recording dikirim ke:{' '}
-                                    <span className="font-medium text-gray-900 dark:text-white">{healthAlertTargetName}</span>
+                                    <span className="font-medium text-content">{healthAlertTargetName}</span>
                                 </p>
                             </div>
                             <div className="mt-6 rounded-xl border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50/40 dark:bg-emerald-500/5 p-4">
-                                <h3 className="font-semibold text-gray-900 dark:text-white">Bot Pengelola Pelanggan</h3>
-                                <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                                <h3 className="font-semibold text-content">Bot Pengelola Pelanggan</h3>
+                                <p className="mt-1 text-sm text-content-muted">
                                     Approval pendaftaran & kelola pelanggan langsung dari Telegram (/pending, /customers, top-up, suspend).
                                 </p>
                                 {(telegramStatus?.effectiveCommandChatIds || []).length > 0 ? (
-                                    <p className="mt-2 text-sm text-gray-700 dark:text-gray-300">
+                                    <p className="mt-2 text-sm text-content-muted">
                                         Chat yang diizinkan:{' '}
                                         <span className="font-medium">{telegramStatus.effectiveCommandChatIds.join(', ')}</span>
                                         {(telegramStatus?.commandChatIds || []).length === 0 && (
-                                            <span className="text-gray-500 dark:text-gray-400"> (default: Chat ID Monitoring)</span>
+                                            <span className="text-content-muted"> (default: Chat ID Monitoring)</span>
                                         )}
                                     </p>
                                 ) : (
@@ -744,8 +744,8 @@ export default function TelegramSettingsPanel() {
                 </div>
             </div>
 
-            <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl p-6">
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Fitur Notifikasi</h3>
+            <div className="bg-surface border border-edge rounded-2xl p-6">
+                <h3 className="text-lg font-bold text-content mb-4">Fitur Notifikasi</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FeatureItem title="Kamera Offline" description="Notifikasi otomatis saat kamera terputus." enabled={telegramStatus?.cameraMonitoringConfigured} />
                     <FeatureItem title="Kamera Online" description="Notifikasi saat kamera kembali terhubung." enabled={telegramStatus?.cameraMonitoringConfigured} />

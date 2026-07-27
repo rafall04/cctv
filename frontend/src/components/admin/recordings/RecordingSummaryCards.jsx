@@ -19,8 +19,8 @@ export default function RecordingSummaryCards({ summary }) {
         {
             label: 'Total Kamera',
             value: summary.cameras,
-            accent: 'text-gray-900 dark:text-white',
-            tone: 'bg-gray-100 text-gray-700 dark:bg-gray-700/80 dark:text-gray-100',
+            accent: 'text-content',
+            tone: 'bg-gray-100 text-content dark:bg-gray-700/80',
         },
         {
             label: 'Total Segmen',
@@ -39,7 +39,7 @@ export default function RecordingSummaryCards({ summary }) {
     return (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 lg:grid-cols-4">
             {items.map((item) => (
-                <div key={item.label} className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700/70 dark:bg-gray-800/70 md:p-6">
+                <div key={item.label} className="rounded-2xl border border-gray-200 bg-surface p-5 shadow-sm dark:border-gray-700/70 md:p-6">
                     <div
                         data-testid={`summary-label-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
                         className={`mb-3 inline-flex rounded-xl px-3 py-1 text-xs font-semibold tracking-wide ${item.tone}`}

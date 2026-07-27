@@ -56,19 +56,19 @@ function formatSeconds(seconds) {
 export default function RecordingAssuranceTable({ cameras = [] }) {
     if (!cameras.length) {
         return (
-            <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700/70 dark:bg-gray-800/70 md:p-6">
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Recording Assurance</h2>
-                <p className="mt-4 text-sm text-gray-600 dark:text-gray-300">Belum ada kamera recording yang dipantau.</p>
+            <div className="rounded-2xl border border-gray-200 bg-surface p-5 shadow-sm dark:border-gray-700/70 md:p-6">
+                <h2 className="text-xl font-bold text-content">Recording Assurance</h2>
+                <p className="mt-4 text-sm text-content-muted">Belum ada kamera recording yang dipantau.</p>
             </div>
         );
     }
 
     return (
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700/70 dark:bg-gray-800/70 md:p-6">
+        <div className="rounded-2xl border border-gray-200 bg-surface p-5 shadow-sm dark:border-gray-700/70 md:p-6">
             <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
                 <div>
-                    <h2 className="text-xl font-bold text-gray-900 dark:text-white">Recording Assurance</h2>
-                    <p className="text-sm text-gray-600 dark:text-gray-300">
+                    <h2 className="text-xl font-bold text-content">Recording Assurance</h2>
+                    <p className="text-sm text-content-muted">
                         Kamera yang mulai stale, missing segment, atau recording process down.
                     </p>
                 </div>
@@ -77,23 +77,23 @@ export default function RecordingAssuranceTable({ cameras = [] }) {
             <div className="mt-4 overflow-x-auto">
                 <table className="w-full">
                     <thead>
-                        <tr className="border-b border-gray-200 dark:border-gray-700">
-                            <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Camera</th>
-                            <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Health</th>
-                            <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Reasons</th>
-                            <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Latest End Age</th>
-                            <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Recent Gap</th>
+                        <tr className="border-b border-edge">
+                            <th className="px-4 py-3 text-left font-medium text-content-muted">Camera</th>
+                            <th className="px-4 py-3 text-left font-medium text-content-muted">Health</th>
+                            <th className="px-4 py-3 text-left font-medium text-content-muted">Reasons</th>
+                            <th className="px-4 py-3 text-left font-medium text-content-muted">Latest End Age</th>
+                            <th className="px-4 py-3 text-left font-medium text-content-muted">Recent Gap</th>
                         </tr>
                     </thead>
                     <tbody>
                         {cameras.map((camera) => (
                             <tr
                                 key={camera.id}
-                                className="border-b border-gray-100 dark:border-gray-800 dark:hover:bg-gray-700/40"
+                                className="border-b border-edge dark:hover:bg-gray-700/40"
                             >
                                 <td className="px-4 py-3">
-                                    <div className="font-medium text-gray-900 dark:text-white">{camera.name}</div>
-                                    <div className="text-xs text-gray-600 dark:text-gray-300">ID {camera.id}</div>
+                                    <div className="font-medium text-content">{camera.name}</div>
+                                    <div className="text-xs text-content-muted">ID {camera.id}</div>
                                 </td>
                                 <td className="px-4 py-3">
                                     <span className={`rounded px-2 py-1 text-xs font-medium capitalize ${getHealthTone(camera.health)}`}>
@@ -105,17 +105,17 @@ export default function RecordingAssuranceTable({ cameras = [] }) {
                                         {(camera.reasons?.length ? camera.reasons : ['healthy']).map((reason) => (
                                             <span
                                                 key={`${camera.id}-${reason}`}
-                                                className="rounded bg-gray-100 px-2 py-1 text-xs text-gray-700 dark:bg-gray-700/80 dark:text-gray-100"
+                                                className="rounded bg-gray-100 px-2 py-1 text-xs text-content dark:bg-gray-700/80"
                                             >
                                                 {formatReason(reason)}
                                             </span>
                                         ))}
                                     </div>
                                 </td>
-                                <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-200">
+                                <td className="px-4 py-3 text-sm text-content">
                                     {formatSeconds(camera.seconds_since_latest_end)}
                                 </td>
-                                <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-200">
+                                <td className="px-4 py-3 text-sm text-content">
                                     {camera.recent_gap
                                         ? `${camera.recent_gap.gap_count} gap, max ${camera.recent_gap.max_gap_seconds}s`
                                         : '-'}

@@ -22,8 +22,8 @@ export default function HealthDebug() {
                 <p className="text-sm font-semibold text-primary">Operations</p>
                 <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
                     <div>
-                        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Health Debug</h1>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                        <h1 className="text-3xl font-bold text-content">Health Debug</h1>
+                        <p className="text-sm text-content-muted">
                             Diagnostik internal backend health, runtime evidence, dan status publik playable.
                         </p>
                     </div>

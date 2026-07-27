@@ -43,18 +43,18 @@ export default function CameraFormModal({
                 role="dialog"
                 aria-modal="true"
                 aria-label={editingCamera ? 'Edit Camera' : 'Add Camera'}
-                className="bg-white dark:bg-gray-800 w-full max-w-lg rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700/50 my-auto max-h-[90vh] flex flex-col"
+                className="bg-white dark:bg-gray-800 w-full max-w-lg rounded-2xl shadow-2xl border border-edge my-auto max-h-[90vh] flex flex-col"
             >
-                <div className="p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700/50 flex justify-between items-center shrink-0">
+                <div className="p-4 sm:p-6 border-b border-edge flex justify-between items-center shrink-0">
                     <div>
                         <h3 className="text-lg font-bold text-gray-900 dark:text-white">
                             {editingCamera ? 'Edit Camera' : 'Add Camera'}
                         </h3>
-                        <p className="text-sm text-gray-600 dark:text-gray-300">Configure stream source</p>
+                        <p className="text-sm text-content-muted dark:text-gray-300">Configure stream source</p>
                     </div>
                     <button
                         onClick={onClose}
-                        className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700/50 text-gray-600 dark:text-gray-300 transition-colors"
+                        className="p-2 rounded-lg hover:bg-surface-sunken text-content-muted transition-colors"
                         disabled={isSubmitting}
                     >
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -118,11 +118,11 @@ export default function CameraFormModal({
                         onChange={onChange}
                     />
 
-                    <div className="flex gap-3 pt-2 sticky bottom-0 bg-white dark:bg-gray-800 pb-1">
+                    <div className="flex gap-3 pt-2 sticky bottom-0 bg-surface pb-1">
                         <button
                             type="button"
                             onClick={onClose}
-                            className="flex-1 px-4 py-2.5 bg-gray-100 dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 font-medium rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 text-sm"
+                            className="flex-1 px-4 py-2.5 bg-surface-sunken text-content-muted font-medium rounded-xl hover:bg-surface-sunken transition-colors disabled:opacity-50 text-sm"
                             disabled={isSubmitting}
                         >
                             Cancel

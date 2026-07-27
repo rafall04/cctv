@@ -11,12 +11,12 @@ export function AnalyticsWorkspaceHeader({ title, description, lastUpdate, filte
         <div className="space-y-4">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{title}</h1>
+                    <h1 className="text-2xl font-bold text-content">{title}</h1>
                     {description && (
-                        <p className="text-sm text-gray-500 dark:text-gray-400">{description}</p>
+                        <p className="text-sm text-content-muted">{description}</p>
                     )}
                 </div>
-                <div className="text-xs text-gray-500 dark:text-gray-400">
+                <div className="text-xs text-content-muted">
                     Update terakhir: {lastUpdate ? lastUpdate.toLocaleTimeString('id-ID') : '-'}
                 </div>
             </div>
@@ -27,7 +27,7 @@ export function AnalyticsWorkspaceHeader({ title, description, lastUpdate, filte
 
 export function AnalyticsTabNav({ tabs = DEFAULT_TABS, activeTab, onChange }) {
     return (
-        <div className="rounded-2xl border border-gray-200 bg-white p-2 dark:border-gray-800 dark:bg-gray-900">
+        <div className="rounded-2xl border border-edge bg-surface p-2">
             <div className="flex flex-wrap gap-2">
                 {tabs.map((tab) => (
                     <button

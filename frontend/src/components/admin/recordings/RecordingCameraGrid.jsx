@@ -77,14 +77,14 @@ function RecordingQuickEditCard({
     };
 
     return (
-        <div key={cameraId} className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700/70 dark:bg-gray-800/70 md:p-6">
+        <div key={cameraId} className="rounded-2xl border border-gray-200 bg-surface p-5 shadow-sm dark:border-gray-700/70 md:p-6">
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="text-lg font-semibold leading-tight text-gray-900 dark:text-white">
+                        <h3 className="text-lg font-semibold leading-tight text-content">
                             {recording.name || recording.camera_name}
                         </h3>
-                        <span className="inline-flex rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-gray-700 dark:bg-gray-700/90 dark:text-gray-100">
+                        <span className="inline-flex rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-content dark:bg-gray-700/90">
                             {recording.stream_source || 'internal'}
                         </span>
                         {(recording.enabled === 0 || recording.enabled === false) && (
@@ -93,7 +93,7 @@ function RecordingQuickEditCard({
                             </span>
                         )}
                     </div>
-                    <p className="mt-1 text-sm font-medium text-gray-700 dark:text-gray-200">
+                    <p className="mt-1 text-sm font-medium text-content">
                         {recording.location || 'No location'}
                     </p>
                 </div>
@@ -111,33 +111,33 @@ function RecordingQuickEditCard({
 
             <div className="mb-4 space-y-2.5">
                 <div className="flex justify-between text-sm">
-                    <span className="font-medium text-gray-700 dark:text-gray-200">Duration:</span>
-                    <span className="text-gray-900 dark:text-white">{recording.recording_duration_hours || 5}h</span>
+                    <span className="font-medium text-content">Duration:</span>
+                    <span className="text-content">{recording.recording_duration_hours || 5}h</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                    <span className="font-medium text-gray-700 dark:text-gray-200">Recording Enabled:</span>
-                    <span className="text-gray-900 dark:text-white">
+                    <span className="font-medium text-content">Recording Enabled:</span>
+                    <span className="text-content">
                         {recording.enable_recording === 1 || recording.enable_recording === true ? 'Yes' : 'No'}
                     </span>
                 </div>
                 <div className="flex justify-between text-sm">
-                    <span className="font-medium text-gray-700 dark:text-gray-200">Segments:</span>
-                    <span className="text-gray-900 dark:text-white">{segmentCount}</span>
+                    <span className="font-medium text-content">Segments:</span>
+                    <span className="text-content">{segmentCount}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                    <span className="font-medium text-gray-700 dark:text-gray-200">Total Size:</span>
-                    <span className="text-gray-900 dark:text-white">{formatFileSize(totalSize)}</span>
+                    <span className="font-medium text-content">Total Size:</span>
+                    <span className="text-content">{formatFileSize(totalSize)}</span>
                 </div>
                 {oldestSegment && (
                     <div className="flex justify-between text-sm">
-                        <span className="font-medium text-gray-700 dark:text-gray-200">Oldest:</span>
-                        <span className="text-gray-900 dark:text-white">{formatTimestamp(oldestSegment)}</span>
+                        <span className="font-medium text-content">Oldest:</span>
+                        <span className="text-content">{formatTimestamp(oldestSegment)}</span>
                     </div>
                 )}
                 {newestSegment && (
                     <div className="flex justify-between text-sm">
-                        <span className="font-medium text-gray-700 dark:text-gray-200">Newest:</span>
-                        <span className="text-gray-900 dark:text-white">{formatTimestamp(newestSegment)}</span>
+                        <span className="font-medium text-content">Newest:</span>
+                        <span className="text-content">{formatTimestamp(newestSegment)}</span>
                     </div>
                 )}
             </div>
@@ -147,14 +147,14 @@ function RecordingQuickEditCard({
                     <div className="rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-500/20 dark:bg-red-500/10">
                         <div className="mb-4 flex items-center justify-between">
                             <div>
-                                <p className="text-sm font-semibold text-gray-900 dark:text-white">Quick Edit Recording</p>
-                                <p className="text-xs text-gray-500 dark:text-gray-400">Ubah setting rekaman tanpa keluar dari dashboard.</p>
+                                <p className="text-sm font-semibold text-content">Quick Edit Recording</p>
+                                <p className="text-xs text-content-muted">Ubah setting rekaman tanpa keluar dari dashboard.</p>
                             </div>
                         </div>
 
                         <div className="space-y-4">
                             <div className="flex items-center justify-between">
-                                <span className="text-sm text-gray-700 dark:text-gray-300">Aktifkan Rekaman</span>
+                                <span className="text-sm text-content-muted">Aktifkan Rekaman</span>
                                 <button
                                     type="button"
                                     onClick={() => handleDraftChange('enable_recording', !draft.enable_recording)}
@@ -174,7 +174,7 @@ function RecordingQuickEditCard({
 
                             {draft.enable_recording && (
                                 <div>
-                                    <label htmlFor={`recording-duration-${cameraId}`} className="mb-2 block text-sm text-gray-700 dark:text-gray-300">
+                                    <label htmlFor={`recording-duration-${cameraId}`} className="mb-2 block text-sm text-content-muted">
                                         Durasi Penyimpanan
                                     </label>
                                     <select
@@ -182,7 +182,7 @@ function RecordingQuickEditCard({
                                         value={draft.recording_duration_hours}
                                         onChange={(event) => handleDraftChange('recording_duration_hours', event.target.value)}
                                         disabled={isSaving}
-                                        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-red-500 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                                        className="w-full rounded-lg border border-edge-strong bg-surface px-3 py-2 text-sm text-content focus:ring-2 focus:ring-red-500 disabled:opacity-50"
                                     >
                                         {recordingDurationOptions.map((group) => (
                                             <optgroup key={group.label} label={group.label}>
@@ -210,7 +210,7 @@ function RecordingQuickEditCard({
                                     type="button"
                                     onClick={handleCancel}
                                     disabled={isSaving}
-                                    className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700"
+                                    className="flex-1 rounded-lg border border-edge-strong bg-surface px-4 py-2 text-sm font-medium text-content transition-colors hover:bg-gray-50 disabled:opacity-50 dark:hover:bg-gray-700"
                                 >
                                     Batal
                                 </button>
@@ -259,8 +259,8 @@ export default function RecordingCameraGrid({
 }) {
     if (recordings.length === 0) {
         return (
-            <div className="rounded-2xl border border-gray-200 bg-white p-12 text-center shadow-sm dark:border-gray-700/50 dark:bg-gray-800/60">
-                <p className="text-gray-600 dark:text-gray-300">Tidak ada kamera dengan recording enabled</p>
+            <div className="rounded-2xl border border-edge bg-white p-12 text-center shadow-sm dark:bg-gray-800/60">
+                <p className="text-content-muted">Tidak ada kamera dengan recording enabled</p>
             </div>
         );
     }

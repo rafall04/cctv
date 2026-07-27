@@ -18,10 +18,10 @@ export default function PlaybackTokenSharePanel({ createdShare, whatsappHref, on
     return (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-5 dark:border-emerald-900 dark:bg-emerald-950/40">
             <div className="mb-3 text-sm font-semibold text-emerald-900 dark:text-emerald-100">Token baru dibuat</div>
-            <pre className="whitespace-pre-wrap rounded-lg bg-white p-3 text-sm text-gray-800 dark:bg-gray-950 dark:text-gray-100">{shareText}</pre>
+            <pre className="whitespace-pre-wrap rounded-lg bg-surface p-3 text-sm text-content">{shareText}</pre>
             <div className="mt-3 flex flex-wrap gap-2">
                 <button type="button" disabled={!hasShareText} onClick={() => onCopy(shareText)} className={`rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white dark:bg-white dark:text-gray-900 ${disabledButtonClass}`}>Copy Teks</button>
-                <button type="button" disabled={!hasShareText} onClick={() => onNativeShare(shareText)} className={`rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-800 dark:bg-gray-800 dark:text-gray-100 ${disabledButtonClass}`}>Share</button>
+                <button type="button" disabled={!hasShareText} onClick={() => onNativeShare(shareText)} className={`rounded-lg bg-surface-sunken px-4 py-2 text-sm font-semibold text-content ${disabledButtonClass}`}>Share</button>
                 <a
                     href={hasShareText ? whatsappHref : '#'}
                     target="_blank"

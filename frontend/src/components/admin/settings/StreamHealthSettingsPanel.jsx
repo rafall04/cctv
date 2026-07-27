@@ -110,10 +110,10 @@ export default function StreamHealthSettingsPanel() {
     }
 
     return (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-            <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Stream Health Defaults</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+        <div className="bg-surface rounded-xl shadow-sm border border-edge">
+            <div className="p-6 border-b border-edge">
+                <h3 className="text-lg font-semibold text-content">Stream Health Defaults</h3>
+                <p className="text-sm text-content-muted mt-1">
                     Urutan precedence: camera override, area override, global default, lalu fallback sistem.
                 </p>
             </div>
@@ -123,9 +123,9 @@ export default function StreamHealthSettingsPanel() {
                     {HEALTH_SETTING_FIELDS.map((field) => (
                         <div
                             key={field.key}
-                            className="rounded-2xl border border-gray-200 bg-gray-50/80 p-4 dark:border-gray-700 dark:bg-gray-900/40"
+                            className="rounded-2xl border border-edge bg-surface-sunken p-4"
                         >
-                            <label className="block text-sm font-semibold text-gray-900 dark:text-white mb-2">
+                            <label className="block text-sm font-semibold text-content mb-2">
                                 {field.label}
                             </label>
                             <select
@@ -134,13 +134,13 @@ export default function StreamHealthSettingsPanel() {
                                     ...current,
                                     [field.key]: event.target.value,
                                 }))}
-                                className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-gray-900 outline-none transition-all focus:border-transparent focus:ring-2 focus:ring-sky-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                className="w-full rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-content outline-none transition-all focus:border-transparent focus:ring-2 focus:ring-sky-500"
                             >
                                 {HEALTH_MODE_OPTIONS.map((option) => (
                                     <option key={option.value} value={option.value}>{option.label}</option>
                                 ))}
                             </select>
-                            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">{field.description}</p>
+                            <p className="mt-2 text-xs text-content-muted">{field.description}</p>
                         </div>
                     ))}
                 </div>

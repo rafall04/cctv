@@ -40,10 +40,10 @@ export default function PlaybackTokenTable({
     onRevoke,
 }) {
     return (
-        <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+        <div className="rounded-lg border border-edge bg-surface p-5 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Token Aktif</h2>
-                <button onClick={onRefresh} className="rounded-lg bg-gray-100 px-3 py-2 text-sm font-semibold text-gray-700 dark:bg-gray-800 dark:text-gray-200">Refresh</button>
+                <h2 className="text-lg font-semibold text-content">Token Aktif</h2>
+                <button onClick={onRefresh} className="rounded-lg bg-surface-sunken px-3 py-2 text-sm font-semibold text-content">Refresh</button>
             </div>
             {loading ? (
                 <div className="py-8 text-center text-sm text-gray-500">Loading...</div>
@@ -60,12 +60,12 @@ export default function PlaybackTokenTable({
                                 <th className="px-3 py-2"></th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                        <tbody className="divide-y divide-edge">
                             {tokens.map((token) => (
-                                <tr key={token.id} className="text-gray-800 dark:text-gray-200">
+                                <tr key={token.id} className="text-content">
                                     <td className="px-3 py-3">
                                         {editingTokenId === token.id ? (
-                                            <input value={editForm.label} onChange={(event) => onUpdateEditForm('label', event.target.value)} className="w-52 rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
+                                            <input value={editForm.label} onChange={(event) => onUpdateEditForm('label', event.target.value)} className="w-52 rounded-lg border border-edge-strong px-3 py-2 text-sm dark:bg-gray-950 dark:text-white" />
                                         ) : (
                                             <>
                                                 <div className="font-medium">{token.label}</div>
@@ -76,7 +76,7 @@ export default function PlaybackTokenTable({
                                     <td className="px-3 py-3">
                                         {editingTokenId === token.id ? (
                                             <div className="min-w-72 space-y-2">
-                                                <select value={editForm.scope_type} onChange={(event) => onUpdateEditForm('scope_type', event.target.value)} className="w-full rounded-lg border border-gray-300 px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-950 dark:text-white">
+                                                <select value={editForm.scope_type} onChange={(event) => onUpdateEditForm('scope_type', event.target.value)} className="w-full rounded-lg border border-edge-strong px-2 py-1 text-xs dark:bg-gray-950 dark:text-white">
                                                     <option value="all">Semua</option>
                                                     <option value="selected">Kamera tertentu</option>
                                                 </select>
@@ -87,20 +87,20 @@ export default function PlaybackTokenTable({
                                                             value={editCameraSearch}
                                                             onChange={(event) => onUpdateEditCameraSearch?.(event.target.value)}
                                                             placeholder="Filter nama CCTV"
-                                                            className="w-full rounded-lg border border-gray-300 px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-950 dark:text-white"
+                                                            className="w-full rounded-lg border border-edge-strong px-2 py-1 text-xs dark:bg-gray-950 dark:text-white"
                                                         />
-                                                        <div className="text-xs text-gray-500 dark:text-gray-400">Menampilkan {visibleEditCameraCount} dari {totalCameraCount} CCTV</div>
+                                                        <div className="text-xs text-content-muted">Menampilkan {visibleEditCameraCount} dari {totalCameraCount} CCTV</div>
                                                         <div className="max-h-48 space-y-2 overflow-y-auto">
                                                             {visibleEditCameras.map((camera) => (
-                                                                <div key={camera.id} className="rounded bg-gray-50 p-2 dark:bg-gray-950">
+                                                                <div key={camera.id} className="rounded bg-surface-sunken p-2">
                                                                     <label className="flex items-center gap-2 text-xs">
                                                                         <input type="checkbox" checked={selectedEditCameraIds.has(camera.id)} onChange={() => onToggleEditCameraRule(camera.id)} />
                                                                         <span>{camera.name}</span>
                                                                     </label>
                                                                     {selectedEditCameraIds.has(camera.id) && (
                                                                         <div className="mt-1 grid gap-1 sm:grid-cols-2">
-                                                                            <input type="number" min="1" placeholder="Window jam" value={editForm.camera_rules[camera.id]?.playback_window_hours || ''} onChange={(event) => onUpdateEditCameraRule(camera.id, 'playback_window_hours', event.target.value)} className="rounded border border-gray-300 px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
-                                                                            <input placeholder="Catatan" value={editForm.camera_rules[camera.id]?.note || ''} onChange={(event) => onUpdateEditCameraRule(camera.id, 'note', event.target.value)} className="rounded border border-gray-300 px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
+                                                                            <input type="number" min="1" placeholder="Window jam" value={editForm.camera_rules[camera.id]?.playback_window_hours || ''} onChange={(event) => onUpdateEditCameraRule(camera.id, 'playback_window_hours', event.target.value)} className="rounded border border-edge-strong px-2 py-1 text-xs dark:bg-gray-950 dark:text-white" />
+                                                                            <input placeholder="Catatan" value={editForm.camera_rules[camera.id]?.note || ''} onChange={(event) => onUpdateEditCameraRule(camera.id, 'note', event.target.value)} className="rounded border border-edge-strong px-2 py-1 text-xs dark:bg-gray-950 dark:text-white" />
                                                                         </div>
                                                                     )}
                                                                 </div>
@@ -114,12 +114,12 @@ export default function PlaybackTokenTable({
                                     <td className="px-3 py-3">
                                         {editingTokenId === token.id ? (
                                             <div className="grid min-w-80 gap-2 sm:grid-cols-3">
-                                                <input type="number" min="0" value={editForm.max_active_sessions} onChange={(event) => onUpdateEditForm('max_active_sessions', event.target.value)} placeholder="Unlimited" className="rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
-                                                <select value={editForm.session_limit_mode} onChange={(event) => onUpdateEditForm('session_limit_mode', event.target.value)} className="rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white">
+                                                <input type="number" min="0" value={editForm.max_active_sessions} onChange={(event) => onUpdateEditForm('max_active_sessions', event.target.value)} placeholder="Unlimited" className="rounded-lg border border-edge-strong px-3 py-2 text-sm dark:bg-gray-950 dark:text-white" />
+                                                <select value={editForm.session_limit_mode} onChange={(event) => onUpdateEditForm('session_limit_mode', event.target.value)} className="rounded-lg border border-edge-strong px-3 py-2 text-sm dark:bg-gray-950 dark:text-white">
                                                     {PLAYBACK_TOKEN_SESSION_LIMIT_MODES.filter((mode) => mode.value).map((mode) => <option key={mode.value} value={mode.value}>{mode.label}</option>)}
                                                 </select>
-                                                <input type="number" min="30" max="3600" value={editForm.session_timeout_seconds} onChange={(event) => onUpdateEditForm('session_timeout_seconds', event.target.value)} className="rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
-                                                <textarea rows={3} value={editForm.share_template} onChange={(event) => onUpdateEditForm('share_template', event.target.value)} className="rounded-lg border border-gray-300 px-3 py-2 text-sm sm:col-span-3 dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
+                                                <input type="number" min="30" max="3600" value={editForm.session_timeout_seconds} onChange={(event) => onUpdateEditForm('session_timeout_seconds', event.target.value)} className="rounded-lg border border-edge-strong px-3 py-2 text-sm dark:bg-gray-950 dark:text-white" />
+                                                <textarea rows={3} value={editForm.share_template} onChange={(event) => onUpdateEditForm('share_template', event.target.value)} className="rounded-lg border border-edge-strong px-3 py-2 text-sm sm:col-span-3 dark:bg-gray-950 dark:text-white" />
                                             </div>
                                         ) : (
                                             <>
@@ -140,7 +140,7 @@ export default function PlaybackTokenTable({
                                                 {editingTokenId === token.id ? (
                                                     <>
                                                         <button onClick={() => onUpdateToken(token.id)} disabled={updatingTokenId === token.id || !editForm.label.trim()} className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-600 disabled:opacity-60">{updatingTokenId === token.id ? 'Menyimpan...' : 'Simpan'}</button>
-                                                        <button onClick={onCancelEdit} className="rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200">Batal</button>
+                                                        <button onClick={onCancelEdit} className="rounded-lg bg-surface-sunken px-3 py-1.5 text-xs font-semibold text-content hover:bg-gray-200">Batal</button>
                                                     </>
                                                 ) : (
                                                     <>

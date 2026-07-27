@@ -3,9 +3,9 @@ import { DeviceIcon, Pagination, formatDuration, formatWatchTime } from './Analy
 
 function SummaryPill({ label, value }) {
     return (
-        <div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 dark:border-gray-800 dark:bg-gray-950/60">
-            <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{label}</div>
-            <div className="mt-1 text-sm font-semibold text-gray-900 dark:text-white">{value}</div>
+        <div className="rounded-xl border border-edge bg-gray-50 px-3 py-2 dark:bg-gray-950/60">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-content-muted">{label}</div>
+            <div className="mt-1 text-sm font-semibold text-content">{value}</div>
         </div>
     );
 }
@@ -18,19 +18,19 @@ export function AnalyticsHistoryDrawer({ open, session, title, fields, onClose }
     return (
         <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-sm" onClick={onClose}>
             <div
-                className="h-full w-full max-w-lg overflow-y-auto bg-white p-6 shadow-2xl dark:bg-gray-900"
+                className="h-full w-full max-w-lg overflow-y-auto bg-surface p-6 shadow-2xl"
                 onClick={(event) => event.stopPropagation()}
             >
                 <div className="mb-6 flex items-start justify-between gap-4">
                     <div>
-                        <h3 className="text-xl font-bold text-gray-900 dark:text-white">{title}</h3>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                        <h3 className="text-xl font-bold text-content">{title}</h3>
+                        <p className="text-sm text-content-muted">
                             Detail sesi untuk analisis operasional dan audit ringan.
                         </p>
                     </div>
                     <button
                         onClick={onClose}
-                        className="rounded-xl bg-gray-100 px-3 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                        className="rounded-xl bg-surface-sunken px-3 py-2 text-sm font-medium text-content-muted transition-colors hover:bg-surface-sunken"
                     >
                         Tutup
                     </button>
@@ -38,9 +38,9 @@ export function AnalyticsHistoryDrawer({ open, session, title, fields, onClose }
 
                 <div className="space-y-3">
                     {fields.map((field) => (
-                        <div key={field.label} className="rounded-2xl border border-gray-200 p-4 dark:border-gray-800">
-                            <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{field.label}</div>
-                            <div className="mt-1 break-all text-sm text-gray-900 dark:text-white">
+                        <div key={field.label} className="rounded-2xl border border-edge p-4">
+                            <div className="text-xs font-semibold uppercase tracking-wide text-content-muted">{field.label}</div>
+                            <div className="mt-1 break-all text-sm text-content">
                                 {field.render ? field.render(session) : (session[field.key] ?? '-')}
                             </div>
                         </div>
@@ -69,27 +69,27 @@ export default function AnalyticsHistoryTable({
     emptyDescription,
 }) {
     return (
-        <section className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
+        <section className="rounded-2xl border border-edge bg-surface p-5">
             <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                 <div>
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{title}</h2>
-                    {description && <p className="text-sm text-gray-500 dark:text-gray-400">{description}</p>}
+                    <h2 className="text-lg font-semibold text-content">{title}</h2>
+                    {description && <p className="text-sm text-content-muted">{description}</p>}
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                     {onExport && (
                         <button
                             onClick={onExport}
-                            className="rounded-xl border border-gray-200 px-3 py-2 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+                            className="rounded-xl border border-edge px-3 py-2 text-xs font-medium text-content-muted transition-colors hover:bg-surface-sunken"
                         >
                             Export CSV
                         </button>
                     )}
-                    <label className="text-sm text-gray-600 dark:text-gray-300">
+                    <label className="text-sm text-content-muted">
                         <span className="sr-only">Ukuran halaman</span>
                         <select
                             value={pagination.pageSize}
                             onChange={(event) => onPageSizeChange(Number(event.target.value))}
-                            className="rounded-xl border border-gray-200 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950 dark:text-white"
+                            className="rounded-xl border border-edge bg-surface px-3 py-2 dark:text-white"
                         >
                             {[10, 25, 50, 100].map((size) => (
                                 <option key={size} value={size}>{size} / halaman</option>
@@ -121,13 +121,13 @@ export default function AnalyticsHistoryTable({
                     <div className="overflow-x-auto">
                         <table className="min-w-full text-sm">
                             <thead>
-                                <tr className="text-left text-gray-500 dark:text-gray-400">
+                                <tr className="text-left text-content-muted">
                                     {columns.map((column) => (
                                         <th key={column.key} className="pb-3 pr-4 font-semibold">{column.label}</th>
                                     ))}
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                            <tbody className="divide-y divide-edge">
                                 {items.map((item, index) => (
                                     <tr
                                         key={rowKey(item, index)}
@@ -135,7 +135,7 @@ export default function AnalyticsHistoryTable({
                                         onClick={() => onRowClick?.(item)}
                                     >
                                         {columns.map((column) => (
-                                            <td key={column.key} className="py-3 pr-4 align-top text-gray-600 dark:text-gray-300">
+                                            <td key={column.key} className="py-3 pr-4 align-top text-content-muted">
                                                 {renderCell(item, column)}
                                             </td>
                                         ))}
@@ -161,7 +161,7 @@ export function renderDeviceBadge(type) {
         ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300'
         : normalizedType === 'tablet'
             ? 'bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300'
-            : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300';
+            : 'bg-surface-sunken text-content-muted';
 
     return (
         <span className={`inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium ${tone}`}>
@@ -172,5 +172,5 @@ export function renderDeviceBadge(type) {
 }
 
 export function renderDurationText(seconds) {
-    return <span className="font-semibold text-gray-900 dark:text-white">{formatDuration(seconds || 0)}</span>;
+    return <span className="font-semibold text-content">{formatDuration(seconds || 0)}</span>;
 }

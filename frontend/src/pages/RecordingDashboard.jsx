@@ -101,12 +101,12 @@ export default function RecordingDashboard() {
 
     return (
         <div className="space-y-4 md:space-y-6">
-            <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700/70 dark:bg-gray-800/70 md:p-6">
+            <div className="rounded-2xl border border-gray-200 bg-surface p-5 shadow-sm dark:border-gray-700/70 md:p-6">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                     <div>
                         <p className="text-sm font-semibold text-primary">Recording Overview</p>
-                        <h1 className="mt-2 text-2xl font-bold text-gray-900 dark:text-white">Recording Dashboard</h1>
-                        <p className="mt-1 text-sm text-gray-700 dark:text-gray-200">
+                        <h1 className="mt-2 text-2xl font-bold text-content">Recording Dashboard</h1>
+                        <p className="mt-1 text-sm text-content">
                             Monitor recording aktif, kapasitas segmen, dan auto-restart kamera.
                         </p>
                     </div>
@@ -116,7 +116,7 @@ export default function RecordingDashboard() {
                         </span>
                         <button
                             onClick={() => fetchData({ mode: 'initial' })}
-                            className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800/90 dark:text-gray-100 dark:hover:bg-gray-700"
+                            className="inline-flex items-center gap-2 rounded-xl border border-edge bg-surface px-4 py-2.5 text-sm font-medium text-content shadow-sm transition-colors hover:bg-gray-50 dark:hover:bg-gray-700"
                         >
                             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />

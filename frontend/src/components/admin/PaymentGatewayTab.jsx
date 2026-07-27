@@ -12,8 +12,8 @@ import { useCallback, useEffect, useState } from 'react';
 import billingAdminService from '../../services/billingAdminService';
 import { useNotification } from '../../contexts/NotificationContext';
 
-const inputClass = 'w-full px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary';
-const cardClass = 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-4';
+const inputClass = 'w-full px-3 py-2 bg-surface-sunken border border-edge rounded-xl text-sm text-content focus:outline-none focus:ring-2 focus:ring-primary';
+const cardClass = 'bg-surface border border-edge rounded-2xl p-4';
 
 export default function PaymentGatewayTab() {
     const { success, error: showError } = useNotification();
@@ -155,15 +155,15 @@ export default function PaymentGatewayTab() {
     };
 
     if (loading) {
-        return <div className="py-16 text-center text-gray-500 dark:text-gray-400">Memuat pengaturan gateway…</div>;
+        return <div className="py-16 text-center text-content-muted">Memuat pengaturan gateway…</div>;
     }
 
     return (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
             <div className="space-y-4 lg:col-span-2">
                 <div className={cardClass}>
-                    <h3 className="font-semibold text-gray-900 dark:text-white">Gateway Aktif</h3>
-                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    <h3 className="font-semibold text-content">Gateway Aktif</h3>
+                    <p className="mt-1 text-xs text-content-muted">
                         Semua konfigurasi di sini, tidak perlu edit file .env di server.
                     </p>
                     <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
@@ -174,14 +174,14 @@ export default function PaymentGatewayTab() {
                                 onClick={() => setGateway(g)}
                                 className={`rounded-xl border px-3 py-2 text-sm font-medium capitalize transition-colors ${gateway === g
                                     ? 'border-primary bg-primary text-white'
-                                    : 'border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800'
+                                    : 'border-gray-300 text-content-muted hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800'
                                 }`}
                             >
                                 {g === 'manual' ? 'Manual (konfirmasi admin)' : g}
                             </button>
                         ))}
                     </div>
-                    <label className="mt-3 block text-xs text-gray-500 dark:text-gray-400">
+                    <label className="mt-3 block text-xs text-content-muted">
                         Base URL publik (untuk callback/webhook)
                         <input value={publicBaseUrl} onChange={(e) => setPublicBaseUrl(e.target.value)} placeholder="https://cctv.domain.com" className={`mt-1 ${inputClass}`} />
                     </label>
@@ -189,23 +189,23 @@ export default function PaymentGatewayTab() {
 
                 {gateway === 'ipaymu' && (
                     <div className={cardClass}>
-                        <h3 className="font-semibold text-gray-900 dark:text-white">Kredensial iPaymu</h3>
+                        <h3 className="font-semibold text-content">Kredensial iPaymu</h3>
                         <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                            <label className="block text-xs text-gray-500 dark:text-gray-400">
+                            <label className="block text-xs text-content-muted">
                                 VA / Kode Toko
                                 <input value={ipaymuVa} onChange={(e) => setIpaymuVa(e.target.value)} placeholder="0000001234567890" className={`mt-1 ${inputClass}`} />
                             </label>
-                            <label className="block text-xs text-gray-500 dark:text-gray-400">
+                            <label className="block text-xs text-content-muted">
                                 API Key {view?.ipaymu?.api_key_set && <span className="text-emerald-600 dark:text-emerald-400">(tersimpan {view.ipaymu.api_key_hint})</span>}
                                 <input type="password" value={ipaymuApiKey} onChange={(e) => setIpaymuApiKey(e.target.value)} placeholder={view?.ipaymu?.api_key_set ? 'Biarkan kosong = tidak diubah' : 'Masukkan API key'} className={`mt-1 ${inputClass}`} autoComplete="new-password" />
                             </label>
                         </div>
-                        <label className="mt-3 flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                        <label className="mt-3 flex items-center gap-2 text-sm text-content-muted">
                             <input type="checkbox" checked={ipaymuProduction} onChange={(e) => setIpaymuProduction(e.target.checked)} />
                             Mode Produksi (matikan untuk Sandbox/testing)
                         </label>
                         <div className="mt-3 flex items-center gap-3">
-                            <button type="button" onClick={handleTest} disabled={testing} className="rounded-xl border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800">
+                            <button type="button" onClick={handleTest} disabled={testing} className="rounded-xl border border-edge-strong px-3 py-1.5 text-sm text-content-muted hover:bg-surface-sunken disabled:opacity-50">
                                 {testing ? 'Mengecek…' : 'Cek Saldo iPaymu'}
                             </button>
                             {testResult && (
@@ -214,22 +214,22 @@ export default function PaymentGatewayTab() {
                                 </span>
                             )}
                         </div>
-                        <p className="mt-2 text-xs text-gray-400 dark:text-gray-500">Simpan dulu sebelum mengecek agar memakai kredensial terbaru.</p>
+                        <p className="mt-2 text-xs text-content-subtle">Simpan dulu sebelum mengecek agar memakai kredensial terbaru.</p>
                     </div>
                 )}
 
                 {gateway === 'ipaymu' && (
                     <div className={cardClass}>
-                        <h3 className="font-semibold text-gray-900 dark:text-white">Metode & Bank Pembayaran</h3>
-                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        <h3 className="font-semibold text-content">Metode & Bank Pembayaran</h3>
+                        <p className="mt-1 text-xs text-content-muted">
                             Aktifkan metode yang ingin ditawarkan ke pelanggan. Pastikan channel sudah aktif di akun iPaymu Anda.
                         </p>
                         <div className="mt-3 space-y-1">
                             {methods.map((m, idx) => (
-                                <div key={`${m.method}:${m.channel}`} className="flex items-center gap-2 rounded-lg border border-gray-100 px-2 py-1.5 dark:border-gray-800">
+                                <div key={`${m.method}:${m.channel}`} className="flex items-center gap-2 rounded-lg border border-edge px-2 py-1.5">
                                     <input type="checkbox" checked={m.enabled} onChange={() => toggleMethod(idx)} />
-                                    <span className="flex-1 text-sm text-gray-800 dark:text-gray-200">{m.label}</span>
-                                    <span className="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-[10px] text-gray-500 dark:bg-gray-800 dark:text-gray-400">{m.method}:{m.channel}</span>
+                                    <span className="flex-1 text-sm text-content">{m.label}</span>
+                                    <span className="rounded bg-surface-sunken px-1.5 py-0.5 font-mono text-[10px] text-content-muted">{m.method}:{m.channel}</span>
                                     <button type="button" onClick={() => removeMethod(idx)} className="text-xs text-red-500 hover:text-red-600">hapus</button>
                                 </div>
                             ))}
@@ -238,27 +238,27 @@ export default function PaymentGatewayTab() {
                             <input value={newMethod.method} onChange={(e) => setNewMethod({ ...newMethod, method: e.target.value })} placeholder="method (va)" className={inputClass} />
                             <input value={newMethod.channel} onChange={(e) => setNewMethod({ ...newMethod, channel: e.target.value })} placeholder="channel (bca)" className={inputClass} />
                             <input value={newMethod.label} onChange={(e) => setNewMethod({ ...newMethod, label: e.target.value })} placeholder="Label (VA BCA)" className={inputClass} />
-                            <button type="button" onClick={addMethod} className="rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800">+ Tambah</button>
+                            <button type="button" onClick={addMethod} className="rounded-xl border border-edge-strong px-3 py-2 text-sm text-content-muted hover:bg-surface-sunken">+ Tambah</button>
                         </div>
 
                         {/* Authoritative: pull the real method:channel codes from the iPaymu account so
                             QRIS/bank codes are never a guess. Save credentials first so this uses them. */}
-                        <div className="mt-4 border-t border-gray-100 pt-3 dark:border-gray-800">
+                        <div className="mt-4 border-t border-edge pt-3">
                             <div className="flex flex-wrap items-center gap-3">
-                                <button type="button" onClick={fetchChannels} disabled={fetchingChannels} className="rounded-xl border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800">
+                                <button type="button" onClick={fetchChannels} disabled={fetchingChannels} className="rounded-xl border border-edge-strong px-3 py-1.5 text-sm text-content-muted hover:bg-surface-sunken disabled:opacity-50">
                                     {fetchingChannels ? 'Mengambil…' : 'Ambil channel dari iPaymu'}
                                 </button>
-                                <span className="text-xs text-gray-400 dark:text-gray-500">Simpan kredensial dulu agar memakai akun yang benar.</span>
+                                <span className="text-xs text-content-subtle">Simpan kredensial dulu agar memakai akun yang benar.</span>
                             </div>
                             {liveChannels && liveChannels.length > 0 && (
                                 <div className="mt-3 space-y-1">
                                     {liveChannels.map((ch) => {
                                         const exists = methods.some((m) => m.method === ch.method && m.channel === ch.channel);
                                         return (
-                                            <div key={`${ch.method}:${ch.channel}`} className="flex items-center gap-2 rounded-lg bg-gray-50 px-2 py-1.5 dark:bg-gray-800/50">
-                                                <span className="flex-1 text-sm text-gray-800 dark:text-gray-200">{ch.label}</span>
-                                                <span className="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-[10px] text-gray-500 dark:bg-gray-800 dark:text-gray-400">{ch.method}:{ch.channel}</span>
-                                                <button type="button" onClick={() => addLiveChannel(ch)} disabled={exists} className="text-xs font-medium text-primary hover:underline disabled:text-gray-400 disabled:no-underline dark:disabled:text-gray-600">
+                                            <div key={`${ch.method}:${ch.channel}`} className="flex items-center gap-2 rounded-lg bg-surface-sunken px-2 py-1.5">
+                                                <span className="flex-1 text-sm text-content">{ch.label}</span>
+                                                <span className="rounded bg-surface-sunken px-1.5 py-0.5 font-mono text-[10px] text-content-muted">{ch.method}:{ch.channel}</span>
+                                                <button type="button" onClick={() => addLiveChannel(ch)} disabled={exists} className="text-xs font-medium text-primary hover:underline disabled:text-content-subtle disabled:no-underline">
                                                     {exists ? 'sudah ada' : '+ Tambah'}
                                                 </button>
                                             </div>
@@ -267,7 +267,7 @@ export default function PaymentGatewayTab() {
                                 </div>
                             )}
                             {liveChannels && liveChannels.length === 0 && (
-                                <p className="mt-2 text-xs text-gray-400 dark:text-gray-500">Tidak ada channel yang dikembalikan — cek kredensial &amp; mode, atau aktifkan channel di dashboard iPaymu.</p>
+                                <p className="mt-2 text-xs text-content-subtle">Tidak ada channel yang dikembalikan — cek kredensial &amp; mode, atau aktifkan channel di dashboard iPaymu.</p>
                             )}
                         </div>
                     </div>
@@ -275,12 +275,12 @@ export default function PaymentGatewayTab() {
 
                 {gateway === 'midtrans' && (
                     <div className={cardClass}>
-                        <h3 className="font-semibold text-gray-900 dark:text-white">Kredensial Midtrans</h3>
-                        <label className="mt-3 block text-xs text-gray-500 dark:text-gray-400">
+                        <h3 className="font-semibold text-content">Kredensial Midtrans</h3>
+                        <label className="mt-3 block text-xs text-content-muted">
                             Server Key {view?.midtrans?.server_key_set && <span className="text-emerald-600 dark:text-emerald-400">(tersimpan {view.midtrans.server_key_hint})</span>}
                             <input type="password" value={midtransKey} onChange={(e) => setMidtransKey(e.target.value)} placeholder={view?.midtrans?.server_key_set ? 'Biarkan kosong = tidak diubah' : 'Masukkan server key'} className={`mt-1 ${inputClass}`} autoComplete="new-password" />
                         </label>
-                        <label className="mt-3 flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                        <label className="mt-3 flex items-center gap-2 text-sm text-content-muted">
                             <input type="checkbox" checked={midtransProduction} onChange={(e) => setMidtransProduction(e.target.checked)} />
                             Mode Produksi
                         </label>
@@ -288,7 +288,7 @@ export default function PaymentGatewayTab() {
                 )}
 
                 {gateway === 'manual' && (
-                    <div className={`${cardClass} text-sm text-gray-600 dark:text-gray-300`}>
+                    <div className={`${cardClass} text-sm text-content-muted`}>
                         Mode <b>Manual</b>: pelanggan membuat permintaan top-up, lalu Anda konfirmasi pembayaran di tab Pembayaran. Tidak perlu kredensial gateway.
                     </div>
                 )}
@@ -298,8 +298,8 @@ export default function PaymentGatewayTab() {
                 </button>
             </div>
 
-            <div className={`${cardClass} h-fit text-sm text-gray-600 dark:text-gray-300`}>
-                <h3 className="font-semibold text-gray-900 dark:text-white">Panduan singkat</h3>
+            <div className={`${cardClass} h-fit text-sm text-content-muted`}>
+                <h3 className="font-semibold text-content">Panduan singkat</h3>
                 <ul className="mt-2 space-y-2 text-xs">
                     <li>• <b>Manual</b>: tanpa gateway, konfirmasi pembayaran manual.</li>
                     <li>• <b>iPaymu</b>: isi VA/kode toko + API key dari dashboard iPaymu, pilih Sandbox dulu untuk uji coba, lalu aktifkan metode/bank yang diinginkan.</li>

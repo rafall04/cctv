@@ -164,7 +164,7 @@ function mapSettingsResponse(data = {}) {
 
 function CheckboxField({ id, name, checked, onChange, label }) {
     return (
-        <label className="flex items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-900/60 dark:text-gray-300">
+        <label className="flex items-center gap-3 rounded-xl border border-edge bg-gray-50 px-4 py-3 text-sm text-content-muted dark:bg-gray-900/60">
             <input
                 id={id}
                 name={name}
@@ -180,10 +180,10 @@ function CheckboxField({ id, name, checked, onChange, label }) {
 
 function SectionCard({ title, description, children }) {
     return (
-        <section className="rounded-2xl border border-gray-200 bg-gray-50/80 p-5 dark:border-gray-700 dark:bg-gray-900/40">
+        <section className="rounded-2xl border border-edge bg-surface-sunken p-5">
             <div className="mb-5">
-                <h4 className="text-base font-semibold text-gray-900 dark:text-white">{title}</h4>
-                <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">{description}</p>
+                <h4 className="text-base font-semibold text-content">{title}</h4>
+                <p className="mt-1 text-sm text-content-muted">{description}</p>
             </div>
             <div className="space-y-5">{children}</div>
         </section>
@@ -200,7 +200,7 @@ function ScriptField({ id, name, value, onChange }) {
             rows={5}
             spellCheck={false}
             placeholder="<script src=&quot;https://...&quot;></script>"
-            className="w-full resize-y rounded-xl border border-gray-300 bg-white px-4 py-3 font-mono text-xs text-gray-900 outline-none transition-all focus:border-transparent focus:ring-2 focus:ring-sky-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+            className="w-full resize-y rounded-xl border border-edge-strong bg-surface px-4 py-3 font-mono text-xs text-content outline-none transition-all focus:border-transparent focus:ring-2 focus:ring-sky-500"
         />
     );
 }
@@ -208,7 +208,7 @@ function ScriptField({ id, name, value, onChange }) {
 function SelectField({ id, name, value, onChange, options, label }) {
     return (
         <div>
-            <label htmlFor={id} className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label htmlFor={id} className="mb-2 block text-sm font-medium text-content-muted">
                 {label}
             </label>
             <select
@@ -216,7 +216,7 @@ function SelectField({ id, name, value, onChange, options, label }) {
                 name={name}
                 value={value}
                 onChange={onChange}
-                className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-gray-900 outline-none transition-all focus:border-transparent focus:ring-2 focus:ring-sky-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                className="w-full rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-content outline-none transition-all focus:border-transparent focus:ring-2 focus:ring-sky-500"
             >
                 {options.map((option) => (
                     <option key={option.value} value={option.value}>
@@ -231,7 +231,7 @@ function SelectField({ id, name, value, onChange, options, label }) {
 function NumberField({ id, name, value, onChange, label, min = 1 }) {
     return (
         <div>
-            <label htmlFor={id} className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label htmlFor={id} className="mb-2 block text-sm font-medium text-content-muted">
                 {label}
             </label>
             <input
@@ -241,7 +241,7 @@ function NumberField({ id, name, value, onChange, label, min = 1 }) {
                 min={min}
                 value={value}
                 onChange={onChange}
-                className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-gray-900 outline-none transition-all focus:border-transparent focus:ring-2 focus:ring-sky-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                className="w-full rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-content outline-none transition-all focus:border-transparent focus:ring-2 focus:ring-sky-500"
             />
         </div>
     );
@@ -318,10 +318,10 @@ export default function AdsSettingsPanel() {
     }
 
     return (
-        <div className="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
-            <div className="border-b border-gray-200 p-6 dark:border-gray-700">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Ads Settings</h3>
-                <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+        <div className="rounded-xl border border-edge bg-surface shadow-sm">
+            <div className="border-b border-edge p-6">
+                <h3 className="text-lg font-semibold text-content">Ads Settings</h3>
+                <p className="mt-1 text-sm text-content-muted">
                     Kelola script iklan pihak ketiga per placement. Hanya admin tepercaya yang boleh mengubah field ini.
                 </p>
             </div>
@@ -357,7 +357,7 @@ export default function AdsSettingsPanel() {
                     </div>
 
                     <div>
-                        <label htmlFor="ads_provider" className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        <label htmlFor="ads_provider" className="mb-2 block text-sm font-medium text-content-muted">
                             Provider
                         </label>
                         <input
@@ -366,7 +366,7 @@ export default function AdsSettingsPanel() {
                             type="text"
                             value={settings.ads_provider}
                             onChange={handleChange}
-                            className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-gray-900 outline-none transition-all focus:border-transparent focus:ring-2 focus:ring-sky-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                            className="w-full rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-content outline-none transition-all focus:border-transparent focus:ring-2 focus:ring-sky-500"
                         />
                     </div>
                 </SectionCard>
@@ -461,7 +461,7 @@ export default function AdsSettingsPanel() {
                         />
                     </div>
                     <div>
-                        <label htmlFor="ads_playback_native_script" className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        <label htmlFor="ads_playback_native_script" className="mb-2 block text-sm font-medium text-content-muted">
                             Script Native Playback
                         </label>
                         <ScriptField
@@ -503,7 +503,7 @@ export default function AdsSettingsPanel() {
                     </div>
 
                     <div>
-                        <label htmlFor="ads_playback_popunder_script" className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        <label htmlFor="ads_playback_popunder_script" className="mb-2 block text-sm font-medium text-content-muted">
                             Script
                         </label>
                         <ScriptField
@@ -530,7 +530,7 @@ export default function AdsSettingsPanel() {
                         />
 
                         <div>
-                            <label htmlFor={slot.scriptKey} className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                            <label htmlFor={slot.scriptKey} className="mb-2 block text-sm font-medium text-content-muted">
                                 Script
                             </label>
                             <ScriptField
@@ -543,7 +543,7 @@ export default function AdsSettingsPanel() {
                     </SectionCard>
                 ))}
 
-                <div className="rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 p-4 text-sm text-gray-700 dark:border-amber-500/20 dark:from-amber-500/10 dark:to-orange-500/10 dark:text-gray-300">
+                <div className="rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 p-4 text-sm text-content-muted dark:border-amber-500/20 dark:from-amber-500/10 dark:to-orange-500/10">
                     Script pihak ketiga akan dijalankan langsung di browser pengunjung. Pastikan hanya domain dan script monetisasi yang sudah Anda percaya yang dimasukkan di sini.
                 </div>
 
@@ -552,7 +552,7 @@ export default function AdsSettingsPanel() {
                         type="button"
                         onClick={fetchSettings}
                         disabled={saving}
-                        className="rounded-xl bg-gray-100 px-4 py-2.5 text-gray-700 transition-colors hover:bg-gray-200 dark:bg-gray-700/50 dark:text-gray-300 dark:hover:bg-gray-700"
+                        className="rounded-xl bg-surface-sunken px-4 py-2.5 text-content-muted transition-colors hover:bg-surface-sunken"
                     >
                         Reset Form
                     </button>

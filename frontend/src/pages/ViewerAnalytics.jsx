@@ -47,8 +47,8 @@ const SORT_OPTIONS = [
 
 function TopMetricCard({ title, children }) {
     return (
-        <section className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{title}</h2>
+        <section className="rounded-2xl border border-edge bg-surface p-5">
+            <h2 className="text-lg font-semibold text-content">{title}</h2>
             <div className="mt-4">{children}</div>
         </section>
     );
@@ -57,7 +57,7 @@ function TopMetricCard({ title, children }) {
 function renderLiveHistoryCell(session, column, formatDateTime) {
     switch (column.key) {
         case 'camera_name':
-            return <span className="font-semibold text-gray-900 dark:text-white">{session.camera_name}</span>;
+            return <span className="font-semibold text-content">{session.camera_name}</span>;
         case 'ip_address':
             return <span className="font-mono text-xs">{session.ip_address}</span>;
         case 'device_type':
@@ -226,8 +226,8 @@ export default function ViewerAnalytics() {
                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                     </svg>
                 </div>
-                <h2 className="mb-2 text-xl font-semibold text-gray-900 dark:text-white">Gagal Memuat Analytics</h2>
-                <p className="mb-6 text-gray-500 dark:text-gray-400">{error}</p>
+                <h2 className="mb-2 text-xl font-semibold text-content">Gagal Memuat Analytics</h2>
+                <p className="mb-6 text-content-muted">{error}</p>
                 <button onClick={retry} className="rounded-lg bg-primary px-4 py-2 font-medium text-white transition-colors hover:bg-primary-600">
                     Coba Lagi
                 </button>
@@ -276,9 +276,9 @@ export default function ViewerAnalytics() {
                 description="Workspace analytics live untuk overview, realtime, history, top, dan audience."
                 lastUpdate={lastUpdate}
                 filters={(
-                    <div className="grid gap-3 rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900 lg:grid-cols-[minmax(0,1fr)_260px]">
+                    <div className="grid gap-3 rounded-2xl border border-edge bg-surface p-4 lg:grid-cols-[minmax(0,1fr)_260px]">
                         <div>
-                            <div className="mb-1 text-sm font-medium text-gray-700 dark:text-gray-200">Periode</div>
+                            <div className="mb-1 text-sm font-medium text-content">Periode</div>
                             <PeriodSelector
                                 value={period}
                                 onChange={selectPeriod}
@@ -287,8 +287,8 @@ export default function ViewerAnalytics() {
                             />
                         </div>
                         <label className="space-y-1 text-sm">
-                            <span className="font-medium text-gray-700 dark:text-gray-200">Kamera</span>
-                            <select value={selectedCamera} onChange={(event) => selectCamera(event.target.value)} className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950 dark:text-white">
+                            <span className="font-medium text-content">Kamera</span>
+                            <select value={selectedCamera} onChange={(event) => selectCamera(event.target.value)} className="w-full rounded-xl border border-edge bg-surface px-3 py-2 dark:text-white">
                                 <option value="">Semua Kamera</option>
                                 {cameraOptions.map((camera) => (
                                     <option key={camera.id} value={camera.id}>{camera.name}</option>
@@ -319,7 +319,7 @@ export default function ViewerAnalytics() {
                         <TopMetricCard title="Preview Sesi Terbaru">
                             <div className="space-y-3">
                                 {analyticsPreviewSessions.length === 0 && (
-                                    <div className="rounded-xl border border-dashed border-gray-200 px-4 py-6 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
+                                    <div className="rounded-xl border border-dashed border-edge px-4 py-6 text-sm text-content-muted">
                                         Belum ada preview sesi.
                                     </div>
                                 )}
@@ -327,14 +327,14 @@ export default function ViewerAnalytics() {
                                     <button
                                         key={session.id}
                                         onClick={() => setSelectedHistorySession(session)}
-                                        className="w-full rounded-xl border border-gray-200 p-3 text-left transition-colors hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800/50"
+                                        className="w-full rounded-xl border border-edge p-3 text-left transition-colors hover:bg-surface-sunken"
                                     >
                                         <div className="flex items-center justify-between gap-3">
-                                            <div className="font-semibold text-gray-900 dark:text-white">{session.camera_name}</div>
+                                            <div className="font-semibold text-content">{session.camera_name}</div>
                                             {renderDeviceBadge(session.device_type)}
                                         </div>
-                                        <div className="mt-1 font-mono text-xs text-gray-500 dark:text-gray-400">{session.ip_address}</div>
-                                        <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                                        <div className="mt-1 font-mono text-xs text-content-muted">{session.ip_address}</div>
+                                        <div className="mt-2 text-xs text-content-muted">
                                             {formatDateTime(session.started_at, { storage: TIMESTAMP_STORAGE.LOCAL_SQL })} • {formatWatchTime(session.duration_seconds)}
                                         </div>
                                     </button>
@@ -347,11 +347,11 @@ export default function ViewerAnalytics() {
 
             {activeTab === 'active' && (
                 <div className="space-y-6">
-                    <section className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
+                    <section className="rounded-2xl border border-edge bg-surface p-6">
                         <div className="mb-4 flex items-center justify-between">
                             <div>
-                                <h2 className="text-lg font-bold text-gray-900 dark:text-white">Viewer Aktif</h2>
-                                <p className="text-xs text-gray-500 dark:text-gray-400">{activeSessions.length} orang sedang menonton</p>
+                                <h2 className="text-lg font-bold text-content">Viewer Aktif</h2>
+                                <p className="text-xs text-content-muted">{activeSessions.length} orang sedang menonton</p>
                             </div>
                             <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-100 px-3 py-1.5 text-sm font-medium text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400">
                                 <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -359,7 +359,7 @@ export default function ViewerAnalytics() {
                             </span>
                         </div>
                         {activeSessions.length === 0 ? (
-                            <div className="rounded-xl border border-dashed border-gray-200 px-4 py-6 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
+                            <div className="rounded-xl border border-dashed border-edge px-4 py-6 text-sm text-content-muted">
                                 Tidak ada viewer aktif untuk filter ini.
                             </div>
                         ) : (
@@ -376,14 +376,14 @@ export default function ViewerAnalytics() {
                             <div className="space-y-3">
                                 {Object.entries(activeByCamera).map(([cameraName, count]) => (
                                     <div key={cameraName} className="flex items-center justify-between rounded-xl bg-gray-50 px-4 py-3 dark:bg-gray-950/60">
-                                        <span className="font-medium text-gray-900 dark:text-white">{cameraName}</span>
+                                        <span className="font-medium text-content">{cameraName}</span>
                                         <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary dark:bg-primary/20 dark:text-primary-300">
                                             {count} aktif
                                         </span>
                                     </div>
                                 ))}
                                 {Object.keys(activeByCamera).length === 0 && (
-                                    <div className="text-sm text-gray-500 dark:text-gray-400">Belum ada distribusi aktif.</div>
+                                    <div className="text-sm text-content-muted">Belum ada distribusi aktif.</div>
                                 )}
                             </div>
                         </TopMetricCard>
@@ -393,11 +393,11 @@ export default function ViewerAnalytics() {
                                 {deviceBreakdown.map((item) => (
                                     <div key={item.device_type} className="flex items-center justify-between rounded-xl bg-gray-50 px-4 py-3 dark:bg-gray-950/60">
                                         <div>{renderDeviceBadge(item.device_type)}</div>
-                                        <span className="text-sm font-semibold text-gray-900 dark:text-white">{item.count}</span>
+                                        <span className="text-sm font-semibold text-content">{item.count}</span>
                                     </div>
                                 ))}
                                 {deviceBreakdown.length === 0 && (
-                                    <div className="text-sm text-gray-500 dark:text-gray-400">Belum ada distribusi perangkat.</div>
+                                    <div className="text-sm text-content-muted">Belum ada distribusi perangkat.</div>
                                 )}
                             </div>
                         </TopMetricCard>
@@ -435,8 +435,8 @@ export default function ViewerAnalytics() {
                         filters={(
                             <div className="grid gap-3 lg:grid-cols-4">
                                 <label className="space-y-1 text-sm">
-                                    <span className="font-medium text-gray-700 dark:text-gray-200">Kamera</span>
-                                    <select value={selectedCamera} onChange={(event) => selectCamera(event.target.value)} className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950 dark:text-white">
+                                    <span className="font-medium text-content">Kamera</span>
+                                    <select value={selectedCamera} onChange={(event) => selectCamera(event.target.value)} className="w-full rounded-xl border border-edge bg-surface px-3 py-2 dark:text-white">
                                         <option value="">Semua Kamera</option>
                                         {cameraOptions.map((camera) => (
                                             <option key={camera.id} value={camera.id}>{camera.name}</option>
@@ -444,8 +444,8 @@ export default function ViewerAnalytics() {
                                     </select>
                                 </label>
                                 <label className="space-y-1 text-sm">
-                                    <span className="font-medium text-gray-700 dark:text-gray-200">Perangkat</span>
-                                    <select value={historyDeviceType} onChange={(event) => setHistoryDeviceType(event.target.value)} className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950 dark:text-white">
+                                    <span className="font-medium text-content">Perangkat</span>
+                                    <select value={historyDeviceType} onChange={(event) => setHistoryDeviceType(event.target.value)} className="w-full rounded-xl border border-edge bg-surface px-3 py-2 dark:text-white">
                                         <option value="">Semua Perangkat</option>
                                         <option value="desktop">Desktop</option>
                                         <option value="mobile">Mobile</option>
@@ -454,20 +454,20 @@ export default function ViewerAnalytics() {
                                     </select>
                                 </label>
                                 <label className="space-y-1 text-sm">
-                                    <span className="font-medium text-gray-700 dark:text-gray-200">Urutkan</span>
-                                    <select value={historySort} onChange={(event) => setHistorySort(event.target.value)} className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950 dark:text-white">
+                                    <span className="font-medium text-content">Urutkan</span>
+                                    <select value={historySort} onChange={(event) => setHistorySort(event.target.value)} className="w-full rounded-xl border border-edge bg-surface px-3 py-2 dark:text-white">
                                         {SORT_OPTIONS.map((option) => (
                                             <option key={option.value} value={option.value}>{option.label}</option>
                                         ))}
                                     </select>
                                 </label>
                                 <label className="space-y-1 text-sm">
-                                    <span className="font-medium text-gray-700 dark:text-gray-200">Cari</span>
+                                    <span className="font-medium text-content">Cari</span>
                                     <input
                                         value={historySearch}
                                         onChange={(event) => setHistorySearch(event.target.value)}
                                         placeholder="IP, kamera, perangkat"
-                                        className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950 dark:text-white"
+                                        className="w-full rounded-xl border border-edge bg-surface px-3 py-2 dark:text-white"
                                     />
                                 </label>
                             </div>
@@ -482,8 +482,8 @@ export default function ViewerAnalytics() {
                         <div className="space-y-3">
                             {topCameras.map((camera) => (
                                 <div key={camera.camera_id} className="rounded-xl bg-gray-50 px-4 py-3 dark:bg-gray-950/60">
-                                    <div className="font-semibold text-gray-900 dark:text-white">{camera.camera_name}</div>
-                                    <div className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                                    <div className="font-semibold text-content">{camera.camera_name}</div>
+                                    <div className="mt-1 text-sm text-content-muted">
                                         {camera.total_views} sesi • {camera.unique_viewers} unique • {formatWatchTime(camera.total_watch_time)}
                                     </div>
                                 </div>
@@ -495,8 +495,8 @@ export default function ViewerAnalytics() {
                         <div className="space-y-3">
                             {topVisitors.map((visitor) => (
                                 <div key={visitor.ip_address} className="rounded-xl bg-gray-50 px-4 py-3 dark:bg-gray-950/60">
-                                    <div className="font-mono text-sm font-semibold text-gray-900 dark:text-white">{visitor.ip_address}</div>
-                                    <div className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                                    <div className="font-mono text-sm font-semibold text-content">{visitor.ip_address}</div>
+                                    <div className="mt-1 text-sm text-content-muted">
                                         {visitor.total_sessions} sesi • {visitor.cameras_watched} kamera • {formatWatchTime(visitor.total_watch_time)}
                                     </div>
                                 </div>
@@ -508,8 +508,8 @@ export default function ViewerAnalytics() {
                         <div className="space-y-3">
                             {peakHours.map((hour) => (
                                 <div key={hour.hour} className="rounded-xl bg-gray-50 px-4 py-3 dark:bg-gray-950/60">
-                                    <div className="font-semibold text-gray-900 dark:text-white">{hour.hour}:00</div>
-                                    <div className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                                    <div className="font-semibold text-content">{hour.hour}:00</div>
+                                    <div className="mt-1 text-sm text-content-muted">
                                         {hour.sessions} sesi • {hour.unique_visitors} unique
                                     </div>
                                 </div>

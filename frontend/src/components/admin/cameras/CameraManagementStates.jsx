@@ -5,7 +5,7 @@ export function CameraManagementLoadingState() {
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {Array.from({ length: 6 }).map((_, index) => (
-                <div key={index} className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl overflow-hidden">
+                <div key={index} className="bg-surface border border-edge rounded-2xl overflow-hidden">
                     <Skeleton className="aspect-video w-full" />
                     <div className="p-5 space-y-4">
                         <div className="flex items-center justify-between">
@@ -18,7 +18,7 @@ export function CameraManagementLoadingState() {
                                 <Skeleton className="h-8 w-8 rounded-lg" />
                             </div>
                         </div>
-                        <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700/50">
+                        <div className="flex items-center justify-between pt-4 border-t border-edge">
                             <Skeleton className="h-3 w-12" />
                             <Skeleton className="h-5 w-10 rounded-full" />
                         </div>
@@ -31,14 +31,14 @@ export function CameraManagementLoadingState() {
 
 export function CameraManagementErrorState({ error, onRetry }) {
     return (
-        <div className="text-center py-20 bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl">
+        <div className="text-center py-20 bg-surface border border-edge rounded-2xl">
             <div className="w-16 h-16 bg-red-100 dark:bg-red-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4 text-red-500">
                 <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Failed to Load Cameras</h3>
-            <p className="text-gray-500 dark:text-gray-400 mb-6">{error}</p>
+            <h3 className="text-lg font-semibold text-content mb-2">Failed to Load Cameras</h3>
+            <p className="text-content-muted mb-6">{error}</p>
             <button
                 onClick={onRetry}
                 className="px-6 py-2.5 bg-gradient-to-r from-primary to-primary-600 hover:from-primary-600 hover:to-blue-700 text-white font-semibold rounded-xl shadow-lg shadow-primary/25 transition-all"
@@ -51,7 +51,7 @@ export function CameraManagementErrorState({ error, onRetry }) {
 
 export function CameraManagementEmptyState({ onAddCamera }) {
     return (
-        <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl">
+        <div className="bg-surface border border-edge rounded-2xl">
             <NoCamerasEmptyState onAddCamera={onAddCamera} />
         </div>
     );
@@ -64,14 +64,14 @@ export function CameraManagementEmptyState({ onAddCamera }) {
  */
 export function CameraManagementNoMatchState({ onResetFilters }) {
     return (
-        <div className="text-center py-20 bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl">
-            <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700/50 rounded-2xl flex items-center justify-center mx-auto mb-4 text-gray-400 dark:text-gray-500">
+        <div className="text-center py-20 bg-surface border border-edge rounded-2xl">
+            <div className="w-16 h-16 bg-surface-sunken rounded-2xl flex items-center justify-center mx-auto mb-4 text-content-subtle">
                 <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
                 </svg>
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Tidak Ada Kamera yang Cocok</h3>
-            <p className="text-gray-500 dark:text-gray-400 mb-6">Tidak ada kamera yang sesuai dengan filter aktif.</p>
+            <h3 className="text-lg font-semibold text-content mb-2">Tidak Ada Kamera yang Cocok</h3>
+            <p className="text-content-muted mb-6">Tidak ada kamera yang sesuai dengan filter aktif.</p>
             <button
                 onClick={onResetFilters}
                 className="px-6 py-2.5 bg-gradient-to-r from-primary to-primary-600 hover:from-primary-600 hover:to-blue-700 text-white font-semibold rounded-xl shadow-lg shadow-primary/25 transition-all"

@@ -26,7 +26,7 @@ function renderTarget(label, value) {
 
     return (
         <div>
-            <span className="font-medium text-gray-500 dark:text-gray-400">{label}:</span>{' '}
+            <span className="font-medium text-content-muted">{label}:</span>{' '}
             <span className="break-all">{value}</span>
         </div>
     );
@@ -34,7 +34,7 @@ function renderTarget(label, value) {
 
 function SummaryCard({ label, value, tone = 'default' }) {
     const toneClassName = {
-        default: 'border-gray-200 bg-white dark:border-gray-700/60 dark:bg-gray-900/40',
+        default: 'border-edge bg-white dark:bg-gray-900/40',
         success: 'border-emerald-200 bg-emerald-50 dark:border-emerald-500/20 dark:bg-emerald-500/10',
         warning: 'border-amber-200 bg-amber-50 dark:border-amber-500/20 dark:bg-amber-500/10',
         danger: 'border-red-200 bg-red-50 dark:border-red-500/20 dark:bg-red-500/10',
@@ -43,8 +43,8 @@ function SummaryCard({ label, value, tone = 'default' }) {
 
     return (
         <div className={`rounded-2xl border p-4 shadow-sm ${toneClassName[tone] || toneClassName.default}`}>
-            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{label}</p>
-            <p className="mt-2 text-2xl font-bold text-gray-900 dark:text-white">{value}</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-content-muted">{label}</p>
+            <p className="mt-2 text-2xl font-bold text-content">{value}</p>
         </div>
     );
 }
@@ -88,27 +88,27 @@ export default function CameraHealthDebugPanel({
                 <SummaryCard label="Unresolved" value={summary?.unresolved ?? 0} tone="info" />
             </div>
 
-            <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700/50 dark:bg-gray-800/50">
+            <div className="rounded-2xl border border-edge bg-surface p-5 shadow-sm">
                 <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
                     <div className="space-y-1">
                         <p className="text-sm font-semibold text-primary">Backend Health Pipeline</p>
-                        <h2 className="text-lg font-bold text-gray-900 dark:text-white">Problem-focused diagnostics</h2>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                        <h2 className="text-lg font-bold text-content">Problem-focused diagnostics</h2>
+                        <p className="text-sm text-content-muted">
                             Internal state, public availability, probe target, runtime evidence, dan domain backoff.
                         </p>
                     </div>
-                    <div className="text-xs text-gray-400 dark:text-gray-500">
+                    <div className="text-xs text-content-subtle">
                         Last updated: {lastUpdated ? formatTimestamp(lastUpdated) : '-'}
                     </div>
                 </div>
 
                 <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-8">
                     <label className="space-y-1 text-sm">
-                        <span className="font-medium text-gray-700 dark:text-gray-200">State</span>
+                        <span className="font-medium text-content">State</span>
                         <select
                             value={query.state}
                             onChange={(event) => onFilterChange('state', event.target.value)}
-                            className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-primary focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                            className="w-full rounded-xl border border-edge bg-surface px-3 py-2 text-sm text-content shadow-sm focus:border-primary focus:outline-none"
                         >
                             <option value="problem">Problem only</option>
                             <option value="all">All states</option>
@@ -121,31 +121,31 @@ export default function CameraHealthDebugPanel({
                     </label>
 
                     <label className="space-y-1 text-sm">
-                        <span className="font-medium text-gray-700 dark:text-gray-200">Delivery Type</span>
+                        <span className="font-medium text-content">Delivery Type</span>
                         <input
                             value={query.deliveryType}
                             onChange={(event) => onFilterChange('deliveryType', event.target.value)}
                             placeholder="external_mjpeg"
-                            className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-primary focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                            className="w-full rounded-xl border border-edge bg-surface px-3 py-2 text-sm text-content shadow-sm focus:border-primary focus:outline-none"
                         />
                     </label>
 
                     <label className="space-y-1 text-sm">
-                        <span className="font-medium text-gray-700 dark:text-gray-200">Error Class</span>
+                        <span className="font-medium text-content">Error Class</span>
                         <input
                             value={query.errorClass}
                             onChange={(event) => onFilterChange('errorClass', event.target.value)}
                             placeholder="tls"
-                            className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-primary focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                            className="w-full rounded-xl border border-edge bg-surface px-3 py-2 text-sm text-content shadow-sm focus:border-primary focus:outline-none"
                         />
                     </label>
 
                     <label className="space-y-1 text-sm">
-                        <span className="font-medium text-gray-700 dark:text-gray-200">Policy Mode</span>
+                        <span className="font-medium text-content">Policy Mode</span>
                         <select
                             value={query.policyMode}
                             onChange={(event) => onFilterChange('policyMode', event.target.value)}
-                            className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-primary focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                            className="w-full rounded-xl border border-edge bg-surface px-3 py-2 text-sm text-content shadow-sm focus:border-primary focus:outline-none"
                         >
                             <option value="">Semua</option>
                             <option value="on_demand">On-Demand</option>
@@ -154,31 +154,31 @@ export default function CameraHealthDebugPanel({
                     </label>
 
                     <label className="space-y-1 text-sm">
-                        <span className="font-medium text-gray-700 dark:text-gray-200">Search</span>
+                        <span className="font-medium text-content">Search</span>
                         <input
                             value={query.search}
                             onChange={(event) => onFilterChange('search', event.target.value)}
                             placeholder="camera, area, provider"
-                            className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-primary focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                            className="w-full rounded-xl border border-edge bg-surface px-3 py-2 text-sm text-content shadow-sm focus:border-primary focus:outline-none"
                         />
                     </label>
 
                     <label className="space-y-1 text-sm">
-                        <span className="font-medium text-gray-700 dark:text-gray-200">Source Profile</span>
+                        <span className="font-medium text-content">Source Profile</span>
                         <input
                             value={query.sourceProfile}
                             onChange={(event) => onFilterChange('sourceProfile', event.target.value)}
                             placeholder="surabaya_private_rtsp"
-                            className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-primary focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                            className="w-full rounded-xl border border-edge bg-surface px-3 py-2 text-sm text-content shadow-sm focus:border-primary focus:outline-none"
                         />
                     </label>
 
                     <label className="space-y-1 text-sm">
-                        <span className="font-medium text-gray-700 dark:text-gray-200">Active Tanpa Viewer</span>
+                        <span className="font-medium text-content">Active Tanpa Viewer</span>
                         <select
                             value={query.activeWithoutViewer}
                             onChange={(event) => onFilterChange('activeWithoutViewer', event.target.value)}
-                            className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-primary focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                            className="w-full rounded-xl border border-edge bg-surface px-3 py-2 text-sm text-content shadow-sm focus:border-primary focus:outline-none"
                         >
                             <option value="">Semua</option>
                             <option value="yes">Ya</option>
@@ -187,11 +187,11 @@ export default function CameraHealthDebugPanel({
                     </label>
 
                     <label className="space-y-1 text-sm">
-                        <span className="font-medium text-gray-700 dark:text-gray-200">Sort</span>
+                        <span className="font-medium text-content">Sort</span>
                         <select
                             value={query.sort}
                             onChange={(event) => onFilterChange('sort', event.target.value)}
-                            className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-primary focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                            className="w-full rounded-xl border border-edge bg-surface px-3 py-2 text-sm text-content shadow-sm focus:border-primary focus:outline-none"
                         >
                             <option value="severity">Severity</option>
                             <option value="confidence">Confidence</option>
@@ -201,7 +201,7 @@ export default function CameraHealthDebugPanel({
                 </div>
 
                 {loading ? (
-                    <div className="mt-6 rounded-2xl border border-gray-200 bg-gray-50 p-5 text-sm text-gray-500 dark:border-gray-700/50 dark:bg-gray-900/40 dark:text-gray-400">
+                    <div className="mt-6 rounded-2xl border border-edge bg-surface-sunken p-5 text-sm text-content-muted">
                         Loading health diagnostics...
                     </div>
                 ) : error ? (
@@ -209,7 +209,7 @@ export default function CameraHealthDebugPanel({
                         Health diagnostics unavailable: {error}
                     </div>
                 ) : !hasItems ? (
-                    <div className="mt-6 rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-6 text-sm text-gray-500 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-400">
+                    <div className="mt-6 rounded-2xl border border-dashed border-edge-strong bg-surface-sunken p-6 text-sm text-content-muted">
                         Tidak ada kamera yang cocok dengan filter saat ini.
                     </div>
                 ) : (
@@ -217,7 +217,7 @@ export default function CameraHealthDebugPanel({
                         <div className="mt-6 overflow-x-auto">
                             <table className="min-w-full text-sm">
                                 <thead>
-                                    <tr className="border-b border-gray-200 text-left text-xs uppercase tracking-wide text-gray-500 dark:border-gray-700/60 dark:text-gray-400">
+                                    <tr className="border-b border-edge text-left text-xs uppercase tracking-wide text-content-muted">
                                         <th className="px-3 py-2">Camera</th>
                                         <th className="px-3 py-2">Internal State</th>
                                         <th className="px-3 py-2">Public State</th>
@@ -230,10 +230,10 @@ export default function CameraHealthDebugPanel({
                                 </thead>
                                 <tbody>
                                     {items.map((item) => (
-                                        <tr key={item.cameraId} className="border-b border-gray-100 align-top text-gray-700 dark:border-gray-700/40 dark:text-gray-200">
+                                        <tr key={item.cameraId} className="border-b border-gray-100 align-top text-content dark:border-gray-700/40">
                                             <td className="px-3 py-3">
                                                 <div className="font-medium">{item.cameraName}</div>
-                                                <div className="text-xs text-gray-400 dark:text-gray-500">
+                                                <div className="text-xs text-content-subtle">
                                                     ID {item.cameraId}{item.areaName ? ` • ${item.areaName}` : ''}
                                                 </div>
                                             </td>
@@ -248,11 +248,11 @@ export default function CameraHealthDebugPanel({
                                                                     ? 'unresolved'
                                                                     : 'offline'
                                                     } />
-                                                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                                                    <div className="text-xs text-content-muted">
                                                         confidence {Number(item.confidence || 0).toFixed(2)}
                                                     </div>
                                                     {item.errorClass ? (
-                                                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                                                        <div className="text-xs text-content-muted">
                                                             {item.errorClass}
                                                         </div>
                                                     ) : null}
@@ -264,69 +264,69 @@ export default function CameraHealthDebugPanel({
                                                         label={item.availability_state || (item.effectiveOnline ? 'online' : 'offline')}
                                                         tone={item.availability_state || (item.effectiveOnline ? 'online' : 'offline')}
                                                     />
-                                                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                                                    <div className="text-xs text-content-muted">
                                                         {formatReason(item.availability_reason)}
                                                     </div>
-                                                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                                                    <div className="text-xs text-content-muted">
                                                         confidence {Number(item.availability_confidence || 0).toFixed(2)}
                                                     </div>
                                                 </div>
                                             </td>
                                             <td className="px-3 py-3 text-xs">
                                                 <div className="space-y-2">
-                                                    <div className="font-medium text-gray-700 dark:text-gray-200">{item.healthMode || '-'}</div>
-                                                    <div className="text-gray-500 dark:text-gray-400">{formatReason(item.monitoring_state)}</div>
-                                                    <div className="text-gray-400 dark:text-gray-500">{formatReason(item.monitoring_reason)}</div>
+                                                    <div className="font-medium text-content">{item.healthMode || '-'}</div>
+                                                    <div className="text-content-muted">{formatReason(item.monitoring_state)}</div>
+                                                    <div className="text-content-subtle">{formatReason(item.monitoring_reason)}</div>
                                                 </div>
                                             </td>
                                             <td className="px-3 py-3 text-xs">
                                                 <div>{item.delivery_type}</div>
-                                                <div className="mt-1 text-gray-400 dark:text-gray-500">
+                                                <div className="mt-1 text-content-subtle">
                                                     {item.healthStrategy}
                                                 </div>
-                                                <div className="mt-1 text-gray-500 dark:text-gray-400">
+                                                <div className="mt-1 text-content-muted">
                                                     policy {item.policy_mode || '-'}
                                                 </div>
                                                 {item.source_profile ? (
-                                                    <div className="mt-1 break-all text-gray-400 dark:text-gray-500">
+                                                    <div className="mt-1 break-all text-content-subtle">
                                                         {item.source_profile}
                                                     </div>
                                                 ) : null}
                                             </td>
                                             <td className="px-3 py-3 text-xs">
                                                 <div>{formatReason(item.lastReason)}</div>
-                                                <div className="mt-1 text-gray-400 dark:text-gray-500">
+                                                <div className="mt-1 text-content-subtle">
                                                     failure score {Number(item.failureScore || 0).toFixed(1)}
                                                 </div>
                                             </td>
                                             <td className="px-3 py-3 text-xs">
-                                                <div className="space-y-1 text-gray-500 dark:text-gray-400">
+                                                <div className="space-y-1 text-content-muted">
                                                     {renderTarget('Runtime', item.runtimeTarget)}
                                                     {renderTarget('Probe', item.probeTarget)}
                                                     {renderTarget('Fallback', item.fallbackTarget)}
                                                     {renderTarget('Provider', item.providerDomain)}
                                                     {item.probeMethod ? (
-                                                        <div><span className="font-medium text-gray-500 dark:text-gray-400">Method:</span> {item.probeMethod}</div>
+                                                        <div><span className="font-medium text-content-muted">Method:</span> {item.probeMethod}</div>
                                                     ) : null}
                                                     {item.httpStatus !== null && item.httpStatus !== undefined ? (
-                                                        <div><span className="font-medium text-gray-500 dark:text-gray-400">HTTP:</span> {item.httpStatus}</div>
+                                                        <div><span className="font-medium text-content-muted">HTTP:</span> {item.httpStatus}</div>
                                                     ) : null}
                                                     {item.contentType ? (
-                                                        <div><span className="font-medium text-gray-500 dark:text-gray-400">Type:</span> {item.contentType}</div>
+                                                        <div><span className="font-medium text-content-muted">Type:</span> {item.contentType}</div>
                                                     ) : null}
                                                     {item.usedFallback ? (
-                                                        <div><span className="font-medium text-gray-500 dark:text-gray-400">Fallback:</span> yes</div>
+                                                        <div><span className="font-medium text-content-muted">Fallback:</span> yes</div>
                                                     ) : null}
-                                                    <div><span className="font-medium text-gray-500 dark:text-gray-400">Configured:</span> {item.configured ? 'yes' : 'no'}</div>
-                                                    <div><span className="font-medium text-gray-500 dark:text-gray-400">Ready:</span> {item.ready ? 'yes' : 'no'}</div>
-                                                    <div><span className="font-medium text-gray-500 dark:text-gray-400">SourceReady:</span> {item.sourceReady ? 'yes' : 'no'}</div>
-                                                    <div><span className="font-medium text-gray-500 dark:text-gray-400">Readers:</span> {item.reader_count || 0}</div>
-                                                    <div><span className="font-medium text-gray-500 dark:text-gray-400">Real Viewers:</span> {item.real_viewer_count || 0}</div>
-                                                    <div><span className="font-medium text-gray-500 dark:text-gray-400">Internal Reader Only:</span> {item.has_internal_reader_only ? 'yes' : 'no'}</div>
-                                                    <div><span className="font-medium text-gray-500 dark:text-gray-400">Close After:</span> {item.close_after_seconds ? `${item.close_after_seconds}s` : '-'}</div>
+                                                    <div><span className="font-medium text-content-muted">Configured:</span> {item.configured ? 'yes' : 'no'}</div>
+                                                    <div><span className="font-medium text-content-muted">Ready:</span> {item.ready ? 'yes' : 'no'}</div>
+                                                    <div><span className="font-medium text-content-muted">SourceReady:</span> {item.sourceReady ? 'yes' : 'no'}</div>
+                                                    <div><span className="font-medium text-content-muted">Readers:</span> {item.reader_count || 0}</div>
+                                                    <div><span className="font-medium text-content-muted">Real Viewers:</span> {item.real_viewer_count || 0}</div>
+                                                    <div><span className="font-medium text-content-muted">Internal Reader Only:</span> {item.has_internal_reader_only ? 'yes' : 'no'}</div>
+                                                    <div><span className="font-medium text-content-muted">Close After:</span> {item.close_after_seconds ? `${item.close_after_seconds}s` : '-'}</div>
                                                 </div>
                                             </td>
-                                            <td className="px-3 py-3 text-xs text-gray-500 dark:text-gray-400">
+                                            <td className="px-3 py-3 text-xs text-content-muted">
                                                 <div>Probe: {formatTimestamp(item.lastProbeAt)}</div>
                                                 <div>Runtime ok: {formatTimestamp(item.lastRuntimeSuccessAt)}</div>
                                                 <div>Runtime fresh: {formatTimestamp(item.lastRuntimeFreshAt)}</div>
@@ -340,8 +340,8 @@ export default function CameraHealthDebugPanel({
                             </table>
                         </div>
 
-                        <div className="mt-5 flex flex-col gap-3 border-t border-gray-200 pt-4 text-sm dark:border-gray-700/60 md:flex-row md:items-center md:justify-between">
-                            <div className="text-gray-500 dark:text-gray-400">
+                        <div className="mt-5 flex flex-col gap-3 border-t border-edge pt-4 text-sm md:flex-row md:items-center md:justify-between">
+                            <div className="text-content-muted">
                                 Menampilkan {items.length} dari {pagination?.totalItems ?? items.length} camera(s)
                             </div>
                             <div className="flex items-center gap-2">
@@ -349,18 +349,18 @@ export default function CameraHealthDebugPanel({
                                     type="button"
                                     onClick={() => onPageChange(Math.max(1, (pagination?.page || 1) - 1))}
                                     disabled={!pagination?.hasPreviousPage}
-                                    className="rounded-xl border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 transition disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:text-gray-200"
+                                    className="rounded-xl border border-edge px-3 py-2 text-sm font-medium text-content transition disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                     Previous
                                 </button>
-                                <span className="text-gray-500 dark:text-gray-400">
+                                <span className="text-content-muted">
                                     Page {pagination?.page ?? 1} / {pagination?.totalPages ?? 1}
                                 </span>
                                 <button
                                     type="button"
                                     onClick={() => onPageChange((pagination?.page || 1) + 1)}
                                     disabled={!pagination?.hasNextPage}
-                                    className="rounded-xl border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 transition disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:text-gray-200"
+                                    className="rounded-xl border border-edge px-3 py-2 text-sm font-medium text-content transition disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                     Next
                                 </button>

@@ -8,10 +8,10 @@
 
 import { getBulkFilterLabel } from '../../../utils/admin/areaManagementOptions';
 
-function SummaryTile({ label, value, valueClassName = 'text-gray-900 dark:text-white' }) {
+function SummaryTile({ label, value, valueClassName = 'text-content' }) {
     return (
-        <div className="rounded-xl bg-white dark:bg-gray-800 px-3 py-2 border border-gray-200 dark:border-gray-700">
-            <div className="text-gray-500 dark:text-gray-400 text-xs">{label}</div>
+        <div className="rounded-xl bg-surface px-3 py-2 border border-edge">
+            <div className="text-content-muted text-xs">{label}</div>
             <div className={`font-semibold ${valueClassName}`}>{value || 0}</div>
         </div>
     );
@@ -19,12 +19,12 @@ function SummaryTile({ label, value, valueClassName = 'text-gray-900 dark:text-w
 
 function BreakdownList({ title, items, badgeClassName }) {
     return (
-        <div className="rounded-xl bg-white dark:bg-gray-800 px-3 py-3 border border-gray-200 dark:border-gray-700">
-            <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">{title}</div>
+        <div className="rounded-xl bg-surface px-3 py-3 border border-edge">
+            <div className="text-xs font-semibold text-content-muted mb-2">{title}</div>
             <div className="space-y-2">
                 {items.slice(0, 5).map((item) => (
                     <div key={item.key || item.reason} className="flex items-center justify-between gap-3 text-xs">
-                        <span className="text-gray-700 dark:text-gray-300">{item.key || item.reason}</span>
+                        <span className="text-content-muted">{item.key || item.reason}</span>
                         <span className={`px-2 py-1 rounded-full shrink-0 ${badgeClassName}`}>{item.count}</span>
                     </div>
                 ))}
@@ -35,16 +35,16 @@ function BreakdownList({ title, items, badgeClassName }) {
 
 function CameraExampleList({ title, cameras, showReason = false }) {
     return (
-        <div className="rounded-xl bg-white dark:bg-gray-800 px-3 py-3 border border-gray-200 dark:border-gray-700">
-            <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">{title}</div>
+        <div className="rounded-xl bg-surface px-3 py-3 border border-edge">
+            <div className="text-xs font-semibold text-content-muted mb-2">{title}</div>
             <div className="space-y-2 max-h-48 overflow-y-auto">
                 {cameras.map((camera) => (
                     <div key={camera.id} className="flex items-center justify-between gap-3 text-xs">
                         <div className="min-w-0">
-                            <div className="text-gray-900 dark:text-white truncate">{camera.name}</div>
-                            {showReason && <div className="text-gray-500 dark:text-gray-400 truncate">{camera.reason}</div>}
+                            <div className="text-content truncate">{camera.name}</div>
+                            {showReason && <div className="text-content-muted truncate">{camera.reason}</div>}
                         </div>
-                        <span className="px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 shrink-0">
+                        <span className="px-2 py-1 rounded-full bg-surface-sunken text-content-muted shrink-0">
                             {camera.delivery_classification}
                         </span>
                     </div>
@@ -64,11 +64,11 @@ export default function BulkPolicyPreview({
 
     return (
         <div className="space-y-4">
-            <div className="rounded-2xl border border-gray-200 dark:border-gray-700/50 bg-gray-50 dark:bg-gray-900/40 p-4">
+            <div className="rounded-2xl border border-edge bg-surface-sunken p-4">
                 <div className="flex items-center justify-between gap-3 mb-3">
                     <div>
-                        <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Preview Dampak</h4>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">Lihat target kamera dan breakdown sebelum apply.</p>
+                        <h4 className="text-sm font-semibold text-content">Preview Dampak</h4>
+                        <p className="text-xs text-content-muted">Lihat target kamera dan breakdown sebelum apply.</p>
                     </div>
                     <button
                         type="button"
@@ -82,9 +82,9 @@ export default function BulkPolicyPreview({
 
                 {bulkPreview ? (
                     <div className="space-y-3 text-sm">
-                        <div className="rounded-xl bg-white dark:bg-gray-800 px-3 py-3 border border-gray-200 dark:border-gray-700">
-                            <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Target Aktif</div>
-                            <div className="font-semibold text-gray-900 dark:text-white">{getBulkFilterLabel(bulkPreview.targetFilter || effectiveBulkTargetFilter)}</div>
+                        <div className="rounded-xl bg-surface px-3 py-3 border border-edge">
+                            <div className="text-xs font-semibold text-content-muted mb-1">Target Aktif</div>
+                            <div className="font-semibold text-content">{getBulkFilterLabel(bulkPreview.targetFilter || effectiveBulkTargetFilter)}</div>
                         </div>
                         <div className="grid grid-cols-2 gap-3">
                             <SummaryTile label="Total Area" value={summary.totalInArea} />
@@ -126,7 +126,7 @@ export default function BulkPolicyPreview({
                         )}
                     </div>
                 ) : (
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Belum ada preview. Klik Preview untuk melihat dampak target filter dan operasi.</p>
+                    <p className="text-sm text-content-muted">Belum ada preview. Klik Preview untuk melihat dampak target filter dan operasi.</p>
                 )}
             </div>
         </div>

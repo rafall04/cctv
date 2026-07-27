@@ -193,7 +193,7 @@ export default function MyAccount() {
                     </div>
                 </div>
                 {requirements.length > 0 && (
-                    <ul className="mt-3 space-y-0.5 rounded-xl bg-gray-50 p-3 text-xs text-gray-500 dark:bg-gray-800/50 dark:text-gray-400">
+                    <ul className="mt-3 space-y-0.5 rounded-xl bg-surface-sunken p-3 text-xs text-gray-500 dark:text-gray-400">
                         <li className="font-medium text-gray-600 dark:text-gray-300">Syarat password baru:</li>
                         {requirements.map((r) => (<li key={r}>• {r}</li>))}
                     </ul>
@@ -206,24 +206,24 @@ export default function MyAccount() {
 
             {/* Informasi akun */}
             <div className={`${cardClass} lg:col-span-2`}>
-                <h2 className="text-lg font-bold text-gray-900 dark:text-white">Informasi Akun</h2>
+                <h2 className="text-lg font-bold text-content">Informasi Akun</h2>
                 <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-4">
                     <div>
-                        <dt className="text-xs text-gray-500 dark:text-gray-400">Jenis akun</dt>
-                        <dd className="mt-0.5 font-medium text-gray-900 dark:text-white">Pelanggan</dd>
+                        <dt className="text-xs text-content-muted">Jenis akun</dt>
+                        <dd className="mt-0.5 font-medium text-content">Pelanggan</dd>
                     </div>
                     <div>
-                        <dt className="text-xs text-gray-500 dark:text-gray-400">Bergabung sejak</dt>
-                        <dd className="mt-0.5 font-medium text-gray-900 dark:text-white">{memberSince}</dd>
+                        <dt className="text-xs text-content-muted">Bergabung sejak</dt>
+                        <dd className="mt-0.5 font-medium text-content">{memberSince}</dd>
                     </div>
                     {pwdChanged && (
                         <div>
-                            <dt className="text-xs text-gray-500 dark:text-gray-400">Password diubah</dt>
-                            <dd className="mt-0.5 font-medium text-gray-900 dark:text-white">{pwdChanged}</dd>
+                            <dt className="text-xs text-content-muted">Password diubah</dt>
+                            <dd className="mt-0.5 font-medium text-content">{pwdChanged}</dd>
                         </div>
                     )}
                 </dl>
-                <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">
+                <p className="mt-4 text-xs text-content-muted">
                     Ingin berhenti berlangganan atau menghapus akun? Hubungi admin RAF NET — langganan &amp; sisa saldo perlu diproses dulu.
                 </p>
             </div>

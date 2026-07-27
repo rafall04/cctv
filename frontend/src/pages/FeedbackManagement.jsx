@@ -90,12 +90,12 @@ export default function FeedbackManagement() {
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Kritik & Saran</h1>
-                    <p className="text-gray-500 dark:text-gray-400 mt-1">Kelola feedback dari pengunjung</p>
+                    <h1 className="text-2xl font-bold text-content">Kritik & Saran</h1>
+                    <p className="text-content-muted mt-1">Kelola feedback dari pengunjung</p>
                 </div>
                 <button
                     onClick={refreshAll}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-surface-sunken hover:bg-surface-sunken rounded-lg transition-colors"
                 >
                     <FeedbackIcons.Refresh />
                     Refresh

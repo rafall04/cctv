@@ -313,22 +313,22 @@ export default function LoginPage() {
 
     // Get field error class for styling (Requirements: 2.9)
     const getFieldClass = (fieldName) => {
-        const baseClass = "w-full pl-12 pr-4 py-3.5 bg-gray-50 dark:bg-gray-900/50 border rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed";
+        const baseClass = "w-full pl-12 pr-4 py-3.5 bg-surface-sunken border rounded-xl text-content placeholder-content-subtle focus:outline-none focus:ring-2 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed";
         
         if (fieldErrors[fieldName]) {
             return `${baseClass} border-red-500 dark:border-red-500 focus:ring-red-500`;
         }
-        return `${baseClass} border-gray-200 dark:border-gray-700/50 focus:ring-primary`;
+        return `${baseClass} border-edge focus:ring-primary`;
     };
 
     // Password field needs different padding for the eye button
     const getPasswordFieldClass = () => {
-        const baseClass = "w-full pl-12 pr-12 py-3.5 bg-gray-50 dark:bg-gray-900/50 border rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed";
+        const baseClass = "w-full pl-12 pr-12 py-3.5 bg-surface-sunken border rounded-xl text-content placeholder-content-subtle focus:outline-none focus:ring-2 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed";
         
         if (fieldErrors.password) {
             return `${baseClass} border-red-500 dark:border-red-500 focus:ring-red-500`;
         }
-        return `${baseClass} border-gray-200 dark:border-gray-700/50 focus:ring-primary`;
+        return `${baseClass} border-edge focus:ring-primary`;
     };
 
     return (
@@ -342,7 +342,7 @@ export default function LoginPage() {
             {/* Theme Toggle */}
             <button
                 onClick={toggleTheme}
-                className="fixed top-4 right-4 p-3 rounded-xl bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm shadow-lg border border-gray-200/50 dark:border-gray-700/50 text-gray-600 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-800 transition-all z-50"
+                className="fixed top-4 right-4 p-3 rounded-xl bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm shadow-lg border border-gray-200/50 text-content-muted hover:bg-surface transition-all z-50"
             >
                 {isDark ? <Icons.Sun /> : <Icons.Moon />}
             </button>
@@ -353,7 +353,7 @@ export default function LoginPage() {
                     <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-primary to-primary-600 rounded-2xl shadow-2xl shadow-primary/30 mb-6 text-white">
                         <Icons.Lock />
                     </div>
-                    <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+                    <h1 className="text-3xl font-bold text-content mb-2">
                         Welcome Back
                     </h1>
                     <p className="text-gray-500 dark:text-gray-400">
@@ -434,7 +434,7 @@ export default function LoginPage() {
 
                         {/* Username Field */}
                         <div>
-                            <label htmlFor="login-username" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                            <label htmlFor="login-username" className="block text-sm font-semibold text-content-muted mb-2">
                                 Username
                             </label>
                             <div className="relative">
@@ -467,7 +467,7 @@ export default function LoginPage() {
 
                         {/* Password Field */}
                         <div>
-                            <label htmlFor="login-password" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                            <label htmlFor="login-password" className="block text-sm font-semibold text-content-muted mb-2">
                                 Password
                             </label>
                             <div className="relative">
@@ -491,7 +491,7 @@ export default function LoginPage() {
                                 <button
                                     type="button"
                                     onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors disabled:opacity-50"
+                                    className="absolute inset-y-0 right-0 pr-4 flex items-center text-content-subtle hover:text-content-muted transition-colors disabled:opacity-50"
                                     disabled={isSubmitDisabled}
                                 >
                                     {showPassword ? <Icons.EyeOff /> : <Icons.Eye />}
@@ -534,7 +534,7 @@ export default function LoginPage() {
                     </form>
 
                     {/* Register + Back Links */}
-                    <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700/50 space-y-3">
+                    <div className="mt-6 pt-6 border-t border-edge space-y-3">
                         <p className="text-center text-sm text-gray-500 dark:text-gray-400">
                             Mau sewa CCTV?{' '}
                             <a href="/daftar" className="font-semibold text-primary hover:underline">
@@ -543,7 +543,7 @@ export default function LoginPage() {
                         </p>
                         <a
                             href="/"
-                            className="flex items-center justify-center gap-2 text-sm text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-sky-400 transition-colors"
+                            className="flex items-center justify-center gap-2 text-sm text-content-muted hover:text-primary dark:hover:text-sky-400 transition-colors"
                         >
                             <Icons.ArrowLeft />
                             <span>Back to public view</span>
@@ -552,7 +552,7 @@ export default function LoginPage() {
                 </div>
 
                 {/* Footer */}
-                <p className="text-center text-gray-400 dark:text-gray-600 text-xs mt-6">
+                <p className="text-center text-content-subtle text-xs mt-6">
                     Authorized personnel only. All access is logged.
                 </p>
             </div>

@@ -125,7 +125,7 @@ function CameraCard({
     ].filter(Boolean);
 
     return (
-        <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl overflow-hidden hover:shadow-xl hover:border-primary/30 transition-all group">
+        <div className="bg-surface border border-edge rounded-2xl overflow-hidden hover:shadow-xl hover:border-primary/30 transition-all group">
             <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 relative">
                 <div className="absolute inset-0 flex items-center justify-center text-gray-300 dark:text-gray-600">
                     <svg className="w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
@@ -176,13 +176,13 @@ function CameraCard({
             <div className="p-5">
                 <div className="flex items-center justify-between mb-4">
                     <div>
-                        <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Location</p>
-                        <p className="text-sm font-medium text-gray-900 dark:text-white">{camera.location || 'Not specified'}</p>
+                        <p className="text-[10px] font-semibold text-content-subtle uppercase tracking-wider">Location</p>
+                        <p className="text-sm font-medium text-content">{camera.location || 'Not specified'}</p>
                         <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
                             <span className="rounded-full bg-sky-50 px-2.5 py-1 font-medium text-sky-700 dark:bg-sky-500/10 dark:text-sky-300">
                                 Public: {camera.availability_state || 'offline'}
                             </span>
-                            <span className="rounded-full bg-gray-100 px-2.5 py-1 font-medium text-gray-700 dark:bg-gray-700/60 dark:text-gray-200">
+                            <span className="rounded-full bg-surface-sunken px-2.5 py-1 font-medium text-content">
                                 Monitor: {camera.monitoring_state || 'unknown'}
                             </span>
                             {secondaryBadges.map((badge) => (
@@ -199,7 +199,7 @@ function CameraCard({
                     <div className="flex gap-1">
                         <button
                             onClick={() => onEdit(camera)}
-                            className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400 hover:text-primary hover:bg-sky-50 dark:hover:bg-primary/10 transition-all"
+                            className="p-2 rounded-lg bg-surface-sunken text-content-muted hover:text-primary hover:bg-sky-50 dark:hover:bg-primary/10 transition-all"
                             title="Edit camera"
                         >
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -209,7 +209,7 @@ function CameraCard({
                         <button
                             onClick={() => onDelete(camera)}
                             disabled={deletingId === camera.id}
-                            className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="p-2 rounded-lg bg-surface-sunken text-content-muted hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                             title="Delete camera"
                         >
                             {deletingId === camera.id ? (

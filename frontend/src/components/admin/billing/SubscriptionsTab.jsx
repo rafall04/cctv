@@ -55,7 +55,7 @@ export default function SubscriptionsTab({ subscriptions, assignableCameras, cus
         if (sub.status === 'cancelled') return <span className="text-xs text-gray-400">—</span>;
         return (
             <div className={`flex gap-1 ${full ? 'w-full' : 'justify-end'}`}>
-                <button onClick={() => toggleStatus(sub)} disabled={busy} className={`whitespace-nowrap rounded-lg border border-gray-200 px-3 py-1.5 text-xs text-gray-600 transition-colors hover:bg-gray-100 disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800 ${full ? 'flex-1' : ''}`}>
+                <button onClick={() => toggleStatus(sub)} disabled={busy} className={`whitespace-nowrap rounded-lg border border-edge px-3 py-1.5 text-xs text-content-muted transition-colors hover:bg-surface-sunken disabled:opacity-50 ${full ? 'flex-1' : ''}`}>
                     {sub.status === 'active' ? 'Tangguhkan' : 'Aktifkan'}
                 </button>
                 <button onClick={() => cancelSub(sub)} disabled={busy} className={`whitespace-nowrap rounded-lg border border-red-200 px-3 py-1.5 text-xs text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-500/30 dark:text-red-400 dark:hover:bg-red-900/30 ${full ? 'flex-1' : ''}`}>
@@ -67,8 +67,8 @@ export default function SubscriptionsTab({ subscriptions, assignableCameras, cus
 
     const assignFormEl = (
         <form onSubmit={submitAssign} className={cardClass}>
-            <h3 className="font-semibold text-gray-900 dark:text-white">Assign Kamera ke Pelanggan</h3>
-            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            <h3 className="font-semibold text-content">Assign Kamera ke Pelanggan</h3>
+            <p className="mt-1 text-xs text-content-muted">
                 Kamera menjadi kelas <code>subscriber</code>: hilang dari publik, hanya bisa dilihat pelanggan, dan mulai ditagih hari ini.
             </p>
             <div className="mt-3 space-y-2">
@@ -94,20 +94,20 @@ export default function SubscriptionsTab({ subscriptions, assignableCameras, cus
 
             <div className="lg:order-1 lg:col-span-2">
                 {subscriptions.length === 0 ? (
-                    <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-12 text-center text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
+                    <div className="rounded-2xl border border-dashed border-edge px-4 py-12 text-center text-sm text-content-muted">
                         Belum ada langganan. Assign kamera ke pelanggan lewat form{' '}
                         <span className="lg:hidden">di atas</span><span className="hidden lg:inline">di samping</span>.
                     </div>
                 ) : (
                     <>
                         {/* Monitoring: customer cameras per area */}
-                        <div className="mb-3 rounded-2xl border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900">
-                            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Monitoring per Area</h3>
+                        <div className="mb-3 rounded-2xl border border-edge bg-surface p-3">
+                            <h3 className="text-sm font-semibold text-content">Monitoring per Area</h3>
                             <div className="mt-2 flex flex-wrap gap-2">
                                 {areaSummary.map((g) => (
-                                    <div key={g.area} className="rounded-xl border border-gray-200 px-3 py-1.5 dark:border-gray-700">
-                                        <p className="text-sm font-medium text-gray-900 dark:text-white">{g.area}</p>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                                    <div key={g.area} className="rounded-xl border border-edge px-3 py-1.5">
+                                        <p className="text-sm font-medium text-content">{g.area}</p>
+                                        <p className="text-xs text-content-muted">
                                             {g.total} kamera · <span className="text-emerald-600 dark:text-emerald-400">{g.online} online</span>
                                             {g.suspended > 0 && <> · <span className="text-amber-600 dark:text-amber-400">{g.suspended} suspend</span></>}
                                         </p>
@@ -119,7 +119,7 @@ export default function SubscriptionsTab({ subscriptions, assignableCameras, cus
                         {/* Desktop: table */}
                         <DesktopTable minWidth="min-w-[560px]">
                             <thead>
-                                <tr className="text-left text-xs uppercase text-gray-500 dark:text-gray-400">
+                                <tr className="text-left text-xs uppercase text-content-muted">
                                     <th className="px-3 py-2">Kamera</th>
                                     <th className="px-3 py-2">Pelanggan</th>
                                     <th className="px-3 py-2 text-right">Harga/bulan</th>
@@ -127,16 +127,16 @@ export default function SubscriptionsTab({ subscriptions, assignableCameras, cus
                                     <th className="px-3 py-2 text-right">Aksi</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                            <tbody className="divide-y divide-edge">
                                 {subscriptions.map((sub) => (
-                                    <tr key={sub.id} className="bg-white dark:bg-gray-900">
+                                    <tr key={sub.id} className="bg-surface">
                                         <td className="px-3 py-2">
-                                            <p className="font-medium text-gray-900 dark:text-white">{sub.camera_name}</p>
+                                            <p className="font-medium text-content">{sub.camera_name}</p>
                                             <p className="text-xs text-gray-400">
                                                 {sub.area_name || 'Tanpa area'} · {sub.camera_is_online === 1 ? 'online' : 'offline'}{sub.camera_is_public ? ' · publik' : ''}
                                             </p>
                                         </td>
-                                        <td className="px-3 py-2 text-gray-600 dark:text-gray-300">
+                                        <td className="px-3 py-2 text-content-muted">
                                             {sub.customer_username}<span className="ml-1 text-xs text-gray-400">({formatRupiah(sub.wallet_balance || 0)})</span>
                                         </td>
                                         <td className="px-3 py-2 text-right">{formatRupiah(sub.monthly_price)}</td>
@@ -150,20 +150,20 @@ export default function SubscriptionsTab({ subscriptions, assignableCameras, cus
                         {/* Mobile: cards */}
                         <div className="space-y-3 md:hidden">
                             {subscriptions.map((sub) => (
-                                <div key={sub.id} className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
+                                <div key={sub.id} className="rounded-2xl border border-edge bg-surface p-4">
                                     <div className="flex items-start justify-between gap-2">
                                         <div className="min-w-0">
-                                            <p className="truncate font-semibold text-gray-900 dark:text-white">{sub.camera_name}</p>
+                                            <p className="truncate font-semibold text-content">{sub.camera_name}</p>
                                             <p className="truncate text-xs text-gray-400">
                                                 {sub.area_name || 'Tanpa area'} · {sub.camera_is_online === 1 ? 'online' : 'offline'}
                                             </p>
-                                            <p className="truncate text-sm text-gray-500 dark:text-gray-400">
+                                            <p className="truncate text-sm text-content-muted">
                                                 {sub.customer_username} · {formatRupiah(sub.wallet_balance || 0)}
                                             </p>
                                         </div>
                                         <StatusBadge className={SUB_STATUS_BADGES[sub.status] || ''}>{sub.status}</StatusBadge>
                                     </div>
-                                    <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">{formatRupiah(sub.monthly_price)}/bulan</p>
+                                    <p className="mt-2 text-sm text-content-muted">{formatRupiah(sub.monthly_price)}/bulan</p>
                                     {sub.status !== 'cancelled' && <div className="mt-3"><Actions sub={sub} full /></div>}
                                 </div>
                             ))}

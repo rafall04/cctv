@@ -27,13 +27,13 @@ export default function CameraRecordingSection({ formData, isSubmitting, onChang
                     </svg>
                 </div>
                 <div>
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">Pengaturan Rekaman</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Rolling buffer 1 jam - 3 bulan</p>
+                    <p className="text-sm font-medium text-content">Pengaturan Rekaman</p>
+                    <p className="text-xs text-content-muted">Rolling buffer 1 jam - 3 bulan</p>
                 </div>
             </div>
 
             <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-700 dark:text-gray-300">Aktifkan Rekaman</span>
+                <span className="text-sm text-content-muted">Aktifkan Rekaman</span>
                 <button
                     type="button"
                     onClick={() => onChange({ target: { name: 'enable_recording', value: !formData.enable_recording, type: 'checkbox', checked: !formData.enable_recording } })}
@@ -46,14 +46,14 @@ export default function CameraRecordingSection({ formData, isSubmitting, onChang
 
             {formData.enable_recording && (
                 <div>
-                    <label htmlFor="camera-recording-duration" className="block text-sm text-gray-700 dark:text-gray-300 mb-2">Durasi Penyimpanan</label>
+                    <label htmlFor="camera-recording-duration" className="block text-sm text-content-muted mb-2">Durasi Penyimpanan</label>
                     <select
                         id="camera-recording-duration"
                         name="recording_duration_hours"
                         value={formData.recording_duration_hours || 5}
                         onChange={onChange}
                         disabled={isSubmitting}
-                        className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-red-500 disabled:opacity-50"
+                        className="w-full px-3 py-2 bg-surface border border-edge-strong rounded-lg text-content text-sm focus:ring-2 focus:ring-red-500 disabled:opacity-50"
                     >
                         {recordingDurationOptions.map((group) => (
                             <optgroup key={group.label} label={group.label}>
@@ -63,7 +63,7 @@ export default function CameraRecordingSection({ formData, isSubmitting, onChang
                             </optgroup>
                         ))}
                     </select>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    <p className="text-xs text-content-muted mt-1">
                         File lama otomatis terhapus sesuai durasi. Estimasi untuk 1080p@25fps.
                     </p>
                 </div>
@@ -71,14 +71,14 @@ export default function CameraRecordingSection({ formData, isSubmitting, onChang
 
             <div className="border-t border-red-200 dark:border-red-500/20 pt-3 space-y-3">
                 <div>
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">Akses Playback Publik</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    <p className="text-sm font-medium text-content">Akses Playback Publik</p>
+                    <p className="text-xs text-content-muted mt-1">
                         Atur apakah kamera ini mengikuti global, tampil preview terbatas, admin only, atau mati di publik.
                     </p>
                 </div>
 
                 <div>
-                    <label htmlFor="camera-public-playback-mode" className="block text-sm text-gray-700 dark:text-gray-300 mb-2">
+                    <label htmlFor="camera-public-playback-mode" className="block text-sm text-content-muted mb-2">
                         Mode Playback Publik
                     </label>
                     <select
@@ -87,7 +87,7 @@ export default function CameraRecordingSection({ formData, isSubmitting, onChang
                         value={formData.public_playback_mode || 'inherit'}
                         onChange={onChange}
                         disabled={isSubmitting}
-                        className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-red-500 disabled:opacity-50"
+                        className="w-full px-3 py-2 bg-surface border border-edge-strong rounded-lg text-content text-sm focus:ring-2 focus:ring-red-500 disabled:opacity-50"
                     >
                         {PUBLIC_PLAYBACK_MODES.map((option) => (
                             <option key={option.value} value={option.value}>{option.label}</option>
@@ -96,7 +96,7 @@ export default function CameraRecordingSection({ formData, isSubmitting, onChang
                 </div>
 
                 <div>
-                    <label htmlFor="camera-public-playback-preview" className="block text-sm text-gray-700 dark:text-gray-300 mb-2">
+                    <label htmlFor="camera-public-playback-preview" className="block text-sm text-content-muted mb-2">
                         Batas Preview Publik
                     </label>
                     <select
@@ -105,13 +105,13 @@ export default function CameraRecordingSection({ formData, isSubmitting, onChang
                         value={formData.public_playback_preview_minutes ?? ''}
                         onChange={onChange}
                         disabled={isSubmitting}
-                        className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-red-500 disabled:opacity-50"
+                        className="w-full px-3 py-2 bg-surface border border-edge-strong rounded-lg text-content text-sm focus:ring-2 focus:ring-red-500 disabled:opacity-50"
                     >
                         {PUBLIC_PLAYBACK_PREVIEW_OPTIONS.map((option) => (
                             <option key={String(option.value)} value={option.value}>{option.label}</option>
                         ))}
                     </select>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    <p className="text-xs text-content-muted mt-1">
                         Dipakai hanya saat mode kamera `preview_only`. Durasi mengikuti kelipatan segment 10 menit.
                     </p>
                 </div>

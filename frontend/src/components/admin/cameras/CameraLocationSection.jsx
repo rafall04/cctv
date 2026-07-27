@@ -12,7 +12,7 @@ export default function CameraLocationSection({
 }) {
     return (
         <>
-            <div className="rounded-xl border border-gray-200/80 bg-white p-4 dark:border-gray-700/70 dark:bg-gray-800/70">
+            <div className="rounded-xl border border-gray-200/80 bg-surface p-4 dark:border-gray-700/70">
                 <div className="mb-3">
                     <div className="flex items-center gap-2">
                         <div className="w-7 h-7 rounded-lg bg-sky-100 dark:bg-primary/20 flex items-center justify-center text-primary-600 dark:text-primary-400 shrink-0">
@@ -21,14 +21,14 @@ export default function CameraLocationSection({
                                 <circle cx="12" cy="11" r="3" />
                             </svg>
                         </div>
-                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Lokasi Kamera</p>
+                        <p className="text-sm font-medium text-content">Lokasi Kamera</p>
                     </div>
-                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    <p className="mt-1 text-xs text-content-muted">
                         Pilih lokasi dengan GPS atau buka peta untuk menentukan titik kamera.
                     </p>
                 </div>
                 <div className="border-t border-gray-200/70 pt-3 dark:border-gray-700/70">
-                    <Suspense fallback={<div className="h-10 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center"><span className="text-gray-500 dark:text-gray-400 text-xs">Loading...</span></div>}>
+                    <Suspense fallback={<div className="h-10 rounded-lg bg-surface-sunken flex items-center justify-center"><span className="text-content-muted text-xs">Loading...</span></div>}>
                     <LocationPicker
                         latitude={latitude}
                         longitude={longitude}
@@ -46,8 +46,8 @@ export default function CameraLocationSection({
                         </svg>
                     </div>
                     <div>
-                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Koneksi Tunnel</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 hidden sm:block">Kurang stabil</p>
+                        <p className="text-sm font-medium text-content">Koneksi Tunnel</p>
+                        <p className="text-xs text-content-muted hidden sm:block">Kurang stabil</p>
                     </div>
                 </div>
                 <button

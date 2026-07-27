@@ -121,17 +121,17 @@ export default function PlaybackSettingsPanel() {
     }
 
     return (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-            <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Playback Settings</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+        <div className="bg-surface rounded-xl shadow-sm border border-edge">
+            <div className="p-6 border-b border-edge">
+                <h3 className="text-lg font-semibold text-content">Playback Settings</h3>
+                <p className="text-sm text-content-muted mt-1">
                     Batasi playback publik menjadi preview singkat dan atur pesan privasi untuk pengguna.
                 </p>
             </div>
 
             <form onSubmit={handleSubmit} className="p-6 space-y-6">
-                <div className="rounded-2xl border border-gray-200 bg-gray-50/80 p-5 dark:border-gray-700 dark:bg-gray-900/40 space-y-5">
-                    <label className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-900/60 dark:text-gray-300">
+                <div className="rounded-2xl border border-edge bg-surface-sunken p-5 space-y-5">
+                    <label className="flex items-center gap-3 rounded-xl border border-edge bg-white px-4 py-3 text-sm text-content-muted dark:bg-gray-900/60">
                         <input
                             type="checkbox"
                             name="public_playback_enabled"
@@ -143,7 +143,7 @@ export default function PlaybackSettingsPanel() {
                     </label>
 
                     <div>
-                        <label htmlFor="public_playback_preview_minutes" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        <label htmlFor="public_playback_preview_minutes" className="block text-sm font-medium text-content-muted mb-2">
                             Batas Preview Publik
                         </label>
                         <select
@@ -151,7 +151,7 @@ export default function PlaybackSettingsPanel() {
                             name="public_playback_preview_minutes"
                             value={settings.public_playback_preview_minutes}
                             onChange={handleChange}
-                            className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 focus:border-sky-500 focus:ring-2 focus:ring-sky-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                            className="w-full rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-sm text-content focus:border-sky-500 focus:ring-2 focus:ring-sky-500"
                         >
                             {PREVIEW_OPTIONS.map((value) => (
                                 <option key={value} value={value}>
@@ -162,8 +162,8 @@ export default function PlaybackSettingsPanel() {
                     </div>
                 </div>
 
-                <div className="rounded-2xl border border-gray-200 bg-gray-50/80 p-5 dark:border-gray-700 dark:bg-gray-900/40 space-y-5">
-                    <label className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-900/60 dark:text-gray-300">
+                <div className="rounded-2xl border border-edge bg-surface-sunken p-5 space-y-5">
+                    <label className="flex items-center gap-3 rounded-xl border border-edge bg-white px-4 py-3 text-sm text-content-muted dark:bg-gray-900/60">
                         <input
                             type="checkbox"
                             name="public_playback_notice_enabled"
@@ -175,7 +175,7 @@ export default function PlaybackSettingsPanel() {
                     </label>
 
                     <div>
-                        <label htmlFor="public_playback_notice_title" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        <label htmlFor="public_playback_notice_title" className="block text-sm font-medium text-content-muted mb-2">
                             Judul Notice
                         </label>
                         <input
@@ -183,12 +183,12 @@ export default function PlaybackSettingsPanel() {
                             name="public_playback_notice_title"
                             value={settings.public_playback_notice_title}
                             onChange={handleChange}
-                            className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 focus:border-sky-500 focus:ring-2 focus:ring-sky-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                            className="w-full rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-sm text-content focus:border-sky-500 focus:ring-2 focus:ring-sky-500"
                         />
                     </div>
 
                     <div>
-                        <label htmlFor="public_playback_notice_text" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        <label htmlFor="public_playback_notice_text" className="block text-sm font-medium text-content-muted mb-2">
                             Isi Notice
                         </label>
                         <textarea
@@ -197,12 +197,12 @@ export default function PlaybackSettingsPanel() {
                             value={settings.public_playback_notice_text}
                             onChange={handleChange}
                             rows={4}
-                            className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 focus:border-sky-500 focus:ring-2 focus:ring-sky-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                            className="w-full rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-sm text-content focus:border-sky-500 focus:ring-2 focus:ring-sky-500"
                         />
                     </div>
 
                     <div>
-                        <label htmlFor="public_playback_contact_mode" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        <label htmlFor="public_playback_contact_mode" className="block text-sm font-medium text-content-muted mb-2">
                             Sumber Kontak
                         </label>
                         <select
@@ -210,11 +210,11 @@ export default function PlaybackSettingsPanel() {
                             name="public_playback_contact_mode"
                             value={settings.public_playback_contact_mode}
                             onChange={handleChange}
-                            className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 focus:border-sky-500 focus:ring-2 focus:ring-sky-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                            className="w-full rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-sm text-content focus:border-sky-500 focus:ring-2 focus:ring-sky-500"
                         >
                             <option value="branding_whatsapp">WhatsApp dari branding</option>
                         </select>
-                        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                        <p className="mt-2 text-xs text-content-muted">
                             Kontak publik akan memakai `whatsapp_number` yang sudah ada di Branding Settings.
                         </p>
                     </div>

@@ -15,8 +15,8 @@ import { areaService } from '../services/areaService';
 import { TableSkeleton } from '../components/ui/Skeleton';
 
 const inputClass =
-    'w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-primary-500';
-const labelClass = 'block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5';
+    'w-full bg-surface border border-edge-strong rounded-lg px-3 py-2 text-content text-sm focus:outline-none focus:border-primary-500';
+const labelClass = 'block text-sm font-medium text-content-muted mb-1.5';
 
 const PROFILE_FORM_DEFAULT = {
     name: '',
@@ -46,7 +46,7 @@ function formatDuration(minutes) {
 function codeStatusBadge(status) {
     switch (status) {
         case 'active': return 'bg-green-500/20 text-green-500';
-        case 'unused': return 'bg-gray-200 dark:bg-gray-700/50 text-gray-600 dark:text-gray-300';
+        case 'unused': return 'bg-gray-200 dark:bg-gray-700/50 text-content-muted';
         case 'expired': return 'bg-amber-500/20 text-amber-500';
         case 'revoked': return 'bg-red-500/20 text-red-500';
         default: return 'bg-gray-100 dark:bg-gray-700/40 text-gray-500';
@@ -290,8 +290,8 @@ export default function VoucherManagement() {
             {/* Header + global flag */}
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Voucher Akses CCTV</h1>
-                    <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">
+                    <h1 className="text-2xl font-bold text-content">Voucher Akses CCTV</h1>
+                    <p className="text-content-muted text-sm mt-1">
                         Batasi akses live kamera per-area dengan kode voucher berdurasi. Tandai area
                         “berbayar”, buat profil, lalu bagikan kodenya.
                     </p>
@@ -315,10 +315,10 @@ export default function VoucherManagement() {
             )}
 
             {/* Area gating */}
-            <div className="bg-white dark:bg-gray-800/90 rounded-xl border border-gray-200 dark:border-gray-700/50 overflow-hidden">
-                <div className="p-4 border-b border-gray-200 dark:border-gray-700/50">
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Area Berbayar</h2>
-                    <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+            <div className="bg-surface rounded-xl border border-edge overflow-hidden">
+                <div className="p-4 border-b border-edge">
+                    <h2 className="text-lg font-semibold text-content">Area Berbayar</h2>
+                    <p className="text-xs text-content-muted mt-1">
                         Hanya area yang ditandai yang terkunci (saat fitur aktif). Pengunjung tanpa
                         voucher melihat kamera area ini sebagai terkunci.
                     </p>
@@ -326,20 +326,20 @@ export default function VoucherManagement() {
                 {areas.length === 0 ? (
                     <div className="p-6 text-center text-sm text-gray-500">Belum ada area. Buat area dulu di menu Areas.</div>
                 ) : (
-                    <ul className="divide-y divide-gray-200 dark:divide-gray-700/50 max-h-72 overflow-y-auto">
+                    <ul className="divide-y divide-edge max-h-72 overflow-y-auto">
                         {areas.map((area) => {
                             const gated = gatedSet.has(area.id);
                             return (
                                 <li key={area.id} className="flex items-center justify-between px-4 py-3">
                                     <div className="min-w-0">
-                                        <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{areaLabel(area)}</p>
+                                        <p className="text-sm font-medium text-content truncate">{areaLabel(area)}</p>
                                     </div>
                                     <button
                                         onClick={() => toggleAreaGated(area)}
                                         disabled={areaBusyId === area.id}
                                         className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50 ${
                                             gated ? 'bg-primary-600 text-white hover:bg-primary-700'
-                                                  : 'bg-gray-100 dark:bg-gray-700/60 text-gray-600 dark:text-gray-300 hover:bg-gray-200'
+                                                  : 'bg-gray-100 dark:bg-gray-700/60 text-content-muted hover:bg-gray-200'
                                         }`}
                                     >
                                         {gated ? '🔒 Berbayar' : 'Gratis'}
@@ -352,9 +352,9 @@ export default function VoucherManagement() {
             </div>
 
             {/* Profiles */}
-            <div className="bg-white dark:bg-gray-800/90 rounded-xl border border-gray-200 dark:border-gray-700/50 overflow-hidden">
-                <div className="p-4 border-b border-gray-200 dark:border-gray-700/50 flex items-center justify-between">
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Profil Voucher</h2>
+            <div className="bg-surface rounded-xl border border-edge overflow-hidden">
+                <div className="p-4 border-b border-edge flex items-center justify-between">
+                    <h2 className="text-lg font-semibold text-content">Profil Voucher</h2>
                     <button onClick={openCreateProfile} className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm transition-colors">
                         + Tambah Profil
                     </button>
@@ -367,22 +367,22 @@ export default function VoucherManagement() {
                             <thead className="bg-gray-100 dark:bg-gray-900/50">
                                 <tr>
                                     {['Nama', 'Durasi', 'Harga', 'Maks/Kode', 'Area', 'Status', 'Aksi'].map((h) => (
-                                        <th key={h} className="px-4 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase">{h}</th>
+                                        <th key={h} className="px-4 py-3 text-left text-xs font-medium text-content-muted uppercase">{h}</th>
                                     ))}
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-200 dark:divide-gray-700/50">
+                            <tbody className="divide-y divide-edge">
                                 {profiles.map((p) => (
                                     <tr key={p.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
                                         <td className="px-4 py-3">
-                                            <p className="text-sm font-medium text-gray-900 dark:text-white">{p.name}</p>
+                                            <p className="text-sm font-medium text-content">{p.name}</p>
                                             {p.description && <p className="text-xs text-gray-500">{p.description}</p>}
                                         </td>
-                                        <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{formatDuration(p.duration_minutes)}</td>
-                                        <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
+                                        <td className="px-4 py-3 text-sm text-content-muted">{formatDuration(p.duration_minutes)}</td>
+                                        <td className="px-4 py-3 text-sm text-content">
                                             {p.price > 0 ? `Rp ${Number(p.price).toLocaleString('id-ID')}` : 'Gratis'}
                                         </td>
-                                        <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{p.max_uses_per_code}</td>
+                                        <td className="px-4 py-3 text-sm text-content-muted">{p.max_uses_per_code}</td>
                                         <td className="px-4 py-3 text-xs text-gray-500">
                                             {(p.area_ids || []).map((id) => areas.find((a) => a.id === id)?.name || `#${id}`).join(', ') || '—'}
                                         </td>
@@ -412,9 +412,9 @@ export default function VoucherManagement() {
             </div>
 
             {/* Codes */}
-            <div className="bg-white dark:bg-gray-800/90 rounded-xl border border-gray-200 dark:border-gray-700/50 overflow-hidden">
-                <div className="p-4 border-b border-gray-200 dark:border-gray-700/50 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Kode Voucher</h2>
+            <div className="bg-surface rounded-xl border border-edge overflow-hidden">
+                <div className="p-4 border-b border-edge flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <h2 className="text-lg font-semibold text-content">Kode Voucher</h2>
                     <div className="flex gap-2">
                         <select value={codeProfileFilter} onChange={(e) => setCodeProfileFilter(e.target.value)} className={`${inputClass} md:w-44`}>
                             <option value="">Semua profil</option>
@@ -434,14 +434,14 @@ export default function VoucherManagement() {
                             <thead className="bg-gray-100 dark:bg-gray-900/50 sticky top-0">
                                 <tr>
                                     {['Kode', 'Profil', 'Status', 'Pemakai', 'Berakhir', 'Pembeli', 'Aksi'].map((h) => (
-                                        <th key={h} className="px-4 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase">{h}</th>
+                                        <th key={h} className="px-4 py-3 text-left text-xs font-medium text-content-muted uppercase">{h}</th>
                                     ))}
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-200 dark:divide-gray-700/50">
+                            <tbody className="divide-y divide-edge">
                                 {filteredCodes.map((c) => (
                                     <tr key={c.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
-                                        <td className="px-4 py-3 font-mono text-sm text-gray-900 dark:text-white">{c.code}</td>
+                                        <td className="px-4 py-3 font-mono text-sm text-content">{c.code}</td>
                                         <td className="px-4 py-3 text-xs text-gray-500">{profilesById[c.profile_id]?.name || `#${c.profile_id}`}</td>
                                         <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded text-xs font-medium ${codeStatusBadge(c.status)}`}>{c.status}</span></td>
                                         <td className="px-4 py-3 text-xs text-gray-500">{c.redeemed_count ?? 0}</td>
@@ -463,9 +463,9 @@ export default function VoucherManagement() {
             {/* Profile modal */}
             {showProfileModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white dark:bg-gray-800 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                        <div className="p-5 border-b border-gray-200 dark:border-gray-700/50">
-                            <h2 className="text-xl font-bold text-gray-900 dark:text-white">{editingId ? 'Edit Profil Voucher' : 'Profil Voucher Baru'}</h2>
+                    <div className="bg-surface rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                        <div className="p-5 border-b border-edge">
+                            <h2 className="text-xl font-bold text-content">{editingId ? 'Edit Profil Voucher' : 'Profil Voucher Baru'}</h2>
                         </div>
                         <form onSubmit={submitProfile} className="p-5 space-y-4">
                             <div>
@@ -503,11 +503,11 @@ export default function VoucherManagement() {
                                 </div>
                             </div>
                             <div className="flex flex-wrap gap-4">
-                                <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700 dark:text-gray-300">
+                                <label className="flex items-center gap-2 cursor-pointer text-sm text-content-muted">
                                     <input type="checkbox" checked={form.online_purchasable} onChange={(e) => setForm({ ...form, online_purchasable: e.target.checked })} className="w-4 h-4 rounded" />
                                     Dijual online (mandiri)
                                 </label>
-                                <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700 dark:text-gray-300">
+                                <label className="flex items-center gap-2 cursor-pointer text-sm text-content-muted">
                                     <input type="checkbox" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} className="w-4 h-4 rounded" />
                                     Aktif
                                 </label>
@@ -520,14 +520,14 @@ export default function VoucherManagement() {
                                     ) : areas.map((area) => (
                                         <label key={area.id} className="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-700/30 cursor-pointer">
                                             <input type="checkbox" checked={form.area_ids.includes(area.id)} onChange={() => toggleFormArea(area.id)} className="w-4 h-4 rounded" />
-                                            <span className="text-sm text-gray-900 dark:text-white">{areaLabel(area)}</span>
+                                            <span className="text-sm text-content">{areaLabel(area)}</span>
                                             {!gatedSet.has(area.id) && <span className="text-[10px] text-amber-500">(belum ditandai berbayar)</span>}
                                         </label>
                                     ))}
                                 </div>
                             </div>
                             <div className="flex gap-3 pt-2">
-                                <button type="button" onClick={() => setShowProfileModal(false)} className="flex-1 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 text-gray-900 dark:text-white px-4 py-2 rounded-lg transition-colors">Batal</button>
+                                <button type="button" onClick={() => setShowProfileModal(false)} className="flex-1 bg-surface-sunken hover:bg-gray-200 text-content px-4 py-2 rounded-lg transition-colors">Batal</button>
                                 <button type="submit" disabled={savingProfile} className="flex-1 bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white px-4 py-2 rounded-lg transition-colors">{editingId ? 'Perbarui' : 'Simpan'}</button>
                             </div>
                         </form>
@@ -538,9 +538,9 @@ export default function VoucherManagement() {
             {/* Generate-codes modal */}
             {genProfile && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white dark:bg-gray-800 rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
-                        <div className="p-5 border-b border-gray-200 dark:border-gray-700/50">
-                            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Generate Kode — {genProfile.name}</h2>
+                    <div className="bg-surface rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+                        <div className="p-5 border-b border-edge">
+                            <h2 className="text-xl font-bold text-content">Generate Kode — {genProfile.name}</h2>
                         </div>
                         {!genResult ? (
                             <form onSubmit={submitGenerate} className="p-5 space-y-4">
@@ -559,19 +559,19 @@ export default function VoucherManagement() {
                                     </div>
                                 </div>
                                 <div className="flex gap-3 pt-2">
-                                    <button type="button" onClick={() => setGenProfile(null)} className="flex-1 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 text-gray-900 dark:text-white px-4 py-2 rounded-lg transition-colors">Batal</button>
+                                    <button type="button" onClick={() => setGenProfile(null)} className="flex-1 bg-surface-sunken hover:bg-gray-200 text-content px-4 py-2 rounded-lg transition-colors">Batal</button>
                                     <button type="submit" disabled={generating} className="flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white px-4 py-2 rounded-lg transition-colors">Buat Kode</button>
                                 </div>
                             </form>
                         ) : (
                             <div className="p-5 space-y-4">
-                                <p className="text-sm text-gray-600 dark:text-gray-400">{genResult.length} kode dibuat. Salin / cetak lalu bagikan.</p>
-                                <div className="bg-gray-50 dark:bg-gray-900/40 rounded-lg p-3 max-h-60 overflow-y-auto font-mono text-sm text-gray-900 dark:text-white space-y-1">
+                                <p className="text-sm text-content-muted">{genResult.length} kode dibuat. Salin / cetak lalu bagikan.</p>
+                                <div className="bg-surface-sunken rounded-lg p-3 max-h-60 overflow-y-auto font-mono text-sm text-content space-y-1">
                                     {genResult.map((c) => <div key={c.id}>{c.code}</div>)}
                                 </div>
                                 <div className="flex gap-3">
                                     <button onClick={() => copyCodes(genResult)} className="flex-1 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg transition-colors">Salin semua</button>
-                                    <button onClick={() => setGenProfile(null)} className="flex-1 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 text-gray-900 dark:text-white px-4 py-2 rounded-lg transition-colors">Tutup</button>
+                                    <button onClick={() => setGenProfile(null)} className="flex-1 bg-surface-sunken hover:bg-gray-200 text-content px-4 py-2 rounded-lg transition-colors">Tutup</button>
                                 </div>
                             </div>
                         )}

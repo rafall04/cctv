@@ -122,7 +122,11 @@ describe('guardrail: legacy grey ratchet (design tokens)', () => {
     // replaces raw greys. Existing usages are frozen at the measured baseline: the count
     // may shrink as pages migrate, never grow. When you migrate a page, lower BASELINE
     // in the same PR so the ratchet tightens behind you.
-    const BASELINE = 5700; // measured 2026-07-22 after public-surface token sweep (was 5865)
+    // 2026-07-27 admin sweep: 5700 -> 1404. The admin surface held 4,630 of the 5,292 greys left in
+    // the tree (87%); it was migrated by exact light+dark PAIR inside a single className, never by
+    // collapsing a lone grey — an unpaired grey is a judgement call about which role was meant, so
+    // those ~1.4k are deliberately still here. Lower this again as they are resolved by hand.
+    const BASELINE = 1404;
 
     it(`-gray-N usage count stays <= ${BASELINE} and shrinks over time`, () => {
         let count = 0;

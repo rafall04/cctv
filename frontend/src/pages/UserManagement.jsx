@@ -507,8 +507,8 @@ export default function UserManagement() {
                                                     onClick={() => handleDeleteAttempt(user)} 
                                                     className={`p-2 rounded-lg transition-all ${
                                                         user.id === currentUser?.id 
-                                                            ? 'bg-gray-100 dark:bg-gray-700/50 text-gray-400 dark:text-gray-500 cursor-not-allowed'
-                                                            : 'bg-gray-100 dark:bg-gray-700/50 text-gray-600 dark:text-gray-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10'
+                                                            ? 'bg-gray-100 dark:bg-gray-700/50 text-content-subtle cursor-not-allowed'
+                                                            : 'bg-gray-100 dark:bg-gray-700/50 text-content-muted hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10'
                                                     }`} 
                                                     title={user.id === currentUser?.id ? "Cannot delete your own account" : "Delete"}
                                                 >
@@ -585,7 +585,7 @@ export default function UserManagement() {
                                     name="username" 
                                     value={formData.username} 
                                     onChange={handleChange} 
-                                    className={`w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary ${
+                                    className={`w-full px-4 py-2.5 bg-surface-sunken border rounded-xl text-content placeholder-content-subtle focus:outline-none focus:ring-2 focus:ring-primary ${
                                         fieldErrors.username 
                                             ? 'border-red-500 dark:border-red-500' 
                                             : 'border-gray-200 dark:border-gray-700/50'
@@ -609,7 +609,7 @@ export default function UserManagement() {
                                         name="password" 
                                         value={formData.password} 
                                         onChange={handleChange} 
-                                        className={`w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary ${
+                                        className={`w-full px-4 py-2.5 bg-surface-sunken border rounded-xl text-content placeholder-content-subtle focus:outline-none focus:ring-2 focus:ring-primary ${
                                             fieldErrors.password 
                                                 ? 'border-red-500 dark:border-red-500' 
                                                 : 'border-gray-200 dark:border-gray-700/50'
@@ -706,7 +706,7 @@ export default function UserManagement() {
                                     name="confirmPassword" 
                                     value={passwordData.confirmPassword} 
                                     onChange={handlePasswordChange} 
-                                    className={`w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary ${
+                                    className={`w-full px-4 py-2.5 bg-surface-sunken border rounded-xl text-content placeholder-content-subtle focus:outline-none focus:ring-2 focus:ring-primary ${
                                         passwordData.confirmPassword && passwordData.password !== passwordData.confirmPassword
                                             ? 'border-red-500 dark:border-red-500'
                                             : 'border-gray-200 dark:border-gray-700/50'

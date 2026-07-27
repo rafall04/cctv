@@ -417,8 +417,8 @@ export default function ImportExport() {
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Import Control Center</h1>
-                    <p className="text-gray-500 dark:text-gray-400">Preview dulu, lalu commit hanya row yang memang valid dan eligible.</p>
+                    <h1 className="text-2xl font-bold text-content">Import Control Center</h1>
+                    <p className="text-content-muted">Preview dulu, lalu commit hanya row yang memang valid dan eligible.</p>
                 </div>
             </div>
 
@@ -434,7 +434,7 @@ export default function ImportExport() {
                 </Link>
             </div>
 
-            <div className="flex space-x-1 border-b border-gray-200 dark:border-gray-800">
+            <div className="flex space-x-1 border-b border-edge">
                 <button onClick={() => setActiveTab('import')} className={`px-4 py-2 font-medium text-sm transition-colors ${activeTab === 'import' ? 'text-primary border-b-2 border-primary' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'}`}>
                     Import Center
                 </button>
@@ -444,7 +444,7 @@ export default function ImportExport() {
             </div>
 
             {activeTab === 'export' && (
-                <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
+                <div className="bg-surface rounded-xl shadow-sm border border-edge p-6">
                     <div className="p-4 bg-primary-50 dark:bg-primary-900/10 text-primary-900 dark:text-primary-100 rounded-xl border border-primary-200 dark:border-primary-800/30">
                         <h3 className="font-semibold text-lg mb-2">Full Database Export</h3>
                         <p className="text-sm mb-4">Unduh snapshot JSON untuk seluruh kamera yang saat ini ada di database. Field private seperti `private_rtsp_url` tidak ikut diekspor di jalur umum ini.</p>
@@ -458,10 +458,10 @@ export default function ImportExport() {
             {activeTab === 'import' && (
                 <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                     <div className="lg:col-span-1 space-y-4">
-                        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-5 space-y-4">
+                        <div className="bg-surface rounded-xl shadow-sm border border-edge p-5 space-y-4">
                             <div>
-                                <h3 className="font-bold text-gray-900 dark:text-white">1. Workflow</h3>
-                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Pilih upload manual atau fetch source preset dari backend.</p>
+                                <h3 className="font-bold text-content">1. Workflow</h3>
+                                <p className="text-xs text-content-muted mt-1">Pilih upload manual atau fetch source preset dari backend.</p>
                             </div>
                             <div className="grid grid-cols-2 gap-2">
                                 {IMPORT_MODE_OPTIONS.map((option) => (
@@ -472,7 +472,7 @@ export default function ImportExport() {
                                             if (option.value === 'remote_preset') setSourceProfile('jombang_mjpeg');
                                             setPreviewResult(null);
                                         }}
-                                        className={`rounded-xl px-3 py-2 text-sm font-medium transition ${importMode === option.value ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'}`}
+                                        className={`rounded-xl px-3 py-2 text-sm font-medium transition ${importMode === option.value ? 'bg-primary text-white' : 'bg-gray-100 text-content-muted hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700'}`}
                                     >
                                         {option.label}
                                     </button>
@@ -480,15 +480,15 @@ export default function ImportExport() {
                             </div>
 
                             <div>
-                                <label htmlFor="import-profile-select" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Import Profile</label>
-                                <select id="import-profile-select" value={sourceProfile} onChange={(event) => setSourceProfile(event.target.value)} className="w-full bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary focus:border-primary block p-2.5 dark:bg-gray-800 dark:border-gray-600 dark:text-white">
+                                <label htmlFor="import-profile-select" className="block text-sm font-medium text-content-muted mb-1">Import Profile</label>
+                                <select id="import-profile-select" value={sourceProfile} onChange={(event) => setSourceProfile(event.target.value)} className="w-full bg-surface-sunken border border-edge-strong text-content text-sm rounded-lg focus:ring-primary focus:border-primary block p-2.5">
                                     {sourceOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                                 </select>
                             </div>
 
                             {importMode === 'upload_json' ? (
                                 <div>
-                                    <label htmlFor="import-json-file" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Upload JSON</label>
+                                    <label htmlFor="import-json-file" className="block text-sm font-medium text-content-muted mb-1">Upload JSON</label>
                                     <input id="import-json-file" type="file" accept=".json" onChange={handleFileUpload} ref={fileInputRef} className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100" />
                                     {rawPayload.length > 0 && <p className="mt-3 text-sm text-green-600 dark:text-green-400 font-medium">Loaded {rawPayload.length} rows from {rawFileName || 'JSON'}.</p>}
                                 </div>
@@ -505,68 +505,68 @@ export default function ImportExport() {
                             )}
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Target Area</label>
-                                <input type="text" value={targetArea} onChange={(event) => { setTargetArea(event.target.value); setPreviewResult(null); }} className="w-full bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary focus:border-primary block p-2.5 dark:bg-gray-800 dark:border-gray-600 dark:text-white" placeholder="Nama area target" />
+                                <label className="block text-sm font-medium text-content-muted mb-1">Target Area</label>
+                                <input type="text" value={targetArea} onChange={(event) => { setTargetArea(event.target.value); setPreviewResult(null); }} className="w-full bg-surface-sunken border border-edge-strong text-content text-sm rounded-lg focus:ring-primary focus:border-primary block p-2.5" placeholder="Nama area target" />
                             </div>
                         </div>
 
-                        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-5 space-y-4">
-                            <h3 className="font-bold text-gray-900 dark:text-white">2. Policy Overrides</h3>
+                        <div className="bg-surface rounded-xl shadow-sm border border-edge p-5 space-y-4">
+                            <h3 className="font-bold text-content">2. Policy Overrides</h3>
                             <div className="grid grid-cols-1 gap-3">
                                 <div>
-                                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Delivery Type Override</label>
-                                    <select value={globalOverrides.delivery_type} onChange={(event) => handleOverrideChange('delivery_type', event.target.value)} disabled={isPrivateRtspProfile} className="w-full rounded-lg border border-gray-300 bg-gray-50 p-2 text-sm disabled:opacity-60 dark:bg-gray-800 dark:border-gray-600 dark:text-white">
+                                    <label className="block text-xs font-medium text-content-muted mb-1">Delivery Type Override</label>
+                                    <select value={globalOverrides.delivery_type} onChange={(event) => handleOverrideChange('delivery_type', event.target.value)} disabled={isPrivateRtspProfile} className="w-full rounded-lg border border-edge-strong bg-surface-sunken p-2 text-sm disabled:opacity-60 dark:text-white">
                                         {DELIVERY_TYPE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                                     </select>
-                                    {isPrivateRtspProfile && <p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">Profile ini selalu dipaksa ke `internal_hls`.</p>}
+                                    {isPrivateRtspProfile && <p className="mt-1 text-[11px] text-content-muted">Profile ini selalu dipaksa ke `internal_hls`.</p>}
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">External Health Mode</label>
-                                    <select value={globalOverrides.external_health_mode} onChange={(event) => handleOverrideChange('external_health_mode', event.target.value)} disabled={isPrivateRtspProfile} className="w-full rounded-lg border border-gray-300 bg-gray-50 p-2 text-sm disabled:opacity-60 dark:bg-gray-800 dark:border-gray-600 dark:text-white">
+                                    <label className="block text-xs font-medium text-content-muted mb-1">External Health Mode</label>
+                                    <select value={globalOverrides.external_health_mode} onChange={(event) => handleOverrideChange('external_health_mode', event.target.value)} disabled={isPrivateRtspProfile} className="w-full rounded-lg border border-edge-strong bg-surface-sunken p-2 text-sm disabled:opacity-60 dark:text-white">
                                         {HEALTH_MODE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">TLS Mode</label>
-                                    <select value={globalOverrides.external_tls_mode} onChange={(event) => handleOverrideChange('external_tls_mode', event.target.value)} disabled={isPrivateRtspProfile} className="w-full rounded-lg border border-gray-300 bg-gray-50 p-2 text-sm disabled:opacity-60 dark:bg-gray-800 dark:border-gray-600 dark:text-white">
+                                    <label className="block text-xs font-medium text-content-muted mb-1">TLS Mode</label>
+                                    <select value={globalOverrides.external_tls_mode} onChange={(event) => handleOverrideChange('external_tls_mode', event.target.value)} disabled={isPrivateRtspProfile} className="w-full rounded-lg border border-edge-strong bg-surface-sunken p-2 text-sm disabled:opacity-60 dark:text-white">
                                         {TLS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Origin Mode</label>
-                                    <select value={globalOverrides.external_origin_mode} onChange={(event) => handleOverrideChange('external_origin_mode', event.target.value)} disabled={isPrivateRtspProfile} className="w-full rounded-lg border border-gray-300 bg-gray-50 p-2 text-sm disabled:opacity-60 dark:bg-gray-800 dark:border-gray-600 dark:text-white">
+                                    <label className="block text-xs font-medium text-content-muted mb-1">Origin Mode</label>
+                                    <select value={globalOverrides.external_origin_mode} onChange={(event) => handleOverrideChange('external_origin_mode', event.target.value)} disabled={isPrivateRtspProfile} className="w-full rounded-lg border border-edge-strong bg-surface-sunken p-2 text-sm disabled:opacity-60 dark:text-white">
                                         {ORIGIN_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Snapshot Handling</label>
-                                    <select value={globalOverrides.external_snapshot_url_handling} onChange={(event) => handleOverrideChange('external_snapshot_url_handling', event.target.value)} className="w-full rounded-lg border border-gray-300 bg-gray-50 p-2 text-sm dark:bg-gray-800 dark:border-gray-600 dark:text-white">
+                                    <label className="block text-xs font-medium text-content-muted mb-1">Snapshot Handling</label>
+                                    <select value={globalOverrides.external_snapshot_url_handling} onChange={(event) => handleOverrideChange('external_snapshot_url_handling', event.target.value)} className="w-full rounded-lg border border-edge-strong bg-surface-sunken p-2 text-sm dark:text-white">
                                         {SNAPSHOT_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Location Mapping</label>
-                                    <select value={importPolicy.locationMapping} onChange={(event) => handlePolicyChange('locationMapping', event.target.value)} className="w-full rounded-lg border border-gray-300 bg-gray-50 p-2 text-sm dark:bg-gray-800 dark:border-gray-600 dark:text-white">
+                                    <label className="block text-xs font-medium text-content-muted mb-1">Location Mapping</label>
+                                    <select value={importPolicy.locationMapping} onChange={(event) => handlePolicyChange('locationMapping', event.target.value)} className="w-full rounded-lg border border-edge-strong bg-surface-sunken p-2 text-sm dark:text-white">
                                         {LOCATION_MAPPING_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Filter Source Rows</label>
-                                    <select value={importPolicy.filterSourceRows} onChange={(event) => handlePolicyChange('filterSourceRows', event.target.value)} className="w-full rounded-lg border border-gray-300 bg-gray-50 p-2 text-sm dark:bg-gray-800 dark:border-gray-600 dark:text-white">
+                                    <label className="block text-xs font-medium text-content-muted mb-1">Filter Source Rows</label>
+                                    <select value={importPolicy.filterSourceRows} onChange={(event) => handlePolicyChange('filterSourceRows', event.target.value)} className="w-full rounded-lg border border-edge-strong bg-surface-sunken p-2 text-sm dark:text-white">
                                         {SOURCE_FILTER_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                                     </select>
                                 </div>
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Description Template</label>
-                                <textarea value={globalOverrides.descriptionTemplate} onChange={(event) => handleOverrideChange('descriptionTemplate', event.target.value)} className="w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm dark:bg-gray-800 dark:border-gray-600 dark:text-white h-20" placeholder="SOURCE: {sourceProfile} | status: {sourceStatus}" />
+                                <label className="block text-xs font-medium text-content-muted mb-1">Description Template</label>
+                                <textarea value={globalOverrides.descriptionTemplate} onChange={(event) => handleOverrideChange('descriptionTemplate', event.target.value)} className="w-full rounded-lg border border-edge-strong bg-surface-sunken p-2.5 text-sm dark:text-white h-20" placeholder="SOURCE: {sourceProfile} | status: {sourceStatus}" />
                             </div>
                             <div className="space-y-3">
-                                <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300"><input type="checkbox" checked={globalOverrides.enabled} onChange={(event) => handleOverrideChange('enabled', event.target.checked)} />Import as enabled</label>
+                                <label className="flex items-center gap-2 text-sm text-content-muted"><input type="checkbox" checked={globalOverrides.enabled} onChange={(event) => handleOverrideChange('enabled', event.target.checked)} />Import as enabled</label>
                                 <label className={`flex items-center gap-2 text-sm ${isPrivateRtspProfile ? 'text-gray-400 dark:text-gray-500' : 'text-gray-700 dark:text-gray-300'}`}><input type="checkbox" checked={globalOverrides.external_use_proxy} onChange={(event) => handleOverrideChange('external_use_proxy', event.target.checked)} disabled={isPrivateRtspProfile} />Enable built-in proxy</label>
-                                <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300"><input type="checkbox" checked={globalOverrides.syncLocationWithName} onChange={(event) => handleOverrideChange('syncLocationWithName', event.target.checked)} />Pakai nama kamera sebagai location</label>
-                                <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300"><input type="checkbox" checked={importPolicy.normalizeNames} onChange={(event) => handlePolicyChange('normalizeNames', event.target.checked)} />Normalize camera names</label>
-                                <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300"><input type="checkbox" checked={importPolicy.dropOfflineSourceRows} onChange={(event) => handlePolicyChange('dropOfflineSourceRows', event.target.checked)} />Drop offline source rows</label>
+                                <label className="flex items-center gap-2 text-sm text-content-muted"><input type="checkbox" checked={globalOverrides.syncLocationWithName} onChange={(event) => handleOverrideChange('syncLocationWithName', event.target.checked)} />Pakai nama kamera sebagai location</label>
+                                <label className="flex items-center gap-2 text-sm text-content-muted"><input type="checkbox" checked={importPolicy.normalizeNames} onChange={(event) => handlePolicyChange('normalizeNames', event.target.checked)} />Normalize camera names</label>
+                                <label className="flex items-center gap-2 text-sm text-content-muted"><input type="checkbox" checked={importPolicy.dropOfflineSourceRows} onChange={(event) => handlePolicyChange('dropOfflineSourceRows', event.target.checked)} />Drop offline source rows</label>
                             </div>
                         </div>
 
@@ -577,18 +577,18 @@ export default function ImportExport() {
                             <button onClick={handleImportSubmit} disabled={isProcessing || !previewResult?.canImport} className="w-full bg-primary text-white py-3 px-4 rounded-xl shadow font-medium hover:bg-primary-600 transition disabled:opacity-50">
                                 {isProcessing ? 'Processing Transaction...' : 'Commit Import to DB'}
                             </button>
-                            <button onClick={clearImport} className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800">
+                            <button onClick={clearImport} className="w-full rounded-xl border border-edge-strong px-4 py-3 text-sm font-medium text-content-muted transition hover:bg-surface-sunken">
                                 Clear
                             </button>
                         </div>
                     </div>
 
                     <div className="lg:col-span-3 space-y-6">
-                        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800">
-                            <div className="p-4 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center">
+                        <div className="bg-surface rounded-xl shadow-sm border border-edge">
+                            <div className="p-4 border-b border-edge flex justify-between items-center">
                                 <div>
-                                    <h3 className="font-bold text-gray-900 dark:text-white">Server Preview</h3>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Preview dan apply memakai logic backend yang sama.</p>
+                                    <h3 className="font-bold text-content">Server Preview</h3>
+                                    <p className="text-xs text-content-muted mt-1">Preview dan apply memakai logic backend yang sama.</p>
                                 </div>
                                 <button onClick={() => setShowTemplate((current) => !current)} className="text-sm text-primary hover:text-primary-600">
                                     {showTemplate ? 'Tutup Template JSON' : 'Lihat Template JSON'}
@@ -596,8 +596,8 @@ export default function ImportExport() {
                             </div>
                             {showTemplate && (
                                 <div className="px-4 pt-4">
-                                    <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-950">
-                                        <pre className="overflow-x-auto text-xs text-gray-700 dark:text-gray-300">{templateJson}</pre>
+                                    <div className="rounded-xl border border-edge bg-surface-sunken p-4">
+                                        <pre className="overflow-x-auto text-xs text-content-muted">{templateJson}</pre>
                                     </div>
                                 </div>
                             )}
@@ -610,33 +610,33 @@ export default function ImportExport() {
                                 ) : (
                                     <>
                                         <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
-                                            <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/40"><div className="text-xs text-gray-500 dark:text-gray-400">Importable</div><div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{previewSummary?.importableCount || 0}</div></div>
-                                            <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/40"><div className="text-xs text-gray-500 dark:text-gray-400">Duplicate</div><div className="text-2xl font-bold text-amber-600 dark:text-amber-400">{previewSummary?.duplicateCount || 0}</div></div>
-                                            <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/40"><div className="text-xs text-gray-500 dark:text-gray-400">Invalid</div><div className="text-2xl font-bold text-red-600 dark:text-red-400">{previewSummary?.invalidCount || 0}</div></div>
-                                            <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/40"><div className="text-xs text-gray-500 dark:text-gray-400">Filtered Out</div><div className="text-2xl font-bold text-slate-600 dark:text-slate-300">{previewSummary?.filteredOutCount || 0}</div></div>
+                                            <div className="rounded-xl border border-edge bg-surface-sunken p-4"><div className="text-xs text-content-muted">Importable</div><div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{previewSummary?.importableCount || 0}</div></div>
+                                            <div className="rounded-xl border border-edge bg-surface-sunken p-4"><div className="text-xs text-content-muted">Duplicate</div><div className="text-2xl font-bold text-amber-600 dark:text-amber-400">{previewSummary?.duplicateCount || 0}</div></div>
+                                            <div className="rounded-xl border border-edge bg-surface-sunken p-4"><div className="text-xs text-content-muted">Invalid</div><div className="text-2xl font-bold text-red-600 dark:text-red-400">{previewSummary?.invalidCount || 0}</div></div>
+                                            <div className="rounded-xl border border-edge bg-surface-sunken p-4"><div className="text-xs text-content-muted">Filtered Out</div><div className="text-2xl font-bold text-slate-600 dark:text-slate-300">{previewSummary?.filteredOutCount || 0}</div></div>
                                         </div>
 
                                         <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-                                            <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/40">
-                                                <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Source Stats</h4>
-                                                <p className="text-sm text-gray-600 dark:text-gray-300">Total: {sourceStats?.totalRows || 0}</p>
-                                                <p className="text-sm text-gray-600 dark:text-gray-300">Online: {sourceStats?.onlineCount || 0}</p>
-                                                <p className="text-sm text-gray-600 dark:text-gray-300">Offline: {sourceStats?.offlineCount || 0}</p>
-                                                <p className="text-sm text-gray-600 dark:text-gray-300">Missing Coords: {sourceStats?.missingCoordsCount || 0}</p>
-                                                <p className="text-sm text-gray-600 dark:text-gray-300">Duplicate URLs: {sourceStats?.duplicateUrlCount || 0}</p>
+                                            <div className="rounded-xl border border-edge bg-surface-sunken p-4">
+                                                <h4 className="font-semibold text-content mb-2">Source Stats</h4>
+                                                <p className="text-sm text-content-muted">Total: {sourceStats?.totalRows || 0}</p>
+                                                <p className="text-sm text-content-muted">Online: {sourceStats?.onlineCount || 0}</p>
+                                                <p className="text-sm text-content-muted">Offline: {sourceStats?.offlineCount || 0}</p>
+                                                <p className="text-sm text-content-muted">Missing Coords: {sourceStats?.missingCoordsCount || 0}</p>
+                                                <p className="text-sm text-content-muted">Duplicate URLs: {sourceStats?.duplicateUrlCount || 0}</p>
                                             </div>
-                                            <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/40">
-                                                <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Field Mapping</h4>
-                                                <div className="space-y-1 text-sm text-gray-600 dark:text-gray-300">
+                                            <div className="rounded-xl border border-edge bg-surface-sunken p-4">
+                                                <h4 className="font-semibold text-content mb-2">Field Mapping</h4>
+                                                <div className="space-y-1 text-sm text-content-muted">
                                                     {Object.entries(previewResult.fieldMapping || {}).map(([key, value]) => (
-                                                        <p key={key}><span className="font-medium text-gray-900 dark:text-white">{key}</span>: {value}</p>
+                                                        <p key={key}><span className="font-medium text-content">{key}</span>: {value}</p>
                                                     ))}
                                                 </div>
                                             </div>
-                                            <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/40">
-                                                <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Breakdown</h4>
-                                                <p className="text-sm text-gray-600 dark:text-gray-300">Delivery: {formatBreakdown(previewSummary?.deliveryTypeBreakdown, 'deliveryType')}</p>
-                                                <p className="text-sm text-gray-600 dark:text-gray-300 mt-2">Kategori: {formatBreakdown(sourceStats?.categoryBreakdown, 'category')}</p>
+                                            <div className="rounded-xl border border-edge bg-surface-sunken p-4">
+                                                <h4 className="font-semibold text-content mb-2">Breakdown</h4>
+                                                <p className="text-sm text-content-muted">Delivery: {formatBreakdown(previewSummary?.deliveryTypeBreakdown, 'deliveryType')}</p>
+                                                <p className="text-sm text-content-muted mt-2">Kategori: {formatBreakdown(sourceStats?.categoryBreakdown, 'category')}</p>
                                             </div>
                                         </div>
 
@@ -652,8 +652,8 @@ export default function ImportExport() {
                                         )}
 
                                         <div className="overflow-x-auto">
-                                            <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400">
-                                                <thead className="bg-gray-50 dark:bg-gray-800 text-xs uppercase text-gray-700 dark:text-gray-400 sticky top-0">
+                                            <table className="w-full text-sm text-left text-content-muted">
+                                                <thead className="bg-surface-sunken text-xs uppercase text-gray-700 dark:text-gray-400 sticky top-0">
                                                     <tr>
                                                         <th className="px-4 py-3 rounded-tl-lg">Status</th>
                                                         <th className="px-4 py-3">Name</th>
@@ -666,12 +666,12 @@ export default function ImportExport() {
                                                 </thead>
                                                 <tbody>
                                                     {previewRows.slice(0, 80).map((row) => (
-                                                        <tr key={`${row.index}-${row.resolvedName || 'row'}`} className="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800">
+                                                        <tr key={`${row.index}-${row.resolvedName || 'row'}`} className="border-b dark:border-gray-700 hover:bg-surface-sunken">
                                                             <td className="px-4 py-3"><span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${row.status === 'importable' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300' : row.status === 'duplicate_name' || row.status === 'duplicate_url' ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300' : row.status === 'filtered_out' ? 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200' : 'bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-300'}`}>{row.status}</span></td>
-                                                            <td className="px-4 py-3 font-medium text-gray-900 dark:text-white max-w-[200px] truncate">{row.resolvedName || `Row ${row.index + 1}`}</td>
+                                                            <td className="px-4 py-3 font-medium text-content max-w-[200px] truncate">{row.resolvedName || `Row ${row.index + 1}`}</td>
                                                             <td className="px-4 py-3">
-                                                                <div className="font-medium text-gray-900 dark:text-white">{row.resolvedDeliveryType || '-'}</div>
-                                                                <div className="text-xs text-gray-500 dark:text-gray-400">
+                                                                <div className="font-medium text-content">{row.resolvedDeliveryType || '-'}</div>
+                                                                <div className="text-xs text-content-muted">
                                                                     {(row.resolvedStreamSource || '-')}{row.resolvedRecordingEnabled === 0 ? ' • live only' : ''}
                                                                 </div>
                                                             </td>

@@ -124,7 +124,7 @@ export default function MyCameras() {
     };
 
     if (loading) {
-        return <div className="py-16 text-center text-gray-500 dark:text-gray-400">Memuat kamera…</div>;
+        return <div className="py-16 text-center text-content-muted">Memuat kamera…</div>;
     }
 
     if (error) {
@@ -143,7 +143,7 @@ export default function MyCameras() {
     return (
         <>
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-                <div className="text-sm text-gray-600 dark:text-gray-300">
+                <div className="text-sm text-content-muted">
                     {limitLabel || 'Kamera yang Anda sewa'}
                     {planState?.plan && !canAdd && !planState.trial_expired && planState.used_cameras >= planState.max_cameras && (
                         <span className="ml-2 text-xs text-amber-600 dark:text-amber-400">
@@ -177,10 +177,10 @@ export default function MyCameras() {
             )}
 
             {cameras.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-gray-300 bg-white px-6 py-16 text-center dark:border-gray-700 dark:bg-gray-900">
+                <div className="rounded-2xl border border-dashed border-edge-strong bg-surface px-6 py-16 text-center">
                     <p className="text-4xl">📷</p>
-                    <h2 className="mt-3 font-semibold text-gray-900 dark:text-white">Belum ada kamera</h2>
-                    <p className="mx-auto mt-1 max-w-md text-sm text-gray-500 dark:text-gray-400">
+                    <h2 className="mt-3 font-semibold text-content">Belum ada kamera</h2>
+                    <p className="mx-auto mt-1 max-w-md text-sm text-content-muted">
                         {planState?.plan
                             ? 'Tambahkan kamera pertama Anda dengan tombol "+ Tambah Kamera" di atas.'
                             : 'Pilih paket dulu di menu Paket, lalu tambahkan kamera Anda sendiri — atau hubungi admin.'}
@@ -194,7 +194,7 @@ export default function MyCameras() {
                         return (
                             <div
                                 key={camera.id}
-                                className="group overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md dark:border-gray-800 dark:bg-gray-900"
+                                className="group overflow-hidden rounded-2xl border border-edge bg-surface shadow-sm transition-shadow hover:shadow-md"
                             >
                                 <button
                                     onClick={() => setActiveCamera(camera)}
@@ -221,7 +221,7 @@ export default function MyCameras() {
                                 </button>
                                 <div className="p-3">
                                     <div className="flex items-center gap-1.5">
-                                        <h3 className="truncate font-semibold text-gray-900 dark:text-white">{camera.name}</h3>
+                                        <h3 className="truncate font-semibold text-content">{camera.name}</h3>
                                         {camera.area_name && (
                                             <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
                                                 {camera.area_name}
@@ -231,11 +231,11 @@ export default function MyCameras() {
                                             <span className="shrink-0 rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-medium text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">🌐 Publik</span>
                                         ) : null}
                                     </div>
-                                    <p className="truncate text-xs text-gray-500 dark:text-gray-400">
+                                    <p className="truncate text-xs text-content-muted">
                                         {camera.location || '—'}
                                     </p>
                                     {camera.monthly_price && (
-                                        <p className="mt-1 text-xs font-medium text-gray-600 dark:text-gray-300">
+                                        <p className="mt-1 text-xs font-medium text-content-muted">
                                             {formatRupiah(camera.monthly_price)}/bulan
                                         </p>
                                     )}
@@ -258,7 +258,7 @@ export default function MyCameras() {
                                         <button
                                             onClick={() => setFormCamera(camera)}
                                             disabled={busyId === camera.id}
-                                            className="rounded-lg px-2 py-1 text-xs text-gray-600 transition-colors hover:bg-gray-100 disabled:opacity-50 dark:text-gray-300 dark:hover:bg-gray-800"
+                                            className="rounded-lg px-2 py-1 text-xs text-content-muted transition-colors hover:bg-surface-sunken disabled:opacity-50"
                                         >
                                             ✏️ Edit
                                         </button>

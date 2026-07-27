@@ -117,14 +117,14 @@ export default function BackupSettingsTab() {
     };
 
     return (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <div className="bg-surface rounded-lg shadow p-6">
             <div className="flex items-center gap-3 mb-6">
                 <Database className="w-6 h-6 text-purple-600" />
                 <div>
-                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                    <h2 className="text-xl font-semibold text-content">
                         Backup & Restore Database
                     </h2>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    <p className="text-sm text-content-muted mt-1">
                         Export/import data untuk migrasi atau backup
                     </p>
                 </div>
@@ -132,12 +132,12 @@ export default function BackupSettingsTab() {
 
             <div className="space-y-6">
                 {/* Export Section */}
-                <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-                    <h3 className="font-medium text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                <div className="border border-edge rounded-lg p-4">
+                    <h3 className="font-medium text-content mb-3 flex items-center gap-2">
                         <Download className="w-5 h-5 text-blue-600" />
                         Export Backup
                     </h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                    <p className="text-sm text-content-muted mb-4">
                         Download semua data database dalam format JSON untuk migrasi ke backend Go atau backup.
                     </p>
                     <button
@@ -153,19 +153,19 @@ export default function BackupSettingsTab() {
                 </div>
 
                 {/* Import Section */}
-                <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-                    <h3 className="font-medium text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                <div className="border border-edge rounded-lg p-4">
+                    <h3 className="font-medium text-content mb-3 flex items-center gap-2">
                         <Upload className="w-5 h-5 text-green-600" />
                         Import Backup
                     </h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                    <p className="text-sm text-content-muted mb-4">
                         Restore data dari file backup JSON.
                     </p>
 
                     <div className="space-y-4">
                         {/* File Input */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            <label className="block text-sm font-medium text-content-muted mb-2">
                                 Pilih File Backup
                             </label>
                             <input
@@ -175,7 +175,7 @@ export default function BackupSettingsTab() {
                                 onChange={handleFileSelect}
                                 disabled={importing}
                                 className="block w-full text-sm text-gray-900 dark:text-white
-                                         border border-gray-300 dark:border-gray-600 rounded-lg
+                                         border border-edge-strong rounded-lg
                                          cursor-pointer bg-gray-50 dark:bg-gray-700
                                          focus:outline-none disabled:opacity-50"
                             />
@@ -183,22 +183,22 @@ export default function BackupSettingsTab() {
 
                         {/* Import Mode */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            <label className="block text-sm font-medium text-content-muted mb-2">
                                 Mode Import
                             </label>
                             <select
                                 value={importMode}
                                 onChange={(e) => setImportMode(e.target.value)}
                                 disabled={importing}
-                                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg 
-                                         bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+                                className="w-full px-4 py-2 border border-edge-strong rounded-lg 
+                                         bg-surface text-gray-900 dark:text-white
                                          focus:ring-2 focus:ring-purple-500 focus:border-transparent
                                          disabled:opacity-50"
                             >
                                 <option value="merge">Merge (Gabung dengan data existing)</option>
                                 <option value="replace">Replace (Ganti semua data)</option>
                             </select>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            <p className="text-xs text-content-muted mt-1">
                                 {importMode === 'merge' 
                                     ? '✓ Data existing dipertahankan, hanya menambah data baru'
                                     : '⚠️ PERINGATAN: Semua data existing akan dihapus!'}
@@ -207,33 +207,33 @@ export default function BackupSettingsTab() {
 
                         {/* Backup Preview */}
                         {backupPreview && (
-                            <div className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                            <div className="bg-surface-sunken border border-edge rounded-lg p-4">
                                 <div className="flex items-center gap-2 mb-3">
                                     <FileJson className="w-5 h-5 text-purple-600" />
-                                    <h4 className="font-medium text-gray-900 dark:text-white">
+                                    <h4 className="font-medium text-content">
                                         Preview Backup
                                     </h4>
                                 </div>
                                 <div className="space-y-2 text-sm">
                                     <div className="flex justify-between">
-                                        <span className="text-gray-600 dark:text-gray-400">Version:</span>
-                                        <span className="font-mono text-gray-900 dark:text-white">
+                                        <span className="text-content-muted">Version:</span>
+                                        <span className="font-mono text-content">
                                             {backupPreview.version}
                                         </span>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span className="text-gray-600 dark:text-gray-400">Exported:</span>
-                                        <span className="font-mono text-gray-900 dark:text-white">
+                                        <span className="text-content-muted">Exported:</span>
+                                        <span className="font-mono text-content">
                                             {new Date(backupPreview.exported_at).toLocaleString('id-ID')}
                                         </span>
                                     </div>
-                                    <div className="border-t border-gray-200 dark:border-gray-700 pt-2 mt-2">
-                                        <p className="text-gray-600 dark:text-gray-400 mb-2">Data Tables:</p>
+                                    <div className="border-t border-edge pt-2 mt-2">
+                                        <p className="text-content-muted mb-2">Data Tables:</p>
                                         <div className="grid grid-cols-2 gap-2">
                                             {Object.entries(backupPreview.tables).map(([table, count]) => (
                                                 <div key={table} className="flex justify-between text-xs">
-                                                    <span className="text-gray-600 dark:text-gray-400">{table}:</span>
-                                                    <span className="font-mono text-gray-900 dark:text-white">
+                                                    <span className="text-content-muted">{table}:</span>
+                                                    <span className="font-mono text-content">
                                                         {count} rows
                                                     </span>
                                                 </div>

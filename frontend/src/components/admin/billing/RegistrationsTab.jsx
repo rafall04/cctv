@@ -51,12 +51,12 @@ export default function RegistrationsTab({ registrations, run, busy }) {
 
     return (
         <div>
-            <p className="mb-3 text-sm text-gray-500 dark:text-gray-400">
+            <p className="mb-3 text-sm text-content-muted">
                 Pendaftar baru lewat halaman <code>/daftar</code> menunggu persetujuan. Mereka belum bisa login sampai disetujui; masa trial baru mulai saat disetujui.
             </p>
 
             {registrations.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-12 text-center text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
+                <div className="rounded-2xl border border-dashed border-edge px-4 py-12 text-center text-sm text-content-muted">
                     Tidak ada pendaftaran yang menunggu persetujuan. 🎉
                 </div>
             ) : (
@@ -64,7 +64,7 @@ export default function RegistrationsTab({ registrations, run, busy }) {
                     {/* Desktop: table */}
                     <DesktopTable minWidth="min-w-[560px]">
                         <thead>
-                            <tr className="text-left text-xs uppercase text-gray-500 dark:text-gray-400">
+                            <tr className="text-left text-xs uppercase text-content-muted">
                                 <th className="px-3 py-2">Calon Pelanggan</th>
                                 <th className="px-3 py-2">Kontak</th>
                                 <th className="px-3 py-2">Paket Dipilih</th>
@@ -72,13 +72,13 @@ export default function RegistrationsTab({ registrations, run, busy }) {
                                 <th className="px-3 py-2 text-right">Aksi</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                        <tbody className="divide-y divide-edge">
                             {registrations.map((reg) => (
-                                <tr key={reg.id} className="bg-white dark:bg-gray-900">
-                                    <td className="px-3 py-2 font-medium text-gray-900 dark:text-white">{reg.username}</td>
-                                    <td className="px-3 py-2 text-gray-600 dark:text-gray-300">{reg.phone || reg.email || '—'}</td>
-                                    <td className="px-3 py-2 text-gray-600 dark:text-gray-300"><PlanTag reg={reg} /></td>
-                                    <td className="px-3 py-2 text-gray-500 dark:text-gray-400">{formatDateTime(reg.created_at)}</td>
+                                <tr key={reg.id} className="bg-surface">
+                                    <td className="px-3 py-2 font-medium text-content">{reg.username}</td>
+                                    <td className="px-3 py-2 text-content-muted">{reg.phone || reg.email || '—'}</td>
+                                    <td className="px-3 py-2 text-content-muted"><PlanTag reg={reg} /></td>
+                                    <td className="px-3 py-2 text-content-muted">{formatDateTime(reg.created_at)}</td>
                                     <td className="px-3 py-2"><ActionButtons reg={reg} /></td>
                                 </tr>
                             ))}
@@ -88,10 +88,10 @@ export default function RegistrationsTab({ registrations, run, busy }) {
                     {/* Mobile: cards */}
                     <div className="space-y-3 md:hidden">
                         {registrations.map((reg) => (
-                            <div key={reg.id} className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
-                                <p className="font-semibold text-gray-900 dark:text-white">{reg.username}</p>
-                                <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">{reg.phone || reg.email || '—'}</p>
-                                <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-sm text-gray-600 dark:text-gray-300">
+                            <div key={reg.id} className="rounded-2xl border border-edge bg-surface p-4">
+                                <p className="font-semibold text-content">{reg.username}</p>
+                                <p className="mt-0.5 text-sm text-content-muted">{reg.phone || reg.email || '—'}</p>
+                                <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-sm text-content-muted">
                                     <PlanTag reg={reg} />
                                     <span className="text-xs text-gray-400">{formatDateTime(reg.created_at)}</span>
                                 </div>

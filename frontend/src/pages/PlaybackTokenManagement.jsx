@@ -17,8 +17,8 @@ export default function PlaybackTokenManagement() {
     return (
         <div className="space-y-6 py-6">
             <div>
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Playback Tokens</h1>
-                <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                <h1 className="text-2xl font-bold text-content">Playback Tokens</h1>
+                <p className="mt-1 text-sm text-content-muted">
                     Buat token playback publik dengan scope kamera, masa berlaku, policy device, dan template share.
                 </p>
             </div>
@@ -72,9 +72,9 @@ export default function PlaybackTokenManagement() {
                 onRevoke={page.handleRevoke}
             />
 
-            <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+            <div className="rounded-lg border border-edge bg-surface p-5 shadow-sm">
                 <div className="mb-4">
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Log Token Terbaru</h2>
+                    <h2 className="text-lg font-semibold text-content">Log Token Terbaru</h2>
                 </div>
                 <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
@@ -87,9 +87,9 @@ export default function PlaybackTokenManagement() {
                                 <th className="px-3 py-2">Actor/IP</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                        <tbody className="divide-y divide-edge">
                             {page.auditLogs.map((log) => (
-                                <tr key={log.id} className="text-gray-800 dark:text-gray-200">
+                                <tr key={log.id} className="text-content">
                                     <td className="whitespace-nowrap px-3 py-3">{page.formatTokenDate(log.created_at)}</td>
                                     <td className="px-3 py-3">{log.event_type}</td>
                                     <td className="px-3 py-3">

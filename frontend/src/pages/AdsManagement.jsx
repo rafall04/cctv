@@ -18,10 +18,10 @@ export default function AdsManagement() {
     return (
         <div className="p-6 space-y-6">
             <div>
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Manajemen Iklan</h1>
-                <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
+                <h1 className="text-2xl font-bold text-content">Manajemen Iklan</h1>
+                <p className="text-content-muted text-sm mt-1">
                     Konfigurasi script iklan eksternal (AdSense / Adsterra / PropellerAds dsb).
-                    <span className="ml-1 text-gray-400 dark:text-gray-500">
+                    <span className="ml-1 text-content-subtle">
                         Sponsor lokal — logo yang kita render sendiri — diatur di halaman Sponsors, terpisah.
                     </span>
                 </p>

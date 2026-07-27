@@ -367,7 +367,7 @@ export default function AreaManagement() {
 
     if (loadError) {
         return (
-            <div className="text-center py-20 bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl">
+            <div className="text-center py-20 bg-surface border border-edge rounded-2xl">
                 <Alert type="error" title="Error" message={loadError} className="max-w-md mx-auto mb-6" />
                 <button onClick={loadAreas} className="px-6 py-2.5 bg-primary hover:bg-primary-600 text-white font-medium rounded-xl">
                     Coba Lagi
@@ -382,8 +382,8 @@ export default function AreaManagement() {
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                 <div>
                     <p className="text-sm font-semibold text-primary mb-1">Manajemen Lokasi</p>
-                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Area</h1>
-                    <p className="text-gray-500 dark:text-gray-400 mt-1">Kelompokkan kamera berdasarkan RT, RW, Kelurahan, Kecamatan</p>
+                    <h1 className="text-2xl font-bold text-content">Area</h1>
+                    <p className="text-content-muted mt-1">Kelompokkan kamera berdasarkan RT, RW, Kelurahan, Kecamatan</p>
                 </div>
                 <div className="flex items-center gap-3 flex-wrap">
                     <Link
@@ -394,13 +394,13 @@ export default function AreaManagement() {
                     </Link>
                     {kecamatans.length > 0 && (
                         <select value={filterKecamatan} onChange={(e) => setFilterKecamatan(e.target.value)}
-                            className="px-4 py-2.5 bg-white dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+                            className="px-4 py-2.5 bg-white dark:bg-gray-800/80 border border-edge rounded-xl text-content text-sm focus:outline-none focus:ring-2 focus:ring-primary">
                             <option value="">Semua Kecamatan</option>
                             {kecamatans.map(k => <option key={k} value={k}>{k}</option>)}
                         </select>
                     )}
                     <button onClick={() => setShowMapCenterModal(true)}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-gray-100 dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 font-medium rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+                        className="flex items-center gap-2 px-4 py-2.5 bg-surface-sunken text-content-muted font-medium rounded-xl hover:bg-surface-sunken transition-colors">
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l5.447 2.724A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
                         </svg>
@@ -418,25 +418,25 @@ export default function AreaManagement() {
 
             {/* Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl p-4 shadow-sm">
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">{areas.length}</p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Total Area</p>
+                <div className="bg-surface border border-edge rounded-2xl p-4 shadow-sm">
+                    <p className="text-2xl font-bold text-content">{areas.length}</p>
+                    <p className="text-sm text-content-muted">Total Area</p>
                 </div>
-                <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl p-4 shadow-sm">
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">{kecamatans.length}</p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Kecamatan</p>
+                <div className="bg-surface border border-edge rounded-2xl p-4 shadow-sm">
+                    <p className="text-2xl font-bold text-content">{kecamatans.length}</p>
+                    <p className="text-sm text-content-muted">Kecamatan</p>
                 </div>
-                <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl p-4 shadow-sm">
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                <div className="bg-surface border border-edge rounded-2xl p-4 shadow-sm">
+                    <p className="text-2xl font-bold text-content">
                         {[...new Set(areas.map(a => a.kelurahan).filter(Boolean))].length}
                     </p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Kelurahan</p>
+                    <p className="text-sm text-content-muted">Kelurahan</p>
                 </div>
-                <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl p-4 shadow-sm">
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                <div className="bg-surface border border-edge rounded-2xl p-4 shadow-sm">
+                    <p className="text-2xl font-bold text-content">
                         {areas.reduce((sum, a) => sum + (a.cameraCount || 0), 0)}
                     </p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Total Kamera</p>
+                    <p className="text-sm text-content-muted">Total Kamera</p>
                 </div>
             </div>
 
@@ -464,14 +464,14 @@ export default function AreaManagement() {
             {/* Areas Grid */}
             {filteredAreas.length === 0 ? (
                 filterKecamatan ? (
-                    <div className="text-center py-20 bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl">
-                        <p className="text-gray-500 dark:text-gray-400 mb-4">Tidak ada area di kecamatan ini</p>
+                    <div className="text-center py-20 bg-surface border border-edge rounded-2xl">
+                        <p className="text-content-muted mb-4">Tidak ada area di kecamatan ini</p>
                         <button onClick={() => setFilterKecamatan('')} className="text-primary font-semibold hover:text-primary-600">
                             Hapus Filter &rarr;
                         </button>
                     </div>
                 ) : (
-                    <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl">
+                    <div className="bg-surface border border-edge rounded-2xl">
                         <NoAreasEmptyState onCreateArea={openAddModal} />
                     </div>
                 )
@@ -513,39 +513,39 @@ export default function AreaManagement() {
             {/* Bulk Config Modal */}
             {bulkConfigArea && (
                 <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white dark:bg-gray-800 w-full max-w-3xl rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700/50 max-h-[90vh] flex flex-col">
-                        <div className="p-6 border-b border-gray-200 dark:border-gray-700/50 flex justify-between items-center bg-amber-50 dark:bg-amber-900/20 rounded-t-2xl shrink-0">
+                    <div className="bg-surface w-full max-w-3xl rounded-2xl shadow-2xl border border-edge max-h-[90vh] flex flex-col">
+                        <div className="p-6 border-b border-edge flex justify-between items-center bg-amber-50 dark:bg-amber-900/20 rounded-t-2xl shrink-0">
                             <div>
-                                <h3 className="text-lg font-bold text-gray-900 dark:text-white">Bulk Policy Center</h3>
+                                <h3 className="text-lg font-bold text-content">Bulk Policy Center</h3>
                                 <p className="text-sm text-amber-600 dark:text-amber-400 font-medium">Area: {bulkConfigArea.name}</p>
                             </div>
-                            <button onClick={() => setBulkConfigArea(null)} className="p-2 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-800/30 text-gray-600 dark:text-gray-300">
+                            <button onClick={() => setBulkConfigArea(null)} className="p-2 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-800/30 text-content-muted">
                                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M6 18L18 6M6 6l12 12"/></svg>
                             </button>
                         </div>
                         <div className="p-6 grid lg:grid-cols-[1.1fr_0.9fr] gap-6 overflow-y-auto">
                             <div className="space-y-4">
-                                <p className="text-sm text-gray-500 dark:text-gray-400">Gunakan bulk tools untuk policy massal, normalisasi unresolved, dan maintenance per area.</p>
+                                <p className="text-sm text-content-muted">Gunakan bulk tools untuk policy massal, normalisasi unresolved, dan maintenance per area.</p>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div className="flex flex-col gap-1.5 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-200 dark:border-gray-700">
-                                        <label className="text-sm font-semibold text-gray-900 dark:text-white">Mode Operasi</label>
+                                    <div className="flex flex-col gap-1.5 p-3 bg-surface-sunken rounded-xl border border-edge">
+                                        <label className="text-sm font-semibold text-content">Mode Operasi</label>
                                         <select
                                             value={bulkConfig.operation}
                                             onChange={(e) => setBulkConfig((current) => ({ ...current, operation: e.target.value }))}
-                                            className="w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+                                            className="w-full bg-surface border border-edge-strong text-content text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5"
                                         >
                                             <option value="policy_update">Bulk Policy Update</option>
                                             <option value="normalization">Bulk Normalization</option>
                                             <option value="maintenance">Bulk Maintenance</option>
                                         </select>
                                     </div>
-                                    <div className="flex flex-col gap-1.5 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-200 dark:border-gray-700">
-                                        <label className="text-sm font-semibold text-gray-900 dark:text-white">Target Kamera</label>
+                                    <div className="flex flex-col gap-1.5 p-3 bg-surface-sunken rounded-xl border border-edge">
+                                        <label className="text-sm font-semibold text-content">Target Kamera</label>
                                         <select
                                             value={effectiveBulkTargetFilter}
                                             onChange={(e) => setBulkConfig((current) => ({ ...current, targetFilter: e.target.value }))}
-                                            className="w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+                                            className="w-full bg-surface border border-edge-strong text-content text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5"
                                         >
                                             <option value="all">Semua Kamera Area</option>
                                             <option value="internal_only">Hanya Internal</option>
@@ -574,13 +574,13 @@ export default function AreaManagement() {
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div className="flex flex-col gap-1.5 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-200 dark:border-gray-700">
-                                        <label className="text-sm font-semibold text-gray-900 dark:text-white">Health Monitoring</label>
+                                    <div className="flex flex-col gap-1.5 p-3 bg-surface-sunken rounded-xl border border-edge">
+                                        <label className="text-sm font-semibold text-content">Health Monitoring</label>
                                         <select
                                             aria-label="Health Monitoring"
                                             value={bulkConfig.external_health_mode}
                                             onChange={(e) => setBulkConfig((current) => ({ ...current, external_health_mode: e.target.value }))}
-                                            className="w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+                                            className="w-full bg-surface border border-edge-strong text-content text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5"
                                         >
                                             <option value="ignore">Biarkan Seperti Semula</option>
                                             <option value="default">Ikuti Default Area/Global</option>
@@ -589,16 +589,16 @@ export default function AreaManagement() {
                                             <option value="probe_first">Probe First</option>
                                             <option value="disabled">Disabled</option>
                                         </select>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                                        <p className="text-xs text-content-muted">
                                             Berlaku untuk kamera external valid; kamera internal atau metadata belum lengkap akan dilewati oleh preview.
                                         </p>
                                     </div>
-                                    <div className="flex flex-col gap-1.5 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-200 dark:border-gray-700">
-                                        <label className="text-sm font-semibold text-gray-900 dark:text-white">Delivery Type</label>
+                                    <div className="flex flex-col gap-1.5 p-3 bg-surface-sunken rounded-xl border border-edge">
+                                        <label className="text-sm font-semibold text-content">Delivery Type</label>
                                         <select
                                             value={bulkConfig.delivery_type}
                                             onChange={(e) => setBulkConfig({ ...bulkConfig, delivery_type: e.target.value })}
-                                            className="w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+                                            className="w-full bg-surface border border-edge-strong text-content text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5"
                                         >
                                             <option value="ignore">Biarkan Seperti Semula</option>
                             <option value="external_hls">External HLS</option>
@@ -609,78 +609,78 @@ export default function AreaManagement() {
                                             <option value="external_custom_ws">Custom WebSocket</option>
                                         </select>
                                     </div>
-                                    <div className="flex flex-col gap-1.5 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-200 dark:border-gray-700">
-                                        <label className="text-sm font-semibold text-gray-900 dark:text-white">Origin Mode</label>
+                                    <div className="flex flex-col gap-1.5 p-3 bg-surface-sunken rounded-xl border border-edge">
+                                        <label className="text-sm font-semibold text-content">Origin Mode</label>
                                         <select
                                             value={bulkConfig.external_origin_mode}
                                             onChange={(e) => setBulkConfig((current) => ({ ...current, external_origin_mode: e.target.value }))}
-                                            className="w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+                                            className="w-full bg-surface border border-edge-strong text-content text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5"
                                         >
                                             <option value="ignore">Biarkan Seperti Semula</option>
                                             <option value="direct">Direct</option>
                                             <option value="embed">Embed</option>
                                         </select>
                                     </div>
-                                    <div className="flex flex-col gap-1.5 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-200 dark:border-gray-700">
-                                        <label className="text-sm font-semibold text-gray-900 dark:text-white">Gunakan Proxy Server</label>
+                                    <div className="flex flex-col gap-1.5 p-3 bg-surface-sunken rounded-xl border border-edge">
+                                        <label className="text-sm font-semibold text-content">Gunakan Proxy Server</label>
                                         <select
                                             value={bulkConfig.external_use_proxy}
                                             onChange={(e) => setBulkConfig((current) => ({ ...current, external_use_proxy: e.target.value }))}
-                                            className="w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+                                            className="w-full bg-surface border border-edge-strong text-content text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5"
                                         >
                                             <option value="ignore">Biarkan Seperti Semula</option>
                                             <option value="1">Aktifkan</option>
                                             <option value="0">Matikan</option>
                                         </select>
                                     </div>
-                                    <div className="flex flex-col gap-1.5 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-200 dark:border-gray-700">
-                                        <label className="text-sm font-semibold text-gray-900 dark:text-white">Mode TLS</label>
+                                    <div className="flex flex-col gap-1.5 p-3 bg-surface-sunken rounded-xl border border-edge">
+                                        <label className="text-sm font-semibold text-content">Mode TLS</label>
                                         <select
                                             value={bulkConfig.external_tls_mode}
                                             onChange={(e) => setBulkConfig((current) => ({ ...current, external_tls_mode: e.target.value }))}
-                                            className="w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+                                            className="w-full bg-surface border border-edge-strong text-content text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5"
                                         >
                                             <option value="ignore">Biarkan Seperti Semula</option>
                                             <option value="strict">Strict</option>
                                             <option value="insecure">Insecure</option>
                                         </select>
                                     </div>
-                                    <div className="flex flex-col gap-1.5 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-200 dark:border-gray-700">
-                                        <label className="text-sm font-semibold text-gray-900 dark:text-white">Recording</label>
+                                    <div className="flex flex-col gap-1.5 p-3 bg-surface-sunken rounded-xl border border-edge">
+                                        <label className="text-sm font-semibold text-content">Recording</label>
                                         <select
                                             value={bulkConfig.enable_recording}
                                             onChange={(e) => setBulkConfig({ ...bulkConfig, enable_recording: e.target.value })}
-                                            className="w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+                                            className="w-full bg-surface border border-edge-strong text-content text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5"
                                         >
                                             <option value="ignore">Biarkan Seperti Semula</option>
                                             <option value="1">Aktifkan</option>
                                             <option value="0">Matikan</option>
                                         </select>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                                        <p className="text-xs text-content-muted">
                                             Matikan aman untuk semua tipe kamera; aktifkan recording tetap diproteksi untuk kamera internal.
                                         </p>
                                     </div>
-                                    <div className="flex flex-col gap-1.5 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-200 dark:border-gray-700">
-                                        <label className="text-sm font-semibold text-gray-900 dark:text-white">Status Publik</label>
+                                    <div className="flex flex-col gap-1.5 p-3 bg-surface-sunken rounded-xl border border-edge">
+                                        <label className="text-sm font-semibold text-content">Status Publik</label>
                                         <select
                                             value={bulkConfig.enabled}
                                             onChange={(e) => setBulkConfig({ ...bulkConfig, enabled: e.target.value })}
-                                            className="w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+                                            className="w-full bg-surface border border-edge-strong text-content text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5"
                                         >
                                             <option value="ignore">Biarkan Seperti Semula</option>
                                             <option value="1">Aktifkan</option>
                                             <option value="0">Matikan</option>
                                         </select>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                                        <p className="text-xs text-content-muted">
                                             Matikan menyembunyikan semua kamera terpilih dari publik tanpa bergantung pada tipe delivery.
                                         </p>
                                     </div>
-                                    <div className="flex flex-col gap-1.5 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-200 dark:border-gray-700">
-                                        <label className="text-sm font-semibold text-gray-900 dark:text-white">Video Codec</label>
+                                    <div className="flex flex-col gap-1.5 p-3 bg-surface-sunken rounded-xl border border-edge">
+                                        <label className="text-sm font-semibold text-content">Video Codec</label>
                                         <select
                                             value={bulkConfig.video_codec}
                                             onChange={(e) => setBulkConfig({ ...bulkConfig, video_codec: e.target.value })}
-                                            className="w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+                                            className="w-full bg-surface border border-edge-strong text-content text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5"
                                         >
                                             <option value="ignore">Biarkan Seperti Semula</option>
                                             <option value="h264">H.264</option>
@@ -689,7 +689,7 @@ export default function AreaManagement() {
                                     </div>
                                 </div>
 
-                                <label className="flex items-center gap-3 p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40">
+                                <label className="flex items-center gap-3 p-3 rounded-xl border border-edge bg-surface-sunken">
                                     <input
                                         type="checkbox"
                                         checked={bulkConfig.clear_internal_rtsp}
@@ -697,8 +697,8 @@ export default function AreaManagement() {
                                         className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
                                     />
                                     <div>
-                                        <div className="text-sm font-semibold text-gray-900 dark:text-white">Clear internal RTSP saat normalisasi</div>
-                                        <div className="text-xs text-gray-500 dark:text-gray-400">Dipakai untuk merapikan legacy row external yang masih menyimpan jejak konfigurasi internal.</div>
+                                        <div className="text-sm font-semibold text-content">Clear internal RTSP saat normalisasi</div>
+                                        <div className="text-xs text-content-muted">Dipakai untuk merapikan legacy row external yang masih menyimpan jejak konfigurasi internal.</div>
                                     </div>
                                 </label>
                             </div>
@@ -710,8 +710,8 @@ export default function AreaManagement() {
                                 onPreview={loadBulkPreview}
                             />
                         </div>
-                        <div className="flex gap-3 p-6 shrink-0 border-t border-gray-200 dark:border-gray-700/50 bg-white dark:bg-gray-800 rounded-b-2xl">
-                            <button onClick={() => setBulkConfigArea(null)} className="flex-1 px-4 py-2.5 bg-gray-100 dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 font-medium rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700" disabled={applyingBulk}>Batal</button>
+                        <div className="flex gap-3 p-6 shrink-0 border-t border-edge bg-surface rounded-b-2xl">
+                            <button onClick={() => setBulkConfigArea(null)} className="flex-1 px-4 py-2.5 bg-surface-sunken text-content-muted font-medium rounded-xl hover:bg-surface-sunken" disabled={applyingBulk}>Batal</button>
                             <button onClick={handleBulkUpdate} className="flex-[2] px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-medium rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-amber-500/30" disabled={applyingBulk}>
                                 {applyingBulk && <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>}
                                 {applyingBulk ? 'Memproses...' : 'Terapkan Segera'}
@@ -724,29 +724,29 @@ export default function AreaManagement() {
             {/* Map Center Settings Modal */}
             {showMapCenterModal && (
                 <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white dark:bg-gray-800 w-full max-w-lg rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700/50">
-                        <div className="p-6 border-b border-gray-200 dark:border-gray-700/50 flex justify-between items-center">
+                    <div className="bg-surface w-full max-w-lg rounded-2xl shadow-2xl border border-edge">
+                        <div className="p-6 border-b border-edge flex justify-between items-center">
                             <div>
-                                <h3 className="text-lg font-bold text-gray-900 dark:text-white">Lokasi Default Peta</h3>
-                                <p className="text-sm text-gray-500 dark:text-gray-400">Titik tengah saat &quot;Semua Lokasi&quot; dipilih</p>
+                                <h3 className="text-lg font-bold text-content">Lokasi Default Peta</h3>
+                                <p className="text-sm text-content-muted">Titik tengah saat &quot;Semua Lokasi&quot; dipilih</p>
                             </div>
-                            <button onClick={() => setShowMapCenterModal(false)} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700/50 text-gray-600 dark:text-gray-300">
+                            <button onClick={() => setShowMapCenterModal(false)} className="p-2 rounded-lg hover:bg-surface-sunken text-content-muted">
                                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M6 18L18 6M6 6l12 12"/></svg>
                             </button>
                         </div>
                         <div className="p-6 space-y-5">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Nama Lokasi</label>
+                                <label className="block text-sm font-medium text-content-muted mb-1.5">Nama Lokasi</label>
                                 <input type="text" value={mapCenter.name} onChange={(e) => setMapCenter({...mapCenter, name: e.target.value})}
-                                    className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                                    className="w-full px-4 py-2.5 bg-surface-sunken border border-edge rounded-xl text-content focus:outline-none focus:ring-2 focus:ring-primary"
                                     placeholder="Contoh: Kabupaten Bojonegoro" />
-                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Nama ini akan ditampilkan di filter &quot;Semua Lokasi&quot;</p>
+                                <p className="text-xs text-content-muted mt-1">Nama ini akan ditampilkan di filter &quot;Semua Lokasi&quot;</p>
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Zoom Level</label>
+                                <label className="block text-sm font-medium text-content-muted mb-1.5">Zoom Level</label>
                                 <select value={mapCenter.zoom} onChange={(e) => setMapCenter({...mapCenter, zoom: parseInt(e.target.value)})}
-                                    className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary">
+                                    className="w-full px-4 py-2.5 bg-surface-sunken border border-edge rounded-xl text-content focus:outline-none focus:ring-2 focus:ring-primary">
                                     <option value={10}>10 - Kabupaten/Kota</option>
                                     <option value={11}>11 - Kecamatan Luas</option>
                                     <option value={12}>12 - Kecamatan</option>
@@ -757,8 +757,8 @@ export default function AreaManagement() {
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Pilih Titik Tengah</label>
-                                <Suspense fallback={<div className="text-sm text-gray-600 dark:text-gray-300">Loading map...</div>}>
+                                <label className="block text-sm font-medium text-content-muted mb-3">Pilih Titik Tengah</label>
+                                <Suspense fallback={<div className="text-sm text-content-muted">Loading map...</div>}>
                                     <LocationPicker 
                                         latitude={mapCenter.latitude} 
                                         longitude={mapCenter.longitude} 
@@ -768,7 +768,7 @@ export default function AreaManagement() {
                             </div>
 
                             <div className="flex gap-3 pt-2">
-                                <button type="button" onClick={() => setShowMapCenterModal(false)} className="flex-1 px-4 py-2.5 bg-gray-100 dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 font-medium rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700" disabled={savingMapCenter}>Batal</button>
+                                <button type="button" onClick={() => setShowMapCenterModal(false)} className="flex-1 px-4 py-2.5 bg-surface-sunken text-content-muted font-medium rounded-xl hover:bg-surface-sunken" disabled={savingMapCenter}>Batal</button>
                                 <button onClick={saveMapCenter} className="flex-[2] px-4 py-2.5 bg-gradient-to-r from-primary to-primary-600 text-white font-medium rounded-xl shadow-lg shadow-primary/30 hover:from-primary-600 hover:to-blue-700 disabled:opacity-50 flex items-center justify-center gap-2" disabled={savingMapCenter || !mapCenter.latitude || !mapCenter.longitude}>
                                     {savingMapCenter && <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>}
                                     {savingMapCenter ? 'Menyimpan...' : 'Simpan'}
@@ -782,16 +782,16 @@ export default function AreaManagement() {
             {/* Bulk Delete Area Cameras Modal */}
             {bulkDeleteAreaConfirm && (
                 <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white dark:bg-gray-800 w-full max-w-md rounded-2xl shadow-2xl border border-red-500/50">
+                    <div className="bg-surface w-full max-w-md rounded-2xl shadow-2xl border border-red-500/50">
                         <div className="p-6">
                             <div className="w-16 h-16 bg-red-100 dark:bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-white dark:border-gray-800 -mt-12 shadow-lg">
                                 <svg className="w-8 h-8 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                 </svg>
                             </div>
-                            <h3 className="text-xl font-bold text-gray-900 dark:text-white text-center mb-2">Hapus Semua Kamera?</h3>
-                            <p className="text-gray-500 dark:text-gray-400 text-center mb-4">
-                                Anda akan menghapus <span className="font-bold text-red-500 border-b border-red-500">{bulkDeleteAreaConfirm.cameraCount || 0} kamera</span> dari area <span className="font-bold text-gray-900 dark:text-white">&quot;{bulkDeleteAreaConfirm.name}&quot;</span>.
+                            <h3 className="text-xl font-bold text-content text-center mb-2">Hapus Semua Kamera?</h3>
+                            <p className="text-content-muted text-center mb-4">
+                                Anda akan menghapus <span className="font-bold text-red-500 border-b border-red-500">{bulkDeleteAreaConfirm.cameraCount || 0} kamera</span> dari area <span className="font-bold text-content">&quot;{bulkDeleteAreaConfirm.name}&quot;</span>.
                             </p>
                             <div className="p-4 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded-xl mb-2">
                                 <p className="text-red-800 dark:text-red-400 text-xs font-semibold uppercase tracking-wider mb-1">PERINGATAN BAHAYA</p>
@@ -799,7 +799,7 @@ export default function AreaManagement() {
                             </div>
                         </div>
                         <div className="flex gap-3 p-6 pt-0">
-                            <button onClick={() => setBulkDeleteAreaConfirm(null)} className="flex-1 px-4 py-2.5 bg-gray-100 dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 font-bold rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors" disabled={applyingBulkDelete}>BATALKAN</button>
+                            <button onClick={() => setBulkDeleteAreaConfirm(null)} className="flex-1 px-4 py-2.5 bg-surface-sunken text-content-muted font-bold rounded-xl hover:bg-surface-sunken transition-colors" disabled={applyingBulkDelete}>BATALKAN</button>
                             <button onClick={handleBulkDelete} className="flex-[2] px-4 py-2.5 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-red-500/30 transition-colors" disabled={applyingBulkDelete}>
                                 {applyingBulkDelete && <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>}
                                 {applyingBulkDelete ? 'MENGHAPUS...' : 'YA, MUSNAHKAN'}
@@ -812,16 +812,16 @@ export default function AreaManagement() {
             {/* Delete Confirmation Modal */}
             {deleteConfirm && (
                 <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white dark:bg-gray-800 w-full max-w-md rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700/50">
+                    <div className="bg-surface w-full max-w-md rounded-2xl shadow-2xl border border-edge">
                         <div className="p-6">
                             <div className="w-12 h-12 bg-red-100 dark:bg-red-500/20 rounded-xl flex items-center justify-center mx-auto mb-4">
                                 <svg className="w-6 h-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                                 </svg>
                             </div>
-                            <h3 className="text-lg font-bold text-gray-900 dark:text-white text-center mb-2">Hapus Area</h3>
-                            <p className="text-gray-500 dark:text-gray-400 text-center mb-4">
-                                Yakin ingin menghapus <span className="font-semibold text-gray-900 dark:text-white">&quot;{deleteConfirm.name}&quot;</span>?
+                            <h3 className="text-lg font-bold text-content text-center mb-2">Hapus Area</h3>
+                            <p className="text-content-muted text-center mb-4">
+                                Yakin ingin menghapus <span className="font-semibold text-content">&quot;{deleteConfirm.name}&quot;</span>?
                             </p>
                             {deleteConfirm.cameraCount > 0 && (
                                 <div className="flex items-start gap-3 p-4 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-xl mb-4">
@@ -833,7 +833,7 @@ export default function AreaManagement() {
                             )}
                         </div>
                         <div className="flex gap-3 p-6 pt-0">
-                            <button onClick={() => setDeleteConfirm(null)} className="flex-1 px-4 py-2.5 bg-gray-100 dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 font-medium rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700" disabled={deleting}>Batal</button>
+                            <button onClick={() => setDeleteConfirm(null)} className="flex-1 px-4 py-2.5 bg-surface-sunken text-content-muted font-medium rounded-xl hover:bg-surface-sunken" disabled={deleting}>Batal</button>
                             <button onClick={handleDelete} className="flex-1 px-4 py-2.5 bg-red-500 hover:bg-red-600 text-white font-medium rounded-xl flex items-center justify-center gap-2" disabled={deleting}>
                                 {deleting && <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>}
                                 {deleting ? 'Menghapus...' : 'Hapus'}

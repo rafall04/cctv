@@ -47,16 +47,16 @@ export default function DailyDetailModal({ date, sessions, onClose }) {
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={onClose}>
-            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[80vh] overflow-hidden" onClick={(event) => event.stopPropagation()}>
-                <div className="p-6 border-b border-gray-200 dark:border-gray-800">
+            <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-4xl max-h-[80vh] overflow-hidden" onClick={(event) => event.stopPropagation()}>
+                <div className="p-6 border-b border-edge">
                     <div className="flex items-center justify-between">
                         <div>
-                            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Detail Tanggal: {formatDate(date, { year: true })}</h2>
-                            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                            <h2 className="text-xl font-bold text-content">Detail Tanggal: {formatDate(date, { year: true })}</h2>
+                            <p className="text-sm text-content-muted mt-1">
                                 {stats.totalSessions} sesi • {stats.uniqueVisitors} pengunjung unik • {formatWatchTime(stats.totalWatchTime)} total
                             </p>
                         </div>
-                        <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
+                        <button onClick={onClose} className="p-2 hover:bg-surface-sunken rounded-lg transition-colors">
                             <svg className="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                             </svg>
@@ -67,7 +67,7 @@ export default function DailyDetailModal({ date, sessions, onClose }) {
                     {filteredSessions.length > 0 ? (
                         <table className="w-full">
                             <thead>
-                                <tr className="text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase border-b border-gray-200 dark:border-gray-700">
+                                <tr className="text-left text-xs font-semibold text-content-muted uppercase border-b border-edge">
                                     <th className="pb-3 pr-4">Waktu</th>
                                     <th className="pb-3 pr-4">Kamera</th>
                                     <th className="pb-3 pr-4">IP Address</th>
@@ -75,10 +75,10 @@ export default function DailyDetailModal({ date, sessions, onClose }) {
                                     <th className="pb-3 text-right">Durasi</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                            <tbody className="divide-y divide-edge">
                                 {filteredSessions.map((session, index) => (
                                     <tr key={session.id || index} className="text-sm">
-                                        <td className="py-3 pr-4 text-gray-600 dark:text-gray-400">
+                                        <td className="py-3 pr-4 text-content-muted">
                                             {formatTime(session.started_at, {
                                                 storage: TIMESTAMP_STORAGE.LOCAL_SQL,
                                                 hour: '2-digit',
@@ -86,8 +86,8 @@ export default function DailyDetailModal({ date, sessions, onClose }) {
                                                 second: undefined,
                                             })}
                                         </td>
-                                        <td className="py-3 pr-4 font-semibold text-gray-900 dark:text-white">{session.camera_name}</td>
-                                        <td className="py-3 pr-4 font-mono text-gray-600 dark:text-gray-400">{session.ip_address}</td>
+                                        <td className="py-3 pr-4 font-semibold text-content">{session.camera_name}</td>
+                                        <td className="py-3 pr-4 font-mono text-content-muted">{session.ip_address}</td>
                                         <td className="py-3 pr-4">
                                             <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium ${
                                                 session.device_type === 'mobile' ? 'bg-blue-100 dark:bg-primary/20 text-primary-600 dark:text-blue-400' :
@@ -98,7 +98,7 @@ export default function DailyDetailModal({ date, sessions, onClose }) {
                                                 {session.device_type || 'desktop'}
                                             </span>
                                         </td>
-                                        <td className="py-3 text-right font-semibold text-gray-900 dark:text-white">{formatDuration(session.duration_seconds)}</td>
+                                        <td className="py-3 text-right font-semibold text-content">{formatDuration(session.duration_seconds)}</td>
                                     </tr>
                                 ))}
                             </tbody>

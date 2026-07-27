@@ -24,9 +24,9 @@ export default function ViewerAnalyticsSessionsSection({
     const { formatDateTime } = useTimezone();
 
     return (
-        <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl p-6">
+        <div className="bg-surface border border-edge rounded-2xl p-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
-                <h2 className="text-lg font-bold text-gray-900 dark:text-white">Sesi Terbaru</h2>
+                <h2 className="text-lg font-bold text-content">Sesi Terbaru</h2>
                 <div className="flex flex-wrap items-center gap-2">
                     {topCameras && topCameras.length > 0 && (
                         <CameraFilter cameras={topCameras} value={selectedCamera} onChange={onCameraChange} />
@@ -34,7 +34,7 @@ export default function ViewerAnalyticsSessionsSection({
                     {filteredSessions.length > 0 && (
                         <button
                             onClick={onExportSessions}
-                            className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-primary dark:hover:text-primary-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors border border-gray-200 dark:border-gray-700"
+                            className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-content-muted hover:text-primary dark:hover:text-primary-400 hover:bg-surface-sunken rounded-lg transition-colors border border-edge"
                         >
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -46,7 +46,7 @@ export default function ViewerAnalyticsSessionsSection({
             </div>
 
             {filteredSessions.length > 0 && (
-                <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                <p className="text-sm text-content-muted mb-4">
                     Menampilkan {paginatedSessions.length} dari {filteredSessions.length} sesi
                     {selectedCamera && ' (difilter)'}
                 </p>
@@ -57,7 +57,7 @@ export default function ViewerAnalyticsSessionsSection({
                     <div className="overflow-x-auto">
                         <table className="w-full">
                             <thead>
-                                <tr className="text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase border-b border-gray-200 dark:border-gray-700">
+                                <tr className="text-left text-xs font-semibold text-content-muted uppercase border-b border-edge">
                                     <th className="pb-3 pr-4">Kamera</th>
                                     <th className="pb-3 pr-4">IP Address</th>
                                     <th className="pb-3 pr-4">Perangkat</th>
@@ -65,14 +65,14 @@ export default function ViewerAnalyticsSessionsSection({
                                     <th className="pb-3 text-right">Durasi</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                            <tbody className="divide-y divide-edge">
                                 {paginatedSessions.map((session, index) => (
-                                    <tr key={session.id || index} className="text-sm hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                                    <tr key={session.id || index} className="text-sm hover:bg-surface-sunken">
                                         <td className="py-3 pr-4">
-                                            <span className="font-semibold text-gray-900 dark:text-white">{session.camera_name}</span>
+                                            <span className="font-semibold text-content">{session.camera_name}</span>
                                         </td>
                                         <td className="py-3 pr-4">
-                                            <span className="font-mono text-gray-600 dark:text-gray-400">{session.ip_address}</span>
+                                            <span className="font-mono text-content-muted">{session.ip_address}</span>
                                         </td>
                                         <td className="py-3 pr-4">
                                             <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium ${
@@ -84,7 +84,7 @@ export default function ViewerAnalyticsSessionsSection({
                                                 {session.device_type || 'desktop'}
                                             </span>
                                         </td>
-                                        <td className="py-3 pr-4 text-gray-600 dark:text-gray-400">
+                                        <td className="py-3 pr-4 text-content-muted">
                                             {formatDateTime(session.started_at, {
                                                 storage: TIMESTAMP_STORAGE.LOCAL_SQL,
                                                 day: '2-digit',
@@ -94,7 +94,7 @@ export default function ViewerAnalyticsSessionsSection({
                                                 second: undefined,
                                             })}
                                         </td>
-                                        <td className="py-3 text-right font-semibold text-gray-900 dark:text-white">{formatDuration(session.duration_seconds)}</td>
+                                        <td className="py-3 text-right font-semibold text-content">{formatDuration(session.duration_seconds)}</td>
                                     </tr>
                                 ))}
                             </tbody>

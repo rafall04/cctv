@@ -47,10 +47,10 @@ function formatDuration(ms) {
     return `${(ms / 1000).toFixed(1)}s`;
 }
 
-function MiniStat({ label, value, tone = 'text-gray-900 dark:text-white' }) {
+function MiniStat({ label, value, tone = 'text-content' }) {
     return (
-        <div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 dark:border-gray-700/70 dark:bg-gray-900/40">
-            <div className="text-xs font-medium text-gray-500 dark:text-gray-400">{label}</div>
+        <div className="rounded-xl border border-gray-200 bg-surface-sunken px-3 py-2.5 dark:border-gray-700/70">
+            <div className="text-xs font-medium text-content-muted">{label}</div>
             <div className={`mt-0.5 text-lg font-bold ${tone}`}>{value}</div>
         </div>
     );
@@ -84,11 +84,11 @@ export default function RecordingHealthPanel() {
 
     if (loading) {
         return (
-            <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700/70 dark:bg-gray-800/70 md:p-6">
-                <div className="h-5 w-48 animate-pulse rounded bg-gray-200 dark:bg-gray-700" />
+            <div className="rounded-2xl border border-gray-200 bg-surface p-5 shadow-sm dark:border-gray-700/70 md:p-6">
+                <div className="h-5 w-48 animate-pulse rounded bg-surface-sunken" />
                 <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-5">
                     {[1, 2, 3, 4, 5].map((i) => (
-                        <div key={i} className="h-16 animate-pulse rounded-xl bg-gray-100 dark:bg-gray-700/50" />
+                        <div key={i} className="h-16 animate-pulse rounded-xl bg-surface-sunken" />
                     ))}
                 </div>
             </div>
@@ -114,12 +114,12 @@ export default function RecordingHealthPanel() {
     const restarts = health.restarts?.last24h || { total: 0, succeeded: 0, failed: 0 };
 
     return (
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700/70 dark:bg-gray-800/70 md:p-6">
+        <div className="rounded-2xl border border-gray-200 bg-surface p-5 shadow-sm dark:border-gray-700/70 md:p-6">
             {/* Header */}
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                    <h2 className="text-lg font-bold text-gray-900 dark:text-white">Kesehatan Pipeline Recording</h2>
-                    <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                    <h2 className="text-lg font-bold text-content">Kesehatan Pipeline Recording</h2>
+                    <p className="mt-0.5 text-xs text-content-muted">
                         Scheduler, antrian recovery, dan auto-restart · diperbarui {formatRelative(health.generatedAt)}
                     </p>
                 </div>
@@ -133,7 +133,7 @@ export default function RecordingHealthPanel() {
             {reasons.length > 0 && (
                 <ul className="mt-3 space-y-1">
                     {reasons.map((reason) => (
-                        <li key={reason} className="flex items-start gap-2 text-xs text-gray-600 dark:text-gray-300">
+                        <li key={reason} className="flex items-start gap-2 text-xs text-content-muted">
                             <span className="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-gray-400 dark:bg-gray-500" />
                             {reason}
                         </li>
@@ -152,24 +152,24 @@ export default function RecordingHealthPanel() {
                 <MiniStat
                     label="Recovery Aktif"
                     value={diagnostics.activeTotal ?? 0}
-                    tone={(diagnostics.activeTotal ?? 0) > 0 ? 'text-amber-600 dark:text-amber-300' : 'text-gray-900 dark:text-white'}
+                    tone={(diagnostics.activeTotal ?? 0) > 0 ? 'text-amber-600 dark:text-amber-300' : 'text-content'}
                 />
                 <MiniStat
                     label="Tidak Terselamatkan"
                     value={diagnostics.terminalTotal ?? 0}
-                    tone={(diagnostics.terminalTotal ?? 0) > 0 ? 'text-red-600 dark:text-red-300' : 'text-gray-900 dark:text-white'}
+                    tone={(diagnostics.terminalTotal ?? 0) > 0 ? 'text-red-600 dark:text-red-300' : 'text-content'}
                 />
                 <MiniStat
                     label="Restart Gagal (24j)"
                     value={`${restarts.failed} / ${restarts.total}`}
-                    tone={restarts.failed > 0 ? 'text-amber-600 dark:text-amber-300' : 'text-gray-900 dark:text-white'}
+                    tone={restarts.failed > 0 ? 'text-amber-600 dark:text-amber-300' : 'text-content'}
                 />
             </div>
 
             {/* Scheduler tasks */}
             {scheduler.tasks?.length > 0 && (
                 <div className="mt-5">
-                    <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-content-muted">
                         Task Maintenance
                     </h3>
                     <div className="mt-2 divide-y divide-gray-100 dark:divide-gray-700/60">
@@ -179,9 +179,9 @@ export default function RecordingHealthPanel() {
                                     <span
                                         className={`h-2 w-2 rounded-full ${task.healthy ? 'bg-emerald-500' : task.lastError ? 'bg-red-500' : 'bg-amber-500'}`}
                                     />
-                                    <span className="text-sm font-medium text-gray-800 dark:text-gray-100">{task.name}</span>
+                                    <span className="text-sm font-medium text-content">{task.name}</span>
                                 </div>
-                                <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
+                                <div className="flex items-center gap-3 text-xs text-content-muted">
                                     <span>{task.runCount}× jalan</span>
                                     <span>terakhir {formatRelative(task.lastRunAt)}</span>
                                     <span>{formatDuration(task.lastDurationMs)}</span>

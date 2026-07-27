@@ -60,25 +60,25 @@ export default function TimezoneSettingsTab() {
     }
 
     return (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <div className="bg-surface rounded-lg shadow p-6">
             <div className="flex items-center gap-3 mb-6">
                 <Clock className="w-6 h-6 text-blue-600" />
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                <h2 className="text-xl font-semibold text-content">
                     Pengaturan Zona Waktu
                 </h2>
             </div>
             
             <div className="space-y-6">
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    <label className="block text-sm font-medium text-content-muted mb-2">
                         Zona Waktu
                     </label>
                     <select
                         value={timezone}
                         onChange={(e) => setTimezone(e.target.value)}
                         disabled={saving}
-                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg 
-                                 bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+                        className="w-full px-4 py-2 border border-edge-strong rounded-lg 
+                                 bg-surface text-gray-900 dark:text-white
                                  focus:ring-2 focus:ring-blue-500 focus:border-transparent
                                  disabled:opacity-50 disabled:cursor-not-allowed"
                     >

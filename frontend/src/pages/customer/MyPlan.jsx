@@ -85,7 +85,7 @@ export default function MyPlan() {
 
     return (
         <div className="space-y-4">
-            <div className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
+            <div className="rounded-2xl border border-edge bg-white p-4 dark:bg-gray-900">
                 <h2 className="font-semibold text-gray-900 dark:text-white">Paket Saya</h2>
                 {current ? (
                     <div className="mt-2 flex flex-wrap items-center gap-x-6 gap-y-1 text-sm text-gray-600 dark:text-gray-300">
@@ -126,7 +126,7 @@ export default function MyPlan() {
                     return (
                         <div
                             key={plan.id}
-                            className={`rounded-2xl border bg-white p-4 dark:bg-gray-900 ${isCurrent
+                            className={`rounded-2xl border bg-surface p-4 ${isCurrent
                                 ? 'border-primary ring-1 ring-primary'
                                 : 'border-gray-200 dark:border-gray-800'
                             }`}

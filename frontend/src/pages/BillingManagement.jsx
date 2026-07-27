@@ -104,29 +104,29 @@ export default function BillingManagement() {
         <div className="space-y-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
-                    <h1 className="text-xl font-bold text-gray-900 dark:text-white sm:text-2xl">Billing Pelanggan</h1>
-                    <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
+                    <h1 className="text-xl font-bold text-content sm:text-2xl">Billing Pelanggan</h1>
+                    <p className="mt-0.5 text-sm text-content-muted">
                         Sewa CCTV prabayar — saldo dipotong harian, kamera ditangguhkan otomatis saat saldo habis.
                     </p>
                 </div>
                 <button
                     onClick={() => run(() => billingAdminService.runCharges(), 'Charge dijalankan')}
                     disabled={busy}
-                    className="shrink-0 whitespace-nowrap rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+                    className="shrink-0 whitespace-nowrap rounded-xl border border-edge-strong px-3 py-2 text-sm text-content-muted transition-colors hover:bg-surface-sunken disabled:opacity-50"
                 >
                     Jalankan charge harian
                 </button>
             </div>
 
             {/* Horizontally scrollable on small screens so all 6 tabs stay reachable without squishing. */}
-            <div className="-mx-1 flex gap-1 overflow-x-auto border-b border-gray-200 px-1 [scrollbar-width:none] dark:border-gray-800 [&::-webkit-scrollbar]:hidden">
+            <div className="-mx-1 flex gap-1 overflow-x-auto border-b border-edge px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {tabs.map((t) => (
                     <button
                         key={t.key}
                         onClick={() => setTab(t.key)}
                         className={`relative shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors ${tab === t.key
                             ? 'border-primary text-primary'
-                            : `border-transparent hover:text-gray-800 dark:hover:text-gray-200 ${t.highlight ? 'text-amber-600 dark:text-amber-400' : 'text-gray-500 dark:text-gray-400'}`
+                            : `border-transparent hover:text-gray-800 dark:hover:text-gray-200 ${t.highlight ? 'text-amber-600 dark:text-amber-400' : 'text-content-muted'}`
                         }`}
                     >
                         {t.label}
@@ -138,7 +138,7 @@ export default function BillingManagement() {
             </div>
 
             {loading ? (
-                <div className="py-16 text-center text-gray-500 dark:text-gray-400">Memuat data billing…</div>
+                <div className="py-16 text-center text-content-muted">Memuat data billing…</div>
             ) : (
                 <>
                     {tab === 'registrations' && <RegistrationsTab registrations={registrations} run={run} busy={busy} />}

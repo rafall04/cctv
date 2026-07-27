@@ -75,7 +75,7 @@ export default function CustomersTab({ customers, plans, run, busy }) {
             value={customer.plan_key || ''}
             disabled={busy}
             onChange={(e) => changePlan(customer, e.target.value)}
-            className={`rounded-lg border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-900/50 dark:text-white ${extra}`}
+            className={`rounded-lg border border-edge bg-surface-sunken px-2 py-1 text-xs text-content ${extra}`}
         >
             <option value="">(tanpa paket)</option>
             {plans.map((plan) => (
@@ -86,8 +86,8 @@ export default function CustomersTab({ customers, plans, run, busy }) {
 
     const topupForm_ = (
         <form onSubmit={submitTopup} className={cardClass}>
-            <h3 className="font-semibold text-gray-900 dark:text-white">Top-up Manual</h3>
-            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Untuk pembayaran tunai/transfer langsung ke admin.</p>
+            <h3 className="font-semibold text-content">Top-up Manual</h3>
+            <p className="mt-1 text-xs text-content-muted">Untuk pembayaran tunai/transfer langsung ke admin.</p>
             <div className="mt-3 space-y-2">
                 <select value={topupForm.user_id} onChange={(e) => setTopupForm({ ...topupForm, user_id: e.target.value })} required className={inputClass}>
                     <option value="">Pilih pelanggan…</option>
@@ -102,8 +102,8 @@ export default function CustomersTab({ customers, plans, run, busy }) {
 
     const adjustForm_ = (
         <form onSubmit={submitAdjust} className={cardClass}>
-            <h3 className="font-semibold text-gray-900 dark:text-white">Penyesuaian Saldo</h3>
-            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Koreksi manual: tambah (kompensasi) atau kurangi (refund). Tercatat di riwayat &amp; audit.</p>
+            <h3 className="font-semibold text-content">Penyesuaian Saldo</h3>
+            <p className="mt-1 text-xs text-content-muted">Koreksi manual: tambah (kompensasi) atau kurangi (refund). Tercatat di riwayat &amp; audit.</p>
             <div className="mt-3 space-y-2">
                 <select value={adjustForm.user_id} onChange={(e) => setAdjustForm({ ...adjustForm, user_id: e.target.value })} required className={inputClass}>
                     <option value="">Pilih pelanggan…</option>
@@ -131,7 +131,7 @@ export default function CustomersTab({ customers, plans, run, busy }) {
 
             <div className="lg:order-1 lg:col-span-2">
                 {customers.length === 0 ? (
-                    <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-12 text-center text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
+                    <div className="rounded-2xl border border-dashed border-edge px-4 py-12 text-center text-sm text-content-muted">
                         Belum ada pelanggan. Pelanggan bisa daftar mandiri di <code>/daftar</code>, atau buat user role <code>customer</code> di halaman Users.
                     </div>
                 ) : (
@@ -139,7 +139,7 @@ export default function CustomersTab({ customers, plans, run, busy }) {
                         {/* Desktop: table */}
                         <DesktopTable minWidth="min-w-[620px]">
                             <thead>
-                                <tr className="text-left text-xs uppercase text-gray-500 dark:text-gray-400">
+                                <tr className="text-left text-xs uppercase text-content-muted">
                                     <th className="px-3 py-2">Pelanggan</th>
                                     <th className="px-3 py-2">Kontak</th>
                                     <th className="px-3 py-2">Paket</th>
@@ -148,20 +148,20 @@ export default function CustomersTab({ customers, plans, run, busy }) {
                                     <th className="px-3 py-2 text-center">Status</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                            <tbody className="divide-y divide-edge">
                                 {customers.map((customer) => (
-                                    <tr key={customer.id} className="bg-white dark:bg-gray-900">
-                                        <td className="px-3 py-2 font-medium text-gray-900 dark:text-white">
+                                    <tr key={customer.id} className="bg-surface">
+                                        <td className="px-3 py-2 font-medium text-content">
                                             {customer.username}<AccountTag status={customer.account_status} />
                                         </td>
-                                        <td className="px-3 py-2 text-gray-500 dark:text-gray-400">{customer.phone || customer.email || '—'}</td>
+                                        <td className="px-3 py-2 text-content-muted">{customer.phone || customer.email || '—'}</td>
                                         <td className="px-3 py-2">
                                             {planSelect(customer)}
                                             {customer.plan_is_trial === 1 && customer.trial_ends_at && (
                                                 <p className="mt-0.5 text-[10px] text-gray-400">trial s/d {String(customer.trial_ends_at).slice(0, 10)}</p>
                                             )}
                                         </td>
-                                        <td className="px-3 py-2 text-right font-semibold text-gray-900 dark:text-white">{formatRupiah(customer.balance)}</td>
+                                        <td className="px-3 py-2 text-right font-semibold text-content">{formatRupiah(customer.balance)}</td>
                                         <td className="px-3 py-2 text-center">{customer.camera_count}{customer.plan_max_cameras ? `/${customer.plan_max_cameras}` : ''}</td>
                                         <td className="px-3 py-2 text-center"><StatusCell customer={customer} /></td>
                                     </tr>
@@ -172,17 +172,17 @@ export default function CustomersTab({ customers, plans, run, busy }) {
                         {/* Mobile: cards */}
                         <div className="space-y-3 md:hidden">
                             {customers.map((customer) => (
-                                <div key={customer.id} className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
+                                <div key={customer.id} className="rounded-2xl border border-edge bg-surface p-4">
                                     <div className="flex items-start justify-between gap-2">
                                         <div className="min-w-0">
-                                            <p className="truncate font-semibold text-gray-900 dark:text-white">
+                                            <p className="truncate font-semibold text-content">
                                                 {customer.username}<AccountTag status={customer.account_status} />
                                             </p>
-                                            <p className="truncate text-sm text-gray-500 dark:text-gray-400">{customer.phone || customer.email || '—'}</p>
+                                            <p className="truncate text-sm text-content-muted">{customer.phone || customer.email || '—'}</p>
                                         </div>
-                                        <p className="shrink-0 font-bold text-gray-900 dark:text-white">{formatRupiah(customer.balance)}</p>
+                                        <p className="shrink-0 font-bold text-content">{formatRupiah(customer.balance)}</p>
                                     </div>
-                                    <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                                    <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-content-muted">
                                         {planSelect(customer)}
                                         <span>Kamera: {customer.camera_count}{customer.plan_max_cameras ? `/${customer.plan_max_cameras}` : ''}</span>
                                         <StatusCell customer={customer} />

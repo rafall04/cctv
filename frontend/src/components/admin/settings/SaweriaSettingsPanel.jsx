@@ -78,8 +78,8 @@ export default function SaweriaSettingsPanel() {
         <div className="space-y-8">
             <div>
                 <p className="text-sm font-semibold text-sky-500 mb-1">Integrasi Donasi</p>
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Pengaturan Saweria</h2>
-                <p className="text-gray-500 dark:text-gray-400 mt-1">Kelola link donasi Saweria untuk website Anda.</p>
+                <h2 className="text-2xl font-bold text-content">Pengaturan Saweria</h2>
+                <p className="text-content-muted mt-1">Kelola link donasi Saweria untuk website Anda.</p>
             </div>
 
             <div className="p-4 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-xl">
@@ -91,10 +91,10 @@ export default function SaweriaSettingsPanel() {
                 </ol>
             </div>
 
-            <form onSubmit={handleSubmit} className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl overflow-hidden">
+            <form onSubmit={handleSubmit} className="bg-surface border border-edge rounded-2xl overflow-hidden">
                 <div className="p-6 space-y-6">
                     <div>
-                        <label htmlFor="saweria_link" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        <label htmlFor="saweria_link" className="block text-sm font-medium text-content-muted mb-2">
                             Link Saweria <span className="text-red-500">*</span>
                         </label>
                         <input
@@ -105,12 +105,12 @@ export default function SaweriaSettingsPanel() {
                             onChange={handleChange}
                             placeholder="https://saweria.co/username"
                             required
-                            className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-transparent text-gray-900 dark:text-white"
+                            className="w-full px-4 py-3 bg-surface-sunken border border-edge-strong rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-transparent text-content"
                         />
                     </div>
 
                     <div>
-                        <label htmlFor="leaderboard_link" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        <label htmlFor="leaderboard_link" className="block text-sm font-medium text-content-muted mb-2">
                             Link Leaderboard Saweria
                         </label>
                         <input
@@ -120,14 +120,14 @@ export default function SaweriaSettingsPanel() {
                             value={settings.leaderboard_link}
                             onChange={handleChange}
                             placeholder="https://saweria.co/overlays/leaderboard/username"
-                            className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-transparent text-gray-900 dark:text-white"
+                            className="w-full px-4 py-3 bg-surface-sunken border border-edge-strong rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-transparent text-content"
                         />
                     </div>
 
-                    <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl">
+                    <div className="flex items-center justify-between p-4 bg-surface-sunken rounded-xl">
                         <div className="flex-1">
-                            <label htmlFor="enabled" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Aktifkan Popup Saweria</label>
-                            <p className="text-sm text-gray-500 dark:text-gray-400">Tampilkan popup donasi Saweria di halaman publik.</p>
+                            <label htmlFor="enabled" className="block text-sm font-medium text-content-muted mb-1">Aktifkan Popup Saweria</label>
+                            <p className="text-sm text-content-muted">Tampilkan popup donasi Saweria di halaman publik.</p>
                         </div>
                         <label className="relative inline-flex items-center cursor-pointer">
                             <input
@@ -144,7 +144,7 @@ export default function SaweriaSettingsPanel() {
 
                     {settings.saweria_link && (
                         <div className="p-4 bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-500/10 dark:to-amber-500/10 border border-orange-200 dark:border-orange-500/20 rounded-xl">
-                            <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Preview Link</h4>
+                            <h4 className="font-semibold text-content mb-2">Preview Link</h4>
                             <a
                                 href={settings.saweria_link}
                                 target="_blank"
@@ -161,7 +161,7 @@ export default function SaweriaSettingsPanel() {
                             type="button"
                             onClick={fetchSettings}
                             disabled={saving}
-                            className="px-4 py-2.5 bg-gray-100 dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                            className="px-4 py-2.5 bg-surface-sunken text-content-muted rounded-xl hover:bg-surface-sunken transition-colors"
                         >
                             Reset Form
                         </button>

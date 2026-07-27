@@ -74,7 +74,7 @@ export default function PaymentsTab({ payments, run, busy }) {
 
     if (payments.length === 0) {
         return (
-            <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-12 text-center text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
+            <div className="rounded-2xl border border-dashed border-edge px-4 py-12 text-center text-sm text-gray-500 dark:text-gray-400">
                 Belum ada pembayaran.
             </div>
         );
@@ -85,7 +85,7 @@ export default function PaymentsTab({ payments, run, busy }) {
             {FilterBar}
 
             {filtered.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-10 text-center text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
+                <div className="rounded-2xl border border-dashed border-edge px-4 py-10 text-center text-sm text-gray-500 dark:text-gray-400">
                     Tidak ada pembayaran berstatus ini.
                 </div>
             ) : (
@@ -128,7 +128,7 @@ export default function PaymentsTab({ payments, run, busy }) {
             {/* Mobile: cards */}
             <div className="space-y-3 md:hidden">
                 {filtered.map((payment) => (
-                    <div key={payment.id} className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
+                    <div key={payment.id} className="rounded-2xl border border-edge bg-white p-4 dark:bg-gray-900">
                         <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0">
                                 <p className="truncate font-semibold text-gray-900 dark:text-white">{payment.username || payment.user_id}</p>
@@ -142,7 +142,7 @@ export default function PaymentsTab({ payments, run, busy }) {
                             </p>
                         )}
                         <div className="mt-3 flex items-center justify-between gap-2">
-                            <p className="font-bold text-gray-900 dark:text-white">{formatRupiah(payment.amount)}</p>
+                            <p className="font-bold text-content">{formatRupiah(payment.amount)}</p>
                             <ConfirmBtn payment={payment} full={false} />
                         </div>
                     </div>

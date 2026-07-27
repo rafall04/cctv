@@ -12,7 +12,7 @@ import { Link } from 'react-router-dom';
 import { authService } from '../services/authService';
 import userService from '../services/userService';
 
-const inputClass = 'w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary';
+const inputClass = 'w-full px-4 py-2.5 bg-surface-sunken border border-edge rounded-xl text-content focus:outline-none focus:ring-2 focus:ring-primary';
 
 function formatRupiah(value) {
     return `Rp${Number(value || 0).toLocaleString('id-ID')}`;
@@ -86,7 +86,7 @@ export default function RegisterPage() {
     return (
         <div className="flex min-h-screen items-center justify-center bg-gray-100 px-4 py-8 dark:bg-gray-950">
             <div className="w-full max-w-md">
-                <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-800 dark:bg-gray-900">
+                <div className="rounded-2xl border border-edge bg-white p-6 shadow-xl dark:bg-gray-900">
                     <h1 className="text-xl font-bold text-gray-900 dark:text-white">Daftar Sewa CCTV</h1>
 
                     {submitted ? (

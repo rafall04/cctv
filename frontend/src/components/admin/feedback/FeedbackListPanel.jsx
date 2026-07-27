@@ -13,8 +13,8 @@ export default function FeedbackListPanel({
     formatDate,
 }) {
     return (
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <div className="divide-y divide-gray-200 dark:divide-gray-700 max-h-[600px] overflow-y-auto">
+        <div className="bg-surface rounded-xl border border-edge overflow-hidden">
+            <div className="divide-y divide-edge max-h-[600px] overflow-y-auto">
                 {loading ? (
                     <TableSkeleton rows={5} columns={4} />
                 ) : feedbacks.length === 0 ? (
@@ -34,11 +34,11 @@ export default function FeedbackListPanel({
                                         {feedback.status === 'unread' && (
                                             <span className="w-2 h-2 rounded-full bg-amber-500" />
                                         )}
-                                        <span className="font-medium text-gray-900 dark:text-white truncate">
+                                        <span className="font-medium text-content truncate">
                                             {feedback.name || 'Anonim'}
                                         </span>
                                     </div>
-                                    <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
+                                    <p className="text-sm text-content-muted line-clamp-2">
                                         {feedback.message}
                                     </p>
                                     <div className="flex items-center gap-3 mt-2 text-xs text-gray-400">
@@ -58,11 +58,11 @@ export default function FeedbackListPanel({
             </div>
 
             {pagination.totalPages > 1 && (
-                <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 dark:border-gray-700">
+                <div className="flex items-center justify-between px-4 py-3 border-t border-edge">
                     <button
                         onClick={onPreviousPage}
                         disabled={pagination.page === 1}
-                        className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50"
+                        className="p-2 rounded-lg hover:bg-surface-sunken disabled:opacity-50"
                     >
                         <FeedbackIcons.ChevronLeft />
                     </button>
@@ -72,7 +72,7 @@ export default function FeedbackListPanel({
                     <button
                         onClick={onNextPage}
                         disabled={pagination.page === pagination.totalPages}
-                        className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50"
+                        className="p-2 rounded-lg hover:bg-surface-sunken disabled:opacity-50"
                     >
                         <FeedbackIcons.ChevronRight />
                     </button>

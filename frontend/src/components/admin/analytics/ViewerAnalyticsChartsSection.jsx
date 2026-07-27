@@ -13,10 +13,10 @@ export default function ViewerAnalyticsChartsSection({
     return (
         <>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl p-6">
+                <div className="bg-surface border border-edge rounded-2xl p-6">
                     <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-lg font-bold text-gray-900 dark:text-white">Sesi per Hari</h2>
-                        <span className="text-xs text-gray-400 dark:text-gray-500">Klik untuk detail</span>
+                        <h2 className="text-lg font-bold text-content">Sesi per Hari</h2>
+                        <span className="text-xs text-content-subtle">Klik untuk detail</span>
                     </div>
                     {sessionsByDayData.length > 0 ? (
                         <InteractiveBarChart
@@ -29,8 +29,8 @@ export default function ViewerAnalyticsChartsSection({
                     )}
                 </div>
 
-                <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl p-6">
-                    <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Aktivitas per Jam</h2>
+                <div className="bg-surface border border-edge rounded-2xl p-6">
+                    <h2 className="text-lg font-bold text-content mb-4">Aktivitas per Jam</h2>
                     {hourlyData.length > 0 ? (
                         <SimpleBarChart data={hourlyData} />
                     ) : (

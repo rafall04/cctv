@@ -108,16 +108,16 @@ export default function NotificationDiagnostics() {
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Notification Diagnostics</h1>
-                <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                <h1 className="text-2xl font-bold text-content">Notification Diagnostics</h1>
+                <p className="mt-1 text-sm text-content-muted">
                     Preview routing dan kirim drill Telegram untuk memastikan CCTV masuk ke grup yang tepat.
                 </p>
             </div>
 
-            <section className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
+            <section className="rounded-lg border border-edge bg-surface p-4">
                 <div className="grid gap-4 md:grid-cols-[1fr_180px_auto_auto] md:items-end">
                     <label className="block">
-                        <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">CCTV</span>
+                        <span className="text-sm font-semibold text-content-muted">CCTV</span>
                         <select
                             aria-label="CCTV"
                             value={cameraId}
@@ -125,7 +125,7 @@ export default function NotificationDiagnostics() {
                                 setCameraId(event.target.value);
                                 setPreview(null);
                             }}
-                            className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white"
+                            className="mt-1 w-full rounded-lg border border-edge-strong bg-surface px-3 py-2 text-sm dark:text-white"
                         >
                             <option value="">Pilih CCTV</option>
                             {cameras.map((camera) => (
@@ -137,7 +137,7 @@ export default function NotificationDiagnostics() {
                     </label>
 
                     <label className="block">
-                        <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">Event</span>
+                        <span className="text-sm font-semibold text-content-muted">Event</span>
                         <select
                             aria-label="Event"
                             value={eventType}
@@ -145,7 +145,7 @@ export default function NotificationDiagnostics() {
                                 setEventType(event.target.value);
                                 setPreview(null);
                             }}
-                            className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white"
+                            className="mt-1 w-full rounded-lg border border-edge-strong bg-surface px-3 py-2 text-sm dark:text-white"
                         >
                             {EVENT_OPTIONS.map((option) => (
                                 <option key={option.value} value={option.value}>{option.label}</option>
@@ -178,25 +178,25 @@ export default function NotificationDiagnostics() {
 
             {preview && (
                 <section className="grid gap-4 lg:grid-cols-3">
-                    <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
-                        <h2 className="text-sm font-bold text-gray-900 dark:text-white">Camera Health</h2>
+                    <div className="rounded-lg border border-edge bg-surface p-4">
+                        <h2 className="text-sm font-bold text-content">Camera Health</h2>
                         <dl className="mt-3 space-y-2 text-sm">
-                            <div className="flex justify-between gap-3"><dt className="text-gray-500">Camera</dt><dd className="font-semibold text-gray-900 dark:text-white">{preview.camera.name}</dd></div>
-                            <div className="flex justify-between gap-3"><dt className="text-gray-500">Area</dt><dd className="text-gray-900 dark:text-white">{preview.camera.areaName}</dd></div>
-                            <div className="flex justify-between gap-3"><dt className="text-gray-500">Status</dt><dd className="text-gray-900 dark:text-white">{preview.health.status}</dd></div>
-                            <div className="flex justify-between gap-3"><dt className="text-gray-500">Last Check ({timezoneLabel})</dt><dd className="text-gray-900 dark:text-white">{formatRuntimeTimestamp(preview.health.lastCheckedAt)}</dd></div>
+                            <div className="flex justify-between gap-3"><dt className="text-gray-500">Camera</dt><dd className="font-semibold text-content">{preview.camera.name}</dd></div>
+                            <div className="flex justify-between gap-3"><dt className="text-gray-500">Area</dt><dd className="text-content">{preview.camera.areaName}</dd></div>
+                            <div className="flex justify-between gap-3"><dt className="text-gray-500">Status</dt><dd className="text-content">{preview.health.status}</dd></div>
+                            <div className="flex justify-between gap-3"><dt className="text-gray-500">Last Check ({timezoneLabel})</dt><dd className="text-content">{formatRuntimeTimestamp(preview.health.lastCheckedAt)}</dd></div>
                         </dl>
                     </div>
 
-                    <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
-                        <h2 className="text-sm font-bold text-gray-900 dark:text-white">Matched Targets</h2>
+                    <div className="rounded-lg border border-edge bg-surface p-4">
+                        <h2 className="text-sm font-bold text-content">Matched Targets</h2>
                         {preview.routing.matchedTargets.length === 0 ? (
                             <p className="mt-3 text-sm text-red-600 dark:text-red-300">{preview.routing.skippedReason || 'Tidak ada target match'}</p>
                         ) : (
                             <ul className="mt-3 space-y-2">
                                 {preview.routing.matchedTargets.map((target) => (
-                                    <li key={target.id} className="rounded-md bg-gray-50 p-2 text-sm dark:bg-gray-950">
-                                        <span className="font-semibold text-gray-900 dark:text-white">{target.name}</span>
+                                    <li key={target.id} className="rounded-md bg-surface-sunken p-2 text-sm">
+                                        <span className="font-semibold text-content">{target.name}</span>
                                         <span className="ml-2 text-gray-500">{target.chatIdMasked}</span>
                                     </li>
                                 ))}
@@ -204,8 +204,8 @@ export default function NotificationDiagnostics() {
                         )}
                     </div>
 
-                    <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
-                        <h2 className="text-sm font-bold text-gray-900 dark:text-white">Matched Rules</h2>
+                    <div className="rounded-lg border border-edge bg-surface p-4">
+                        <h2 className="text-sm font-bold text-content">Matched Rules</h2>
                         <ul className="mt-3 space-y-2 text-sm">
                             {preview.routing.matchedRules.map((rule) => (
                                 <li key={rule.id} className="rounded-md bg-emerald-50 p-2 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
@@ -218,8 +218,8 @@ export default function NotificationDiagnostics() {
                 </section>
             )}
 
-            <section className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
-                <h2 className="text-sm font-bold text-gray-900 dark:text-white">Recent Diagnostic Runs</h2>
+            <section className="rounded-lg border border-edge bg-surface p-4">
+                <h2 className="text-sm font-bold text-content">Recent Diagnostic Runs</h2>
                 <div className="mt-3 overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
                         <thead>
@@ -231,13 +231,13 @@ export default function NotificationDiagnostics() {
                                 <th className="py-2 pr-4">Status</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                        <tbody className="divide-y divide-edge">
                             {runs.map((run) => (
                                 <tr key={run.id}>
                                     <td className="py-2 pr-4 text-gray-500">{formatAuditTimestamp(run.createdAt)}</td>
-                                    <td className="py-2 pr-4 text-gray-900 dark:text-white">{run.cameraName}</td>
-                                    <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">{run.eventType}</td>
-                                    <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">{run.sentCount}/{run.targetCount}</td>
+                                    <td className="py-2 pr-4 text-content">{run.cameraName}</td>
+                                    <td className="py-2 pr-4 text-content-muted">{run.eventType}</td>
+                                    <td className="py-2 pr-4 text-content-muted">{run.sentCount}/{run.targetCount}</td>
                                     <td className={`py-2 pr-4 font-semibold ${statusTone(run.success)}`}>
                                         {run.success ? 'Sent' : (run.skippedReason || 'Failed')}
                                     </td>

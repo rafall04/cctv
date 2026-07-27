@@ -109,14 +109,14 @@ export default function BrandingSettingsPanel() {
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <div>
-                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Branding Settings</h2>
-                    <p className="text-gray-600 dark:text-gray-400 mt-1">Customize your CCTV system branding and appearance.</p>
+                    <h2 className="text-2xl font-bold text-content">Branding Settings</h2>
+                    <p className="text-content-muted mt-1">Customize your CCTV system branding and appearance.</p>
                 </div>
                 <div className="flex gap-3">
                     <button
                         onClick={handleReset}
                         disabled={saving}
-                        className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
+                        className="px-4 py-2 border border-edge-strong rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
                     >
                         Reset to Defaults
                     </button>
@@ -132,8 +132,8 @@ export default function BrandingSettingsPanel() {
 
             <div className="space-y-6">
                 {Object.entries(groupedSettings).map(([groupName, keys]) => (
-                    <div key={groupName} className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">{groupName}</h3>
+                    <div key={groupName} className="bg-surface rounded-lg shadow p-6">
+                        <h3 className="text-lg font-semibold text-content mb-4">{groupName}</h3>
                         <div className="space-y-4">
                             {keys.map((key) => {
                                 const setting = settings.find((item) => item.key === key);
@@ -155,16 +155,16 @@ export default function BrandingSettingsPanel() {
 
                                 return (
                                     <div key={key}>
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{setting.description || key}</label>
+                                        <label className="block text-sm font-medium text-content-muted mb-1">{setting.description || key}</label>
                                         {placeholderHint && (
-                                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">{placeholderHint}</p>
+                                            <p className="text-xs text-content-muted mb-2">{placeholderHint}</p>
                                         )}
                                         {isTextarea ? (
                                             <textarea
                                                 value={formData[key] || ''}
                                                 onChange={(event) => handleChange(key, event.target.value)}
                                                 rows={3}
-                                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                                className="w-full px-3 py-2 border border-edge-strong rounded-lg bg-surface text-content"
                                             />
                                         ) : isColor ? (
                                             <div className="flex gap-3 items-center">
@@ -172,14 +172,14 @@ export default function BrandingSettingsPanel() {
                                                     type="color"
                                                     value={formData[key] || '#0ea5e9'}
                                                     onChange={(event) => handleChange(key, event.target.value)}
-                                                    className="h-10 w-20 rounded border border-gray-300 dark:border-gray-600"
+                                                    className="h-10 w-20 rounded border border-edge-strong"
                                                 />
                                                 <input
                                                     type="text"
                                                     value={formData[key] || ''}
                                                     onChange={(event) => handleChange(key, event.target.value)}
                                                     placeholder="#0ea5e9"
-                                                    className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                                    className="flex-1 px-3 py-2 border border-edge-strong rounded-lg bg-surface text-content"
                                                 />
                                             </div>
                                         ) : isBoolean ? (
@@ -188,9 +188,9 @@ export default function BrandingSettingsPanel() {
                                                     type="checkbox"
                                                     checked={formData[key] === 'true'}
                                                     onChange={(event) => handleChange(key, event.target.checked ? 'true' : 'false')}
-                                                    className="rounded border-gray-300 dark:border-gray-600"
+                                                    className="rounded border-edge-strong"
                                                 />
-                                                <span className="text-sm text-gray-600 dark:text-gray-400">
+                                                <span className="text-sm text-content-muted">
                                                     {key === 'show_powered_by' ? `Show "Powered by ${formData.company_name || 'Company'}" badge` : 'Enable watermark on snapshots'}
                                                 </span>
                                             </label>
@@ -198,7 +198,7 @@ export default function BrandingSettingsPanel() {
                                             <select
                                                 value={formData[key] || 'bottom-right'}
                                                 onChange={(event) => handleChange(key, event.target.value)}
-                                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                                className="w-full px-3 py-2 border border-edge-strong rounded-lg bg-surface text-content"
                                             >
                                                 <option value="bottom-right">Bottom Right</option>
                                                 <option value="bottom-left">Bottom Left</option>
@@ -210,7 +210,7 @@ export default function BrandingSettingsPanel() {
                                                 type={isNumber ? 'number' : 'text'}
                                                 value={formData[key] || ''}
                                                 onChange={(event) => handleChange(key, event.target.value)}
-                                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                                className="w-full px-3 py-2 border border-edge-strong rounded-lg bg-surface text-content"
                                             />
                                         )}
                                     </div>

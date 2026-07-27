@@ -67,19 +67,19 @@ export default function CameraManagement() {
             <CameraManagementHeader onAddCamera={openAddModal} />
 
             {!loading && !loadError && cameras.length > 0 && (
-                <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800/60">
+                <div className="rounded-2xl border border-edge bg-white p-4 shadow-sm dark:bg-gray-800/60">
                     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
                         <input
                             type="text"
                             value={filters.search}
                             onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
                             placeholder="Cari nama, area, mode health..."
-                            className="xl:col-span-2 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none transition focus:border-transparent focus:ring-2 focus:ring-sky-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                            className="xl:col-span-2 rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-sm text-content outline-none transition focus:border-transparent focus:ring-2 focus:ring-sky-500"
                         />
                         <select
                             value={filters.areaId}
                             onChange={(event) => setFilters((current) => ({ ...current, areaId: event.target.value }))}
-                            className="rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none transition focus:border-transparent focus:ring-2 focus:ring-sky-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                            className="rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-sm text-content outline-none transition focus:border-transparent focus:ring-2 focus:ring-sky-500"
                         >
                             <option value="all">Semua Area</option>
                             {areas.map((area) => (
@@ -89,7 +89,7 @@ export default function CameraManagement() {
                         <select
                             value={filters.cameraClass}
                             onChange={(event) => setFilters((current) => ({ ...current, cameraClass: event.target.value }))}
-                            className="rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none transition focus:border-transparent focus:ring-2 focus:ring-sky-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                            className="rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-sm text-content outline-none transition focus:border-transparent focus:ring-2 focus:ring-sky-500"
                         >
                             <option value="all">Semua Kelas</option>
                             <option value="community">Community (Publik)</option>
@@ -99,7 +99,7 @@ export default function CameraManagement() {
                         <select
                             value={filters.deliveryType}
                             onChange={(event) => setFilters((current) => ({ ...current, deliveryType: event.target.value }))}
-                            className="rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none transition focus:border-transparent focus:ring-2 focus:ring-sky-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                            className="rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-sm text-content outline-none transition focus:border-transparent focus:ring-2 focus:ring-sky-500"
                         >
                             <option value="all">Semua Delivery</option>
                             <option value="internal_hls">Internal HLS</option>
@@ -113,7 +113,7 @@ export default function CameraManagement() {
                         <select
                             value={filters.healthMode}
                             onChange={(event) => setFilters((current) => ({ ...current, healthMode: event.target.value }))}
-                            className="rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none transition focus:border-transparent focus:ring-2 focus:ring-sky-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                            className="rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-sm text-content outline-none transition focus:border-transparent focus:ring-2 focus:ring-sky-500"
                         >
                             <option value="all">Semua Health Mode</option>
                             <option value="default">Default</option>
@@ -125,7 +125,7 @@ export default function CameraManagement() {
                         <select
                             value={filters.availabilityState}
                             onChange={(event) => setFilters((current) => ({ ...current, availabilityState: event.target.value }))}
-                            className="rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none transition focus:border-transparent focus:ring-2 focus:ring-sky-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                            className="rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-sm text-content outline-none transition focus:border-transparent focus:ring-2 focus:ring-sky-500"
                         >
                             <option value="all">Semua Availability</option>
                             <option value="online">Online</option>
@@ -136,7 +136,7 @@ export default function CameraManagement() {
                         <select
                             value={filters.monitoringState}
                             onChange={(event) => setFilters((current) => ({ ...current, monitoringState: event.target.value }))}
-                            className="rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none transition focus:border-transparent focus:ring-2 focus:ring-sky-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                            className="rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-sm text-content outline-none transition focus:border-transparent focus:ring-2 focus:ring-sky-500"
                         >
                             <option value="all">Semua Monitoring</option>
                             <option value="passive">Passive</option>
@@ -147,7 +147,7 @@ export default function CameraManagement() {
                             <option value="maintenance">Maintenance</option>
                         </select>
                     </div>
-                    <div className="mt-3 text-xs text-gray-500 dark:text-gray-400">
+                    <div className="mt-3 text-xs text-content-muted">
                         Menampilkan {filteredCameras.length} dari {cameras.length} kamera.
                     </div>
                 </div>

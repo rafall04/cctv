@@ -84,7 +84,7 @@ function renderRecovery(log) {
 
     if (recoveryLabel === '-') {
         return (
-                <div className="text-sm text-gray-600 dark:text-gray-300">
+                <div className="text-sm text-content-muted">
                     {log.success ? 'Belum tersedia' : 'Belum pulih'}
                 </div>
             );
@@ -92,9 +92,9 @@ function renderRecovery(log) {
 
     return (
         <div>
-                <div className="text-sm text-gray-700 dark:text-gray-200">{recoveryLabel}</div>
+                <div className="text-sm text-content">{recoveryLabel}</div>
             {duration && (
-                <div className="text-xs text-gray-600 dark:text-gray-300">Pulih dalam {duration}</div>
+                <div className="text-xs text-content-muted">Pulih dalam {duration}</div>
             )}
         </div>
     );
@@ -102,25 +102,25 @@ function renderRecovery(log) {
 
 export default function RecordingRestartLogs({ logs }) {
     return (
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700/70 dark:bg-gray-800/70 md:p-6">
-            <h2 className="mb-4 text-xl font-bold text-gray-900 dark:text-white">Auto-Restart Logs</h2>
+        <div className="rounded-2xl border border-gray-200 bg-surface p-5 shadow-sm dark:border-gray-700/70 md:p-6">
+            <h2 className="mb-4 text-xl font-bold text-content">Auto-Restart Logs</h2>
 
             {logs.length > 0 ? (
                 <div className="overflow-x-auto">
                     <table className="w-full">
                         <thead>
-                            <tr className="border-b border-gray-200 dark:border-gray-700">
-                                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Camera</th>
-                                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Reason</th>
-                                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Status</th>
-                                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Restart</th>
-                                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Recovery</th>
+                            <tr className="border-b border-edge">
+                                <th className="px-4 py-3 text-left font-medium text-content-muted">Camera</th>
+                                <th className="px-4 py-3 text-left font-medium text-content-muted">Reason</th>
+                                <th className="px-4 py-3 text-left font-medium text-content-muted">Status</th>
+                                <th className="px-4 py-3 text-left font-medium text-content-muted">Restart</th>
+                                <th className="px-4 py-3 text-left font-medium text-content-muted">Recovery</th>
                             </tr>
                         </thead>
                         <tbody>
                             {logs.slice(0, 20).map((log, index) => (
-                                <tr key={`${log.camera_name}-${log.restart_time || log.recovery_time || index}-${index}`} className="border-b border-gray-100 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-700/40">
-                                    <td className="px-4 py-3 text-gray-900 dark:text-white">{log.camera_name}</td>
+                                <tr key={`${log.camera_name}-${log.restart_time || log.recovery_time || index}-${index}`} className="border-b border-edge hover:bg-gray-50 dark:hover:bg-gray-700/40">
+                                    <td className="px-4 py-3 text-content">{log.camera_name}</td>
                                     <td className="px-4 py-3">
                                         <span className={`px-2 py-1 rounded text-xs ${
                                             getReasonTone(log.reason)
@@ -133,7 +133,7 @@ export default function RecordingRestartLogs({ logs }) {
                                             {getStatusInfo(log.success, log.recovery_time).label}
                                         </span>
                                     </td>
-                                    <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-200">{formatTimestamp(log.restart_time)}</td>
+                                    <td className="px-4 py-3 text-sm text-content">{formatTimestamp(log.restart_time)}</td>
                                     <td className="px-4 py-3">{renderRecovery(log)}</td>
                                 </tr>
                             ))}
@@ -141,7 +141,7 @@ export default function RecordingRestartLogs({ logs }) {
                     </table>
                 </div>
             ) : (
-                <p className="py-8 text-center text-gray-600 dark:text-gray-300">Belum ada restart logs</p>
+                <p className="py-8 text-center text-content-muted">Belum ada restart logs</p>
             )}
         </div>
     );

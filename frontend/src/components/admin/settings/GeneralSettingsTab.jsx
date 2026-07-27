@@ -98,12 +98,12 @@ export default function GeneralSettingsTab() {
     }
 
     return (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-            <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+        <div className="bg-surface rounded-xl shadow-sm border border-edge">
+            <div className="p-6 border-b border-edge">
+                <h3 className="text-lg font-semibold text-content">
                     Landing Page Settings
                 </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                <p className="text-sm text-content-muted mt-1">
                     Customize text displayed on public landing page
                 </p>
             </div>
@@ -111,7 +111,7 @@ export default function GeneralSettingsTab() {
             <form onSubmit={handleSubmit} className="p-6 space-y-6">
                 {/* Hero Badge */}
                 <div>
-                    <label htmlFor="landing_hero_badge" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    <label htmlFor="landing_hero_badge" className="block text-sm font-medium text-content-muted mb-2">
                         Hero Badge Text
                     </label>
                     <input
@@ -121,16 +121,16 @@ export default function GeneralSettingsTab() {
                         value={settings.landing_hero_badge}
                         onChange={handleChange}
                         placeholder="LIVE STREAMING 24 JAM"
-                        className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:ring-2 focus:ring-sky-500 focus:border-transparent outline-none transition-all"
+                        className="w-full px-4 py-2.5 bg-surface-sunken border border-edge-strong rounded-xl text-content focus:ring-2 focus:ring-sky-500 focus:border-transparent outline-none transition-all"
                     />
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    <p className="text-xs text-content-muted mt-1">
                         Badge displayed above hero title
                     </p>
                 </div>
 
                 {/* Section Title */}
                 <div>
-                    <label htmlFor="landing_section_title" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    <label htmlFor="landing_section_title" className="block text-sm font-medium text-content-muted mb-2">
                         Section Title
                     </label>
                     <input
@@ -140,16 +140,16 @@ export default function GeneralSettingsTab() {
                         value={settings.landing_section_title}
                         onChange={handleChange}
                         placeholder="CCTV Publik"
-                        className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:ring-2 focus:ring-sky-500 focus:border-transparent outline-none transition-all"
+                        className="w-full px-4 py-2.5 bg-surface-sunken border border-edge-strong rounded-xl text-content focus:ring-2 focus:ring-sky-500 focus:border-transparent outline-none transition-all"
                     />
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    <p className="text-xs text-content-muted mt-1">
                         Main section title for camera list
                     </p>
                 </div>
 
                 {/* Area Coverage */}
                 <div>
-                    <label htmlFor="landing_area_coverage" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    <label htmlFor="landing_area_coverage" className="block text-sm font-medium text-content-muted mb-2">
                         Area Coverage Text
                     </label>
                     <textarea
@@ -159,9 +159,9 @@ export default function GeneralSettingsTab() {
                         onChange={handleChange}
                         rows={3}
                         placeholder="Saat ini area coverage kami baru mencakup <strong>Dander</strong> dan <strong>Tanjungharjo</strong>"
-                        className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:ring-2 focus:ring-sky-500 focus:border-transparent outline-none transition-all resize-none"
+                        className="w-full px-4 py-2.5 bg-surface-sunken border border-edge-strong rounded-xl text-content focus:ring-2 focus:ring-sky-500 focus:border-transparent outline-none transition-all resize-none"
                     />
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    <p className="text-xs text-content-muted mt-1">
                         Supports HTML tags like &lt;strong&gt; for bold text
                     </p>
                 </div>
@@ -175,7 +175,7 @@ export default function GeneralSettingsTab() {
                         </svg>
                         <span className="text-sm font-semibold text-amber-700 dark:text-amber-400">Preview</span>
                     </div>
-                    <div className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
+                    <div className="space-y-2 text-sm text-content-muted">
                         <div>
                             <span className="font-medium">Hero Badge:</span>
                             <div className="mt-1 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-semibold">
@@ -197,12 +197,12 @@ export default function GeneralSettingsTab() {
                 </div>
 
                 {/* Actions */}
-                <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <div className="flex items-center justify-end gap-3 pt-4 border-t border-edge">
                     <button
                         type="button"
                         onClick={fetchSettings}
                         disabled={saving}
-                        className="px-6 py-2.5 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                        className="px-6 py-2.5 bg-surface border border-edge-strong text-content-muted rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
                     >
                         Reset
                     </button>

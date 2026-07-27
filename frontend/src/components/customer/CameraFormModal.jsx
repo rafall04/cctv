@@ -13,7 +13,7 @@ import { useFocusTrap } from '../../hooks/useFocusTrap';
 
 const LocationPicker = lazy(() => import('../LocationPicker'));
 
-const inputClass = 'w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary';
+const inputClass = 'w-full px-4 py-2.5 bg-surface-sunken border border-edge rounded-xl text-sm text-content focus:outline-none focus:ring-2 focus:ring-primary';
 
 export default function CameraFormModal({ camera = null, areas = [], onClose, onSaved }) {
     const isEdit = !!camera;
@@ -89,28 +89,28 @@ export default function CameraFormModal({ camera = null, areas = [], onClose, on
                 role="dialog"
                 aria-modal="true"
                 aria-label={isEdit ? `Edit ${camera.name}` : 'Tambah Kamera'}
-                className="my-auto flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-gray-800 dark:bg-gray-900"
+                className="my-auto flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-edge bg-surface shadow-2xl"
                 onClick={(e) => e.stopPropagation()}
             >
-                <h3 className="shrink-0 border-b border-gray-200 p-5 text-lg font-bold text-gray-900 dark:border-gray-800 dark:text-white">
+                <h3 className="shrink-0 border-b border-edge p-5 text-lg font-bold text-content">
                     {isEdit ? `Edit ${camera.name}` : 'Tambah Kamera'}
                 </h3>
                 <form onSubmit={handleSubmit} className="flex-1 space-y-3 overflow-y-auto p-5">
                     <div>
-                        <label htmlFor="cam-name" className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Nama kamera</label>
+                        <label htmlFor="cam-name" className="mb-1 block text-sm font-medium text-content-muted">Nama kamera</label>
                         <input id="cam-name" name="name" value={form.name} onChange={handleChange} required minLength={2} maxLength={100} className={inputClass} placeholder="Kamera Depan Toko" />
                     </div>
                     <div>
-                        <label htmlFor="cam-location" className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Lokasi (opsional)</label>
+                        <label htmlFor="cam-location" className="mb-1 block text-sm font-medium text-content-muted">Lokasi (opsional)</label>
                         <input id="cam-location" name="location" value={form.location} onChange={handleChange} maxLength={120} className={inputClass} placeholder="Jl. Mawar No. 1" />
                     </div>
                     <div>
-                        <label htmlFor="cam-desc" className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Deskripsi (opsional)</label>
+                        <label htmlFor="cam-desc" className="mb-1 block text-sm font-medium text-content-muted">Deskripsi (opsional)</label>
                         <input id="cam-desc" name="description" value={form.description} onChange={handleChange} maxLength={200} className={inputClass} />
                     </div>
 
                     <div>
-                        <label htmlFor="cam-area" className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Area (opsional)</label>
+                        <label htmlFor="cam-area" className="mb-1 block text-sm font-medium text-content-muted">Area (opsional)</label>
                         <select id="cam-area" name="area_id" value={form.area_id} onChange={handleChange} className={inputClass}>
                             <option value="">— Tanpa area —</option>
                             {areas.map((area) => (
@@ -119,34 +119,34 @@ export default function CameraFormModal({ camera = null, areas = [], onClose, on
                                 </option>
                             ))}
                         </select>
-                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Pilih wilayah dari daftar. Belum ada wilayah Anda? Kosongkan saja — titik peta tetap tersimpan, atau minta admin menambahkannya.</p>
+                        <p className="mt-1 text-xs text-content-muted">Pilih wilayah dari daftar. Belum ada wilayah Anda? Kosongkan saja — titik peta tetap tersimpan, atau minta admin menambahkannya.</p>
                     </div>
 
-                    <label className="flex items-start gap-2 rounded-xl border border-gray-200 p-3 dark:border-gray-700/50">
+                    <label className="flex items-start gap-2 rounded-xl border border-edge p-3">
                         <input
                             type="checkbox"
                             checked={form.is_public}
                             onChange={(e) => { setForm({ ...form, is_public: e.target.checked }); setError(''); }}
                             className="mt-0.5"
                         />
-                        <span className="text-sm text-gray-700 dark:text-gray-300">
+                        <span className="text-sm text-content-muted">
                             Tampilkan di hub publik
-                            <span className="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">
+                            <span className="mt-0.5 block text-xs text-content-muted">
                                 Kamera muncul di peta &amp; daftar publik RAF NET — hanya selama saldo aktif. Bisa diubah kapan saja.
                             </span>
                         </span>
                     </label>
                     <div>
-                        <label htmlFor="cam-rtsp" className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        <label htmlFor="cam-rtsp" className="mb-1 block text-sm font-medium text-content-muted">
                             URL RTSP {isEdit && <span className="font-normal text-gray-400">(kosongkan jika tidak diganti)</span>}
                         </label>
                         <input id="cam-rtsp" name="private_rtsp_url" value={form.private_rtsp_url} onChange={handleChange} maxLength={500} className={inputClass} placeholder="rtsp://user:pass@ip-kamera:554/stream" />
-                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        <p className="mt-1 text-xs text-content-muted">
                             Dari aplikasi kamera/NVR Anda. Pastikan kamera bisa diakses dari jaringan RAF NET.
                         </p>
-                        <details className="mt-2 rounded-xl border border-gray-200 bg-gray-50 p-3 text-xs dark:border-gray-700/50 dark:bg-gray-900/40">
+                        <details className="mt-2 rounded-xl border border-edge bg-surface-sunken p-3 text-xs">
                             <summary className="cursor-pointer font-medium text-primary">Tidak tahu URL RTSP? Klik di sini</summary>
-                            <div className="mt-2 space-y-2 text-gray-600 dark:text-gray-300">
+                            <div className="mt-2 space-y-2 text-content-muted">
                                 <p>Format umum: <code className="rounded bg-gray-200 px-1 dark:bg-gray-800">rtsp://user:password@IP-kamera:554/jalur</code></p>
                                 <ul className="ml-4 list-disc space-y-1">
                                     <li><b>Hikvision:</b> <code>rtsp://user:pass@IP:554/Streaming/Channels/101</code></li>
@@ -159,17 +159,17 @@ export default function CameraFormModal({ camera = null, areas = [], onClose, on
                     </div>
 
                     <div>
-                        <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        <label className="mb-1 block text-sm font-medium text-content-muted">
                             Lokasi di Peta (opsional)
                         </label>
-                        <Suspense fallback={<div className="flex h-10 items-center justify-center rounded-lg bg-gray-100 text-xs text-gray-500 dark:bg-gray-800 dark:text-gray-400">Memuat peta…</div>}>
+                        <Suspense fallback={<div className="flex h-10 items-center justify-center rounded-lg bg-surface-sunken text-xs text-content-muted">Memuat peta…</div>}>
                             <LocationPicker
                                 latitude={form.latitude}
                                 longitude={form.longitude}
                                 onLocationChange={handleLocationChange}
                             />
                         </Suspense>
-                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        <p className="mt-1 text-xs text-content-muted">
                             Pakai tombol GPS atau buka peta untuk menandai titik kamera Anda.
                         </p>
                     </div>
@@ -177,7 +177,7 @@ export default function CameraFormModal({ camera = null, areas = [], onClose, on
                     {error && <p role="alert" className="rounded-lg bg-red-50 p-2 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-300">{error}</p>}
 
                     <div className="flex gap-2 pt-1">
-                        <button type="button" onClick={onClose} disabled={submitting} className="flex-1 rounded-xl border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800">
+                        <button type="button" onClick={onClose} disabled={submitting} className="flex-1 rounded-xl border border-edge-strong px-4 py-2 text-sm text-content-muted hover:bg-surface-sunken">
                             Batal
                         </button>
                         <button type="submit" disabled={submitting} className="flex-[2] rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-600 disabled:opacity-60">
