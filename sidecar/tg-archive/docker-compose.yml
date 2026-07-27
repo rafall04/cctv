@@ -1,0 +1,36 @@
+services:
+  telegram-bot-api:
+    image: aiogram/telegram-bot-api:latest
+    container_name: tg-archive-api
+    restart: unless-stopped
+    # /opt/tg-archive/.env — also what compose interpolates ${...} from
+    env_file: .env
+    entrypoint: ["telegram-bot-api"]
+    command:
+      - "--local"
+      - "--api-id=${TELEGRAM_API_ID}"
+      - "--api-hash=${TELEGRAM_API_HASH}"
+      - "--http-port=8092"
+      - "--dir=/var/lib/telegram-bot-api"
+      - "--temp-dir=/tmp/telegram-bot-api"
+      - "--http-ip-address=0.0.0.0"
+      - "--verbosity=1"
+    ports:
+      # bind loopback only — never expose the bot token surface to the LAN
+      - "127.0.0.1:8092:8092"
+    volumes:
+      - tg-archive-data:/var/lib/telegram-bot-api
+      # recordings mounted READ-ONLY at the SAME absolute path the app uses,
+      # so --local file paths resolve identically inside the container.
+      - /var/www/rafnet-cctv/recordings:/var/www/rafnet-cctv/recordings:ro
+    tmpfs:
+      - /tmp/telegram-bot-api:size=512m
+    # keep the archiver from starving live streaming / recording ffmpeg
+    cpus: "1.0"
+    mem_limit: 1g
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+volumes:
+  tg-archive-data:
