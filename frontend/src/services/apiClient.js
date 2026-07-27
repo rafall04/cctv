@@ -32,6 +32,11 @@ let notificationCallback = null;
 // Retry callback for timeout errors (allows UI to offer retry option)
 let timeoutRetryCallback = null;
 
+// Transport-level retries for idempotent requests. Short and few on purpose: this exists to ride
+// out a tunnel re-dial (~1s), not to mask a server that is genuinely down.
+const NETWORK_RETRY_DELAYS_MS = [400, 1200];
+const NETWORK_RETRY_ATTEMPTS = NETWORK_RETRY_DELAYS_MS.length;
+
 /**
  * Set the notification callback for error handling
  * This should be called from the app initialization with the notification context
@@ -221,6 +226,25 @@ apiClient.interceptors.response.use(
 
         // Handle network errors (not timeout)
         if (isNetworkError(error) && !isTimeoutError(error)) {
+            // The Cloudflare tunnel re-dials its QUIC connections when they go idle
+            // ("timeout: no recent network activity"), so the FIRST request after the app has been
+            // sitting in the background routinely dies at the transport layer. Absorbing it beats
+            // telling the operator the server is unreachable when a manual refresh would work.
+            //
+            // Only replay methods that are safe to repeat: a POST/PUT/DELETE that failed at the
+            // network layer may still have reached the server, and re-sending could double-apply it.
+            const method = (originalRequest?.method || 'get').toLowerCase();
+            const replayable = method === 'get' || method === 'head';
+            const attempt = originalRequest?._networkRetry ?? 0;
+
+            if (replayable && attempt < NETWORK_RETRY_ATTEMPTS) {
+                originalRequest._networkRetry = attempt + 1;
+                await new Promise((resolve) => {
+                    setTimeout(resolve, NETWORK_RETRY_DELAYS_MS[attempt]);
+                });
+                return apiClient(originalRequest);
+            }
+
             if (!shouldSuppressGlobalErrorNotification(originalRequest)) {
                 showErrorNotification('Connection Error', ERROR_MESSAGES.NETWORK_ERROR);
             }
