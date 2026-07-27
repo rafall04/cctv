@@ -552,6 +552,15 @@ const start = async () => {
         } else {
             console.log(`[TelegramBot] Not started on cluster worker #${botWorker} (poller runs only on worker 0)`);
         }
+
+        // LAST line of start(), deliberately. The server binds its port early and then
+        // keeps booting for a long time — prod measured ~67s of tail after /health first
+        // answered 200. Anything that only checks "did it serve a request" is blind to a
+        // crash in that tail, which is precisely how 0413b4b reached production and stayed
+        // there for 7h36m. This marker is the difference between "it responded once" and
+        // "it actually finished starting", and both the boot smoke test and any operator
+        // reading logs should key off it.
+        console.log('[Server] Startup complete — all background services running');
     } catch (err) {
         // fastify.log/console write to a PIPE under pm2, which Node buffers asynchronously —
         // process.exit() below discards anything still queued. A boot crash then shows up as a

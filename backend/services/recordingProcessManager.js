@@ -15,6 +15,11 @@ import { createLogTailer, openFfmpegLog } from './recordingFfmpegLog.js';
 // there is no 'close' event to wait on — kill(pid, 0) is the only signal available.
 const ADOPTED_LIVENESS_POLL_MS = 5000;
 
+// Per-camera stderr tail retained for exit classification. Hard byte ceiling so the
+// worker's memory stays flat as the fleet grows — 64 KB × cameras is the whole cost.
+export const OUTPUT_BUFFER_MAX_BYTES = 64 * 1024;
+export const OUTPUT_BUFFER_MAX_CHUNKS = 50;
+
 export class RecordingProcessManager {
     constructor({ gracefulStopTimeoutMs = RECORDING_PROCESS_GRACEFUL_STOP_MS, binary = 'ffmpeg' } = {}) {
         this.binary = binary;
@@ -308,14 +313,33 @@ export class RecordingProcessManager {
         return (this.outputBuffers.get(cameraId) ?? []).join('');
     }
 
+    /**
+     * Keep a small tail of ffmpeg stderr per camera, for exit classification.
+     *
+     * Bounded by BYTES, not chunk count. That distinction became load-bearing when
+     * stderr moved from a pipe to a tailed log file: a pipe delivered small chunks,
+     * but a tailer chunk is "everything appended since the last poll" and can be
+     * megabytes if the process is busy. Keeping 50 of those per camera would scale
+     * into hundreds of MB per camera — the opposite of what a fixed-size ring is for.
+     *
+     * classifyRecordingExit only ever reads the recent tail, so a few KB is plenty.
+     */
     pushOutput(cameraId, output) {
         const chunks = this.outputBuffers.get(cameraId);
         if (!chunks) {
             return;
         }
-        chunks.push(output);
-        if (chunks.length > 50) {
-            chunks.shift();
+
+        const text = String(output ?? '');
+        // A single oversized chunk is truncated to its TAIL — the end is where the
+        // error that killed ffmpeg will be.
+        chunks.push(text.length > OUTPUT_BUFFER_MAX_BYTES
+            ? text.slice(-OUTPUT_BUFFER_MAX_BYTES)
+            : text);
+
+        let total = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+        while (chunks.length > 1 && (total > OUTPUT_BUFFER_MAX_BYTES || chunks.length > OUTPUT_BUFFER_MAX_CHUNKS)) {
+            total -= chunks.shift().length;
         }
     }
 

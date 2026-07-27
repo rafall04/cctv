@@ -379,6 +379,38 @@ else
     ok "Stability gate passed — no crash-restarts in ${STABILITY_WINDOW}s."
 fi
 
+# ---------------------------------------------------------------------------
+# Positive proof of a finished boot.
+#
+# The restart counter above catches a boot that CRASHES. It cannot catch one that
+# HANGS — a process stuck part-way through startup serves /health, never restarts,
+# and looks perfectly healthy while half its background services were never started.
+# server.js prints this marker as the very last line of start(), so its presence is
+# the only direct evidence that startup actually completed.
+# ---------------------------------------------------------------------------
+BOOT_MARKER='[Server] Startup complete'
+BACKEND_OUT_LOG="$(pm2 jlist 2>/dev/null \
+    | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{const a=JSON.parse(s).find(p=>p.name==='$BACKEND_PM2');process.stdout.write(a?a.pm2_env.pm_out_log_path:'')}catch(e){process.stdout.write('')}})" \
+    2>/dev/null || true)"
+
+if [ -n "$BACKEND_OUT_LOG" ] && [ -f "$BACKEND_OUT_LOG" ]; then
+    if tail -n 400 "$BACKEND_OUT_LOG" | grep -qF "$BOOT_MARKER"; then
+        ok "Boot completed fully — '${BOOT_MARKER}' present."
+    else
+        hr
+        err "DEPLOY SUSPECT — backend answers /health but never logged '${BOOT_MARKER}'."
+        echo "  Startup is stuck part-way: some background services (recording, thumbnails,"
+        echo "  telegram) may never have started even though the API looks up."
+        echo ""
+        echo "    pm2 logs ${BACKEND_PM2} --lines 80"
+        echo ""
+        echo "  Rollback:  git -C ${APP_DIR} reset --hard ${ROLLBACK_COMMIT} && bash deployment/safe-deploy.sh deploy"
+        exit 1
+    fi
+else
+    warn "Could not locate the backend log — skipped the boot-completion check."
+fi
+
 # ===========================================================================
 # PHASE 8 — Next steps
 # ===========================================================================

@@ -74,6 +74,14 @@ SideEffects: None; documentation only.
 ## Verification Commands
 
 - Backend full gate: `cd backend && npm run migrate && npm test`.
+- **Boot smoke (`__tests__/bootSmoke.test.js`) — runs inside `npm test`:** actually spawns `server.js` and
+  `recorder.js` as real processes against a throwaway copy of the DB (every camera disabled, so no ffmpeg
+  and nothing real is touched), then requires each to reach its explicit end-of-boot marker
+  (`[Server] Startup complete` / `[Recorder] Worker ready`) and still be alive after that. This is the only
+  test that executes the entry points at all — unit tests mock the module graph, so they proved every piece
+  worked in isolation while `0413b4b` crash-looped production for 7h36m. **Do not weaken it into a
+  fixed-duration wait**: an earlier version waited 12s after `/health` and PASSED with that exact bug
+  reintroduced, because `/health` answers at t=3.2s and the crash lands at t=23.4s.
 - Backend focused test: `cd backend && npm test -- <test-file>`.
 - Frontend full gate: `cd frontend && npm test && npm run build && npm run lint`.
 - Frontend focused test: `cd frontend && npm test -- <test-file>`.

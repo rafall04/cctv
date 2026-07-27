@@ -18,14 +18,14 @@
 
 import Database from 'better-sqlite3';
 import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
+import { dirname, join, isAbsolute } from 'path';
 import { existsSync, mkdirSync } from 'fs';
 import { config } from '../config/config.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const dbPath = config.database.path.startsWith('/') 
+const dbPath = isAbsolute(config.database.path) 
   ? config.database.path 
   : join(__dirname, '..', config.database.path);
 

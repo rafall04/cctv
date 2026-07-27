@@ -121,6 +121,30 @@ describe('RecordingProcessManager', () => {
         expect(manager.getActiveCameraIds()).toEqual([]);
     });
 
+    it('bounds the stderr tail by BYTES so worker memory stays flat as the fleet grows', async () => {
+        // A tailed-log chunk is "everything since the last poll" and can be megabytes,
+        // unlike the small chunks a pipe used to deliver. Capping by chunk count alone
+        // would let a single camera pin hundreds of MB.
+        const { RecordingProcessManager, OUTPUT_BUFFER_MAX_BYTES } = await import('../services/recordingProcessManager.js');
+        const child = createProcess(1200);
+        spawnMock.mockReturnValue(child);
+        const manager = new RecordingProcessManager();
+
+        await manager.start(120, { ffmpegArgs: ['a'], camera: { id: 120 }, streamSource: 'internal' });
+
+        for (let i = 0; i < 20; i += 1) {
+            manager.pushOutput(120, 'x'.repeat(500_000));
+        }
+        manager.pushOutput(120, 'FATAL: the real reason ffmpeg died\n');
+
+        const buffered = manager.getOutput(120);
+        expect(buffered.length).toBeLessThanOrEqual(OUTPUT_BUFFER_MAX_BYTES * 2);
+        // The tail must survive — that is where the exit cause lives.
+        expect(buffered).toContain('FATAL: the real reason ffmpeg died');
+
+        manager.detachAll();
+    });
+
     it('detachAll leaves recorders RUNNING and only releases our side', async () => {
         // The point of the whole detached-recorder design: a backend restart must
         // not signal ffmpeg. Killing here is what used to truncate a segment per
