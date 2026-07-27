@@ -100,7 +100,7 @@ export default function BulkPolicyPreview({
                             <BreakdownList
                                 title="Delivery Mix"
                                 items={summary.deliveryTypeBreakdown || []}
-                                badgeClassName="bg-sky-100 dark:bg-primary/10 text-sky-700 dark:text-sky-300"
+                                badgeClassName="bg-primary-100 dark:bg-primary/10 text-primary text-primary"
                             />
                             <BreakdownList
                                 title="Current Health Modes"

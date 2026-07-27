@@ -313,7 +313,7 @@ export default function AdsSettingsPanel() {
     if (loading) {
         return (
             <div className="flex items-center justify-center py-12">
-                <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-sky-500"></div>
+                <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary"></div>
             </div>
         );
     }
@@ -424,7 +424,7 @@ export default function AdsSettingsPanel() {
                         />
                     </div>
 
-                    <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900 dark:border-sky-500/20 dark:bg-primary/10 dark:text-sky-100">
+                    <div className="rounded-xl border border-primary-300 bg-primary-100 px-4 py-3 text-sm text-primary border-primary-300 dark:bg-primary/10 dark:text-sky-100">
                         Gunakan creative compact atau vertikal untuk slot popup. Pada desktop, hanya satu slot popup yang diprioritaskan agar player tetap terbaca.
                     </div>
                 </SectionCard>

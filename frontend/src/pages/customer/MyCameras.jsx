@@ -228,7 +228,7 @@ export default function MyCameras() {
                                             </span>
                                         )}
                                         {camera.is_public ? (
-                                            <span className="shrink-0 rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-medium text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">🌐 Publik</span>
+                                            <span className="shrink-0 rounded-full bg-primary-100 px-2 py-0.5 text-[10px] font-medium text-primary dark:bg-sky-900/40 text-primary">🌐 Publik</span>
                                         ) : null}
                                     </div>
                                     <p className="truncate text-xs text-content-muted">
@@ -251,7 +251,7 @@ export default function MyCameras() {
                                             onClick={() => togglePublic(camera)}
                                             disabled={busyId === camera.id}
                                             title={camera.is_public ? 'Sembunyikan dari hub publik' : 'Tampilkan di hub publik'}
-                                            className="rounded-lg px-2 py-1 text-xs text-sky-700 transition-colors hover:bg-sky-50 disabled:opacity-50 dark:text-sky-300 dark:hover:bg-sky-900/30"
+                                            className="rounded-lg px-2 py-1 text-xs text-primary transition-colors hover:bg-primary-100 disabled:opacity-50 text-primary dark:hover:bg-sky-900/30"
                                         >
                                             {camera.is_public ? '🔒 Privatkan' : '🌐 Publikkan'}
                                         </button>

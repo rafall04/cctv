@@ -28,7 +28,7 @@ const ITEMS = [
     {
         key: 'recent_gap_cameras',
         label: 'Recent Gaps',
-        tone: 'border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-500/20 dark:bg-primary/10 dark:text-sky-100',
+        tone: 'border-primary-300 bg-primary-100 text-primary border-primary-300 dark:bg-primary/10 dark:text-sky-100',
         caption: 'Ada gap segmen terbaru',
     },
 ];

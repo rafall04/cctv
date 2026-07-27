@@ -444,21 +444,21 @@ export default function AreaManagement() {
                 </div>
             </div>
 
-            <div className="rounded-[26px] border border-sky-200/70 dark:border-sky-500/20 bg-[linear-gradient(135deg,rgba(14,165,233,0.09),rgba(59,130,246,0.03))] px-5 py-4 shadow-sm">
+            <div className="rounded-[26px] border border-sky-200/70 border-primary-300 bg-[linear-gradient(135deg,rgba(14,165,233,0.09),rgba(59,130,246,0.03))] px-5 py-4 shadow-sm">
                 <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <div>
-                        <p className="text-sm font-semibold text-sky-800 dark:text-sky-200">Grid View Default</p>
+                        <p className="text-sm font-semibold text-primary text-primary">Grid View Default</p>
                         <p className="text-sm text-sky-700/90 dark:text-sky-100/80">
                             Saat filter masih di semua area, grid hanya memuat area yang ditandai aktif di sini. Jika user memilih area tertentu, area itu tetap tampil penuh.
                         </p>
                     </div>
                     <div className="grid grid-cols-2 gap-3 text-sm md:min-w-[240px]">
                         <div className="rounded-2xl border border-sky-200/60 bg-white/70 px-4 py-3 text-center dark:border-sky-500/10 dark:bg-slate-900/40">
-                            <div className="font-bold text-sky-900 dark:text-white">{gridDefaultEnabledAreaCount}</div>
+                            <div className="font-bold text-primary dark:text-white">{gridDefaultEnabledAreaCount}</div>
                             <div className="text-sky-700/80 dark:text-sky-100/70">Area aktif</div>
                         </div>
                         <div className="rounded-2xl border border-sky-200/60 bg-white/70 px-4 py-3 text-center dark:border-sky-500/10 dark:bg-slate-900/40">
-                            <div className="font-bold text-sky-900 dark:text-white">{gridDefaultCameraCount}</div>
+                            <div className="font-bold text-primary dark:text-white">{gridDefaultCameraCount}</div>
                             <div className="text-sky-700/80 dark:text-sky-100/70">Kamera default</div>
                         </div>
                     </div>
@@ -576,7 +576,7 @@ export default function AreaManagement() {
                                             </p>
                                         )}
                                         {requiresExternalStreamsTarget(bulkConfig) && !requiresExternalHlsTarget(bulkConfig) && (
-                                            <p className="text-xs text-sky-700 dark:text-sky-300">
+                                            <p className="text-xs text-primary text-primary">
                                                 Health monitoring policy otomatis dikunci ke target External Valid.
                                             </p>
                                         )}

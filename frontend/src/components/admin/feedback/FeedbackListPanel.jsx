@@ -25,7 +25,7 @@ export default function FeedbackListPanel({
                             key={feedback.id}
                             onClick={() => onSelect(feedback)}
                             className={`p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors ${
-                                selectedFeedback?.id === feedback.id ? 'bg-sky-50 dark:bg-sky-900/20' : ''
+                                selectedFeedback?.id === feedback.id ? 'bg-primary-100 dark:bg-sky-900/20' : ''
                             }`}
                         >
                             <div className="flex items-start justify-between gap-3">

@@ -163,7 +163,7 @@ export function InteractiveBarChart({ data, maxValue, onBarClick, selectedDate }
             {data.map((item, index) => (
                 <div
                     key={`${item.rawDate}-${index}`}
-                    className={`flex items-center gap-3 p-1 rounded-lg cursor-pointer transition-all hover:bg-surface-sunken ${selectedDate === item.rawDate ? 'bg-sky-50 dark:bg-primary/10 ring-1 ring-primary/30' : ''}`}
+                    className={`flex items-center gap-3 p-1 rounded-lg cursor-pointer transition-all hover:bg-surface-sunken ${selectedDate === item.rawDate ? 'bg-primary-100 dark:bg-primary/10 ring-1 ring-primary/30' : ''}`}
                     onClick={() => onBarClick(item)}
                 >
                     <span className="text-xs text-content-muted w-16 text-right truncate">{item.label}</span>

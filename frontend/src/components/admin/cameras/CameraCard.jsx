@@ -53,7 +53,7 @@ function getIngestBadge(camera) {
         label: policy === 'always_on' ? 'Ingest: Always On' : 'Ingest: On Demand',
         className: policy === 'always_on'
             ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-200'
-            : 'bg-primary/15 text-sky-700 dark:text-sky-200',
+            : 'bg-primary/15 text-primary text-primary',
         title: 'Resolved internal RTSP ingest policy',
     };
 }
@@ -168,7 +168,7 @@ function CameraCard({
                     </span>
                 </div>
                 <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/80 to-transparent">
-                    <p className="text-[10px] font-semibold text-sky-300 mb-0.5">{camera.area_name || 'Uncategorized'}</p>
+                    <p className="text-[10px] font-semibold text-primary mb-0.5">{camera.area_name || 'Uncategorized'}</p>
                     <h3 className="text-sm font-bold text-white">{camera.name}</h3>
                 </div>
             </div>
@@ -179,7 +179,7 @@ function CameraCard({
                         <p className="text-[10px] font-semibold text-content-subtle uppercase tracking-wider">Location</p>
                         <p className="text-sm font-medium text-content">{camera.location || 'Not specified'}</p>
                         <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
-                            <span className="rounded-full bg-sky-50 px-2.5 py-1 font-medium text-sky-700 dark:bg-primary/10 dark:text-sky-300">
+                            <span className="rounded-full bg-primary-100 px-2.5 py-1 font-medium text-primary dark:bg-primary/10 text-primary">
                                 Public: {camera.availability_state || 'offline'}
                             </span>
                             <span className="rounded-full bg-surface-sunken px-2.5 py-1 font-medium text-content">
@@ -199,7 +199,7 @@ function CameraCard({
                     <div className="flex gap-1">
                         <button
                             onClick={() => onEdit(camera)}
-                            className="p-2 rounded-lg bg-surface-sunken text-content-muted hover:text-primary hover:bg-sky-50 dark:hover:bg-primary/10 transition-all"
+                            className="p-2 rounded-lg bg-surface-sunken text-content-muted hover:text-primary hover:bg-primary-100 dark:hover:bg-primary/10 transition-all"
                             title="Edit camera"
                         >
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

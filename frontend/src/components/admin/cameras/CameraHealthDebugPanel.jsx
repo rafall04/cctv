@@ -38,7 +38,7 @@ function SummaryCard({ label, value, tone = 'default' }) {
         success: 'border-emerald-200 bg-emerald-50 dark:border-emerald-500/20 dark:bg-emerald-500/10',
         warning: 'border-amber-200 bg-amber-50 dark:border-amber-500/20 dark:bg-amber-500/10',
         danger: 'border-red-200 bg-red-50 dark:border-red-500/20 dark:bg-red-500/10',
-        info: 'border-sky-200 bg-sky-50 dark:border-sky-500/20 dark:bg-primary/10',
+        info: 'border-primary-300 bg-primary-100 border-primary-300 dark:bg-primary/10',
     };
 
     return (
@@ -55,7 +55,7 @@ function StatusBadge({ label, tone }) {
         degraded: 'bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-200',
         offline: 'bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-300',
         unresolved: 'bg-slate-200 text-slate-700 dark:bg-slate-500/10 dark:text-slate-200',
-        maintenance: 'bg-sky-100 text-sky-700 dark:bg-primary/10 dark:text-sky-300',
+        maintenance: 'bg-primary-100 text-primary dark:bg-primary/10 text-primary',
     };
 
     return (

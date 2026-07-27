@@ -493,7 +493,7 @@ export default function ImportExport() {
                                     {rawPayload.length > 0 && <p className="mt-3 text-sm text-green-600 dark:text-green-400 font-medium">Loaded {rawPayload.length} rows from {rawFileName || 'JSON'}.</p>}
                                 </div>
                             ) : (
-                                <div className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm text-sky-800 dark:border-sky-500/20 dark:bg-primary/10 dark:text-sky-200">
+                                <div className="rounded-xl border border-primary-300 bg-primary-100 p-3 text-sm text-primary border-primary-300 dark:bg-primary/10 text-primary">
                                     Backend akan fetch source preset saat preview. Saat ini preset remote yang aktif adalah Jombang v2 dan Surakarta FLV.
                                 </div>
                             )}
@@ -571,7 +571,7 @@ export default function ImportExport() {
                         </div>
 
                         <div className="space-y-3">
-                            <button onClick={handlePreview} disabled={previewLoading} className="w-full bg-sky-600 text-white py-3 px-4 rounded-xl shadow font-medium hover:bg-sky-700 transition disabled:opacity-50">
+                            <button onClick={handlePreview} disabled={previewLoading} className="w-full bg-primary text-white py-3 px-4 rounded-xl shadow font-medium hover:bg-primary transition disabled:opacity-50">
                                 {previewLoading ? 'Generating Preview...' : 'Preview Import'}
                             </button>
                             <button onClick={handleImportSubmit} disabled={isProcessing || !previewResult?.canImport} className="w-full bg-primary text-white py-3 px-4 rounded-xl shadow font-medium hover:bg-primary-600 transition disabled:opacity-50">

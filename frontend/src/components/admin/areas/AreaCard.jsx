@@ -58,7 +58,7 @@ export default function AreaCard({
                     <Link
                         title="Restore metadata kamera area ini"
                         to={`/admin/backup-restore?areaId=${area.id}`}
-                        className="p-2 rounded-lg bg-surface-sunken text-content-muted hover:text-primary hover:bg-sky-50 dark:hover:bg-primary/10 transition-all"
+                        className="p-2 rounded-lg bg-surface-sunken text-content-muted hover:text-primary hover:bg-primary-100 dark:hover:bg-primary/10 transition-all"
                     >
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582M20 11A8 8 0 005.582 9M20 20v-5h-.581M4 13a8 8 0 0014.581 2" />
@@ -70,7 +70,7 @@ export default function AreaCard({
                             <line x1="3" y1="3" x2="21" y2="21" strokeWidth={2} strokeLinecap="round" />
                         </svg>
                     </button>
-                    <button type="button" onClick={() => onEdit(area)} className="p-2 rounded-lg bg-surface-sunken text-content-muted hover:text-primary hover:bg-sky-50 dark:hover:bg-primary/10 transition-all">
+                    <button type="button" onClick={() => onEdit(area)} className="p-2 rounded-lg bg-surface-sunken text-content-muted hover:text-primary hover:bg-primary-100 dark:hover:bg-primary/10 transition-all">
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                         </svg>
@@ -99,7 +99,7 @@ export default function AreaCard({
                     {getAreaCoverageLabel(area.coverage_scope)}
                 </span>
                 {gridDefaultEnabled ? (
-                    <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-sky-100 dark:bg-primary/20 text-sky-700 dark:text-sky-300">
+                    <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-primary-100 dark:bg-primary/20 text-primary text-primary">
                         Grid Default On
                     </span>
                 ) : (
@@ -131,7 +131,7 @@ export default function AreaCard({
                     <div className="text-content-muted">Health Default Area</div>
                     <div className="text-right font-semibold text-content">{area.external_health_mode_override || 'default'}</div>
                     <div className="text-content-muted">Dominant External Mode</div>
-                    <div className="text-right font-semibold text-sky-700 dark:text-sky-300">{area.dominantExternalHealthMode || 'default'}</div>
+                    <div className="text-right font-semibold text-primary text-primary">{area.dominantExternalHealthMode || 'default'}</div>
                     <div className="text-content-muted">Passive Monitored</div>
                     <div className="text-right font-semibold text-emerald-700 dark:text-emerald-300">{area.passiveMonitoredCount || 0}</div>
                     <div className="text-content-muted">Coverage Area</div>
@@ -155,7 +155,7 @@ export default function AreaCard({
                     disabled={gridDefaultBusy}
                     className={`w-full rounded-2xl border px-4 py-3 text-left transition-colors ${
                         gridDefaultEnabled
-                            ? 'border-sky-200 bg-sky-50 text-sky-900 hover:bg-sky-100 dark:border-sky-500/20 dark:bg-primary/10 dark:text-sky-100 dark:hover:bg-primary/20'
+                            ? 'border-primary-300 bg-primary-100 text-primary hover:bg-primary-100 border-primary-300 dark:bg-primary/10 dark:text-sky-100 dark:hover:bg-primary/20'
                             : 'border-gray-200 bg-surface-sunken text-content hover:bg-gray-100 dark:border-gray-700/60'
                     } ${gridDefaultBusy ? 'cursor-wait opacity-70' : ''}`}
                 >

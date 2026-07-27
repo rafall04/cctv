@@ -91,7 +91,7 @@ export default function BrandingSettingsPanel() {
     if (loading) {
         return (
             <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sky-500"></div>
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
             </div>
         );
     }
@@ -123,7 +123,7 @@ export default function BrandingSettingsPanel() {
                     <button
                         onClick={handleSave}
                         disabled={saving}
-                        className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-sky-600 disabled:opacity-50"
+                        className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary disabled:opacity-50"
                     >
                         {saving ? 'Saving...' : 'Save Changes'}
                     </button>

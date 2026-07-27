@@ -109,7 +109,7 @@ export default function RegisterPage() {
                         </div>
                     ) : (
                         <>
-                            <div className="mt-3 rounded-xl bg-sky-50 p-3 text-xs text-sky-800 dark:bg-sky-900/30 dark:text-sky-200">
+                            <div className="mt-3 rounded-xl bg-primary-100 p-3 text-xs text-primary dark:bg-sky-900/30 text-primary">
                                 ℹ️ Pendaftaran perlu <b>persetujuan admin</b> sebelum bisa login.
                             </div>
                             {plan && (

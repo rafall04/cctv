@@ -16,7 +16,7 @@ export default function PeakHoursCard({ peakHours }) {
                                 <p className="text-xs text-content-muted">{peak.unique_visitors} pengunjung unik</p>
                             </div>
                             {index === 0 && (
-                                <span className="px-2 py-1 bg-sky-100 dark:bg-primary/20 text-primary-600 dark:text-primary-400 text-xs font-medium rounded-lg">Peak</span>
+                                <span className="px-2 py-1 bg-primary-100 dark:bg-primary/20 text-primary-600 dark:text-primary-400 text-xs font-medium rounded-lg">Peak</span>
                             )}
                         </div>
                     ))}

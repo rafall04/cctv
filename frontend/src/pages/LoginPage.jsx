@@ -405,13 +405,13 @@ export default function LoginPage() {
 
                         {/* Account approval notice (pending / rejected) — calm info/warning, not an error */}
                         {accountNotice && (
-                            <div className={`flex items-start gap-3 p-4 rounded-xl border ${accountNotice.tone === 'info' ? 'bg-sky-50 dark:bg-primary/10 border-sky-200 dark:border-sky-500/30' : 'bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/30'}`}>
+                            <div className={`flex items-start gap-3 p-4 rounded-xl border ${accountNotice.tone === 'info' ? 'bg-primary-100 dark:bg-primary/10 border-primary-300 border-primary-300' : 'bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/30'}`}>
                                 <div className={`flex-shrink-0 ${accountNotice.tone === 'info' ? 'text-primary' : 'text-amber-500'}`}>
                                     {accountNotice.tone === 'info' ? <Icons.Clock /> : <Icons.Warning />}
                                 </div>
                                 <div className="flex-1">
-                                    <p className={`text-sm font-semibold ${accountNotice.tone === 'info' ? 'text-sky-700 dark:text-sky-300' : 'text-amber-700 dark:text-amber-300'}`}>{accountNotice.title}</p>
-                                    <p className={`text-sm mt-0.5 ${accountNotice.tone === 'info' ? 'text-sky-600 dark:text-sky-400' : 'text-amber-600 dark:text-amber-400'}`}>{accountNotice.message}</p>
+                                    <p className={`text-sm font-semibold ${accountNotice.tone === 'info' ? 'text-primary text-primary' : 'text-amber-700 dark:text-amber-300'}`}>{accountNotice.title}</p>
+                                    <p className={`text-sm mt-0.5 ${accountNotice.tone === 'info' ? 'text-primary text-primary' : 'text-amber-600 dark:text-amber-400'}`}>{accountNotice.message}</p>
                                 </div>
                             </div>
                         )}
@@ -543,7 +543,7 @@ export default function LoginPage() {
                         </p>
                         <a
                             href="/"
-                            className="flex items-center justify-center gap-2 text-sm text-content-muted hover:text-primary dark:hover:text-sky-400 transition-colors"
+                            className="flex items-center justify-center gap-2 text-sm text-content-muted hover:text-primary hover:text-primary transition-colors"
                         >
                             <Icons.ArrowLeft />
                             <span>Back to public view</span>
