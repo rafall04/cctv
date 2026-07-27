@@ -17,10 +17,40 @@
  */
 
 import fs from 'fs';
+import path from 'path';
 import { query, queryOne } from '../database/connectionPool.js';
 
-const API_BASE = (process.env.TG_API_BASE || 'http://127.0.0.1:8092').replace(/\/+$/, '');
-const TOKEN = process.env.TG_BOT_TOKEN || '';
+/*
+ * The bot token lives in the SIDECAR's .env, not the backend's. Read it from there rather than
+ * asking an operator to paste the same secret into a second file — telegramArchiveService.js
+ * already reads that file for the same reason, and duplicating a credential is how the two copies
+ * drift until one of them silently stops working.
+ *
+ * Resolved per call, not at import: the backend boots before anyone edits the sidecar config, and
+ * a value cached at import would keep serving 503 long after the token was set.
+ */
+const BASE_DIR = process.env.TG_ARCHIVE_DIR || '/opt/tg-archive';
+const ENV_FILE = process.env.TG_ARCHIVE_ENV_FILE || path.join(BASE_DIR, '.env');
+
+function sidecarEnv() {
+    try {
+        return fs.readFileSync(ENV_FILE, 'utf8').split('\n').reduce((acc, line) => {
+            const match = /^([A-Z0-9_]+)=(.*)$/.exec(line.trim());
+            if (match) acc[match[1]] = match[2].replace(/^["']|["']$/g, '');
+            return acc;
+        }, {});
+    } catch {
+        return {};
+    }
+}
+
+function telegramConfig() {
+    const env = sidecarEnv();
+    return {
+        apiBase: (process.env.TG_API_BASE || env.TG_API_BASE || 'http://127.0.0.1:8092').replace(/\/+$/, ''),
+        token: process.env.TG_BOT_TOKEN || env.TG_BOT_TOKEN || '',
+    };
+}
 
 /** Rows the archive page lists, newest first, optionally narrowed to one camera. */
 export function listUploads({ cameraId = null, status = 'ok', limit = 100, offset = 0 } = {}) {
@@ -118,13 +148,14 @@ export async function openSegmentStream(segmentId) {
         err.statusCode = 409;
         throw err;
     }
-    if (!TOKEN) {
-        const err = new Error('TG_BOT_TOKEN belum diset di backend');
+    const { apiBase, token } = telegramConfig();
+    if (!token) {
+        const err = new Error(`Token bot Telegram tidak ditemukan di ${ENV_FILE}`);
         err.statusCode = 503;
         throw err;
     }
 
-    const response = await fetch(`${API_BASE}/bot${TOKEN}/getFile?file_id=${encodeURIComponent(row.file_id)}`);
+    const response = await fetch(`${apiBase}/bot${token}/getFile?file_id=${encodeURIComponent(row.file_id)}`);
     const body = await response.json().catch(() => ({}));
     if (!body?.ok || !body.result?.file_path) {
         const err = new Error(body?.description || 'Telegram menolak permintaan berkas');
@@ -139,7 +170,7 @@ export async function openSegmentStream(segmentId) {
     if (filePath.startsWith('/') || /^[A-Za-z]:[\\/]/.test(filePath)) {
         return { stream: fs.createReadStream(filePath), size, filename: row.filename };
     }
-    const download = await fetch(`${API_BASE}/file/bot${TOKEN}/${filePath}`);
+    const download = await fetch(`${apiBase}/file/bot${token}/${filePath}`);
     if (!download.ok || !download.body) {
         const err = new Error('Gagal mengunduh berkas dari Telegram');
         err.statusCode = 502;
