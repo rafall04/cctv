@@ -17,6 +17,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useConfirm } from '../../../contexts/ConfirmContext';
 import { useNotification } from '../../../contexts/NotificationContext';
 import sponsorPackageService from '../../../services/sponsorPackageService';
+import { Button, Modal, inputClasses } from '../../ui';
 
 const DEFAULT_FORM = {
     key: '',
@@ -225,16 +226,22 @@ export default function SponsorPackagePanel({ packages = [], onChanged }) {
             )}
 
             {showModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-surface rounded-xl max-w-xl w-full max-h-[90vh] overflow-y-auto">
-                        <div className="p-5 border-b border-edge">
-                            <h2 className="text-lg font-bold text-content">
-                                {editingId ? 'Edit Profil Paket' : 'Tambah Profil Paket'}
-                            </h2>
-                        </div>
-                        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+                <Modal
+                    title={editingId ? 'Edit Profil Paket' : 'Tambah Profil Paket'}
+                    size="lg"
+                    onClose={() => setShowModal(false)}
+                    footer={(
+                        <>
+                            <Button onClick={() => setShowModal(false)} disabled={saving}>Batal</Button>
+                            <Button type="submit" form="sponsor-package-form" variant="primary" loading={saving}>
+                                {editingId ? 'Perbarui' : 'Simpan'}
+                            </Button>
+                        </>
+                    )}
+                >
+                    <form id="sponsor-package-form" onSubmit={handleSubmit} className="space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-content-muted mb-2">
+                                <label className="mb-1.5 block text-xs font-semibold text-content-muted">
                                     Key (kode unik, lowercase) *
                                 </label>
                                 <input
@@ -242,32 +249,32 @@ export default function SponsorPackagePanel({ packages = [], onChanged }) {
                                     value={form.key}
                                     onChange={(e) => setForm({ ...form, key: e.target.value.toLowerCase() })}
                                     disabled={!!editingId}
-                                    className="w-full bg-surface border border-edge-strong rounded-lg px-3 py-2 text-content text-sm focus:outline-none focus:border-primary-500 disabled:opacity-60"
+                                    className={inputClasses()}
                                     placeholder="paket-sukamaju"
                                     pattern="^[a-z0-9_-]{1,40}$"
                                     required
                                 />
                                 {editingId && (
-                                    <p className="text-xs text-gray-500 mt-1">Key tidak bisa diubah karena melekat di sponsor & kolom kamera.</p>
+                                    <p className="mt-1 text-xs text-content-subtle">Key tidak bisa diubah karena melekat di sponsor & kolom kamera.</p>
                                 )}
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                 <div>
-                                    <label className="block text-sm font-medium text-content-muted mb-2">Nama Tampilan *</label>
+                                    <label className="mb-1.5 block text-xs font-semibold text-content-muted">Nama Tampilan *</label>
                                     <input
                                         type="text"
                                         value={form.name}
                                         onChange={(e) => setForm({ ...form, name: e.target.value })}
-                                        className="w-full bg-surface border border-edge-strong rounded-lg px-3 py-2 text-content text-sm focus:outline-none focus:border-primary-500"
+                                        className={inputClasses()}
                                         required
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-content-muted mb-2">Warna Badge</label>
+                                    <label className="mb-1.5 block text-xs font-semibold text-content-muted">Warna Badge</label>
                                     <select
                                         value={form.color}
                                         onChange={(e) => setForm({ ...form, color: e.target.value })}
-                                        className="w-full bg-surface border border-edge-strong rounded-lg px-3 py-2 text-content text-sm focus:outline-none focus:border-primary-500"
+                                        className={inputClasses()}
                                     >
                                         {COLOR_OPTIONS.map((opt) => (
                                             <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -277,17 +284,17 @@ export default function SponsorPackagePanel({ packages = [], onChanged }) {
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                 <div>
-                                    <label className="block text-sm font-medium text-content-muted mb-2">Harga Default (Rp)</label>
+                                    <label className="mb-1.5 block text-xs font-semibold text-content-muted">Harga Default (Rp)</label>
                                     <input
                                         type="number"
                                         min="0"
                                         value={form.default_price}
                                         onChange={(e) => setForm({ ...form, default_price: e.target.value })}
-                                        className="w-full bg-surface border border-edge-strong rounded-lg px-3 py-2 text-content text-sm focus:outline-none focus:border-primary-500"
+                                        className={inputClasses()}
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-content-muted mb-2">
+                                    <label className="mb-1.5 block text-xs font-semibold text-content-muted">
                                         Limit Kamera
                                         <span className="text-xs text-gray-500 ml-1">(kosong = tanpa batas)</span>
                                     </label>
@@ -296,51 +303,34 @@ export default function SponsorPackagePanel({ packages = [], onChanged }) {
                                         min="0"
                                         value={form.default_camera_limit}
                                         onChange={(e) => setForm({ ...form, default_camera_limit: e.target.value })}
-                                        className="w-full bg-surface border border-edge-strong rounded-lg px-3 py-2 text-content text-sm focus:outline-none focus:border-primary-500"
+                                        className={inputClasses()}
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-content-muted mb-2">Urutan</label>
+                                    <label className="mb-1.5 block text-xs font-semibold text-content-muted">Urutan</label>
                                     <input
                                         type="number"
                                         min="0"
                                         value={form.sort_order}
                                         onChange={(e) => setForm({ ...form, sort_order: e.target.value })}
-                                        className="w-full bg-surface border border-edge-strong rounded-lg px-3 py-2 text-content text-sm focus:outline-none focus:border-primary-500"
+                                        className={inputClasses()}
                                     />
                                 </div>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-content-muted mb-2">
+                                <label className="mb-1.5 block text-xs font-semibold text-content-muted">
                                     Fitur (1 baris per fitur)
                                 </label>
                                 <textarea
                                     value={form.features}
                                     onChange={(e) => setForm({ ...form, features: e.target.value })}
                                     rows={4}
-                                    className="w-full bg-surface border border-edge-strong rounded-lg px-3 py-2 text-content text-sm focus:outline-none focus:border-primary-500"
+                                    className={inputClasses()}
                                     placeholder={'Logo di kamera tertentu\nLink ke website\n...'}
                                 />
                             </div>
-                            <div className="flex gap-3 pt-2">
-                                <button
-                                    type="button"
-                                    onClick={() => setShowModal(false)}
-                                    className="flex-1 bg-surface hover:bg-gray-200 dark:bg-gray-600 text-content px-4 py-2 rounded-lg transition-colors text-sm"
-                                >
-                                    Batal
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={saving}
-                                    className="flex-1 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg transition-colors text-sm disabled:opacity-60"
-                                >
-                                    {editingId ? 'Perbarui' : 'Simpan'}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
+                    </form>
+                </Modal>
             )}
         </div>
     );

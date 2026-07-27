@@ -13,10 +13,10 @@ import { useConfirm } from '../contexts/ConfirmContext';
 import voucherAdminService from '../services/voucherAdminService';
 import { areaService } from '../services/areaService';
 import { TableSkeleton } from '../components/ui/Skeleton';
+import { Button, Field, Modal } from '../components/ui';
 
 const inputClass =
     'w-full bg-surface border border-edge-strong rounded-lg px-3 py-2 text-content text-sm focus:outline-none focus:border-primary-500';
-const labelClass = 'block text-sm font-medium text-content-muted mb-1.5';
 
 const PROFILE_FORM_DEFAULT = {
     name: '',
@@ -43,13 +43,15 @@ function formatDuration(minutes) {
     return `${value} ${unit}`;
 }
 
+// Voucher-code state is a lifecycle, not a health reading: `revoked` is the only one that means
+// something went wrong, so it is the only one allowed the fault token.
 function codeStatusBadge(status) {
     switch (status) {
-        case 'active': return 'bg-green-500/20 text-green-500';
-        case 'unused': return 'bg-gray-200 dark:bg-gray-700/50 text-content-muted';
-        case 'expired': return 'bg-amber-500/20 text-amber-500';
-        case 'revoked': return 'bg-red-500/20 text-red-500';
-        default: return 'bg-gray-100 dark:bg-gray-700/40 text-gray-500';
+        case 'active': return 'bg-status-live/10 text-status-live';
+        case 'expired': return 'bg-status-warn/10 text-status-warn';
+        case 'revoked': return 'bg-status-fault/10 text-status-fault';
+        case 'unused':
+        default: return 'bg-surface-sunken text-content-muted';
     }
 }
 
@@ -462,121 +464,157 @@ export default function VoucherManagement() {
 
             {/* Profile modal */}
             {showProfileModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-surface rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                        <div className="p-5 border-b border-edge">
-                            <h2 className="text-xl font-bold text-content">{editingId ? 'Edit Profil Voucher' : 'Profil Voucher Baru'}</h2>
+                <Modal
+                    title={editingId ? 'Edit Profil Voucher' : 'Profil Voucher Baru'}
+                    size="lg"
+                    onClose={() => setShowProfileModal(false)}
+                    footer={(
+                        <>
+                            <Button onClick={() => setShowProfileModal(false)} disabled={savingProfile}>Batal</Button>
+                            <Button type="submit" form="voucher-profile-form" variant="primary" loading={savingProfile}>
+                                {editingId ? 'Perbarui' : 'Simpan'}
+                            </Button>
+                        </>
+                    )}
+                >
+                    <form id="voucher-profile-form" onSubmit={submitProfile} className="space-y-4">
+                        <Field
+                            label="Nama Profil"
+                            value={form.name}
+                            onChange={(e) => setForm({ ...form, name: e.target.value })}
+                            placeholder="RW Dander — 1 Hari"
+                            required
+                            minLength={2}
+                        />
+                        <Field
+                            label="Deskripsi"
+                            value={form.description}
+                            onChange={(e) => setForm({ ...form, description: e.target.value })}
+                        />
+                        <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+                            <Field
+                                label="Durasi"
+                                type="number"
+                                min="1"
+                                value={form.duration_value}
+                                onChange={(e) => setForm({ ...form, duration_value: e.target.value })}
+                                required
+                            />
+                            <Field
+                                as="select"
+                                label="Satuan"
+                                value={form.duration_unit}
+                                onChange={(e) => setForm({ ...form, duration_unit: e.target.value })}
+                            >
+                                <option value="menit">Menit</option>
+                                <option value="jam">Jam</option>
+                                <option value="hari">Hari</option>
+                            </Field>
+                            <Field
+                                label="Maks pemakai/kode"
+                                type="number"
+                                min="1"
+                                value={form.max_uses_per_code}
+                                onChange={(e) => setForm({ ...form, max_uses_per_code: e.target.value })}
+                            />
+                            <Field
+                                label="Harga (Rp)"
+                                type="number"
+                                min="0"
+                                value={form.price}
+                                onChange={(e) => setForm({ ...form, price: e.target.value })}
+                            />
+                            <Field
+                                className="col-span-2 md:col-span-1"
+                                label="Masa berlaku kode"
+                                hint="Hari; kosongkan untuk tanpa batas"
+                                type="number"
+                                min="1"
+                                value={form.code_validity_days}
+                                onChange={(e) => setForm({ ...form, code_validity_days: e.target.value })}
+                            />
                         </div>
-                        <form onSubmit={submitProfile} className="p-5 space-y-4">
-                            <div>
-                                <label className={labelClass}>Nama Profil *</label>
-                                <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputClass} placeholder="RW Dander — 1 Hari" required minLength={2} />
+                        <div className="flex flex-wrap gap-4">
+                            <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-content-muted">
+                                <input type="checkbox" checked={form.online_purchasable} onChange={(e) => setForm({ ...form, online_purchasable: e.target.checked })} className="h-4 w-4 rounded accent-primary" />
+                                Dijual online (mandiri)
+                            </label>
+                            <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-content-muted">
+                                <input type="checkbox" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} className="h-4 w-4 rounded accent-primary" />
+                                Aktif
+                            </label>
+                        </div>
+                        <fieldset>
+                            <legend className="mb-1.5 text-xs font-semibold text-content-muted">Area yang dibuka *</legend>
+                            <div className="max-h-40 divide-y divide-edge overflow-y-auto rounded-control border border-edge">
+                                {areas.length === 0 ? (
+                                    <p className="p-3 text-xs text-content-subtle">Belum ada area.</p>
+                                ) : areas.map((area) => (
+                                    <label key={area.id} className="flex min-h-11 cursor-pointer items-center gap-3 px-3 py-2 hover:bg-surface-raised">
+                                        <input type="checkbox" checked={form.area_ids.includes(area.id)} onChange={() => toggleFormArea(area.id)} className="h-4 w-4 rounded accent-primary" />
+                                        <span className="text-sm text-content">{areaLabel(area)}</span>
+                                        {!gatedSet.has(area.id) && <span className="text-xs text-status-warn">(belum ditandai berbayar)</span>}
+                                    </label>
+                                ))}
                             </div>
-                            <div>
-                                <label className={labelClass}>Deskripsi</label>
-                                <input type="text" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className={inputClass} />
-                            </div>
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                                <div>
-                                    <label className={labelClass}>Durasi *</label>
-                                    <input type="number" min="1" value={form.duration_value} onChange={(e) => setForm({ ...form, duration_value: e.target.value })} className={inputClass} required />
-                                </div>
-                                <div>
-                                    <label className={labelClass}>Satuan</label>
-                                    <select value={form.duration_unit} onChange={(e) => setForm({ ...form, duration_unit: e.target.value })} className={inputClass}>
-                                        <option value="menit">Menit</option>
-                                        <option value="jam">Jam</option>
-                                        <option value="hari">Hari</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className={labelClass}>Maks pemakai/kode</label>
-                                    <input type="number" min="1" value={form.max_uses_per_code} onChange={(e) => setForm({ ...form, max_uses_per_code: e.target.value })} className={inputClass} />
-                                </div>
-                                <div>
-                                    <label className={labelClass}>Harga (Rp)</label>
-                                    <input type="number" min="0" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} className={inputClass} />
-                                </div>
-                                <div className="col-span-2 md:col-span-1">
-                                    <label className={labelClass}>Masa berlaku kode <span className="text-xs text-gray-500">(hari, kosong=∞)</span></label>
-                                    <input type="number" min="1" value={form.code_validity_days} onChange={(e) => setForm({ ...form, code_validity_days: e.target.value })} className={inputClass} />
-                                </div>
-                            </div>
-                            <div className="flex flex-wrap gap-4">
-                                <label className="flex items-center gap-2 cursor-pointer text-sm text-content-muted">
-                                    <input type="checkbox" checked={form.online_purchasable} onChange={(e) => setForm({ ...form, online_purchasable: e.target.checked })} className="w-4 h-4 rounded" />
-                                    Dijual online (mandiri)
-                                </label>
-                                <label className="flex items-center gap-2 cursor-pointer text-sm text-content-muted">
-                                    <input type="checkbox" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} className="w-4 h-4 rounded" />
-                                    Aktif
-                                </label>
-                            </div>
-                            <div>
-                                <label className={labelClass}>Area yang dibuka *</label>
-                                <div className="max-h-40 overflow-y-auto border border-gray-200 dark:border-gray-700/40 rounded-lg divide-y divide-gray-200 dark:divide-gray-700/40">
-                                    {areas.length === 0 ? (
-                                        <p className="text-xs text-gray-500 p-3">Belum ada area.</p>
-                                    ) : areas.map((area) => (
-                                        <label key={area.id} className="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-700/30 cursor-pointer">
-                                            <input type="checkbox" checked={form.area_ids.includes(area.id)} onChange={() => toggleFormArea(area.id)} className="w-4 h-4 rounded" />
-                                            <span className="text-sm text-content">{areaLabel(area)}</span>
-                                            {!gatedSet.has(area.id) && <span className="text-[10px] text-amber-500">(belum ditandai berbayar)</span>}
-                                        </label>
-                                    ))}
-                                </div>
-                            </div>
-                            <div className="flex gap-3 pt-2">
-                                <button type="button" onClick={() => setShowProfileModal(false)} className="flex-1 bg-surface-sunken hover:bg-gray-200 text-content px-4 py-2 rounded-lg transition-colors">Batal</button>
-                                <button type="submit" disabled={savingProfile} className="flex-1 bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white px-4 py-2 rounded-lg transition-colors">{editingId ? 'Perbarui' : 'Simpan'}</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
+                        </fieldset>
+                    </form>
+                </Modal>
             )}
 
             {/* Generate-codes modal */}
             {genProfile && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-surface rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
-                        <div className="p-5 border-b border-edge">
-                            <h2 className="text-xl font-bold text-content">Generate Kode — {genProfile.name}</h2>
-                        </div>
-                        {!genResult ? (
-                            <form onSubmit={submitGenerate} className="p-5 space-y-4">
-                                <div>
-                                    <label className={labelClass}>Jumlah kode</label>
-                                    <input type="number" min="1" max="500" value={genCount} onChange={(e) => setGenCount(e.target.value)} className={inputClass} required />
-                                </div>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div>
-                                        <label className={labelClass}>Nama (opsional)</label>
-                                        <input type="text" value={genBuyerName} onChange={(e) => setGenBuyerName(e.target.value)} className={inputClass} placeholder="mis. Pak RT" />
-                                    </div>
-                                    <div>
-                                        <label className={labelClass}>No HP (opsional)</label>
-                                        <input type="text" value={genBuyerPhone} onChange={(e) => setGenBuyerPhone(e.target.value)} className={inputClass} />
-                                    </div>
-                                </div>
-                                <div className="flex gap-3 pt-2">
-                                    <button type="button" onClick={() => setGenProfile(null)} className="flex-1 bg-surface-sunken hover:bg-gray-200 text-content px-4 py-2 rounded-lg transition-colors">Batal</button>
-                                    <button type="submit" disabled={generating} className="flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white px-4 py-2 rounded-lg transition-colors">Buat Kode</button>
-                                </div>
-                            </form>
-                        ) : (
-                            <div className="p-5 space-y-4">
-                                <p className="text-sm text-content-muted">{genResult.length} kode dibuat. Salin / cetak lalu bagikan.</p>
-                                <div className="bg-surface-sunken rounded-lg p-3 max-h-60 overflow-y-auto font-mono text-sm text-content space-y-1">
-                                    {genResult.map((c) => <div key={c.id}>{c.code}</div>)}
-                                </div>
-                                <div className="flex gap-3">
-                                    <button onClick={() => copyCodes(genResult)} className="flex-1 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg transition-colors">Salin semua</button>
-                                    <button onClick={() => setGenProfile(null)} className="flex-1 bg-surface-sunken hover:bg-gray-200 text-content px-4 py-2 rounded-lg transition-colors">Tutup</button>
-                                </div>
+                <Modal
+                    title={`Generate Kode — ${genProfile.name}`}
+                    size="md"
+                    onClose={() => setGenProfile(null)}
+                    footer={!genResult ? (
+                        <>
+                            <Button onClick={() => setGenProfile(null)} disabled={generating}>Batal</Button>
+                            <Button type="submit" form="voucher-generate-form" variant="primary" loading={generating}>Buat Kode</Button>
+                        </>
+                    ) : (
+                        <>
+                            <Button onClick={() => setGenProfile(null)}>Tutup</Button>
+                            <Button variant="primary" onClick={() => copyCodes(genResult)}>Salin semua</Button>
+                        </>
+                    )}
+                >
+                    {!genResult ? (
+                        <form id="voucher-generate-form" onSubmit={submitGenerate} className="space-y-4">
+                            <Field
+                                label="Jumlah kode"
+                                type="number"
+                                min="1"
+                                max="500"
+                                value={genCount}
+                                onChange={(e) => setGenCount(e.target.value)}
+                                required
+                            />
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                <Field
+                                    label="Nama (opsional)"
+                                    value={genBuyerName}
+                                    onChange={(e) => setGenBuyerName(e.target.value)}
+                                    placeholder="mis. Pak RT"
+                                />
+                                <Field
+                                    label="No HP (opsional)"
+                                    type="tel"
+                                    value={genBuyerPhone}
+                                    onChange={(e) => setGenBuyerPhone(e.target.value)}
+                                />
                             </div>
-                        )}
-                    </div>
-                </div>
+                        </form>
+                    ) : (
+                        <div className="space-y-3">
+                            <p className="text-sm text-content-muted">{genResult.length} kode dibuat. Salin / cetak lalu bagikan.</p>
+                            <div className="max-h-60 space-y-1 overflow-y-auto rounded-control bg-surface-sunken p-3 font-mono text-sm tabular-nums text-content">
+                                {genResult.map((c) => <div key={c.id}>{c.code}</div>)}
+                            </div>
+                        </div>
+                    )}
+                </Modal>
             )}
         </div>
     );

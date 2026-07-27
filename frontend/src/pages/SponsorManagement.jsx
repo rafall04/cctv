@@ -14,6 +14,7 @@ import sponsorPackageService from '../services/sponsorPackageService';
 import { cameraService } from '../services/cameraService';
 import { TableSkeleton, StatCardSkeleton } from '../components/ui/Skeleton';
 import SponsorPackagePanel from '../components/admin/sponsors/SponsorPackagePanel.jsx';
+import { Button, Modal, inputClasses } from '../components/ui';
 
 // Pre-bound Tailwind color classes — using template literals against the
 // `color` field would silently get purged by the JIT compiler. The list
@@ -591,42 +592,48 @@ function SponsorManagement() {
 
             {/* Sponsor Modal */}
             {showModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white dark:bg-gray-800 rounded-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-                        <div className="p-5 border-b border-gray-200 dark:border-gray-700/50">
-                            <h2 className="text-xl font-bold text-content dark:text-white">
-                                {editingId ? 'Edit Sponsor' : 'Tambah Sponsor Baru'}
-                            </h2>
-                        </div>
-                        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+                <Modal
+                    title={editingId ? 'Edit Sponsor' : 'Tambah Sponsor Baru'}
+                    size="xl"
+                    onClose={() => { setShowModal(false); resetForm(); }}
+                    footer={(
+                        <>
+                            <Button onClick={() => { setShowModal(false); resetForm(); }} disabled={saving}>Batal</Button>
+                            <Button type="submit" form="sponsor-form" variant="primary" loading={saving} disabled={overCameraLimit}>
+                                {editingId ? 'Perbarui' : 'Simpan'}
+                            </Button>
+                        </>
+                    )}
+                >
+                    <form id="sponsor-form" onSubmit={handleSubmit} className="space-y-4">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                 <div className="md:col-span-2">
-                                    <label className="block text-sm font-medium text-content-muted mb-2">Nama Sponsor *</label>
+                                    <label className="mb-1.5 block text-xs font-semibold text-content-muted">Nama Sponsor *</label>
                                     <input type="text" value={form.name}
                                         onChange={(e) => setForm({ ...form, name: e.target.value })}
-                                        className="w-full bg-surface border border-edge-strong rounded-lg px-3 py-2 text-content text-sm focus:outline-none focus:border-primary-500"
+                                        className={inputClasses()}
                                         required />
                                 </div>
                                 <div className="md:col-span-2">
-                                    <label className="block text-sm font-medium text-content-muted mb-2">URL Logo</label>
+                                    <label className="mb-1.5 block text-xs font-semibold text-content-muted">URL Logo</label>
                                     <input type="url" value={form.logo}
                                         onChange={(e) => setForm({ ...form, logo: e.target.value })}
                                         placeholder="https://example.com/logo.png"
-                                        className="w-full bg-surface border border-edge-strong rounded-lg px-3 py-2 text-content text-sm focus:outline-none focus:border-primary-500" />
+                                        className={inputClasses()} />
                                 </div>
                                 <div className="md:col-span-2">
-                                    <label className="block text-sm font-medium text-content-muted mb-2">Website URL</label>
+                                    <label className="mb-1.5 block text-xs font-semibold text-content-muted">Website URL</label>
                                     <input type="url" value={form.url}
                                         onChange={(e) => setForm({ ...form, url: e.target.value })}
                                         placeholder="https://example.com"
-                                        className="w-full bg-surface border border-edge-strong rounded-lg px-3 py-2 text-content text-sm focus:outline-none focus:border-primary-500" />
+                                        className={inputClasses()} />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-content-muted mb-2">Paket *</label>
+                                    <label className="mb-1.5 block text-xs font-semibold text-content-muted">Paket *</label>
                                     <select
                                         value={form.package}
                                         onChange={(e) => handlePackageChange(e.target.value)}
-                                        className="w-full bg-surface border border-edge-strong rounded-lg px-3 py-2 text-content text-sm focus:outline-none focus:border-primary-500"
+                                        className={inputClasses()}
                                         required
                                     >
                                         <option value="" disabled>Pilih paket</option>
@@ -638,56 +645,56 @@ function SponsorManagement() {
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-content-muted mb-2">Harga (Rp) *</label>
+                                    <label className="mb-1.5 block text-xs font-semibold text-content-muted">Harga (Rp) *</label>
                                     <input type="number" min="0" value={form.price}
                                         onChange={(e) => setForm({ ...form, price: e.target.value })}
-                                        className="w-full bg-surface border border-edge-strong rounded-lg px-3 py-2 text-content text-sm focus:outline-none focus:border-primary-500"
+                                        className={inputClasses()}
                                         required />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-content-muted mb-2">
+                                    <label className="mb-1.5 block text-xs font-semibold text-content-muted">
                                         Limit Kamera <span className="text-xs text-gray-500">(kosong = tanpa batas)</span>
                                     </label>
                                     <input type="number" min="0" value={form.camera_limit}
                                         onChange={(e) => setForm({ ...form, camera_limit: e.target.value })}
-                                        className="w-full bg-surface border border-edge-strong rounded-lg px-3 py-2 text-content text-sm focus:outline-none focus:border-primary-500" />
+                                        className={inputClasses()} />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-content-muted mb-2">Tanggal Mulai</label>
+                                    <label className="mb-1.5 block text-xs font-semibold text-content-muted">Tanggal Mulai</label>
                                     <input type="date" value={form.start_date}
                                         onChange={(e) => setForm({ ...form, start_date: e.target.value })}
-                                        className="w-full bg-surface border border-edge-strong rounded-lg px-3 py-2 text-content text-sm focus:outline-none focus:border-primary-500" />
+                                        className={inputClasses()} />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-content-muted mb-2">Tanggal Berakhir</label>
+                                    <label className="mb-1.5 block text-xs font-semibold text-content-muted">Tanggal Berakhir</label>
                                     <input type="date" value={form.end_date}
                                         onChange={(e) => setForm({ ...form, end_date: e.target.value })}
-                                        className="w-full bg-surface border border-edge-strong rounded-lg px-3 py-2 text-content text-sm focus:outline-none focus:border-primary-500" />
+                                        className={inputClasses()} />
                                 </div>
                                 <div className="md:col-span-2">
-                                    <label className="block text-sm font-medium text-content-muted mb-2">Nama Kontak</label>
+                                    <label className="mb-1.5 block text-xs font-semibold text-content-muted">Nama Kontak</label>
                                     <input type="text" value={form.contact_name}
                                         onChange={(e) => setForm({ ...form, contact_name: e.target.value })}
-                                        className="w-full bg-surface border border-edge-strong rounded-lg px-3 py-2 text-content text-sm focus:outline-none focus:border-primary-500" />
+                                        className={inputClasses()} />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-content-muted mb-2">Email Kontak</label>
+                                    <label className="mb-1.5 block text-xs font-semibold text-content-muted">Email Kontak</label>
                                     <input type="email" value={form.contact_email}
                                         onChange={(e) => setForm({ ...form, contact_email: e.target.value })}
-                                        className="w-full bg-surface border border-edge-strong rounded-lg px-3 py-2 text-content text-sm focus:outline-none focus:border-primary-500" />
+                                        className={inputClasses()} />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-content-muted mb-2">Telepon Kontak</label>
+                                    <label className="mb-1.5 block text-xs font-semibold text-content-muted">Telepon Kontak</label>
                                     <input type="tel" value={form.contact_phone}
                                         onChange={(e) => setForm({ ...form, contact_phone: e.target.value })}
-                                        className="w-full bg-surface border border-edge-strong rounded-lg px-3 py-2 text-content text-sm focus:outline-none focus:border-primary-500" />
+                                        className={inputClasses()} />
                                 </div>
                                 <div className="md:col-span-2">
-                                    <label className="block text-sm font-medium text-content-muted mb-2">Catatan</label>
+                                    <label className="mb-1.5 block text-xs font-semibold text-content-muted">Catatan</label>
                                     <textarea value={form.notes}
                                         onChange={(e) => setForm({ ...form, notes: e.target.value })}
                                         rows="3"
-                                        className="w-full bg-surface border border-edge-strong rounded-lg px-3 py-2 text-content text-sm focus:outline-none focus:border-primary-500" />
+                                        className={inputClasses()} />
                                 </div>
                                 <div className="md:col-span-2">
                                     <label className="flex items-center gap-2 cursor-pointer">
@@ -761,25 +768,8 @@ function SponsorManagement() {
                                 </div>
                             </div>
 
-                            <div className="flex gap-3 pt-2">
-                                <button
-                                    type="button"
-                                    onClick={() => { setShowModal(false); resetForm(); }}
-                                    className="flex-1 bg-surface hover:bg-gray-200 dark:bg-gray-600 text-content px-4 py-2 rounded-lg transition-colors"
-                                >
-                                    Batal
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={saving || overCameraLimit}
-                                    className="flex-1 bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white px-4 py-2 rounded-lg transition-colors"
-                                >
-                                    {editingId ? 'Perbarui' : 'Simpan'}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
+                    </form>
+                </Modal>
             )}
         </div>
     );
