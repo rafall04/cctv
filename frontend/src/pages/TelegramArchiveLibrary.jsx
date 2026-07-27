@@ -29,9 +29,12 @@ function formatSize(bytes) {
 
 function parseWhen(value) {
     if (!value) return null;
-    // Segment times are stored as local SQL ('YYYY-MM-DD HH:MM:SS'), already in the box's zone —
-    // appending 'Z' would shift every label by the UTC offset.
-    const parsed = new Date(String(value).replace(' ', 'T'));
+    // recording_segments stores segment times as UTC SQL ('YYYY-MM-DD HH:MM:SS'), so the 'Z' is
+    // REQUIRED: verified against prod, where a clip whose own filename says 19:32:50 WIB is stored
+    // as 12:32:50. Dropping the Z renders every label 7 hours early.
+    const raw = String(value);
+    const iso = raw.includes('T') ? raw : raw.replace(' ', 'T');
+    const parsed = new Date(/[Z+]|-\d{2}:\d{2}$/.test(iso) ? iso : `${iso}Z`);
     return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
