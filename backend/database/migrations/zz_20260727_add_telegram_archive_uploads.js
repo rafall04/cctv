@@ -39,6 +39,10 @@ try {
             -- parsing JSON per row. NULL for rows written before the uploader recorded it.
             file_id         TEXT,
             recorded_at     TEXT,
+            -- A CCTV segment is a RANGE, not an instant. Storing only the start left the page
+            -- saying "19.32" when what an operator needs to know is "19.32 -> 19.42, 10 minutes".
+            recorded_until  TEXT,
+            duration_seconds INTEGER,
             uploaded_at     TEXT    NOT NULL DEFAULT (datetime('now'))
         )
     `);

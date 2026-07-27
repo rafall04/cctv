@@ -34,7 +34,7 @@ export function listUploads({ cameraId = null, status = 'ok', limit = 100, offse
     // recording it and are listed by the caller separately if wanted.
     const rows = query(
         `SELECT u.segment_id, u.camera_id, u.filename, u.file_size, u.status,
-                u.file_id, u.recorded_at, u.uploaded_at, u.targets,
+                u.file_id, u.recorded_at, u.recorded_until, u.duration_seconds, u.uploaded_at, u.targets,
                 c.name AS camera_name, a.name AS area_name
          FROM telegram_archive_uploads u
          LEFT JOIN cameras c ON c.id = u.camera_id
@@ -56,6 +56,8 @@ export function listUploads({ cameraId = null, status = 'ok', limit = 100, offse
         // The web player needs a file_id; say so plainly rather than rendering a dead play button.
         playable: Boolean(row.file_id),
         recordedAt: row.recorded_at,
+        recordedUntil: row.recorded_until,
+        durationSeconds: row.duration_seconds,
         uploadedAt: row.uploaded_at,
         groups: safeTargets(row.targets).map((t) => t.label).filter(Boolean),
     }));

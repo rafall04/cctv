@@ -458,10 +458,11 @@ def mirror_to_app_db(cfg, seg, status, detail, targets, payload, log=None):
         conn.execute(
             'INSERT OR REPLACE INTO telegram_archive_uploads'
             '(segment_id,camera_id,filename,file_size,status,detail,targets,file_id,'
-            ' recorded_at,uploaded_at) '
-            "VALUES(?,?,?,?,?,?,?,?,?,datetime('now'))",
+            ' recorded_at,recorded_until,duration_seconds,uploaded_at) '
+            "VALUES(?,?,?,?,?,?,?,?,?,?,?,datetime('now'))",
             (seg['id'], seg['camera_id'], seg['filename'], seg['file_size'],
-             status, detail, payload, file_id, seg['start_time']))
+             status, detail, payload, file_id,
+             seg['start_time'], seg['end_time'], seg['duration']))
         conn.commit()
     except Exception as exc:  # noqa: BLE001 - never let bookkeeping break an upload
         if log:

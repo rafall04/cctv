@@ -17,10 +17,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNotification } from '../contexts/NotificationContext';
 import archiveLibrary from '../services/telegramArchiveLibraryService';
-import {
-    Badge, Button, Field, Modal, PageHeader, StatTile,
-    Table, TBody, TD, TH, THead, TR,
-} from '../components/ui';
+import { Badge, Button, Field, Modal, PageHeader, StatTile } from '../components/ui';
 import { TableSkeleton } from '../components/ui/Skeleton';
 
 function formatSize(bytes) {
@@ -30,13 +27,39 @@ function formatSize(bytes) {
     return `${(bytes / 1024 ** i).toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
 }
 
-function formatWhen(value) {
-    if (!value) return '—';
-    const parsed = new Date(value.includes('T') ? value : value.replace(' ', 'T') + 'Z');
-    if (Number.isNaN(parsed.getTime())) return value;
-    return parsed.toLocaleString('id-ID', {
-        day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
-    });
+function parseWhen(value) {
+    if (!value) return null;
+    // Segment times are stored as local SQL ('YYYY-MM-DD HH:MM:SS'), already in the box's zone —
+    // appending 'Z' would shift every label by the UTC offset.
+    const parsed = new Date(String(value).replace(' ', 'T'));
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+const clock = (d) => d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+const day = (d) => d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+
+function formatDuration(seconds) {
+    const total = Math.round(Number(seconds) || 0);
+    if (!total) return null;
+    const m = Math.floor(total / 60);
+    const s = total % 60;
+    if (m && s) return `${m} mnt ${s} dtk`;
+    return m ? `${m} mnt` : `${s} dtk`;
+}
+
+/**
+ * A CCTV segment is a RANGE. Showing only its start ("19.32") leaves an operator guessing how much
+ * footage a row covers, when what they are hunting for is "the clip that contains 19.36".
+ */
+function segmentWindow(row) {
+    const start = parseWhen(row.recordedAt);
+    const end = parseWhen(row.recordedUntil);
+    if (!start) return { date: '—', range: '—', duration: null };
+    return {
+        date: day(start),
+        range: end ? `${clock(start)} – ${clock(end)}` : clock(start),
+        duration: formatDuration(row.durationSeconds),
+    };
 }
 
 export default function TelegramArchiveLibrary() {
@@ -117,49 +140,54 @@ export default function TelegramArchiveLibrary() {
                     <p className="text-sm text-content-muted">Belum ada segmen terarsip untuk pilihan ini.</p>
                 </div>
             ) : (
-                <div className="overflow-x-auto rounded-card border border-edge bg-surface">
-                    <Table>
-                        <THead>
-                            <TR>
-                                <TH>Kamera</TH>
-                                <TH>Berkas</TH>
-                                <TH>Direkam</TH>
-                                <TH align="right">Ukuran</TH>
-                                <TH align="right">Aksi</TH>
-                            </TR>
-                        </THead>
-                        <TBody>
-                            {rows.map((row) => (
-                                <TR key={row.segmentId} interactive>
-                                    <TD>
-                                        <p className="font-semibold text-content">{row.cameraName}</p>
-                                        {row.areaName && (
-                                            <p className="text-xs text-content-subtle">{row.areaName}</p>
-                                        )}
-                                    </TD>
-                                    <TD mono className="text-xs">{row.filename}</TD>
-                                    <TD mono className="text-xs text-content-muted">
-                                        {formatWhen(row.recordedAt || row.uploadedAt)}
-                                    </TD>
-                                    <TD align="right" mono className="text-xs">{formatSize(row.fileSize)}</TD>
-                                    <TD align="right">
-                                        {row.playable ? (
-                                            <Button size="sm" onClick={() => setPlaying(row)}>Putar</Button>
-                                        ) : (
-                                            <Badge tone="neutral">Hanya di Telegram</Badge>
-                                        )}
-                                    </TD>
-                                </TR>
-                            ))}
-                        </TBody>
-                    </Table>
-                </div>
+                /*
+                 * A list, not a table. The table forced horizontal scroll on a phone and pushed the
+                 * Putar button off-screen entirely — the feature was unusable on mobile. The
+                 * filename column is gone too: it IS the timestamp in another format.
+                 */
+                <ul className="space-y-2">
+                    {rows.map((row) => {
+                        const when = segmentWindow(row);
+                        return (
+                            <li
+                                key={row.segmentId}
+                                className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-card border border-edge bg-surface p-3"
+                            >
+                                <div className="min-w-0 flex-1 basis-40">
+                                    <p className="truncate text-sm font-semibold text-content">{row.cameraName}</p>
+                                    <p className="truncate text-xs text-content-subtle">
+                                        {row.areaName ? `${row.areaName} · ` : ''}{when.date}
+                                    </p>
+                                </div>
+
+                                <div className="shrink-0 text-right">
+                                    <p className="font-mono text-sm font-semibold tabular-nums text-content">
+                                        {when.range}
+                                    </p>
+                                    <p className="font-mono text-xs tabular-nums text-content-subtle">
+                                        {[when.duration, formatSize(row.fileSize)].filter(Boolean).join(' · ')}
+                                    </p>
+                                </div>
+
+                                <div className="shrink-0">
+                                    {row.playable ? (
+                                        <Button size="sm" onClick={() => setPlaying(row)}>Putar</Button>
+                                    ) : (
+                                        <Badge tone="neutral">Hanya di Telegram</Badge>
+                                    )}
+                                </div>
+                            </li>
+                        );
+                    })}
+                </ul>
             )}
 
             {playing && (
                 <Modal
                     title={playing.cameraName}
-                    description={`${playing.filename} • ${formatSize(playing.fileSize)}`}
+                    description={`${segmentWindow(playing).date} · ${segmentWindow(playing).range}`
+                        + `${segmentWindow(playing).duration ? ` · ${segmentWindow(playing).duration}` : ''}`
+                        + ` · ${formatSize(playing.fileSize)}`}
                     size="xl"
                     onClose={() => setPlaying(null)}
                     footer={(
