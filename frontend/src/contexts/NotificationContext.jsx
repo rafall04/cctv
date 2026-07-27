@@ -84,24 +84,34 @@ export function NotificationProvider({ children }) {
     }, []);
 
     /**
-     * Add a notification to the stack
-     * @param {Object} notification - Notification object
+     * Add a notification to the stack.
+     *
+     * Accepts either the full object form, or the `('Tersimpan', 'success')` shorthand that admin
+     * pages already use. Without the shorthand a string argument produced a toast with no title and
+     * no message — a visible but completely empty box (seen live on the archive + ronda pages).
+     *
+     * @param {Object|string} notification - Notification object, or the message text
+     * @param {string} [shorthandType] - Type when the first argument is a string
      * @returns {string} Notification ID
      */
-    const showNotification = useCallback((notification) => {
+    const showNotification = useCallback((notification, shorthandType) => {
+        const input = typeof notification === 'string'
+            ? { type: shorthandType || 'info', title: notification }
+            : (notification || {});
+
         const id = generateId();
-        const config = getNotificationConfig(notification.type);
-        const duration = notification.duration ?? config.duration;
-        const dismissible = notification.dismissible ?? true;
+        const config = getNotificationConfig(input.type);
+        const duration = input.duration ?? config.duration;
+        const dismissible = input.dismissible ?? true;
 
         const newNotification = {
             id,
-            type: notification.type || 'info',
-            title: notification.title,
-            message: notification.message,
+            type: input.type || 'info',
+            title: input.title,
+            message: input.message,
             duration,
             dismissible,
-            action: notification.action,
+            action: input.action,
             createdAt: Date.now(),
         };
 
