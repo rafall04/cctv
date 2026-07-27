@@ -459,6 +459,12 @@ class RecordingService {
     /**
      * Get recording status
      */
+    /** Cameras this process currently holds a recorder for. Used by the worker to
+     *  publish its state for the API, which can no longer read the in-memory map. */
+    getActiveRecordingCameraIds() {
+        return recordingProcessManager.getActiveCameraIds();
+    }
+
     getRecordingStatus(cameraId) {
         const recording = recordingProcessManager.getStatus(cameraId);
         const health = this.healthMonitor.getState(cameraId);

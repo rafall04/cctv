@@ -171,6 +171,26 @@ export const config = {
     },
   },
 
+  recording: {
+    // Does the recording domain live in a SEPARATE process (rafnet-cctv-recorder)?
+    //
+    // false (default) — the API process owns recording, exactly as it always has.
+    //   Existing deployments that never add the recorder app keep working untouched.
+    // true            — the API starts NO recorders and reads recording state from the
+    //   DB instead; backend/recorder.js owns the domain. The point is that restarting
+    //   the API for a UI/route change stops touching ffmpeg at all.
+    //
+    // recorder.js sets this for itself, so only backend/.env needs the flag.
+    workerEnabled: process.env.RECORDING_WORKER_ENABLED === 'true',
+    // How often the worker claims queued reconcile requests from the API. Low enough
+    // that an admin toggling a camera sees it act immediately.
+    reconcileRequestIntervalMs: parseInt(process.env.RECORDING_RECONCILE_REQUEST_INTERVAL_MS || '2000', 10),
+    // Backstop full sweep, in case a request row is ever lost.
+    reconcileSweepIntervalMs: parseInt(process.env.RECORDING_RECONCILE_SWEEP_INTERVAL_MS || '60000', 10),
+    // Cadence for publishing process state + health snapshot for the API to read.
+    statePublishIntervalMs: parseInt(process.env.RECORDING_STATE_PUBLISH_INTERVAL_MS || '15000', 10),
+  },
+
   telegram: {
     botToken: process.env.TELEGRAM_BOT_TOKEN || '',
     monitoringChatId: process.env.TELEGRAM_MONITORING_CHAT_ID || process.env.TELEGRAM_CHAT_ID || '',

@@ -48,7 +48,7 @@ export async function stopRecording(request, reply) {
 export async function getRecordingStatus(request, reply) {
     try {
         const { cameraId } = request.params;
-        const status = recordingPlaybackService.getRecordingStatus(cameraId);
+        const status = await recordingPlaybackService.getRecordingStatus(cameraId);
 
         return reply.send({ success: true, data: status });
     } catch (error) {
@@ -63,7 +63,7 @@ export async function getRecordingStatus(request, reply) {
 // Get all recordings overview (dashboard)
 export async function getRecordingsOverview(request, reply) {
     try {
-        const overviewData = recordingPlaybackService.getRecordingsOverview();
+        const overviewData = await recordingPlaybackService.getRecordingsOverview();
         return reply.send({ success: true, data: overviewData });
     } catch (error) {
         console.error('Get recordings overview error:', error);

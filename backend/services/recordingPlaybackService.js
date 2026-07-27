@@ -9,6 +9,7 @@
 import { query, queryOne, execute } from '../database/connectionPool.js';
 import { getEffectiveDeliveryType } from '../utils/cameraDelivery.js';
 import { recordingService } from './recordingService.js';
+import recordingControl from './recordingControlService.js';
 import recordingSegmentRepository from './recordingSegmentRepository.js';
 import { logAdminAction } from './securityAuditLogger.js';
 import settingsService from './settingsService.js';
@@ -92,7 +93,7 @@ class RecordingPlaybackService {
             );
         }
 
-        const result = await recordingService.startRecording(cameraId);
+        const result = await recordingControl.start(cameraId, 'admin_start');
 
         if (result.success) {
             logAdminAction({
@@ -115,7 +116,7 @@ class RecordingPlaybackService {
             throw err;
         }
 
-        const result = await recordingService.stopRecording(cameraId);
+        const result = await recordingControl.stop(cameraId, { reason: 'admin_stop' });
 
         if (result.success) {
             logAdminAction({
@@ -129,7 +130,7 @@ class RecordingPlaybackService {
         return result;
     }
 
-    getRecordingStatus(cameraId) {
+    async getRecordingStatus(cameraId) {
         const camera = queryOne(
             'SELECT id, name, enable_recording, recording_status, recording_duration_hours, last_recording_start FROM cameras WHERE id = ?',
             [cameraId]
@@ -141,7 +142,9 @@ class RecordingPlaybackService {
             throw err;
         }
 
-        const runtimeStatus = recordingService.getRecordingStatus(cameraId);
+        // Worker mode: the recorder lives in another process, so runtime status comes
+        // from what it published to the DB. Storage is DB-backed already.
+        const runtimeStatus = await recordingControl.getRuntimeStatus(cameraId);
         const storage = recordingService.getStorageUsage(cameraId);
 
         return {
@@ -156,7 +159,7 @@ class RecordingPlaybackService {
         };
     }
 
-    getRecordingsOverview() {
+    async getRecordingsOverview() {
         const cameras = query(`
             SELECT 
                 id, 
@@ -174,8 +177,8 @@ class RecordingPlaybackService {
             ORDER BY id ASC
         `);
 
-        const camerasWithStatus = cameras.map((camera) => {
-            const runtimeStatus = recordingService.getRecordingStatus(camera.id);
+        const camerasWithStatus = await Promise.all(cameras.map(async (camera) => {
+            const runtimeStatus = await recordingControl.getRuntimeStatus(camera.id);
             const storage = recordingService.getStorageUsage(camera.id);
 
             return {
@@ -183,7 +186,7 @@ class RecordingPlaybackService {
                 runtime_status: runtimeStatus,
                 storage,
             };
-        });
+        }));
 
         const activeRecordings = camerasWithStatus.filter((camera) => camera.runtime_status.isRecording).length;
         const totalStorage = camerasWithStatus.reduce((sum, camera) => sum + camera.storage.totalSize, 0);
@@ -651,7 +654,7 @@ class RecordingPlaybackService {
         if (enable_recording !== undefined) {
             // Delegate to reconciler so the same policy used by periodic safety net
             // (delivery type, online state, cooldown) decides start vs stop.
-            await recordingService.reconcileRecordingLifecycle(cameraId, 'settings_changed');
+            await recordingControl.reconcile(cameraId, 'settings_changed');
         }
 
         logAdminAction({

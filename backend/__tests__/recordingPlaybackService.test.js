@@ -86,7 +86,7 @@ describe('recordingPlaybackService', () => {
         validateRequestForCameraMock.mockReturnValue(null);
     });
 
-    it('returns enriched overview camera fields for recording dashboard', () => {
+    it('returns enriched overview camera fields for recording dashboard', async () => {
         queryMock.mockReturnValueOnce([
             {
                 id: 5,
@@ -105,7 +105,7 @@ describe('recordingPlaybackService', () => {
         getRecordingStatusMock.mockReturnValue({ isRecording: true, status: 'recording' });
         getStorageUsageMock.mockReturnValue({ totalSize: 1024, segmentCount: 2 });
 
-        const result = recordingPlaybackService.getRecordingsOverview();
+        const result = await recordingPlaybackService.getRecordingsOverview();
 
         expect(result.cameras).toEqual([
             expect.objectContaining({

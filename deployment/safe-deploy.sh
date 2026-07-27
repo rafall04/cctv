@@ -130,6 +130,7 @@ if [ -f "$SCRIPT_DIR/client.config.sh" ]; then
 fi
 BACKEND_PM2="${CLIENT_CODE:+${CLIENT_CODE}-}cctv-backend"
 MEDIAMTX_PM2="${CLIENT_CODE:+${CLIENT_CODE}-}mediamtx"
+RECORDER_PM2="${CLIENT_CODE:+${CLIENT_CODE}-}cctv-recorder"
 
 # ===========================================================================
 # PHASE 2 — Repair backend/.env
@@ -278,6 +279,39 @@ if command -v pm2 >/dev/null 2>&1; then
     pm2 restart "$BACKEND_PM2" --update-env || fatal "pm2 restart ${BACKEND_PM2} failed."
     pm2 restart "$MEDIAMTX_PM2" --update-env >/dev/null 2>&1 || true
     ok "PM2 restarted ${BACKEND_PM2}"
+
+    # -----------------------------------------------------------------------
+    # Recording worker: restart ONLY when recording code actually changed.
+    #
+    # This is the entire point of splitting it out. A UI copy tweak or a route
+    # change has no business touching the process that owns ffmpeg — even though
+    # detach+adopt makes a recorder restart survivable, the cheapest interruption
+    # is the one that never happens. So we diff the deployed range and leave the
+    # worker completely alone unless something it runs actually moved.
+    # -----------------------------------------------------------------------
+    if pm2 describe "$RECORDER_PM2" >/dev/null 2>&1; then
+        NEW_COMMIT="$(git -C "$APP_DIR" rev-parse HEAD)"
+        RECORDING_CHANGED=""
+        if [ -n "${ROLLBACK_COMMIT:-}" ] && [ "$ROLLBACK_COMMIT" != "$NEW_COMMIT" ]; then
+            RECORDING_CHANGED="$(git -C "$APP_DIR" diff --name-only "$ROLLBACK_COMMIT" "$NEW_COMMIT" -- \
+                'backend/recorder.js' \
+                'backend/services/recording*' \
+                'backend/database/migrations/*' \
+                2>/dev/null || true)"
+        else
+            # Same commit (re-deploy / no fast-forward): we cannot prove nothing moved.
+            RECORDING_CHANGED="unknown"
+        fi
+
+        if [ -n "$RECORDING_CHANGED" ]; then
+            pm2 restart "$RECORDER_PM2" --update-env >/dev/null 2>&1 \
+                && ok "PM2 restarted ${RECORDER_PM2} (recording code changed)" \
+                || warn "pm2 restart ${RECORDER_PM2} failed — check 'pm2 logs ${RECORDER_PM2}'"
+            echo "  Recorders detach on shutdown and are re-adopted on boot, so segments continue."
+        else
+            ok "${RECORDER_PM2} left running — no recording code in this deploy."
+        fi
+    fi
 else
     warn "pm2 not found — restart the backend manually."
 fi

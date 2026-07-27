@@ -86,7 +86,7 @@ import viewerSessionService from './services/viewerSessionService.js';
 import playbackViewerSessionService from './services/playbackViewerSessionService.js';
 import { recordingService } from './services/recordingService.js';
 import recordingScheduler from './services/recordingScheduler.js';
-import recordingHealthAlertService from './services/recordingHealthAlertService.js';
+import { startRecordingDomain } from './services/recordingDomainBootstrap.js';
 import thumbnailService from './services/thumbnailService.js';
 import telegramBotService from './services/telegramBotService.js';
 import archiveCache from './services/archiveCacheService.js';
@@ -520,40 +520,16 @@ const start = async () => {
         playbackViewerSessionService.startCleanup();
         console.log('[PlaybackViewerSession] Session cleanup service started (15s interval)');
         
-        // Wait for MediaMTX paths to be fully ready before starting recordings
-        console.log('[Recording] Waiting for MediaMTX paths to be ready...');
-        await new Promise(resolve => setTimeout(resolve, 5000)); // Reduced from 10s to 5s
-        
-        // Re-attach to recorders the previous instance left running, instead of
-        // killing them. Recorders are spawned detached with stderr on a file
-        // precisely so they survive a restart — adopting them here is what turns
-        // "every deploy punches a hole in the recordings" into "a deploy is
-        // invisible to recording". Must run BEFORE auto-start, so adopted cameras
-        // are already known to be recording and don't get a second ffmpeg.
-        const adoption = await recordingService.adoptExistingRecordings();
-        if (adoption.adopted?.length) {
-            console.log(`[Recording] Adopted ${adoption.adopted.length} running recorder(s) — no segment interrupted by this restart`);
+        // Recording domain: owned by THIS process only when there is no separate
+        // recorder worker. With RECORDING_WORKER_ENABLED=true the `<client>-cctv-recorder`
+        // pm2 app owns it, and starting it here too would spawn a second ffmpeg per
+        // camera onto the same output directory.
+        if (config.recording.workerEnabled) {
+            console.log('[Recording] Owned by the separate recorder worker — not started here');
+            console.log('[Recording] This process only reads recording state and queues reconcile requests');
+        } else {
+            await startRecordingDomain({ logger: console });
         }
-        if (adoption.retired?.length) {
-            console.log(`[Recording] Retired ${adoption.retired.length} recorder(s) with no matching camera`);
-        }
-
-        // Auto-start recordings untuk cameras yang enable_recording = 1
-        console.log('[Recording] Auto-starting recordings with retry logic...');
-        await recordingService.autoStartRecordings();
-        recordingService.initializeBackgroundWork();
-        console.log('[Recording] Background scheduler initialized');
-
-        // Proactive recording-pipeline health alerts — edge-triggered Telegram
-        // notifications when the health level changes (ok ⇄ warning ⇄ critical).
-        recordingScheduler.register({
-            name: 'recording-health-alert',
-            task: () => recordingHealthAlertService.checkAndAlert(),
-            intervalMs: 60000,
-            initialDelayMs: 60000,
-        });
-        console.log('[Recording] Health-alert watcher registered');
-        console.log('[Recording] Recording service initialized');
         
         // Start thumbnail generation service
         await thumbnailService.start();
@@ -655,12 +631,17 @@ const shutdown = async () => {
 
         // Recorders are DETACHED, not stopped — ffmpeg keeps writing across the
         // restart and the next instance adopts it. See recordingService.shutdown().
-        console.log('[Shutdown] Detaching active recordings (they keep running)...');
-        try {
-            const results = await recordingService.shutdown();
-            console.log(`[Shutdown] Detached ${results.length} recorder(s) — still running, next boot will adopt them`);
-        } catch (error) {
-            console.error('[Shutdown] Recording detach error:', error.message);
+        // In worker mode this process never owned them, so there is nothing to release.
+        if (config.recording.workerEnabled) {
+            console.log('[Shutdown] Recording owned by the recorder worker — nothing to release here');
+        } else {
+            console.log('[Shutdown] Detaching active recordings (they keep running)...');
+            try {
+                const results = await recordingService.shutdown();
+                console.log(`[Shutdown] Detached ${results.length} recorder(s) — still running, next boot will adopt them`);
+            } catch (error) {
+                console.error('[Shutdown] Recording detach error:', error.message);
+            }
         }
         
         // Close database connections

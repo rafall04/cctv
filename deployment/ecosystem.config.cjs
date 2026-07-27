@@ -61,6 +61,35 @@ module.exports = {
                 NODE_ENV: 'production',
                 PORT: 3000
             }
+        },
+        {
+            // Recording worker — owns every FFmpeg recorder and the whole recording
+            // pipeline, so restarting the API for a UI/route change (the overwhelming
+            // majority of deploys) does not involve recording at all.
+            //
+            // Only takes effect when backend/.env sets RECORDING_WORKER_ENABLED=true;
+            // otherwise the API still owns recording and this app would be a SECOND
+            // ffmpeg per camera writing to the same directory. safe-deploy.sh keys off
+            // the same flag, and only restarts this app when recording code changed.
+            name: `${CLIENT_CODE}-cctv-recorder`,
+            script: 'recorder.js',
+            cwd: path.join(ROOT_DIR, 'backend'),
+            instances: 1,
+            // fork, never cluster: exactly one process may own the recorders. Two
+            // workers would both adopt and both spawn.
+            exec_mode: 'fork',
+            autorestart: true,
+            watch: false,
+            max_memory_restart: '512M',
+            wait_ready: true,
+            listen_timeout: 30000,
+            // Same reason as the backend: pm2's default treekill walks the process tree
+            // by PPID and would kill the detached recorders this worker exists to keep
+            // alive across its own restarts.
+            treekill: false,
+            env_production: {
+                NODE_ENV: 'production'
+            }
         }
     ]
 };

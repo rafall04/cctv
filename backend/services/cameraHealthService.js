@@ -1,7 +1,7 @@
 /*
 Purpose: Monitor camera availability, update runtime health state, and trigger recording/thumbnail transitions.
 Caller: Backend server startup, camera health routes, and runtime stream signal handlers.
-Deps: connectionPool, cameraRuntimeStateService, mediaMtxService, recordingService, thumbnailService, cameraHealthPolicy, cameraMonitoringAlertPolicy, telegramAlertConfirmationPolicy.
+Deps: connectionPool, cameraRuntimeStateService, mediaMtxService, recordingControlService, thumbnailService, cameraHealthPolicy, cameraMonitoringAlertPolicy, telegramAlertConfirmationPolicy.
 MainFuncs: CameraHealthService, checkAllCameras(), checkCamera(), evaluateCameraStatus(), clearCameraRuntimeState(), recordRuntimeSignal().
 SideEffects: Updates camera online state/runtime state, repairs MediaMTX paths, sends notifications, pauses/resumes recording.
 */
@@ -17,7 +17,7 @@ import {
     getTelegramAlertConfirmationMs
 } from './telegramService.js';
 import { getTimezone } from './timezoneService.js';
-import { recordingService } from './recordingService.js';
+import recordingControl from './recordingControlService.js';
 import thumbnailService from './thumbnailService.js';
 import settingsService from './settingsService.js';
 import cameraRuntimeStateService from './cameraRuntimeStateService.js';
@@ -1040,7 +1040,7 @@ class CameraHealthService {
     }
 
     triggerRecordingLifecycleReconcile(cameraId, reason) {
-        Promise.resolve(recordingService.reconcileRecordingLifecycle(cameraId, reason)).catch((error) => {
+        Promise.resolve(recordingControl.reconcile(cameraId, reason)).catch((error) => {
             console.error(`[CameraHealth] Failed to reconcile recording for camera ${cameraId}:`, error.message);
         });
     }
@@ -1383,7 +1383,7 @@ class CameraHealthService {
         if (nextOnline === 1) {
             try {
                 if (camera.enabled && camera.enable_recording) {
-                    await recordingService.reconcileRecordingLifecycle(camera.id, 'health_transition_online');
+                    await recordingControl.reconcile(camera.id, 'health_transition_online');
                 }
             } catch (error) {
                 console.error(`[CameraHealth] Failed to auto-resume recording for camera ${camera.id}:`, error.message);
@@ -1399,7 +1399,7 @@ class CameraHealthService {
         }
 
         try {
-            await recordingService.reconcileRecordingLifecycle(camera.id, 'health_transition_offline');
+            await recordingControl.reconcile(camera.id, 'health_transition_offline');
         } catch (error) {
             console.error(`[CameraHealth] Failed to suspend recording for camera ${camera.id}:`, error.message);
         }

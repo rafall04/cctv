@@ -145,6 +145,31 @@ pm2 save
 pm2 startup
 ```
 
+##### Separate recording worker (recommended)
+
+By default the API process owns the FFmpeg recorders, so every backend restart involves
+the recording pipeline. Recorders are spawned detached and re-adopted on boot, so a
+restart no longer breaks segments — but you can take recording out of the API's blast
+radius entirely by running it as its own process:
+
+```bash
+echo "RECORDING_WORKER_ENABLED=true" >> backend/.env
+pm2 restart deployment/ecosystem.config.cjs --only rafnet-cctv-backend --update-env
+pm2 start   deployment/ecosystem.config.cjs --only rafnet-cctv-recorder
+pm2 save
+```
+
+With this on, `<client>-cctv-recorder` owns recording and `safe-deploy.sh` restarts it
+only when recording code actually changed — a UI or route deploy leaves it untouched.
+
+> ⚠️ Set the env var and restart the backend **before** starting the recorder. If both
+> processes think they own recording, each camera gets two FFmpeg writing to the same
+> directory. `pm2 logs <client>-cctv-backend` prints which mode it is in at boot.
+
+**`treekill: false` is load-bearing** for both apps (already in the ecosystem config).
+PM2 otherwise walks the process tree by PPID and kills the detached recorders on every
+restart, which silently undoes the whole mechanism.
+
 #### 6. Configure Nginx
 
 ```bash

@@ -21,6 +21,7 @@ SideEffects: None; documentation only.
 ## Backend Entry Points
 
 - `backend/server.js`: Fastify bootstrap, global middleware order, route registration, background services, startup/shutdown.
+- `backend/recorder.js`: standalone recording worker (pm2 app `<client>-cctv-recorder`), enabled by `RECORDING_WORKER_ENABLED=true`. Owns all FFmpeg recorders so restarting the API never touches recording. Coordinates with the API purely through SQLite (WAL): the API queues `recording_reconcile_requests`, the worker publishes `recording_process_state` + `recording_health_snapshot`.
 - `backend/routes/*.js`: HTTP route wiring. Keep route files thin; route behavior should delegate to controllers/services.
 - `backend/controllers/*.js`: Request/response handlers and API response shaping.
 - `backend/services/*.js`: Domain logic for cameras, health, streaming, recording, analytics, settings, security, and thumbnails.

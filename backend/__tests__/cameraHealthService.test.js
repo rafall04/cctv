@@ -46,6 +46,14 @@ vi.mock('../services/recordingService.js', () => ({
     },
 }));
 
+// cameraHealthService reconciles through recordingControlService, not recordingService
+// directly: with a separate recorder worker the call has to become a queued request
+// instead of an in-process call. Same mock target either way.
+vi.mock('../services/recordingControlService.js', () => ({
+    default: { reconcile: reconcileCameraLifecycleMock },
+    reconcile: reconcileCameraLifecycleMock,
+}));
+
 vi.mock('../services/thumbnailService.js', () => ({
     default: {
         refreshCameraThumbnail: refreshCameraThumbnailMock,

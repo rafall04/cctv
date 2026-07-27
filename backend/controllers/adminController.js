@@ -23,6 +23,8 @@ import backupService from '../services/backupService.js';
 import cameraHealthService from '../services/cameraHealthService.js';
 import notificationDiagnosticsService from '../services/notificationDiagnosticsService.js';
 import recordingHealthDashboardService from '../services/recordingHealthDashboardService.js';
+import workerState from '../services/recordingWorkerStateRepository.js';
+import { config } from '../config/config.js';
 import securityAuditLogger from '../services/securityAuditLogger.js';
 
 export async function getDashboardStats(request, reply) {
@@ -326,6 +328,38 @@ export async function getCameraHealthDebug(request, reply) {
  */
 export async function getRecordingHealth(request, reply) {
     try {
+        // With a separate recording worker, the scheduler/queue telemetry this snapshot
+        // is built from lives in THAT process. Serve what the worker published, and say
+        // so plainly when it is stale — a dashboard that looks healthy because nobody is
+        // updating it is worse than one that admits it cannot see.
+        if (config.recording.workerEnabled) {
+            const published = workerState.readHealthSnapshot();
+            if (!published.available || published.stale) {
+                return reply.send({
+                    success: true,
+                    data: {
+                        status: 'critical',
+                        source: 'recorder_worker',
+                        workerReachable: false,
+                        message: published.available
+                            ? `Recording worker last reported ${Math.round((published.ageMs || 0) / 1000)}s ago — it may be down.`
+                            : 'Recording worker has never reported. Check `pm2 logs <client>-cctv-recorder`.',
+                        updatedAt: published.updatedAt,
+                    },
+                });
+            }
+            return reply.send({
+                success: true,
+                data: {
+                    ...published.snapshot,
+                    source: 'recorder_worker',
+                    workerReachable: true,
+                    workerPid: published.workerPid,
+                    updatedAt: published.updatedAt,
+                },
+            });
+        }
+
         return reply.send({
             success: true,
             data: recordingHealthDashboardService.getSnapshot(),
