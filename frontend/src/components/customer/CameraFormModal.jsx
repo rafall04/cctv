@@ -13,7 +13,7 @@ import { useFocusTrap } from '../../hooks/useFocusTrap';
 
 const LocationPicker = lazy(() => import('../LocationPicker'));
 
-const inputClass = 'w-full px-4 py-2.5 bg-surface-sunken border border-edge rounded-xl text-sm text-content focus:outline-none focus:ring-2 focus:ring-primary';
+const inputClass = 'w-full px-4 py-2.5 bg-surface-sunken border border-edge rounded-xl text-sm text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary';
 
 export default function CameraFormModal({ camera = null, areas = [], onClose, onSaved }) {
     const isEdit = !!camera;

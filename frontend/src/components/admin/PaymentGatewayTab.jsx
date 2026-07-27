@@ -12,7 +12,7 @@ import { useCallback, useEffect, useState } from 'react';
 import billingAdminService from '../../services/billingAdminService';
 import { useNotification } from '../../contexts/NotificationContext';
 
-const inputClass = 'w-full px-3 py-2 bg-surface-sunken border border-edge rounded-xl text-sm text-content focus:outline-none focus:ring-2 focus:ring-primary';
+const inputClass = 'w-full px-3 py-2 bg-surface-sunken border border-edge rounded-xl text-sm text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary';
 const cardClass = 'bg-surface border border-edge rounded-2xl p-4';
 
 export default function PaymentGatewayTab() {

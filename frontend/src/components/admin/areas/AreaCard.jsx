@@ -192,7 +192,7 @@ export default function AreaCard({
                             value={area.grid_default_camera_limit === null || area.grid_default_camera_limit === undefined ? '' : String(area.grid_default_camera_limit)}
                             onChange={(event) => onGridDefaultLimitChange(area, event.target.value)}
                             disabled={gridDefaultBusy}
-                            className="min-w-[140px] rounded-xl border border-edge bg-surface px-3 py-2 text-sm text-content focus:outline-none focus:ring-2 focus:ring-primary"
+                            className="min-w-[140px] rounded-xl border border-edge bg-surface px-3 py-2 text-sm text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                         >
                             {GRID_DEFAULT_LIMIT_OPTIONS.map((option) => (
                                 <option key={option.value || 'unlimited'} value={option.value}>{option.label}</option>

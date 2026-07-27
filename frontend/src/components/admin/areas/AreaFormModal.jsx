@@ -55,7 +55,7 @@ export default function AreaFormModal({
                     <div>
                         <label className="block text-sm font-medium text-content-muted mb-1.5">Nama Area *</label>
                         <input type="text" name="name" value={formData.name} onChange={onChange}
-                            className={`w-full px-4 py-2.5 bg-surface-sunken border rounded-xl text-content focus:outline-none focus:ring-2 focus:ring-primary ${formErrors.name ? 'border-red-500' : 'border-gray-200 dark:border-gray-700/50'}`}
+                            className={`w-full px-4 py-2.5 bg-surface-sunken border rounded-xl text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary ${formErrors.name ? 'border-red-500' : 'border-gray-200 dark:border-gray-700/50'}`}
                             placeholder="Contoh: Pos Kamling RT 01" />
                         {formErrors.name && <p className="mt-1.5 text-sm text-red-500">{formErrors.name}</p>}
                     </div>
@@ -64,12 +64,12 @@ export default function AreaFormModal({
                         <div>
                             <label className="block text-sm font-medium text-content-muted mb-1.5">RT</label>
                             <input type="text" name="rt" value={formData.rt} onChange={onChange}
-                                className="w-full px-4 py-2.5 bg-surface-sunken border border-edge rounded-xl text-content focus:outline-none focus:ring-2 focus:ring-primary" placeholder="01" />
+                                className="w-full px-4 py-2.5 bg-surface-sunken border border-edge rounded-xl text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary" placeholder="01" />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-content-muted mb-1.5">RW</label>
                             <input type="text" name="rw" value={formData.rw} onChange={onChange}
-                                className="w-full px-4 py-2.5 bg-surface-sunken border border-edge rounded-xl text-content focus:outline-none focus:ring-2 focus:ring-primary" placeholder="05" />
+                                className="w-full px-4 py-2.5 bg-surface-sunken border border-edge rounded-xl text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary" placeholder="05" />
                         </div>
                     </div>
 
@@ -77,19 +77,19 @@ export default function AreaFormModal({
                         <div>
                             <label className="block text-sm font-medium text-content-muted mb-1.5">Kelurahan</label>
                             <input type="text" name="kelurahan" value={formData.kelurahan} onChange={onChange}
-                                className="w-full px-4 py-2.5 bg-surface-sunken border border-edge rounded-xl text-content focus:outline-none focus:ring-2 focus:ring-primary" placeholder="Nama kelurahan" />
+                                className="w-full px-4 py-2.5 bg-surface-sunken border border-edge rounded-xl text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary" placeholder="Nama kelurahan" />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-content-muted mb-1.5">Kecamatan</label>
                             <input type="text" name="kecamatan" value={formData.kecamatan} onChange={onChange}
-                                className="w-full px-4 py-2.5 bg-surface-sunken border border-edge rounded-xl text-content focus:outline-none focus:ring-2 focus:ring-primary" placeholder="Nama kecamatan" />
+                                className="w-full px-4 py-2.5 bg-surface-sunken border border-edge rounded-xl text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary" placeholder="Nama kecamatan" />
                         </div>
                     </div>
 
                     <div>
                         <label className="block text-sm font-medium text-content-muted mb-1.5">Deskripsi</label>
                         <textarea name="description" value={formData.description} onChange={onChange} rows="2"
-                            className="w-full px-4 py-2.5 bg-surface-sunken border border-edge rounded-xl text-content focus:outline-none focus:ring-2 focus:ring-primary resize-none" placeholder="Catatan opsional..." />
+                            className="w-full px-4 py-2.5 bg-surface-sunken border border-edge rounded-xl text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary resize-none" placeholder="Catatan opsional..." />
                     </div>
 
                     <div>
@@ -98,7 +98,7 @@ export default function AreaFormModal({
                             name="external_health_mode_override"
                             value={formData.external_health_mode_override}
                             onChange={onChange}
-                            className="w-full px-4 py-2.5 bg-surface-sunken border border-edge rounded-xl text-content focus:outline-none focus:ring-2 focus:ring-primary"
+                            className="w-full px-4 py-2.5 bg-surface-sunken border border-edge rounded-xl text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                         >
                             {[
                                 { value: 'default', label: 'Ikuti Global Default' },
@@ -122,7 +122,7 @@ export default function AreaFormModal({
                                 name="coverage_scope"
                                 value={formData.coverage_scope}
                                 onChange={onChange}
-                                className="w-full px-4 py-2.5 bg-surface-sunken border border-edge rounded-xl text-content focus:outline-none focus:ring-2 focus:ring-primary"
+                                className="w-full px-4 py-2.5 bg-surface-sunken border border-edge rounded-xl text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                             >
                                 {AREA_COVERAGE_OPTIONS.map((option) => (
                                     <option key={option.value} value={option.value}>{option.label}</option>
@@ -141,7 +141,7 @@ export default function AreaFormModal({
                                 name="viewport_zoom_override"
                                 value={formData.viewport_zoom_override}
                                 onChange={onChange}
-                                className="w-full px-4 py-2.5 bg-surface-sunken border border-edge rounded-xl text-content focus:outline-none focus:ring-2 focus:ring-primary"
+                                className="w-full px-4 py-2.5 bg-surface-sunken border border-edge rounded-xl text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                                 placeholder="Kosongkan untuk auto"
                             />
                             <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
@@ -174,7 +174,7 @@ export default function AreaFormModal({
                             name="grid_default_camera_limit"
                             value={formData.grid_default_camera_limit}
                             onChange={onChange}
-                            className="w-full px-4 py-2.5 bg-surface-sunken border border-edge rounded-xl text-content focus:outline-none focus:ring-2 focus:ring-primary"
+                            className="w-full px-4 py-2.5 bg-surface-sunken border border-edge rounded-xl text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                         >
                             {GRID_DEFAULT_LIMIT_OPTIONS.map((option) => (
                                 <option key={`form-${option.value || 'unlimited'}`} value={option.value}>{option.label}</option>
@@ -201,7 +201,7 @@ export default function AreaFormModal({
                                     name="internal_ingest_policy_default"
                                     value={formData.internal_ingest_policy_default}
                                     onChange={onChange}
-                                    className="w-full px-4 py-2.5 bg-surface border border-edge rounded-xl text-content focus:outline-none focus:ring-2 focus:ring-primary"
+                                    className="w-full px-4 py-2.5 bg-surface border border-edge rounded-xl text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                                 >
                                     {INTERNAL_INGEST_POLICY_OPTIONS.map((option) => (
                                         <option key={option.value} value={option.value}>{option.label}</option>
@@ -216,7 +216,7 @@ export default function AreaFormModal({
                                     name="internal_rtsp_transport_default"
                                     value={formData.internal_rtsp_transport_default || 'default'}
                                     onChange={onChange}
-                                    className="w-full px-4 py-2.5 bg-surface border border-edge rounded-xl text-content focus:outline-none focus:ring-2 focus:ring-primary"
+                                    className="w-full px-4 py-2.5 bg-surface border border-edge rounded-xl text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                                 >
                                     {INTERNAL_RTSP_TRANSPORT_OPTIONS.map((option) => (
                                         <option key={option.value} value={option.value}>{option.label}</option>
@@ -233,7 +233,7 @@ export default function AreaFormModal({
                                     name="internal_on_demand_close_after_seconds"
                                     value={formData.internal_on_demand_close_after_seconds}
                                     onChange={onChange}
-                                    className="w-full px-4 py-2.5 bg-surface border border-edge rounded-xl text-content focus:outline-none focus:ring-2 focus:ring-primary"
+                                    className="w-full px-4 py-2.5 bg-surface border border-edge rounded-xl text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                                     placeholder="Kosong = ikuti default"
                                 />
                             </div>

@@ -351,7 +351,7 @@ function TopupPanel({ onCompleted, resumable = [] }) {
                         id="topup-method"
                         value={selectedMethod}
                         onChange={(e) => setSelectedMethod(e.target.value)}
-                        className="w-full rounded-xl border border-edge-strong bg-surface-sunken px-3 py-2.5 text-sm text-content focus:outline-none focus:ring-2 focus:ring-primary"
+                        className="w-full rounded-xl border border-edge-strong bg-surface-sunken px-3 py-2.5 text-sm text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                     >
                         {methods.map((m) => (
                             <option key={m.key} value={m.key}>{m.label}</option>
@@ -385,7 +385,7 @@ function TopupPanel({ onCompleted, resumable = [] }) {
                     placeholder="Nominal lain (min 10.000)"
                     value={customAmount ? Number(customAmount).toLocaleString('id-ID') : ''}
                     onChange={(e) => { setCustomAmount(e.target.value.replace(/\D/g, '')); setError(''); }}
-                    className="w-full rounded-xl border border-edge-strong bg-surface-sunken py-2.5 pl-10 pr-4 text-sm text-content focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full rounded-xl border border-edge-strong bg-surface-sunken py-2.5 pl-10 pr-4 text-sm text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                 />
             </div>
             <input
@@ -394,7 +394,7 @@ function TopupPanel({ onCompleted, resumable = [] }) {
                 onChange={(e) => { setPromoCode(e.target.value); setError(''); }}
                 maxLength={40}
                 placeholder="Kode promo (opsional)"
-                className="mt-2 w-full rounded-xl border border-edge-strong bg-surface-sunken px-4 py-2.5 text-sm uppercase text-content placeholder:normal-case focus:outline-none focus:ring-2 focus:ring-primary"
+                className="mt-2 w-full rounded-xl border border-edge-strong bg-surface-sunken px-4 py-2.5 text-sm uppercase text-content placeholder:normal-case focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
             />
             {promoPreview?.ok && promoPreview.bonus > 0 && (
                 <p className="mt-1.5 text-sm font-medium text-emerald-600 dark:text-emerald-400">
@@ -424,7 +424,7 @@ function TopupPanel({ onCompleted, resumable = [] }) {
                     onChange={(e) => { setGiftCode(e.target.value); setGiftMsg(null); }}
                     maxLength={40}
                     placeholder="Kode hadiah"
-                    className="w-full rounded-xl border border-edge-strong bg-surface-sunken px-3 py-2 text-sm uppercase text-content placeholder:normal-case focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full rounded-xl border border-edge-strong bg-surface-sunken px-3 py-2 text-sm uppercase text-content placeholder:normal-case focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                 />
                 <button
                     type="button"

@@ -16,7 +16,7 @@ import { TableSkeleton } from '../components/ui/Skeleton';
 import { Button, Field, Modal } from '../components/ui';
 
 const inputClass =
-    'w-full bg-surface border border-edge-strong rounded-lg px-3 py-2 text-content text-sm focus:outline-none focus:border-primary-500';
+    'w-full bg-surface border border-edge-strong rounded-lg px-3 py-2 text-content text-sm focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary';
 
 const PROFILE_FORM_DEFAULT = {
     name: '',

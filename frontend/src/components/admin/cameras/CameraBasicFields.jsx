@@ -21,7 +21,7 @@ export default function CameraBasicFields({
                         onChange={onChange}
                         onBlur={onBlur}
                         disabled={isSubmitting}
-                        className={`w-full px-3 py-2 bg-surface-sunken border rounded-xl text-content placeholder-content-subtle focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 text-sm ${getFieldError('name') ? 'border-red-500 focus:ring-red-500' : 'border-gray-200 dark:border-gray-700/50'}`}
+                        className={`w-full px-3 py-2 bg-surface-sunken border rounded-xl text-content placeholder-content-subtle focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50 text-sm ${getFieldError('name') ? 'border-red-500 focus:ring-red-500' : 'border-gray-200 dark:border-gray-700/50'}`}
                         placeholder="Front Entrance"
                     />
                     {getFieldError('name') && (
@@ -37,7 +37,7 @@ export default function CameraBasicFields({
                         value={formData.area_id}
                         onChange={onChange}
                         disabled={isSubmitting}
-                        className="w-full px-3 py-2 bg-surface-sunken border border-edge rounded-xl text-content focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 text-sm"
+                        className="w-full px-3 py-2 bg-surface-sunken border border-edge rounded-xl text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50 text-sm"
                     >
                         <option value="">Select Area</option>
                         {areas.map((area) => (
@@ -57,7 +57,7 @@ export default function CameraBasicFields({
                         value={formData.location}
                         onChange={onChange}
                         disabled={isSubmitting}
-                        className="w-full px-3 py-2 bg-surface-sunken border border-edge rounded-xl text-content placeholder-content-subtle focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 text-sm"
+                        className="w-full px-3 py-2 bg-surface-sunken border border-edge rounded-xl text-content placeholder-content-subtle focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50 text-sm"
                         placeholder="Building A"
                     />
                 </div>
@@ -71,7 +71,7 @@ export default function CameraBasicFields({
                         value={formData.group_name}
                         onChange={onChange}
                         disabled={isSubmitting}
-                        className="w-full px-3 py-2 bg-surface-sunken border border-edge rounded-xl text-content placeholder-content-subtle focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 text-sm"
+                        className="w-full px-3 py-2 bg-surface-sunken border border-edge rounded-xl text-content placeholder-content-subtle focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50 text-sm"
                         placeholder="Security"
                     />
                 </div>
@@ -86,7 +86,7 @@ export default function CameraBasicFields({
                     onChange={onChange}
                     disabled={isSubmitting}
                     rows="2"
-                    className="w-full px-3 py-2 bg-surface-sunken border border-edge rounded-xl text-content placeholder-content-subtle focus:outline-none focus:ring-2 focus:ring-primary resize-none disabled:opacity-50 text-sm"
+                    className="w-full px-3 py-2 bg-surface-sunken border border-edge rounded-xl text-content placeholder-content-subtle focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary resize-none disabled:opacity-50 text-sm"
                     placeholder="Optional notes..."
                 />
             </div>

@@ -33,7 +33,7 @@ describe('guardrail: frontend file-size ratchet (anti-penumpukan)', () => {
         'components/MultiView/MultiViewVideoItem.jsx': 1196,
         'components/MapView.jsx': 1176,
         'pages/Playback.jsx': 1160,
-        'pages/AreaManagement.jsx': 847,
+        'pages/AreaManagement.jsx': 845,
     };
 
     const files = walk(SRC_ROOT);
@@ -122,11 +122,12 @@ describe('guardrail: legacy grey ratchet (design tokens)', () => {
     // replaces raw greys. Existing usages are frozen at the measured baseline: the count
     // may shrink as pages migrate, never grow. When you migrate a page, lower BASELINE
     // in the same PR so the ratchet tightens behind you.
-    // 2026-07-27 admin sweep: 5700 -> 1404. The admin surface held 4,630 of the 5,292 greys left in
-    // the tree (87%); it was migrated by exact light+dark PAIR inside a single className, never by
-    // collapsing a lone grey — an unpaired grey is a judgement call about which role was meant, so
-    // those ~1.4k are deliberately still here. Lower this again as they are resolved by hand.
-    const BASELINE = 1404;
+    // 2026-07-27 admin reconstruction: 5700 -> 1212. The admin surface held 4,630 of the 5,292
+    // greys in the tree (87%). It was swept by exact light+dark PAIR inside a single className and
+    // then page by page as each moved onto the components/ui primitives — never by collapsing a
+    // lone grey, since an unpaired grey is a judgement call about which role was meant. What is
+    // left is exactly those singletons; resolve them by hand and lower this again.
+    const BASELINE = 1212;
 
     it(`-gray-N usage count stays <= ${BASELINE} and shrinks over time`, () => {
         let count = 0;

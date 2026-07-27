@@ -147,7 +147,7 @@ export default function CameraSourceFields({
                             onChange={onChange}
                             onBlur={onBlur}
                             disabled={isSubmitting}
-                            className={`w-full px-3 py-2 bg-surface-sunken border rounded-xl text-content font-mono text-xs placeholder-content-subtle focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 ${getFieldError('private_rtsp_url') ? 'border-red-500 focus:ring-red-500' : 'border-gray-200 dark:border-gray-700/50'}`}
+                            className={`w-full px-3 py-2 bg-surface-sunken border rounded-xl text-content font-mono text-xs placeholder-content-subtle focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50 ${getFieldError('private_rtsp_url') ? 'border-red-500 focus:ring-red-500' : 'border-gray-200 dark:border-gray-700/50'}`}
                             placeholder="rtsp://user:pass@ip:port/path"
                         />
                         {getFieldError('private_rtsp_url') ? (
@@ -205,7 +205,7 @@ export default function CameraSourceFields({
                                 value={formData.internal_ingest_policy_override || 'default'}
                                 onChange={onChange}
                                 disabled={isSubmitting}
-                                className="w-full px-3 py-2 bg-surface-sunken border rounded-xl text-content text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 border-edge"
+                                className="w-full px-3 py-2 bg-surface-sunken border rounded-xl text-content text-sm focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50 border-edge"
                             >
                                 {INTERNAL_INGEST_POLICY_OPTIONS.map((option) => (
                                     <option key={option.value} value={option.value}>{option.label}</option>
@@ -226,7 +226,7 @@ export default function CameraSourceFields({
                                 value={formData.internal_rtsp_transport_override || 'default'}
                                 onChange={onChange}
                                 disabled={isSubmitting}
-                                className="w-full px-3 py-2 bg-surface-sunken border rounded-xl text-content text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 border-edge"
+                                className="w-full px-3 py-2 bg-surface-sunken border rounded-xl text-content text-sm focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50 border-edge"
                             >
                                 {INTERNAL_RTSP_TRANSPORT_OPTIONS.map((option) => (
                                     <option key={option.value} value={option.value}>{option.label}</option>
@@ -247,7 +247,7 @@ export default function CameraSourceFields({
                                 value={formData.thumbnail_strategy || 'default'}
                                 onChange={onChange}
                                 disabled={isSubmitting}
-                                className="w-full px-3 py-2 bg-surface-sunken border rounded-xl text-content text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 border-edge"
+                                className="w-full px-3 py-2 bg-surface-sunken border rounded-xl text-content text-sm focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50 border-edge"
                             >
                                 {THUMBNAIL_STRATEGY_OPTIONS.map((option) => (
                                     <option key={option.value} value={option.value}>{option.label}</option>
@@ -271,7 +271,7 @@ export default function CameraSourceFields({
                                 value={formData.internal_on_demand_close_after_seconds_override}
                                 onChange={onChange}
                                 disabled={isSubmitting}
-                                className="w-full px-3 py-2 bg-surface-sunken border rounded-xl text-content text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 border-edge"
+                                className="w-full px-3 py-2 bg-surface-sunken border rounded-xl text-content text-sm focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50 border-edge"
                                 placeholder="Kosong = ikuti area/default"
                             />
                             <p className="mt-1 text-xs text-content-muted">
@@ -291,7 +291,7 @@ export default function CameraSourceFields({
                             value={formData.source_profile}
                             onChange={onChange}
                             disabled={isSubmitting}
-                            className="w-full px-3 py-2 bg-surface-sunken border rounded-xl text-content text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 border-edge"
+                            className="w-full px-3 py-2 bg-surface-sunken border rounded-xl text-content text-sm focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50 border-edge"
                             placeholder="Contoh: surabaya_private_rtsp"
                         />
                         <p className="mt-1 text-xs text-content-muted">
@@ -316,7 +316,7 @@ export default function CameraSourceFields({
                                 onChange={onChange}
                                 onBlur={onBlur}
                                 disabled={isSubmitting}
-                                className={`w-full px-3 py-2 bg-surface-sunken border rounded-xl text-content font-mono text-xs placeholder-content-subtle focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 ${getFieldError('external_stream_url') ? 'border-red-500 focus:ring-red-500' : 'border-gray-200 dark:border-gray-700/50'}`}
+                                className={`w-full px-3 py-2 bg-surface-sunken border rounded-xl text-content font-mono text-xs placeholder-content-subtle focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50 ${getFieldError('external_stream_url') ? 'border-red-500 focus:ring-red-500' : 'border-gray-200 dark:border-gray-700/50'}`}
                                 placeholder={deliveryType.includes('ws') || deliveryType.includes('jsmpeg') ? 'wss://example.com/stream' : 'https://example.com/live.m3u8'}
                             />
                             {getFieldError('external_stream_url') ? (
@@ -346,7 +346,7 @@ export default function CameraSourceFields({
                                 onChange={onChange}
                                 onBlur={onBlur}
                                 disabled={isSubmitting}
-                                className={`w-full px-3 py-2 bg-surface-sunken border rounded-xl text-content font-mono text-xs placeholder-content-subtle focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 ${getFieldError('external_embed_url') ? 'border-red-500 focus:ring-red-500' : 'border-gray-200 dark:border-gray-700/50'}`}
+                                className={`w-full px-3 py-2 bg-surface-sunken border rounded-xl text-content font-mono text-xs placeholder-content-subtle focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50 ${getFieldError('external_embed_url') ? 'border-red-500 focus:ring-red-500' : 'border-gray-200 dark:border-gray-700/50'}`}
                                 placeholder="https://source.example.com/player?id=cam-1"
                             />
                             {getFieldError('external_embed_url') ? (
@@ -371,7 +371,7 @@ export default function CameraSourceFields({
                             onChange={onChange}
                             onBlur={onBlur}
                             disabled={isSubmitting}
-                            className="w-full px-3 py-2 bg-surface-sunken border rounded-xl text-content font-mono text-xs placeholder-content-subtle focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 border-edge"
+                            className="w-full px-3 py-2 bg-surface-sunken border rounded-xl text-content font-mono text-xs placeholder-content-subtle focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50 border-edge"
                             placeholder="https://example.com/snapshot.jpg"
                         />
                         <p className="mt-1 text-xs text-content-muted">Dipakai untuk card/grid/map agar halaman utama tetap thumbnail-first dan tidak membebani server.</p>
@@ -422,7 +422,7 @@ export default function CameraSourceFields({
                                     onChange={onChange}
                                     onBlur={onBlur}
                                     disabled={isSubmitting}
-                                    className={`w-full px-3 py-2 bg-surface-sunken border rounded-xl text-content text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 ${getFieldError('external_tls_mode') ? 'border-red-500 focus:ring-red-500' : 'border-gray-200 dark:border-gray-700/50'}`}
+                                    className={`w-full px-3 py-2 bg-surface-sunken border rounded-xl text-content text-sm focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50 ${getFieldError('external_tls_mode') ? 'border-red-500 focus:ring-red-500' : 'border-gray-200 dark:border-gray-700/50'}`}
                                 >
                                     <option value="strict">Strict (Default)</option>
                                     <option value="insecure">Insecure (Darurat)</option>
@@ -456,7 +456,7 @@ export default function CameraSourceFields({
                                 onChange={onChange}
                                 onBlur={onBlur}
                                 disabled={isSubmitting}
-                                className="w-full px-3 py-2 bg-surface-sunken border rounded-xl text-content text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 border-edge"
+                                className="w-full px-3 py-2 bg-surface-sunken border rounded-xl text-content text-sm focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50 border-edge"
                             >
                                 {EXTERNAL_HEALTH_MODE_OPTIONS.map((option) => (
                                     <option key={option.value} value={option.value}>

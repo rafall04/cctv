@@ -177,7 +177,7 @@ export default function BackupSettingsTab() {
                                 className="block w-full text-sm text-gray-900 dark:text-white
                                          border border-edge-strong rounded-lg
                                          cursor-pointer bg-gray-50 dark:bg-gray-700
-                                         focus:outline-none disabled:opacity-50"
+                                         focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50"
                             />
                         </div>
 

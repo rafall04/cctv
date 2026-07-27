@@ -313,7 +313,7 @@ export default function LoginPage() {
 
     // Get field error class for styling (Requirements: 2.9)
     const getFieldClass = (fieldName) => {
-        const baseClass = "w-full pl-12 pr-4 py-3.5 bg-surface-sunken border rounded-xl text-content placeholder-content-subtle focus:outline-none focus:ring-2 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed";
+        const baseClass = "w-full pl-12 pr-4 py-3.5 bg-surface-sunken border rounded-xl text-content placeholder-content-subtle focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary transition-all disabled:opacity-50 disabled:cursor-not-allowed";
         
         if (fieldErrors[fieldName]) {
             return `${baseClass} border-red-500 dark:border-red-500 focus:ring-red-500`;
@@ -323,7 +323,7 @@ export default function LoginPage() {
 
     // Password field needs different padding for the eye button
     const getPasswordFieldClass = () => {
-        const baseClass = "w-full pl-12 pr-12 py-3.5 bg-surface-sunken border rounded-xl text-content placeholder-content-subtle focus:outline-none focus:ring-2 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed";
+        const baseClass = "w-full pl-12 pr-12 py-3.5 bg-surface-sunken border rounded-xl text-content placeholder-content-subtle focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary transition-all disabled:opacity-50 disabled:cursor-not-allowed";
         
         if (fieldErrors.password) {
             return `${baseClass} border-red-500 dark:border-red-500 focus:ring-red-500`;

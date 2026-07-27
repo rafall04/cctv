@@ -12,7 +12,7 @@ import { Link } from 'react-router-dom';
 import { authService } from '../services/authService';
 import userService from '../services/userService';
 
-const inputClass = 'w-full px-4 py-2.5 bg-surface-sunken border border-edge rounded-xl text-content focus:outline-none focus:ring-2 focus:ring-primary';
+const inputClass = 'w-full px-4 py-2.5 bg-surface-sunken border border-edge rounded-xl text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary';
 
 function formatRupiah(value) {
     return `Rp${Number(value || 0).toLocaleString('id-ID')}`;

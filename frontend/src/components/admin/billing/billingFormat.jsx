@@ -39,7 +39,7 @@ export function StatusBadge({ className = '', children }) {
 }
 
 export const cardClass = 'bg-surface border border-edge rounded-2xl p-4';
-export const inputClass = 'w-full px-3 py-2 bg-surface-sunken border border-edge rounded-xl text-sm text-content focus:outline-none focus:ring-2 focus:ring-primary';
+export const inputClass = 'w-full px-3 py-2 bg-surface-sunken border border-edge rounded-xl text-sm text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary';
 
 // Wrapper for the desktop table half of each tab: horizontal scroll is a safety net for
 // tablet widths; `min-w` on the inner <table> is what actually lets it scroll instead of

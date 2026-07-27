@@ -398,7 +398,7 @@ export default function AreaManagement() {
                     </Link>
                     {kecamatans.length > 0 && (
                         <select value={filterKecamatan} onChange={(e) => setFilterKecamatan(e.target.value)}
-                            className="px-4 py-2.5 bg-white dark:bg-gray-800/80 border border-edge rounded-xl text-content text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+                            className="px-4 py-2.5 bg-white dark:bg-gray-800/80 border border-edge rounded-xl text-content text-sm focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary">
                             <option value="">Semua Kecamatan</option>
                             {kecamatans.map(k => <option key={k} value={k}>{k}</option>)}
                         </select>

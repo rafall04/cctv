@@ -12,7 +12,7 @@ import billingAdminService from '../../services/billingAdminService';
 import { useNotification } from '../../contexts/NotificationContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
 
-const inputClass = 'w-full px-3 py-2 bg-surface-sunken border border-edge rounded-xl text-sm text-content focus:outline-none focus:ring-2 focus:ring-primary';
+const inputClass = 'w-full px-3 py-2 bg-surface-sunken border border-edge rounded-xl text-sm text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary';
 const cardClass = 'bg-surface border border-edge rounded-2xl p-4';
 
 const EMPTY = { code: '', type: 'percent', value: 10, max_bonus: '', min_topup: 0, max_uses: '', per_user_limit: 1, expires_at: '', description: '' };

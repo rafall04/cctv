@@ -108,7 +108,7 @@ export default function CameraHealthDebugPanel({
                         <select
                             value={query.state}
                             onChange={(event) => onFilterChange('state', event.target.value)}
-                            className="w-full rounded-xl border border-edge bg-surface px-3 py-2 text-sm text-content shadow-sm focus:border-primary focus:outline-none"
+                            className="w-full rounded-xl border border-edge bg-surface px-3 py-2 text-sm text-content shadow-sm focus:border-primary focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                         >
                             <option value="problem">Problem only</option>
                             <option value="all">All states</option>
@@ -126,7 +126,7 @@ export default function CameraHealthDebugPanel({
                             value={query.deliveryType}
                             onChange={(event) => onFilterChange('deliveryType', event.target.value)}
                             placeholder="external_mjpeg"
-                            className="w-full rounded-xl border border-edge bg-surface px-3 py-2 text-sm text-content shadow-sm focus:border-primary focus:outline-none"
+                            className="w-full rounded-xl border border-edge bg-surface px-3 py-2 text-sm text-content shadow-sm focus:border-primary focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                         />
                     </label>
 
@@ -136,7 +136,7 @@ export default function CameraHealthDebugPanel({
                             value={query.errorClass}
                             onChange={(event) => onFilterChange('errorClass', event.target.value)}
                             placeholder="tls"
-                            className="w-full rounded-xl border border-edge bg-surface px-3 py-2 text-sm text-content shadow-sm focus:border-primary focus:outline-none"
+                            className="w-full rounded-xl border border-edge bg-surface px-3 py-2 text-sm text-content shadow-sm focus:border-primary focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                         />
                     </label>
 
@@ -145,7 +145,7 @@ export default function CameraHealthDebugPanel({
                         <select
                             value={query.policyMode}
                             onChange={(event) => onFilterChange('policyMode', event.target.value)}
-                            className="w-full rounded-xl border border-edge bg-surface px-3 py-2 text-sm text-content shadow-sm focus:border-primary focus:outline-none"
+                            className="w-full rounded-xl border border-edge bg-surface px-3 py-2 text-sm text-content shadow-sm focus:border-primary focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                         >
                             <option value="">Semua</option>
                             <option value="on_demand">On-Demand</option>
@@ -159,7 +159,7 @@ export default function CameraHealthDebugPanel({
                             value={query.search}
                             onChange={(event) => onFilterChange('search', event.target.value)}
                             placeholder="camera, area, provider"
-                            className="w-full rounded-xl border border-edge bg-surface px-3 py-2 text-sm text-content shadow-sm focus:border-primary focus:outline-none"
+                            className="w-full rounded-xl border border-edge bg-surface px-3 py-2 text-sm text-content shadow-sm focus:border-primary focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                         />
                     </label>
 
@@ -169,7 +169,7 @@ export default function CameraHealthDebugPanel({
                             value={query.sourceProfile}
                             onChange={(event) => onFilterChange('sourceProfile', event.target.value)}
                             placeholder="surabaya_private_rtsp"
-                            className="w-full rounded-xl border border-edge bg-surface px-3 py-2 text-sm text-content shadow-sm focus:border-primary focus:outline-none"
+                            className="w-full rounded-xl border border-edge bg-surface px-3 py-2 text-sm text-content shadow-sm focus:border-primary focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                         />
                     </label>
 
@@ -178,7 +178,7 @@ export default function CameraHealthDebugPanel({
                         <select
                             value={query.activeWithoutViewer}
                             onChange={(event) => onFilterChange('activeWithoutViewer', event.target.value)}
-                            className="w-full rounded-xl border border-edge bg-surface px-3 py-2 text-sm text-content shadow-sm focus:border-primary focus:outline-none"
+                            className="w-full rounded-xl border border-edge bg-surface px-3 py-2 text-sm text-content shadow-sm focus:border-primary focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                         >
                             <option value="">Semua</option>
                             <option value="yes">Ya</option>
@@ -191,7 +191,7 @@ export default function CameraHealthDebugPanel({
                         <select
                             value={query.sort}
                             onChange={(event) => onFilterChange('sort', event.target.value)}
-                            className="w-full rounded-xl border border-edge bg-surface px-3 py-2 text-sm text-content shadow-sm focus:border-primary focus:outline-none"
+                            className="w-full rounded-xl border border-edge bg-surface px-3 py-2 text-sm text-content shadow-sm focus:border-primary focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                         >
                             <option value="severity">Severity</option>
                             <option value="confidence">Confidence</option>
