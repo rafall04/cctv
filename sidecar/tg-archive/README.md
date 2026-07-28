@@ -171,5 +171,13 @@ rm -rf /opt/tg-archive
   within 0.07-0.60h of being recorded, so an age test separates them cleanly while
   a length test alone would have discarded them. The video file itself is untouched
   and still plays back from the web UI — only the Telegram copy is skipped.
+- Segments recorded before `ARCHIVE_MIN_RECORDED_AT` are skipped as `before_cutoff`,
+  and segments older than `MAX_LATE_HOURS` as `too_late`. **The archive is a live
+  mirror, not a backfill tool** — its value is that the group reads in recording
+  order, and a clip arriving hours late breaks that permanently. Recovery after an
+  incident registers rescued fragments as NEW segments with OLD recording times, so
+  without these they upload after newer footage. `MAX_LATE_HOURS` doubles as the
+  uploader-outage tolerance: raise it above the longest downtime you would still
+  want backfilled.
 - A permanently failing segment is recorded as `failed` and skipped so it cannot
   wedge the queue behind it.

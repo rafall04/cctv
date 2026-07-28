@@ -31,6 +31,23 @@ def env(name, default=None, required=False):
     return val
 
 
+def parse_cutoff(raw):
+    """
+    ARCHIVE_MIN_RECORDED_AT -> aware datetime, or None when unset.
+
+    Exits rather than silently ignoring a malformed value: a cutoff that quietly
+    does nothing would let exactly the flood it was set to stop back through.
+    """
+    raw = (raw or '').strip()
+    if not raw:
+        return None
+    try:
+        parsed = datetime.fromisoformat(raw.replace('Z', '+00:00'))
+    except ValueError:
+        sys.exit('FATAL: ARCHIVE_MIN_RECORDED_AT=%r is not ISO-8601 (e.g. 2026-07-27T22:00:00Z)' % raw)
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+
 class Config:
     def __init__(self):
         self.api_base = env('TG_API_BASE', 'http://127.0.0.1:8092').rstrip('/')
@@ -66,6 +83,16 @@ class Config:
         # disable the filter entirely.
         self.min_duration_sec = int(env('MIN_DURATION_SEC', '120'))
         self.stale_hours = float(env('STALE_HOURS', '2'))
+        # Ceiling on how late a segment may arrive and still be archived, whatever
+        # its length. The archive's value is chronological order; a clip landing
+        # hours after it was recorded breaks that permanently. Doubles as the
+        # tolerance for an uploader outage — set it above the longest downtime you
+        # would still want backfilled. 0 disables.
+        self.max_late_hours = float(env('MAX_LATE_HOURS', '6'))
+        # Hard cutoff: never archive anything recorded before this instant.
+        # Surgical tool for excluding a known-bad window (e.g. a recording incident)
+        # without loosening the tolerance rules. Empty = no cutoff.
+        self.min_recorded_at = parse_cutoff(env('ARCHIVE_MIN_RECORDED_AT', ''))
         self.dry_run = env('DRY_RUN', '0') == '1'
         # Set to 0 only if some OTHER process ever needs to consume this bot's updates —
         # Telegram allows a single getUpdates consumer per token (a second one gets 409).
@@ -507,31 +534,71 @@ def pace(cfg, size_bytes, elapsed, log):
 
 # -------------------------------------------------------------------------- main
 
-def is_stale_salvage(seg, cfg, now=None):
-    """
-    True when a segment is BOTH very short AND long past its recording time.
-
-    That pairing is what identifies wreckage rescued from a corrupt partial, as
-    opposed to a genuinely short recording. Either condition alone gives a wrong
-    answer: short-but-fresh is a flaky camera (keep it), old-but-full-length is an
-    ordinary backfill (keep it too).
-    """
-    if cfg.min_duration_sec <= 0:
-        return False
-
-    duration = seg['duration']
-    if duration is None or duration >= cfg.min_duration_sec:
-        return False
-
+def parse_recorded_at(seg):
+    """recording_segments.start_time is ISO-8601 UTC. None when unparseable."""
     try:
-        recorded = datetime.fromisoformat(str(seg['start_time']).replace('Z', '+00:00'))
+        return datetime.fromisoformat(str(seg['start_time']).replace('Z', '+00:00'))
     except (ValueError, AttributeError, TypeError):
-        # Unparseable timestamp — we cannot prove it is stale, so archive it.
-        return False
+        return None
 
+
+def skip_reason(seg, cfg, now=None):
+    """
+    Why this segment should NOT be archived, or None to archive it.
+
+    THE ARCHIVE IS A LIVE MIRROR, NOT A BACKFILL TOOL. Its value comes from the
+    group reading in recording order. A clip that lands hours after it was recorded
+    breaks that ordering permanently, and no amount of correct content makes up for
+    an archive you can no longer scroll chronologically.
+
+    That matters because of how recovery works: after a recording incident the
+    pipeline rescues fragments out of corrupt partials and registers them as NEW
+    segments — new ids, old recording times — so they upload after newer footage.
+    Measured after the 2026-07-27 incident: 161 short fragments plus 25 mid-length
+    ones, with 1749 partials still queued to produce more.
+
+    Three rules, cheapest first. All are opt-out.
+    """
     now = now or datetime.now(timezone.utc)
+    recorded = parse_recorded_at(seg)
+
+    # 1. Hard cutoff. Excludes a known-bad window outright, without touching the
+    #    tolerance rules below. This is the surgical tool for "we had an incident on
+    #    date X, never archive anything from before it".
+    if cfg.min_recorded_at and recorded and recorded < cfg.min_recorded_at:
+        return ('before_cutoff',
+                'recorded %s, before ARCHIVE_MIN_RECORDED_AT=%s'
+                % (seg['start_time'], cfg.min_recorded_at.isoformat()))
+
+    if recorded is None:
+        # Cannot prove anything about an unparseable timestamp — archive it.
+        return None
+
     age_hours = (now - recorded).total_seconds() / 3600.0
-    return age_hours > cfg.stale_hours
+
+    # 2. Too late to be worth ordering. Catches salvage of ANY length, which rule 3
+    #    misses — the incident produced 25 clips of 2-9 minutes that passed a
+    #    length-based test and still arrived out of order.
+    #    Set generously: it doubles as the tolerance for an uploader outage, since
+    #    anything recorded while the uploader was down ages exactly the same way.
+    if cfg.max_late_hours > 0 and age_hours > cfg.max_late_hours:
+        return ('too_late',
+                'recorded %s (%.1fh ago) — older than MAX_LATE_HOURS=%s'
+                % (seg['start_time'], age_hours, cfg.max_late_hours))
+
+    # 3. Short AND stale. Catches salvage early, before rule 2's generous window is
+    #    reached. Both conditions are required: measured across 390 real uploads, 24
+    #    were legitimately short (a flaky camera reconnecting) and every one reached
+    #    the uploader within 0.07-0.60h, so age separates them cleanly while length
+    #    alone would have discarded real footage.
+    duration = seg['duration']
+    if (cfg.min_duration_sec > 0 and duration is not None
+            and duration < cfg.min_duration_sec and age_hours > cfg.stale_hours):
+        return ('stale_salvage',
+                '%ss clip recorded %s (%.1fh ago) — below MIN_DURATION_SEC=%s and older than STALE_HOURS=%s'
+                % (duration, seg['start_time'], age_hours, cfg.min_duration_sec, cfg.stale_hours))
+
+    return None
 
 
 def process_one(cfg, state, router, seg, cam_meta, log):
@@ -545,13 +612,12 @@ def process_one(cfg, state, router, seg, cam_meta, log):
         return True
 
     # Checked before touching the disk: this is the cheap way out of a salvage flood.
-    if is_stale_salvage(seg, cfg):
-        record(state, seg, 'stale_salvage',
-               '%ss clip recorded %s — below MIN_DURATION_SEC=%s and older than STALE_HOURS=%s'
-               % (seg['duration'], seg['start_time'], cfg.min_duration_sec, cfg.stale_hours),
-               cfg=cfg, log=log)
-        log.info('seg %s cam%s %s: stale salvage (%ss), not archiving',
-                 seg['id'], seg['camera_id'], seg['filename'], seg['duration'])
+    skip = skip_reason(seg, cfg)
+    if skip:
+        status, detail = skip
+        record(state, seg, status, detail, cfg=cfg, log=log)
+        log.info('seg %s cam%s %s: %s (%ss), not archiving',
+                 seg['id'], seg['camera_id'], seg['filename'], status, seg['duration'])
         return True
 
     path = seg['file_path']
