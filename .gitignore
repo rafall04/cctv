@@ -80,8 +80,13 @@ private_imports/
 # Claude Code local artifacts (SECURITY)
 # settings.local.json is machine-specific, and .claude/tmp/ holds throwaway ops scripts that
 # carry live credentials (payment-gateway keys, SSH passwords) — they must never be committed.
-# If something in here ever needs sharing, un-ignore it explicitly (e.g. `!.claude/agents/`).
-.claude/
+#
+# Deny-by-default, then re-include ONLY what is meant to be shared. The pattern has to be
+# `.claude/*` rather than `.claude/` — git never descends into an excluded DIRECTORY, so a
+# bare `.claude/` makes any `!.claude/<x>` below it silently do nothing.
+# Anything not explicitly re-included here stays ignored.
+.claude/*
+!.claude/skills/
 
 # Backup files (SECURITY)
 *.bak
