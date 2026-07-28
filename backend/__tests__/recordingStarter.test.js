@@ -117,7 +117,17 @@ describe('recordingStarter.buildRecordingFfmpegArgs', () => {
         expect(args).toContain('-segment_time');
         expect(args).toContain('600');
         expect(args).toContain('-strftime');
-        expect(args).toContain('+frag_keyframe+empty_moov+default_base_moof');
+
+        // The fMP4 flags must reach the INNER mp4 muxer. As a bare top-level
+        // `-movflags` the segment muxer drops them silently and every abrupt stop
+        // destroys the whole in-flight segment — measured on prod: 48 bytes on disk
+        // after 12s and "moov atom not found", versus 236 KB and playable with the
+        // option routed correctly. Assert the exact pairing, not just that the flag
+        // string appears somewhere: a loose toContain() is what let this ship.
+        const optIndex = args.indexOf('-segment_format_options');
+        expect(optIndex).toBeGreaterThan(-1);
+        expect(args[optIndex + 1]).toBe('movflags=+frag_keyframe+empty_moov+default_base_moof');
+        expect(args).not.toContain('-movflags');
         // Internal RTSP recording carries a socket timeout so a stalled camera makes
         // FFmpeg exit instead of hanging (routes through the failure handler).
         expect(args).toContain('-stimeout');

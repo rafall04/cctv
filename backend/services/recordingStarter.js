@@ -115,7 +115,20 @@ export function buildRecordingFfmpegArgs({ cameraDir, outputPattern, inputUrl, s
         '-f', 'segment',
         '-segment_time', '600',
         '-segment_format', 'mp4',
-        '-movflags', '+frag_keyframe+empty_moov+default_base_moof',
+        // The fragmented-MP4 flags MUST be handed to the inner mp4 muxer via
+        // -segment_format_options. As a bare top-level `-movflags` they are applied to
+        // the SEGMENT muxer, which has no such option and drops them silently — no
+        // warning, no error, and the mp4 muxer then runs with its default behaviour of
+        // holding the whole moov atom in memory until the segment closes.
+        //
+        // Measured on prod ffmpeg 4.2.7, 12 seconds into a segment:
+        //   bare -movflags            ->     48 bytes on disk, "moov atom not found"
+        //   -segment_format_options   -> 236,140 bytes, plays fine, survives SIGKILL
+        //
+        // That silent drop is why every abrupt stop destroyed the entire in-flight
+        // segment (up to 10 minutes per camera) instead of losing a few seconds, and
+        // why the 2026-07-27 crash loop left 2,087 unrecoverable partials behind.
+        '-segment_format_options', 'movflags=+frag_keyframe+empty_moov+default_base_moof',
         '-segment_atclocktime', '1',
         '-reset_timestamps', '1',
         '-strftime', '1',

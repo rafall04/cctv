@@ -6,6 +6,7 @@
 
 import {
     RECORDING_RECOVERY_MAX_ATTEMPTS,
+    RECORDING_RECOVERY_PARTIAL_MAX_ATTEMPTS,
     RECORDING_RECOVERY_RETRY_BASE_MS as RETRY_BASE_MS,
     RECORDING_RECOVERY_RETRY_CAP_MS as RETRY_CAP_MS,
 } from './recordingIntervalsPolicy.js';
@@ -34,6 +35,7 @@ export function decideRecoveryRetry({
     lastAttemptAtMs = null,
     retentionExpiresAtMs = null,
     maxAttempts = RECORDING_RECOVERY_MAX_ATTEMPTS,
+    partialMaxAttempts = RECORDING_RECOVERY_PARTIAL_MAX_ATTEMPTS,
     nowMs = Date.now(),
 } = {}) {
     if (STILL_CHANGING_REASONS.has(reason)) {
@@ -49,6 +51,26 @@ export function decideRecoveryRetry({
         if (Number.isFinite(retentionExpiresAtMs) && nowMs >= retentionExpiresAtMs) {
             return {
                 action: 'retain_for_cleanup',
+                shouldCountAttempt: false,
+                shouldQuarantine: false,
+                nextRetryAtMs: null,
+            };
+        }
+
+        // Give up RETRYING without giving up the FILE.
+        //
+        // Partials must never be terminal-quarantined before retention owns their
+        // deletion — that rule came from a real incident and still holds, which is why
+        // shouldQuarantine stays false here. But "never quarantine" had been implemented
+        // as "retry forever", and a mass-corruption event then produces a queue that
+        // refills itself faster than it drains: 1,693 dead partials starved newly
+        // finished segments out of all 3 recovery slots for 2 hours.
+        //
+        // Dormant means: file untouched on disk, retention still deletes it on schedule,
+        // it simply stops being re-enqueued.
+        if (Number(attemptCount || 0) >= partialMaxAttempts) {
+            return {
+                action: 'retain_dormant',
                 shouldCountAttempt: false,
                 shouldQuarantine: false,
                 nextRetryAtMs: null,

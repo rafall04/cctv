@@ -168,7 +168,23 @@ export function createRecordingHealthMonitor({
         }
         const state = ensureState(cameraId);
         if (!state.suspendedReason) state.suspendedReason = 'waiting_retry';
-        if (clearCooldown) state.cooldownUntil = 0;
+        if (clearCooldown) {
+            state.cooldownUntil = 0;
+            // Reset the breaker too, not just the cooldown.
+            //
+            // Those failures were caused by the camera being OFFLINE, and that cause is
+            // now gone. Carrying the count forward punishes a camera for an outage it
+            // has already recovered from: a device that just rebooted usually is not
+            // serving RTSP yet for the first seconds, so attempt #1 fails, and a stale
+            // count of 7+ puts the next try 5 MINUTES away (15s doubling, capped at 5m).
+            // Clearing it means a rebooted camera retries in 15s instead.
+            //
+            // This does NOT reopen the hole the breaker exists for. That hole is a
+            // camera which pings but sends no frames — it never leaves the online
+            // state, so no offline->online transition fires, this branch never runs,
+            // and its count keeps climbing until the breaker suspends it.
+            state.consecutiveFailureCount = 0;
+        }
         return attemptRecovery(cameraId, state.suspendedReason, nowMs);
     }
 

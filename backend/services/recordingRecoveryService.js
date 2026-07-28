@@ -77,6 +77,13 @@ export function createRecordingRecoveryService({
             maxAttempts,
         });
 
+        // Checked BEFORE the nextRetryAtMs test below, which reads a null as "no backoff,
+        // go now" — the opposite of what dormant means. This one line is what stops the
+        // scanner re-enqueueing dead partials forever and starving fresh segments.
+        if (decision.action === 'retain_dormant') {
+            return { allowed: false, reason: 'retain_dormant', nextRetryAtMs: null };
+        }
+
         if (!decision.nextRetryAtMs || decision.nextRetryAtMs <= nowMs) {
             return {
                 allowed: true,

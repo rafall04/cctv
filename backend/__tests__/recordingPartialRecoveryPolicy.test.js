@@ -32,7 +32,7 @@ describe('recordingPartialRecoveryPolicy', () => {
         const decision = decideRecoveryRetry({
             sourceType: 'partial',
             reason: 'invalid_duration',
-            attemptCount: 12,
+            attemptCount: 5,
             lastAttemptAtMs: nowMs - 5 * 60_000,
             nowMs,
         });
@@ -43,6 +43,23 @@ describe('recordingPartialRecoveryPolicy', () => {
             shouldQuarantine: false,
         });
         expect(decision.nextRetryAtMs).toBeGreaterThan(nowMs);
+    });
+
+    it('NEVER quarantines a partial, no matter how many attempts have failed', () => {
+        // The invariant the test above was written to protect, stated directly and
+        // pushed far past the dormancy cap so it cannot be satisfied by coincidence.
+        // Dormancy stops the RETRIES; it must never start deleting the file.
+        for (const attemptCount of [12, 50, 500]) {
+            const decision = decideRecoveryRetry({
+                sourceType: 'partial',
+                reason: 'invalid_duration',
+                attemptCount,
+                lastAttemptAtMs: nowMs - 5 * 60_000,
+                nowMs,
+            });
+            expect(decision.shouldQuarantine).toBe(false);
+            expect(decision.action).not.toBe('terminal_quarantine');
+        }
     });
 
     it('lets cleanup own expired partial files instead of recovery quarantine', () => {
@@ -75,5 +92,46 @@ describe('recordingPartialRecoveryPolicy', () => {
             shouldCountAttempt: true,
             shouldQuarantine: true,
         });
+    });
+});
+
+describe('decideRecoveryRetry — dormancy cap for partials', () => {
+    it('keeps retrying a partial below the cap', () => {
+        const d = decideRecoveryRetry({
+            sourceType: 'partial', reason: 'invalid_duration',
+            attemptCount: 5, partialMaxAttempts: 12, nowMs: 1_000_000,
+        });
+        expect(d.action).toBe('retry_later');
+        expect(d.shouldQuarantine).toBe(false);
+    });
+
+    it('goes DORMANT at the cap — stops retrying but never quarantines the file', () => {
+        // The livelock fix. "Never quarantine a partial" was implemented as "retry
+        // forever", which let 1,693 dead files starve fresh segments out of the queue.
+        // Dormant = file untouched, retention still deletes it, it just leaves the queue.
+        const d = decideRecoveryRetry({
+            sourceType: 'partial', reason: 'invalid_duration',
+            attemptCount: 12, partialMaxAttempts: 12, nowMs: 1_000_000,
+        });
+        expect(d.action).toBe('retain_dormant');
+        expect(d.shouldQuarantine).toBe(false);   // file MUST survive
+        expect(d.nextRetryAtMs).toBeNull();
+    });
+
+    it('retention expiry still wins over dormancy', () => {
+        const d = decideRecoveryRetry({
+            sourceType: 'partial', reason: 'invalid_duration',
+            attemptCount: 99, partialMaxAttempts: 12,
+            retentionExpiresAtMs: 500_000, nowMs: 1_000_000,
+        });
+        expect(d.action).toBe('retain_for_cleanup');
+    });
+
+    it('does not apply the partial cap to final orphans', () => {
+        const d = decideRecoveryRetry({
+            sourceType: 'final', reason: 'final_invalid_duration',
+            attemptCount: 12, maxAttempts: 3, partialMaxAttempts: 12, nowMs: 1_000_000,
+        });
+        expect(d.action).toBe('terminal_quarantine');
     });
 });

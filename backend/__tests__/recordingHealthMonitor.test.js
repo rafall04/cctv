@@ -127,6 +127,60 @@ describe('recordingHealthMonitor — state transitions', () => {
     });
 });
 
+describe('recordingHealthMonitor — recovery speed after a camera reboot', () => {
+    it('clears the accumulated failure count when a camera comes back online', async () => {
+        // A camera that was offline for hours racks up failures. Those failures were
+        // caused by the outage, which is now over — carrying them forward puts the next
+        // retry 5 minutes away (15s doubling, capped), which is what made a rebooted
+        // camera take minutes to resume recording.
+        const { processStatus, deps, startRecording } = createDeps();
+        const monitor = createRecordingHealthMonitor(deps);
+
+        for (let i = 0; i < 8; i += 1) monitor.markFailure(1, 'process_crashed', 1000);
+        expect(monitor.getState(1).consecutiveFailureCount).toBe(8);
+        expect(computeCooldownMs(8)).toBe(5 * 60 * 1000); // the 5-minute penalty
+
+        processStatus.status = 'stopped';
+        processStatus.isRecording = false;
+        await monitor.handleCameraBecameOnline(1, 2000);
+
+        expect(monitor.getState(1).consecutiveFailureCount).toBe(0);
+        expect(startRecording).toHaveBeenCalledWith(1);
+    });
+
+    it('a rebooted camera that fails its FIRST attempt retries in 15s, not 5 minutes', async () => {
+        // Devices commonly are not serving RTSP yet in the seconds after power-on, so
+        // attempt #1 failing is the normal case — it must not re-arm the old penalty.
+        const { processStatus, deps, startRecording } = createDeps();
+        startRecording.mockResolvedValue({ success: false });
+        const monitor = createRecordingHealthMonitor(deps);
+
+        for (let i = 0; i < 8; i += 1) monitor.markFailure(2, 'process_crashed', 1000);
+        processStatus.status = 'stopped';
+        processStatus.isRecording = false;
+
+        await monitor.handleCameraBecameOnline(2, 2000);
+
+        const state = monitor.getState(2);
+        expect(state.consecutiveFailureCount).toBe(1);
+        expect(state.cooldownUntil - 2000).toBe(15 * 1000);
+    });
+
+    it('still lets the breaker engage for a camera that pings but sends no video', async () => {
+        // The reset above must not reopen the hole the breaker exists for. Such a camera
+        // never goes offline, so no online transition fires and the count keeps climbing.
+        const { deps } = createDeps();
+        const monitor = createRecordingHealthMonitor(deps);
+
+        for (let i = 0; i < 4; i += 1) monitor.markFailure(3, 'no_media', 1000);
+
+        const state = monitor.getState(3);
+        expect(state.consecutiveFailureCount).toBe(4);
+        expect(state.suspendedReason).toBe('waiting_retry');
+        expect(state.cooldownUntil).toBeGreaterThan(1000);
+    });
+});
+
 describe('recordingHealthMonitor.attemptRecovery', () => {
     it('skips when in-flight action or cooldown active', async () => {
         const { deps } = createDeps();

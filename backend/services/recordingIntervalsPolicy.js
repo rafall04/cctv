@@ -41,6 +41,21 @@ export const RECORDING_DEFAULT_RETENTION_HOURS = 5;
 export const RECORDING_RECOVERY_MIN_AGE_MS = 30 * 1000;
 export const RECORDING_RECOVERY_DUPLICATE_PARTIAL_MIN_AGE_MS = 5 * 60 * 1000;
 export const RECORDING_RECOVERY_MAX_ATTEMPTS = 3;
+// Attempts after which a PARTIAL stops being retried — it is kept on disk untouched
+// (retention still owns its deletion), it just stops consuming recovery queue slots.
+//
+// Partials are deliberately never terminal-quarantined, but "never quarantine" had been
+// implemented as "retry forever". On 2026-07-28 that turned 1,693 unrecoverable partials
+// into a self-replenishing queue: with maxConcurrent=3, newly finished segments sat
+// behind them and finalization stopped dead for 2 hours across every camera — which also
+// removed them from playback, not just the Telegram archive.
+//
+// 12 attempts against a 30-minute capped backoff is roughly 6 hours of trying: far beyond
+// what a genuinely recoverable file needs, and finite.
+export const RECORDING_RECOVERY_PARTIAL_MAX_ATTEMPTS = readPositiveIntEnv(
+    'RECORDING_RECOVERY_PARTIAL_MAX_ATTEMPTS',
+    12
+);
 export const RECORDING_RECOVERY_MAX_CONCURRENT = readPositiveIntEnv(
     'RECORDING_RECOVERY_MAX_CONCURRENT',
     3
