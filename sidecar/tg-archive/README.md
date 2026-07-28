@@ -162,5 +162,14 @@ rm -rf /opt/tg-archive
 - A group upgraded to a supergroup changes its chat id. That is handled — the new id
   is recorded and the send retried — but `routes.json` still shows the old one.
 - Segments over `MAX_FILE_MB` are skipped and logged as `too_big`, not retried.
+- Segments that are BOTH shorter than `MIN_DURATION_SEC` and older than
+  `STALE_HOURS` are skipped as `stale_salvage`. This targets the wreckage the
+  recovery pipeline rescues out of corrupt partials after a recording incident —
+  6-60 second clips that arrive hours late and bury the group. **Both conditions
+  are required on purpose**: measured across 390 real uploads, 24 were legitimately
+  short (a flaky camera reconnecting) and every one of those reached the uploader
+  within 0.07-0.60h of being recorded, so an age test separates them cleanly while
+  a length test alone would have discarded them. The video file itself is untouched
+  and still plays back from the web UI — only the Telegram copy is skipped.
 - A permanently failing segment is recorded as `failed` and skipped so it cannot
   wedge the queue behind it.

@@ -51,6 +51,21 @@ class Config:
         self.timeout = int(env('REQUEST_TIMEOUT_SEC', '1800'))
         self.backfill = env('BACKFILL', '0') == '1'
         self.stability_sec = int(env('STABILITY_SEC', '3'))
+        # Stale-salvage filter. A recording incident leaves thousands of corrupt
+        # partials behind; the recovery pipeline rescues a few seconds out of each,
+        # registers them as segments, and they land here HOURS later — burying the
+        # archive group under 6-60 second clips that arrive after newer footage.
+        #
+        # Duration alone is NOT a safe test: measured over 390 real uploads, 24 of
+        # them were legitimately short (a flaky camera reconnecting) and those are
+        # exactly the clips an operator wants. What separates them is AGE, not length
+        # — every legitimate short segment reached here within 0.07-0.60h of being
+        # recorded, while salvage fragments are many hours old.
+        #
+        # So both conditions must hold before we skip. Set MIN_DURATION_SEC=0 to
+        # disable the filter entirely.
+        self.min_duration_sec = int(env('MIN_DURATION_SEC', '120'))
+        self.stale_hours = float(env('STALE_HOURS', '2'))
         self.dry_run = env('DRY_RUN', '0') == '1'
         # Set to 0 only if some OTHER process ever needs to consume this bot's updates —
         # Telegram allows a single getUpdates consumer per token (a second one gets 409).
@@ -492,6 +507,33 @@ def pace(cfg, size_bytes, elapsed, log):
 
 # -------------------------------------------------------------------------- main
 
+def is_stale_salvage(seg, cfg, now=None):
+    """
+    True when a segment is BOTH very short AND long past its recording time.
+
+    That pairing is what identifies wreckage rescued from a corrupt partial, as
+    opposed to a genuinely short recording. Either condition alone gives a wrong
+    answer: short-but-fresh is a flaky camera (keep it), old-but-full-length is an
+    ordinary backfill (keep it too).
+    """
+    if cfg.min_duration_sec <= 0:
+        return False
+
+    duration = seg['duration']
+    if duration is None or duration >= cfg.min_duration_sec:
+        return False
+
+    try:
+        recorded = datetime.fromisoformat(str(seg['start_time']).replace('Z', '+00:00'))
+    except (ValueError, AttributeError, TypeError):
+        # Unparseable timestamp — we cannot prove it is stale, so archive it.
+        return False
+
+    now = now or datetime.now(timezone.utc)
+    age_hours = (now - recorded).total_seconds() / 3600.0
+    return age_hours > cfg.stale_hours
+
+
 def process_one(cfg, state, router, seg, cam_meta, log):
     """Returns True when the watermark may advance past this segment."""
     cam = cam_meta.get(seg['camera_id']) or {
@@ -500,6 +542,16 @@ def process_one(cfg, state, router, seg, cam_meta, log):
     targets = router.targets(seg['camera_id'], cam['area_id'])
     if not targets:
         record(state, seg, 'no_route', 'no group configured for this camera/area', cfg=cfg, log=log)
+        return True
+
+    # Checked before touching the disk: this is the cheap way out of a salvage flood.
+    if is_stale_salvage(seg, cfg):
+        record(state, seg, 'stale_salvage',
+               '%ss clip recorded %s — below MIN_DURATION_SEC=%s and older than STALE_HOURS=%s'
+               % (seg['duration'], seg['start_time'], cfg.min_duration_sec, cfg.stale_hours),
+               cfg=cfg, log=log)
+        log.info('seg %s cam%s %s: stale salvage (%ss), not archiving',
+                 seg['id'], seg['camera_id'], seg['filename'], seg['duration'])
         return True
 
     path = seg['file_path']
