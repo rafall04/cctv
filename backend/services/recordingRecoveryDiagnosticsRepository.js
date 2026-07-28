@@ -174,19 +174,55 @@ class RecordingRecoveryDiagnosticsRepository {
             return 0;
         }
 
+        /*
+         * The table is UNIQUE on (camera_id, filename, active). A file can therefore hold BOTH an
+         * active row and an already-resolved row for the same name — which happens routinely when
+         * a segment is retried. Flipping the active one to 0 then collides with its resolved twin,
+         * and because every UPDATE ran inside ONE transaction, that single collision rolled the
+         * whole batch back. The prune then failed identically on every cycle forever: observed in
+         * production as 873 orphan rows still active while the log repeated
+         * "Error pruning recovery diagnostics: UNIQUE constraint failed".
+         *
+         * The file is gone either way, so a duplicate active row carries no information its
+         * resolved twin does not already hold — delete it instead of resolving it. Rows with no
+         * twin still resolve normally.
+         */
         const run = transaction((ids) => {
+            let cleared = 0;
             for (const id of ids) {
-                execute(
-                    `UPDATE recording_recovery_diagnostics
-                     SET active = 0, resolved_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-                     WHERE id = ? AND active = 1`,
+                const hasResolvedTwin = queryOne(
+                    `SELECT 1 AS present
+                     FROM recording_recovery_diagnostics AS orphan
+                     WHERE orphan.id = ?
+                       AND EXISTS (
+                           SELECT 1
+                           FROM recording_recovery_diagnostics AS twin
+                           WHERE twin.camera_id = orphan.camera_id
+                             AND twin.filename = orphan.filename
+                             AND twin.active = 0
+                             AND twin.id <> orphan.id
+                       )`,
                     [id]
                 );
-            }
-        });
-        run(absentIds);
 
-        return absentIds.length;
+                const result = hasResolvedTwin
+                    ? execute(
+                        'DELETE FROM recording_recovery_diagnostics WHERE id = ? AND active = 1',
+                        [id]
+                    )
+                    : execute(
+                        `UPDATE recording_recovery_diagnostics
+                         SET active = 0, resolved_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                         WHERE id = ? AND active = 1`,
+                        [id]
+                    );
+
+                cleared += result?.changes || 0;
+            }
+            return cleared;
+        });
+
+        return run(absentIds);
     }
 
     markTerminal({
