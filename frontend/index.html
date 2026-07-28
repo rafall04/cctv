@@ -116,8 +116,16 @@
     }
     </script>
     
-    <!-- Dynamic Meta Tags Configuration -->
-    <script defer src="/meta-config.js"></script>
+    <!--
+      Dynamic Meta Tags Configuration.
+
+      The ?v= is load-bearing. This file is NOT content-hashed by Vite (it is copied from
+      public/ verbatim), yet the edge serves it with `Cache-Control: immutable, max-age=1y`
+      like a hashed asset — so an edited meta-config.js sat unseen at the CDN for 30 days
+      while the origin had the new copy. index.html itself is never edge-cached, so bumping
+      this number is what actually ships a change. BUMP IT whenever meta-config.js changes.
+    -->
+    <script defer src="/meta-config.js?v=2"></script>
   </head>
   <body>
     <div id="root"></div>
