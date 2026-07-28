@@ -63,8 +63,20 @@ export function cacheMiddleware(ttl = CacheTTL.SHORT, options = {}) {
             reply.header('X-Cache', 'HIT');
             reply.header('X-Cache-Key', cacheKey);
             reply.type(cached.contentType || 'application/json');
+            /*
+             * `return reply` — NOT a bare `return`. Resolving undefined does not stop Fastify's
+             * preHandler chain; it only checks `reply.sent`, and `reply.sent` is
+             * `(hijacked || raw.writableEnded) === true` — i.e. it flips when the SOCKET write
+             * ends, not when send() is called. This app registers two *async* onSend hooks
+             * (server.js voucher cache-control, middleware/securityHeaders.js), which defer
+             * writeHead/end to a later microtask, so `reply.sent` is still false when Fastify
+             * decides whether to run the route handler. The handler then sent a second time:
+             * ERR_HTTP_HEADERS_SENT, surfacing as an unhandledRejection thrown inside the
+             * onSend hook chain — ~113/day in production, in bursts, because it only fires on a
+             * cache HIT (offline cameras make clients retry inside the 30s TTL window).
+             */
             reply.send(cached.payload);
-            return;
+            return reply;
         }
         
         // Cache miss

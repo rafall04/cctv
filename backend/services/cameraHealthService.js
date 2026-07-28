@@ -2633,7 +2633,7 @@ class CameraHealthService {
                 if (isOnline) onlineCount += 1;
                 else {
                     offlineCount += 1;
-                    console.warn(`[CameraHealth] Camera ${camera.id} (${camera.name}) offline reason: ${rawReason}`);
+                    (statusChanged ? console.warn : console.log)(`[CameraHealth] Camera ${camera.id} (${camera.name}) offline reason: ${rawReason}`); // transition=stderr, steady-state=stdout: a provider still being down is info, not an app error (5,322/day buried the ~113 real ones)
                 }
             }
 
