@@ -117,6 +117,36 @@ describe('guardrail: mobile viewport regressions', () => {
     });
 });
 
+describe('guardrail: unhashed public/ scripts must be cache-busted', () => {
+    /*
+     * Vite content-hashes everything it builds, so /assets/* can safely be served immutable.
+     * Files copied verbatim from public/ get NO hash — but the edge serves them with the same
+     * `Cache-Control: immutable, max-age=1y`. Result (observed 2026-07-28): an edited
+     * meta-config.js sat at the CDN for 30 DAYS (Age 2,629,151, cf-cache-status HIT) while the
+     * origin had the new copy, so the fix it carried never reached a single visitor.
+     *
+     * index.html itself is never edge-cached, so a ?v= on the reference is the only lever that
+     * actually ships a change. Bump it whenever the file changes.
+     */
+    const FRONTEND_ROOT = path.resolve(SRC_ROOT, '..');
+    const SCRIPT_SRC_RE = /<script[^>]+src="(\/[^"]+\.js[^"]*)"/g;
+
+    it('every non-/assets script in index.html carries a ?v= version', () => {
+        const html = fs.readFileSync(path.join(FRONTEND_ROOT, 'index.html'), 'utf8');
+        const offenders = [];
+        for (const match of html.matchAll(SCRIPT_SRC_RE)) {
+            const src = match[1];
+            if (src.startsWith('/assets/') || src.startsWith('/src/')) continue; // hashed by Vite
+            if (!/\?v=/.test(src)) offenders.push(src);
+        }
+        expect(
+            offenders,
+            `\nUnhashed public/ script without ?v= — the edge will pin the old copy for a year:\n  ${
+                offenders.join('\n  ')}\n`,
+        ).toEqual([]);
+    });
+});
+
 describe('guardrail: one owner for the page gutter', () => {
     /*
      * AdminLayout wraps every route in `px-4 lg:px-8` + `mx-auto max-w-7xl`. A page that pads its

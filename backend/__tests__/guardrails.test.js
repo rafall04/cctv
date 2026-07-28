@@ -85,10 +85,12 @@ describe('guardrail: layering invariants', () => {
 
 describe('guardrail: data-safety patterns', () => {
     // `INSERT OR REPLACE` silently DELETEs the conflicting row on PK/UNIQUE conflict — the exact
-    // pattern that once cost a real customer row. Existing uses are FROZEN (tracked for follow-up fix);
-    // no NEW occurrences allowed.
+    // pattern that once cost a real customer row. No NEW occurrences allowed.
+    // 2026-07-28: backupService REMOVED from this list — its restore path now upserts on the primary
+    // key, so a collision on another unique column raises instead of destroying someone else's row.
+    // sessionManager stays: its target is token_blacklist keyed by token_hash, where replacing an
+    // identical blacklist entry is idempotent and destroys nothing.
     const INSERT_OR_REPLACE_ALLOW = new Set([
-        'services/backupService.js',
         'services/sessionManager.js',
     ]);
     it('no NEW `INSERT OR REPLACE` in services', () => {
@@ -124,6 +126,56 @@ describe('guardrail: auth perimeter stays tested (coverage-floor surrogate)', ()
         it(`${name} keeps >= ${min} test cases`, () => {
             const file = path.join(BACKEND_ROOT, '__tests__', `${name}.test.js`);
             expect(fs.existsSync(file), `${name}.test.js is missing — the auth perimeter must stay tested`).toBe(true);
+            const count = (read(file).match(/\bit\(/g) || []).length;
+            expect(count, `${name}.test.js has ${count} test cases, below the floor of ${min}`).toBeGreaterThanOrEqual(min);
+        });
+    }
+});
+
+describe('guardrail: a mock cannot prove a constraint (real-dependency tests)', () => {
+    /*
+     * Earned 2026-07-28. Two bugs lived for months behind GREEN tests, both for the same reason:
+     * the test mocked the exact thing whose behaviour WAS the bug.
+     *
+     *  - pruneAbsentActiveDiagnostics died on `UNIQUE constraint failed` every cycle for ~2 months.
+     *    Its sibling test mocks `execute`, and a mocked execute can never raise a constraint error,
+     *    so the suite stayed green while the prune resolved nothing at all.
+     *  - The cacheMiddleware double-send only throws when Fastify's ASYNC onSend hooks defer the
+     *    socket write. Without a real Fastify instance carrying those hooks, Fastify silently
+     *    absorbs the second send and the test passes against broken code.
+     *
+     * So: when correctness depends on a DATABASE CONSTRAINT or on FRAMEWORK internals, the test
+     * must exercise the real thing. Mocks are fine everywhere else.
+     */
+    const REAL_DEPENDENCY = {
+        'backupService.test.js': 'better-sqlite3',
+        'recordingRecoveryDiagnosticsPrune.test.js': 'better-sqlite3',
+        'cacheMiddlewareDoubleReply.test.js': 'fastify',
+    };
+    for (const [testFile, dependency] of Object.entries(REAL_DEPENDENCY)) {
+        it(`${testFile} exercises the real ${dependency}, not a mock`, () => {
+            const file = path.join(BACKEND_ROOT, '__tests__', testFile);
+            expect(fs.existsSync(file), `${testFile} is missing — it proves behaviour a mock cannot`).toBe(true);
+            const src = read(file);
+            expect(
+                new RegExp(`from\\s+['"]${dependency}['"]`).test(src),
+                `${testFile} must import ${dependency} directly; mocking it away is what hid the original bug`
+            ).toBe(true);
+        });
+    }
+});
+
+describe('guardrail: data-destroying paths stay tested', () => {
+    /*
+     * backupService could DELETE a live row on restore (INSERT OR REPLACE) and had ZERO tests for
+     * years. Anything that can destroy or overwrite real rows keeps a test floor, same idea as the
+     * auth perimeter above.
+     */
+    const FLOOR = { backupService: 6, recordingRecoveryDiagnosticsPrune: 4 };
+    for (const [name, min] of Object.entries(FLOOR)) {
+        it(`${name} keeps >= ${min} test cases`, () => {
+            const file = path.join(BACKEND_ROOT, '__tests__', `${name}.test.js`);
+            expect(fs.existsSync(file), `${name}.test.js is missing — this path can destroy real data`).toBe(true);
             const count = (read(file).match(/\bit\(/g) || []).length;
             expect(count, `${name}.test.js has ${count} test cases, below the floor of ${min}`).toBeGreaterThanOrEqual(min);
         });

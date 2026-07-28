@@ -154,7 +154,7 @@ export function importBackup(backupData, options = {}) {
                         let sql;
                         if (mode === 'replace') {
                             /*
-                             * NEVER `INSERT OR REPLACE`. On ANY primary-key *or* UNIQUE conflict
+                             * NEVER an INSERT-OR-REPLACE upsert. On ANY primary-key *or* UNIQUE conflict
                              * SQLite DELETEs the conflicting row before inserting — so restoring a
                              * backup could destroy a live row that merely shared a username/email,
                              * and fire ON DELETE CASCADE on its children. That is exactly how a real
