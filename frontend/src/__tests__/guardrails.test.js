@@ -160,7 +160,13 @@ describe('guardrail: legacy grey ratchet (design tokens)', () => {
     // then page by page as each moved onto the components/ui primitives — never by collapsing a
     // lone grey, since an unpaired grey is a judgement call about which role was meant. What is
     // left is exactly those singletons; resolve them by hand and lower this again.
-    const BASELINE = 778;
+    // 2026-07-28: 778 -> 660. The shared ui/ primitives (EmptyState, Skeleton, ErrorBoundary) held
+    // 116 of them; because the semantic tokens are already theme-aware, every `x-gray-N
+    // dark:x-gray-M` pair collapsed to a single class and the `dark:` variant disappeared with it.
+    // Fixing a shared primitive is worth more than a page: the result propagates everywhere it is
+    // used. The only greys left there are Skeleton's video-tile gradient, which is deliberately
+    // dark in BOTH themes (over-video chrome — see docs/frontend-guide.md).
+    const BASELINE = 660;
 
     it(`-gray-N usage count stays <= ${BASELINE} and shrinks over time`, () => {
         let count = 0;

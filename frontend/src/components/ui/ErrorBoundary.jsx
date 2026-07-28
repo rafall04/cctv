@@ -78,9 +78,9 @@ class ErrorBoundary extends Component {
 
             // Default error UI
             return (
-                <div className="min-h-screen flex items-center justify-center p-4 bg-gray-50 dark:bg-gray-900">
+                <div className="min-h-screen flex items-center justify-center p-4 bg-surface-sunken">
                     <div className="max-w-lg w-full">
-                        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-xl overflow-hidden">
+                        <div className="bg-surface-raised border border-edge rounded-2xl shadow-xl overflow-hidden">
                             {/* Header */}
                             <div className="bg-gradient-to-r from-red-500 to-red-600 p-6">
                                 <div className="flex items-center gap-4">
@@ -110,11 +110,11 @@ class ErrorBoundary extends Component {
 
                                 {/* Error Details (Development only) */}
                                 {import.meta.env.DEV && this.state.errorInfo && (
-                                    <details className="bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
-                                        <summary className="text-sm font-semibold text-gray-700 dark:text-gray-300 cursor-pointer hover:text-gray-900 dark:hover:text-white">
+                                    <details className="bg-surface-sunken/50 border border-edge rounded-xl p-4">
+                                        <summary className="text-sm font-semibold text-content-muted cursor-pointer hover:text-content">
                                             Stack Trace (Development)
                                         </summary>
-                                        <pre className="mt-3 text-xs text-gray-600 dark:text-gray-400 overflow-x-auto whitespace-pre-wrap font-mono">
+                                        <pre className="mt-3 text-xs text-content-muted overflow-x-auto whitespace-pre-wrap font-mono">
                                             {this.state.errorInfo.componentStack}
                                         </pre>
                                     </details>
@@ -151,10 +151,10 @@ class ErrorBoundary extends Component {
                             </div>
 
                             {/* Actions */}
-                            <div className="p-6 bg-gray-50 dark:bg-gray-900/50 border-t border-gray-200 dark:border-gray-700 flex gap-3">
+                            <div className="p-6 bg-surface-sunken/50 border-t border-edge flex gap-3">
                                 <button
                                     onClick={this.handleReset}
-                                    className="flex-1 px-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                                    className="flex-1 px-4 py-2.5 bg-surface-raised border border-edge-strong text-content-muted font-medium rounded-lg hover:bg-surface-overlay transition-colors"
                                 >
                                     Coba Lagi
                                 </button>
@@ -168,7 +168,7 @@ class ErrorBoundary extends Component {
                         </div>
 
                         {/* Footer Note */}
-                        <p className="text-center text-sm text-gray-500 dark:text-gray-400 mt-4">
+                        <p className="text-center text-sm text-content-subtle mt-4">
                             Error ID: {Date.now().toString(36).toUpperCase()}
                         </p>
                     </div>
