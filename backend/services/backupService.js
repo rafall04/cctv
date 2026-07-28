@@ -12,6 +12,43 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 /**
+ * Tables a backup may read or write.
+ *
+ * This list is also the IMPORT WHITELIST. SQL identifiers cannot be bound as parameters, so
+ * table/column names reach the statement by interpolation — and importBackup's input is the raw
+ * request body (admin endpoint), i.e. attacker-controlled. Anything not named here is rejected
+ * rather than interpolated. Keep export and import on this one list so they cannot drift.
+ */
+const BACKUP_TABLES = [
+    'users',
+    'cameras',
+    'areas',
+    'audit_logs',
+    'feedbacks',
+    'api_keys',
+    'viewer_sessions',
+    'viewer_session_history',
+    'system_settings',
+    'saweria_settings'
+];
+
+/**
+ * Describe a whitelisted table: which columns exist, and which form the primary key.
+ * `table` MUST already be validated against BACKUP_TABLES before it gets here.
+ */
+function describeTable(table) {
+    const info = query(`PRAGMA table_info(${table})`);
+    return {
+        validColumns: new Set(info.map((column) => column.name)),
+        // `pk` is 0 for non-key columns and 1..n for the position within a composite key.
+        primaryKey: info
+            .filter((column) => column.pk > 0)
+            .sort((a, b) => a.pk - b.pk)
+            .map((column) => column.name)
+    };
+}
+
+/**
  * Export complete database backup
  */
 export function exportBackup() {
@@ -22,19 +59,7 @@ export function exportBackup() {
             data: {}
         };
 
-        // Export all tables
-        const tables = [
-            'users',
-            'cameras', 
-            'areas',
-            'audit_logs',
-            'feedbacks',
-            'api_keys',
-            'viewer_sessions',
-            'viewer_session_history',
-            'system_settings',
-            'saweria_settings'
-        ];
+        const tables = BACKUP_TABLES;
 
         tables.forEach(table => {
             try {
@@ -77,11 +102,21 @@ export function importBackup(backupData, options = {}) {
             success: true,
             imported: {},
             skipped: {},
-            errors: {}
+            errors: {},
+            // Rows that could not be written because they collided with an EXISTING row on a
+            // unique column other than the primary key. Previously such rows were silently
+            // destroyed; now they are refused and reported so an operator can decide.
+            conflicts: {}
         };
 
-        // Determine which tables to import
-        const tablesToImport = tables || Object.keys(backupData.data);
+        // Determine which tables to import, dropping anything outside the whitelist.
+        const requestedTables = tables || Object.keys(backupData.data);
+        const tablesToImport = requestedTables.filter((table) => BACKUP_TABLES.includes(table));
+        requestedTables
+            .filter((table) => !BACKUP_TABLES.includes(table))
+            .forEach((table) => {
+                results.skipped[table] = 'Not an allowed backup table';
+            });
 
         // Import in transaction
         const importTxn = transaction(() => {
@@ -100,26 +135,66 @@ export function importBackup(backupData, options = {}) {
                     }
 
                     let imported = 0;
+                    const { validColumns, primaryKey } = describeTable(table);
+                    const conflicts = [];
 
-                    records.forEach(record => {
-                        const columns = Object.keys(record);
-                        const values = Object.values(record);
+                    records.forEach((record, index) => {
+                        // Drop keys that are not real columns of this table: they would otherwise
+                        // be interpolated into the statement verbatim.
+                        const columns = Object.keys(record).filter((column) => validColumns.has(column));
+                        if (columns.length === 0) {
+                            conflicts.push({ row: index, reason: 'No recognisable columns' });
+                            return;
+                        }
+
+                        const values = columns.map((column) => record[column]);
                         const placeholders = columns.map(() => '?').join(', ');
+                        const columnList = columns.join(', ');
 
+                        let sql;
                         if (mode === 'replace') {
-                            // Replace mode: INSERT OR REPLACE
-                            const sql = `INSERT OR REPLACE INTO ${table} (${columns.join(', ')}) VALUES (${placeholders})`;
-                            execute(sql, values);
-                            imported++;
+                            /*
+                             * NEVER `INSERT OR REPLACE`. On ANY primary-key *or* UNIQUE conflict
+                             * SQLite DELETEs the conflicting row before inserting — so restoring a
+                             * backup could destroy a live row that merely shared a username/email,
+                             * and fire ON DELETE CASCADE on its children. That is exactly how a real
+                             * customer row was lost in 2026-06 (see AGENTS.md "Production data safety").
+                             *
+                             * An upsert targeted at the PRIMARY KEY updates the row in place instead,
+                             * and a collision on some other unique column now raises loudly (caught
+                             * per row below) rather than silently removing someone else's data.
+                             */
+                            const updatable = columns.filter((column) => !primaryKey.includes(column));
+                            if (primaryKey.length === 0) {
+                                // No declared primary key: there is no safe conflict target, so fall
+                                // back to insert-only rather than guessing which row to overwrite.
+                                sql = `INSERT OR IGNORE INTO ${table} (${columnList}) VALUES (${placeholders})`;
+                            } else if (updatable.length === 0) {
+                                sql = `INSERT INTO ${table} (${columnList}) VALUES (${placeholders}) `
+                                    + `ON CONFLICT(${primaryKey.join(', ')}) DO NOTHING`;
+                            } else {
+                                sql = `INSERT INTO ${table} (${columnList}) VALUES (${placeholders}) `
+                                    + `ON CONFLICT(${primaryKey.join(', ')}) DO UPDATE SET `
+                                    + updatable.map((column) => `${column} = excluded.${column}`).join(', ');
+                            }
                         } else {
                             // Merge mode: INSERT OR IGNORE (skip duplicates)
-                            const sql = `INSERT OR IGNORE INTO ${table} (${columns.join(', ')}) VALUES (${placeholders})`;
+                            sql = `INSERT OR IGNORE INTO ${table} (${columnList}) VALUES (${placeholders})`;
+                        }
+
+                        try {
                             const result = execute(sql, values);
                             if (result.changes > 0) imported++;
+                        } catch (rowError) {
+                            // One unwritable row must not abort the rest of the table.
+                            conflicts.push({ row: index, reason: rowError.message });
                         }
                     });
 
                     results.imported[table] = imported;
+                    if (conflicts.length > 0) {
+                        results.conflicts[table] = conflicts;
+                    }
                 } catch (error) {
                     console.error(`Import error for table ${table}:`, error);
                     results.errors[table] = error.message;
