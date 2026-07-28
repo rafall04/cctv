@@ -161,6 +161,8 @@ class ThumbnailService {
             failures,
             nextRetryAt: Date.now() + backoffMs,
         });
+        // Returned so the caller can log the FIRST failure loudly and keep the repeats quiet.
+        return failures;
     }
 
     clearThumbnailFailure(cameraId) {
@@ -443,18 +445,23 @@ class ThumbnailService {
                         }
                     } catch (error) {
                         failed += 1;
-                        this.registerThumbnailFailure(camera.id);
+                        const failures = this.registerThumbnailFailure(camera.id);
                         /*
-                         * `unsupported_delivery_type` is not a failure at all — it states that this
-                         * camera's delivery type cannot produce a thumbnail, which is a fixed fact
-                         * about its configuration, not an event. It was raised as console.error on
-                         * every sweep: 2,532 stderr lines a day, ~20 per camera, saying the same
-                         * unchanging thing. Same for a camera we cannot reach: the health sweep
-                         * already reports that. Real, actionable failures stay on stderr.
+                         * Two separate reasons this used to flood stderr (2,532/day, ~20 per camera):
+                         *
+                         * 1. `unsupported_delivery_type` (and the missing-source variants) is not a
+                         *    failure at all — it states that this camera's delivery type cannot
+                         *    produce a thumbnail. That is a fixed fact about its configuration, not
+                         *    an event, so it never belongs on stderr.
+                         * 2. A camera that keeps timing out re-reports the SAME failure every sweep.
+                         *    Per the logging policy in AGENTS.md we announce the transition and stay
+                         *    quiet about the steady state: first failure is loud, repeats go to
+                         *    stdout. clearThumbnailFailure() resets this, so a camera that recovers
+                         *    and breaks again is loud again.
                          */
                         const message = this.sanitizeErrorMessage(error.message);
-                        const expected = /unsupported_delivery_type|missing_external_snapshot_source|missing_mjpeg_thumbnail_source/i.test(message || '');
-                        const emit = expected ? console.log : console.error;
+                        const isConfigFact = /unsupported_delivery_type|missing_external_snapshot_source|missing_mjpeg_thumbnail_source/i.test(message || '');
+                        const emit = (isConfigFact || failures > 1) ? console.log : console.error;
                         emit(`[Thumbnail] Camera ${camera.id} (${camera.name}) failed:`, message);
                     }
                 }
