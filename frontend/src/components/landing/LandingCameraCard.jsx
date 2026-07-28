@@ -54,7 +54,9 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
     const disableAnimations = liteEffects || shouldDisableAnimations();
     // Let the browser skip layout/paint for off-screen cards while scrolling (big win on long grids /
     // weak GPUs); `contain-intrinsic-size` reserves an approximate height so the scrollbar stays stable.
-    const contentVisibilityClass = liteEffects ? '[content-visibility:auto] [contain-intrinsic-size:auto_300px]' : '';
+    // Applied on every tier, not just lite: skipping off-screen paint costs nothing on a capable device
+    // and capable devices are exactly the ones that expand the grid to hundreds of cards.
+    const contentVisibilityClass = '[content-visibility:auto] [contain-intrinsic-size:auto_300px]';
     const isFav = isFavorite?.(camera.id);
 
     // Only surface a quality chip when it actually distinguishes this camera.

@@ -43,18 +43,29 @@ function Toast({ message, type = 'info', onClose }) {
             <div className="flex-1 min-w-0">
                 <p className="font-semibold text-sm">{message}</p>
             </div>
-            <button onClick={onClose} className="p-1.5 hover:bg-white/20 rounded-xl transition-colors shrink-0">
+            <button
+                type="button"
+                onClick={onClose}
+                aria-label="Tutup notifikasi"
+                className="p-1.5 hover:bg-white/20 rounded-xl transition-colors shrink-0"
+            >
                 <Icons.X />
             </button>
         </div>
     );
 }
 
-// Toast container for multiple toasts
+// Toast container for multiple toasts.
+// The live region is rendered unconditionally (even with zero toasts): screen readers only
+// announce mutations INTO an existing aria-live region, so a container that appears together
+// with its first toast is silent. Empty, it is a zero-height fixed box and costs nothing.
 function ToastContainer({ toasts, removeToast }) {
-    if (toasts.length === 0) return null;
     return (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[1002] flex flex-col gap-3 w-full max-w-sm px-4">
+        <div
+            role="status"
+            aria-live="polite"
+            className="fixed top-20 left-1/2 -translate-x-1/2 z-[1002] flex flex-col gap-3 w-full max-w-sm px-4"
+        >
             {toasts.map(toast => (
                 <Toast key={toast.id} {...toast} onClose={() => removeToast(toast.id)} />
             ))}

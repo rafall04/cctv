@@ -11,13 +11,14 @@
  * Navigation model (labels, grouping, icons) lives in ./adminNavigation.jsx.
  */
 
-import { useState, useEffect, useCallback, useMemo, useId } from 'react';
+import { useState, useEffect, useCallback, useMemo, useId, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { authService } from '../services/authService';
 import { useTheme } from '../contexts/ThemeContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { NetworkStatusBanner } from '../components/ui/NetworkStatusBanner';
 import { useBranding } from '../contexts/BrandingContext';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 import { AdminIcons, DOCK_ACTIONS, filterNavGroups } from './adminNavigation';
 
 function AdminMobileDock({ activePath, isAdmin }) {
@@ -95,7 +96,13 @@ export default function AdminLayout({ children }) {
     const navGroups = useMemo(() => filterNavGroups(isAdmin, navQuery), [isAdmin, navQuery]);
     const isActive = (path) => location.pathname === path;
 
-    const closeMobileMenu = () => setIsMobileMenuOpen(false);
+    const closeMobileMenu = useCallback(() => setIsMobileMenuOpen(false), []);
+
+    // The drawer is an overlay on mobile: trap Tab inside it and close on Escape so keyboard
+    // focus cannot fall through to the page behind the scrim. On lg the sidebar is permanent
+    // (isMobileMenuOpen stays false), so the trap never engages there.
+    const drawerRef = useRef(null);
+    useFocusTrap(drawerRef, { active: isMobileMenuOpen, onEscape: closeMobileMenu });
 
     return (
         <div className="min-h-screen bg-surface-sunken transition-colors">
@@ -134,6 +141,7 @@ export default function AdminLayout({ children }) {
             </header>
 
             <aside
+                ref={drawerRef}
                 className={`fixed inset-y-0 left-0 z-shell flex w-72 flex-col border-r border-edge bg-surface transition-transform duration-300 lg:translate-x-0 ${
                     isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
                 }`}
@@ -254,6 +262,7 @@ export default function AdminLayout({ children }) {
                 <div
                     className="fixed inset-0 z-scrim bg-black/60 lg:hidden"
                     onClick={closeMobileMenu}
+                    aria-hidden="true"
                 />
             )}
 

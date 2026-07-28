@@ -35,6 +35,54 @@ function getFallbackApiUrl() {
     return '';
 }
 
+const warmedOrigins = new Set();
+
+/**
+ * Warm the connection to the API origin as soon as it is known.
+ *
+ * Camera thumbnails — the landing page's LCP image — are served from the API host, which in
+ * production is a different subdomain than the SPA. Without this, the DNS + TCP + TLS handshake
+ * is paid inside the first thumbnail request. The API host is only known after /api/config/public
+ * resolves, so a static <link> in index.html cannot express it; emitting here still lands well
+ * before the grid mounts. Two preconnects are deliberate: <img> loads are no-CORS and use a
+ * different connection-pool entry than the crossorigin fetches apiClient makes.
+ *
+ * No-op for same-origin deployments (apiUrl empty) and for an origin already warmed.
+ */
+function preconnectApiOrigin(apiUrl) {
+    if (!apiUrl || typeof document === 'undefined' || typeof window === 'undefined') {
+        return;
+    }
+
+    let origin;
+    try {
+        origin = new URL(apiUrl, window.location.href).origin;
+    } catch {
+        return;
+    }
+
+    if (origin === window.location.origin || warmedOrigins.has(origin)) {
+        return;
+    }
+    warmedOrigins.add(origin);
+
+    const hints = [
+        { rel: 'preconnect', crossOrigin: null },
+        { rel: 'preconnect', crossOrigin: 'anonymous' },
+        { rel: 'dns-prefetch', crossOrigin: null },
+    ];
+
+    for (const hint of hints) {
+        const link = document.createElement('link');
+        link.rel = hint.rel;
+        link.href = origin;
+        if (hint.crossOrigin) {
+            link.crossOrigin = hint.crossOrigin;
+        }
+        document.head.appendChild(link);
+    }
+}
+
 /**
  * Load runtime configuration from backend
  * 
@@ -82,6 +130,8 @@ export const loadRuntimeConfig = async () => {
                 source: 'backend',
             };
 
+            preconnectApiOrigin(runtimeConfig.apiUrl);
+
             return runtimeConfig;
         } catch (error) {
             console.warn('⚠️ Failed to load runtime config from backend:', error.message);
@@ -99,6 +149,8 @@ export const loadRuntimeConfig = async () => {
                 buildId: import.meta.env.VITE_BUILD_ID || 'env-fallback',
                 source: 'env',
             };
+
+            preconnectApiOrigin(runtimeConfig.apiUrl);
 
             return runtimeConfig;
         } finally {
@@ -205,6 +257,7 @@ export const isConfigLoaded = () => {
 export const resetConfig = () => {
     runtimeConfig = null;
     loadPromise = null;
+    warmedOrigins.clear();
 };
 
 /**

@@ -20,6 +20,23 @@ const FILTERS = [
     { key: 'expired', label: 'Kedaluwarsa' },
 ];
 
+
+// Module level: defined inside the tab this was a new component type per render, remounting
+// every row's confirm button on each `busy`/filter change.
+function ConfirmBtn({ payment, full, busy, onConfirm }) {
+    if (payment.status !== 'pending') return null;
+    return (
+        <button
+            type="button"
+            onClick={() => onConfirm(payment)}
+            disabled={busy}
+            className={`whitespace-nowrap rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-emerald-700 disabled:opacity-50 ${full ? 'w-full' : ''}`}
+        >
+            Konfirmasi Bayar
+        </button>
+    );
+}
+
 export default function PaymentsTab({ payments, run, busy }) {
     const [filter, setFilter] = useState('all');
     const confirm = useConfirm();
@@ -40,16 +57,6 @@ export default function PaymentsTab({ payments, run, busy }) {
             run(() => billingAdminService.markPaymentPaid(payment.id), 'Pembayaran dikonfirmasi');
         }
     };
-
-    const ConfirmBtn = ({ payment, full }) => payment.status !== 'pending' ? null : (
-        <button
-            onClick={() => confirmPaid(payment)}
-            disabled={busy}
-            className={`whitespace-nowrap rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-emerald-700 disabled:opacity-50 ${full ? 'w-full' : ''}`}
-        >
-            Konfirmasi Bayar
-        </button>
-    );
 
     const FilterBar = (
         <div className="mb-3 flex flex-wrap gap-1.5">
@@ -119,7 +126,7 @@ export default function PaymentsTab({ payments, run, busy }) {
                             <td className="px-3 py-2 text-right font-semibold">{formatRupiah(payment.amount)}</td>
                             <td className="px-3 py-2 text-center"><StatusBadge className={PAY_STATUS_BADGES[payment.status] || ''}>{payment.status}</StatusBadge></td>
                             <td className="px-3 py-2 whitespace-nowrap text-content-muted">{formatDateTime(payment.created_at)}</td>
-                            <td className="px-3 py-2 text-right"><ConfirmBtn payment={payment} /></td>
+                            <td className="px-3 py-2 text-right"><ConfirmBtn payment={payment} busy={busy} onConfirm={confirmPaid} /></td>
                         </tr>
                     ))}
                 </tbody>
@@ -143,7 +150,7 @@ export default function PaymentsTab({ payments, run, busy }) {
                         )}
                         <div className="mt-3 flex items-center justify-between gap-2">
                             <p className="font-bold text-content">{formatRupiah(payment.amount)}</p>
-                            <ConfirmBtn payment={payment} full={false} />
+                            <ConfirmBtn payment={payment} full={false} busy={busy} onConfirm={confirmPaid} />
                         </div>
                     </div>
                 ))}

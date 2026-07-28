@@ -74,10 +74,12 @@ export default function CameraManagement() {
                             value={filters.search}
                             onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
                             placeholder="Cari nama, area, mode health..."
+                            aria-label="Cari kamera"
                             className="xl:col-span-2 rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-sm text-content transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                         />
                         <select
                             value={filters.areaId}
+                            aria-label="Filter area"
                             onChange={(event) => setFilters((current) => ({ ...current, areaId: event.target.value }))}
                             className="rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-sm text-content transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                         >
@@ -88,6 +90,7 @@ export default function CameraManagement() {
                         </select>
                         <select
                             value={filters.cameraClass}
+                            aria-label="Filter kelas kamera"
                             onChange={(event) => setFilters((current) => ({ ...current, cameraClass: event.target.value }))}
                             className="rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-sm text-content transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                         >
@@ -98,6 +101,7 @@ export default function CameraManagement() {
                         </select>
                         <select
                             value={filters.deliveryType}
+                            aria-label="Filter tipe delivery"
                             onChange={(event) => setFilters((current) => ({ ...current, deliveryType: event.target.value }))}
                             className="rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-sm text-content transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                         >
@@ -112,6 +116,7 @@ export default function CameraManagement() {
                         </select>
                         <select
                             value={filters.healthMode}
+                            aria-label="Filter health mode"
                             onChange={(event) => setFilters((current) => ({ ...current, healthMode: event.target.value }))}
                             className="rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-sm text-content transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                         >
@@ -124,6 +129,7 @@ export default function CameraManagement() {
                         </select>
                         <select
                             value={filters.availabilityState}
+                            aria-label="Filter availability"
                             onChange={(event) => setFilters((current) => ({ ...current, availabilityState: event.target.value }))}
                             className="rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-sm text-content transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                         >
@@ -135,6 +141,7 @@ export default function CameraManagement() {
                         </select>
                         <select
                             value={filters.monitoringState}
+                            aria-label="Filter monitoring"
                             onChange={(event) => setFilters((current) => ({ ...current, monitoringState: event.target.value }))}
                             className="rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-sm text-content transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                         >

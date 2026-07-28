@@ -149,7 +149,7 @@
   
   const ogImage = document.querySelector('meta[property="og:image"]');
   if (ogImage) {
-    ogImage.content = `${baseUrl}/og-image.jpg`;
+    ogImage.content = `${baseUrl}/og-image.png`;
   }
   
   const twitterUrl = document.querySelector('meta[property="twitter:url"]');
@@ -159,7 +159,7 @@
   
   const twitterImage = document.querySelector('meta[property="twitter:image"]');
   if (twitterImage) {
-    twitterImage.content = `${baseUrl}/og-image.jpg`;
+    twitterImage.content = `${baseUrl}/og-image.png`;
   }
   
   // Update JSON-LD URLs
@@ -170,8 +170,8 @@
       
       if (data.url) data.url = baseUrl;
       if (data.logo) data.logo = `${baseUrl}/logo.png`;
-      if (data.image) data.image = `${baseUrl}/og-image.jpg`;
-      if (data.thumbnailUrl) data.thumbnailUrl = `${baseUrl}/og-image.jpg`;
+      if (data.image) data.image = `${baseUrl}/og-image.png`;
+      if (data.thumbnailUrl) data.thumbnailUrl = `${baseUrl}/og-image.png`;
       if (data.contentUrl) data.contentUrl = baseUrl;
       if (data.embedUrl) data.embedUrl = baseUrl;
       if (data.potentialAction && data.potentialAction.target) {

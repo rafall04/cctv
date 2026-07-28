@@ -10,6 +10,23 @@ import billingAdminService from '../../../services/billingAdminService';
 import { formatRupiah, StatusBadge, SUB_STATUS_BADGES, cardClass, inputClass, DesktopTable } from './billingFormat';
 import { useConfirm } from '../../../contexts/ConfirmContext';
 
+
+// Module level: defined inside the tab this was a new component type per render, remounting
+// every row's action pair on each `busy` toggle.
+function Actions({ sub, full, busy, onToggleStatus, onCancel }) {
+    if (sub.status === 'cancelled') return <span className="text-xs text-content-subtle">—</span>;
+    return (
+        <div className={`flex gap-1 ${full ? 'w-full' : 'justify-end'}`}>
+            <button type="button" onClick={() => onToggleStatus(sub)} disabled={busy} className={`whitespace-nowrap rounded-lg border border-edge px-3 py-1.5 text-xs text-content-muted transition-colors hover:bg-surface-sunken disabled:opacity-50 ${full ? 'flex-1' : ''}`}>
+                {sub.status === 'active' ? 'Tangguhkan' : 'Aktifkan'}
+            </button>
+            <button type="button" onClick={() => onCancel(sub)} disabled={busy} className={`whitespace-nowrap rounded-lg border border-red-200 px-3 py-1.5 text-xs text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-500/30 dark:text-red-400 dark:hover:bg-red-900/30 ${full ? 'flex-1' : ''}`}>
+                Hentikan
+            </button>
+        </div>
+    );
+}
+
 export default function SubscriptionsTab({ subscriptions, assignableCameras, customers, run, busy }) {
     const [assignForm, setAssignForm] = useState({ camera_id: '', user_id: '', monthly_price: 20000 });
     const confirm = useConfirm();
@@ -49,20 +66,6 @@ export default function SubscriptionsTab({ subscriptions, assignableCameras, cus
             'Kamera di-assign'
         );
         if (ok) setAssignForm({ camera_id: '', user_id: '', monthly_price: 20000 });
-    };
-
-    const Actions = ({ sub, full }) => {
-        if (sub.status === 'cancelled') return <span className="text-xs text-content-subtle">—</span>;
-        return (
-            <div className={`flex gap-1 ${full ? 'w-full' : 'justify-end'}`}>
-                <button onClick={() => toggleStatus(sub)} disabled={busy} className={`whitespace-nowrap rounded-lg border border-edge px-3 py-1.5 text-xs text-content-muted transition-colors hover:bg-surface-sunken disabled:opacity-50 ${full ? 'flex-1' : ''}`}>
-                    {sub.status === 'active' ? 'Tangguhkan' : 'Aktifkan'}
-                </button>
-                <button onClick={() => cancelSub(sub)} disabled={busy} className={`whitespace-nowrap rounded-lg border border-red-200 px-3 py-1.5 text-xs text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-500/30 dark:text-red-400 dark:hover:bg-red-900/30 ${full ? 'flex-1' : ''}`}>
-                    Hentikan
-                </button>
-            </div>
-        );
     };
 
     const assignFormEl = (
@@ -141,7 +144,7 @@ export default function SubscriptionsTab({ subscriptions, assignableCameras, cus
                                         </td>
                                         <td className="px-3 py-2 text-right">{formatRupiah(sub.monthly_price)}</td>
                                         <td className="px-3 py-2 text-center"><StatusBadge className={SUB_STATUS_BADGES[sub.status] || ''}>{sub.status}</StatusBadge></td>
-                                        <td className="px-3 py-2"><Actions sub={sub} /></td>
+                                        <td className="px-3 py-2"><Actions sub={sub} busy={busy} onToggleStatus={toggleStatus} onCancel={cancelSub} /></td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -164,7 +167,7 @@ export default function SubscriptionsTab({ subscriptions, assignableCameras, cus
                                         <StatusBadge className={SUB_STATUS_BADGES[sub.status] || ''}>{sub.status}</StatusBadge>
                                     </div>
                                     <p className="mt-2 text-sm text-content-muted">{formatRupiah(sub.monthly_price)}/bulan</p>
-                                    {sub.status !== 'cancelled' && <div className="mt-3"><Actions sub={sub} full /></div>}
+                                    {sub.status !== 'cancelled' && <div className="mt-3"><Actions sub={sub} full busy={busy} onToggleStatus={toggleStatus} onCancel={cancelSub} /></div>}
                                 </div>
                             ))}
                         </div>

@@ -366,13 +366,15 @@ export default function LandingPageSimple({
             </main>
 
             {showFooterBanner && (
-                <InlineAdSlot
-                    slotKey="footer-banner-simple"
-                    label="Sponsored"
-                    script={adsConfig.slots.footerBanner.script}
-                    className="mt-2"
-                    minHeightClassName="min-h-[120px]"
-                />
+                <DeferUntilVisible minHeight={120}>
+                    <InlineAdSlot
+                        slotKey="footer-banner-simple"
+                        label="Sponsored"
+                        script={adsConfig.slots.footerBanner.script}
+                        className="mt-2"
+                        minHeightClassName="min-h-[120px]"
+                    />
+                </DeferUntilVisible>
             )}
 
             <SimpleFooter

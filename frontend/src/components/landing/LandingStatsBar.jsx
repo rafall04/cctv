@@ -14,6 +14,26 @@ import { groupCamerasByCity } from '../../utils/publicCityMapping';
 import { Icons } from '../ui/Icons';
 import { shouldDisableAnimations } from '../../utils/animationControl';
 
+// One board cell. Clickable cells open the drill-down modal; the numeral is the
+// emphasis (mono + tabular so it never twitches as counts refresh), colour on the
+// value encodes state (green up / red offline) — not decoration.
+//
+// Module level on purpose: defined inside StatsBar this was a NEW component type on
+// every render, so each background camera refresh remounted all four cells.
+function Metric({ value, label, ariaLabel, valueClass = 'text-content', onClick, disableAnimations = false }) {
+    const interactive = typeof onClick === 'function';
+    const Tag = interactive ? 'button' : 'div';
+    return (
+        <Tag
+            {...(interactive ? { type: 'button', onClick, 'aria-label': ariaLabel } : {})}
+            className={`flex flex-col gap-1 bg-surface px-3.5 py-3 text-left ${interactive ? `hover:bg-surface-raised ${disableAnimations ? '' : 'transition-colors'}` : ''}`}
+        >
+            <span className={`font-mono text-2xl font-bold leading-none tabular-nums ${valueClass}`}>{value}</span>
+            <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-content-subtle">{label}</span>
+        </Tag>
+    );
+}
+
 function ListModal({ title, items, type, onClose, onCameraClick }) {
     // One dot instead of a per-type gradient header. Same reasoning as the stats
     // row: colour should encode state, not decorate a panel.
@@ -89,7 +109,7 @@ function ListModal({ title, items, type, onClose, onCameraClick }) {
                     ) : type === 'areas' ? (
                         <div className="divide-y divide-edge">
                             {items.map(area => (
-                                <div key={area.id} className="px-4 py-3 hover:bg-surface-raised">
+                                <div key={area.id} className="px-4 py-3 hover:bg-surface-raised [content-visibility:auto] [contain-intrinsic-size:auto_64px]">
                                     <p className="font-medium text-content text-sm sm:text-base">{area.name}</p>
                                     <p className="text-xs sm:text-sm text-content-muted">
                                         {[area.kelurahan, area.kecamatan].filter(Boolean).join(', ') || 'Lokasi tidak tersedia'}
@@ -104,7 +124,7 @@ function ListModal({ title, items, type, onClose, onCameraClick }) {
                                     <button
                                         key={camera.id}
                                         onClick={() => onCameraClick?.(camera)}
-                                        className={`w-full px-4 py-3 text-left flex items-center gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary ${disableAnimations
+                                        className={`w-full px-4 py-3 text-left flex items-center gap-3 [content-visibility:auto] [contain-intrinsic-size:auto_64px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary ${disableAnimations
                                             ? 'hover:bg-surface-raised'
                                             : 'hover:bg-surface-raised transition-colors'
                                             }`}
@@ -212,24 +232,8 @@ export default function StatsBar({ onCameraClick }) {
      * including a purple one for "Area" that carried no meaning — turned a row of
      * plain facts into the loudest element on the page. Now the numeral itself is
      * the emphasis, with a small dot doing the colour-coding, and `tabular-nums`
-     * keeps the row from twitching as counts refresh.
+     * keeps the row from twitching as counts refresh. (Metric lives at module level.)
      */
-    // One board cell. Clickable cells open the drill-down modal; the numeral is the
-    // emphasis (mono + tabular so it never twitches as counts refresh), colour on the
-    // value encodes state (green up / red offline) — not decoration.
-    const Metric = ({ value, label, ariaLabel, valueClass = 'text-content', onClick }) => {
-        const interactive = typeof onClick === 'function';
-        const Tag = interactive ? 'button' : 'div';
-        return (
-            <Tag
-                {...(interactive ? { type: 'button', onClick, 'aria-label': ariaLabel } : {})}
-                className={`flex flex-col gap-1 bg-surface px-3.5 py-3 text-left ${interactive ? `hover:bg-surface-raised ${disableAnimations ? '' : 'transition-colors'}` : ''}`}
-            >
-                <span className={`font-mono text-2xl font-bold leading-none tabular-nums ${valueClass}`}>{value}</span>
-                <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-content-subtle">{label}</span>
-            </Tag>
-        );
-    };
 
     return (
         <div className="relative flex h-full flex-col rounded-card border border-edge bg-surface p-4">
@@ -244,6 +248,7 @@ export default function StatsBar({ onCameraClick }) {
                     ariaLabel={`${stats.online} kamera online`}
                     valueClass="text-status-live"
                     onClick={() => setActiveModal('online')}
+                    disableAnimations={disableAnimations}
                 />
                 <Metric
                     value={stats.offline}
@@ -251,6 +256,7 @@ export default function StatsBar({ onCameraClick }) {
                     ariaLabel={`${stats.offline} kamera offline`}
                     valueClass={stats.offline > 0 ? 'text-status-fault' : 'text-content'}
                     onClick={() => setActiveModal('offline')}
+                    disableAnimations={disableAnimations}
                 />
                 <Metric value={stats.total} label="Total unit" />
                 <Metric value={cities.length} label="Kota terpantau" />

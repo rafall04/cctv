@@ -30,6 +30,17 @@ const KIND_LABEL = {
     invalid: 'Tidak valid',
 };
 
+
+// Module level: defined inside the page this was a new component type per render,
+// remounting every row badge on each state change.
+function Badge({ kind }) {
+    return (
+        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${KIND_BADGE[kind] || KIND_BADGE.invalid}`}>
+            {KIND_LABEL[kind] || kind}
+        </span>
+    );
+}
+
 export default function CustomerCameraIPs() {
     const { success, error: showError } = useNotification();
     const [data, setData] = useState(null);
@@ -66,12 +77,6 @@ export default function CustomerCameraIPs() {
             showError('Gagal menyalin', 'Salin manual dari kotak di bawah.');
         }
     };
-
-    const Badge = ({ kind }) => (
-        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${KIND_BADGE[kind] || KIND_BADGE.invalid}`}>
-            {KIND_LABEL[kind] || kind}
-        </span>
-    );
 
     return (
         <div className="space-y-5">

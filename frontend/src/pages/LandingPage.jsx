@@ -28,6 +28,7 @@ import LandingQuickAccessStrip from '../components/landing/LandingQuickAccessStr
 import LandingMobileDock from '../components/landing/LandingMobileDock';
 import MultiViewButton from '../components/MultiView/MultiViewButton';
 import InlineAdSlot from '../components/ads/InlineAdSlot';
+import DeferUntilVisible from '../components/landing/DeferUntilVisible';
 import GlobalAdScript from '../components/ads/GlobalAdScript';
 import { isAdsMobileViewport, shouldRenderAdSlot } from '../components/ads/adsConfig';
 import lazyWithRetry from '../utils/lazyWithRetry';
@@ -254,84 +255,95 @@ function LandingPageContent({ onRefreshPauseChange }) {
             {showSocialBar && <GlobalAdScript slotKey="social-bar" script={adsConfig.slots.socialBar.script} />}
             <div className="min-h-screen bg-surface-sunken pb-24 flex flex-col sm:pb-0">
                 <LandingNavbar branding={branding} layoutMode={layoutMode} onLayoutToggle={toggleLayoutMode} />
-                <LandingPublicTopStack
-                    layoutMode="full"
-                    loading={publicConfigReady}
-                    eventBanner={landingSettings.eventBanner}
-                    announcement={landingSettings.announcement}
-                />
-
-                <LandingHero
-                    branding={branding}
-                    landingSettings={landingSettings}
-                    disableHeavyEffects={disableHeavyEffects}
-                    onCameraClick={handleGridPopupOpen}
-                />
-
-                {/*
-                  * One ranked discovery surface, not two. LandingSmartFeed used to render
-                  * directly below this strip showing the same cameras again under different
-                  * headings ("Paling Ditonton" here vs "Paling Banyak Ditonton" there), so
-                  * the page repeated its top six cameras across four sections. This strip
-                  * wins because its ranking is backend-aggregated and it also covers areas,
-                  * which the camera-only feed could not.
-                  */}
-                <LandingDiscoveryStrip
-                    discovery={publicDiscovery}
-                    loading={discoveryLoading}
-                    onCameraClick={handleGridPopupOpen}
-                />
-
-                <LandingQuickAccessStrip
-                    recentCameras={recentCameraItems}
-                    favoriteCameras={favoriteCameras}
-                    onCameraClick={handleGridPopupOpen}
-                    forceVisible
-                />
-
-                <LandingCamerasSection
-                    onCameraClick={handleGridPopupOpen}
-                    onAddMulti={handleAddMulti}
-                    multiCameras={multiCameras}
-                    viewMode={viewMode}
-                    setViewMode={setViewMode}
-                    landingSettings={landingSettings}
-                    selectedCamera={popup}
-                    adsConfig={adsConfig}
-                    onMapCameraOpen={handleMapPopupOpen}
-                    favorites={favorites}
-                    onToggleFavorite={toggleFavorite}
-                    isFavorite={isFavorite}
-                    disableHeavyEffects={disableHeavyEffects}
-                />
-
-                {showAfterCamerasNative && (
-                    <InlineAdSlot
-                        slotKey="after-cameras-native"
-                        label="Sponsored"
-                        script={adsConfig.slots.afterCamerasNative.script}
-                        className="mt-2"
-                        minHeightClassName="min-h-[120px]"
+                {/* Landmark for skip-to-content / screen-reader navigation. flex-1 keeps the
+                    footer pinned to the bottom exactly as the previous flat layout did. */}
+                <main id="main-content" className="flex flex-1 flex-col">
+                    <LandingPublicTopStack
+                        layoutMode="full"
+                        loading={publicConfigReady}
+                        eventBanner={landingSettings.eventBanner}
+                        announcement={landingSettings.announcement}
                     />
-                )}
 
-                {saweriaEnabled && saweriaLeaderboardLink && (
-                    <Suspense fallback={<DeferredSurfaceFallback className="mx-auto mt-6 min-h-[140px] max-w-7xl" />}>
-                        <SaweriaLeaderboard leaderboardLink={saweriaLeaderboardLink} />
-                    </Suspense>
-                )}
-
-                <div className="flex-1" />
-
-                {showFooterBanner && (
-                    <InlineAdSlot
-                        slotKey="footer-banner"
-                        label="Sponsored"
-                        script={adsConfig.slots.footerBanner.script}
-                        className="mt-6"
-                        minHeightClassName="min-h-[120px]"
+                    <LandingHero
+                        branding={branding}
+                        landingSettings={landingSettings}
+                        disableHeavyEffects={disableHeavyEffects}
+                        onCameraClick={handleGridPopupOpen}
                     />
-                )}
+
+                    {/*
+                      * One ranked discovery surface, not two. LandingSmartFeed used to render
+                      * directly below this strip showing the same cameras again under different
+                      * headings ("Paling Ditonton" here vs "Paling Banyak Ditonton" there), so
+                      * the page repeated its top six cameras across four sections. This strip
+                      * wins because its ranking is backend-aggregated and it also covers areas,
+                      * which the camera-only feed could not.
+                      */}
+                    <LandingDiscoveryStrip
+                        discovery={publicDiscovery}
+                        loading={discoveryLoading}
+                        onCameraClick={handleGridPopupOpen}
+                    />
+
+                    <LandingQuickAccessStrip
+                        recentCameras={recentCameraItems}
+                        favoriteCameras={favoriteCameras}
+                        onCameraClick={handleGridPopupOpen}
+                        forceVisible
+                    />
+
+                    <LandingCamerasSection
+                        onCameraClick={handleGridPopupOpen}
+                        onAddMulti={handleAddMulti}
+                        multiCameras={multiCameras}
+                        viewMode={viewMode}
+                        setViewMode={setViewMode}
+                        landingSettings={landingSettings}
+                        selectedCamera={popup}
+                        adsConfig={adsConfig}
+                        onMapCameraOpen={handleMapPopupOpen}
+                        favorites={favorites}
+                        onToggleFavorite={toggleFavorite}
+                        isFavorite={isFavorite}
+                        disableHeavyEffects={disableHeavyEffects}
+                    />
+
+                    {/* Below the fold: hold the third-party ad script until the slot is within
+                        300px of the viewport, so it never competes with the camera grid for
+                        bandwidth or main thread during the initial load. */}
+                    {showAfterCamerasNative && (
+                        <DeferUntilVisible minHeight={120}>
+                            <InlineAdSlot
+                                slotKey="after-cameras-native"
+                                label="Sponsored"
+                                script={adsConfig.slots.afterCamerasNative.script}
+                                className="mt-2"
+                                minHeightClassName="min-h-[120px]"
+                            />
+                        </DeferUntilVisible>
+                    )}
+
+                    {saweriaEnabled && saweriaLeaderboardLink && (
+                        <Suspense fallback={<DeferredSurfaceFallback className="mx-auto mt-6 min-h-[140px] max-w-7xl" />}>
+                            <SaweriaLeaderboard leaderboardLink={saweriaLeaderboardLink} />
+                        </Suspense>
+                    )}
+
+                    <div className="flex-1" />
+
+                    {showFooterBanner && (
+                        <DeferUntilVisible minHeight={120}>
+                            <InlineAdSlot
+                                slotKey="footer-banner"
+                                label="Sponsored"
+                                script={adsConfig.slots.footerBanner.script}
+                                className="mt-6"
+                                minHeightClassName="min-h-[120px]"
+                            />
+                        </DeferUntilVisible>
+                    )}
+                </main>
 
                 <LandingFooter
                     saweriaEnabled={saweriaEnabled}

@@ -341,7 +341,9 @@ export default function LoginPage() {
             
             {/* Theme Toggle */}
             <button
+                type="button"
                 onClick={toggleTheme}
+                aria-label={isDark ? 'Aktifkan light mode' : 'Aktifkan dark mode'}
                 className="fixed top-4 right-4 p-3 rounded-xl bg-white/80 backdrop-blur-sm shadow-lg border border-gray-200/50 text-content-muted hover:bg-surface transition-all z-50"
             >
                 {isDark ? <Icons.Sun /> : <Icons.Moon />}
@@ -491,6 +493,8 @@ export default function LoginPage() {
                                 <button
                                     type="button"
                                     onClick={() => setShowPassword(!showPassword)}
+                                    aria-label={showPassword ? 'Sembunyikan password' : 'Tampilkan password'}
+                                    aria-pressed={showPassword}
                                     className="absolute inset-y-0 right-0 pr-4 flex items-center text-content-subtle hover:text-content-muted transition-colors disabled:opacity-50"
                                     disabled={isSubmitDisabled}
                                 >

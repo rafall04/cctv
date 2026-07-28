@@ -540,7 +540,7 @@ export default function AreaManagement() {
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="flex flex-col gap-1.5 p-3 bg-surface-sunken rounded-xl border border-edge">
                                         <label className="text-sm font-semibold text-content">Mode Operasi</label>
-                                        <select
+                                        <select aria-label="Mode Operasi"
                                             value={bulkConfig.operation}
                                             onChange={(e) => setBulkConfig((current) => ({ ...current, operation: e.target.value }))}
                                             className="w-full bg-surface border border-edge-strong text-content text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5"
@@ -552,7 +552,7 @@ export default function AreaManagement() {
                                     </div>
                                     <div className="flex flex-col gap-1.5 p-3 bg-surface-sunken rounded-xl border border-edge">
                                         <label className="text-sm font-semibold text-content">Target Kamera</label>
-                                        <select
+                                        <select aria-label="Target Kamera"
                                             value={effectiveBulkTargetFilter}
                                             onChange={(e) => setBulkConfig((current) => ({ ...current, targetFilter: e.target.value }))}
                                             className="w-full bg-surface border border-edge-strong text-content text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5"
@@ -605,7 +605,7 @@ export default function AreaManagement() {
                                     </div>
                                     <div className="flex flex-col gap-1.5 p-3 bg-surface-sunken rounded-xl border border-edge">
                                         <label className="text-sm font-semibold text-content">Delivery Type</label>
-                                        <select
+                                        <select aria-label="Delivery Type"
                                             value={bulkConfig.delivery_type}
                                             onChange={(e) => setBulkConfig({ ...bulkConfig, delivery_type: e.target.value })}
                                             className="w-full bg-surface border border-edge-strong text-content text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5"
@@ -621,7 +621,7 @@ export default function AreaManagement() {
                                     </div>
                                     <div className="flex flex-col gap-1.5 p-3 bg-surface-sunken rounded-xl border border-edge">
                                         <label className="text-sm font-semibold text-content">Origin Mode</label>
-                                        <select
+                                        <select aria-label="Origin Mode"
                                             value={bulkConfig.external_origin_mode}
                                             onChange={(e) => setBulkConfig((current) => ({ ...current, external_origin_mode: e.target.value }))}
                                             className="w-full bg-surface border border-edge-strong text-content text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5"
@@ -633,7 +633,7 @@ export default function AreaManagement() {
                                     </div>
                                     <div className="flex flex-col gap-1.5 p-3 bg-surface-sunken rounded-xl border border-edge">
                                         <label className="text-sm font-semibold text-content">Gunakan Proxy Server</label>
-                                        <select
+                                        <select aria-label="Gunakan Proxy Server"
                                             value={bulkConfig.external_use_proxy}
                                             onChange={(e) => setBulkConfig((current) => ({ ...current, external_use_proxy: e.target.value }))}
                                             className="w-full bg-surface border border-edge-strong text-content text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5"
@@ -645,7 +645,7 @@ export default function AreaManagement() {
                                     </div>
                                     <div className="flex flex-col gap-1.5 p-3 bg-surface-sunken rounded-xl border border-edge">
                                         <label className="text-sm font-semibold text-content">Mode TLS</label>
-                                        <select
+                                        <select aria-label="Mode TLS"
                                             value={bulkConfig.external_tls_mode}
                                             onChange={(e) => setBulkConfig((current) => ({ ...current, external_tls_mode: e.target.value }))}
                                             className="w-full bg-surface border border-edge-strong text-content text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5"
@@ -657,7 +657,7 @@ export default function AreaManagement() {
                                     </div>
                                     <div className="flex flex-col gap-1.5 p-3 bg-surface-sunken rounded-xl border border-edge">
                                         <label className="text-sm font-semibold text-content">Recording</label>
-                                        <select
+                                        <select aria-label="Recording"
                                             value={bulkConfig.enable_recording}
                                             onChange={(e) => setBulkConfig({ ...bulkConfig, enable_recording: e.target.value })}
                                             className="w-full bg-surface border border-edge-strong text-content text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5"
@@ -672,7 +672,7 @@ export default function AreaManagement() {
                                     </div>
                                     <div className="flex flex-col gap-1.5 p-3 bg-surface-sunken rounded-xl border border-edge">
                                         <label className="text-sm font-semibold text-content">Status Publik</label>
-                                        <select
+                                        <select aria-label="Status Publik"
                                             value={bulkConfig.enabled}
                                             onChange={(e) => setBulkConfig({ ...bulkConfig, enabled: e.target.value })}
                                             className="w-full bg-surface border border-edge-strong text-content text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5"
@@ -687,7 +687,7 @@ export default function AreaManagement() {
                                     </div>
                                     <div className="flex flex-col gap-1.5 p-3 bg-surface-sunken rounded-xl border border-edge">
                                         <label className="text-sm font-semibold text-content">Video Codec</label>
-                                        <select
+                                        <select aria-label="Video Codec"
                                             value={bulkConfig.video_codec}
                                             onChange={(e) => setBulkConfig({ ...bulkConfig, video_codec: e.target.value })}
                                             className="w-full bg-surface border border-edge-strong text-content text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5"

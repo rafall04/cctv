@@ -26,11 +26,17 @@ export default function CameraStatusActions({
                 <div className="flex items-center gap-2">
                     <span className="text-xs text-content-muted">{camera.enabled ? 'On' : 'Off'}</span>
                     <button
+                        type="button"
+                        role="switch"
+                        aria-checked={Boolean(camera.enabled)}
+                        aria-label={`Kamera aktif — ${camera.name || `ID ${camera.id}`}`}
                         onClick={() => onToggleEnabled(camera)}
                         disabled={togglingId === camera.id}
-                        className={`relative w-10 h-5 rounded-full transition-colors disabled:opacity-50 ${camera.enabled ? 'bg-primary' : 'bg-gray-300'}`}
+                        className="inline-flex h-6 w-11 items-center justify-center rounded-control transition-colors disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                     >
-                        <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${camera.enabled ? 'left-5' : 'left-0.5'}`}></div>
+                        <span className={`relative block w-10 h-5 rounded-full transition-colors ${camera.enabled ? 'bg-primary' : 'bg-gray-300'}`}>
+                            <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${camera.enabled ? 'left-5' : 'left-0.5'}`}></span>
+                        </span>
                     </button>
                 </div>
             </div>
@@ -59,12 +65,18 @@ export default function CameraStatusActions({
                     </span>
                 </div>
                 <button
+                    type="button"
+                    role="switch"
+                    aria-checked={camera.status === 'maintenance'}
+                    aria-label={`Mode perbaikan — ${camera.name || `ID ${camera.id}`}`}
                     onClick={() => onToggleMaintenance(camera)}
                     disabled={togglingMaintenanceId === camera.id}
-                    className={`relative w-10 h-5 rounded-full transition-colors disabled:opacity-50 ${camera.status === 'maintenance' ? 'bg-red-500' : 'bg-gray-300 dark:bg-gray-600'}`}
+                    className="inline-flex h-6 w-11 items-center justify-center rounded-control transition-colors disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                     title={camera.status === 'maintenance' ? 'Matikan mode perbaikan' : 'Aktifkan mode perbaikan'}
                 >
-                    <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${camera.status === 'maintenance' ? 'left-5' : 'left-0.5'}`}></div>
+                    <span className={`relative block w-10 h-5 rounded-full transition-colors ${camera.status === 'maintenance' ? 'bg-red-500' : 'bg-gray-300 dark:bg-gray-600'}`}>
+                        <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${camera.status === 'maintenance' ? 'left-5' : 'left-0.5'}`}></span>
+                    </span>
                 </button>
             </div>
         </>

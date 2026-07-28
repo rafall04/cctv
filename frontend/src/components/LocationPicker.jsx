@@ -5,7 +5,7 @@
  * Features: Search, GPS detection, drag marker
  */
 
-import { useEffect, useRef, useState, useCallback, memo } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback, memo } from 'react';
 import { settingsService } from '../services/settingsService';
 import 'leaflet/dist/leaflet.css';
 import '../styles/leaflet-overrides.css';
@@ -153,6 +153,42 @@ const LazyMap = ({ position, mapCenter, defaultZoom, mapType, onLocationSelect }
         });
     }, [leafletModules]);
 
+    /*
+     * react-leaflet's hook-children must keep a STABLE component identity. Defined inline in the
+     * render body they were a NEW component type on every render, so each keystroke in the lat/lng
+     * inputs (local state) tore down and re-registered the map click handler and re-ran
+     * MapController's setView — which could re-centre the map while the user was still typing.
+     * Memoised on the dynamically-imported module, so they are built exactly once per load.
+     * Declared ABOVE the early return below: hooks may not sit behind a conditional return.
+     */
+    const { MapClickHandler, MapController } = useMemo(() => {
+        if (!leafletModules) {
+            return { MapClickHandler: null, MapController: null };
+        }
+        const { useMapEvents, useMap } = leafletModules.RL;
+
+        function MapClickHandler({ onSelect }) {
+            useMapEvents({
+                click: (e) => {
+                    onSelect(e.latlng.lat, e.latlng.lng);
+                },
+            });
+            return null;
+        }
+
+        function MapController({ center }) {
+            const map = useMap();
+            useEffect(() => {
+                if (center && map) {
+                    map.setView(center, map.getZoom());
+                }
+            }, [center, map]);
+            return null;
+        }
+
+        return { MapClickHandler, MapController };
+    }, [leafletModules]);
+
     if (!leafletModules) {
         return (
             <div className="w-full h-[200px] bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center">
@@ -167,34 +203,13 @@ const LazyMap = ({ position, mapCenter, defaultZoom, mapType, onLocationSelect }
         );
     }
 
-    const { MapContainer, TileLayer, Marker, useMapEvents, useMap } = leafletModules.RL;
+    const { MapContainer, TileLayer, Marker } = leafletModules.RL;
     const tileUrl = mapType === MAP_TYPES.HYBRID
         ? 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}'
         : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
     const tileAttribution = mapType === MAP_TYPES.HYBRID
         ? '&copy; Google'
         : '&copy; OpenStreetMap';
-
-    // Map click handler
-    const MapClickHandler = () => {
-        useMapEvents({
-            click: (e) => {
-                onLocationSelect(e.latlng.lat, e.latlng.lng);
-            },
-        });
-        return null;
-    };
-
-    // Map center controller
-    const MapController = ({ center }) => {
-        const map = useMap();
-        useEffect(() => {
-            if (center && map) {
-                map.setView(center, map.getZoom());
-            }
-        }, [center, map]);
-        return null;
-    };
 
     return (
         <div className="relative rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
@@ -209,7 +224,7 @@ const LazyMap = ({ position, mapCenter, defaultZoom, mapType, onLocationSelect }
                     url={tileUrl}
                 />
                 <MapController center={mapCenter} />
-                <MapClickHandler />
+                <MapClickHandler onSelect={onLocationSelect} />
                 {position && (
                     <Marker
                         position={position}

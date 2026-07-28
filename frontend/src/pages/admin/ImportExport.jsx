@@ -506,7 +506,7 @@ export default function ImportExport() {
 
                             <div>
                                 <label className="block text-sm font-medium text-content-muted mb-1">Target Area</label>
-                                <input type="text" value={targetArea} onChange={(event) => { setTargetArea(event.target.value); setPreviewResult(null); }} className="w-full bg-surface-sunken border border-edge-strong text-content text-sm rounded-lg focus:ring-primary focus:border-primary block p-2.5" placeholder="Nama area target" />
+                                <input aria-label="Target Area" type="text" value={targetArea} onChange={(event) => { setTargetArea(event.target.value); setPreviewResult(null); }} className="w-full bg-surface-sunken border border-edge-strong text-content text-sm rounded-lg focus:ring-primary focus:border-primary block p-2.5" placeholder="Nama area target" />
                             </div>
                         </div>
 
@@ -515,51 +515,51 @@ export default function ImportExport() {
                             <div className="grid grid-cols-1 gap-3">
                                 <div>
                                     <label className="block text-xs font-medium text-content-muted mb-1">Delivery Type Override</label>
-                                    <select value={globalOverrides.delivery_type} onChange={(event) => handleOverrideChange('delivery_type', event.target.value)} disabled={isPrivateRtspProfile} className="w-full rounded-lg border border-edge-strong bg-surface-sunken p-2 text-sm disabled:opacity-60 dark:text-white">
+                                    <select aria-label="Delivery Type Override" value={globalOverrides.delivery_type} onChange={(event) => handleOverrideChange('delivery_type', event.target.value)} disabled={isPrivateRtspProfile} className="w-full rounded-lg border border-edge-strong bg-surface-sunken p-2 text-sm disabled:opacity-60 dark:text-white">
                                         {DELIVERY_TYPE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                                     </select>
                                     {isPrivateRtspProfile && <p className="mt-1 text-[11px] text-content-muted">Profile ini selalu dipaksa ke `internal_hls`.</p>}
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-content-muted mb-1">External Health Mode</label>
-                                    <select value={globalOverrides.external_health_mode} onChange={(event) => handleOverrideChange('external_health_mode', event.target.value)} disabled={isPrivateRtspProfile} className="w-full rounded-lg border border-edge-strong bg-surface-sunken p-2 text-sm disabled:opacity-60 dark:text-white">
+                                    <select aria-label="External Health Mode" value={globalOverrides.external_health_mode} onChange={(event) => handleOverrideChange('external_health_mode', event.target.value)} disabled={isPrivateRtspProfile} className="w-full rounded-lg border border-edge-strong bg-surface-sunken p-2 text-sm disabled:opacity-60 dark:text-white">
                                         {HEALTH_MODE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                                     </select>
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-content-muted mb-1">TLS Mode</label>
-                                    <select value={globalOverrides.external_tls_mode} onChange={(event) => handleOverrideChange('external_tls_mode', event.target.value)} disabled={isPrivateRtspProfile} className="w-full rounded-lg border border-edge-strong bg-surface-sunken p-2 text-sm disabled:opacity-60 dark:text-white">
+                                    <select aria-label="TLS Mode" value={globalOverrides.external_tls_mode} onChange={(event) => handleOverrideChange('external_tls_mode', event.target.value)} disabled={isPrivateRtspProfile} className="w-full rounded-lg border border-edge-strong bg-surface-sunken p-2 text-sm disabled:opacity-60 dark:text-white">
                                         {TLS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                                     </select>
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-content-muted mb-1">Origin Mode</label>
-                                    <select value={globalOverrides.external_origin_mode} onChange={(event) => handleOverrideChange('external_origin_mode', event.target.value)} disabled={isPrivateRtspProfile} className="w-full rounded-lg border border-edge-strong bg-surface-sunken p-2 text-sm disabled:opacity-60 dark:text-white">
+                                    <select aria-label="Origin Mode" value={globalOverrides.external_origin_mode} onChange={(event) => handleOverrideChange('external_origin_mode', event.target.value)} disabled={isPrivateRtspProfile} className="w-full rounded-lg border border-edge-strong bg-surface-sunken p-2 text-sm disabled:opacity-60 dark:text-white">
                                         {ORIGIN_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                                     </select>
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-content-muted mb-1">Snapshot Handling</label>
-                                    <select value={globalOverrides.external_snapshot_url_handling} onChange={(event) => handleOverrideChange('external_snapshot_url_handling', event.target.value)} className="w-full rounded-lg border border-edge-strong bg-surface-sunken p-2 text-sm dark:text-white">
+                                    <select aria-label="Snapshot Handling" value={globalOverrides.external_snapshot_url_handling} onChange={(event) => handleOverrideChange('external_snapshot_url_handling', event.target.value)} className="w-full rounded-lg border border-edge-strong bg-surface-sunken p-2 text-sm dark:text-white">
                                         {SNAPSHOT_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                                     </select>
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-content-muted mb-1">Location Mapping</label>
-                                    <select value={importPolicy.locationMapping} onChange={(event) => handlePolicyChange('locationMapping', event.target.value)} className="w-full rounded-lg border border-edge-strong bg-surface-sunken p-2 text-sm dark:text-white">
+                                    <select aria-label="Location Mapping" value={importPolicy.locationMapping} onChange={(event) => handlePolicyChange('locationMapping', event.target.value)} className="w-full rounded-lg border border-edge-strong bg-surface-sunken p-2 text-sm dark:text-white">
                                         {LOCATION_MAPPING_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                                     </select>
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-content-muted mb-1">Filter Source Rows</label>
-                                    <select value={importPolicy.filterSourceRows} onChange={(event) => handlePolicyChange('filterSourceRows', event.target.value)} className="w-full rounded-lg border border-edge-strong bg-surface-sunken p-2 text-sm dark:text-white">
+                                    <select aria-label="Filter Source Rows" value={importPolicy.filterSourceRows} onChange={(event) => handlePolicyChange('filterSourceRows', event.target.value)} className="w-full rounded-lg border border-edge-strong bg-surface-sunken p-2 text-sm dark:text-white">
                                         {SOURCE_FILTER_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                                     </select>
                                 </div>
                             </div>
                             <div>
                                 <label className="block text-xs font-medium text-content-muted mb-1">Description Template</label>
-                                <textarea value={globalOverrides.descriptionTemplate} onChange={(event) => handleOverrideChange('descriptionTemplate', event.target.value)} className="w-full rounded-lg border border-edge-strong bg-surface-sunken p-2.5 text-sm dark:text-white h-20" placeholder="SOURCE: {sourceProfile} | status: {sourceStatus}" />
+                                <textarea aria-label="Description Template" value={globalOverrides.descriptionTemplate} onChange={(event) => handleOverrideChange('descriptionTemplate', event.target.value)} className="w-full rounded-lg border border-edge-strong bg-surface-sunken p-2.5 text-sm dark:text-white h-20" placeholder="SOURCE: {sourceProfile} | status: {sourceStatus}" />
                             </div>
                             <div className="space-y-3">
                                 <label className="flex items-center gap-2 text-sm text-content-muted"><input type="checkbox" checked={globalOverrides.enabled} onChange={(event) => handleOverrideChange('enabled', event.target.checked)} />Import as enabled</label>

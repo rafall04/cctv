@@ -21,6 +21,32 @@ function PlanTag({ reg }) {
     );
 }
 
+
+// Module level: defined inside the tab this was a new component type per render, so every
+// row's action pair remounted on each `busy`/filter change.
+function ActionButtons({ reg, full, busy, onApprove, onReject }) {
+    return (
+        <div className={`flex gap-1 ${full ? 'w-full' : 'justify-end'}`}>
+            <button
+                type="button"
+                onClick={() => onApprove(reg)}
+                disabled={busy}
+                className={`whitespace-nowrap rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-emerald-700 disabled:opacity-50 ${full ? 'flex-1' : ''}`}
+            >
+                Setujui
+            </button>
+            <button
+                type="button"
+                onClick={() => onReject(reg)}
+                disabled={busy}
+                className={`whitespace-nowrap rounded-lg border border-red-200 px-3 py-1.5 text-xs text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-500/30 dark:text-red-400 dark:hover:bg-red-900/30 ${full ? 'flex-1' : ''}`}
+            >
+                Tolak
+            </button>
+        </div>
+    );
+}
+
 export default function RegistrationsTab({ registrations, run, busy }) {
     const confirm = useConfirm();
     const approve = (reg) => run(() => billingAdminService.approveRegistration(reg.id), 'Pendaftaran disetujui');
@@ -29,25 +55,6 @@ export default function RegistrationsTab({ registrations, run, busy }) {
             run(() => billingAdminService.rejectRegistration(reg.id), 'Pendaftaran ditolak');
         }
     };
-
-    const ActionButtons = ({ reg, full }) => (
-        <div className={`flex gap-1 ${full ? 'w-full' : 'justify-end'}`}>
-            <button
-                onClick={() => approve(reg)}
-                disabled={busy}
-                className={`whitespace-nowrap rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-emerald-700 disabled:opacity-50 ${full ? 'flex-1' : ''}`}
-            >
-                Setujui
-            </button>
-            <button
-                onClick={() => reject(reg)}
-                disabled={busy}
-                className={`whitespace-nowrap rounded-lg border border-red-200 px-3 py-1.5 text-xs text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-500/30 dark:text-red-400 dark:hover:bg-red-900/30 ${full ? 'flex-1' : ''}`}
-            >
-                Tolak
-            </button>
-        </div>
-    );
 
     return (
         <div>
@@ -79,7 +86,7 @@ export default function RegistrationsTab({ registrations, run, busy }) {
                                     <td className="px-3 py-2 text-content-muted">{reg.phone || reg.email || '—'}</td>
                                     <td className="px-3 py-2 text-content-muted"><PlanTag reg={reg} /></td>
                                     <td className="px-3 py-2 text-content-muted">{formatDateTime(reg.created_at)}</td>
-                                    <td className="px-3 py-2"><ActionButtons reg={reg} /></td>
+                                    <td className="px-3 py-2"><ActionButtons reg={reg} busy={busy} onApprove={approve} onReject={reject} /></td>
                                 </tr>
                             ))}
                         </tbody>
@@ -95,7 +102,7 @@ export default function RegistrationsTab({ registrations, run, busy }) {
                                     <PlanTag reg={reg} />
                                     <span className="text-xs text-content-subtle">{formatDateTime(reg.created_at)}</span>
                                 </div>
-                                <div className="mt-3"><ActionButtons reg={reg} full /></div>
+                                <div className="mt-3"><ActionButtons reg={reg} full busy={busy} onApprove={approve} onReject={reject} /></div>
                             </div>
                         ))}
                     </div>
