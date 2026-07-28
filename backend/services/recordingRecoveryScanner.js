@@ -121,7 +121,6 @@ export function createRecordingRecoveryScanner({
                     continue;
                 }
 
-                logger.log?.(`[Scanner] Found pending segment: ${filename} (age: ${Math.round(fileAge / 1000)}s)`);
                 onSegmentCreated(cameraId, filename);
                 result.queuedSegments += 1;
             }
@@ -154,7 +153,6 @@ export function createRecordingRecoveryScanner({
                     continue;
                 }
 
-                logger.log?.(`[Scanner] Found unregistered final segment: ${filename} (age: ${Math.round(fileAge / 1000)}s)`);
                 onSegmentCreated(cameraId, filename);
                 result.queuedSegments += 1;
             }
@@ -222,6 +220,18 @@ export function createRecordingRecoveryScanner({
             }
         } catch (error) {
             logger.error?.('[Scanner] Error in segment scanner:', error);
+        }
+
+        /*
+         * One line per SCAN, not per file. The per-file lines this replaces printed 8,879
+         * entries a day and were duplicated verbatim by the enqueue path, so one event cost
+         * two lines. These counters already existed but were never reported anywhere — the
+         * volume was high and the visibility was still zero. Silent when nothing happened.
+         */
+        const queued = result.queuedSegments + result.duplicatePartialsDeleted
+            + result.emptyPartialsDeleted + result.retrySkipped;
+        if (queued > 0) {
+            logger.log?.(`[Scanner] ${result.scannedCameras} camera(s): queued=${result.queuedSegments} dupDeleted=${result.duplicatePartialsDeleted} emptyDeleted=${result.emptyPartialsDeleted} retrySkipped=${result.retrySkipped}`);
         }
 
         return result;

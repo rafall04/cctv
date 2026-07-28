@@ -444,7 +444,18 @@ class ThumbnailService {
                     } catch (error) {
                         failed += 1;
                         this.registerThumbnailFailure(camera.id);
-                        console.error(`[Thumbnail] Camera ${camera.id} (${camera.name}) failed:`, this.sanitizeErrorMessage(error.message));
+                        /*
+                         * `unsupported_delivery_type` is not a failure at all — it states that this
+                         * camera's delivery type cannot produce a thumbnail, which is a fixed fact
+                         * about its configuration, not an event. It was raised as console.error on
+                         * every sweep: 2,532 stderr lines a day, ~20 per camera, saying the same
+                         * unchanging thing. Same for a camera we cannot reach: the health sweep
+                         * already reports that. Real, actionable failures stay on stderr.
+                         */
+                        const message = this.sanitizeErrorMessage(error.message);
+                        const expected = /unsupported_delivery_type|missing_external_snapshot_source|missing_mjpeg_thumbnail_source/i.test(message || '');
+                        const emit = expected ? console.log : console.error;
+                        emit(`[Thumbnail] Camera ${camera.id} (${camera.name}) failed:`, message);
                     }
                 }
             };

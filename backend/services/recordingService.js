@@ -328,7 +328,9 @@ class RecordingService {
             return;
         }
 
-        console.log(`[Segment] Enqueue recovery: camera${cameraId}/${filename}`);
+        // No log line here on purpose: the scanner that produced this segment already accounts for
+        // it (result.queuedSegments), and printing both gave two lines for ONE event — 8,879 each
+        // per day, exactly duplicated. Failures below are still logged.
         recordingRecoveryService.enqueueRecovery({
             cameraId,
             filename,

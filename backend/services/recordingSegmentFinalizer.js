@@ -138,7 +138,19 @@ export function createRecordingSegmentFinalizer({
             logger.log?.(`[RecordingFinalizer] Finalized camera${cameraId}/${finalFilename} duration=${duration}s source=${sourceType}`);
             return { success: true, finalFilename, duration, filePath: finalPath };
         } catch (error) {
-            logger.warn?.(`[RecordingFinalizer] Failed camera${cameraId}/${finalFilename}: ${error.message || 'finalize_failed'}`);
+            /*
+             * Two of these are EXPECTED and were the largest source of stderr noise (4,106/day):
+             *   - ENOENT: retention already deleted the source while a retry was queued.
+             *   - ffprobe "moov atom not found": the partial is still being written, or it is a
+             *     pre-movflags corpse that can never be probed.
+             * Neither means the application is broken, so they go to stdout. Anything else is a
+             * genuine finalize failure and stays on stderr where it can be seen.
+             */
+            const message = error.message || 'finalize_failed';
+            const expected = error.code === 'ENOENT'
+                || /ENOENT|moov atom not found|Invalid data found/i.test(message);
+            const emit = expected ? logger.log : logger.warn;
+            emit?.call(logger, `[RecordingFinalizer] Failed camera${cameraId}/${finalFilename}: ${message}`);
             await safeUnlink(tempPath, 'temp file');
             recordDiagnostic({
                 cameraId, finalFilename, filePath: sourcePath,

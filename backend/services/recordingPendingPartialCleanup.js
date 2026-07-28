@@ -49,6 +49,8 @@ export function createPendingPartialCleanup({
             filenames: finalFilenames,
         }));
 
+        const kept = { count: 0, oldestAgeMs: -1, oldestDecision: null };
+
         for (const filename of filenames) {
             const finalFilename = toFinalSegmentFilename(filename);
             if (!finalFilename) {
@@ -101,10 +103,18 @@ export function createPendingPartialCleanup({
                 nowMs,
             });
             if (!deletePolicy.allowed) {
-                logger.log?.(`[Cleanup] Keeping pending partial recording: camera${cameraId}/${describeRecordingRetentionDecision({
-                    filename,
-                    decision: deletePolicy,
-                })}`);
+                /*
+                 * Counted, not printed. "Still within retention" is the NORMAL answer for every
+                 * partial on every cleanup cycle, so printing it per file produced 10,591 lines a
+                 * day whose whole content was "nothing happened" — the single largest source of
+                 * log volume in the app. One aggregate line below keeps the fact and drops the
+                 * noise; the oldest sample is kept so a stuck file is still visible.
+                 */
+                kept.count += 1;
+                if (deletePolicy.ageMs > kept.oldestAgeMs) {
+                    kept.oldestAgeMs = deletePolicy.ageMs;
+                    kept.oldestDecision = describeRecordingRetentionDecision({ filename, decision: deletePolicy });
+                }
                 continue;
             }
 
@@ -122,6 +132,10 @@ export function createPendingPartialCleanup({
 
             result.orphanDeleted++;
             result.deletedBytes += deleteResult.size || 0;
+        }
+
+        if (kept.count > 0) {
+            logger.log?.(`[Cleanup] camera${cameraId}: kept ${kept.count} pending partial(s), oldest ${kept.oldestDecision}`);
         }
     };
 }

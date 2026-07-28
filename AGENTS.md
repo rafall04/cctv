@@ -116,6 +116,27 @@ npm test -- CameraManagement.test.jsx -t "name"      # single test
 - `console.log` for debugging; structured logging via pino-pretty in production.
 - Attach `error.statusCode` to thrown errors for HTTP status (e.g. `err.statusCode = 404`).
 
+### Logging: pick the stream, then pick the rate
+
+pm2 splits `console.error`/`warn` into `*-error.log` and everything else into `*-out.log`. That
+split is the only triage tool an operator has, so it must mean something.
+
+- **stderr (`console.error` / `console.warn`) = a human must look at this.** A third-party camera
+  being down, a deliberate backoff, a config that cannot produce thumbnails, a file retention
+  already deleted — none of these are application errors. Route expected conditions to
+  `console.log`; keep stderr for what is actually broken, plus genuine state *transitions*.
+- **Log transitions, not steady state.** "Camera X went offline" once beats "camera X is still
+  offline" every tick.
+- **Never log per item inside a loop that runs every cycle.** Count, then emit ONE line per cycle,
+  and stay silent when the count is zero. Keep the oldest/worst sample in that line so a stuck
+  item is still visible.
+- **One event, one line.** Don't log the same event from both the producer and the consumer.
+
+Earned the hard way (2026-07-28): 5,322 offline notices + 2,532 `unsupported_delivery_type` on
+stderr made ~98% of the error log non-errors, which hid a real `ERR_HTTP_HEADERS_SENT`
+double-reply for months. Per-item loop logging added ~28k lines/day on stdout, 8,879 of them
+duplicated verbatim by a second component.
+
 ### Backend (Node.js/Fastify)
 
 - **File naming:** camelCase — `cameraController.js`, `mediaMtxService.js`, `authMiddleware.js`.
