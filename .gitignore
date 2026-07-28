@@ -122,3 +122,7 @@ id_rsa.pub
 
 # Generated client configuration (per-installation)
 deployment/client.config.sh
+
+# Python bytecode (sidecar)
+__pycache__/
+*.pyc
