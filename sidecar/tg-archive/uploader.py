@@ -88,7 +88,7 @@ class Config:
         # hours after it was recorded breaks that permanently. Doubles as the
         # tolerance for an uploader outage — set it above the longest downtime you
         # would still want backfilled. 0 disables.
-        self.max_late_hours = float(env('MAX_LATE_HOURS', '6'))
+        self.max_late_hours = float(env('MAX_LATE_HOURS', '12'))
         # Hard cutoff: never archive anything recorded before this instant.
         # Surgical tool for excluding a known-bad window (e.g. a recording incident)
         # without loosening the tolerance rules. Empty = no cutoff.
