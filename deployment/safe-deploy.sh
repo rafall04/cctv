@@ -274,6 +274,14 @@ fi
 # PHASE 7 — Restart + health verify
 # ===========================================================================
 hr
+# Stamp the commit we are about to run into the environment. appConfigService already surfaces
+# APP_BUILD_ID as `buildId` on GET /api/config/public, so after the restart we can ASK THE RUNNING
+# PROCESS which commit it is, instead of trusting that the restart did anything. Twice in one day a
+# deploy reported success while the old code kept serving (adopted ffmpeg holding stale args; an
+# edited public/ file pinned at the CDN), so "the script exited 0" is not evidence.
+DEPLOYED_COMMIT="$(git -C "$APP_DIR" rev-parse --short HEAD)"
+env_set "$BACKEND_ENV" "APP_BUILD_ID" "$DEPLOYED_COMMIT"
+
 info "Restarting services"
 if command -v pm2 >/dev/null 2>&1; then
     pm2 restart "$BACKEND_PM2" --update-env || fatal "pm2 restart ${BACKEND_PM2} failed."
@@ -357,6 +365,21 @@ done
 hr
 if [ "$HEALTH_OK" = "1" ]; then
     ok "Health check passed — backend is up."
+
+    # Ask the RUNNING process which commit it is. /health only proves something answers; this
+    # proves the thing answering is the code we just deployed.
+    RUNNING_BUILD="$(curl -fsS "http://localhost:${PORT}/api/config/public" 2>/dev/null \
+        | sed -n 's/.*"buildId"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
+    if [ -z "$RUNNING_BUILD" ]; then
+        warn "Could not read buildId from /api/config/public — cannot confirm the new code is live."
+    elif [ "$RUNNING_BUILD" = "$DEPLOYED_COMMIT" ]; then
+        ok "Running build confirmed: ${RUNNING_BUILD} (matches the deployed commit)."
+    else
+        err "DEPLOY DID NOT TAKE: the process reports build '${RUNNING_BUILD}', expected '${DEPLOYED_COMMIT}'."
+        echo "  The restart did not pick up the new code. Check:  pm2 logs ${BACKEND_PM2} --lines 50"
+        echo "  Then:  pm2 restart ${BACKEND_PM2} --update-env"
+        exit 1
+    fi
 else
     err "Health check FAILED after ~40s."
     echo "  Inspect:  pm2 logs ${BACKEND_PM2} --lines 50"
