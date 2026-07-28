@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { basename } from 'path';
 
 import {
     createThumbnailExistenceChecker,
@@ -47,9 +48,12 @@ describe('thumbnailPathService', () => {
 
     it('sanitizes a whole list with a single shared existence check (honours caller fileExists)', () => {
         const checked = [];
+        // Match the FILENAME, not the whole path: `filePath.includes('7')` also matched the
+        // absolute checkout path, so this test failed in any working directory whose name
+        // happened to contain a "7" (e.g. a temp dir named after a UUID).
         const fileExists = (filePath) => {
             checked.push(filePath);
-            return filePath.includes('7');
+            return basename(filePath) === '7.jpg';
         };
 
         const out = sanitizeCameraThumbnailList(
