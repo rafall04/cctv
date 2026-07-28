@@ -300,6 +300,12 @@ if command -v pm2 >/dev/null 2>&1; then
     if pm2 describe "$RECORDER_PM2" >/dev/null 2>&1; then
         NEW_COMMIT="$(git -C "$APP_DIR" rev-parse HEAD)"
         RECORDING_CHANGED=""
+        # Initialised here, NOT only inside the branch below. This script runs under `set -u`, and
+        # on a same-commit re-deploy the branch never executes — so an unset FFMPEG_ARGS_CHANGED
+        # killed the whole script at its first read, AFTER both services had already been restarted
+        # but BEFORE the health check ever ran. A "pull first, then deploy" (the safe way to update
+        # this very script) takes exactly that path, so the failure was reachable on purpose.
+        FFMPEG_ARGS_CHANGED=""
         if [ -n "${ROLLBACK_COMMIT:-}" ] && [ "$ROLLBACK_COMMIT" != "$NEW_COMMIT" ]; then
             RECORDING_CHANGED="$(git -C "$APP_DIR" diff --name-only "$ROLLBACK_COMMIT" "$NEW_COMMIT" -- \
                 'backend/recorder.js' \
