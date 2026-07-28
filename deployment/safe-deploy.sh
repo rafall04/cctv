@@ -296,7 +296,21 @@ if command -v pm2 >/dev/null 2>&1; then
             RECORDING_CHANGED="$(git -C "$APP_DIR" diff --name-only "$ROLLBACK_COMMIT" "$NEW_COMMIT" -- \
                 'backend/recorder.js' \
                 'backend/services/recording*' \
+                'backend/utils/internalRtspTransportPolicy.js' \
+                'backend/utils/ffmpegCapabilities.js' \
                 'backend/database/migrations/*' \
+                2>/dev/null || true)"
+
+            # FFmpeg ARGUMENTS are a special case that no restart can apply on its own.
+            # Recorders are adopted across a restart by design, so a running ffmpeg keeps
+            # the command line it was spawned with — forever, until the process itself is
+            # cycled. Deploying an argument change therefore looks successful while
+            # changing nothing at all (observed: 11 recorders still on the old args 4.4
+            # hours after the fix shipped). Surface it instead of failing silently.
+            FFMPEG_ARGS_CHANGED="$(git -C "$APP_DIR" diff --name-only "$ROLLBACK_COMMIT" "$NEW_COMMIT" -- \
+                'backend/services/recordingStarter.js' \
+                'backend/utils/internalRtspTransportPolicy.js' \
+                'backend/utils/ffmpegCapabilities.js' \
                 2>/dev/null || true)"
         else
             # Same commit (re-deploy / no fast-forward): we cannot prove nothing moved.
@@ -310,6 +324,20 @@ if command -v pm2 >/dev/null 2>&1; then
             echo "  Recorders detach on shutdown and are re-adopted on boot, so segments continue."
         else
             ok "${RECORDER_PM2} left running — no recording code in this deploy."
+        fi
+
+        if [ -n "$FFMPEG_ARGS_CHANGED" ]; then
+            hr
+            warn "FFmpeg ARGUMENTS changed — the running recorders are NOT using them yet."
+            echo "  Adoption keeps each ffmpeg alive across restarts, so it holds the command"
+            echo "  line it was spawned with until the process itself is cycled."
+            echo ""
+            echo "  Check what is actually running:"
+            echo "    ps -eo args | grep 'ffmpeg.*pending' | head -1"
+            echo ""
+            echo "  Apply the new arguments (SIGINT lets each finish its segment cleanly,"
+            echo "  then the worker restarts it — costs one segment boundary, loses nothing):"
+            echo "    kill -INT \$(pgrep -f 'ffmpeg.*pending')"
         fi
     fi
 else
