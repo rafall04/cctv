@@ -69,15 +69,24 @@ export default function PwaInstallPrompt({ delayMs = DEFAULT_DELAY_MS }) {
             return undefined;
         }
 
+        /*
+         * The event is captured in index.html, BEFORE React exists — it fires once per page load
+         * and a listener attached later just misses it. So the primary source is the stash left on
+         * `window`; the listener below only covers the case where React somehow mounted first.
+         *
+         * Each capture also records WHICH app it belongs to. The browser binds the event to the
+         * manifest linked at fire time and never re-binds it, so after a client-side move from /
+         * to /admin the captured event still installs the PUBLIC app while the toast says "Admin".
+         */
+        const adopt = () => {
+            if (window.__deferredInstallPrompt) {
+                setInstallEvent(window.__deferredInstallPrompt);
+            }
+        };
+        adopt();
+
         const handleBeforeInstallPrompt = (event) => {
             event.preventDefault();
-            /*
-             * Remember WHICH app this event belongs to. The browser binds it to the manifest linked
-             * at fire time and never re-binds it, so after a client-side move from / to /admin the
-             * captured event still installs the PUBLIC app — while the toast now says "Admin".
-             * Storing the manifest lets us refuse to offer an install we cannot honour, instead of
-             * quietly installing the wrong one.
-             */
             setInstallEvent({
                 event,
                 manifest: document.querySelector('link[rel="manifest"]')?.getAttribute('href') || '',
@@ -85,7 +94,11 @@ export default function PwaInstallPrompt({ delayMs = DEFAULT_DELAY_MS }) {
         };
 
         window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-        return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+        window.addEventListener('rafnet:installprompt', adopt);
+        return () => {
+            window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+            window.removeEventListener('rafnet:installprompt', adopt);
+        };
     }, []);
 
     // True only when the captured event installs the app this route is actually about.

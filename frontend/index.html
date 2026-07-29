@@ -48,11 +48,32 @@
        * tags it edits, because a parser-blocking script cannot see markup that follows it.
        */
       (function () {
-        if (location.pathname.indexOf('/admin') !== 0) return;
-        var link = document.querySelector('link[rel="manifest"]');
-        if (link) link.setAttribute('href', '/admin.webmanifest?v=1');
-        var theme = document.querySelector('meta[name="theme-color"]');
-        if (theme) theme.setAttribute('content', '#b45309');
+        if (location.pathname.indexOf('/admin') === 0) {
+          var link = document.querySelector('link[rel="manifest"]');
+          if (link) link.setAttribute('href', '/admin.webmanifest?v=1');
+          var theme = document.querySelector('meta[name="theme-color"]');
+          if (theme) theme.setAttribute('content', '#b45309');
+        }
+
+        /*
+         * Capture `beforeinstallprompt` HERE, not in React.
+         * It fires exactly once per page load, and a listener that is not attached yet simply
+         * misses it — forever. React attaches its listener from a useEffect, which on /admin runs
+         * only after the lazy admin chunks have loaded, a far longer window than on the public
+         * landing. That is why the admin toast could never appear no matter how often the page was
+         * refreshed. Stashing it on `window` lets React pick it up whenever it does mount.
+         */
+        window.__deferredInstallPrompt = null;
+        window.addEventListener('beforeinstallprompt', function (event) {
+          event.preventDefault();
+          window.__deferredInstallPrompt = {
+            event: event,
+            manifest: (document.querySelector('link[rel="manifest"]') || {}).getAttribute
+              ? document.querySelector('link[rel="manifest"]').getAttribute('href')
+              : '',
+          };
+          window.dispatchEvent(new Event('rafnet:installprompt'));
+        });
       })();
     </script>
     

@@ -43,6 +43,7 @@ describe('PwaInstallPrompt', () => {
         vi.useFakeTimers();
         localStorage.clear();
         setManifest('/site.webmanifest?v=1');
+        delete window.__deferredInstallPrompt;
         Object.defineProperty(window, 'matchMedia', {
             writable: true,
             value: vi.fn().mockReturnValue({ matches: false }),
@@ -177,4 +178,40 @@ describe('PwaInstallPrompt', () => {
         expect(document.querySelector('link[rel="manifest"]').getAttribute('href'))
             .toBe('/admin.webmanifest?v=1');
     });
+
+    /*
+     * THE bug behind "sudah refresh berkali-kali, popup tidak muncul sama sekali".
+     * `beforeinstallprompt` fires once per page load. React attaches its listener from a useEffect,
+     * which on /admin only runs after the lazy admin chunks have loaded — a much longer window than
+     * on the public landing. An event that fires in that window is missed FOREVER, so no amount of
+     * refreshing helps. index.html now captures it into window.__deferredInstallPrompt before React
+     * exists, and the component adopts it on mount.
+     */
+    it('adopts an install event that fired BEFORE React mounted', async () => {
+        setManifest('/admin.webmanifest?v=1');
+        const early = new Event('beforeinstallprompt');
+        early.preventDefault = vi.fn();
+        early.prompt = vi.fn().mockResolvedValue(undefined);
+        early.userChoice = Promise.resolve({ outcome: 'accepted' });
+        // Exactly what the inline script in index.html leaves behind.
+        window.__deferredInstallPrompt = { event: early, manifest: '/admin.webmanifest?v=1' };
+
+        render(
+            <MemoryRouter initialEntries={['/admin/login']}>
+                <PwaInstallPrompt delayMs={100} />
+            </MemoryRouter>
+        );
+
+        await act(async () => { vi.advanceTimersByTime(200); });
+
+        expect(screen.getByTestId('pwa-install-prompt')).toBeTruthy();
+        expect(screen.getByText('Install CCTV Admin')).toBeTruthy();
+
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', { name: /^Install$/i }));
+            await Promise.resolve();
+        });
+        expect(early.prompt).toHaveBeenCalledTimes(1);
+    });
+
 });

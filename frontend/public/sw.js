@@ -15,8 +15,12 @@ const SW_VERSION = '__SW_VERSION__';
 const RAFNET_CCTV_CACHE = `rafnet-cctv-public-${SW_VERSION}`;
 const APP_SHELL_URLS = [
     '/',
-    '/site.webmanifest',
+    // Versioned, because index.html links them that way — caching the bare path stored an
+    // entry nothing ever requests, so the manifest went to the network on every install check.
+    '/site.webmanifest?v=1',
+    '/admin.webmanifest?v=1',
     '/favicon.svg',
+    '/admin-icon.svg',
 ];
 
 function offlineFallback() {
