@@ -44,6 +44,8 @@ import { resolveHlsViewerUser } from './services/hlsProxyService.js';
 
 // Import services
 import { startDailyCleanup, stopDailyCleanup, logSecurityEvent, SECURITY_EVENTS } from './services/securityAuditLogger.js';
+import backupTelegramService from './services/backupTelegramService.js';
+import workerWatchdogService from './services/workerWatchdogService.js';
 import { getTimezone } from './services/timezoneService.js';
 import { closeAll as closeDbConnections, getStats as getDbStats } from './database/connectionPool.js';
 import { cachePlugin, getCacheStats } from './middleware/cacheMiddleware.js';
@@ -70,6 +72,7 @@ import voucherWebhookRoutes from './routes/voucherWebhookRoutes.js';
 import voucherAdminRoutes from './routes/voucherAdminRoutes.js';
 import rondaAdminRoutes from './routes/rondaAdminRoutes.js';
 import telegramArchiveRoutes from './routes/telegramArchiveRoutes.js';
+import backupTelegramRoutes from './routes/backupTelegramRoutes.js';
 import recordingRoutes from './routes/recordingRoutes.js';
 import playbackTokenRoutes from './routes/playbackTokenRoutes.js';
 import brandingRoutes from './routes/brandingRoutes.js';
@@ -364,6 +367,7 @@ await fastify.register(billingAdminRoutes, { prefix: '/api/admin/billing' });
 await fastify.register(voucherAdminRoutes, { prefix: '/api/admin/voucher' });
 await fastify.register(rondaAdminRoutes, { prefix: '/api/admin/ronda' });
 await fastify.register(telegramArchiveRoutes, { prefix: '/api/admin/telegram-archive' });
+await fastify.register(backupTelegramRoutes, { prefix: '/api/admin/backup' });
 await fastify.register(billingWebhookRoutes, { prefix: '/api/billing' });
 // thumbnailRoutes removed - @fastify/static handles /api/thumbnails/* automatically
 
@@ -508,6 +512,28 @@ const start = async () => {
         // Start security audit log cleanup scheduler
         startDailyCleanup();
         console.log('[Security] Daily audit log cleanup scheduled (90-day retention)');
+
+        // Daily off-box database backup. The DB holds real payments and months of history; every
+        // guardrail in this repo protects against bugs, none protects against losing the disk.
+        // Silent no-op until an admin sets a chat id in Settings, so it is safe to ship enabled.
+        const scheduleDailyBackup = () => {
+            setTimeout(async () => {
+                await backupTelegramService.runScheduledBackup();
+                scheduleDailyBackup();
+            }, 24 * 60 * 60 * 1000).unref();
+        };
+        scheduleDailyBackup();
+        console.log('[Backup] Daily Telegram database backup scheduled (24h interval)');
+
+        // Worker watchdog. Restart policies bring a dead worker back but tell nobody it keeps
+        // dying, and the workers live under three different supervisors (pm2/systemd/docker), so
+        // "pm2 list looks fine" was never proof. Alerts fire on transition only.
+        setInterval(() => {
+            workerWatchdogService.runWatchdogCycle().catch((error) => {
+                console.error('[Watchdog] cycle failed:', error.message);
+            });
+        }, 5 * 60 * 1000).unref();
+        console.log('[Watchdog] Worker liveness watchdog started (5m interval)');
         
         // Start camera health check service (every 30 seconds)
         cameraHealthService.start(30000);

@@ -10,6 +10,7 @@ import { useState, useRef } from 'react';
 import { adminAPI } from '../../../services/api';
 import { useConfirm } from '../../../contexts/ConfirmContext';
 import { Download, Upload, Database, FileJson, Info } from 'lucide-react';
+import TelegramBackupPanel from './TelegramBackupPanel';
 
 export default function BackupSettingsTab() {
     const [exporting, setExporting] = useState(false);
@@ -117,6 +118,10 @@ export default function BackupSettingsTab() {
     };
 
     return (
+        <div className="space-y-6">
+            {/* Off-box copy first: an export you have to remember to click is not a backup. */}
+            <TelegramBackupPanel />
+
         <div className="bg-surface rounded-lg shadow p-6">
             <div className="flex items-center gap-3 mb-6">
                 <Database className="w-6 h-6 text-purple-600" />
@@ -288,6 +293,7 @@ export default function BackupSettingsTab() {
                     </div>
                 )}
             </div>
+        </div>
         </div>
     );
 }
