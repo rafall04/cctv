@@ -51,13 +51,13 @@ export default function PwaInstallPrompt({ delayMs = DEFAULT_DELAY_MS }) {
     const config = isAdminRoute
         ? {
             dismissKey: ADMIN_DISMISS_KEY,
-            title: 'Install RAF Admin',
+            title: 'Install CCTV Admin',
             body: 'Buka admin lebih cepat untuk cek kamera, health, analytics, dan token playback.',
             className: 'bottom-24 sm:bottom-6',
         }
         : {
             dismissKey: PUBLIC_DISMISS_KEY,
-            title: 'Install RAF CCTV',
+            title: 'Install CCTV System',
             body: 'Buka lebih cepat dari layar utama tanpa mencari browser lagi.',
             className: 'top-20',
         };
@@ -71,22 +71,37 @@ export default function PwaInstallPrompt({ delayMs = DEFAULT_DELAY_MS }) {
 
         const handleBeforeInstallPrompt = (event) => {
             event.preventDefault();
-            setInstallEvent(event);
+            /*
+             * Remember WHICH app this event belongs to. The browser binds it to the manifest linked
+             * at fire time and never re-binds it, so after a client-side move from / to /admin the
+             * captured event still installs the PUBLIC app — while the toast now says "Admin".
+             * Storing the manifest lets us refuse to offer an install we cannot honour, instead of
+             * quietly installing the wrong one.
+             */
+            setInstallEvent({
+                event,
+                manifest: document.querySelector('link[rel="manifest"]')?.getAttribute('href') || '',
+            });
         };
 
         window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
         return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     }, []);
 
+    // True only when the captured event installs the app this route is actually about.
+    const matchesRoute = Boolean(installEvent)
+        && installEvent.manifest.includes(isAdminRoute ? 'admin.webmanifest' : 'site.webmanifest');
+
     useEffect(() => {
-        if (!installEvent || isStandaloneDisplay() || localStorage.getItem(config.dismissKey) === 'true') {
+        if (!installEvent || !matchesRoute || isStandaloneDisplay()
+            || localStorage.getItem(config.dismissKey) === 'true') {
             setVisible(false);
             return undefined;
         }
 
         const timer = window.setTimeout(() => setVisible(true), delayMs);
         return () => window.clearTimeout(timer);
-    }, [delayMs, installEvent, config.dismissKey]);
+    }, [delayMs, installEvent, matchesRoute, config.dismissKey]);
 
     const dismiss = () => {
         localStorage.setItem(config.dismissKey, 'true');
@@ -99,8 +114,8 @@ export default function PwaInstallPrompt({ delayMs = DEFAULT_DELAY_MS }) {
             return;
         }
 
-        await installEvent.prompt();
-        await installEvent.userChoice.catch(() => null);
+        await installEvent.event.prompt();
+        await installEvent.event.userChoice.catch(() => null);
         dismiss();
     };
 

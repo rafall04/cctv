@@ -37,6 +37,24 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/site.webmanifest?v=1" />
     <meta name="theme-color" content="#0ea5e9" />
+    <script>
+      /*
+       * Pick the right app BEFORE the browser decides what is installable.
+       * `beforeinstallprompt` fires once per page load and binds to whatever manifest is linked at
+       * that moment — which can be well before React mounts. Without this, loading /admin directly
+       * captured an install event for the PUBLIC app, and the admin toast would then have installed
+       * the wrong one. React keeps this in sync afterwards for client-side navigation.
+       * Inline + synchronous on purpose: any deferral reintroduces the race. Placed AFTER the two
+       * tags it edits, because a parser-blocking script cannot see markup that follows it.
+       */
+      (function () {
+        if (location.pathname.indexOf('/admin') !== 0) return;
+        var link = document.querySelector('link[rel="manifest"]');
+        if (link) link.setAttribute('href', '/admin.webmanifest?v=1');
+        var theme = document.querySelector('meta[name="theme-color"]');
+        if (theme) theme.setAttribute('content', '#b45309');
+      })();
+    </script>
     
     <!-- Open Graph / Facebook (will be updated by meta-config.js) -->
     <meta property="og:type" content="website" />
