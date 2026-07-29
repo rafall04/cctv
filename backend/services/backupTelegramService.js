@@ -2,7 +2,7 @@
  * Purpose: Ship a consistent, compressed snapshot of the SQLite database to a Telegram chat, so the
  *          database survives losing the box itself.
  * Caller: server.js daily scheduler, routes/backupTelegramRoutes.js (admin "send now").
- * Deps: settingsService (chat id + enable flag), telegramService (bot token), node:zlib, node:fs.
+ * Deps: settingsService (chat id + enable flag), telegramDocumentSender (token + upload), node:zlib, node:fs.
  * MainFuncs: createDatabaseSnapshot, sendDatabaseBackup, runScheduledBackup.
  * SideEffects: Writes a temp snapshot under data/backups/, uploads it to Telegram, deletes the temp.
  *
@@ -20,17 +20,15 @@ import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { db } from '../database/database.js';
 import settingsService from './settingsService.js';
-import { getTelegramSettings } from './telegramService.js';
+import { sendTelegramDocument, isTelegramTokenConfigured } from './telegramDocumentSender.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = join(__dirname, '..', 'data');
 const BACKUP_DIR = join(DATA_DIR, 'backups');
-const DB_PATH = join(DATA_DIR, 'cctv.db');
 
 // Telegram's cloud Bot API refuses documents over 50 MB. Measured headroom is large (12.5 MB), but
 // a growing database must fail LOUDLY here rather than have Telegram reject the upload silently.
 const TELEGRAM_DOCUMENT_LIMIT_BYTES = 50 * 1024 * 1024;
-const UPLOAD_TIMEOUT_MS = 5 * 60 * 1000;
 
 export const BACKUP_SETTING_KEYS = {
     enabled: 'backup_telegram_enabled',
@@ -84,32 +82,6 @@ export async function createDatabaseSnapshot({ now = new Date() } = {}) {
     return { path: gzPath, bytes: statSync(gzPath).size, filename: `cctv_${stamp}.db.gz` };
 }
 
-async function uploadDocument({ botToken, chatId, filePath, filename, caption }) {
-    const form = new FormData();
-    form.append('chat_id', chatId);
-    form.append('caption', caption);
-    form.append('parse_mode', 'HTML');
-    form.append('document', new Blob([readFileSync(filePath)]), filename);
-
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
-    try {
-        const response = await fetch(`https://api.telegram.org/bot${botToken}/sendDocument`, {
-            method: 'POST',
-            body: form,
-            signal: controller.signal,
-        });
-        const data = await response.json().catch(() => null);
-        if (!data?.ok) {
-            const reason = data?.description || `HTTP ${response.status}`;
-            throw new Error(`Telegram rejected the backup: ${reason}`);
-        }
-        return data.result;
-    } finally {
-        clearTimeout(timer);
-    }
-}
-
 /**
  * Build a snapshot and push it to Telegram. Throws with a human-readable message on any refusal so
  * the admin UI can show exactly what to fix.
@@ -123,8 +95,7 @@ export async function sendDatabaseBackup({ chatId = null, reason = 'manual' } = 
         throw err;
     }
 
-    const { botToken } = getTelegramSettings();
-    if (!botToken) {
+    if (!isTelegramTokenConfigured()) {
         const err = new Error('Bot token Telegram belum diatur.');
         err.statusCode = 400;
         throw err;
@@ -142,10 +113,8 @@ export async function sendDatabaseBackup({ chatId = null, reason = 'manual' } = 
         }
 
         const sizeMb = (snapshot.bytes / 1048576).toFixed(1);
-        await uploadDocument({
-            botToken,
-            chatId: targetChatId,
-            filePath: snapshot.path,
+        await sendTelegramDocument(targetChatId, {
+            buffer: readFileSync(snapshot.path),
             filename: snapshot.filename,
             caption: `🗄️ <b>Backup database CCTV</b>\n`
                 + `Ukuran: ${sizeMb} MB (gzip)\n`
