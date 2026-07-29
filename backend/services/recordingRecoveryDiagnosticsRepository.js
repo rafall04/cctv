@@ -35,10 +35,32 @@ class RecordingRecoveryDiagnosticsRepository {
     }
 
     clearDiagnostic({ cameraId, filename }) {
-        return execute(
-            'UPDATE recording_recovery_diagnostics SET active = 0, resolved_at = CURRENT_TIMESTAMP WHERE camera_id = ? AND filename = ? AND active = 1',
-            [cameraId, filename]
-        );
+        /*
+         * Same UNIQUE(camera_id, filename, active) collision the prune had to solve — but on the
+         * SUCCESS path, where it does more damage. A file that failed, was resolved, then failed
+         * again holds BOTH an active row and a resolved twin; flipping the active one to 0 raised
+         * `UNIQUE constraint failed` right after the segment had already been written by
+         * upsertSegment. The finalizer's catch then reported success:false for a segment that
+         * actually finalized, skipped the source .partial unlink so the file lingered forever, and
+         * the runner re-queued work that was already done.
+         *
+         * Unlike the prune (where the file is gone, so the older twin suffices), here the ACTIVE
+         * row is the interesting one — it carries the latest reason and attempt_count. So drop the
+         * stale twin and resolve the current row, atomically.
+         */
+        const run = transaction(() => {
+            execute(
+                'DELETE FROM recording_recovery_diagnostics WHERE camera_id = ? AND filename = ? AND active = 0',
+                [cameraId, filename]
+            );
+            return execute(
+                `UPDATE recording_recovery_diagnostics
+                 SET active = 0, resolved_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                 WHERE camera_id = ? AND filename = ? AND active = 1`,
+                [cameraId, filename]
+            );
+        });
+        return run();
     }
 
     getActiveDiagnostic({ cameraId, filename }) {

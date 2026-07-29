@@ -19,28 +19,28 @@ export default {
                 // Semantic roles — prefer these over `dark-*`/`light-*` in new work.
                 // Definitions and usage rules live in src/index.css.
                 surface: {
-                    DEFAULT: 'var(--surface)',
-                    sunken: 'var(--surface-sunken)',
-                    raised: 'var(--surface-raised)',
-                    overlay: 'var(--surface-overlay)',
+                    DEFAULT: 'rgb(var(--surface) / <alpha-value>)',
+                    sunken: 'rgb(var(--surface-sunken) / <alpha-value>)',
+                    raised: 'rgb(var(--surface-raised) / <alpha-value>)',
+                    overlay: 'rgb(var(--surface-overlay) / <alpha-value>)',
                 },
                 edge: {
-                    DEFAULT: 'var(--edge)',
-                    strong: 'var(--edge-strong)',
+                    DEFAULT: 'rgb(var(--edge) / <alpha-value>)',
+                    strong: 'rgb(var(--edge-strong) / <alpha-value>)',
                 },
                 content: {
-                    DEFAULT: 'var(--content)',
-                    muted: 'var(--content-muted)',
-                    subtle: 'var(--content-subtle)',
+                    DEFAULT: 'rgb(var(--content) / <alpha-value>)',
+                    muted: 'rgb(var(--content-muted) / <alpha-value>)',
+                    subtle: 'rgb(var(--content-subtle) / <alpha-value>)',
                 },
                 status: {
-                    live: 'var(--status-live)',
-                    warn: 'var(--status-warn)',
-                    fault: 'var(--status-fault)',
-                    idle: 'var(--status-idle)',
+                    live: 'rgb(var(--status-live) / <alpha-value>)',
+                    warn: 'rgb(var(--status-warn) / <alpha-value>)',
+                    fault: 'rgb(var(--status-fault) / <alpha-value>)',
+                    idle: 'rgb(var(--status-idle) / <alpha-value>)',
                 },
                 // Data accent (not a status). See --data in index.css.
-                data: 'var(--data)',
+                data: 'rgb(var(--data) / <alpha-value>)',
                 primary: {
                     DEFAULT: 'var(--primary-color)',
                     50: 'rgba(var(--primary-color-rgb), 0.05)',

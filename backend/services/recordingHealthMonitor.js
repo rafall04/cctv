@@ -40,6 +40,10 @@ function emptyHealth(nowMs) {
         suspendedReason: null,
         lastRestartAt: null,
         inFlightAction: false,
+        // One "don't punish a camera for the outage it just left" reset is available per outage.
+        // suspendOffline() re-arms it; handleCameraBecameOnline() consumes it. Starts armed so a
+        // camera whose state is rebuilt (boot, adoption) still gets its one fast retry.
+        offlineResetPending: true,
     };
 }
 
@@ -131,6 +135,8 @@ export function createRecordingHealthMonitor({
         state.cooldownUntil = Math.max(state.cooldownUntil || 0, nowMs + RECORDING_OFFLINE_COOLDOWN_MS);
         state.suspendedReason = 'camera_offline';
         state.inFlightAction = false;
+        // Arms the ONE failure-count reset this outage is entitled to. See handleCameraBecameOnline.
+        state.offlineResetPending = true;
         return state;
     }
 
@@ -183,7 +189,19 @@ export function createRecordingHealthMonitor({
             // camera which pings but sends no frames — it never leaves the online
             // state, so no offline->online transition fires, this branch never runs,
             // and its count keeps climbing until the breaker suspends it.
-            state.consecutiveFailureCount = 0;
+            //
+            // BUT the reset must be consumed ONCE PER OUTAGE, not on every reconcile. Without the
+            // flag this branch is re-entered every 60s: markFailure re-stamps suspendedReason to
+            // 'camera_offline' whenever the count is below the threshold, and
+            // recordingLifecyclePolicy treats that value as "bypass cooldown + clearCooldown", so
+            // the reconciler calls back in here, zeroes the count again, and the count is pinned
+            // at 1 forever. The breaker could then never reach RECORDING_FAILURE_SUSPEND_THRESHOLD
+            // and ffmpeg was respawned every 60s indefinitely — the orphan-ffmpeg storm the
+            // breaker exists to stop. suspendOffline() re-arms this on the next genuine outage.
+            if (state.offlineResetPending) {
+                state.consecutiveFailureCount = 0;
+                state.offlineResetPending = false;
+            }
         }
         return attemptRecovery(cameraId, state.suspendedReason, nowMs);
     }
@@ -229,7 +247,14 @@ export function createRecordingHealthMonitor({
                 // Data is flowing. Confirm recovery only after the stream has stayed
                 // healthy for a sustained window since the last restart — a freshly
                 // spawned process that has not proven itself must not clear the breaker.
-                if (state.consecutiveFailureCount > 0
+                // `suspendedReason` is checked too, not just the counter. markRecovered is the ONLY
+                // writer that clears suspendedReason, so gating solely on the counter meant a
+                // camera that came back from an outage (count reset to 0 above, reason still
+                // 'camera_offline') could record healthily for hours while every status read still
+                // reported it suspended — and the moment it stopped for any benign reason it was
+                // shown as 'suspended_offline'. Data has flowed for the confirm window here, which
+                // is exactly what "recovered" means.
+                if ((state.consecutiveFailureCount > 0 || state.suspendedReason)
                     && (nowMs - (state.lastRestartAt || 0)) >= RECORDING_RECOVERY_CONFIRM_MS) {
                     api.markRecovered(cameraId, nowMs);
                 }

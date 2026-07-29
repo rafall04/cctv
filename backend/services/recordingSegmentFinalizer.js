@@ -147,8 +147,12 @@ export function createRecordingSegmentFinalizer({
              * genuine finalize failure and stays on stderr where it can be seen.
              */
             const message = error.message || 'finalize_failed';
+            // `Invalid data found` is NOT in this list on purpose: that is ffmpeg's generic verdict
+            // on corrupt input, so demoting it would hide a real integrity failure — e.g. a provider
+            // serving corrupt H.264 would fail every segment while the error log stayed clean.
+            // Only the two genuinely-expected conditions are demoted.
             const expected = error.code === 'ENOENT'
-                || /ENOENT|moov atom not found|Invalid data found/i.test(message);
+                || /ENOENT|moov atom not found/i.test(message);
             const emit = expected ? logger.log : logger.warn;
             emit?.call(logger, `[RecordingFinalizer] Failed camera${cameraId}/${finalFilename}: ${message}`);
             await safeUnlink(tempPath, 'temp file');

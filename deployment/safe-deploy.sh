@@ -374,8 +374,13 @@ if [ "$HEALTH_OK" = "1" ]; then
 
     # Ask the RUNNING process which commit it is. /health only proves something answers; this
     # proves the thing answering is the code we just deployed.
+    # `|| true` is load-bearing: this runs under `set -euo pipefail`, so without it a failing
+    # curl (429 from the rate limiter, a 5xx during boot, a socket reset mid-restart) makes the
+    # assignment itself fail and kills the script HERE — after both services were restarted but
+    # before the crash-restart stability gate below. The deploy would then abort silently on
+    # exactly the runs where the gate matters most, and the warn branch below would be dead code.
     RUNNING_BUILD="$(curl -fsS "http://localhost:${PORT}/api/config/public" 2>/dev/null \
-        | sed -n 's/.*"buildId"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
+        | sed -n 's/.*"buildId"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' || true)"
     if [ -z "$RUNNING_BUILD" ]; then
         warn "Could not read buildId from /api/config/public — cannot confirm the new code is live."
     elif [ "$RUNNING_BUILD" = "$DEPLOYED_COMMIT" ]; then

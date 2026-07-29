@@ -30,30 +30,30 @@
  */
 :root {
     /* Surfaces: page -> card -> hover -> popover */
-    --surface-sunken:  #f6f7f9;
-    --surface:         #ffffff;
-    --surface-raised:  #ffffff;
-    --surface-overlay: #ffffff;
+    --surface-sunken:  246 247 249;
+    --surface:         255 255 255;
+    --surface-raised:  255 255 255;
+    --surface-overlay: 255 255 255;
 
     /* Edges: two weights on purpose */
-    --edge:        #e4e7eb;
-    --edge-strong: #cbd1d9;
+    --edge:        228 231 235;
+    --edge-strong: 203 209 217;
 
     /* Content: three text weights, no more */
-    --content:        #0b0d0f;
-    --content-muted:  #5a626d;
-    --content-subtle: #656c78; /* WCAG AA 4.5:1 even at 10px on white/surface-sunken (was #858d98 = 3.4:1, failed) */
+    --content:        11 13 15;
+    --content-muted:  90 98 109;
+    --content-subtle: 101 108 120; /* WCAG AA 4.5:1 even at 10px on white/surface-sunken (was #858d98 = 3.4:1, failed) */
 
     /* Status: meaning, not decoration */
-    --status-live:  #059669;
-    --status-warn:  #b45309;
-    --status-fault: #dc2626;
-    --status-idle:  #9ca3af;
+    --status-live:  5 150 105;
+    --status-warn:  180 83 9;
+    --status-fault: 220 38 38;
+    --status-idle:  156 163 175;
 
     /* Data accent (operational redesign): viewer counts, timelines, interactive
      * data highlights. NOT a status — it never means health. Cyan reads as
      * "instrument readout" and stays distinct from brand red + status green. */
-    --data: #0284c7;
+    --data: 2 132 199;
 
     /* Radius scale: controls and cards, plus rounded-full for true pills */
     --radius-control: 0.5rem;
@@ -65,24 +65,24 @@
 }
 
 .dark {
-    --surface-sunken:  #08090b;
-    --surface:         #0b0d0f;
-    --surface-raised:  #12151a;
-    --surface-overlay: #171b21;
+    --surface-sunken:  8 9 11;
+    --surface:         11 13 15;
+    --surface-raised:  18 21 26;
+    --surface-overlay: 23 27 33;
 
-    --edge:        #1c2024;
-    --edge-strong: #2a3038;
+    --edge:        28 32 36;
+    --edge-strong: 42 48 56;
 
-    --content:        #e9ebed;
-    --content-muted:  #9aa0a6;
-    --content-subtle: #868c93; /* WCAG AA 4.5:1 on dark surfaces incl. surface-overlay (was #6c7278 = 4.0:1, failed) */
+    --content:        233 235 237;
+    --content-muted:  154 160 166;
+    --content-subtle: 134 140 147; /* WCAG AA 4.5:1 on dark surfaces incl. surface-overlay (was #6c7278 = 4.0:1, failed) */
 
-    --status-live:  #10b981;
-    --status-warn:  #f59e0b;
-    --status-fault: #ef4444;
-    --status-idle:  #6b7280;
+    --status-live:  16 185 129;
+    --status-warn:  245 158 11;
+    --status-fault: 239 68 68;
+    --status-idle:  107 114 128;
 
-    --data: #38bdf8;
+    --data: 56 189 248;
 
     /* Depth in a dark UI comes from the surface step + edge, not from shadow. */
     --elevation-1: 0 1px 2px rgb(0 0 0 / 0.4);
@@ -146,7 +146,7 @@ body {
          * a modest layout slip looked like half the screen had broken off. With the
          * canvas themed, the same slip degrades quietly instead of screaming.
          */
-        background-color: var(--surface-sunken);
+        background-color: rgb(var(--surface-sunken));
         /* Second line of defence next to the html rule above. */
         overflow-x: clip;
     }

@@ -45,12 +45,24 @@ export function getFfmpegMajorVersion({ exec = null, binary = 'ffmpeg' } = {}) {
     try {
         const run = exec || requireFromHere('node:child_process').execFileSync;
         const out = String(run(binary, ['-version'], { encoding: 'utf8', timeout: 5000 }));
-        // "ffmpeg version 4.2.7-0ubuntu0.1 ..." / "ffmpeg version n6.0 ..." / "... version 7.1"
-        const match = /ffmpeg version n?(\d+)\./i.exec(out);
+        /*
+         * Accept a major with or without a following dot. Requiring `\d+\.` missed the builds most
+         * likely to be NEW: git/snapshot and static tarballs print `ffmpeg version N-113456-g5f2f0e`
+         * and a bare `ffmpeg version 7` has no dot either — both would have fallen back to 4.x
+         * behaviour and emitted `-stimeout` to an ffmpeg that removed it, which is the exact
+         * box-wide recording outage this module exists to prevent.
+         */
+        const match = /ffmpeg version n?(\d+)(?:[.\-\s]|$)/i.exec(out);
         cachedMajorVersion = match ? Number.parseInt(match[1], 10) : null;
     } catch {
-        // Not installed, not on PATH, or too slow — callers fall back to 4.x behaviour.
-        cachedMajorVersion = null;
+        /*
+         * Do NOT cache a failure. `undefined` means "not probed yet", `null` means "probed and
+         * genuinely unknown". A transient EAGAIN/ENOMEM under boot-storm fork pressure, or this
+         * call tripping its own 5s timeout on a loaded box, must not pin the whole process to
+         * 4.x behaviour for its entire lifetime — on an ffmpeg 5+ host that would kill every
+         * recorder until restart. Leaving it unset lets the next caller retry.
+         */
+        return null;
     }
 
     return cachedMajorVersion;

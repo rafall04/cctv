@@ -196,14 +196,16 @@ class ThumbnailService {
         }
 
         if (isRtsp) {
-            const rtspArgs = buildFfmpegRtspInputArgs(sourceUrl, rtspTransport);
-            const inputIndex = rtspArgs.indexOf('-i');
-            if (inputIndex >= 0) {
-                rtspArgs.splice(inputIndex, 0, '-stimeout', '10000000');
-                args.push(...rtspArgs);
-                return args;
-            }
-            args.push('-stimeout', '10000000');
+            /*
+             * Ask the policy for the socket timeout instead of splicing a literal `-stimeout`.
+             * The hand-rolled splice bypassed the version-aware naming entirely, so an ffmpeg 5+
+             * upgrade (where -stimeout was removed) would have killed every RTSP thumbnail while
+             * the recorders — which do go through this helper — kept working.
+             */
+            args.push(...buildFfmpegRtspInputArgs(sourceUrl, rtspTransport, {
+                socketTimeoutMicros: 10_000_000,
+            }));
+            return args;
         } else {
             args.push('-rw_timeout', '10000000');
         }

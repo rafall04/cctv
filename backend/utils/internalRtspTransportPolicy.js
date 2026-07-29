@@ -61,11 +61,18 @@ export function buildFfmpegRtspInputArgs(inputUrl, transport = 'tcp', {
     // Biased deliberately toward 4.x: only a positively-identified major >= 5 switches
     // the name. An undetectable version keeps today's proven behaviour rather than
     // gambling on a guess.
-    const major = ffmpegMajorVersion === undefined ? getFfmpegMajorVersion() : ffmpegMajorVersion;
-    const timeoutOption = Number.isFinite(major) && major >= 5 ? '-timeout' : '-stimeout';
-    const timeoutArgs = Number.isFinite(socketTimeoutMicros) && socketTimeoutMicros > 0
-        ? [timeoutOption, String(Math.floor(socketTimeoutMicros))]
-        : [];
+    // The probe is INSIDE the guard on purpose: getFfmpegMajorVersion() shells out synchronously
+    // (execFileSync, 5s timeout), and callers that pass no socketTimeoutMicros cannot use the
+    // answer. Computing it unconditionally blocked the Fastify event loop on paths that then
+    // threw the result away.
+    const timeoutArgs = [];
+    if (Number.isFinite(socketTimeoutMicros) && socketTimeoutMicros > 0) {
+        const major = ffmpegMajorVersion === undefined ? getFfmpegMajorVersion() : ffmpegMajorVersion;
+        timeoutArgs.push(
+            Number.isFinite(major) && major >= 5 ? '-timeout' : '-stimeout',
+            String(Math.floor(socketTimeoutMicros)),
+        );
+    }
 
     if (normalized === 'auto') {
         return [...timeoutArgs, '-i', inputUrl];

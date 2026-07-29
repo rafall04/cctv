@@ -54,14 +54,20 @@ describe('recordingRecoveryDiagnosticsRepository', () => {
         ]);
     });
 
-    it('clears diagnostic after successful registration', async () => {
+    it('clears diagnostic by dropping the stale twin first, then resolving the active row', async () => {
+        // The twin DELETE is not cosmetic: without it the UPDATE collides with
+        // UNIQUE(camera_id, filename, active) whenever a file failed, resolved, then failed again.
+        // The behavioural proof (a real UNIQUE index raising) lives in
+        // recordingRecoveryDiagnosticsPrune.test.js — a mocked `execute` can never raise it.
         const repository = (await import('../services/recordingRecoveryDiagnosticsRepository.js')).default;
         repository.clearDiagnostic({ cameraId: 7, filename: '20260511_211000.mp4' });
 
         expect(executeMock).toHaveBeenCalledWith(
-            'UPDATE recording_recovery_diagnostics SET active = 0, resolved_at = CURRENT_TIMESTAMP WHERE camera_id = ? AND filename = ? AND active = 1',
+            'DELETE FROM recording_recovery_diagnostics WHERE camera_id = ? AND filename = ? AND active = 0',
             [7, '20260511_211000.mp4']
         );
+        expect(executeMock.mock.calls.at(-1)[0]).toMatch(/SET active = 0, resolved_at = CURRENT_TIMESTAMP/);
+        expect(executeMock.mock.calls.at(-1)[1]).toEqual([7, '20260511_211000.mp4']);
     });
 
     it('returns an active diagnostic by camera and filename', async () => {

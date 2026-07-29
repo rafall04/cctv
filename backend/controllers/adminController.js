@@ -575,20 +575,35 @@ export async function importDatabaseBackup(request, reply) {
             });
         }
 
+        /*
+         * A restore can now REFUSE rows instead of destroying the live ones they collide with
+         * (see backupService: the old INSERT OR REPLACE deleted the conflicting row). Refusing is
+         * the safe behaviour, but reporting it as a clean success is not: an operator restoring
+         * onto a live DB whose AUTOINCREMENT ids have drifted can have most rows rejected on a
+         * secondary UNIQUE and never learn of it. Surface the count in the message AND the audit
+         * trail, so "it said success" is never the whole story.
+         */
+        const refusedRows = Object.values(result.conflicts || {})
+            .reduce((total, rows) => total + rows.length, 0);
+
         logAdminAction({
             action: 'backup_imported',
             details: {
                 mode,
                 imported: result.imported,
                 skipped: result.skipped,
-                errors: result.errors
+                errors: result.errors,
+                conflicts: result.conflicts,
+                refusedRows
             },
             userId: request.user?.id
         }, request);
 
         return reply.send({
             success: true,
-            message: 'Backup berhasil diimport',
+            message: refusedRows > 0
+                ? `Backup diimport dengan ${refusedRows} baris DITOLAK (bentrok dengan data yang ada — tidak ada data lama yang dihapus). Periksa "conflicts".`
+                : 'Backup berhasil diimport',
             data: result
         });
     } catch (error) {

@@ -224,6 +224,45 @@ describe('guardrail: only real semantic tokens (typo-proofing)', () => {
     };
     const PREFIX = '(?:text|bg|border|ring|fill|stroke|divide|from|to|via|decoration|outline|shadow|accent|caret|placeholder)';
 
+    /*
+     * The list above only proves the token NAME exists. It deliberately strips the `/NN` opacity
+     * suffix — which made it blind to a second silent-drop: Tailwind cannot compute alpha for a
+     * colour declared as a bare `var(--x)` string, so `bg-edge/50` compiled to NOTHING while
+     * `bg-edge` compiled fine. 88 usages across 26 files (bg-status-fault/10, border-edge/50, …)
+     * were dead in production: skeletons rendered with no background at all, and `border-edge/50`
+     * fell back to Tailwind preflight's light grey in BOTH themes.
+     *
+     * The fix is at the source — tokens are now `rgb(var(--x) / <alpha-value>)` over channel
+     * triplets — so this guard defends that form. Revert a token to bare `var(--x)` and every
+     * `token/NN` in the app silently dies again.
+     */
+    it('every semantic token is declared alpha-capable, so `token/NN` cannot silently vanish', () => {
+        const config = fs.readFileSync(path.resolve(SRC_ROOT, '..', 'tailwind.config.js'), 'utf8');
+        const ROLE_RE = /'(?:rgb\()?var\(--((?:surface|edge|content|status|data)(?:-[a-z]+)?)\)(?:[^']*)?'/g;
+        const offenders = [];
+        for (const m of config.matchAll(ROLE_RE)) {
+            if (!/rgb\(var\(--[a-z-]+\) \/ <alpha-value>\)/.test(m[0])) {
+                offenders.push(`--${m[1]}: ${m[0]} — must be 'rgb(var(--${m[1]}) / <alpha-value>)'`);
+            }
+        }
+        expect(
+            offenders,
+            `\nToken declared without alpha support — every \`token/NN\` utility using it compiles to nothing:\n  ${
+                offenders.join('\n  ')}\n`,
+        ).toEqual([]);
+    });
+
+    it('token CSS variables hold channel triplets, not hex (hex breaks the alpha form)', () => {
+        const css = fs.readFileSync(path.join(SRC_ROOT, 'index.css'), 'utf8');
+        const offenders = [...css.matchAll(/--((?:surface|edge|content|status|data)(?:-[a-z]+)?):\s*(#[0-9a-fA-F]{3,8})/g)]
+            .map((m) => `--${m[1]}: ${m[2]} — use space-separated channels, e.g. 228 231 235`);
+        expect(
+            [...new Set(offenders)],
+            `\nSemantic token still a hex literal; \`rgb(var(--x) / <alpha>)\` cannot consume it:\n  ${
+                [...new Set(offenders)].join('\n  ')}\n`,
+        ).toEqual([]);
+    });
+
     it('every status/surface/content/edge modifier used in JSX is defined', () => {
         const offenders = [];
         for (const role of Object.keys(VALID)) {

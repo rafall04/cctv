@@ -228,9 +228,13 @@ export function createRecordingRecoveryScanner({
          * two lines. These counters already existed but were never reported anywhere — the
          * volume was high and the visibility was still zero. Silent when nothing happened.
          */
-        const queued = result.queuedSegments + result.duplicatePartialsDeleted
-            + result.emptyPartialsDeleted + result.retrySkipped;
-        if (queued > 0) {
+        // retrySkipped is deliberately NOT in this gate. A file parked as `retain_dormant` is
+        // re-skipped on every scan until retention removes it, so including it would print this
+        // line every 60s forever once anything goes dormant — reintroducing the steady-state
+        // noise this aggregate replaced. It is still reported when something else did happen.
+        const didSomething = result.queuedSegments + result.duplicatePartialsDeleted
+            + result.emptyPartialsDeleted;
+        if (didSomething > 0) {
             logger.log?.(`[Scanner] ${result.scannedCameras} camera(s): queued=${result.queuedSegments} dupDeleted=${result.duplicatePartialsDeleted} emptyDeleted=${result.emptyPartialsDeleted} retrySkipped=${result.retrySkipped}`);
         }
 

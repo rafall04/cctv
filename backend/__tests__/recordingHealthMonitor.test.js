@@ -335,6 +335,47 @@ describe('recordingHealthMonitor.tick', () => {
         expect(monitor.getState(7).consecutiveFailureCount).toBe(2);
     });
 
+    it('REGRESSION: the breaker can still trip when a camera is online but never records', async () => {
+        /*
+         * The offline->online failure-count reset must be consumed ONCE per outage. Without that,
+         * markFailure re-stamps suspendedReason to 'camera_offline' while the count is below the
+         * threshold, the lifecycle policy reads that value as "bypass cooldown", the reconciler
+         * calls handleCameraBecameOnline again, and the count is zeroed forever. The breaker then
+         * never reaches RECORDING_FAILURE_SUSPEND_THRESHOLD and ffmpeg is respawned every 60s
+         * indefinitely -- the orphan-ffmpeg storm this breaker exists to prevent.
+         */
+        const { deps, processManager } = createDeps();
+        processManager.getStatus.mockReturnValue({ status: 'stopped', isRecording: false });
+        const monitor = createRecordingHealthMonitor(deps);
+
+        monitor.suspendOffline(7, 0);                  // camera went offline: reset is armed
+        for (let i = 0; i < 6; i += 1) {
+            const state = monitor.ensureState(7);
+            state.cooldownUntil = 0;                   // policy bypasses cooldown for 'camera_offline'
+            await monitor.handleCameraBecameOnline(7, 1000 + i * 60_000);
+            monitor.markFailure(7, 'camera_offline', 1000 + i * 60_000);
+        }
+
+        // The single armed reset was spent on the first attempt; the rest accumulate.
+        expect(monitor.getState(7).consecutiveFailureCount).toBeGreaterThanOrEqual(3);
+        expect(monitor.getState(7).suspendedReason).toBe('waiting_retry');
+    });
+
+    it('still gives a rebooted camera its one fast retry per outage', async () => {
+        const { deps, processManager } = createDeps();
+        processManager.getStatus.mockReturnValue({ status: 'stopped', isRecording: false });
+        const monitor = createRecordingHealthMonitor(deps);
+
+        const state = monitor.ensureState(7);
+        state.consecutiveFailureCount = 7;             // stale count from a previous outage
+        monitor.suspendOffline(7, 0);
+        state.cooldownUntil = 0;
+        await monitor.handleCameraBecameOnline(7, 1000);
+
+        // Reset consumed: the rebooted camera is not punished for the outage it just left.
+        expect(monitor.getState(7).consecutiveFailureCount).toBe(0);
+    });
+
     it('stops recording + suspends offline when frozen but camera confirmed offline', async () => {
         const { deps, processManager, queryOne, stopRecording, restartRecording } = createDeps();
         processManager.getStatus.mockReturnValue({ status: 'recording', isRecording: true });

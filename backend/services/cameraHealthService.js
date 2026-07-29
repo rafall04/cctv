@@ -2633,7 +2633,7 @@ class CameraHealthService {
                 if (isOnline) onlineCount += 1;
                 else {
                     offlineCount += 1;
-                    (statusChanged ? console.warn : console.log)(`[CameraHealth] Camera ${camera.id} (${camera.name}) offline reason: ${rawReason}`); // transition=stderr, steady-state=stdout: a provider still being down is info, not an app error (5,322/day buried the ~113 real ones)
+                    if (statusChanged) console.warn(`[CameraHealth] Camera ${camera.id} (${camera.name}) went offline: ${rawReason}`); // transition only — steady state is already carried by the "Check complete: N online, M offline" summary at the end of this sweep, so logging it per camera per tick just reprinted 5,322 lines/day of the same fact
                 }
             }
 

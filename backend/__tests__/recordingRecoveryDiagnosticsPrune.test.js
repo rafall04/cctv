@@ -131,3 +131,44 @@ describe('pruneAbsentActiveDiagnostics', () => {
         expect(activeRows()).toEqual([]);
     });
 });
+
+describe('clearDiagnostic — the same UNIQUE collision, on the SUCCESS path', () => {
+    /*
+     * A file that failed, was resolved, then failed again holds BOTH an active row and a resolved
+     * twin. The old `UPDATE ... SET active = 0` collided with UNIQUE(camera_id, filename, active)
+     * and threw — AFTER upsertSegment had already written the segment. The finalizer's catch then
+     * reported success:false for a segment that actually finalized, skipped the .partial unlink so
+     * the file lingered forever, and the runner re-queued completed work.
+     *
+     * Only a real UNIQUE index can raise this; the sibling mock-based test cannot.
+     */
+    it('REGRESSION: resolves a diagnostic that already has a resolved twin, without throwing', () => {
+        h.db.prepare(
+            `INSERT INTO recording_recovery_diagnostics (camera_id, filename, file_path, state, reason, detected_at, last_seen_at, active) VALUES (7, 'a.mp4', '/x/a.mp4', 'retryable_failed', 'lama', '2026-07-28', '2026-07-28', 0)`
+        ).run();
+        h.db.prepare(
+            `INSERT INTO recording_recovery_diagnostics (camera_id, filename, file_path, state, reason, detected_at, last_seen_at, active, attempt_count) VALUES (7, 'a.mp4', '/x/a.mp4', 'retryable_failed', 'terbaru', '2026-07-28', '2026-07-28', 1, 5)`
+        ).run();
+
+        expect(() => repository.clearDiagnostic({ cameraId: 7, filename: 'a.mp4' })).not.toThrow();
+
+        const rows = h.db.prepare('SELECT active, reason, attempt_count FROM recording_recovery_diagnostics WHERE camera_id = 7').all();
+        expect(rows).toHaveLength(1);
+        expect(rows[0].active).toBe(0);
+        // The ACTIVE row is the informative one — it carries the latest reason and attempt count.
+        expect(rows[0].reason).toBe('terbaru');
+        expect(rows[0].attempt_count).toBe(5);
+    });
+
+    it('still resolves normally when there is no twin', () => {
+        h.db.prepare(
+            `INSERT INTO recording_recovery_diagnostics (camera_id, filename, file_path, state, reason, detected_at, last_seen_at, active) VALUES (9, 'b.mp4', '/x/b.mp4', 'retryable_failed', 'sendirian', '2026-07-28', '2026-07-28', 1)`
+        ).run();
+
+        repository.clearDiagnostic({ cameraId: 9, filename: 'b.mp4' });
+
+        const row = h.db.prepare('SELECT active, reason FROM recording_recovery_diagnostics WHERE camera_id = 9').get();
+        expect(row.active).toBe(0);
+        expect(row.reason).toBe('sendirian');
+    });
+});
