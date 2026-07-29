@@ -2,6 +2,8 @@
   "name": "CCTV System",
   "short_name": "CCTV",
   "description": "Pantau CCTV secara online dan live streaming 24 jam",
+  "id": "/",
+  "scope": "/",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0f172a",
@@ -25,49 +27,49 @@
       "type": "image/png"
     }
   ],
-  "categories": ["security", "utilities"],
+  "categories": [
+    "security",
+    "utilities"
+  ],
   "shortcuts": [
     {
       "name": "Peta CCTV",
       "short_name": "Peta",
       "description": "Buka peta CCTV publik",
       "url": "/?view=map",
-      "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
+      "icons": [
+        {
+          "src": "/favicon.svg",
+          "sizes": "any",
+          "type": "image/svg+xml"
+        }
+      ]
     },
     {
       "name": "Grid CCTV",
       "short_name": "Grid",
       "description": "Buka grid CCTV publik",
       "url": "/?view=grid",
-      "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
+      "icons": [
+        {
+          "src": "/favicon.svg",
+          "sizes": "any",
+          "type": "image/svg+xml"
+        }
+      ]
     },
     {
       "name": "Playback",
       "short_name": "Playback",
       "description": "Buka halaman playback publik",
       "url": "/playback",
-      "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
-    },
-    {
-      "name": "Admin Dashboard",
-      "short_name": "Admin",
-      "description": "Buka dashboard admin RAF",
-      "url": "/admin/dashboard",
-      "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
-    },
-    {
-      "name": "Kamera Admin",
-      "short_name": "Kamera",
-      "description": "Kelola kamera CCTV dari admin",
-      "url": "/admin/cameras",
-      "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
-    },
-    {
-      "name": "Health CCTV",
-      "short_name": "Health",
-      "description": "Cek status health CCTV",
-      "url": "/admin/health-debug",
-      "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
+      "icons": [
+        {
+          "src": "/favicon.svg",
+          "sizes": "any",
+          "type": "image/svg+xml"
+        }
+      ]
     }
   ],
   "lang": "id",

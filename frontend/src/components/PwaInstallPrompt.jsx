@@ -13,8 +13,34 @@ const PUBLIC_DISMISS_KEY = 'rafnet_pwa_prompt_dismissed';
 const ADMIN_DISMISS_KEY = 'rafnet_admin_pwa_prompt_dismissed';
 const DEFAULT_DELAY_MS = 11000;
 
+// Bump when either manifest changes: `public/` files are copied unhashed, and the edge serves them
+// immutable for a year — an edited manifest sat at the CDN for 30 days once. Identity is pinned by
+// the manifest's own `id`, so a query string here cannot orphan an installed app.
+const MANIFEST_VERSION = '1';
+const PUBLIC_MANIFEST = `/site.webmanifest?v=${MANIFEST_VERSION}`;
+const ADMIN_MANIFEST = `/admin.webmanifest?v=${MANIFEST_VERSION}`;
+
 function isStandaloneDisplay() {
     return window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator?.standalone === true;
+}
+
+/**
+ * Point <link rel="manifest"> at the admin app while on /admin, and back at the public app
+ * otherwise. This is what makes "Install" on an admin page install ADMIN — same origin, same
+ * bundle, but its own name, icon, start_url and shortcuts. Without it the browser installs
+ * whatever single manifest the document shipped with, so an admin who installed from /admin got
+ * an app called "CCTV System" that opened the public landing page.
+ */
+function useRouteManifest(isAdminRoute) {
+    useEffect(() => {
+        if (typeof document === 'undefined') return;
+        const link = document.querySelector('link[rel="manifest"]');
+        if (!link) return;
+        const next = isAdminRoute ? ADMIN_MANIFEST : PUBLIC_MANIFEST;
+        if (link.getAttribute('href') !== next) {
+            link.setAttribute('href', next);
+        }
+    }, [isAdminRoute]);
 }
 
 export default function PwaInstallPrompt({ delayMs = DEFAULT_DELAY_MS }) {
@@ -35,6 +61,8 @@ export default function PwaInstallPrompt({ delayMs = DEFAULT_DELAY_MS }) {
             body: 'Buka lebih cepat dari layar utama tanpa mencari browser lagi.',
             className: 'top-20',
         };
+
+    useRouteManifest(isAdminRoute);
 
     useEffect(() => {
         if (typeof window === 'undefined') {

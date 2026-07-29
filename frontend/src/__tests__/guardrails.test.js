@@ -147,6 +147,69 @@ describe('guardrail: unhashed public/ scripts must be cache-busted', () => {
     });
 });
 
+describe('guardrail: the two PWAs keep separate, stable identities', () => {
+    /*
+     * Public and admin are two installable apps served from ONE origin, told apart only by their
+     * manifest `id`/`scope`/`start_url`. Get that wrong and the damage lands on someone's home
+     * screen, where it cannot be fixed by a deploy:
+     *   - drop `id` and identity falls back to start_url, so an edit can orphan every existing
+     *     install into a duplicate ghost icon;
+     *   - let the scopes overlap and the browser may treat admin as the same app as public,
+     *     which is exactly what this split exists to stop.
+     * The public `id` MUST stay "/" — that is the identity browsers already derived when the field
+     * was absent, so it is what currently-installed apps are keyed by.
+     */
+    const FRONTEND_ROOT = path.resolve(SRC_ROOT, '..');
+    const readManifest = (name) => JSON.parse(fs.readFileSync(path.join(FRONTEND_ROOT, 'public', name), 'utf8'));
+
+    it('public manifest keeps the identity existing installs are keyed by', () => {
+        const pub = readManifest('site.webmanifest');
+        expect(pub.id, 'changing this orphans every installed public app').toBe('/');
+        expect(pub.scope).toBe('/');
+        expect(pub.start_url).toBe('/');
+    });
+
+    it('admin manifest is a distinct app scoped to /admin', () => {
+        const admin = readManifest('admin.webmanifest');
+        expect(admin.id).toBe('/admin');
+        expect(admin.scope).toBe('/admin');
+        expect(admin.start_url.startsWith('/admin')).toBe(true);
+        const pub = readManifest('site.webmanifest');
+        expect(admin.id).not.toBe(pub.id);
+        expect(admin.name).not.toBe(pub.name);
+    });
+
+    it('the two apps do not share an icon — identical icons defeat the split', () => {
+        const iconSrcs = (m) => new Set(m.icons.map((i) => i.src));
+        const pub = iconSrcs(readManifest('site.webmanifest'));
+        const admin = iconSrcs(readManifest('admin.webmanifest'));
+        const shared = [...admin].filter((src) => pub.has(src));
+        expect(shared, `both manifests point at ${shared.join(', ')} — they would be indistinguishable`).toEqual([]);
+    });
+
+    it('every icon and shortcut target referenced by either manifest exists', () => {
+        const missing = [];
+        for (const name of ['site.webmanifest', 'admin.webmanifest']) {
+            for (const icon of readManifest(name).icons) {
+                if (!fs.existsSync(path.join(FRONTEND_ROOT, 'public', icon.src.replace(/^\//, '')))) {
+                    missing.push(`${name}: ${icon.src}`);
+                }
+            }
+        }
+        // A manifest whose icons 404 is silently not installable on Android.
+        expect(missing).toEqual([]);
+    });
+
+    it('admin shortcuts stay inside the admin scope, public shortcuts stay out of it', () => {
+        const adminOutside = readManifest('admin.webmanifest').shortcuts
+            .filter((s) => !s.url.startsWith('/admin')).map((s) => s.url);
+        const publicInside = readManifest('site.webmanifest').shortcuts
+            .filter((s) => s.url.startsWith('/admin')).map((s) => s.url);
+        expect(adminOutside, 'a shortcut outside scope opens in a browser tab, not the app').toEqual([]);
+        expect(publicInside, 'admin links do not belong in the public app').toEqual([]);
+    });
+});
+
 describe('guardrail: one owner for the page gutter', () => {
     /*
      * AdminLayout wraps every route in `px-4 lg:px-8` + `mx-auto max-w-7xl`. A page that pads its

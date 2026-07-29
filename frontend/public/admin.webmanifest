@@ -1,0 +1,91 @@
+{
+  "name": "CCTV Admin",
+  "short_name": "CCTV Admin",
+  "description": "Panel admin RAF CCTV — kamera, kesehatan sistem, rekaman, analitik.",
+  "id": "/admin",
+  "scope": "/admin",
+  "start_url": "/admin/dashboard",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#b45309",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/admin-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/admin-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/admin-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "categories": [
+    "security",
+    "utilities",
+    "productivity"
+  ],
+  "shortcuts": [
+    {
+      "name": "Kamera",
+      "short_name": "Kamera",
+      "description": "Kelola kamera CCTV",
+      "url": "/admin/cameras",
+      "icons": [
+        {
+          "src": "/admin-icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Rekaman",
+      "short_name": "Rekaman",
+      "description": "Dasbor rekaman",
+      "url": "/admin/recordings",
+      "icons": [
+        {
+          "src": "/admin-icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Kesehatan Sistem",
+      "short_name": "Health",
+      "description": "Diagnostik kesehatan kamera",
+      "url": "/admin/health-debug",
+      "icons": [
+        {
+          "src": "/admin-icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Analitik Penonton",
+      "short_name": "Analitik",
+      "description": "Statistik penonton",
+      "url": "/admin/viewer-analytics",
+      "icons": [
+        {
+          "src": "/admin-icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    }
+  ],
+  "lang": "id",
+  "dir": "ltr"
+}

@@ -12,7 +12,13 @@ import { describe, expect, it } from 'vitest';
 const publicAssetPath = (filename) => `public/${filename}`;
 
 describe('PWA public assets', () => {
-    it('defines app shortcuts for core public and admin workflows', () => {
+    /*
+     * Admin shortcuts used to live in the PUBLIC manifest, because there was only one manifest.
+     * They moved to admin.webmanifest when admin became its own installable app — a shortcut
+     * outside a manifest's own scope opens in a browser tab rather than in the app, so mixing
+     * them defeated both.
+     */
+    it('the public manifest offers public shortcuts, and no admin ones', () => {
         const manifest = JSON.parse(fs.readFileSync(publicAssetPath('site.webmanifest'), 'utf8'));
 
         expect(manifest.display).toBe('standalone');
@@ -20,9 +26,18 @@ describe('PWA public assets', () => {
             expect.objectContaining({ name: 'Peta CCTV', url: '/?view=map' }),
             expect.objectContaining({ name: 'Grid CCTV', url: '/?view=grid' }),
             expect.objectContaining({ name: 'Playback', url: '/playback' }),
-            expect.objectContaining({ name: 'Admin Dashboard', url: '/admin/dashboard' }),
-            expect.objectContaining({ name: 'Kamera Admin', url: '/admin/cameras' }),
-            expect.objectContaining({ name: 'Health CCTV', url: '/admin/health-debug' }),
+        ]));
+        expect(manifest.shortcuts.filter((s) => s.url.startsWith('/admin'))).toEqual([]);
+    });
+
+    it('the admin manifest is a separate installable app with its own shortcuts', () => {
+        const manifest = JSON.parse(fs.readFileSync(publicAssetPath('admin.webmanifest'), 'utf8'));
+
+        expect(manifest.display).toBe('standalone');
+        expect(manifest.start_url).toBe('/admin/dashboard');
+        expect(manifest.shortcuts).toEqual(expect.arrayContaining([
+            expect.objectContaining({ url: '/admin/cameras' }),
+            expect.objectContaining({ url: '/admin/health-debug' }),
         ]));
     });
 
