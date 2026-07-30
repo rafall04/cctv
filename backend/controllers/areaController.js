@@ -1,4 +1,5 @@
 import areaService from '../services/areaService.js';
+import { logAdminAction } from '../services/securityAuditLogger.js';
 
 export async function getAllAreas(request, reply) {
     try {
@@ -89,6 +90,13 @@ export async function getAreaById(request, reply) {
 export async function createArea(request, reply) {
     try {
         const newArea = areaService.createArea(request.body);
+        logAdminAction({
+            action: 'CREATE_AREA',
+            targetType: 'area',
+            targetId: newArea?.id,
+            details: { name: newArea?.name, kecamatan: newArea?.kecamatan },
+            userId: request.user?.id,
+        }, request);
         return reply.code(201).send({
             success: true,
             message: 'Area created successfully',
@@ -106,7 +114,29 @@ export async function createArea(request, reply) {
 export async function updateArea(request, reply) {
     try {
         const { id } = request.params;
+        // Read before the write: an audit trail exists to answer "what was it before".
+        const before = areaService.getAreaById(id);
         const updatedArea = areaService.updateArea(id, request.body);
+        logAdminAction({
+            action: 'UPDATE_AREA',
+            targetType: 'area',
+            targetId: Number(id),
+            details: {
+                name: updatedArea?.name,
+                // Only the fields that change what the PUBLIC sees are worth carrying.
+                from: before && {
+                    name: before.name,
+                    show_on_grid_default: before.show_on_grid_default,
+                    coverage_scope: before.coverage_scope,
+                },
+                to: {
+                    name: updatedArea?.name,
+                    show_on_grid_default: updatedArea?.show_on_grid_default,
+                    coverage_scope: updatedArea?.coverage_scope,
+                },
+            },
+            userId: request.user?.id,
+        }, request);
         return reply.send({
             success: true,
             message: 'Area updated successfully',
@@ -127,7 +157,17 @@ export async function updateArea(request, reply) {
 export async function deleteArea(request, reply) {
     try {
         const { id } = request.params;
+        // Capture identity BEFORE deletion — afterwards the row is gone, and a log that can only
+        // say "area 12 was deleted" is useless when reconstructing what happened.
+        const before = areaService.getAreaById(id);
         areaService.deleteArea(id);
+        logAdminAction({
+            action: 'DELETE_AREA',
+            targetType: 'area',
+            targetId: Number(id),
+            details: { name: before?.name, kecamatan: before?.kecamatan },
+            userId: request.user?.id,
+        }, request);
         return reply.send({ success: true, message: 'Area deleted successfully' });
     } catch (error) {
         if (error.statusCode === 400) {
