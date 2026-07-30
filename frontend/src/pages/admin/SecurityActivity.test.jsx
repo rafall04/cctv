@@ -28,7 +28,14 @@ vi.mock('../../contexts/NotificationContext', () => ({
     useNotification: () => ({ error: notifyErrorMock, success: vi.fn() }),
 }));
 
-vi.mock('../../contexts/TimezoneContext', () => ({
+/*
+ * Only useTimezone is stubbed. parseBackendDateInput/TIMESTAMP_STORAGE are pure and deterministic,
+ * and mocking them away is exactly what would hide a timezone bug: these rows are SQLite
+ * CURRENT_TIMESTAMP (UTC, no zone marker), and rendering them with a plain `new Date()` showed
+ * the admin log 7 hours early.
+ */
+vi.mock('../../contexts/TimezoneContext', async (importActual) => ({
+    ...(await importActual()),
     useTimezone: () => ({ timezone: 'Asia/Jakarta' }),
 }));
 

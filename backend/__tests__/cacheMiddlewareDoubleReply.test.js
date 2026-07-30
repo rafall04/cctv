@@ -37,8 +37,11 @@ function buildApp() {
         return payload;
     });
 
+    // 1h TTL, not the production 30s: this test is about the double-send, not about expiry.
+    // Under a memory-starved worker the two injects can land >30s apart, and the second one then
+    // legitimately MISSes — a flake that says nothing about the bug being guarded.
     let handlerCalls = 0;
-    app.get('/api/cameras/active', { preHandler: cacheMiddleware(30) }, async (_request, reply) => {
+    app.get('/api/cameras/active', { preHandler: cacheMiddleware(3600) }, async (_request, reply) => {
         handlerCalls += 1;
         return reply.send({ success: true, data: [{ id: 1 }] });
     });

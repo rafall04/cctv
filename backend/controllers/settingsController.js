@@ -8,6 +8,7 @@
 
 import settingsService from '../services/settingsService.js';
 import { getTimezone, TIMEZONE_MAP } from '../services/timezoneService.js';
+import { logAdminAction } from '../services/securityAuditLogger.js';
 
 function getTimezonePayload() {
     const timezone = getTimezone();
@@ -59,12 +60,56 @@ export async function getSetting(request, reply) {
     }
 }
 
+/*
+ * Settings hold secrets (bot tokens, gateway keys). An audit trail that copies values verbatim
+ * turns the log itself into a place credentials leak, so anything whose key OR nested field name
+ * looks secret is recorded as changed/unchanged, never quoted.
+ */
+const SECRET_KEY_PATTERN = /token|secret|password|passwd|api[_-]?key|private|credential/i;
+
+function redactForAudit(key, value) {
+    if (SECRET_KEY_PATTERN.test(String(key))) return '[disunting]';
+    if (value === null || value === undefined) return null;
+    if (typeof value === 'object') {
+        const out = {};
+        for (const [field, inner] of Object.entries(value)) {
+            out[field] = SECRET_KEY_PATTERN.test(field)
+                ? (inner ? '[disunting]' : null)
+                : (typeof inner === 'object' ? '[objek]' : inner);
+        }
+        return out;
+    }
+    // Long free text (landing copy, HTML) would bloat every row; keep it recognisable, not whole.
+    const text = String(value);
+    return text.length > 120 ? `${text.slice(0, 120)}…` : text;
+}
+
 export async function updateSetting(request, reply) {
     try {
         const { key } = request.params;
         const { value, description } = request.body;
 
+        // Read BEFORE the write: "what did it used to be" is the question an audit trail exists to
+        // answer, and it is unrecoverable afterwards.
+        let previousValue = null;
+        try {
+            previousValue = settingsService.getSetting(key)?.value ?? null;
+        } catch {
+            previousValue = null; // key did not exist yet — this update creates it
+        }
+
         const data = settingsService.updateSetting(key, value, description);
+
+        logAdminAction({
+            action: 'UPDATE_SETTING',
+            details: {
+                key,
+                from: redactForAudit(key, previousValue),
+                to: redactForAudit(key, value),
+                created: previousValue === null,
+            },
+            userId: request.user?.id,
+        }, request);
 
         return reply.send({
             success: true,

@@ -6,14 +6,32 @@
  * SideEffects: None (pure presentational helpers).
  */
 
+import { parseBackendDateInput, TIMESTAMP_STORAGE } from '../../../contexts/TimezoneContext';
+
 export function formatRupiah(value) {
     return `Rp${Number(value || 0).toLocaleString('id-ID')}`;
 }
 
-// Backend timestamps are "YYYY-MM-DD HH:MM:SS" — show date + HH:MM, drop seconds.
-export function formatDateTime(raw) {
+/*
+ * Backend timestamps are SQLite CURRENT_TIMESTAMP: "YYYY-MM-DD HH:MM:SS" in UTC, with no zone
+ * marker. This used to slice the string and print it as-is, so every payment and registration date
+ * in the billing tabs was shown 7 hours behind WIB — a money surface reading the wrong clock.
+ * Parse as UTC, then render in the operator's timezone.
+ */
+export function formatDateTime(raw, timezone = 'Asia/Jakarta') {
     if (!raw) return '—';
-    return String(raw).replace('T', ' ').slice(0, 16);
+    const date = parseBackendDateInput(String(raw), { storage: TIMESTAMP_STORAGE.UTC_SQL });
+    if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
+        return String(raw).replace('T', ' ').slice(0, 16);
+    }
+    return date.toLocaleString('id-ID', {
+        timeZone: timezone,
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
 }
 
 export const SUB_STATUS_BADGES = {

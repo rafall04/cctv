@@ -9,7 +9,7 @@ SideEffects: Fetches paginated security logs and 7-day stats.
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { adminService } from '../../services/adminService';
 import { useNotification } from '../../contexts/NotificationContext';
-import { useTimezone } from '../../contexts/TimezoneContext';
+import { useTimezone, parseBackendDateInput, TIMESTAMP_STORAGE } from '../../contexts/TimezoneContext';
 
 // Event types grouped by severity — drives the dropdown and the row tone.
 const THREAT_EVENTS = [
@@ -85,10 +85,16 @@ export default function SecurityActivity() {
     const [page, setPage] = useState(1);
     const [loading, setLoading] = useState(true);
 
+    /*
+     * These rows come from SQLite CURRENT_TIMESTAMP, which is ALWAYS UTC and carries no zone
+     * marker ("2026-07-29 11:49:32"). `new Date()` on that string parses it as LOCAL time, so on a
+     * WIB machine the log read 7 hours early — converting to Asia/Jakarta afterwards cannot undo a
+     * wrong instant. parseBackendDateInput with UTC_SQL appends the missing Z before parsing.
+     */
     const formatTimestamp = useCallback((value) => {
         if (!value) return '—';
-        const date = new Date(value);
-        if (Number.isNaN(date.getTime())) return String(value);
+        const date = parseBackendDateInput(value, { storage: TIMESTAMP_STORAGE.UTC_SQL });
+        if (Number.isNaN(date?.getTime?.())) return String(value);
         return date.toLocaleString('id-ID', {
             timeZone: timezone || 'Asia/Jakarta',
             day: '2-digit',
