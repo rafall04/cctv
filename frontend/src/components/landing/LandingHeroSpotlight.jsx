@@ -31,6 +31,7 @@ export default function LandingHeroSpotlight({ camera, onOpen, disableHeavyEffec
             <div className="relative aspect-video overflow-hidden bg-black">
                 <CameraThumbnail
                     thumbnailPath={camera.external_snapshot_url || camera.thumbnail_path}
+                    thumbnailVersion={camera.thumbnail_updated_at}
                     cameraName={camera.name}
                 />
                 {!disableHeavyEffects && (

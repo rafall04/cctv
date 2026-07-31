@@ -110,6 +110,7 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
                 <CameraThumbnail
                     cameraId={camera.id}
                     thumbnailPath={camera.external_snapshot_url || camera.thumbnail_path}
+                    thumbnailVersion={camera.thumbnail_updated_at}
                     cameraName={camera.name}
                     isMaintenance={status === STATUS.maintenance}
                     isOffline={status === STATUS.offline}

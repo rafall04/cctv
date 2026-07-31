@@ -90,6 +90,56 @@ describe('CameraThumbnail', () => {
         expect(recoveredImage.getAttribute('src')).toBe('/api/thumbnails/recovered.jpg');
     });
 
+    it('versions the thumbnail URL so a new capture is not served from a stale cache', () => {
+        render(
+            <CameraThumbnail
+                thumbnailPath="/api/thumbnails/16.jpg"
+                thumbnailVersion="2026-07-31 13:16:16"
+                cameraName="Simpang"
+            />
+        );
+
+        expect(screen.getByAltText('Simpang preview').getAttribute('src'))
+            .toBe('/api/thumbnails/16.jpg?v=2026-07-31%2013%3A16%3A16');
+    });
+
+    it('leaves third-party snapshot URLs untouched (they may be signed)', () => {
+        render(
+            <CameraThumbnail
+                thumbnailPath="https://up.example/snap.jpg?token=abc"
+                thumbnailVersion="2026-07-31 13:16:16"
+                cameraName="Eksternal"
+            />
+        );
+
+        expect(screen.getByAltText('Eksternal preview').getAttribute('src'))
+            .toBe('https://up.example/snap.jpg?token=abc');
+    });
+
+    it('re-renders the image when a newer capture arrives after an error', () => {
+        const { rerender, container } = render(
+            <CameraThumbnail
+                thumbnailPath="/api/thumbnails/16.jpg"
+                thumbnailVersion="2026-07-31 13:16:16"
+                cameraName="Simpang"
+            />
+        );
+
+        fireEvent.error(container.querySelector('img'));
+        expect(container.querySelector('img')).toBeNull();
+
+        rerender(
+            <CameraThumbnail
+                thumbnailPath="/api/thumbnails/16.jpg"
+                thumbnailVersion="2026-07-31 16:16:16"
+                cameraName="Simpang"
+            />
+        );
+
+        expect(container.querySelector('img').getAttribute('src'))
+            .toBe('/api/thumbnails/16.jpg?v=2026-07-31%2016%3A16%3A16');
+    });
+
     it('falls back to the maintenance icon when camera is in maintenance mode', () => {
         render(
             <CameraThumbnail

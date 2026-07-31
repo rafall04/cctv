@@ -34,8 +34,26 @@ function FallbackIcon({ isMaintenance, isOffline }) {
     );
 }
 
+// Thumbnail files keep a STABLE name (/api/thumbnails/16.jpg) and are overwritten in
+// place on every capture, so nothing in the URL tells a cache that the picture changed.
+// The origin already says `Cache-Control: public, max-age=0`, but Cloudflare rewrites
+// that to `max-age=14400` (its default 4h browser TTL, applied because .jpg is a
+// default-cacheable extension) — so a fresh capture stayed invisible for up to 4 hours
+// and no amount of reloading helped. Versioning the URL with thumbnail_updated_at makes
+// a new capture a genuinely new URL, which every cache layer honours.
+// External snapshot URLs are left untouched: they are third-party and may be signed.
+function withThumbnailVersion(path, version) {
+    if (!path || !version || !path.startsWith('/api/thumbnails/')) {
+        return path;
+    }
+
+    const separator = path.includes('?') ? '&' : '?';
+    return `${path}${separator}v=${encodeURIComponent(version)}`;
+}
+
 export default function CameraThumbnail({
     thumbnailPath,
+    thumbnailVersion = null,
     cameraName,
     isMaintenance = false,
     isOffline = false,
@@ -44,9 +62,12 @@ export default function CameraThumbnail({
     const [error, setError] = useState(false);
     const imageRef = useRef(null);
 
+    // Version is part of the deps on purpose: a camera whose thumbnail 404'd once must
+    // retry when a newer capture lands, otherwise the fallback icon sticks for the
+    // whole session.
     useEffect(() => {
         setError(false);
-    }, [thumbnailPath]);
+    }, [thumbnailPath, thumbnailVersion]);
 
     useEffect(() => {
         if (!imageRef.current) {
@@ -60,7 +81,7 @@ export default function CameraThumbnail({
         return <FallbackIcon isMaintenance={isMaintenance} isOffline={isOffline} />;
     }
     
-    const thumbnailUrl = buildApiAssetUrl(thumbnailPath);
+    const thumbnailUrl = buildApiAssetUrl(withThumbnailVersion(thumbnailPath, thumbnailVersion));
     
     return (
         <img

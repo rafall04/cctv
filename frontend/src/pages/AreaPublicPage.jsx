@@ -167,6 +167,7 @@ function AreaCameraCard({ camera, onClick, thumbnailPriority = false }) {
                 <CameraThumbnail
                     cameraId={camera.id}
                     thumbnailPath={camera.external_snapshot_url || camera.thumbnail_path}
+                    thumbnailVersion={camera.thumbnail_updated_at}
                     cameraName={camera.name}
                     isMaintenance={camera.status === 'maintenance'}
                     isOffline={camera.availability_state === 'offline'}
