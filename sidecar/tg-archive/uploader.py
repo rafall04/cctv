@@ -406,6 +406,32 @@ def is_stable(path, wait_sec):
         return False, 0
 
 
+# Telegram's CLOUD API reports throttling as a structured `parameters.retry_after`. The
+# self-hosted Bot API server does not: it answers HTTP 400 with the hint buried in the
+# description text ("too Many Requests: retry after 8"). In --local mode — the only mode
+# this sidecar runs in — the structured field is therefore always absent, the purpose-built
+# back-off below never fired once, and every throttle fell through to the caller's generic
+# 30/60/90s ladder. Measured on prod 2026-07-31: 15 throttles in 30 minutes, each paying
+# 30s for a documented 8s request, burning ~25% of wall-clock during a backfill.
+RETRY_AFTER_RE = re.compile(r'retry after (\d+)', re.IGNORECASE)
+
+# Prefix on the returned error telling the caller the mandated wait has ALREADY been served
+# inside call(), so it must not stack its own back-off on top.
+RATE_LIMITED = 'RATE_LIMITED'
+
+
+def retry_after_seconds(params, description):
+    """Seconds Telegram asked us to wait, from the structured field or the description."""
+    value = params.get('retry_after')
+    if value is None:
+        match = RETRY_AFTER_RE.search(description or '')
+        value = match.group(1) if match else None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def call(cfg, state, method, payload, log):
     """POST to the local Bot API. Handles 429 back-off and supergroup migration."""
     resp = requests.post(cfg.api(method), data=payload, timeout=cfg.timeout)
@@ -428,10 +454,12 @@ def call(cfg, state, method, payload, log):
         retry['chat_id'] = new
         return call(cfg, state, method, retry, log)
 
-    if params.get('retry_after'):
-        wait = int(params['retry_after']) + 1
+    wait_for = retry_after_seconds(params, desc)
+    if wait_for is not None:
+        wait = wait_for + 1
         log.warning('rate limited by Telegram, sleeping %ss', wait)
         time.sleep(wait)
+        return False, None, '%s %s %s' % (RATE_LIMITED, resp.status_code, desc)
 
     return False, None, '%s %s' % (resp.status_code, desc)
 
@@ -683,7 +711,10 @@ def process_one(cfg, state, router, seg, cam_meta, log):
         log.warning('seg %s upload attempt %s/%s failed: %s',
                     seg['id'], attempt, cfg.max_attempts, err)
         if attempt < cfg.max_attempts:
-            time.sleep(min(30 * attempt, 180))
+            # A throttle has already been waited out inside call(), for exactly as long as
+            # Telegram asked. Stacking the generic ladder on top would triple an 8s wait.
+            if not (err or '').startswith(RATE_LIMITED):
+                time.sleep(min(30 * attempt, 180))
 
     # Give up on this one rather than wedging the queue behind it forever.
     record(state, seg, 'failed', err, targets, cfg=cfg, log=log)
