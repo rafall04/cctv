@@ -43,6 +43,20 @@ export default function PlaybackTokenAccess({
                         placeholder="Masukkan token akses"
                         className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-primary dark:border-gray-700 dark:bg-gray-950 dark:text-white"
                     />
+                    {/*
+                     * The one moment a visitor is being asked for something they may not have — so the
+                     * way to get one belongs here, not on the landing page where a paid offer would
+                     * read as a paywall over the free live streams. Semantic tokens on purpose: the
+                     * gray-* classes around it are deprecated legacy, not a pattern to copy.
+                     */}
+                    {!tokenStatus && (
+                        <p className="mt-1 text-xs text-content-muted">
+                            Belum punya token?{' '}
+                            <a href="/playback/langganan" className="font-medium text-primary underline">
+                                Coba gratis 3 hari atau beli paket
+                            </a>
+                        </p>
+                    )}
                 </div>
                 <div className="flex gap-2">
                     <button
