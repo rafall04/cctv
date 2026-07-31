@@ -13,6 +13,8 @@ export default function PlaybackTokenForm({
     cameras,
     saving,
     selectedCameraIds,
+    areaOptions = [],
+    onToggleArea,
     cameraSearch = '',
     totalCameraCount = cameras.length,
     visibleCameraCount = cameras.length,
@@ -39,6 +41,7 @@ export default function PlaybackTokenForm({
                     <span className="mb-1 block text-sm font-medium text-content-muted">Scope Kamera</span>
                     <select value={form.scope_type} onChange={(event) => onUpdateForm('scope_type', event.target.value)} className="w-full rounded-lg border border-edge-strong px-3 py-2 text-sm dark:bg-gray-950 dark:text-white">
                         <option value="all">Semua kamera playback</option>
+                        <option value="area">Per area</option>
                         <option value="selected">Kamera tertentu</option>
                     </select>
                 </label>
@@ -77,6 +80,37 @@ export default function PlaybackTokenForm({
                     </select>
                 </label>
             </div>
+
+            {form.scope_type === 'area' && (
+                <div className="mt-4 rounded-lg border border-edge p-3">
+                    <div className="mb-1 text-sm font-medium text-content-muted">Pilih Area</div>
+                    {/*
+                     * Stated explicitly because it is the whole reason to pick area over "kamera
+                     * tertentu", and it is not visible from the checkboxes alone.
+                     */}
+                    <p className="mb-3 text-xs text-content-subtle">
+                        Kamera yang ditambahkan ke area ini nanti otomatis ikut tercakup — token tidak
+                        perlu dibuat ulang.
+                    </p>
+                    {areaOptions.length === 0 ? (
+                        <p className="text-sm text-content-muted">Belum ada kamera yang punya area.</p>
+                    ) : (
+                        <div className="grid gap-2 sm:grid-cols-2">
+                            {areaOptions.map((area) => (
+                                <label key={area.id} className="flex items-center gap-2 rounded-md bg-surface-sunken p-3 text-sm">
+                                    <input
+                                        type="checkbox"
+                                        checked={form.area_ids.includes(area.id)}
+                                        onChange={() => onToggleArea(area.id)}
+                                    />
+                                    <span className="truncate text-content">{area.name}</span>
+                                    <span className="ml-auto shrink-0 text-xs text-content-subtle">{area.cameraCount} CCTV</span>
+                                </label>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
 
             {form.scope_type === 'selected' && (
                 <div className="mt-4 rounded-lg border border-edge p-3">
@@ -117,7 +151,7 @@ export default function PlaybackTokenForm({
             </label>
 
             <div className="mt-4 flex justify-end">
-                <button type="submit" disabled={saving || (form.scope_type === 'selected' && selectedCameraIds.size === 0)} className="rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-white hover:bg-primary-600 disabled:cursor-not-allowed disabled:opacity-60">
+                <button type="submit" disabled={saving || (form.scope_type === 'selected' && selectedCameraIds.size === 0) || (form.scope_type === 'area' && form.area_ids.length === 0)} className="rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-white hover:bg-primary-600 disabled:cursor-not-allowed disabled:opacity-60">
                     {saving ? 'Membuat...' : 'Buat Token'}
                 </button>
             </div>

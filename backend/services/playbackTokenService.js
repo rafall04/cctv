@@ -10,6 +10,7 @@ import crypto from 'crypto';
 import { execute, query, queryOne, transaction } from '../database/connectionPool.js';
 import { parseUtcSql, toUtcSql } from './timeService.js';
 import playbackTokenRuleService from './playbackTokenRuleService.js';
+import { normalizeCameraIds, parseCameraIdsJson, parseAreaIdsJson, resolveAreaIdsForWrite } from './playbackTokenScopeIds.js';
 
 export const PLAYBACK_TOKEN_COOKIE = 'raf_playback_token';
 export const PLAYBACK_TOKEN_SESSION_COOKIE = 'raf_playback_session';
@@ -118,18 +119,11 @@ function normalizeAccessCodeLength(value) {
     return Math.min(Math.max(parsed, MIN_ACCESS_CODE_LENGTH), MAX_ACCESS_CODE_LENGTH);
 }
 
+// Unknown values fall back to 'all' — the WIDEST scope. Safe only because every consumer decides
+// 'area' and 'selected' explicitly before its own fall-through: a new scope added here without a
+// branch in playbackTokenRuleService.resolveCameraAccess silently grants every camera.
 function normalizeScopeType(value) {
-    return value === 'selected' ? 'selected' : 'all';
-}
-
-function normalizeCameraIds(value) {
-    if (!Array.isArray(value)) {
-        return [];
-    }
-
-    return [...new Set(value
-        .map((item) => Number.parseInt(item, 10))
-        .filter((item) => Number.isInteger(item) && item > 0))];
+    return ['selected', 'area'].includes(value) ? value : 'all';
 }
 
 function hashToken(token) {
@@ -228,14 +222,6 @@ function shouldThrottleTokenTouch(token, eventType, now = new Date()) {
     return (now.getTime() - lastUsedAt.getTime()) < TOKEN_TOUCH_THROTTLE_SECONDS * 1000;
 }
 
-function parseCameraIdsJson(value) {
-    try {
-        const parsed = JSON.parse(value || '[]');
-        return normalizeCameraIds(parsed);
-    } catch {
-        return [];
-    }
-}
 
 function sanitizeTokenRow(row) {
     if (!row) {
@@ -260,6 +246,8 @@ function sanitizeTokenRow(row) {
         preset: row.preset,
         scope_type: row.scope_type,
         camera_ids: cameraIds,
+        // Exposed so an edit that touches only the label can round-trip the areas back unchanged.
+        area_ids: parseAreaIdsJson(row.area_ids_json),
         camera_rules: cameraRules,
         camera_names: Array.isArray(row.camera_names) ? row.camera_names : [],
         allowed_camera_ids: [...new Set(allowedCameraIds)],
@@ -618,6 +606,8 @@ class PlaybackTokenService {
             throw err;
         }
 
+        const areaIds = resolveAreaIdsForWrite(scopeType, payload.area_ids);
+
         const now = new Date();
         const customExpiresAt = parseDate(payload.expires_at);
         const expiresAt = preset.expiresInHours === null
@@ -634,8 +624,8 @@ class PlaybackTokenService {
 
         const result = execute(
             `INSERT INTO playback_tokens
-            (label, token_hash, token_prefix, share_key_hash, share_key_prefix, preset, scope_type, camera_ids_json, playback_window_hours, expires_at, max_active_sessions, session_limit_mode, session_timeout_seconds, client_note, share_template, created_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            (label, token_hash, token_prefix, share_key_hash, share_key_prefix, preset, scope_type, camera_ids_json, area_ids_json, playback_window_hours, expires_at, max_active_sessions, session_limit_mode, session_timeout_seconds, client_note, share_template, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 label,
                 tokenHash,
@@ -645,6 +635,9 @@ class PlaybackTokenService {
                 presetKey,
                 scopeType,
                 JSON.stringify(cameraIds),
+                // NULL unless the scope is 'area', so the column can never be read as a restriction
+                // on a token that was not scoped by area.
+                scopeType === 'area' ? JSON.stringify(areaIds) : null,
                 playbackWindowHours,
                 toSqlDate(expiresAt),
                 sessionPolicy.maxActiveSessions,
@@ -783,6 +776,8 @@ class PlaybackTokenService {
             throw err;
         }
 
+        const areaIds = resolveAreaIdsForWrite(scopeType, payload.area_ids, existing.area_ids);
+
         const normalizedRules = candidateRules.length > 0 || scopeType === 'selected'
             ? playbackTokenRuleService.replaceRulesForToken(normalizedTokenId, candidateRules)
             : [];
@@ -792,6 +787,7 @@ class PlaybackTokenService {
             SET label = ?,
                 scope_type = ?,
                 camera_ids_json = ?,
+                area_ids_json = ?,
                 playback_window_hours = ?,
                 expires_at = ?,
                 max_active_sessions = ?,
@@ -805,6 +801,7 @@ class PlaybackTokenService {
                 label,
                 scopeType,
                 JSON.stringify(cameraIds),
+                scopeType === 'area' ? JSON.stringify(areaIds) : null,
                 playbackWindowHours,
                 toSqlDate(customExpiresAt),
                 sessionPolicy.maxActiveSessions,

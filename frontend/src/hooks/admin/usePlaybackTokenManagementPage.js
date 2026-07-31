@@ -140,6 +140,9 @@ function createDefaultForm() {
         preset: 'trial_3d',
         scope_type: 'all',
         camera_ids: [],
+        // Areas, not cameras: an 'area' token resolves its cameras at access time, so this list is
+        // what makes a camera added to the area later covered by a token issued earlier.
+        area_ids: [],
         camera_rules: {},
         playback_window_hours: '',
         expires_at: '',
@@ -186,6 +189,9 @@ export function usePlaybackTokenManagementPage() {
         label: '',
         scope_type: 'all',
         camera_ids: [],
+        // Areas, not cameras: an 'area' token resolves its cameras at access time, so this list is
+        // what makes a camera added to the area later covered by a token issued earlier.
+        area_ids: [],
         camera_rules: {},
         playback_window_hours: '',
         expires_at: '',
@@ -204,6 +210,24 @@ export function usePlaybackTokenManagementPage() {
         () => new Set(buildTokenCameraRulesPayload(editForm.camera_rules).map((rule) => rule.camera_id)),
         [editForm.camera_rules]
     );
+    /*
+     * Derived from the cameras already loaded rather than fetched separately — one less request, and
+     * it cannot drift from the camera list the admin is looking at. Cameras with no area are simply
+     * absent here, which is correct: an area token can never reach them, and the access check denies
+     * them explicitly rather than relying on this list.
+     */
+    const areaOptions = useMemo(() => {
+        const seen = new Map();
+        for (const camera of cameras) {
+            const areaId = Number.parseInt(camera?.area_id, 10);
+            if (!Number.isInteger(areaId) || areaId <= 0) continue;
+            const entry = seen.get(areaId) || { id: areaId, name: camera.area_name || `Area ${areaId}`, cameraCount: 0 };
+            entry.cameraCount += 1;
+            seen.set(areaId, entry);
+        }
+        return [...seen.values()].sort((a, b) => a.name.localeCompare(b.name));
+    }, [cameras]);
+
     const visibleCreateCameras = useMemo(() => buildVisiblePlaybackTokenCameras({
         cameras,
         selectedIds: selectedCameraIds,
@@ -269,6 +293,15 @@ export function usePlaybackTokenManagementPage() {
                 },
             };
         });
+    };
+
+    const toggleArea = (areaId) => {
+        setForm((current) => ({
+            ...current,
+            area_ids: current.area_ids.includes(areaId)
+                ? current.area_ids.filter((id) => id !== areaId)
+                : [...current.area_ids, areaId],
+        }));
     };
 
     const updateCameraRule = (cameraId, key, value) => {
@@ -398,7 +431,7 @@ export function usePlaybackTokenManagementPage() {
                 setCreatedShare(null);
                 showError('Teks share kosong', 'Backend tidak mengirim teks share token.');
             }
-            setForm((current) => ({ ...current, label: '', camera_ids: [], camera_rules: {}, custom_access_code: '' }));
+            setForm((current) => ({ ...current, label: '', camera_ids: [], area_ids: [], camera_rules: {}, custom_access_code: '' }));
             setCameraSearch('');
             await loadData();
         } catch (error) {
@@ -540,6 +573,8 @@ export function usePlaybackTokenManagementPage() {
         editForm,
         selectedCameraIds,
         selectedEditCameraIds,
+        areaOptions,
+        toggleArea,
         whatsappHref,
         loadData,
         setCameraSearch,

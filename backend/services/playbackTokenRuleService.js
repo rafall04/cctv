@@ -38,6 +38,35 @@ function parseLegacyCameraIds(value) {
     }
 }
 
+/**
+ * Area ids carried by an 'area'-scoped token. Same shape and validation as camera ids, deliberately
+ * a separate name at every call site: the two lists are interchangeable to a parser and catastrophic
+ * to confuse, since reading one as the other silently resolves to a different set of cameras.
+ */
+function parseAreaIds(value) {
+    return parseLegacyCameraIds(value);
+}
+
+/** Cameras currently in these areas. Recomputed per call — that IS the point of area scope. */
+function camerasInAreas(areaIds) {
+    if (!Array.isArray(areaIds) || areaIds.length === 0) {
+        return [];
+    }
+    const placeholders = areaIds.map(() => '?').join(',');
+    try {
+        return query(
+            `SELECT id FROM cameras
+              WHERE area_id IN (${placeholders})
+                AND COALESCE(public_playback_mode, '') <> 'admin_only'
+              ORDER BY id`,
+            areaIds
+        ).map((row) => row.id);
+    } catch {
+        // Fail closed: an unreadable camera table must not be read as "no restriction".
+        return [];
+    }
+}
+
 function isMissingRuleSchemaError(error) {
     const message = String(error?.message || '');
     return message.includes('playback_token_camera_rules')
@@ -153,6 +182,10 @@ class PlaybackTokenRuleService {
             return parseLegacyCameraIds(token.camera_ids_json || token.camera_ids);
         }
 
+        if (token?.scope_type === 'area') {
+            return camerasInAreas(parseAreaIds(token.area_ids_json || token.area_ids));
+        }
+
         return [];
     }
 
@@ -198,6 +231,50 @@ class PlaybackTokenRuleService {
             };
         }
 
+        /*
+         * Area scope MUST be decided here, above the fall-through below. Everything that is not
+         * 'selected' used to reach that fall-through and be allowed for every camera, so a new scope
+         * added without its own branch would silently grant the whole fleet.
+         *
+         * Membership is judged from the camera's CURRENT area, which is what makes a camera moved
+         * into (or added to) an area covered by a token issued earlier — the whole reason for this
+         * scope. A camera whose area_id is missing or unparseable is DENIED: an access decision made
+         * from data we do not have must fail closed.
+         */
+        if (token?.scope_type === 'area') {
+            const areaIds = parseAreaIds(token.area_ids_json || token.area_ids);
+            const cameraAreaId = Number.parseInt(camera?.area_id, 10);
+            const inArea = Number.isInteger(cameraAreaId) && areaIds.includes(cameraAreaId);
+
+            if (!inArea) {
+                return {
+                    allowed: false,
+                    reason: 'token_area_excludes_camera',
+                    message: 'Token playback tidak mencakup area kamera ini',
+                    playbackWindowHours: null,
+                    ruleSource: 'none',
+                };
+            }
+
+            if (camera?.public_playback_mode === 'admin_only') {
+                return {
+                    allowed: false,
+                    reason: 'token_area_excludes_admin_only',
+                    message: 'Token playback tidak mencakup kamera admin-only ini',
+                    playbackWindowHours: null,
+                    ruleSource: 'none',
+                };
+            }
+
+            return {
+                allowed: true,
+                reason: null,
+                message: null,
+                playbackWindowHours: tokenWindow,
+                ruleSource: 'token_area_scope',
+            };
+        }
+
         if (camera?.public_playback_mode === 'admin_only') {
             return {
                 allowed: false,
@@ -222,7 +299,9 @@ class PlaybackTokenRuleService {
         return {
             allowed_camera_ids: allowedCameraIds,
             camera_count: allowedCameraIds.length,
-            scope_type: token?.scope_type === 'selected' ? 'selected' : 'all',
+            // Pass 'area' through rather than collapsing it to 'all' — the summary is what the admin
+            // UI and share text read, and calling an area token "all" would misdescribe its reach.
+            scope_type: ['selected', 'area'].includes(token?.scope_type) ? token.scope_type : 'all',
         };
     }
 }

@@ -28,6 +28,8 @@ export default function PlaybackTokenManagement() {
                 cameras={page.visibleCreateCameras}
                 saving={page.saving}
                 selectedCameraIds={page.selectedCameraIds}
+                areaOptions={page.areaOptions}
+                onToggleArea={page.toggleArea}
                 cameraSearch={page.cameraSearch}
                 totalCameraCount={page.cameras.length}
                 visibleCameraCount={page.visibleCreateCameras.length}
