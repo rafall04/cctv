@@ -16,7 +16,8 @@ export default function PlaybackHeader({
     playbackPolicy = null,
     showPublicNotice = false,
 }) {
-    const contact = playbackPolicy?.contact || null;
+    // playbackPolicy.contact is no longer read here — the capped-playback notice now sends people to
+    // self-serve access instead of to an operator. The setting itself is left alone for other callers.
 
     return (
         <div className="space-y-3 rounded-card border border-edge bg-surface p-3 sm:space-y-4 sm:p-4 md:p-6">
@@ -94,28 +95,17 @@ export default function PlaybackHeader({
                         </p>
                         {/*
                          * This notice is the only thing a visitor actually reads when playback is
-                         * capped, so the way OUT of the cap belongs here — first, and always shown.
-                         * The contact button below is admin-configured and optional: when it is unset
-                         * the card previously offered no next step at all.
+                         * capped, so the way OUT of the cap belongs here — and it is now the only
+                         * next step offered. The admin-contact button was removed deliberately:
+                         * self-serve exists, so sending people to chat an operator adds a manual
+                         * step that scales badly and leaves the visitor waiting.
                          */}
-                        <div className="mt-1 flex flex-wrap items-center gap-2">
-                            <a
-                                href="/playback/langganan"
-                                className="inline-flex items-center gap-2 rounded-control bg-primary px-3 py-1.5 text-xs font-medium text-white"
-                            >
-                                Coba gratis 3 hari atau beli akses
-                            </a>
-                            {contact?.href && (
-                                <a
-                                    href={contact.href}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="inline-flex items-center gap-2 rounded-control border border-edge px-3 py-1.5 text-xs font-medium text-content transition-colors hover:border-edge-strong hover:bg-surface"
-                                >
-                                    {contact.label || 'Hubungi Admin'}
-                                </a>
-                            )}
-                        </div>
+                        <a
+                            href="/playback/langganan"
+                            className="mt-1 inline-flex items-center gap-2 rounded-control bg-primary px-3 py-1.5 text-xs font-medium text-white"
+                        >
+                            Coba gratis 3 hari atau beli akses
+                        </a>
                     </div>
                 </div>
             )}
