@@ -232,7 +232,11 @@ describe('guardrail: one owner for the page gutter', () => {
         const offenders = [];
         for (const f of walk(SRC_ROOT)) {
             const r = rel(f);
-            if (!ADMIN_PAGE_RE.test(r) || r.includes('Landing') || r.includes('AreaPublic')) continue;
+            // Public pages render under PublicPageRoute, which supplies NO shell — so unlike admin
+            // routes they legitimately own their own gutter and width cap. Keep this list to pages
+            // that genuinely render outside AdminLayout; it is not an escape hatch for admin pages.
+            const isPublicShellLess = r.includes('Landing') || r.includes('AreaPublic') || r.includes('PlaybackAccess');
+            if (!ADMIN_PAGE_RE.test(r) || isPublicShellLess) continue;
             if (STANDALONE.test(r)) continue;
             const m = fs.readFileSync(f, 'utf8').match(ROOT_RETURN_RE);
             if (m && BAD_ROOT.test(m[1]) && !isCard(m[1])) {
