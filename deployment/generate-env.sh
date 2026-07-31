@@ -36,16 +36,23 @@ fi
 
 source "${SCRIPT_DIR}/client.config.sh"
 
-# Detect if running in aaPanel (check common paths)
+# Detect if running in aaPanel (check common paths).
+# Only NGINX_CONF_DIR is environment-dependent. APP_DIR must NOT be reassigned here:
+# it arrives from client.config.sh, which is where the installer records the answer to
+# its own "Installation Directory" prompt. Overwriting it silently discarded that answer,
+# so any install into a directory other than /var/www/cctv wrote backend/.env and
+# frontend/.env into a tree nobody cloned into and then died on the nginx config with
+# "No such file or directory" — after apt, Node, and the repo clone had already run.
 if [ -d "/www/server/nginx" ]; then
     echo "🔍 Detected aaPanel environment"
     NGINX_CONF_DIR="/www/server/panel/vhost/nginx"
-    APP_DIR="/var/www/cctv"
 else
     echo "🔍 Detected standard Ubuntu environment"
     NGINX_CONF_DIR="/etc/nginx/sites-available"
-    APP_DIR="/var/www/cctv"
 fi
+
+# Fall back only when client.config.sh did not provide one.
+APP_DIR="${APP_DIR:-/var/www/cctv}"
 
 echo "============================================"
 echo "Generating Environment Files"

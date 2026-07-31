@@ -10,18 +10,21 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/client.config.sh"
 
-# Detect environment
+# Detect environment. Only NGINX_CONF_DIR and NGINX_RELOAD are environment-dependent —
+# APP_DIR comes from client.config.sh and must not be reassigned here (same reason as
+# generate-env.sh: it silently discarded the installer's chosen directory).
 if [ -d "/www/server/nginx" ]; then
     echo "🔍 Detected aaPanel environment"
     NGINX_CONF_DIR="/www/server/panel/vhost/nginx"
-    APP_DIR="/var/www/cctv"
     NGINX_RELOAD="/etc/init.d/nginx reload"
 else
     echo "🔍 Detected standard Ubuntu environment"
     NGINX_CONF_DIR="/etc/nginx/sites-available"
-    APP_DIR="/var/www/cctv"
     NGINX_RELOAD="systemctl reload nginx"
 fi
+
+# Fall back only when client.config.sh did not provide one.
+APP_DIR="${APP_DIR:-/var/www/cctv}"
 
 echo "============================================"
 echo "RAF NET CCTV - Quick Deploy"
