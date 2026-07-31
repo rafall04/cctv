@@ -17,6 +17,7 @@ import playbackTokenService from './playbackTokenService.js';
 import { existsSync, statSync } from 'fs';
 import { isSafeRecordingFilePath } from './recordingPathSafetyPolicy.js';
 import { RECORDINGS_BASE_PATH } from './recordingPaths.js';
+import archivedSegmentSourceService from './archivedSegmentSourceService.js';
 
 const PUBLIC_PLAYBACK_MODES = new Set(['inherit', 'disabled', 'preview_only', 'admin_only']);
 const VALID_PREVIEW_MINUTES = new Set([0, 10, 20, 30, 60]);
@@ -427,7 +428,11 @@ class RecordingPlaybackService {
                 ? { cameraId, order: 'oldest', limit: 1000, returnAscending: true }
                 : { cameraId, order: 'latest', limit: previewLimit, returnAscending: true };
         const segmentsAscending = this.applyPlaybackWindow(
-            recordingSegmentRepository.findPlaybackSegments(queryOptions),
+            this.mergeArchivedSegments(
+                recordingSegmentRepository.findPlaybackSegments(queryOptions),
+                cameraId,
+                access
+            ),
             access
         );
 
@@ -460,6 +465,35 @@ class RecordingPlaybackService {
             publicPlaybackMode: camera.public_playback_mode,
             segmentCount: segmentsAscending.length,
         };
+    }
+
+    /**
+     * Add Telegram-archived segments the caller is entitled to, so a token sold with more depth than
+     * local retention actually lists that depth instead of stopping at the 4 hours still on disk.
+     *
+     * Only for token/admin scopes. An anonymous public preview must NOT gain history it never had:
+     * its limit is a deliberate product boundary, not an accident of how long files survive.
+     *
+     * Local rows WIN on a tie. A recent segment exists in both places, and the on-disk copy streams
+     * instantly while the archived one costs a re-download from Telegram — same footage, worse trip.
+     */
+    mergeArchivedSegments(localSegments, cameraId, access) {
+        if (access?.accessMode !== 'token_full' && access?.accessMode !== 'admin_full') {
+            return localSegments;
+        }
+
+        const sinceMs = access.playbackWindowHours
+            ? Date.now() - access.playbackWindowHours * 60 * 60 * 1000
+            : null;
+        const archived = archivedSegmentSourceService.listArchivedSegments(cameraId, { sinceMs });
+        if (archived.length === 0) {
+            return localSegments;
+        }
+
+        const seen = new Set(localSegments.map((segment) => segment.id));
+        const merged = localSegments.concat(archived.filter((segment) => !seen.has(segment.id)));
+        merged.sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+        return merged;
     }
 
     applyPlaybackWindow(segments, access) {
