@@ -222,7 +222,7 @@ server {
     }
 
     # Recording Playback (MUST be before /api/)
-    location /api/recordings/ {
+    location ^~ /api/recordings/ {
         proxy_pass http://localhost:BACKEND_PORT_PLACEHOLDER;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
@@ -235,7 +235,10 @@ server {
     }
 
     # Backend API Proxy
-    location /api/ {
+    # ^~ is REQUIRED: nginx evaluates regex locations before prefix ones, so the
+    # "Cache static assets" regex below would otherwise swallow every /api/ path
+    # ending in .jpg (thumbnails) and serve it from the SPA root as a 404.
+    location ^~ /api/ {
         proxy_pass http://localhost:BACKEND_PORT_PLACEHOLDER;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
@@ -245,7 +248,7 @@ server {
     }
 
     # HLS Stream Proxy
-    location /hls/ {
+    location ^~ /hls/ {
         proxy_pass http://localhost:BACKEND_PORT_PLACEHOLDER;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
