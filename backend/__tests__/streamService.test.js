@@ -1,7 +1,7 @@
 /**
  * Purpose: Verify stream response delivery routing and public viewer stats enrichment.
  * Caller: Backend focused test gate for streamService.
- * Deps: vitest, streamService, connectionPool and cameraViewStatsService mocks.
+ * Deps: vitest, streamService, connectionPool/cameraViewStatsService/config mocks.
  * MainFuncs: streamService camera response tests.
  * SideEffects: Mocks database/stat service calls only.
  */
@@ -10,11 +10,19 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import streamService from '../services/streamService.js';
 import { invalidateCameraAccessCache } from '../services/cameraAccessService.js';
 
-const { queryMock, queryOneMock, viewStatsMock, voucherGatedMock } = vi.hoisted(() => ({
+const { queryMock, queryOneMock, viewStatsMock, voucherGatedMock, mockConfig } = vi.hoisted(() => ({
     queryMock: vi.fn(),
     queryOneMock: vi.fn(),
     viewStatsMock: vi.fn(),
     voucherGatedMock: vi.fn(() => false),
+    // config/config.js loads backend/.env through dotenv at import time, so a developer
+    // who sets PUBLIC_STREAM_BASE_URL locally would otherwise see these URL assertions
+    // fail against their own machine's config. Pin what buildStreamUrls reads so the
+    // stream-URL shape is a property of the code, not of whoever runs the suite.
+    mockConfig: {
+        mediamtx: { hlsUrl: '/hls', webrtcUrl: '/webrtc', publicBaseUrl: '' },
+        jwt: { secret: 'test-secret' },
+    },
 }));
 
 vi.mock('../database/connectionPool.js', () => ({
@@ -45,6 +53,8 @@ vi.mock('../services/voucherService.js', () => ({
     default: { isAreaAccessGated: voucherGatedMock },
 }));
 
+vi.mock('../config/config.js', () => ({ config: mockConfig, default: mockConfig }));
+
 describe('streamService camera response routing', () => {
     beforeEach(() => {
         queryMock.mockReset();
@@ -56,6 +66,10 @@ describe('streamService camera response routing', () => {
         invalidateCameraAccessCache();
         voucherGatedMock.mockReset();
         voucherGatedMock.mockReturnValue(false);
+        // Default = no PUBLIC_STREAM_BASE_URL, i.e. the single-origin deploy.
+        mockConfig.mediamtx.hlsUrl = '/hls';
+        mockConfig.mediamtx.webrtcUrl = '/webrtc';
+        mockConfig.mediamtx.publicBaseUrl = '';
     });
 
     describe('voucher-gated read model (Phase 2)', () => {
@@ -314,5 +328,41 @@ describe('streamService camera response routing', () => {
         expect(response.streams.hls).toBe('/hls/camera31/index.m3u8');
         expect(JSON.stringify(response)).not.toContain('rtsp://admin:secret');
         expect(response.camera).not.toHaveProperty('private_rtsp_url');
+    });
+
+    // Both deploy shapes are supported and both are load-bearing, so pin them:
+    //   - PUBLIC_STREAM_BASE_URL unset -> relative URLs. This is what keeps the
+    //     single-origin deploy (frontend + API behind one Cloudflare Tunnel host)
+    //     free of mixed-content and CORS breakage; an absolute http:// base baked
+    //     into a public response would fail there.
+    //   - PUBLIC_STREAM_BASE_URL set -> absolute URLs, for split-origin deploys
+    //     that serve HLS from a separate API host (see deployment/backend.env.prod).
+    describe('public HLS base follows PUBLIC_STREAM_BASE_URL', () => {
+        it('stays origin-relative when no public base URL is configured', () => {
+            expect(streamService.buildStreamUrls('camera31')).toEqual({
+                hls: '/hls/camera31/index.m3u8',
+                webrtc: '/webrtc/camera31',
+            });
+        });
+
+        it('uses the configured absolute base for split-origin deploys', () => {
+            mockConfig.mediamtx.hlsUrl = 'https://api-cctv.raf.my.id/hls';
+            mockConfig.mediamtx.webrtcUrl = 'https://api-cctv.raf.my.id/webrtc';
+
+            expect(streamService.buildStreamUrls('camera31')).toEqual({
+                hls: 'https://api-cctv.raf.my.id/hls/camera31/index.m3u8',
+                webrtc: 'https://api-cctv.raf.my.id/webrtc/camera31',
+            });
+        });
+
+        it('falls back to relative paths when reached by raw IP, even with an absolute base', () => {
+            mockConfig.mediamtx.hlsUrl = 'https://api-cctv.raf.my.id/hls';
+            mockConfig.mediamtx.webrtcUrl = 'https://api-cctv.raf.my.id/webrtc';
+
+            expect(streamService.buildStreamUrls('camera31', '172.17.2.11')).toEqual({
+                hls: '/hls/camera31/index.m3u8',
+                webrtc: '/webrtc/camera31',
+            });
+        });
     });
 });
