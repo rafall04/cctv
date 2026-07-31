@@ -92,16 +92,30 @@ export default function PlaybackHeader({
                         <p className="text-xs leading-5 text-content-muted sm:text-sm">
                             {playbackPolicy.notice.text}
                         </p>
-                        {contact?.href && (
+                        {/*
+                         * This notice is the only thing a visitor actually reads when playback is
+                         * capped, so the way OUT of the cap belongs here — first, and always shown.
+                         * The contact button below is admin-configured and optional: when it is unset
+                         * the card previously offered no next step at all.
+                         */}
+                        <div className="mt-1 flex flex-wrap items-center gap-2">
                             <a
-                                href={contact.href}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="mt-1 inline-flex items-center gap-2 rounded-control border border-edge px-3 py-1.5 text-xs font-medium text-content transition-colors hover:border-edge-strong hover:bg-surface"
+                                href="/playback/langganan"
+                                className="inline-flex items-center gap-2 rounded-control bg-primary px-3 py-1.5 text-xs font-medium text-white"
                             >
-                                {contact.label || 'Hubungi Admin'}
+                                Coba gratis 3 hari atau beli akses
                             </a>
-                        )}
+                            {contact?.href && (
+                                <a
+                                    href={contact.href}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex items-center gap-2 rounded-control border border-edge px-3 py-1.5 text-xs font-medium text-content transition-colors hover:border-edge-strong hover:bg-surface"
+                                >
+                                    {contact.label || 'Hubungi Admin'}
+                                </a>
+                            )}
+                        </div>
                     </div>
                 </div>
             )}
