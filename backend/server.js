@@ -76,6 +76,7 @@ import backupTelegramRoutes from './routes/backupTelegramRoutes.js';
 import recordingRoutes from './routes/recordingRoutes.js';
 import playbackTokenRoutes from './routes/playbackTokenRoutes.js';
 import playbackAccessRoutes from './routes/playbackAccessRoutes.js';
+import publicArchiveRoutes from './routes/publicArchiveRoutes.js';
 import brandingRoutes from './routes/brandingRoutes.js';
 import publicGrowthRoutes from './routes/publicGrowthRoutes.js';
 import customerRoutes from './routes/customerRoutes.js';
@@ -363,6 +364,7 @@ await fastify.register(voucherWebhookRoutes, { prefix: '/api/voucher/webhook' })
 await fastify.register(recordingRoutes, { prefix: '/api' });
 await fastify.register(playbackTokenRoutes, { prefix: '/api' });
 await fastify.register(playbackAccessRoutes, { prefix: '/api/playback-access' });
+await fastify.register(publicArchiveRoutes, { prefix: '/api/playback-archive' });
 await fastify.register(brandingRoutes, { prefix: '/api/branding' });
 await fastify.register(customerRoutes, { prefix: '/api/customer' });
 await fastify.register(billingAdminRoutes, { prefix: '/api/admin/billing' });
