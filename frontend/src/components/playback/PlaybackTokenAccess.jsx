@@ -6,6 +6,9 @@
  * SideEffects: Invokes token activation/clear callbacks from props.
  */
 
+import { useState } from 'react';
+import PlaybackAccessPanel from './PlaybackAccessPanel.jsx';
+
 export default function PlaybackTokenAccess({
     tokenInput,
     onTokenInputChange,
@@ -16,6 +19,7 @@ export default function PlaybackTokenAccess({
     message,
     compact = false,
 }) {
+    const [showAccess, setShowAccess] = useState(false);
     const handleSubmit = (event) => {
         event.preventDefault();
         onActivate(tokenInput);
@@ -49,13 +53,25 @@ export default function PlaybackTokenAccess({
                      * read as a paywall over the free live streams. Semantic tokens on purpose: the
                      * gray-* classes around it are deprecated legacy, not a pattern to copy.
                      */}
+                    {/*
+                     * Expands in place instead of linking away. A separate page stripped the app
+                     * shell and, worse, navigated the visitor off the very player they were trying
+                     * to unlock — so the trial they just claimed landed them somewhere else.
+                     */}
                     {!tokenStatus && (
-                        <p className="mt-1 text-xs text-content-muted">
-                            Belum punya token?{' '}
-                            <a href="/playback/langganan" className="font-medium text-primary underline">
-                                Coba gratis 3 hari atau beli paket
-                            </a>
-                        </p>
+                        <div id="akses-playback">
+                            <button
+                                type="button"
+                                onClick={() => setShowAccess((v) => !v)}
+                                className="mt-1 text-xs text-content-muted underline-offset-2 hover:underline"
+                            >
+                                Belum punya token?{' '}
+                                <span className="font-medium text-primary">
+                                    {showAccess ? 'Tutup' : 'Coba gratis 3 hari atau beli akses'}
+                                </span>
+                            </button>
+                            {showAccess && <PlaybackAccessPanel />}
+                        </div>
                     )}
                 </div>
                 <div className="flex gap-2">

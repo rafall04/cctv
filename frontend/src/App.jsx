@@ -45,7 +45,6 @@ const SponsorManagement = lazyWithRetry(() => import('./pages/SponsorManagement'
 const AdsManagement = lazyWithRetry(() => import('./pages/AdsManagement'), 'ads-management');
 const RecordingDashboard = lazyWithRetry(() => import('./pages/RecordingDashboard'), 'recording-dashboard');
 const AreaPublicPage = lazyWithRetry(() => import('./pages/AreaPublicPage'), 'area-public-page');
-const PlaybackAccessPage = lazyWithRetry(() => import('./pages/PlaybackAccessPage'), 'playback-access-page');
 const BillingManagement = lazyWithRetry(() => import('./pages/BillingManagement'), 'billing-management');
 const VoucherManagement = lazyWithRetry(() => import('./pages/VoucherManagement'), 'voucher-management');
 const RondaSettings = lazyWithRetry(() => import('./pages/RondaSettings'), 'ronda-settings');
@@ -130,9 +129,6 @@ function App() {
                 } />
                 <Route path="/playback" element={
                     <PublicPageRoute><Playback accessScope="public_preview" /></PublicPageRoute>
-                } />
-                <Route path="/playback/langganan" element={
-                    <PublicPageRoute><PlaybackAccessPage /></PublicPageRoute>
                 } />
                 <Route path="/admin/login" element={<LoginPage />} />
                 <Route path="/daftar" element={

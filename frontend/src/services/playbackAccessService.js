@@ -1,7 +1,7 @@
 /*
  * Purpose: Public API client for buying playback access — package catalogue, free trial claim, and
  *          self-serve iPaymu payment (create order + poll status).
- * Caller: pages/PlaybackAccessPage.
+ * Caller: components/playback/PlaybackAccessPanel.
  * Deps: shared apiClient (sends the signed vdev device cookie automatically, same-origin).
  * MainFuncs: getProducts, claimTrial, createOrder, getOrderStatus.
  * SideEffects: HTTP requests only; the device cookie is set server-side on first call.

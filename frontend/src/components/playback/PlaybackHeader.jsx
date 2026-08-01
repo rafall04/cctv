@@ -101,7 +101,7 @@ export default function PlaybackHeader({
                          * step that scales badly and leaves the visitor waiting.
                          */}
                         <a
-                            href="/playback/langganan"
+                            href="#akses-playback"
                             className="mt-1 inline-flex items-center gap-2 rounded-control bg-primary px-3 py-1.5 text-xs font-medium text-white"
                         >
                             Coba gratis 3 hari atau beli akses
