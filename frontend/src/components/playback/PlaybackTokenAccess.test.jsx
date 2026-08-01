@@ -60,11 +60,32 @@ describe('PlaybackTokenAccess when access is held', () => {
         expect(screen.getByText('Sampai 04 Agu 2026, 10.02')).toBeTruthy();
     });
 
-    it('says so plainly when nothing limits the token, rather than leaving it blank', () => {
-        setup({ playbackPolicy: { accessMode: 'token_full', playbackWindowHours: null } });
+    it('says so plainly when nothing limits the reach, rather than leaving it blank', () => {
+        setup({
+            playbackPolicy: { accessMode: 'token_full', playbackWindowHours: null },
+            tokenStatus: { scope_type: 'all' },
+        });
 
         expect(screen.getByText('Semua rekaman')).toBeTruthy();
         expect(screen.getByText('Selamanya')).toBeTruthy();
+    });
+
+    /*
+     * Caught in production: an AREA token, opened without a key in the URL, was announced as
+     * "Cakupan: Semua kamera" and "Berlaku: Selamanya". Both came from filling unknown blanks with
+     * defaults, and both were false. Coverage and expiry are known only from the activation payload.
+     */
+    it('states nothing about coverage or expiry it cannot actually know', () => {
+        setup({ playbackPolicy: TOKEN_POLICY, tokenStatus: null });
+
+        expect(screen.getByText('Akses playback aktif')).toBeTruthy();
+        // The reach is still shown: the server resolves it per camera on every request.
+        expect(screen.getByText('4 jam terakhir')).toBeTruthy();
+
+        expect(screen.queryByText('Cakupan')).toBeNull();
+        expect(screen.queryByText('Semua kamera')).toBeNull();
+        expect(screen.queryByText('Berlaku')).toBeNull();
+        expect(screen.queryByText('Selamanya')).toBeNull();
     });
 
     it('prefers the server verdict over the activation payload when the two disagree', () => {

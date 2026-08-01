@@ -91,12 +91,31 @@ export default function PlaybackTokenAccess({
             || tokenStatus?.camera_rules?.find((rule) => rule?.playback_window_hours)?.playback_window_hours
             || null);
 
-    const scopeLabel = () => {
-        if (cameraCount > 0) {
-            return `${cameraCount} kamera`;
-        }
-        return tokenStatus?.scope_type === 'area' ? 'Per area' : 'Semua kamera';
-    };
+    /*
+     * Only what is actually known gets stated.
+     *
+     * Coverage and expiry come from the activation payload alone. A visitor returning on a live
+     * cookie has none, and the panel used to fill the blanks with "Semua kamera" and "Selamanya" —
+     * both plain falsehoods for the area-scoped, expiring token that was really in force. The reach
+     * survives because the server resolves it per camera on every request.
+     */
+    const facts = [{
+        label: 'Jangkauan',
+        value: windowHours ? `${windowHours} jam terakhir` : 'Semua rekaman',
+    }];
+
+    if (tokenStatus) {
+        facts.push({
+            label: 'Cakupan',
+            value: cameraCount > 0
+                ? `${cameraCount} kamera`
+                : (tokenStatus.scope_type === 'area' ? 'Per area' : 'Semua kamera'),
+        });
+        facts.push({
+            label: 'Berlaku',
+            value: tokenStatus.expires_at ? `Sampai ${tokenStatus.expires_at}` : 'Selamanya',
+        });
+    }
 
     if (hasAccess && !isSwapping) {
         return (
@@ -110,12 +129,7 @@ export default function PlaybackTokenAccess({
                 </div>
 
                 <dl className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                    <Fact label="Jangkauan" value={windowHours ? `${windowHours} jam terakhir` : 'Semua rekaman'} />
-                    <Fact label="Cakupan" value={scopeLabel()} />
-                    <Fact
-                        label="Berlaku"
-                        value={tokenStatus?.expires_at ? `Sampai ${tokenStatus.expires_at}` : 'Selamanya'}
-                    />
+                    {facts.map((fact) => <Fact key={fact.label} label={fact.label} value={fact.value} />)}
                 </dl>
 
                 <p className="mt-3 text-xs leading-5 text-content-muted">
