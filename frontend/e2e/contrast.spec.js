@@ -43,7 +43,32 @@ const TOLERATED = new Map([
         + 'content tokens; fixing it belongs with that migration.'],
 ]);
 
-const PAGES = ['/', '/playback'];
+/*
+ * Same offline mocking as overflow.spec.js: every /api/* answers empty-success and every external
+ * host is blocked, so the run is deterministic and needs no backend. Pages therefore render their
+ * CHROME rather than real data — which is exactly the surface this audit is about, since chrome is
+ * where fixed colours live.
+ */
+test.beforeEach(async ({ page, context }) => {
+    await context.route('**/*', (route) => {
+        const url = new URL(route.request().url());
+        const local = url.hostname === '127.0.0.1' || url.hostname === 'localhost';
+        if (!local) return route.abort();
+        if (url.pathname.startsWith('/api/')) {
+            return route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({ success: true, data: [] }),
+            });
+        }
+        return route.continue();
+    });
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+});
+
+/* [path, minimum text nodes expected] — the floor guards against a page that failed to render at
+ * all, which would otherwise let the audit pass by measuring nothing. */
+const PAGES = [['/', 6], ['/?mode=full', 6], ['/login', 4], ['/playback', 2]];
 
 const AUDIT = () => {
     const rgb = (s) => (s.match(/[\d.]+/g) || []).map(Number);
@@ -93,9 +118,9 @@ const AUDIT = () => {
     return out;
 };
 
-for (const path of PAGES) {
+for (const [path, minNodes] of PAGES) {
     test(`no unreadable text on ${path} in dark mode`, async ({ page }) => {
-        await page.goto(path);
+        await page.goto(path, { waitUntil: 'networkidle' });
         // Dark mode is where an unthemed foreground turns invisible; light mode hides the bug.
         await page.evaluate(() => {
             document.documentElement.classList.remove('light');
@@ -104,7 +129,10 @@ for (const path of PAGES) {
         await page.waitForTimeout(1500);
 
         const found = await page.evaluate(AUDIT);
-        expect(found.length, `${path} rendered no measurable text — the audit would pass vacuously`).toBeGreaterThan(5);
+        expect(
+            found.length,
+            `${path} rendered only ${found.length} text nodes — the audit would pass vacuously`,
+        ).toBeGreaterThanOrEqual(minNodes);
 
         const invisible = found.filter((f) => f.ratio < INVISIBLE_FLOOR);
         expect(
