@@ -19,6 +19,7 @@ import { ApiClientInitializer } from './components/ApiClientInitializer';
 import ErrorBoundary from './components/ui/ErrorBoundary';
 import { NetworkStatusBanner } from './components/ui/NetworkStatusBanner';
 import PwaInstallPrompt from './components/PwaInstallPrompt';
+import UpdateAvailableBar from './components/UpdateAvailableBar';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -121,6 +122,7 @@ function App() {
         <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
             <ToastContainer />
             <PwaInstallPrompt />
+            <UpdateAvailableBar />
             <Routes>
                 {/* Public routes */}
                 <Route path="/" element={<PublicPageRoute><LandingPage /></PublicPageRoute>} />

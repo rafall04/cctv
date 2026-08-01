@@ -7,8 +7,9 @@ import { fileURLToPath } from 'node:url';
 // Stamp dist/sw.js's `__SW_VERSION__` with a short hash of the built asset
 // filenames. The asset names are content-hashed by Vite, so this version changes
 // IFF the app output changes — an unchanged rebuild does not churn the SW, but a
-// real deploy ships a byte-different sw.js that the browser detects as an update
-// (drives the PWA auto-reload; see public/sw.js + utils/registerServiceWorker.js).
+// real deploy ships a byte-different sw.js that the browser detects as an update.
+// That update then WAITS to be accepted rather than seizing the page — see public/sw.js
+// + utils/registerServiceWorker.js for why the forced auto-reload was removed.
 function stampServiceWorkerVersion() {
     const root = fileURLToPath(new URL('.', import.meta.url));
     return {

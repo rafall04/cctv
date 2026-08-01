@@ -9,8 +9,19 @@
 // `__SW_VERSION__` is replaced at build time (vite closeBundle plugin) with a short
 // hash of the built asset filenames. Because the hash changes whenever the app's
 // output changes, each deploy ships a byte-different sw.js → the browser detects a
-// new service worker → install (skipWaiting) → activate (purges old caches + claim)
-// → controllerchange → the page auto-reloads to the new version (registerServiceWorker).
+// new service worker → install → the new worker WAITS.
+//
+// It waits on purpose. This used to call skipWaiting() in install and clients.claim()
+// in activate, so a new worker seized a page whose HTML and JS were still the old
+// build — and activate immediately deleted the cache holding the assets that running
+// page was still using. registerServiceWorker then force-reloaded to paper over the
+// mismatch, roughly 3s after the visitor came back (measured). A visitor reported the
+// page arriving skewed with black down the right before that reload "fixed" it, which
+// is what a half-styled document looks like.
+//
+// Now nothing takes over until the visitor accepts the update, so the old page keeps
+// being served consistently by the old worker for its whole life. See
+// utils/registerServiceWorker.js and components/UpdateAvailableBar.jsx.
 const SW_VERSION = '__SW_VERSION__';
 const RAFNET_CCTV_CACHE = `rafnet-cctv-public-${SW_VERSION}`;
 const APP_SHELL_URLS = [
@@ -36,11 +47,16 @@ function offlineFallback() {
 }
 
 self.addEventListener('install', (event) => {
-    event.waitUntil(
-        caches.open(RAFNET_CCTV_CACHE)
-            .then((cache) => cache.addAll(APP_SHELL_URLS))
-            .then(() => self.skipWaiting())
-    );
+    event.waitUntil(caches.open(RAFNET_CCTV_CACHE).then((cache) => cache.addAll(APP_SHELL_URLS)));
+});
+
+// The ONLY way this worker may take over early. The page posts this after the visitor
+// taps "Muat ulang", and reloads itself once the takeover completes — so activate's
+// cache purge below can never delete assets a live page still needs.
+self.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'SKIP_WAITING') {
+        self.skipWaiting();
+    }
 });
 
 self.addEventListener('activate', (event) => {
