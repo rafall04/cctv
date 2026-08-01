@@ -76,6 +76,9 @@ export default function PlaybackTokenManagement() {
                 onRevoke={page.handleRevoke}
                 onDelete={page.handleDelete}
                 deletingTokenId={page.deletingTokenId}
+                areaOptions={page.areaOptions}
+                selectedEditAreaIds={page.selectedEditAreaIds}
+                onToggleEditArea={page.toggleEditArea}
             />
 
             {/*

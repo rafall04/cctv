@@ -202,3 +202,84 @@ describe('PlaybackTokenTable reach limit', () => {
         expect(screen.getByText('Semua rekaman')).toBeTruthy();
     });
 });
+
+/*
+ * The editor rendered six of the ten fields the payload carried, and its scope select offered only
+ * "all" and "selected". An AREA token therefore opened showing "Semua kamera" — a plain lie — and
+ * one touch of that select would have converted it to all-cameras for real.
+ */
+describe('PlaybackTokenTable editor completeness', () => {
+    const AREA_TOKEN = {
+        ...ACTIVE,
+        scope_type: 'area',
+        playback_window_hours: 24,
+        expires_at: '2026-08-04 10:02:00',
+        client_note: 'Pak Budi',
+    };
+
+    function openEditor(overrides = {}) {
+        return setup({
+            tokens: [AREA_TOKEN],
+            editingTokenId: AREA_TOKEN.id,
+            editForm: {
+                label: 'BJN',
+                scope_type: 'area',
+                area_ids: [3],
+                camera_rules: {},
+                playback_window_hours: 24,
+                expires_at: '2026-08-04 10:02:00',
+                client_note: 'Pak Budi',
+                max_active_sessions: '',
+                session_limit_mode: 'unlimited',
+                session_timeout_seconds: 60,
+                share_template: 'Halo',
+            },
+            areaOptions: [{ id: 3, name: 'KEC BOJONEGORO' }, { id: 4, name: 'KAB MAGETAN' }],
+            selectedEditAreaIds: new Set([3]),
+            ...overrides,
+        });
+    }
+
+    it('offers "Per area", so an area token stops claiming it covers everything', () => {
+        openEditor();
+
+        const select = screen.getByDisplayValue('Per area');
+        expect(within(select).getByText('Per area')).toBeTruthy();
+        expect(select.value).toBe('area');
+    });
+
+    it('shows which areas are covered, and lets them be changed', () => {
+        const onToggleEditArea = vi.fn();
+        openEditor({ onToggleEditArea });
+
+        const bojonegoro = screen.getByRole('checkbox', { name: /KEC BOJONEGORO/ });
+        expect(bojonegoro.checked).toBe(true);
+        expect(screen.getByRole('checkbox', { name: /KAB MAGETAN/ }).checked).toBe(false);
+
+        fireEvent.click(screen.getByRole('checkbox', { name: /KAB MAGETAN/ }));
+        expect(onToggleEditArea).toHaveBeenCalledWith(4);
+    });
+
+    it('lets the reach limit be edited, not only set at creation', () => {
+        const { onUpdateEditForm } = openEditor();
+
+        const input = screen.getByDisplayValue('24');
+        fireEvent.change(input, { target: { value: '48' } });
+
+        expect(onUpdateEditForm).toHaveBeenCalledWith('playback_window_hours', '48');
+    });
+
+    it('renders the stored expiry in the shape datetime-local needs, not blank', () => {
+        openEditor();
+
+        // "2026-08-04 10:02:00" would render as empty — reading as "never expires" on a token that
+        // does. It has to become "2026-08-04T10:02".
+        expect(screen.getByDisplayValue('2026-08-04T10:02')).toBeTruthy();
+    });
+
+    it('exposes the internal note, which the payload always carried', () => {
+        openEditor();
+
+        expect(screen.getByDisplayValue('Pak Budi')).toBeTruthy();
+    });
+});

@@ -274,3 +274,82 @@ describe('usePlaybackTokenManagementPage delete', () => {
         expect(notifyErrorMock).toHaveBeenCalledWith('Gagal menghapus token', 'Token dipakai');
     });
 });
+
+/*
+ * An area-scoped token could be opened for editing but not honestly edited: its areas were never
+ * read back into the form, and the payload never sent them. The server's fallback to the stored
+ * value hid that — right up until someone touched the scope select.
+ */
+describe('usePlaybackTokenManagementPage area scope editing', () => {
+    const AREA_TOKEN = {
+        id: 15,
+        label: 'BJN',
+        scope_type: 'area',
+        area_ids: [3],
+        camera_rules: [],
+        allowed_camera_ids: [],
+        playback_window_hours: 24,
+        expires_at: '2026-08-04 10:02:00',
+        client_note: 'Pak Budi',
+        max_active_sessions: null,
+        session_limit_mode: 'unlimited',
+        session_timeout_seconds: 60,
+        share_template: 'Kode {{token}}',
+    };
+
+    beforeEach(() => {
+        playbackTokenService.listTokens.mockResolvedValue({ success: true, data: [AREA_TOKEN] });
+        playbackTokenService.listAuditLogs.mockResolvedValue({ success: true, data: [] });
+    });
+
+    it('reads the covered areas back into the form', async () => {
+        const { result } = renderHook(() => usePlaybackTokenManagementPage());
+        await waitFor(() => expect(result.current.loading).toBe(false));
+
+        act(() => result.current.beginEditToken(result.current.tokens[0]));
+
+        expect(result.current.editForm.scope_type).toBe('area');
+        expect(result.current.editForm.area_ids).toEqual([3]);
+    });
+
+    it('sends the areas on save, so the scope survives an edit', async () => {
+        const { result } = renderHook(() => usePlaybackTokenManagementPage());
+        await waitFor(() => expect(result.current.loading).toBe(false));
+
+        act(() => result.current.beginEditToken(result.current.tokens[0]));
+        await act(async () => { await result.current.handleUpdateToken(15); });
+
+        expect(playbackTokenService.updateToken).toHaveBeenCalledWith(15, expect.objectContaining({
+            scope_type: 'area',
+            area_ids: [3],
+        }));
+    });
+
+    it('lets an area be added and removed from the edit form', async () => {
+        const { result } = renderHook(() => usePlaybackTokenManagementPage());
+        await waitFor(() => expect(result.current.loading).toBe(false));
+
+        act(() => result.current.beginEditToken(result.current.tokens[0]));
+        act(() => result.current.toggleEditArea(4));
+        expect(result.current.editForm.area_ids).toEqual([3, 4]);
+
+        act(() => result.current.toggleEditArea(3));
+        expect(result.current.editForm.area_ids).toEqual([4]);
+    });
+
+    it('carries the reach limit and expiry through an edit', async () => {
+        const { result } = renderHook(() => usePlaybackTokenManagementPage());
+        await waitFor(() => expect(result.current.loading).toBe(false));
+
+        act(() => result.current.beginEditToken(result.current.tokens[0]));
+        expect(result.current.editForm.playback_window_hours).toBe(24);
+
+        act(() => result.current.updateEditForm('playback_window_hours', '48'));
+        await act(async () => { await result.current.handleUpdateToken(15); });
+
+        expect(playbackTokenService.updateToken).toHaveBeenCalledWith(15, expect.objectContaining({
+            playback_window_hours: '48',
+            expires_at: '2026-08-04 10:02:00',
+        }));
+    });
+});

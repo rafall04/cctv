@@ -315,6 +315,18 @@ export function usePlaybackTokenManagementPage() {
         }));
     };
 
+    const toggleEditArea = (areaId) => {
+        setEditForm((current) => {
+            const areaIds = Array.isArray(current.area_ids) ? current.area_ids : [];
+            return {
+                ...current,
+                area_ids: areaIds.includes(areaId)
+                    ? areaIds.filter((id) => id !== areaId)
+                    : [...areaIds, areaId],
+            };
+        });
+    };
+
     const updateCameraRule = (cameraId, key, value) => {
         setForm((current) => ({
             ...current,
@@ -399,6 +411,9 @@ export function usePlaybackTokenManagementPage() {
         setEditForm({
             label: token.label || '',
             scope_type: token.scope_type || 'all',
+            // Without this an area token opened its editor with no areas loaded, so the form could
+            // not show which areas it covered — and the select had no 'area' option to show anyway.
+            area_ids: Array.isArray(token.area_ids) ? [...token.area_ids] : [],
             camera_ids: fallbackIds,
             camera_rules: buildInitialRuleMap(token.camera_rules || [], fallbackIds),
             playback_window_hours: token.playback_window_hours || '',
@@ -522,6 +537,7 @@ export function usePlaybackTokenManagementPage() {
             const response = await playbackTokenService.updateToken(tokenId, {
                 label: editForm.label,
                 scope_type: editForm.scope_type,
+                area_ids: editForm.area_ids || [],
                 camera_ids: cameraRules.map((rule) => rule.camera_id),
                 camera_rules: cameraRules,
                 playback_window_hours: editForm.playback_window_hours || null,
@@ -645,6 +661,8 @@ export function usePlaybackTokenManagementPage() {
         handleUpdateToken,
         handleRevoke,
         handleDelete,
+        toggleEditArea,
+        selectedEditAreaIds: new Set(editForm.area_ids || []),
         auditTokenId,
         setAuditTokenId,
         auditLimit,

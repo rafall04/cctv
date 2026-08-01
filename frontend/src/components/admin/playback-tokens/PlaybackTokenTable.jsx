@@ -27,6 +27,17 @@ function scopeLabel(token) {
 
 const FIELD = 'w-full rounded-control border border-edge-strong bg-surface px-3 py-2 text-sm text-content';
 
+/**
+ * SQL datetime ("2026-08-04 10:02:00") -> the "YYYY-MM-DDTHH:mm" that <input type="datetime-local">
+ * requires. Handed the raw stored value the input silently renders blank, which reads as "no expiry
+ * set" on a token that very much has one.
+ */
+function toDateTimeLocal(value) {
+    if (!value) return '';
+    const normalized = String(value).replace(' ', 'T');
+    return normalized.slice(0, 16);
+}
+
 /** One label/value line. Fixed-width label so the values line up down the card. */
 function Detail({ label, children }) {
     return (
@@ -40,7 +51,7 @@ function Detail({ label, children }) {
 function TokenEditFields({
     editForm, onUpdateEditForm, selectedEditCameraIds, visibleEditCameras, editCameraSearch,
     totalCameraCount, visibleEditCameraCount, onUpdateEditCameraSearch, onToggleEditCameraRule,
-    onUpdateEditCameraRule,
+    onUpdateEditCameraRule, areaOptions = [], selectedEditAreaIds = new Set(), onToggleEditArea,
 }) {
     return (
         <div className="space-y-3">
@@ -51,11 +62,37 @@ function TokenEditFields({
 
             <label className="block">
                 <span className="mb-1 block text-xs font-semibold text-content-muted">Akses kamera</span>
+                {/*
+                  * "Per area" was missing, so an area-scoped token opened its editor showing
+                  * "Semua kamera" — a plain lie about what it covers, and one touch of the select
+                  * would have converted it to all-cameras for real.
+                  */}
                 <select value={editForm.scope_type} onChange={(event) => onUpdateEditForm('scope_type', event.target.value)} className={FIELD}>
                     <option value="all">Semua kamera</option>
+                    <option value="area">Per area</option>
                     <option value="selected">Kamera tertentu</option>
                 </select>
             </label>
+
+            {editForm.scope_type === 'area' && (
+                <div className="space-y-2 rounded-card border border-edge p-2">
+                    <p className="text-xs text-content-subtle">
+                        Kamera yang ditambahkan ke area ini nanti otomatis ikut tercakup.
+                    </p>
+                    {areaOptions.length === 0 ? (
+                        <p className="text-sm text-content-muted">Belum ada kamera yang punya area.</p>
+                    ) : areaOptions.map((area) => (
+                        <label key={area.id} className="flex items-center gap-2 rounded-control bg-surface-sunken p-2 text-sm text-content">
+                            <input
+                                type="checkbox"
+                                checked={selectedEditAreaIds.has(area.id)}
+                                onChange={() => onToggleEditArea?.(area.id)}
+                            />
+                            <span className="truncate">{area.name}</span>
+                        </label>
+                    ))}
+                </div>
+            )}
 
             {editForm.scope_type === 'selected' && (
                 <div className="space-y-2 rounded-card border border-edge p-2">
@@ -86,6 +123,23 @@ function TokenEditFields({
                 </div>
             )}
 
+            {/*
+              * These two were in the payload the whole time but had no inputs, so the editor could
+              * never change how far back a token reaches or when it stops working — the two things
+              * most likely to need changing after a token is issued.
+              */}
+            <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block">
+                    <span className="mb-1 block text-xs font-semibold text-content-muted">Maksimal mundur (jam)</span>
+                    <input type="number" min="1" value={editForm.playback_window_hours ?? ''} onChange={(event) => onUpdateEditForm('playback_window_hours', event.target.value)} placeholder="Kosong = semua rekaman" className={FIELD} />
+                </label>
+                <label className="block">
+                    <span className="mb-1 block text-xs font-semibold text-content-muted">Berlaku sampai</span>
+                    <input type="datetime-local" value={toDateTimeLocal(editForm.expires_at)} onChange={(event) => onUpdateEditForm('expires_at', event.target.value)} className={FIELD} />
+                    <span className="mt-1 block text-xs text-content-subtle">Kosong = selamanya.</span>
+                </label>
+            </div>
+
             <div className="grid gap-3 sm:grid-cols-3">
                 <label className="block">
                     <span className="mb-1 block text-xs font-semibold text-content-muted">Maks. sesi</span>
@@ -102,6 +156,11 @@ function TokenEditFields({
                     <input type="number" min="30" max="3600" value={editForm.session_timeout_seconds} onChange={(event) => onUpdateEditForm('session_timeout_seconds', event.target.value)} className={FIELD} />
                 </label>
             </div>
+
+            <label className="block">
+                <span className="mb-1 block text-xs font-semibold text-content-muted">Catatan (internal)</span>
+                <input value={editForm.client_note ?? ''} onChange={(event) => onUpdateEditForm('client_note', event.target.value)} placeholder="Mis. nama pelanggan" className={FIELD} />
+            </label>
 
             <label className="block">
                 <span className="mb-1 block text-xs font-semibold text-content-muted">Template pesan share</span>
@@ -211,6 +270,9 @@ export default function PlaybackTokenTable({
     onRevoke,
     onDelete,
     deletingTokenId = null,
+    areaOptions = [],
+    selectedEditAreaIds,
+    onToggleEditArea,
 }) {
     const editFieldProps = {
         onUpdateEditForm,
@@ -222,6 +284,9 @@ export default function PlaybackTokenTable({
         onUpdateEditCameraSearch,
         onToggleEditCameraRule,
         onUpdateEditCameraRule,
+        areaOptions,
+        selectedEditAreaIds,
+        onToggleEditArea,
     };
 
     return (
