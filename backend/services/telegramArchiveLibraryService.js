@@ -122,7 +122,7 @@ export function listUploads({
          LEFT JOIN cameras c ON c.id = u.camera_id
          LEFT JOIN areas a ON a.id = c.area_id
          WHERE ${clause}
-         ORDER BY u.uploaded_at DESC
+         ORDER BY u.uploaded_at DESC, u.segment_id DESC
          LIMIT ? OFFSET ?`,
         [...params, Math.min(Number(limit) || 100, 500), Math.max(Number(offset) || 0, 0)],
     );
@@ -143,6 +143,57 @@ export function listUploads({
         uploadedAt: row.uploaded_at,
         groups: safeTargets(row.targets).map((t) => t.label).filter(Boolean),
     }));
+}
+
+/**
+ * Where does a given instant sit in the filtered list? Returns the segment plus its 0-based
+ * position, so the caller can turn that into a page number and jump straight there.
+ *
+ * Without this, "Lompat ke jam" could only search the rows already on screen — one page out of
+ * dozens — and reported "tidak ada rekaman" for footage that was merely on another page.
+ *
+ * `at`, recorded_at and recorded_until are all ISO-8601 UTC in one fixed format, so plain string
+ * comparison is chronological here. Do NOT swap in SQLite's datetime(): it emits
+ * 'YYYY-MM-DD HH:MM:SS', which does not compare correctly against the stored '…THH:MM:SS.sssZ'.
+ */
+export function locateUpload({ at = null, ...filters } = {}) {
+    if (!at) {
+        return null;
+    }
+    const { clause, params } = buildUploadFilter(filters);
+
+    // The newest segment that had already STARTED at that instant. With contiguous recording that
+    // is the covering clip; across a gap it is the one just before, which is where an operator
+    // wants to land anyway — "not found" with no bearing helps nobody.
+    const target = queryOne(
+        `SELECT u.segment_id, u.uploaded_at, u.recorded_until
+         FROM telegram_archive_uploads u
+         WHERE ${clause} AND u.recorded_at <= ?
+         ORDER BY u.recorded_at DESC, u.segment_id DESC
+         LIMIT 1`,
+        [...params, at],
+    );
+    if (!target) {
+        return null;
+    }
+
+    // Counted on uploaded_at because that is what the list is ordered by. recorded_at (capture) and
+    // uploaded_at (upload) are different clocks and do not always agree on order, so deriving the
+    // position from the search key would land on the wrong page.
+    const before = queryOne(
+        `SELECT COUNT(*) AS n
+         FROM telegram_archive_uploads u
+         WHERE ${clause}
+           AND (u.uploaded_at > ? OR (u.uploaded_at = ? AND u.segment_id > ?))`,
+        [...params, target.uploaded_at, target.uploaded_at, target.segment_id],
+    );
+
+    return {
+        segmentId: target.segment_id,
+        offset: before?.n ?? 0,
+        // True when the instant fell in a recording hole and we landed on the clip before it.
+        approximate: !(target.recorded_until && target.recorded_until >= at),
+    };
 }
 
 /**
@@ -363,4 +414,6 @@ function safeTargets(raw) {
 
 // Routes import the DEFAULT, so anything they call has to be listed here — a named export alone
 // is invisible to them and fails only at runtime, on the live page.
-export default { listUploads, countUploads, getSummary, getUpload, openSegmentStream, parseRange };
+export default {
+    listUploads, countUploads, locateUpload, getSummary, getUpload, openSegmentStream, parseRange,
+};

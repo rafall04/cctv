@@ -77,6 +77,63 @@ describe('telegramArchiveLibraryService default export covers what the routes ca
         expect(camerasParams).not.toContain(16);
     });
 
+    it('locates an instant by position in the SAME ordering the list pages through', async () => {
+        const { queryOne } = await import('../database/connectionPool.js');
+        const { default: archiveLibrary } = await import('../services/telegramArchiveLibraryService.js');
+
+        queryOne.mockReset();
+        queryOne
+            .mockReturnValueOnce({
+                segment_id: 4242,
+                uploaded_at: '2026-08-01 06:51:00',
+                recorded_until: '2026-08-01T07:00:00.000Z',
+            })
+            .mockReturnValueOnce({ n: 137 });
+
+        const found = archiveLibrary.locateUpload({
+            at: '2026-08-01T06:45:00.000Z',
+            cameraId: 16,
+        });
+
+        expect(found).toEqual({ segmentId: 4242, offset: 137, approximate: false });
+
+        // Position must be counted on uploaded_at + segment_id — the list's ordering — not on the
+        // recorded_at used to search, or the jump lands on the wrong page.
+        const [countSql, countParams] = queryOne.mock.calls.at(-1);
+        expect(countSql).toContain('u.uploaded_at > ?');
+        expect(countSql).toContain('u.segment_id > ?');
+        expect(countParams).toContain('2026-08-01 06:51:00');
+        expect(countParams).toContain(4242);
+    });
+
+    it('flags a hit as approximate when the instant fell in a recording gap', async () => {
+        const { queryOne } = await import('../database/connectionPool.js');
+        const { default: archiveLibrary } = await import('../services/telegramArchiveLibraryService.js');
+
+        queryOne.mockReset();
+        queryOne
+            .mockReturnValueOnce({
+                segment_id: 7,
+                uploaded_at: '2026-08-01 06:00:00',
+                // Ended well BEFORE the instant asked for: landed next to it, not on it.
+                recorded_until: '2026-08-01T05:00:00.000Z',
+            })
+            .mockReturnValueOnce({ n: 0 });
+
+        expect(archiveLibrary.locateUpload({ at: '2026-08-01T06:45:00.000Z' }).approximate).toBe(true);
+    });
+
+    it('answers null rather than guessing when nothing sits at or before the instant', async () => {
+        const { queryOne } = await import('../database/connectionPool.js');
+        const { default: archiveLibrary } = await import('../services/telegramArchiveLibraryService.js');
+
+        queryOne.mockReset();
+        queryOne.mockReturnValueOnce(undefined);
+
+        expect(archiveLibrary.locateUpload({ at: '2020-01-01T00:00:00.000Z' })).toBeNull();
+        expect(archiveLibrary.locateUpload({})).toBeNull();
+    });
+
     it('leaves the summary unrestricted when no filters are given', async () => {
         const { queryOne } = await import('../database/connectionPool.js');
         const { default: archiveLibrary } = await import('../services/telegramArchiveLibraryService.js');

@@ -105,6 +105,26 @@ export default async function telegramArchiveRoutes(fastify) {
         });
     });
 
+    // Where a moment in time sits in the current list, so the page can jump to it instead of only
+    // searching the rows already on screen.
+    fastify.get('/library/locate', { onRequest: guard }, async (request, reply) => {
+        const { at, cameraId, status, from, to } = request.query || {};
+        if (!at) {
+            return reply.code(400).send({ success: false, message: 'Parameter "at" wajib diisi' });
+        }
+        const found = archiveLibrary.locateUpload({
+            at,
+            cameraId: cameraId ? Number(cameraId) : null,
+            status: status || 'ok',
+            from: from || null,
+            to: to || null,
+        });
+        if (!found) {
+            return reply.code(404).send({ success: false, message: 'Tidak ada rekaman pada waktu itu' });
+        }
+        return reply.send({ success: true, data: found });
+    });
+
     fastify.get('/library/summary', { onRequest: guard }, async (request, reply) => {
         // Same filters as /library on purpose: the header describes the list under it.
         const { cameraId, status, from, to } = request.query || {};

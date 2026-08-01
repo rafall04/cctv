@@ -39,6 +39,25 @@ export async function listUploads({ cameraId, limit = 100, offset = 0, from, to 
     return { items, total: Number(data?.meta?.total ?? items.length) };
 }
 
+/**
+ * Where an instant sits in the current list: `{ segmentId, offset, approximate }`, or null when the
+ * archive holds nothing at or before it. The caller turns `offset` into a page number.
+ */
+export async function locate({ at, cameraId, from, to } = {}) {
+    const params = { at };
+    if (cameraId) params.cameraId = cameraId;
+    if (from) params.from = from;
+    if (to) params.to = to;
+    try {
+        const { data } = await apiClient.get(`${BASE}/locate`, { params });
+        return data?.data ?? null;
+    } catch (err) {
+        // 404 is a legitimate answer here ("nothing that early"), not a failure worth an error toast.
+        if (err?.response?.status === 404) return null;
+        throw err;
+    }
+}
+
 /** Local calendar date (YYYY-MM-DD from <input type="date">) -> the UTC instants bounding that day. */
 export function dayBounds(date, edge) {
     if (!date) return undefined;
@@ -54,4 +73,4 @@ export function streamUrl(segmentId) {
     return `${BASE}/${segmentId}/stream`;
 }
 
-export default { getSummary, listUploads, streamUrl, dayBounds };
+export default { getSummary, listUploads, locate, streamUrl, dayBounds };

@@ -13,17 +13,20 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import TelegramArchiveLibrary from './TelegramArchiveLibrary';
 
-const { getSummary, listUploads, streamUrl, dayBounds, notifyError, notifyWarning } = vi.hoisted(() => ({
+const {
+    getSummary, listUploads, locate, streamUrl, dayBounds, notifyError, notifyWarning,
+} = vi.hoisted(() => ({
     getSummary: vi.fn(),
     listUploads: vi.fn(),
+    locate: vi.fn(),
     streamUrl: vi.fn((id) => `/stream/${id}`),
-    dayBounds: vi.fn(() => undefined),
+    dayBounds: vi.fn((date, edge) => (date ? `${date}T${edge === 'end' ? '23' : '00'}:00:00.000Z` : undefined)),
     notifyError: vi.fn(),
     notifyWarning: vi.fn(),
 }));
 
 vi.mock('../services/telegramArchiveLibraryService', () => ({
-    default: { getSummary, listUploads, streamUrl, dayBounds },
+    default: { getSummary, listUploads, locate, streamUrl, dayBounds },
 }));
 
 vi.mock('../contexts/NotificationContext', () => ({
@@ -64,11 +67,20 @@ const SUMMARY = {
 beforeEach(() => {
     vi.clearAllMocks();
     getSummary.mockResolvedValue(SUMMARY);
+    locate.mockResolvedValue(null);
     listUploads.mockResolvedValue({
         items: [segment(1, CAMERA_NAME, 16), segment(2, 'SIMPANG 3 PASAR PLAOSAN', 41)],
         total: 401,
     });
 });
+
+/** YYYY-MM-DD for today in LOCAL time — the same basis the presets use. */
+function todayLocal(offsetDays = 0) {
+    const d = new Date();
+    d.setDate(d.getDate() + offsetDays);
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
 
 describe('TelegramArchiveLibrary row density', () => {
     it('keeps camera and area on each row while the list mixes cameras', async () => {
@@ -101,5 +113,95 @@ describe('TelegramArchiveLibrary row density', () => {
 
         // Still visible exactly once as scroll-surviving context, in the sticky day heading.
         expect(screen.getByRole('heading', { name: new RegExp(CAMERA_NAME) })).toBeTruthy();
+    });
+});
+
+describe('TelegramArchiveLibrary range presets', () => {
+    it('fills both date fields from LOCAL today, not a UTC-shifted day', async () => {
+        render(<TelegramArchiveLibrary />);
+        await waitFor(() => expect(screen.getAllByRole('listitem').length).toBeGreaterThan(0));
+
+        fireEvent.click(screen.getByRole('button', { name: 'Hari ini' }));
+
+        const today = todayLocal();
+        // Awaited, not asserted synchronously: the click changes filters, which kicks off a reload.
+        // Asserting before that settles leaves React updating outside act() and muddies the suite.
+        await waitFor(() => {
+            expect(screen.getByLabelText('Dari tanggal').value).toBe(today);
+            expect(screen.getByLabelText('Sampai tanggal').value).toBe(today);
+        });
+    });
+
+    it('spans the last 7 days inclusive', async () => {
+        render(<TelegramArchiveLibrary />);
+        await waitFor(() => expect(screen.getAllByRole('listitem').length).toBeGreaterThan(0));
+
+        fireEvent.click(screen.getByRole('button', { name: '7 hari' }));
+
+        await waitFor(() => {
+            expect(screen.getByLabelText('Dari tanggal').value).toBe(todayLocal(-6));
+            expect(screen.getByLabelText('Sampai tanggal').value).toBe(todayLocal(0));
+        });
+    });
+
+    it('clears the range when the active preset is pressed again', async () => {
+        render(<TelegramArchiveLibrary />);
+        await waitFor(() => expect(screen.getAllByRole('listitem').length).toBeGreaterThan(0));
+
+        fireEvent.click(screen.getByRole('button', { name: 'Kemarin' }));
+        await waitFor(() => expect(screen.getByLabelText('Dari tanggal').value).toBe(todayLocal(-1)));
+
+        fireEvent.click(screen.getByRole('button', { name: 'Kemarin' }));
+        await waitFor(() => {
+            expect(screen.getByLabelText('Dari tanggal').value).toBe('');
+            expect(screen.getByLabelText('Sampai tanggal').value).toBe('');
+        });
+    });
+});
+
+describe('TelegramArchiveLibrary jump to time', () => {
+    it('turns a hit on another page into that page instead of reporting nothing found', async () => {
+        // Rows on screen are 06:40-06:50; 02:15 is elsewhere in the archive entirely.
+        locate.mockResolvedValue({ segmentId: 4242, offset: 137, approximate: false });
+        render(<TelegramArchiveLibrary />);
+        await waitFor(() => expect(screen.getAllByRole('listitem').length).toBeGreaterThan(0));
+
+        fireEvent.change(screen.getByLabelText('Lompat ke jam'), { target: { value: '02:15' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Cari' }));
+
+        await waitFor(() => expect(locate).toHaveBeenCalled());
+        // offset 137 at the default page size of 25 -> page index 5, i.e. "Hal. 6".
+        await waitFor(() => expect(listUploads).toHaveBeenCalledWith(
+            expect.objectContaining({ offset: 125, limit: 25 }),
+        ));
+        expect(notifyWarning).not.toHaveBeenCalled();
+    });
+
+    it('says so plainly when the archive holds nothing that early', async () => {
+        locate.mockResolvedValue(null);
+        render(<TelegramArchiveLibrary />);
+        await waitFor(() => expect(screen.getAllByRole('listitem').length).toBeGreaterThan(0));
+
+        fireEvent.change(screen.getByLabelText('Lompat ke jam'), { target: { value: '02:15' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Cari' }));
+
+        await waitFor(() => expect(notifyWarning).toHaveBeenCalledWith(
+            'Tidak ketemu',
+            expect.stringContaining('02:15'),
+        ));
+    });
+
+    it('rejects a malformed time without calling the server', async () => {
+        render(<TelegramArchiveLibrary />);
+        await waitFor(() => expect(screen.getAllByRole('listitem').length).toBeGreaterThan(0));
+
+        fireEvent.change(screen.getByLabelText('Lompat ke jam'), { target: { value: '99:99' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Cari' }));
+
+        await waitFor(() => expect(notifyWarning).toHaveBeenCalledWith(
+            'Format jam salah',
+            expect.any(String),
+        ));
+        expect(locate).not.toHaveBeenCalled();
     });
 });

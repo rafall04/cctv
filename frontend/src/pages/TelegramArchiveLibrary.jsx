@@ -96,6 +96,49 @@ function SegmentRow({ row, win, highlighted, showCamera, onPlay }) {
 const PAGE_SIZES = [10, 25, 50, 100];
 const DEFAULT_PAGE_SIZE = 25;
 
+/**
+ * Local calendar date, N days from today, as YYYY-MM-DD for <input type="date">.
+ *
+ * Built from LOCAL parts on purpose. toISOString() is UTC, so for WIB (+7) any moment before 07:00
+ * lands on the previous day — "Hari ini" would silently mean yesterday all morning.
+ */
+function localDate(offsetDays = 0) {
+    const d = new Date();
+    d.setDate(d.getDate() + offsetDays);
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+const RANGE_PRESETS = [
+    { label: 'Hari ini', build: () => [localDate(0), localDate(0)] },
+    { label: 'Kemarin', build: () => [localDate(-1), localDate(-1)] },
+    { label: '7 hari', build: () => [localDate(-6), localDate(0)] },
+];
+
+/**
+ * "19:36" -> the instant the operator means, as an ISO string.
+ *
+ * A bare wall-clock time needs a day to become a moment. When a date range is set the operator has
+ * already said which day; without one, the most recent occurrence is meant — which is yesterday if
+ * that time has not come round yet today.
+ */
+function instantFromTime(hhmm, { from, to }) {
+    const match = /^(\d{1,2})[.:](\d{2})$/.exec(String(hhmm).trim());
+    if (!match) return null;
+    const hours = Number(match[1]);
+    const minutes = Number(match[2]);
+    if (hours > 23 || minutes > 59) return null;
+
+    const anchor = to || from;
+    const target = anchor ? new Date(`${anchor}T00:00:00`) : new Date();
+    if (Number.isNaN(target.getTime())) return null;
+    target.setHours(hours, minutes, 0, 0);
+    if (!anchor && target.getTime() > Date.now()) {
+        target.setDate(target.getDate() - 1);
+    }
+    return target.toISOString();
+}
+
 export default function TelegramArchiveLibrary() {
     const { error: notifyError, warning: notifyWarning } = useNotification();
     const [summary, setSummary] = useState(null);
@@ -107,7 +150,11 @@ export default function TelegramArchiveLibrary() {
     const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
     const [page, setPage] = useState(0);
     const [jumpTo, setJumpTo] = useState('');
+    const [jumping, setJumping] = useState(false);
     const [highlighted, setHighlighted] = useState(null);
+    // Set when a jump lands on ANOTHER page: the row does not exist yet, so the scroll has to wait
+    // for that page to finish loading rather than fire against a DOM that has not caught up.
+    const [pendingScroll, setPendingScroll] = useState(null);
     const [loading, setLoading] = useState(true);
     const [playing, setPlaying] = useState(null);
 
@@ -140,6 +187,18 @@ export default function TelegramArchiveLibrary() {
 
     useEffect(() => { load(); }, [load]);
 
+    useEffect(() => {
+        if (!pendingScroll || loading) {
+            return;
+        }
+        const el = document.getElementById(`seg-${pendingScroll}`);
+        if (!el) {
+            return;
+        }
+        el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        setPendingScroll(null);
+    }, [pendingScroll, loading, rows]);
+
     const pageCount = Math.max(Math.ceil(total / pageSize), 1);
     // The archive grows ~200 rows/hour, so a page deep in an UNFILTERED list drifts as new segments
     // push older ones down. Say so rather than let a segment seem to vanish between clicks; picking
@@ -167,19 +226,41 @@ export default function TelegramArchiveLibrary() {
     const singleCamera = Boolean(cameraId);
     const days = useMemo(() => buildTimeline(rows, { detectGaps: singleCamera }), [rows, singleCamera]);
 
-    const handleJump = (event) => {
+    const handleJump = async (event) => {
         event.preventDefault();
-        const found = findSegmentAt(rows, jumpTo);
-        if (!found) {
-            // Scope matters now that the list is paged: "not found" here means not on THIS page,
-            // not absent from the archive. Saying only "tidak ada rekaman" would be a lie.
-            notifyWarning('Tidak ketemu', `Tidak ada rekaman di sekitar ${jumpTo} pada halaman ini.`);
+        const at = instantFromTime(jumpTo, { from, to });
+        if (!at) {
+            notifyWarning('Format jam salah', 'Tulis seperti 19:36.');
             return;
         }
-        setHighlighted(found.segmentId);
-        document.getElementById(`seg-${found.segmentId}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-        if (found._approximate) {
-            notifyWarning('Tidak persis', `Tidak ada klip yang memuat ${jumpTo}; ini yang terdekat.`);
+
+        // Try the rows already on screen first: no round trip, and it keeps the common case
+        // (scanning the page you are looking at) instant.
+        const onThisPage = findSegmentAt(rows, jumpTo);
+        if (onThisPage && !onThisPage._approximate) {
+            setHighlighted(onThisPage.segmentId);
+            setPendingScroll(onThisPage.segmentId);
+            return;
+        }
+
+        setJumping(true);
+        try {
+            const found = await archiveLibrary.locate({ at, ...filters });
+            if (!found) {
+                notifyWarning('Tidak ketemu', `Tidak ada rekaman pada atau sebelum ${jumpTo}.`);
+                return;
+            }
+            // Turn the position in the whole list into the page that holds it.
+            setPage(Math.floor(found.offset / pageSize));
+            setHighlighted(found.segmentId);
+            setPendingScroll(found.segmentId);
+            if (found.approximate) {
+                notifyWarning('Tidak persis', `Tidak ada klip yang memuat ${jumpTo}; ini yang terdekat sebelumnya.`);
+            }
+        } catch (err) {
+            notifyError('Gagal mencari', err?.response?.data?.message || err.message);
+        } finally {
+            setJumping(false);
         }
     };
 
@@ -266,8 +347,34 @@ export default function TelegramArchiveLibrary() {
                         inputMode="numeric"
                         className="w-24 shrink-0"
                     />
-                    <Button type="submit" disabled={!jumpTo.trim()}>Cari</Button>
+                    <Button type="submit" disabled={!jumpTo.trim() || jumping}>
+                        {jumping ? 'Mencari…' : 'Cari'}
+                    </Button>
                 </form>
+            </div>
+
+            {/* The two dates people actually pick, without opening a calendar twice. */}
+            <div className="flex flex-wrap items-center gap-2">
+                {RANGE_PRESETS.map((preset) => {
+                    const [presetFrom, presetTo] = preset.build();
+                    const active = from === presetFrom && to === presetTo;
+                    return (
+                        <Button
+                            key={preset.label}
+                            size="sm"
+                            variant={active ? 'primary' : 'secondary'}
+                            onClick={() => {
+                                // Clicking the active preset again clears it — otherwise the only way
+                                // back to "everything" is to blank two date fields by hand.
+                                if (active) { setFrom(''); setTo(''); return; }
+                                setFrom(presetFrom);
+                                setTo(presetTo);
+                            }}
+                        >
+                            {preset.label}
+                        </Button>
+                    );
+                })}
             </div>
 
             {(from || to) && (
