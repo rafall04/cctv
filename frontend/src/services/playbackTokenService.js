@@ -62,9 +62,12 @@ export const playbackTokenService = {
         }
     },
 
-    async listAuditLogs(limit = 50) {
+    /** `tokenId` narrows the trail to one token — the backend has always supported it. */
+    async listAuditLogs(limit = 50, tokenId = null) {
         try {
-            const response = await apiClient.get(`/api/admin/playback-tokens/audit?limit=${limit}`);
+            const params = new URLSearchParams({ limit: String(limit) });
+            if (tokenId) params.set('tokenId', String(tokenId));
+            const response = await apiClient.get(`/api/admin/playback-tokens/audit?${params}`);
             return response.data;
         } catch (error) {
             console.error('List playback token audit logs error:', error);

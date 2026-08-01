@@ -7,6 +7,7 @@
  */
 
 import { Button, Modal } from '../components/ui';
+import PlaybackTokenAuditLog from '../components/admin/playback-tokens/PlaybackTokenAuditLog.jsx';
 import PlaybackTokenForm from '../components/admin/playback-tokens/PlaybackTokenForm.jsx';
 import PlaybackTokenSharePanel from '../components/admin/playback-tokens/PlaybackTokenSharePanel.jsx';
 import PlaybackTokenTable from '../components/admin/playback-tokens/PlaybackTokenTable.jsx';
@@ -113,46 +114,15 @@ export default function PlaybackTokenManagement() {
                 </Modal>
             )}
 
-            <div className="rounded-lg border border-edge bg-surface p-5 shadow-sm">
-                <div className="mb-4">
-                    <h2 className="text-lg font-semibold text-content">Log Token Terbaru</h2>
-                </div>
-                <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
-                        <thead className="text-left text-xs uppercase tracking-wide text-content-muted">
-                            <tr>
-                                <th className="px-3 py-2">Waktu</th>
-                                <th className="px-3 py-2">Event</th>
-                                <th className="px-3 py-2">Token</th>
-                                <th className="px-3 py-2">Kamera</th>
-                                <th className="px-3 py-2">Actor/IP</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-edge">
-                            {page.auditLogs.map((log) => (
-                                <tr key={log.id} className="text-content">
-                                    <td className="whitespace-nowrap px-3 py-3">{page.formatTokenDate(log.created_at)}</td>
-                                    <td className="px-3 py-3">{log.event_type}</td>
-                                    <td className="px-3 py-3">
-                                        <div>{log.token_label || '-'}</div>
-                                        <div className="text-xs text-content-muted">{log.token_prefix || ''}</div>
-                                    </td>
-                                    <td className="px-3 py-3">{log.camera_name || (log.camera_id ? `ID ${log.camera_id}` : '-')}</td>
-                                    <td className="px-3 py-3">
-                                        <div>{log.actor_username || '-'}</div>
-                                        <div className="text-xs text-content-muted">{log.ip_address || '-'}</div>
-                                    </td>
-                                </tr>
-                            ))}
-                            {page.auditLogs.length === 0 && (
-                                <tr>
-                                    <td className="px-3 py-6 text-center text-content-muted" colSpan={5}>Belum ada log token.</td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+            <PlaybackTokenAuditLog
+                logs={page.auditLogs}
+                tokens={page.tokens}
+                formatTokenDate={page.formatTokenDate}
+                filterTokenId={page.auditTokenId}
+                onFilterTokenId={page.setAuditTokenId}
+                onShowMore={page.showMoreAuditLogs}
+                canShowMore={page.canShowMoreAuditLogs}
+            />
         </div>
     );
 }

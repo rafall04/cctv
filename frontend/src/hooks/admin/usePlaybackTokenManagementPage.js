@@ -191,6 +191,10 @@ export function usePlaybackTokenManagementPage() {
     // all the way up to find the result. Creating a token still uses the panel — you are up there.
     const [sharePreview, setSharePreview] = useState(null);
     const [deletingTokenId, setDeletingTokenId] = useState(null);
+    // The audit trail is its own view: which token, and how far back. Both were fixed before —
+    // always every token, always the newest 50 — with no way to ask for anything else.
+    const [auditTokenId, setAuditTokenId] = useState('');
+    const [auditLimit, setAuditLimit] = useState(50);
     const [form, setForm] = useState(createDefaultForm);
     const [editForm, setEditForm] = useState({
         label: '',
@@ -251,7 +255,7 @@ export function usePlaybackTokenManagementPage() {
         try {
             const [tokenResponse, auditResponse, cameraResponse] = await Promise.all([
                 playbackTokenService.listTokens(),
-                playbackTokenService.listAuditLogs(50),
+                playbackTokenService.listAuditLogs(auditLimit, auditTokenId || null),
                 cameraService.getAllCameras(),
             ]);
             setTokens(Array.isArray(tokenResponse?.data) ? tokenResponse.data : []);
@@ -265,7 +269,7 @@ export function usePlaybackTokenManagementPage() {
         } finally {
             setLoading(false);
         }
-    }, [showError]);
+    }, [showError, auditLimit, auditTokenId]);
 
     useEffect(() => {
         loadData();
@@ -641,6 +645,12 @@ export function usePlaybackTokenManagementPage() {
         handleUpdateToken,
         handleRevoke,
         handleDelete,
+        auditTokenId,
+        setAuditTokenId,
+        auditLimit,
+        showMoreAuditLogs: () => setAuditLimit((current) => Math.min(current + 50, 200)),
+        // 200 is the backend's hard cap on this endpoint, so past it the button would lie.
+        canShowMoreAuditLogs: auditLimit < 200 && auditLogs.length >= auditLimit,
         sharePreview,
         setSharePreview,
         deletingTokenId,
