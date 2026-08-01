@@ -2,7 +2,7 @@
  * Purpose: Render the playback page header — title, share action, and the camera picker.
  * Caller: Playback page (public preview and admin full scope).
  * Deps: Caller-provided camera list and change/share handlers.
- * MainFuncs: PlaybackHeader, cameraOptionLabel.
+ * MainFuncs: PlaybackHeader, cameraOptionLabel, groupCamerasByArea.
  * SideEffects: Invokes caller-provided camera change and share handlers.
  *
  * Deliberately ends at the picker. The access notice and auto-play toggle moved to PlaybackOptions,
@@ -30,12 +30,38 @@ export function cameraOptionLabel(camera) {
     return `${name} — ${location}`;
 }
 
+/**
+ * Cameras grouped by area, areas and names both sorted, so scanning is predictable.
+ *
+ * A flat list of 36 meant someone looking for a Magetan junction scrolled past 14 Bojonegoro ones
+ * first. <optgroup> is deliberately chosen over a custom search box: it keeps the native picker that
+ * mobile users already know (and that Android renders as a grouped, flickable list), costs no
+ * keyboard/aria work, and adds nothing to a page already at its size ceiling.
+ *
+ * Cameras without an area fall into a trailing group rather than disappearing.
+ */
+export function groupCamerasByArea(cameras) {
+    const groups = new Map();
+    for (const camera of cameras || []) {
+        const key = (camera?.area_name || '').trim() || 'Lainnya';
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(camera);
+    }
+    for (const list of groups.values()) {
+        list.sort((a, b) => String(a?.name || '').localeCompare(String(b?.name || ''), 'id'));
+    }
+    return [...groups.entries()]
+        .sort(([a], [b]) => (a === 'Lainnya' ? 1 : b === 'Lainnya' ? -1 : a.localeCompare(b, 'id')))
+        .map(([area, list]) => ({ area, cameras: list }));
+}
+
 export default function PlaybackHeader({
     cameras,
     selectedCamera,
     onCameraChange,
     onShare,
 }) {
+    const grouped = groupCamerasByArea(cameras);
     return (
         <div className="space-y-3 rounded-card border border-edge bg-surface p-3 sm:p-4">
             <div className="flex items-center justify-between gap-3">
@@ -60,10 +86,14 @@ export default function PlaybackHeader({
                 aria-label="Pilih kamera"
                 className="w-full rounded-control border border-edge bg-surface px-3 py-2 text-content focus:border-transparent focus:ring-2 focus:ring-primary"
             >
-                {cameras.map((camera, idx) => (
-                    <option key={camera.id ?? `cam-${idx}`} value={camera.id}>
-                        {cameraOptionLabel(camera)}
-                    </option>
+                {grouped.map(({ area, cameras: list }) => (
+                    <optgroup key={area} label={`${area} (${list.length})`}>
+                        {list.map((camera, idx) => (
+                            <option key={camera.id ?? `cam-${idx}`} value={camera.id}>
+                                {cameraOptionLabel(camera)}
+                            </option>
+                        ))}
+                    </optgroup>
                 ))}
             </select>
         </div>
