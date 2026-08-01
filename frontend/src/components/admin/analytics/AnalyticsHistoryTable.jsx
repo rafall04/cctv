@@ -68,6 +68,7 @@ export default function AnalyticsHistoryTable({
     summary,
     items,
     columns,
+    renderCard = null,
     rowKey,
     renderCell,
     pagination,
@@ -128,7 +129,28 @@ export default function AnalyticsHistoryTable({
                 />
             ) : (
                 <>
-                    <div className="overflow-x-auto">
+                    {/*
+                      * Cards on a phone, table from lg up.
+                      *
+                      * `overflow-x-auto` stopped the page widening — the right instinct — but a
+                      * six-column history on a 360px screen still could not be READ: reaching the
+                      * IP scrolled the camera name off, so the two halves of one row were never
+                      * visible together. A card owns its width, so a row stays a row.
+                      */}
+                    {renderCard && (
+                        <ul className="space-y-2 lg:hidden">
+                            {items.map((item, index) => (
+                                <li
+                                    key={rowKey(item, index)}
+                                    onClick={() => onRowClick?.(item)}
+                                    className={`rounded-card border border-edge bg-surface p-3 ${onRowClick ? 'cursor-pointer' : ''}`}
+                                >
+                                    {renderCard(item)}
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                    <div className={`overflow-x-auto ${renderCard ? 'hidden lg:block' : ''}`}>
                         <table className="min-w-full text-sm">
                             <thead>
                                 <tr className="text-left text-content-muted">

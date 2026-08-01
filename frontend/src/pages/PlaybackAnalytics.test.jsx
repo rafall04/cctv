@@ -189,7 +189,8 @@ describe('PlaybackAnalytics', () => {
         expect(getPlaybackViewerHistoryMock).toHaveBeenCalledWith(expect.objectContaining({
             period: '7days',
         }), 'blocking');
-        expect(screen.getByText('seg-1.mp4')).toBeTruthy();
+        // Rendered in both the phone card and the wide table; jsdom shows both.
+        expect(screen.getAllByText('seg-1.mp4').length).toBeGreaterThan(0);
     });
 
     it('tetap menampilkan playback history page 2 setelah pagination diklik', async () => {
@@ -205,7 +206,10 @@ describe('PlaybackAnalytics', () => {
             expect(getPlaybackViewerHistoryMock).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2 }), 'blocking');
         });
         await waitFor(() => {
-            expect(screen.getByText('seg-2.mp4')).toBeTruthy();
+            // getAllByText, not getByText: one row now renders twice — a card for phones and a
+            // table row for wide screens. Only one is ever displayed (the other is display:none),
+            // but jsdom applies no CSS, so both are in the document.
+            expect(screen.getAllByText('seg-2.mp4').length).toBeGreaterThan(0);
         });
     });
 });

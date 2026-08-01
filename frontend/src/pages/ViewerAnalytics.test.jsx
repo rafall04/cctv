@@ -229,7 +229,10 @@ describe('ViewerAnalytics', () => {
             expect(getViewerHistory).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2 }), 'blocking');
         });
         await waitFor(() => {
-            expect(screen.getByText('Page Two Camera')).toBeTruthy();
+            // getAllByText, not getByText: one row now renders twice — a card for phones and a
+            // table row for wide screens. Only one is ever displayed (the other is display:none),
+            // but jsdom applies no CSS, so both are in the document.
+            expect(screen.getAllByText('Page Two Camera').length).toBeGreaterThan(0);
         });
     });
 });

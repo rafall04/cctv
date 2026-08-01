@@ -16,6 +16,7 @@ import DailyDetailModal from '../components/admin/analytics/DailyDetailModal';
 import { ActiveViewerCard, PeriodSelector } from '../components/admin/analytics/AnalyticsPrimitives';
 import AnalyticsHistoryTable, { AnalyticsHistoryDrawer, renderDeviceBadge, renderDurationText } from '../components/admin/analytics/AnalyticsHistoryTable';
 import { AnalyticsTabNav, AnalyticsWorkspaceHeader } from '../components/admin/analytics/AnalyticsWorkspace';
+import { summarizeUserAgent } from '../utils/admin/deviceLabel.js';
 import ViewerAnalyticsAudienceSection from '../components/admin/analytics/ViewerAnalyticsAudienceSection';
 import ViewerAnalyticsChartsSection from '../components/admin/analytics/ViewerAnalyticsChartsSection';
 import ViewerAnalyticsSkeleton from '../components/admin/analytics/ViewerAnalyticsSkeleton';
@@ -51,6 +52,40 @@ function TopMetricCard({ title, children }) {
             <h2 className="text-lg font-semibold text-content">{title}</h2>
             <div className="mt-4">{children}</div>
         </section>
+    );
+}
+
+/**
+ * Phone view of one live-viewer row. The table this replaces on small screens was six columns wide
+ * inside `overflow-x-auto`: reaching the duration scrolled the camera name away, so a row could
+ * never be read as a row.
+ */
+function renderLiveHistoryCard(session, formatDateTime) {
+    return (
+        <>
+            <p className="font-semibold text-content">{session.camera_name}</p>
+            <dl className="mt-2 space-y-0.5">
+                <ViewerHistoryLine label="Ditonton">{formatWatchTime(session.duration_seconds)}</ViewerHistoryLine>
+                <ViewerHistoryLine label="Mulai">{formatDateTime(session.started_at, { storage: TIMESTAMP_STORAGE.LOCAL_SQL })}</ViewerHistoryLine>
+                <ViewerHistoryLine label="Selesai">
+                    {session.ended_at ? formatDateTime(session.ended_at, { storage: TIMESTAMP_STORAGE.LOCAL_SQL }) : 'masih berjalan'}
+                </ViewerHistoryLine>
+                {/* The full user agent, summarised. `device_type` alone only ever said "mobile". */}
+                <ViewerHistoryLine label="Perangkat">{summarizeUserAgent(session.user_agent) || session.device_type}</ViewerHistoryLine>
+                <ViewerHistoryLine label="IP">{session.ip_address}</ViewerHistoryLine>
+            </dl>
+        </>
+    );
+}
+
+/** One label/value line, skipped when empty so a card never shows a column of dashes. */
+function ViewerHistoryLine({ label, children }) {
+    if (!children) return null;
+    return (
+        <div className="flex gap-2 text-xs">
+            <dt className="w-20 shrink-0 text-content-subtle">{label}</dt>
+            <dd className="min-w-0 flex-1 break-all text-content-muted">{children}</dd>
+        </div>
     );
 }
 
@@ -425,6 +460,7 @@ export default function ViewerAnalytics() {
                         ]}
                         rowKey={(item) => item.id}
                         renderCell={(session, column) => renderLiveHistoryCell(session, column, formatDateTime)}
+                        renderCard={(session) => renderLiveHistoryCard(session, formatDateTime)}
                         pagination={history.pagination}
                         onPageChange={(page) => loadHistory({ page, pageSize: history.pagination.pageSize })}
                         onPageSizeChange={(pageSize) => loadHistory({ page: 1, pageSize })}

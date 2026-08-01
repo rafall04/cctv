@@ -92,25 +92,61 @@ function SectionCard({ title, children }) {
     );
 }
 
+/** Phone view of one history row: everything readable at once, nothing scrolled off. */
+function renderPlaybackHistoryCard(session, formatDateTime) {
+    return (
+        <>
+            <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                    <p className="font-semibold text-content">{session.camera_name}</p>
+                    <p className="text-xs text-content-muted">
+                        {session.segment_started_at
+                            ? `Rekaman ${formatDateTime(session.segment_started_at)}`
+                            : session.segment_filename}
+                    </p>
+                </div>
+                <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${ACCESS_MODE_LABELS[session.playback_access_mode]?.tone || 'bg-surface-sunken text-content'}`}>
+                    {ACCESS_MODE_LABELS[session.playback_access_mode]?.label || session.playback_access_mode}
+                </span>
+            </div>
+            <dl className="mt-2 space-y-0.5">
+                <HistoryLine label="Ditonton">{formatWatchTime(session.duration_seconds)}</HistoryLine>
+                <HistoryLine label="Dibuka">{formatDateTime(session.started_at, { storage: TIMESTAMP_STORAGE.LOCAL_SQL })}</HistoryLine>
+                <HistoryLine label="Perangkat">{summarizeUserAgent(session.user_agent) || session.device_type}</HistoryLine>
+                <HistoryLine label="IP">{session.ip_address}</HistoryLine>
+                <HistoryLine label="Token">{session.token_label}</HistoryLine>
+                <HistoryLine label="Admin">{session.admin_username}</HistoryLine>
+            </dl>
+        </>
+    );
+}
+
 function renderPlaybackHistoryCell(session, column, formatDateTime) {
     switch (column.key) {
         case 'camera_name':
             return (
                 <div>
                     <div className="font-semibold text-content">{session.camera_name}</div>
-                    <div className="text-xs text-content-muted">{session.segment_filename}</div>
+                    {/* The recording time, not the filename it is encoded in. */}
+                    <div className="text-xs text-content-muted">
+                        {session.segment_started_at ? `Rekaman ${formatDateTime(session.segment_started_at)}` : session.segment_filename}
+                    </div>
                 </div>
             );
         case 'playback_access_mode':
             return (
-                <span className="rounded-full bg-surface-sunken px-2.5 py-1 text-xs font-medium text-content">
-                    {session.playback_access_mode}
+                <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${ACCESS_MODE_LABELS[session.playback_access_mode]?.tone || 'bg-surface-sunken text-content'}`}>
+                    {ACCESS_MODE_LABELS[session.playback_access_mode]?.label || session.playback_access_mode}
                 </span>
             );
         case 'viewer':
             return (
-                <div>
-                    <div className="font-mono text-xs">{session.ip_address}</div>
+                <div className="min-w-0">
+                    {/* break-all: an IPv6 address is 39 characters and was being clipped. */}
+                    <div className="break-all font-mono text-xs">{session.ip_address}</div>
+                    {session.token_label && (
+                        <div className="text-xs font-medium text-primary">Token: {session.token_label}</div>
+                    )}
                     {session.admin_username && (
                         <div className="text-xs text-content-muted">{session.admin_username}</div>
                     )}
@@ -499,6 +535,7 @@ export default function PlaybackAnalytics() {
                         ]}
                         rowKey={(item) => item.id}
                         renderCell={(session, column) => renderPlaybackHistoryCell(session, column, formatDateTime)}
+                        renderCard={(session) => renderPlaybackHistoryCard(session, formatDateTime)}
                         pagination={history.pagination}
                         onPageChange={(page) => loadHistory({ page, pageSize: history.pagination.pageSize })}
                         onPageSizeChange={(pageSize) => loadHistory({ page: 1, pageSize })}
@@ -539,7 +576,7 @@ export default function PlaybackAnalytics() {
                                     <input
                                         value={historySearch}
                                         onChange={(event) => setHistorySearch(event.target.value)}
-                                        placeholder="IP, segment, admin"
+                                        placeholder="Kamera, IP, segmen, token, admin"
                                         className="w-full rounded-xl border border-edge bg-surface px-3 py-2 dark:text-white"
                                     />
                                 </label>
