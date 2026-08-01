@@ -102,7 +102,7 @@ function Playback({
         cameraId,
         timestamp,
         replace = false,
-        stripAccessParams = false,
+        stripRawToken = false,
     }) => {
         setSearchParams((previous) => {
             const next = buildPlaybackSearchParams({
@@ -112,9 +112,10 @@ function Playback({
             });
             const nextMode = next.get('mode');
 
-            if (stripAccessParams) {
+            // `share` stays in the URL: it is the distribution artifact, and keeping it is what lets a
+            // refresh re-activate. Only the raw token — an admin's master credential — is swept away.
+            if (stripRawToken) {
                 next.delete('token');
-                next.delete('share');
             }
 
             if (!nextMode || !['full', 'simple'].includes(nextMode)) {
@@ -146,7 +147,7 @@ function Playback({
             updatePlaybackSearchParams({
                 cameraId: selectedCameraId,
                 replace: true,
-                stripAccessParams: true,
+                stripRawToken: true,
             });
             return selectedCameraId;
         }
@@ -155,7 +156,7 @@ function Playback({
         updatePlaybackSearchParams({
             camera: targetCamera,
             replace: true,
-            stripAccessParams: true,
+            stripRawToken: true,
         });
         return targetCamera.id;
     }, [isAdminPlayback, playbackCameras, selectedCameraId, updatePlaybackSearchParams]);
@@ -309,7 +310,7 @@ function Playback({
             updatePlaybackSearchParams({
                 camera: firstAllowedCamera,
                 replace: true,
-                stripAccessParams: true,
+                stripRawToken: true,
             });
         }
     }, [allowedCameraIds, isAdminPlayback, playbackCameras, selectedCameraId, tokenStatus, updatePlaybackSearchParams]);

@@ -246,11 +246,36 @@ export async function activatePlaybackToken(request, reply) {
             throw validationError;
         }
 
-        const session = playbackTokenService.createPlaybackSession({
-            token: data,
-            clientId: request.body?.client_id || '',
-            request,
-        });
+        /*
+         * A reload is not a new device.
+         *
+         * The share key now stays in the URL so a link survives a lost cookie, which means this
+         * endpoint is hit on every refresh. createPlaybackSession unconditionally INSERTs, so the
+         * same browser would burn one device slot per refresh and lock ITSELF out with 429 on any
+         * token that caps sessions. assertPlaybackSession only matches a live row for THIS token,
+         * so a stale cookie or another token's session correctly falls through to a fresh session.
+         */
+        let session = null;
+        try {
+            const live = playbackTokenService.assertPlaybackSession({ request, token: data, touch: true });
+            if (live) {
+                session = {
+                    session_id: request.cookies?.[PLAYBACK_TOKEN_SESSION_COOKIE],
+                    timeout_seconds: data.session_timeout_seconds,
+                    reused: true,
+                };
+            }
+        } catch {
+            session = null;
+        }
+
+        if (!session) {
+            session = playbackTokenService.createPlaybackSession({
+                token: data,
+                clientId: request.body?.client_id || '',
+                request,
+            });
+        }
 
         // Only record activation success after session creation succeeds, so
         // the audit log + use_count match reality (cookies set below).

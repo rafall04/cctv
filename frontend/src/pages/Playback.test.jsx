@@ -398,7 +398,45 @@ describe('Playback', () => {
         });
         await waitFor(() => {
             expect(screen.getByTestId('location-search').textContent).toContain('cam=2');
-            expect(screen.getByTestId('location-search').textContent).not.toContain('share=');
+            // The share key deliberately STAYS. Stripping it made the URL depend entirely on the
+            // cookie, so clearing cookies or opening the page in another browser turned a perfectly
+            // valid link into a dead one. Keeping it costs nothing — the key is the thing that was
+            // handed out over WhatsApp in the first place — and makes the link self-sufficient.
+            expect(screen.getByTestId('location-search').textContent).toContain('share=SANDI1234');
+        });
+    });
+
+    it('menghapus token mentah dari URL, berbeda dari kode share', async () => {
+        activateTokenMock.mockResolvedValueOnce({
+            success: true,
+            data: {
+                id: 101,
+                scope_type: 'selected',
+                allowed_camera_ids: [2],
+                camera_rules: [{ camera_id: 2, enabled: true }],
+                default_camera_id: 2,
+            },
+        });
+
+        render(
+            <TestRouter initialEntries={['/playback?token=rafpb_rahasia']}>
+                <LocationProbe />
+                <Playback
+                    cameras={[
+                        { id: 1, name: 'Lobby', enable_recording: 1 },
+                        { id: 2, name: 'Gate', enable_recording: 1 },
+                    ]}
+                />
+            </TestRouter>
+        );
+
+        await waitFor(() => {
+            expect(activateTokenMock).toHaveBeenCalledWith('rafpb_rahasia', null, expect.any(String));
+        });
+        await waitFor(() => {
+            // A share key is a link meant to be passed around; the raw token is the master
+            // credential an admin pastes. Only the latter is swept out of the address bar.
+            expect(screen.getByTestId('location-search').textContent).not.toContain('rafpb_rahasia');
         });
     });
 
