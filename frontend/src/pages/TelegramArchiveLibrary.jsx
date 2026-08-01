@@ -85,9 +85,8 @@ function SegmentRow({ row, win, highlighted, onPlay }) {
     );
 }
 
-// One request covers ~33 minutes of a 30-camera fleet, or ~2 weeks of a single camera. Big enough
-// that browsing rarely needs a second click, small enough to stay under the backend's 500 cap.
-const PAGE_SIZE = 200;
+const PAGE_SIZES = [10, 25, 50, 100];
+const DEFAULT_PAGE_SIZE = 25;
 
 export default function TelegramArchiveLibrary() {
     const { error: notifyError, warning: notifyWarning } = useNotification();
@@ -97,10 +96,11 @@ export default function TelegramArchiveLibrary() {
     const [cameraId, setCameraId] = useState('');
     const [from, setFrom] = useState('');
     const [to, setTo] = useState('');
+    const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+    const [page, setPage] = useState(0);
     const [jumpTo, setJumpTo] = useState('');
     const [highlighted, setHighlighted] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [loadingMore, setLoadingMore] = useState(false);
     const [playing, setPlaying] = useState(null);
 
     const filters = useMemo(() => ({
@@ -109,42 +109,34 @@ export default function TelegramArchiveLibrary() {
         to: archiveLibrary.dayBounds(to, 'end'),
     }), [cameraId, from, to]);
 
+    // Any change to WHAT is being listed invalidates the position within it. Without this, changing
+    // camera while on page 40 asks for an offset that filter may not even have.
+    useEffect(() => { setPage(0); setHighlighted(null); }, [filters, pageSize]);
+
     const load = useCallback(async () => {
         setLoading(true);
         try {
-            const [sum, page] = await Promise.all([
+            const [sum, result] = await Promise.all([
                 archiveLibrary.getSummary(),
-                archiveLibrary.listUploads({ ...filters, limit: PAGE_SIZE, offset: 0 }),
+                archiveLibrary.listUploads({ ...filters, limit: pageSize, offset: page * pageSize }),
             ]);
             setSummary(sum);
-            setRows(page.items);
-            setTotal(page.total);
+            setRows(result.items);
+            setTotal(result.total);
         } catch (err) {
             notifyError('Gagal memuat arsip', err?.response?.data?.message || err.message);
         } finally {
             setLoading(false);
         }
-    }, [filters, notifyError]);
-
-    // Paged by the CURRENT row count, so rows that arrive while browsing cannot shift the window
-    // and make a segment appear twice or get skipped.
-    const loadMore = useCallback(async () => {
-        setLoadingMore(true);
-        try {
-            const page = await archiveLibrary.listUploads({
-                ...filters, limit: PAGE_SIZE, offset: rows.length,
-            });
-            const seen = new Set(rows.map((row) => row.segmentId));
-            setRows((prev) => [...prev, ...page.items.filter((row) => !seen.has(row.segmentId))]);
-            setTotal(page.total);
-        } catch (err) {
-            notifyError('Gagal memuat lagi', err?.response?.data?.message || err.message);
-        } finally {
-            setLoadingMore(false);
-        }
-    }, [filters, rows, notifyError]);
+    }, [filters, page, pageSize, notifyError]);
 
     useEffect(() => { load(); }, [load]);
+
+    const pageCount = Math.max(Math.ceil(total / pageSize), 1);
+    // The archive grows ~200 rows/hour, so a page deep in an UNFILTERED list drifts as new segments
+    // push older ones down. Say so rather than let a segment seem to vanish between clicks; picking
+    // a date range pins the window and makes paging exact.
+    const driftWarning = page > 0 && !filters.from && !filters.to;
 
     const cameras = useMemo(() => summary?.cameras ?? [], [summary]);
     const notPlayable = Math.max((summary?.total ?? 0) - (summary?.playable ?? 0), 0);
@@ -158,7 +150,9 @@ export default function TelegramArchiveLibrary() {
         event.preventDefault();
         const found = findSegmentAt(rows, jumpTo);
         if (!found) {
-            notifyWarning('Tidak ketemu', `Tidak ada rekaman di sekitar ${jumpTo}.`);
+            // Scope matters now that the list is paged: "not found" here means not on THIS page,
+            // not absent from the archive. Saying only "tidak ada rekaman" would be a lie.
+            notifyWarning('Tidak ketemu', `Tidak ada rekaman di sekitar ${jumpTo} pada halaman ini.`);
             return;
         }
         setHighlighted(found.segmentId);
@@ -257,9 +251,7 @@ export default function TelegramArchiveLibrary() {
 
             {(from || to) && (
                 <div className="flex items-center gap-3">
-                    <p className="text-xs text-content-subtle">
-                        Disaring per tanggal. &ldquo;Lompat ke jam&rdquo; hanya mencari di dalam hasil yang sudah dimuat.
-                    </p>
+                    <p className="text-xs text-content-subtle">Disaring per tanggal.</p>
                     <Button size="sm" variant="secondary" onClick={() => { setFrom(''); setTo(''); }}>
                         Hapus filter
                     </Button>
@@ -307,21 +299,55 @@ export default function TelegramArchiveLibrary() {
             )}
 
             {/*
-              * Always state how much is loaded against how much exists. The old page showed the
-              * newest 100 rows with no counter and no way forward, so a list that stopped at last
-              * night looked like an archive that stopped at last night.
+              * Always state the position within the whole. The old page showed the newest 100 rows
+              * with no counter and no way forward, so a list that stopped at last night looked like
+              * an archive that stopped at last night.
               */}
-            {!loading && rows.length > 0 && (
-                <div className="flex flex-col items-center gap-2 py-2">
-                    <p className="font-mono text-xs tabular-nums text-content-subtle">
-                        {rows.length} dari {total} segmen
-                    </p>
-                    {rows.length < total ? (
-                        <Button variant="secondary" onClick={loadMore} disabled={loadingMore}>
-                            {loadingMore ? 'Memuat…' : 'Muat lebih banyak'}
+            {!loading && total > 0 && (
+                <div className="flex flex-col gap-3 border-t border-edge pt-3">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <p className="font-mono text-xs tabular-nums text-content-subtle">
+                            {page * pageSize + 1}–{Math.min((page + 1) * pageSize, total)} dari {total} segmen
+                        </p>
+                        <label className="flex items-center gap-2 text-xs text-content-muted">
+                            Baris
+                            <select
+                                value={pageSize}
+                                onChange={(e) => setPageSize(Number(e.target.value))}
+                                className="rounded-control border border-edge bg-surface px-2 py-1 font-mono text-xs tabular-nums text-content"
+                            >
+                                {PAGE_SIZES.map((size) => <option key={size} value={size}>{size}</option>)}
+                            </select>
+                        </label>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2">
+                        <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => setPage((p) => Math.max(p - 1, 0))}
+                            disabled={page === 0}
+                        >
+                            ‹ Sebelumnya
                         </Button>
-                    ) : (
-                        <p className="text-xs text-content-subtle">Semua segmen sudah ditampilkan.</p>
+                        <span className="font-mono text-xs tabular-nums text-content-muted">
+                            Hal. {page + 1} / {pageCount}
+                        </span>
+                        <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => setPage((p) => Math.min(p + 1, pageCount - 1))}
+                            disabled={page >= pageCount - 1}
+                        >
+                            Berikutnya ›
+                        </Button>
+                    </div>
+
+                    {driftWarning && (
+                        <p className="text-xs text-content-subtle">
+                            Arsip terus bertambah, jadi halaman dalam bisa bergeser. Pilih rentang
+                            tanggal kalau ingin urutannya tetap.
+                        </p>
                     )}
                 </div>
             )}
