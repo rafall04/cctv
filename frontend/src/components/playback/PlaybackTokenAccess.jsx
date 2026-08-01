@@ -6,7 +6,7 @@
  * SideEffects: Invokes token activation/clear callbacks from props.
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import PlaybackAccessPanel from './PlaybackAccessPanel.jsx';
 
 export default function PlaybackTokenAccess({
@@ -20,6 +20,26 @@ export default function PlaybackTokenAccess({
     compact = false,
 }) {
     const [showAccess, setShowAccess] = useState(false);
+
+    /*
+     * The capped-playback notice sits far above this box, so its call to action has to do two things
+     * at once: open the panel AND bring it into view. Scrolling alone left the visitor staring at a
+     * collapsed toggle, which reads as a dead button.
+     *
+     * requestAnimationFrame because the panel does not exist in the DOM until this state flips —
+     * scrolling in the same tick would target the collapsed box and land short.
+     */
+    useEffect(() => {
+        const open = () => {
+            setShowAccess(true);
+            requestAnimationFrame(() => {
+                document.getElementById('akses-playback')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            });
+        };
+        window.addEventListener('playback:open-access', open);
+        return () => window.removeEventListener('playback:open-access', open);
+    }, []);
+
     const handleSubmit = (event) => {
         event.preventDefault();
         onActivate(tokenInput);

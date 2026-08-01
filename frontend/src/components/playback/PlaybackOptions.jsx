@@ -40,13 +40,19 @@ export default function PlaybackOptions({
                      * The only next step offered. The admin-contact button was removed deliberately:
                      * self-serve exists, so sending people to chat an operator adds a manual step
                      * that scales badly and leaves the visitor waiting.
+                     *
+                     * An event, not an <a href="#...">. The anchor only scrolled to the access box
+                     * while it was still COLLAPSED, so the visitor landed in the right place and saw
+                     * nothing happen. The intent here is "open the access panel", and a hash cannot
+                     * express that — nor re-fire when the hash is already set.
                      */}
-                    <a
-                        href="#akses-playback"
+                    <button
+                        type="button"
+                        onClick={() => window.dispatchEvent(new CustomEvent('playback:open-access'))}
                         className="mt-2 inline-flex items-center gap-2 rounded-control bg-primary px-3 py-1.5 text-xs font-medium text-white"
                     >
                         Coba gratis 3 hari atau beli akses
-                    </a>
+                    </button>
                 </div>
             )}
 
