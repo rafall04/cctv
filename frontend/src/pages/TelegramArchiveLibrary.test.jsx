@@ -210,3 +210,61 @@ describe('TelegramArchiveLibrary jump to time', () => {
         expect(locate).not.toHaveBeenCalled();
     });
 });
+
+/*
+ * Paging felt like a page reload and threw the view to the top. Neither was intended: the list was
+ * being swapped for a 6-row skeleton, the document collapsed, and since the pagination sits at the
+ * BOTTOM the browser clamped scroll to the new maximum. Nothing ever called scrollTo.
+ */
+describe('TelegramArchiveLibrary paging stability', () => {
+    it('keeps the rows mounted while the next page loads, so the page cannot collapse', async () => {
+        render(<TelegramArchiveLibrary />);
+        await waitFor(() => expect(screen.getAllByRole('listitem').length).toBeGreaterThan(0));
+        const before = screen.getAllByRole('listitem').length;
+
+        // A request that never settles: whatever is on screen during the fetch is what we assert.
+        listUploads.mockReturnValue(new Promise(() => {}));
+        fireEvent.click(screen.getByRole('button', { name: /Berikutnya/ }));
+
+        await waitFor(() => expect(document.querySelector('[aria-busy="true"]')).toBeTruthy());
+        expect(screen.getAllByRole('listitem').length).toBe(before);
+    });
+
+    it('does not refetch the summary on a page change — it depends on the filters only', async () => {
+        render(<TelegramArchiveLibrary />);
+        await waitFor(() => expect(getSummary).toHaveBeenCalledTimes(1));
+
+        fireEvent.click(screen.getByRole('button', { name: /Berikutnya/ }));
+        await waitFor(() => expect(listUploads).toHaveBeenCalledWith(
+            expect.objectContaining({ offset: 25 }),
+        ));
+
+        expect(getSummary).toHaveBeenCalledTimes(1);
+    });
+
+    it('refetches the summary when the filters DO change', async () => {
+        render(<TelegramArchiveLibrary />);
+        await waitFor(() => expect(getSummary).toHaveBeenCalledTimes(1));
+
+        fireEvent.click(screen.getByRole('button', { name: 'Hari ini' }));
+
+        await waitFor(() => expect(getSummary).toHaveBeenCalledTimes(2));
+    });
+
+    it('lets only the newest request write, so a slow earlier page cannot reappear', async () => {
+        render(<TelegramArchiveLibrary />);
+        await waitFor(() => expect(screen.getAllByRole('listitem').length).toBeGreaterThan(0));
+
+        let settleFirst;
+        listUploads.mockReturnValueOnce(new Promise((resolve) => { settleFirst = resolve; }));
+        fireEvent.click(screen.getByRole('button', { name: /Berikutnya/ }));
+
+        listUploads.mockResolvedValueOnce({ items: [segment(99, CAMERA_NAME, 16)], total: 401 });
+        fireEvent.click(screen.getByRole('button', { name: /Berikutnya/ }));
+        await waitFor(() => expect(screen.getAllByRole('listitem').length).toBe(1));
+
+        // The stale page-2 response lands last and must be ignored.
+        settleFirst({ items: [segment(1, CAMERA_NAME, 16), segment(2, CAMERA_NAME, 16)], total: 401 });
+        await waitFor(() => expect(screen.getAllByRole('listitem').length).toBe(1));
+    });
+});

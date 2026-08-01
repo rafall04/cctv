@@ -14,7 +14,7 @@
  * rather than showing a play button that would fail.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNotification } from '../contexts/NotificationContext';
 import archiveLibrary from '../services/telegramArchiveLibraryService';
 import { Badge, Button, Field, IconButton, Modal, PageHeader } from '../components/ui';
@@ -163,7 +163,11 @@ export default function TelegramArchiveLibrary() {
     // Set when a jump lands on ANOTHER page: the row does not exist yet, so the scroll has to wait
     // for that page to finish loading rather than fire against a DOM that has not caught up.
     const [pendingScroll, setPendingScroll] = useState(null);
-    const [loading, setLoading] = useState(true);
+    // `ready` = the list has content to show at least once; `busy` = a fetch is in flight.
+    // They are separate because blanking the list on every page click was what made paging feel
+    // like a page reload — and what silently scrolled the view to the top (see load()).
+    const [ready, setReady] = useState(false);
+    const [busy, setBusy] = useState(true);
     const [playing, setPlaying] = useState(null);
 
     const filters = useMemo(() => ({
@@ -176,27 +180,45 @@ export default function TelegramArchiveLibrary() {
     // camera while on page 40 asks for an offset that filter may not even have.
     useEffect(() => { setPage(0); setHighlighted(null); }, [filters, pageSize]);
 
+    // The header figures depend on the FILTERS only — never on which page is open. Refetching them
+    // on every page click was a wasted request per tap, and it made paging slower than it is.
+    useEffect(() => {
+        let cancelled = false;
+        archiveLibrary.getSummary(filters)
+            .then((sum) => { if (!cancelled) setSummary(sum); })
+            .catch((err) => {
+                if (!cancelled) notifyError('Gagal memuat ringkasan', err?.response?.data?.message || err.message);
+            });
+        return () => { cancelled = true; };
+    }, [filters, notifyError]);
+
+    // Tapping Berikutnya twice quickly leaves two requests racing. Without a guard the slower one
+    // can land last and put the earlier page back on screen — so only the newest request may write.
+    const requestRef = useRef(0);
+
     const load = useCallback(async () => {
-        setLoading(true);
+        const ticket = ++requestRef.current;
+        setBusy(true);
         try {
-            const [sum, result] = await Promise.all([
-                archiveLibrary.getSummary(filters),
-                archiveLibrary.listUploads({ ...filters, limit: pageSize, offset: page * pageSize }),
-            ]);
-            setSummary(sum);
+            const result = await archiveLibrary.listUploads({
+                ...filters, limit: pageSize, offset: page * pageSize,
+            });
+            if (ticket !== requestRef.current) return;
             setRows(result.items);
             setTotal(result.total);
+            setReady(true);
         } catch (err) {
+            if (ticket !== requestRef.current) return;
             notifyError('Gagal memuat arsip', err?.response?.data?.message || err.message);
         } finally {
-            setLoading(false);
+            if (ticket === requestRef.current) setBusy(false);
         }
     }, [filters, page, pageSize, notifyError]);
 
     useEffect(() => { load(); }, [load]);
 
     useEffect(() => {
-        if (!pendingScroll || loading) {
+        if (!pendingScroll || busy) {
             return;
         }
         const el = document.getElementById(`seg-${pendingScroll}`);
@@ -205,7 +227,7 @@ export default function TelegramArchiveLibrary() {
         }
         el.scrollIntoView({ block: 'center', behavior: 'smooth' });
         setPendingScroll(null);
-    }, [pendingScroll, loading, rows]);
+    }, [pendingScroll, busy, rows]);
 
     const pageCount = Math.max(Math.ceil(total / pageSize), 1);
     // The archive grows ~200 rows/hour, so a page deep in an UNFILTERED list drifts as new segments
@@ -278,7 +300,7 @@ export default function TelegramArchiveLibrary() {
             <PageHeader
                 title="Arsip Rekaman"
                 description="Tersimpan di Telegram, diputar dari sini."
-                actions={<Button onClick={load} disabled={loading}>Muat ulang</Button>}
+                actions={<Button onClick={load} disabled={busy}>Muat ulang</Button>}
             />
 
             {/*
@@ -403,7 +425,7 @@ export default function TelegramArchiveLibrary() {
                 </div>
             )}
 
-            {!singleCamera && !loading && days.length > 0 && (
+            {!singleCamera && ready && days.length > 0 && (
                 // Said HERE, where the absence of gap markers is what needs explaining — not as a
                 // hint under a select, where it pushed the two controls off a shared baseline.
                 <p className="text-xs text-content-subtle">
@@ -411,14 +433,27 @@ export default function TelegramArchiveLibrary() {
                 </p>
             )}
 
-            {loading ? (
+            {/*
+              * The skeleton appears ONLY when there is nothing yet to show. On a page change the
+              * rows stay mounted and merely dim: swapping 25 rows for a 6-row skeleton collapsed
+              * the document height, and because the pagination sits at the bottom, the browser
+              * clamped the scroll position to the new maximum — which read as "it jumped to the
+              * top by itself". Opacity costs no height, so the view stays where the finger left it.
+              */}
+            {!ready ? (
                 <TableSkeleton rows={6} columns={4} />
             ) : days.length === 0 ? (
                 <div className="rounded-card border border-edge bg-surface px-4 py-12 text-center">
                     <p className="text-sm text-content-muted">Belum ada segmen terarsip untuk pilihan ini.</p>
                 </div>
             ) : (
-                days.map((group) => (
+                <div
+                    aria-busy={busy || undefined}
+                    className={`space-y-4 transition-opacity duration-150 motion-reduce:transition-none ${
+                        busy ? 'opacity-60' : 'opacity-100'
+                    }`}
+                >
+                {days.map((group) => (
                     <section key={group.key} className="space-y-2">
                         {/* Date once per group, not repeated on every row. */}
                         <h2 className="sticky top-0 z-sticky flex items-baseline gap-2 bg-surface-sunken py-1 text-xs font-semibold uppercase tracking-wide text-content-subtle">
@@ -446,7 +481,8 @@ export default function TelegramArchiveLibrary() {
                             ))}
                         </ul>
                     </section>
-                ))
+                ))}
+                </div>
             )}
 
             {/*
@@ -454,7 +490,7 @@ export default function TelegramArchiveLibrary() {
               * with no counter and no way forward, so a list that stopped at last night looked like
               * an archive that stopped at last night.
               */}
-            {!loading && total > 0 && (
+            {ready && total > 0 && (
                 <div className="flex flex-col gap-3 border-t border-edge pt-3">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                         <p className="font-mono text-xs tabular-nums text-content-subtle">
