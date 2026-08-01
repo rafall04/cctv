@@ -1,16 +1,182 @@
 /*
- * Purpose: Render admin playback token list with editable policy fields and row actions.
+ * Purpose: List playback tokens as cards — identity first, then policy, then the actions for that
+ *          one token.
  * Caller: PlaybackTokenManagement page.
- * Deps: React props and playback token hook helpers.
- * MainFuncs: PlaybackTokenTable.
+ * Deps: React props, components/ui (Button), playback token hook helpers.
  * SideEffects: Invokes row action callbacks supplied by page hook.
+ *
+ * WHY CARDS AND NOT A TABLE
+ * It was a 6-column table in `overflow-x-auto`. That kept the page from widening — the right
+ * instinct — but on a phone the first two columns, Nama and Scope, sat off-screen. What was left
+ * read as a wall of identical rows ("0 aktif - Unlimited", "TTL 60s") with the headings clipped
+ * mid-word to "ESSION". The token's NAME, the one thing that tells two rows apart, was the part
+ * you could not see, while "Cabut" and "Hapus" stayed in reach. That is a safety problem, not a
+ * cosmetic one: the wrong click cuts off a real viewer.
+ *
+ * A card owns its own width, so the name leads and nothing is ever clipped. Rows are few (tens,
+ * not thousands) and every one carries several actions, which is what cards are good at.
  */
 
+import { Button } from '../../ui';
 import { PLAYBACK_TOKEN_SESSION_LIMIT_MODES, formatPlaybackTokenSessionPolicy } from '../../../hooks/admin/usePlaybackTokenManagementPage.js';
 
 function scopeLabel(token) {
     const count = token.allowed_camera_ids?.length || token.camera_ids?.length || token.camera_rules?.filter((rule) => rule.enabled !== false).length || 0;
-    return token.scope_type === 'selected' ? `${count} kamera` : 'Semua';
+    return token.scope_type === 'selected' ? `${count} kamera` : 'Semua kamera';
+}
+
+const FIELD = 'w-full rounded-control border border-edge-strong bg-surface px-3 py-2 text-sm text-content';
+
+/** One label/value line. Fixed-width label so the values line up down the card. */
+function Detail({ label, children }) {
+    return (
+        <div className="flex gap-3 text-sm">
+            <dt className="w-24 shrink-0 text-content-subtle">{label}</dt>
+            <dd className="min-w-0 flex-1 break-words text-content">{children}</dd>
+        </div>
+    );
+}
+
+function TokenEditFields({
+    editForm, onUpdateEditForm, selectedEditCameraIds, visibleEditCameras, editCameraSearch,
+    totalCameraCount, visibleEditCameraCount, onUpdateEditCameraSearch, onToggleEditCameraRule,
+    onUpdateEditCameraRule,
+}) {
+    return (
+        <div className="space-y-3">
+            <label className="block">
+                <span className="mb-1 block text-xs font-semibold text-content-muted">Nama token</span>
+                <input value={editForm.label} onChange={(event) => onUpdateEditForm('label', event.target.value)} className={FIELD} />
+            </label>
+
+            <label className="block">
+                <span className="mb-1 block text-xs font-semibold text-content-muted">Akses kamera</span>
+                <select value={editForm.scope_type} onChange={(event) => onUpdateEditForm('scope_type', event.target.value)} className={FIELD}>
+                    <option value="all">Semua kamera</option>
+                    <option value="selected">Kamera tertentu</option>
+                </select>
+            </label>
+
+            {editForm.scope_type === 'selected' && (
+                <div className="space-y-2 rounded-card border border-edge p-2">
+                    <input
+                        type="search"
+                        value={editCameraSearch}
+                        onChange={(event) => onUpdateEditCameraSearch?.(event.target.value)}
+                        placeholder="Cari nama CCTV"
+                        className={FIELD}
+                    />
+                    <p className="text-xs text-content-subtle">Menampilkan {visibleEditCameraCount} dari {totalCameraCount} CCTV</p>
+                    <div className="max-h-48 space-y-2 overflow-y-auto">
+                        {visibleEditCameras.map((camera) => (
+                            <div key={camera.id} className="rounded-control bg-surface-sunken p-2">
+                                <label className="flex items-center gap-2 text-xs text-content">
+                                    <input type="checkbox" checked={selectedEditCameraIds.has(camera.id)} onChange={() => onToggleEditCameraRule(camera.id)} />
+                                    <span>{camera.name}</span>
+                                </label>
+                                {selectedEditCameraIds.has(camera.id) && (
+                                    <div className="mt-1 grid gap-1 sm:grid-cols-2">
+                                        <input type="number" min="1" placeholder="Window jam" value={editForm.camera_rules[camera.id]?.playback_window_hours || ''} onChange={(event) => onUpdateEditCameraRule(camera.id, 'playback_window_hours', event.target.value)} className="rounded-control border border-edge-strong bg-surface px-2 py-1 text-xs text-content" />
+                                        <input placeholder="Catatan" value={editForm.camera_rules[camera.id]?.note || ''} onChange={(event) => onUpdateEditCameraRule(camera.id, 'note', event.target.value)} className="rounded-control border border-edge-strong bg-surface px-2 py-1 text-xs text-content" />
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            <div className="grid gap-3 sm:grid-cols-3">
+                <label className="block">
+                    <span className="mb-1 block text-xs font-semibold text-content-muted">Maks. sesi</span>
+                    <input type="number" min="0" value={editForm.max_active_sessions} onChange={(event) => onUpdateEditForm('max_active_sessions', event.target.value)} placeholder="Tanpa batas" className={FIELD} />
+                </label>
+                <label className="block">
+                    <span className="mb-1 block text-xs font-semibold text-content-muted">Jika penuh</span>
+                    <select value={editForm.session_limit_mode} onChange={(event) => onUpdateEditForm('session_limit_mode', event.target.value)} className={FIELD}>
+                        {PLAYBACK_TOKEN_SESSION_LIMIT_MODES.filter((mode) => mode.value).map((mode) => <option key={mode.value} value={mode.value}>{mode.label}</option>)}
+                    </select>
+                </label>
+                <label className="block">
+                    <span className="mb-1 block text-xs font-semibold text-content-muted">Timeout (detik)</span>
+                    <input type="number" min="30" max="3600" value={editForm.session_timeout_seconds} onChange={(event) => onUpdateEditForm('session_timeout_seconds', event.target.value)} className={FIELD} />
+                </label>
+            </div>
+
+            <label className="block">
+                <span className="mb-1 block text-xs font-semibold text-content-muted">Template pesan share</span>
+                {/* rows=5, not 3: at 3 the last line was sliced through its middle, which reads as a
+                    rendering fault rather than as "scroll for more". */}
+                <textarea rows={5} value={editForm.share_template} onChange={(event) => onUpdateEditForm('share_template', event.target.value)} className={`${FIELD} font-mono text-xs`} />
+            </label>
+        </div>
+    );
+}
+
+function TokenCard({
+    token, isEditing, editForm, updatingTokenId, sharingTokenId, deletingTokenId, formatTokenDate,
+    onEdit, onCancelEdit, onUpdateToken, onRepeatShare, onClearSessions, onRevoke, onDelete,
+    editFieldProps,
+}) {
+    const sessions = token.active_session_count || 0;
+
+    return (
+        <li className="rounded-card border border-edge bg-surface p-4">
+            <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                    {/* The name leads and never truncates — it is the only thing distinguishing
+                        one row from the next, and the reason the old table was unusable. */}
+                    <h3 className="break-words text-sm font-semibold text-content">{token.label}</h3>
+                    <p className="mt-0.5 font-mono text-xs text-content-subtle">{token.token_prefix}…</p>
+                </div>
+                {/*
+                  * Nonaktif is `idle`, not `fault`. It used to be red, but a token the operator
+                  * deliberately revoked is not a malfunction — reserving red for real faults is
+                  * what keeps red meaning something.
+                  */}
+                <span className={`shrink-0 rounded-full px-2 py-1 text-xs font-semibold ${
+                    token.is_active ? 'bg-status-live/15 text-status-live' : 'bg-status-idle/15 text-status-idle'
+                }`}>
+                    {token.is_active ? 'Aktif' : 'Nonaktif'}
+                </span>
+            </div>
+
+            <div className="mt-3 border-t border-edge pt-3">
+                {isEditing ? (
+                    <TokenEditFields editForm={editForm} {...editFieldProps} />
+                ) : (
+                    <dl className="space-y-1.5">
+                        <Detail label="Akses">{scopeLabel(token)}</Detail>
+                        <Detail label="Berlaku">{formatTokenDate(token.expires_at)}</Detail>
+                        <Detail label="Sesi">{formatPlaybackTokenSessionPolicy(token)}</Detail>
+                        <Detail label="Timeout">{token.session_timeout_seconds || 60} detik</Detail>
+                    </dl>
+                )}
+            </div>
+
+            <div className="mt-3 flex flex-wrap gap-2 border-t border-edge pt-3">
+                {isEditing ? (
+                    <>
+                        <Button size="sm" onClick={() => onUpdateToken(token.id)} loading={updatingTokenId === token.id} disabled={!editForm.label.trim()}>Simpan</Button>
+                        <Button size="sm" variant="secondary" onClick={onCancelEdit}>Batal</Button>
+                    </>
+                ) : (
+                    <>
+                        {token.is_active && <Button size="sm" variant="secondary" onClick={() => onEdit(token)}>Edit</Button>}
+                        {token.is_active && <Button size="sm" onClick={() => onRepeatShare(token.id)} loading={sharingTokenId === token.id}>Bagikan</Button>}
+                        {token.is_active && sessions > 0 && <Button size="sm" variant="secondary" onClick={() => onClearSessions(token.id)}>Reset sesi ({sessions})</Button>}
+                        {token.is_active && <Button size="sm" variant="dangerGhost" onClick={() => onRevoke(token.id)}>Cabut</Button>}
+                        {/*
+                          * Offered on EVERY card, active or not. A revoked token used to get no
+                          * actions at all, which is how trial tokens became permanent debris.
+                          * Deleting is the only thing left worth doing to a dead one.
+                          */}
+                        <Button size="sm" variant="danger" onClick={() => onDelete(token.id)} loading={deletingTokenId === token.id} className="ml-auto">Hapus</Button>
+                    </>
+                )}
+            </div>
+        </li>
+    );
 }
 
 export default function PlaybackTokenTable({
@@ -38,126 +204,57 @@ export default function PlaybackTokenTable({
     onRepeatShare,
     onClearSessions,
     onRevoke,
+    onDelete,
+    deletingTokenId = null,
 }) {
+    const editFieldProps = {
+        onUpdateEditForm,
+        selectedEditCameraIds,
+        visibleEditCameras,
+        editCameraSearch,
+        totalCameraCount,
+        visibleEditCameraCount,
+        onUpdateEditCameraSearch,
+        onToggleEditCameraRule,
+        onUpdateEditCameraRule,
+    };
+
     return (
-        <div className="rounded-lg border border-edge bg-surface p-5 shadow-sm">
-            <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-content">Token Aktif</h2>
-                <button onClick={onRefresh} className="rounded-lg bg-surface-sunken px-3 py-2 text-sm font-semibold text-content">Refresh</button>
+        <div className="rounded-card border border-edge bg-surface-raised p-4 shadow-e1 sm:p-5">
+            <div className="mb-4 flex items-center justify-between gap-3">
+                <h2 className="text-lg font-semibold text-content">Daftar Token</h2>
+                <Button size="sm" variant="secondary" onClick={onRefresh}>Muat ulang</Button>
             </div>
+
             {loading ? (
-                <div className="py-8 text-center text-sm text-content-muted">Loading...</div>
-            ) : (
-                <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
-                        <thead className="text-left text-xs uppercase tracking-wide text-content-muted">
-                            <tr>
-                                <th className="px-3 py-2">Nama</th>
-                                <th className="px-3 py-2">Scope</th>
-                                <th className="px-3 py-2">Session</th>
-                                <th className="px-3 py-2">Expired</th>
-                                <th className="px-3 py-2">Status</th>
-                                <th className="px-3 py-2"></th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-edge">
-                            {tokens.map((token) => (
-                                <tr key={token.id} className="text-content">
-                                    <td className="px-3 py-3">
-                                        {editingTokenId === token.id ? (
-                                            <input value={editForm.label} onChange={(event) => onUpdateEditForm('label', event.target.value)} className="w-52 rounded-lg border border-edge-strong px-3 py-2 text-sm dark:bg-gray-950 dark:text-white" />
-                                        ) : (
-                                            <>
-                                                <div className="font-medium">{token.label}</div>
-                                                <div className="text-xs text-content-muted">{token.token_prefix}...</div>
-                                            </>
-                                        )}
-                                    </td>
-                                    <td className="px-3 py-3">
-                                        {editingTokenId === token.id ? (
-                                            <div className="min-w-72 space-y-2">
-                                                <select value={editForm.scope_type} onChange={(event) => onUpdateEditForm('scope_type', event.target.value)} className="w-full rounded-lg border border-edge-strong px-2 py-1 text-xs dark:bg-gray-950 dark:text-white">
-                                                    <option value="all">Semua</option>
-                                                    <option value="selected">Kamera tertentu</option>
-                                                </select>
-                                                {editForm.scope_type === 'selected' && (
-                                                    <div className="space-y-2">
-                                                        <input
-                                                            type="search"
-                                                            value={editCameraSearch}
-                                                            onChange={(event) => onUpdateEditCameraSearch?.(event.target.value)}
-                                                            placeholder="Filter nama CCTV"
-                                                            className="w-full rounded-lg border border-edge-strong px-2 py-1 text-xs dark:bg-gray-950 dark:text-white"
-                                                        />
-                                                        <div className="text-xs text-content-muted">Menampilkan {visibleEditCameraCount} dari {totalCameraCount} CCTV</div>
-                                                        <div className="max-h-48 space-y-2 overflow-y-auto">
-                                                            {visibleEditCameras.map((camera) => (
-                                                                <div key={camera.id} className="rounded bg-surface-sunken p-2">
-                                                                    <label className="flex items-center gap-2 text-xs">
-                                                                        <input type="checkbox" checked={selectedEditCameraIds.has(camera.id)} onChange={() => onToggleEditCameraRule(camera.id)} />
-                                                                        <span>{camera.name}</span>
-                                                                    </label>
-                                                                    {selectedEditCameraIds.has(camera.id) && (
-                                                                        <div className="mt-1 grid gap-1 sm:grid-cols-2">
-                                                                            <input type="number" min="1" placeholder="Window jam" value={editForm.camera_rules[camera.id]?.playback_window_hours || ''} onChange={(event) => onUpdateEditCameraRule(camera.id, 'playback_window_hours', event.target.value)} className="rounded border border-edge-strong px-2 py-1 text-xs dark:bg-gray-950 dark:text-white" />
-                                                                            <input placeholder="Catatan" value={editForm.camera_rules[camera.id]?.note || ''} onChange={(event) => onUpdateEditCameraRule(camera.id, 'note', event.target.value)} className="rounded border border-edge-strong px-2 py-1 text-xs dark:bg-gray-950 dark:text-white" />
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        ) : scopeLabel(token)}
-                                    </td>
-                                    <td className="px-3 py-3">
-                                        {editingTokenId === token.id ? (
-                                            <div className="grid min-w-80 gap-2 sm:grid-cols-3">
-                                                <input type="number" min="0" value={editForm.max_active_sessions} onChange={(event) => onUpdateEditForm('max_active_sessions', event.target.value)} placeholder="Unlimited" className="rounded-lg border border-edge-strong px-3 py-2 text-sm dark:bg-gray-950 dark:text-white" />
-                                                <select value={editForm.session_limit_mode} onChange={(event) => onUpdateEditForm('session_limit_mode', event.target.value)} className="rounded-lg border border-edge-strong px-3 py-2 text-sm dark:bg-gray-950 dark:text-white">
-                                                    {PLAYBACK_TOKEN_SESSION_LIMIT_MODES.filter((mode) => mode.value).map((mode) => <option key={mode.value} value={mode.value}>{mode.label}</option>)}
-                                                </select>
-                                                <input type="number" min="30" max="3600" value={editForm.session_timeout_seconds} onChange={(event) => onUpdateEditForm('session_timeout_seconds', event.target.value)} className="rounded-lg border border-edge-strong px-3 py-2 text-sm dark:bg-gray-950 dark:text-white" />
-                                                <textarea rows={3} value={editForm.share_template} onChange={(event) => onUpdateEditForm('share_template', event.target.value)} className="rounded-lg border border-edge-strong px-3 py-2 text-sm sm:col-span-3 dark:bg-gray-950 dark:text-white" />
-                                            </div>
-                                        ) : (
-                                            <>
-                                                <div>{formatPlaybackTokenSessionPolicy(token)}</div>
-                                                <div className="text-xs text-content-muted">TTL {token.session_timeout_seconds || 60}s</div>
-                                            </>
-                                        )}
-                                    </td>
-                                    <td className="px-3 py-3">{formatTokenDate(token.expires_at)}</td>
-                                    <td className="px-3 py-3">
-                                        <span className={`rounded-full px-2 py-1 text-xs font-semibold ${token.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-                                            {token.is_active ? 'Aktif' : 'Nonaktif'}
-                                        </span>
-                                    </td>
-                                    <td className="px-3 py-3 text-right">
-                                        {token.is_active && (
-                                            <div className="flex flex-wrap justify-end gap-2">
-                                                {editingTokenId === token.id ? (
-                                                    <>
-                                                        <button onClick={() => onUpdateToken(token.id)} disabled={updatingTokenId === token.id || !editForm.label.trim()} className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-600 disabled:opacity-60">{updatingTokenId === token.id ? 'Menyimpan...' : 'Simpan'}</button>
-                                                        <button onClick={onCancelEdit} className="rounded-lg bg-surface-sunken px-3 py-1.5 text-xs font-semibold text-content hover:bg-surface-sunken">Batal</button>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <button onClick={() => onEdit(token)} className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100">Edit</button>
-                                                        <button onClick={() => onRepeatShare(token.id)} disabled={sharingTokenId === token.id} className="rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-60">{sharingTokenId === token.id ? 'Membuat...' : 'Share'}</button>
-                                                        {(token.active_session_count || 0) > 0 && <button onClick={() => onClearSessions(token.id)} className="rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-100">Clear Session</button>}
-                                                        <button onClick={() => onRevoke(token.id)} className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-100">Cabut</button>
-                                                    </>
-                                                )}
-                                            </div>
-                                        )}
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                <div className="py-8 text-center text-sm text-content-muted">Memuat…</div>
+            ) : tokens.length === 0 ? (
+                <div className="rounded-card border border-edge bg-surface px-4 py-10 text-center text-sm text-content-muted">
+                    Belum ada token playback.
                 </div>
+            ) : (
+                <ul className="grid gap-3 xl:grid-cols-2">
+                    {tokens.map((token) => (
+                        <TokenCard
+                            key={token.id}
+                            token={token}
+                            isEditing={editingTokenId === token.id}
+                            editForm={editForm}
+                            updatingTokenId={updatingTokenId}
+                            sharingTokenId={sharingTokenId}
+                            deletingTokenId={deletingTokenId}
+                            formatTokenDate={formatTokenDate}
+                            onEdit={onEdit}
+                            onCancelEdit={onCancelEdit}
+                            onUpdateToken={onUpdateToken}
+                            onRepeatShare={onRepeatShare}
+                            onClearSessions={onClearSessions}
+                            onRevoke={onRevoke}
+                            onDelete={onDelete}
+                            editFieldProps={editFieldProps}
+                        />
+                    ))}
+                </ul>
             )}
         </div>
     );

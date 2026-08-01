@@ -121,6 +121,17 @@ export const playbackTokenService = {
             return failure(error, 'Gagal mencabut token');
         }
     },
+
+    /** Permanent, unlike revoke — the row goes, so trial tokens stop piling up as dead clutter. */
+    async deleteToken(id) {
+        try {
+            const response = await apiClient.delete(`/api/admin/playback-tokens/${id}`);
+            return response.data;
+        } catch (error) {
+            console.error('Delete playback token error:', error);
+            return failure(error, 'Gagal menghapus token');
+        }
+    },
 };
 
 export default playbackTokenService;

@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { cameraService } from '../../services/cameraService';
 import playbackTokenService from '../../services/playbackTokenService.js';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import { useNotification } from '../../contexts/NotificationContext';
 import { TIMESTAMP_STORAGE, useTimezone } from '../../contexts/TimezoneContext';
 
@@ -172,6 +173,7 @@ export function formatPlaybackTokenSessionPolicy(token) {
 
 export function usePlaybackTokenManagementPage() {
     const { success: showSuccess, error: showError } = useNotification();
+    const confirm = useConfirm();
     const { formatDateTime } = useTimezone();
     const [tokens, setTokens] = useState([]);
     const [auditLogs, setAuditLogs] = useState([]);
@@ -184,6 +186,11 @@ export function usePlaybackTokenManagementPage() {
     const [editingTokenId, setEditingTokenId] = useState(null);
     const [updatingTokenId, setUpdatingTokenId] = useState(null);
     const [createdShare, setCreatedShare] = useState(null);
+    // Sharing an EXISTING row is shown where the finger already is, not in the panel beside the
+    // form: that panel sits at the top of the page, so re-sharing the twelfth token meant scrolling
+    // all the way up to find the result. Creating a token still uses the panel — you are up there.
+    const [sharePreview, setSharePreview] = useState(null);
+    const [deletingTokenId, setDeletingTokenId] = useState(null);
     const [form, setForm] = useState(createDefaultForm);
     const [editForm, setEditForm] = useState({
         label: '',
@@ -477,10 +484,10 @@ export function usePlaybackTokenManagementPage() {
             }
             const shareText = extractPlaybackTokenShareText(response);
             if (shareText) {
-                setCreatedShare({ shareText });
-                showSuccess('Teks share dibuat', 'Kode akses yang sama siap dibagikan ulang.');
+                const token = tokens.find((row) => row.id === tokenId);
+                setSharePreview({ tokenId, label: token?.label || 'Token', shareText });
             } else {
-                setCreatedShare(null);
+                setSharePreview(null);
                 showError('Teks share kosong', 'Backend tidak mengirim teks share token.');
             }
         } catch (error) {
@@ -550,6 +557,44 @@ export function usePlaybackTokenManagementPage() {
         }
     };
 
+    /**
+     * Permanent removal, which revoking never was. Revoke only stamps revoked_at, so every trial
+     * token stayed on the list as another identical-looking dead row.
+     *
+     * A LIVE token can be deleted too — requiring a revoke first would be two steps for the common
+     * case of clearing an experiment. The confirmation says outright when access is about to be cut.
+     */
+    const handleDelete = async (tokenId) => {
+        const token = tokens.find((row) => row.id === tokenId);
+        const label = token?.label || 'token ini';
+        const ok = await confirm({
+            title: 'Hapus token permanen?',
+            message: token?.is_active
+                ? `"${label}" masih AKTIF. Menghapusnya memutus akses siapa pun yang sedang memakainya, dan tidak bisa dibatalkan. Riwayat aksesnya tetap tersimpan.`
+                : `"${label}" akan dihapus permanen dan tidak bisa dikembalikan. Riwayat aksesnya tetap tersimpan.`,
+            confirmLabel: 'Hapus permanen',
+            tone: 'danger',
+        });
+        if (!ok) return;
+
+        setDeletingTokenId(tokenId);
+        try {
+            const response = await playbackTokenService.deleteToken(tokenId);
+            if (!response.success) {
+                showError('Gagal menghapus token', response.message || 'Token gagal dihapus.');
+                return;
+            }
+            // The row is gone, so an on-screen confirmation is the only thing left saying which one.
+            showSuccess('Token dihapus', response.message || `"${label}" dihapus permanen.`);
+            if (sharePreview?.tokenId === tokenId) setSharePreview(null);
+            await loadData();
+        } catch (error) {
+            showError('Gagal menghapus token', error?.response?.data?.message || error.message);
+        } finally {
+            setDeletingTokenId(null);
+        }
+    };
+
     const whatsappHref = createdShare?.shareText
         ? `https://wa.me/?text=${encodeURIComponent(createdShare.shareText)}`
         : '#';
@@ -595,5 +640,9 @@ export function usePlaybackTokenManagementPage() {
         handleClearSessions,
         handleUpdateToken,
         handleRevoke,
+        handleDelete,
+        sharePreview,
+        setSharePreview,
+        deletingTokenId,
     };
 }

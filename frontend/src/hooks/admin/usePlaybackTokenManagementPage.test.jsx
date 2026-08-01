@@ -19,6 +19,7 @@ import playbackTokenService from '../../services/playbackTokenService.js';
 
 const notifySuccessMock = vi.fn();
 const notifyErrorMock = vi.fn();
+const confirmMock = vi.fn(() => Promise.resolve(true));
 
 vi.mock('../../services/playbackTokenService.js', () => ({
     default: {
@@ -29,6 +30,7 @@ vi.mock('../../services/playbackTokenService.js', () => ({
         shareToken: vi.fn(),
         clearSessions: vi.fn(),
         revokeToken: vi.fn(),
+        deleteToken: vi.fn(),
     },
 }));
 
@@ -43,6 +45,12 @@ vi.mock('../../contexts/NotificationContext', () => ({
         success: notifySuccessMock,
         error: notifyErrorMock,
     }),
+}));
+
+// Deleting a token is irreversible, so the hook asks for confirmation first. Defaults to "yes" here
+// so existing cases are unaffected; the delete cases below set it per test.
+vi.mock('../../contexts/ConfirmContext', () => ({
+    useConfirm: () => confirmMock,
 }));
 
 vi.mock('../../contexts/TimezoneContext', () => ({
@@ -138,12 +146,16 @@ describe('usePlaybackTokenManagementPage', () => {
         });
 
         expect(playbackTokenService.shareToken).toHaveBeenCalledWith(9);
-        expect(result.current.createdShare.shareText).toContain('SANDI1234');
-        expect(result.current.createdShare.shareText).toContain('CCTV Gate');
-        expect(notifySuccessMock).toHaveBeenCalledWith(
-            'Teks share dibuat',
-            'Kode akses yang sama siap dibagikan ulang.'
-        );
+        // Lands in `sharePreview`, which the page opens as a dialog over the row that was tapped —
+        // NOT in `createdShare`, whose panel sits beside the create form at the top of the page.
+        // Writing it up there meant scrolling away from the row to read the result and back again.
+        expect(result.current.sharePreview.tokenId).toBe(9);
+        expect(result.current.sharePreview.shareText).toContain('SANDI1234');
+        expect(result.current.sharePreview.shareText).toContain('CCTV Gate');
+        expect(result.current.createdShare).toBeNull();
+        // No toast either: the dialog IS the feedback, and a toast on top of it is one more thing
+        // to dismiss before the operator can copy the text they asked for.
+        expect(notifySuccessMock).not.toHaveBeenCalled();
     });
 
     it('extracts playback token share text from top-level and nested responses', () => {
@@ -198,5 +210,67 @@ describe('usePlaybackTokenManagementPage', () => {
         });
 
         expect(result.current.visibleCreateCameras.map((camera) => camera.id)).toEqual([2001, 1168]);
+    });
+});
+
+/*
+ * Revoking only stamps revoked_at, so every trial token stayed on the list as another dead row
+ * nobody could clear. Deleting is permanent, which is exactly why it asks first.
+ */
+describe('usePlaybackTokenManagementPage delete', () => {
+    beforeEach(() => {
+        confirmMock.mockClear();
+        confirmMock.mockResolvedValue(true);
+        playbackTokenService.listTokens.mockResolvedValue({
+            success: true,
+            data: [{ id: 9, label: 'Uji Coba', is_active: false }],
+        });
+        playbackTokenService.listAuditLogs.mockResolvedValue({ success: true, data: [] });
+    });
+
+    it('does nothing at all when the confirmation is declined', async () => {
+        confirmMock.mockResolvedValue(false);
+        const { result } = renderHook(() => usePlaybackTokenManagementPage());
+        await waitFor(() => expect(result.current.loading).toBe(false));
+
+        await act(async () => { await result.current.handleDelete(9); });
+
+        expect(playbackTokenService.deleteToken).not.toHaveBeenCalled();
+    });
+
+    it('warns that access is about to be cut when the token is still LIVE', async () => {
+        playbackTokenService.listTokens.mockResolvedValue({
+            success: true,
+            data: [{ id: 9, label: 'Pelanggan A', is_active: true }],
+        });
+        const { result } = renderHook(() => usePlaybackTokenManagementPage());
+        await waitFor(() => expect(result.current.loading).toBe(false));
+
+        await act(async () => { await result.current.handleDelete(9); });
+
+        expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({
+            tone: 'danger',
+            message: expect.stringContaining('AKTIF'),
+        }));
+    });
+
+    it('does not claim access will be cut for a token that is already revoked', async () => {
+        const { result } = renderHook(() => usePlaybackTokenManagementPage());
+        await waitFor(() => expect(result.current.loading).toBe(false));
+
+        await act(async () => { await result.current.handleDelete(9); });
+
+        expect(confirmMock.mock.calls[0][0].message).not.toContain('AKTIF');
+        expect(playbackTokenService.deleteToken).toHaveBeenCalledWith(9);
+    });
+
+    it('reports the failure instead of pretending the token went', async () => {
+        playbackTokenService.deleteToken.mockResolvedValue({ success: false, message: 'Token dipakai' });
+        const { result } = renderHook(() => usePlaybackTokenManagementPage());
+        await waitFor(() => expect(result.current.loading).toBe(false));
+
+        await act(async () => { await result.current.handleDelete(9); });
+
+        expect(notifyErrorMock).toHaveBeenCalledWith('Gagal menghapus token', 'Token dipakai');
     });
 });

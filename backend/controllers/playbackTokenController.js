@@ -10,6 +10,7 @@ import playbackTokenService, {
     PLAYBACK_TOKEN_COOKIE,
     PLAYBACK_TOKEN_SESSION_COOKIE,
 } from '../services/playbackTokenService.js';
+import { deletePlaybackToken } from '../services/playbackTokenDeletionService.js';
 import { parseUtcSql } from '../services/timeService.js';
 import { isHttpsRequest } from '../utils/authCookieOptions.js';
 
@@ -170,6 +171,24 @@ export async function revokePlaybackToken(request, reply) {
         return reply.send({ success: true, message: 'Token playback dicabut', data });
     } catch (error) {
         console.error('Revoke playback token error:', error);
+        return reply.code(error.statusCode || 500).send({
+            success: false,
+            message: error.statusCode ? error.message : 'Internal server error',
+        });
+    }
+}
+
+export async function deletePlaybackTokenById(request, reply) {
+    try {
+        const data = deletePlaybackToken(request.params.id, request);
+        // The message names the token, because after a delete there is nothing left on screen to
+        // confirm which one went — and says plainly when a LIVE one was just cut off.
+        const message = data.wasActive
+            ? `Token "${data.label}" dihapus permanen — akses yang memakainya langsung terputus`
+            : `Token "${data.label}" dihapus permanen`;
+        return reply.send({ success: true, message, data });
+    } catch (error) {
+        console.error('Delete playback token error:', error);
         return reply.code(error.statusCode || 500).send({
             success: false,
             message: error.statusCode ? error.message : 'Internal server error',

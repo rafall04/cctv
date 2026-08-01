@@ -6,6 +6,7 @@
  * SideEffects: Delegates admin token API calls and browser share/copy effects to usePlaybackTokenManagementPage.
  */
 
+import { Button, Modal } from '../components/ui';
 import PlaybackTokenForm from '../components/admin/playback-tokens/PlaybackTokenForm.jsx';
 import PlaybackTokenSharePanel from '../components/admin/playback-tokens/PlaybackTokenSharePanel.jsx';
 import PlaybackTokenTable from '../components/admin/playback-tokens/PlaybackTokenTable.jsx';
@@ -72,7 +73,45 @@ export default function PlaybackTokenManagement() {
                 onRepeatShare={page.handleRepeatShare}
                 onClearSessions={page.handleClearSessions}
                 onRevoke={page.handleRevoke}
+                onDelete={page.handleDelete}
+                deletingTokenId={page.deletingTokenId}
             />
+
+            {/*
+              * Sharing an existing token opens HERE, over the row that was tapped. It used to write
+              * into the panel beside the create form at the top of the page, so re-sharing the
+              * twelfth token meant scrolling all the way up to find the result and back down again.
+              */}
+            {page.sharePreview && (
+                <Modal
+                    title={`Bagikan "${page.sharePreview.label}"`}
+                    description="Kode akses yang sama, siap dikirim ulang."
+                    onClose={() => page.setSharePreview(null)}
+                    size="md"
+                    footer={(
+                        <>
+                            <Button variant="secondary" onClick={() => page.handleCopy(page.sharePreview.shareText)}>
+                                Salin Teks
+                            </Button>
+                            <Button variant="secondary" onClick={() => page.handleNativeShare(page.sharePreview.shareText)}>
+                                Bagikan
+                            </Button>
+                            <a
+                                href={`https://wa.me/?text=${encodeURIComponent(page.sharePreview.shareText)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex h-11 items-center rounded-control bg-emerald-600 px-4 text-sm font-semibold text-white hover:bg-emerald-700"
+                            >
+                                WhatsApp
+                            </a>
+                        </>
+                    )}
+                >
+                    <pre className="whitespace-pre-wrap break-words rounded-card bg-surface-sunken p-3 font-mono text-xs text-content">
+                        {page.sharePreview.shareText}
+                    </pre>
+                </Modal>
+            )}
 
             <div className="rounded-lg border border-edge bg-surface p-5 shadow-sm">
                 <div className="mb-4">

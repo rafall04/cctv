@@ -8,7 +8,7 @@
 
 import { getDashboardStats, getTodayStats, testTelegramNotification, getTelegramConfig, updateTelegramConfig, previewNotificationDiagnostics, runNotificationDiagnosticsDrill, listNotificationDiagnosticsRuns, getViewerAnalytics, getViewerHistoryPage, getRealTimeViewers, getCameraHealthDebug, getRecordingHealth, getSecurityLogs, getSecurityStats, getCacheStats, clearCache, getTimezoneConfig, updateTimezoneConfig, exportDatabaseBackup, importDatabaseBackup, getBackupPreview } from '../controllers/adminController.js';
 import { generateApiKey, listApiKeys, deleteApiKey } from '../controllers/apiKeyController.js';
-import { clearPlaybackTokenSessions, createPlaybackToken, listPlaybackTokenAuditLogs, listPlaybackTokens, revokePlaybackToken, sharePlaybackToken, updatePlaybackToken } from '../controllers/playbackTokenController.js';
+import { clearPlaybackTokenSessions, createPlaybackToken, deletePlaybackTokenById, listPlaybackTokenAuditLogs, listPlaybackTokens, revokePlaybackToken, sharePlaybackToken, updatePlaybackToken } from '../controllers/playbackTokenController.js';
 import { authMiddleware, requireAdmin } from '../middleware/authMiddleware.js';
 import { createApiKeySchema, apiKeyIdParamSchema } from '../middleware/schemaValidators.js';
 import mediaMtxService from '../services/mediaMtxService.js';
@@ -128,6 +128,13 @@ export default async function adminRoutes(fastify, options) {
     fastify.post('/playback-tokens/:id/revoke', {
         onRequest: [authMiddleware, requireAdmin],
         handler: revokePlaybackToken,
+    });
+
+    // Revoking only stamps revoked_at, so trial tokens pile up as dead rows nobody can clear.
+    // DELETE is the missing half: sessions and camera rules cascade away, audit history stays.
+    fastify.delete('/playback-tokens/:id', {
+        onRequest: [authMiddleware, requireAdmin],
+        handler: deletePlaybackTokenById,
     });
 
     // Debug endpoint - raw MediaMTX data (for troubleshooting viewer count)
