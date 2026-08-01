@@ -84,7 +84,7 @@ export default function LandingDiscoveryStrip({
             <div className="min-w-0 max-w-full overflow-hidden rounded-card border border-edge bg-surface p-2 sm:p-3">
                 {/* A single tab is not a choice — show its name as a plain heading instead. */}
                 {sections.length > 1 ? (
-                    <div className="flex min-w-0 max-w-full items-center gap-2 overflow-x-auto pb-2 [-webkit-overflow-scrolling:touch]" role="tablist" aria-label="Discovery CCTV publik">
+                    <div className="flex min-w-0 max-w-full items-center gap-2 overflow-x-auto pb-2 [contain:paint] [-webkit-overflow-scrolling:touch]" role="tablist" aria-label="Discovery CCTV publik">
                         {sections.map((section) => {
                             const active = section.key === activeSection.key;
                             return (
@@ -118,7 +118,15 @@ export default function LandingDiscoveryStrip({
                     </div>
                 )}
 
-                <div data-testid="landing-discovery-strip-list" className="flex min-w-0 max-w-full gap-2 overflow-x-auto pt-1 [-webkit-overflow-scrolling:touch]">
+                {/* [contain:paint] is load-bearing, not decoration. Without it this strip's 1768px
+                    of cards leaked all the way into the DOCUMENT's scrollable rect: every ancestor
+                    correctly reported 393px (they clip), yet documentElement.scrollWidth read 1514
+                    on a 393px phone. Mobile browsers that fit the page to the document width then
+                    zoomed to 393/1514 = 26%, which is a visitor's screenshot of the site squeezed
+                    into a left-hand column with black beside it. Neither overflow-x:auto here nor
+                    overflow-hidden on the two ancestors stopped it, and changing the root's
+                    overflow-x to hidden or visible did not either — only paint containment did. */}
+                <div data-testid="landing-discovery-strip-list" className="flex min-w-0 max-w-full gap-2 overflow-x-auto pt-1 [contain:paint] [-webkit-overflow-scrolling:touch]">
                     {activeItems.map((item) => (
                         activeSection.type === 'area' ? (
                             <DiscoveryAreaLink key={`area-${item.id}`} area={item} />

@@ -148,8 +148,10 @@ function PickerDialog({ cameras, selectedCamera, onPick, onClose }) {
                     />
                 </div>
 
+                {/* [contain:paint] — see LandingDiscoveryStrip: a horizontal strip's overflow
+                    reaches the document's scrollable rect even through clipping ancestors. */}
                 {facets.length > 2 && (
-                    <div className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5" role="group" aria-label="Saring per area">
+                    <div className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5 [contain:paint]" role="group" aria-label="Saring per area">
                         {facets.map((facet) => {
                             const active = facet.key === area;
                             return (

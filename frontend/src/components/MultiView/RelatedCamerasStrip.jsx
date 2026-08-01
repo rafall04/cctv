@@ -28,7 +28,10 @@ export default function RelatedCamerasStrip({
             <div className="mb-2 flex items-center justify-between gap-3">
                 <h3 className="text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">Terkait</h3>
             </div>
-            <div className="flex max-w-full gap-2 overflow-x-auto pb-1 [-webkit-overflow-scrolling:touch]">
+            {/* min-w-0 + [contain:paint] — see LandingDiscoveryStrip for the incident. A horizontal
+                strip's overflow reaches the document's scrollable rect even through clipping
+                ancestors, and mobile browsers zoom the whole page out to fit it. */}
+            <div className="flex min-w-0 max-w-full gap-2 overflow-x-auto pb-1 [contain:paint] [-webkit-overflow-scrolling:touch]">
                 {cameras.slice(0, 3).map((camera) => {
                     const viewersText = metric(camera, 'live_viewers') > 0
                         ? `${metric(camera, 'live_viewers')} live`

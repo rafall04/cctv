@@ -39,7 +39,10 @@ function QuickGroup({ title, label, cameras, onCameraClick }) {
                 <h2 className="text-sm font-semibold text-content">{title}</h2>
                 <span className="text-xs tabular-nums text-content-muted">{cameras.length} kamera</span>
             </div>
-            <div className="flex min-w-0 max-w-full gap-2 overflow-x-auto pb-1 [-webkit-overflow-scrolling:touch]">
+            {/* [contain:paint] — see LandingDiscoveryStrip for the incident. A horizontal strip's
+                overflow reaches the document's scrollable rect even through clipping ancestors,
+                and mobile browsers zoom the whole page out to fit it. */}
+            <div className="flex min-w-0 max-w-full gap-2 overflow-x-auto pb-1 [contain:paint] [-webkit-overflow-scrolling:touch]">
                 {cameras.slice(0, 5).map((camera) => (
                     <QuickCameraButton
                         key={`${title}-${camera.id}`}
