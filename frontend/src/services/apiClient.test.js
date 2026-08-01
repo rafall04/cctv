@@ -163,3 +163,77 @@ function networkError(config) {
     err.request = {};
     return err;
 }
+
+/*
+ * A stack of "Session Expired" toasts on the login screen was not one expiry reported three times.
+ * It was the page logging ITSELF out: three requests met the same just-expired access token, each
+ * POSTed /api/auth/refresh with the same refresh token, the first rotated the pair — which
+ * blacklists the old refresh token server-side — and the other two were then rejected as invalid.
+ */
+describe('apiClient session refresh under concurrency', () => {
+    let axios;
+    let apiClient;
+    let notify;
+
+    /** Drive the response interceptor's error path directly, as a 401 would. */
+    function reject401(url) {
+        const handler = apiClient.interceptors.response.handlers.find((h) => h?.rejected);
+        return handler.rejected({
+            config: { url, method: 'get', headers: {} },
+            response: { status: 401, data: {} },
+        });
+    }
+
+    beforeEach(async () => {
+        vi.resetModules();
+        vi.clearAllMocks();
+        axios = (await import('axios')).default;
+        const module = await import('./apiClient.js');
+        apiClient = module.default;
+        notify = vi.fn();
+        module.setNotificationCallback(notify);
+    });
+
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    it('sends ONE refresh for three simultaneous 401s, not three', async () => {
+        const post = vi.spyOn(axios, 'post').mockResolvedValue({ data: { success: true } });
+        // The retry re-issues the original request; resolve it so the chain completes.
+        vi.spyOn(apiClient, 'request').mockResolvedValue({ status: 200, data: {} });
+
+        await Promise.allSettled([reject401('/api/a'), reject401('/api/b'), reject401('/api/c')]);
+
+        const refreshCalls = post.mock.calls.filter(([url]) => String(url).includes('/api/auth/refresh'));
+        expect(refreshCalls).toHaveLength(1);
+    });
+
+    it('reports an expiry ONCE however many requests failed', async () => {
+        // Refresh itself rejects with 401: the session really is gone this time.
+        vi.spyOn(axios, 'post').mockRejectedValue({ response: { status: 401 } });
+        const events = vi.fn();
+        window.addEventListener('session-expired', events);
+
+        await Promise.allSettled([reject401('/api/a'), reject401('/api/b'), reject401('/api/c')]);
+
+        const expiredToasts = notify.mock.calls.filter(([, title]) => title === 'Session Expired');
+        expect(expiredToasts).toHaveLength(1);
+        expect(events).toHaveBeenCalledTimes(1);
+
+        window.removeEventListener('session-expired', events);
+    });
+
+    it('announces a LATER expiry again once the session has been working', async () => {
+        vi.spyOn(axios, 'post').mockRejectedValue({ response: { status: 401 } });
+        await Promise.allSettled([reject401('/api/a')]);
+        expect(notify.mock.calls.filter(([, t]) => t === 'Session Expired')).toHaveLength(1);
+
+        // A successful response means the session is alive again — silence would then be wrong.
+        const ok = apiClient.interceptors.response.handlers.find((h) => h?.fulfilled);
+        ok.fulfilled({ status: 200, data: {} });
+
+        await Promise.allSettled([reject401('/api/b')]);
+        expect(notify.mock.calls.filter(([, t]) => t === 'Session Expired')).toHaveLength(2);
+    });
+});

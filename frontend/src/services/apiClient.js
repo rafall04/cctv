@@ -80,13 +80,62 @@ function shouldBypassAuthRefresh(config) {
  * @param {Error} error - Error to reject with
  * @returns {Promise<never>} Rejected promise
  */
-function handleSessionExpired(error) {
-    localStorage.removeItem('user');
-    clearCsrfToken();
-    showErrorNotification('Session Expired', 'Your session has expired. Please log in again.');
+/**
+ * One refresh at a time.
+ *
+ * Without this, every request that meets a just-expired access token POSTs /api/auth/refresh on its
+ * own — with the SAME refresh token. The first one wins and rotates the pair, which blacklists the
+ * old refresh token (sessionManager.rotateTokens). Every other refresh then arrives carrying a
+ * token that is now blacklisted, gets 401, and tears down a session that was perfectly healthy.
+ *
+ * That is what a stack of "Session Expired" toasts on the login screen actually was: not one
+ * expiry reported three times, but a page that logged itself out because it happened to have three
+ * requests in flight.
+ */
+let refreshPromise = null;
 
-    // Dispatch a global event so React Router can handle the redirect cleanly
-    window.dispatchEvent(new Event('session-expired'));
+function refreshSession() {
+    if (!refreshPromise) {
+        refreshPromise = (async () => {
+            const csrf = await getCsrfToken();
+            const response = await axios.post(`${getApiUrl()}/api/auth/refresh`, {}, {
+                withCredentials: true,
+                headers: {
+                    ...(API_KEY && { 'X-API-Key': API_KEY }),
+                    ...(csrf && { 'X-CSRF-Token': csrf }),
+                },
+            });
+            if (!response.data?.success) {
+                const err = new Error('Refresh rejected');
+                err.response = response;
+                throw err;
+            }
+            return true;
+        })().finally(() => {
+            // Cleared only after every waiter has attached, so the NEXT expiry starts a fresh one.
+            refreshPromise = null;
+        });
+    }
+    return refreshPromise;
+}
+
+/**
+ * True once the session has been reported as gone, so several failed requests produce ONE toast and
+ * ONE redirect instead of one per request. Reset by the next successful response — if anything
+ * succeeds, the session is alive again and a later expiry deserves its own notice.
+ */
+let sessionExpiredReported = false;
+
+function handleSessionExpired(error) {
+    if (!sessionExpiredReported) {
+        sessionExpiredReported = true;
+        localStorage.removeItem('user');
+        clearCsrfToken();
+        showErrorNotification('Session Expired', 'Your session has expired. Please log in again.');
+
+        // Dispatch a global event so React Router can handle the redirect cleanly
+        window.dispatchEvent(new Event('session-expired'));
+    }
 
     return Promise.reject(error);
 }
@@ -197,6 +246,9 @@ apiClient.interceptors.request.use(
 // Response interceptor - Handle auth errors and enhanced error handling
 apiClient.interceptors.response.use(
     (response) => {
+        // Anything succeeding means the session is usable again, so a future expiry is allowed to
+        // announce itself once more.
+        sessionExpiredReported = false;
         return response;
     },
     async (error) => {
@@ -267,24 +319,15 @@ apiClient.interceptors.response.use(
                 return handleSessionExpired(error);
             }
 
-            // Try to refresh token automatically (refresh token in HttpOnly cookie)
+            // Try to refresh token automatically (refresh token in HttpOnly cookie).
+            // Shared: concurrent 401s wait on the SAME refresh instead of each starting one.
             if (!originalRequest._retry) {
                 originalRequest._retry = true;
 
                 try {
-                    const csrf = await getCsrfToken();
-                    const response = await axios.post(`${getApiUrl()}/api/auth/refresh`, {}, {
-                        withCredentials: true,
-                        headers: {
-                            ...(API_KEY && { 'X-API-Key': API_KEY }),
-                            ...(csrf && { 'X-CSRF-Token': csrf })
-                        }
-                    });
-
-                    if (response.data.success) {
-                        // Tokens refreshed in cookies, retry original request
-                        return apiClient(originalRequest);
-                    }
+                    await refreshSession();
+                    // Tokens refreshed in cookies, retry original request
+                    return apiClient(originalRequest);
                 } catch (refreshError) {
                     // Only logout if it's an auth error (401/403) indicating invalid refresh token
                     // For network/timeout errors, keep the session (user can retry)
