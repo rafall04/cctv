@@ -106,7 +106,17 @@ export default async function telegramArchiveRoutes(fastify) {
     });
 
     fastify.get('/library/summary', { onRequest: guard }, async (request, reply) => {
-        return reply.send({ success: true, data: archiveLibrary.getSummary() });
+        // Same filters as /library on purpose: the header describes the list under it.
+        const { cameraId, status, from, to } = request.query || {};
+        return reply.send({
+            success: true,
+            data: archiveLibrary.getSummary({
+                cameraId: cameraId ? Number(cameraId) : null,
+                status: status || 'ok',
+                from: from || null,
+                to: to || null,
+            }),
+        });
     });
 
     fastify.get('/library/:segmentId/stream', {

@@ -117,7 +117,7 @@ export default function TelegramArchiveLibrary() {
         setLoading(true);
         try {
             const [sum, result] = await Promise.all([
-                archiveLibrary.getSummary(),
+                archiveLibrary.getSummary(filters),
                 archiveLibrary.listUploads({ ...filters, limit: pageSize, offset: page * pageSize }),
             ]);
             setSummary(sum);
@@ -139,6 +139,13 @@ export default function TelegramArchiveLibrary() {
     const driftWarning = page > 0 && !filters.from && !filters.to;
 
     const cameras = useMemo(() => summary?.cameras ?? [], [summary]);
+    // summary.total now honours the camera filter, so it is NOT the right number for the "all
+    // cameras" option — that one has to ignore the current camera. The per-camera counts already
+    // do (they only honour the date range), so their sum is the honest figure.
+    const totalAllCameras = useMemo(
+        () => cameras.reduce((sum, camera) => sum + (camera.segments || 0), 0),
+        [cameras],
+    );
     const notPlayable = Math.max((summary?.total ?? 0) - (summary?.playable ?? 0), 0);
 
     // Gaps are only meaningful along ONE camera's timeline. Across a mixed feed, a "hole" between
@@ -211,7 +218,7 @@ export default function TelegramArchiveLibrary() {
                     onChange={(e) => { setCameraId(e.target.value); setHighlighted(null); }}
                     className="min-w-0 sm:flex-1 sm:max-w-sm"
                 >
-                    <option value="">Semua kamera · {summary?.total ?? 0} segmen</option>
+                    <option value="">Semua kamera · {totalAllCameras} segmen</option>
                     {cameras.map((camera) => (
                         <option key={camera.id} value={camera.id}>
                             {camera.name} · {camera.segments}

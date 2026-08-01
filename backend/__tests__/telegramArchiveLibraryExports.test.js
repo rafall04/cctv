@@ -55,4 +55,38 @@ describe('telegramArchiveLibraryService default export covers what the routes ca
         expect(archiveLibrary.countUploads({ cameraId: 16, from: '2026-07-31T00:00:00.000Z' })).toBe(0);
         expect(archiveLibrary.countUploads()).toBe(0);
     });
+
+    it('applies the caller filters to the summary totals, but never narrows the camera picker', async () => {
+        const { queryOne, query } = await import('../database/connectionPool.js');
+        const { default: archiveLibrary } = await import('../services/telegramArchiveLibraryService.js');
+
+        queryOne.mockClear();
+        query.mockClear();
+        archiveLibrary.getSummary({ cameraId: 16, from: '2026-07-31T00:00:00.000Z' });
+
+        const [totalsSql, totalsParams] = queryOne.mock.calls.at(-1);
+        expect(totalsSql).toContain('u.camera_id = ?');
+        expect(totalsSql).toContain('u.recorded_at >= ?');
+        expect(totalsParams).toContain(16);
+
+        // The picker must keep every camera, or filtering to one strands the operator there with
+        // no way back. Dates still apply, so the counts match the list.
+        const [camerasSql, camerasParams] = query.mock.calls.at(-1);
+        expect(camerasSql).not.toContain('u.camera_id = ?');
+        expect(camerasSql).toContain('u.recorded_at >= ?');
+        expect(camerasParams).not.toContain(16);
+    });
+
+    it('leaves the summary unrestricted when no filters are given', async () => {
+        const { queryOne } = await import('../database/connectionPool.js');
+        const { default: archiveLibrary } = await import('../services/telegramArchiveLibraryService.js');
+
+        queryOne.mockClear();
+        archiveLibrary.getSummary();
+
+        const [sql, params] = queryOne.mock.calls.at(-1);
+        expect(sql).not.toContain('recorded_at');
+        expect(sql).not.toContain('camera_id = ?');
+        expect(params).toEqual(['ok']);
+    });
 });

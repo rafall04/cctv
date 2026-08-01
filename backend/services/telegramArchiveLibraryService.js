@@ -62,20 +62,33 @@ function telegramConfig() {
  * comparison against ISO bounds orders correctly. The CALLER converts the operator's local date
  * into those UTC bounds; doing it here would silently assume the server's timezone.
  */
-function buildUploadFilter({ cameraId = null, status = 'ok', from = null, to = null }) {
+function buildDateClause({ from = null, to = null } = {}) {
+    const parts = [];
+    const params = [];
+    if (from) {
+        parts.push('u.recorded_at >= ?');
+        params.push(from);
+    }
+    if (to) {
+        parts.push('u.recorded_at <= ?');
+        params.push(to);
+    }
+    // '1' rather than an empty string: this clause is also embedded inside a CASE WHEN, where a
+    // blank would be a syntax error instead of "no restriction".
+    return { clause: parts.length ? parts.join(' AND ') : '1', params };
+}
+
+function buildUploadFilter({ cameraId = null, status = 'ok', from = null, to = null } = {}) {
     const where = ['u.status = ?'];
     const params = [status];
     if (cameraId) {
         where.push('u.camera_id = ?');
         params.push(cameraId);
     }
-    if (from) {
-        where.push('u.recorded_at >= ?');
-        params.push(from);
-    }
-    if (to) {
-        where.push('u.recorded_at <= ?');
-        params.push(to);
+    const dates = buildDateClause({ from, to });
+    if (dates.clause !== '1') {
+        where.push(dates.clause);
+        params.push(...dates.params);
     }
     return { clause: where.join(' AND '), params };
 }
@@ -132,22 +145,37 @@ export function listUploads({
     }));
 }
 
-/** Per-camera counts + total bytes, for the page header. */
-export function getSummary() {
+/**
+ * Per-camera counts + total bytes, for the page header.
+ *
+ * Takes the SAME filters as listUploads: a header that reports the whole archive while the list
+ * below shows one filtered day is not a summary, it is a contradiction — and it is exactly how the
+ * page read before, with "5120 segmen" sitting above a list of 216.
+ */
+export function getSummary(filters = {}) {
+    const { clause, params } = buildUploadFilter(filters);
     const totals = queryOne(
         `SELECT COUNT(*) AS total,
-                SUM(CASE WHEN file_id IS NOT NULL THEN 1 ELSE 0 END) AS playable,
-                COALESCE(SUM(file_size), 0) AS bytes
-         FROM telegram_archive_uploads WHERE status = 'ok'`,
+                SUM(CASE WHEN u.file_id IS NOT NULL THEN 1 ELSE 0 END) AS playable,
+                COALESCE(SUM(u.file_size), 0) AS bytes
+         FROM telegram_archive_uploads u WHERE ${clause}`,
+        params,
     ) || {};
+
+    // The camera list drives the PICKER, so every camera stays in it regardless of the current
+    // camera filter — narrowing by cameraId would strand the operator on one camera with no way
+    // back. Only the date range is applied, via a conditional SUM, so a camera with nothing in the
+    // range still appears (showing 0) instead of vanishing out from under the selection.
+    const dates = buildDateClause(filters);
     const cameras = query(
         `SELECT u.camera_id, COALESCE(c.name, 'Kamera ' || u.camera_id) AS camera_name,
-                COUNT(*) AS segments
+                SUM(CASE WHEN ${dates.clause} THEN 1 ELSE 0 END) AS segments
          FROM telegram_archive_uploads u
          LEFT JOIN cameras c ON c.id = u.camera_id
-         WHERE u.status = 'ok'
+         WHERE u.status = ?
          GROUP BY u.camera_id
          ORDER BY segments DESC`,
+        [...dates.params, filters.status || 'ok'],
     );
     return {
         total: totals.total || 0,

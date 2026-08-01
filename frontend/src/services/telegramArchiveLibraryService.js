@@ -11,8 +11,13 @@ import apiClient from './apiClient';
 
 const BASE = '/api/admin/telegram-archive/library';
 
-export async function getSummary() {
-    const { data } = await apiClient.get(`${BASE}/summary`);
+/** Header figures for the CURRENT filter — pass the same ones given to listUploads. */
+export async function getSummary({ cameraId, from, to } = {}) {
+    const params = {};
+    if (cameraId) params.cameraId = cameraId;
+    if (from) params.from = from;
+    if (to) params.to = to;
+    const { data } = await apiClient.get(`${BASE}/summary`, { params });
     return data?.data ?? null;
 }
 
