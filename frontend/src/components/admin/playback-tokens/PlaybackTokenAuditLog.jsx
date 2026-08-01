@@ -37,7 +37,9 @@ const EVENTS = {
     activation_failed: { label: 'Gagal masuk', tone: 'fault' },
     session_started: { label: 'Sesi dimulai', tone: 'ok' },
     sessions_cleared: { label: 'Sesi direset', tone: 'warn' },
-    access_segments: { label: 'Buka rekaman', tone: 'ok' },
+    access_segments: { label: 'Buka daftar rekaman', tone: 'ok' },
+    access_playlist: { label: 'Buka playlist', tone: 'ok' },
+    watch_segment: { label: 'Menonton rekaman', tone: 'ok' },
 };
 
 const TONE_CLASS = {
@@ -91,11 +93,33 @@ function Line({ label, children }) {
     );
 }
 
+/** Minutes/seconds from a segment duration, for the footage line. */
+function formatClipLength(seconds) {
+    const total = Number(seconds);
+    if (!Number.isFinite(total) || total <= 0) return null;
+    const minutes = Math.floor(total / 60);
+    const rest = Math.round(total % 60);
+    if (!minutes) return `${rest} dtk`;
+    return rest ? `${minutes} mnt ${rest} dtk` : `${minutes} mnt`;
+}
+
+function parseDetail(log) {
+    try {
+        return typeof log.detail_json === 'string' ? JSON.parse(log.detail_json || '{}') : (log.detail_json || {});
+    } catch {
+        return {};
+    }
+}
+
 function LogCard({ log, formatTokenDate }) {
     const event = describeEvent(log.event_type);
     const device = summarizeUserAgent(log.user_agent);
     const detail = describeDetail(log);
     const isFault = event.tone === 'fault';
+    // WHICH footage, as opposed to when they clicked. Two different clocks, and the entry is
+    // useless for "who watched what" without the first one.
+    const watched = parseDetail(log);
+    const clipLength = formatClipLength(watched.duration);
 
     return (
         <li className={`rounded-card border p-3 ${isFault ? 'border-status-fault/40 bg-status-fault/5' : 'border-edge bg-surface'}`}>
@@ -118,6 +142,16 @@ function LogCard({ log, formatTokenDate }) {
                         : <span className="italic">token sudah dihapus</span>}
                 </Line>
                 <Line label="Kamera">{log.camera_name || (log.camera_id ? `ID ${log.camera_id}` : null)}</Line>
+                {/*
+                  * The footage window. The timestamp at the top of the card is when the viewer
+                  * pressed play; this is the recording they pressed play ON — often hours apart,
+                  * and the only one of the two that answers "what did they see?".
+                  */}
+                <Line label="Rekaman">
+                    {watched.start_time
+                        ? <>{formatTokenDate(watched.start_time)}{clipLength ? ` · ${clipLength}` : ''}</>
+                        : null}
+                </Line>
                 {/* The one field that separates two viewers holding the same shared code. */}
                 <Line label="Perangkat">{device}</Line>
                 <Line label="IP">{log.ip_address ? <span className="font-mono">{log.ip_address}</span> : null}</Line>

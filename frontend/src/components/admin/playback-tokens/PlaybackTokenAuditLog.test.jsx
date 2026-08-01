@@ -85,7 +85,8 @@ describe('PlaybackTokenAuditLog detail', () => {
             log({ id: 3, event_type: 'session_started' }),
         ]);
 
-        expect(screen.getByText('Buka rekaman')).toBeTruthy();
+        // Renamed: browsing the list and watching a clip are different acts and now say so.
+        expect(screen.getByText('Buka daftar rekaman')).toBeTruthy();
         expect(screen.getByText('Masuk pakai tautan')).toBeTruthy();
         expect(screen.getByText('Sesi dimulai')).toBeTruthy();
     });
@@ -124,7 +125,7 @@ describe('PlaybackTokenAuditLog detail', () => {
     it('survives malformed detail_json without taking the row down with it', () => {
         setup([log({ detail_json: '{not json' })]);
 
-        expect(screen.getByText('Buka rekaman')).toBeTruthy();
+        expect(screen.getByText('Buka daftar rekaman')).toBeTruthy();
     });
 });
 
@@ -151,5 +152,76 @@ describe('PlaybackTokenAuditLog controls', () => {
     it('says so when the current filter has nothing', () => {
         setup([]);
         expect(screen.getByText('Belum ada aktivitas untuk pilihan ini.')).toBeTruthy();
+    });
+});
+
+/*
+ * "Buka rekaman 19.51" says when someone pressed play. It never said WHAT they pressed play on —
+ * two different clocks, and only the second answers "who watched what".
+ */
+describe('PlaybackTokenAuditLog footage window', () => {
+    const watch = (overrides = {}) => log({
+        event_type: 'watch_segment',
+        created_at: '2026-08-01 19:51:00',
+        detail_json: JSON.stringify({
+            filename: '20260801_134000.mp4',
+            start_time: '2026-08-01 13:40:00',
+            end_time: '2026-08-01 13:50:00',
+            duration: 600,
+            ...overrides,
+        }),
+    });
+
+    it('shows the recording time, which is not the same as the click time', () => {
+        render(
+            <PlaybackTokenAuditLog
+                logs={[watch()]}
+                tokens={[]}
+                // Distinguishable per input so the test proves WHICH timestamp is rendered.
+                formatTokenDate={(value) => `fmt(${value})`}
+            />,
+        );
+
+        expect(screen.getByText('Rekaman')).toBeTruthy();
+        expect(screen.getByText(/fmt\(2026-08-01 13:40:00\) · 10 mnt/)).toBeTruthy();
+        // And the click time is still there, separately.
+        expect(screen.getByText('fmt(2026-08-01 19:51:00)')).toBeTruthy();
+    });
+
+    it('labels the event as watching, distinct from merely browsing the list', () => {
+        setup([watch(), log({ id: 2, event_type: 'access_segments' })]);
+
+        expect(screen.getByText('Menonton rekaman')).toBeTruthy();
+        expect(screen.getByText('Buka daftar rekaman')).toBeTruthy();
+    });
+
+    it.each([
+        [45, '45 dtk'],
+        [600, '10 mnt'],
+        [610, '10 mnt 10 dtk'],
+    ])('states a %s second clip as "%s"', (duration, expected) => {
+        render(
+            <PlaybackTokenAuditLog logs={[watch({ duration })]} tokens={[]} formatTokenDate={() => 'X'} />,
+        );
+        expect(screen.getByText(new RegExp(expected))).toBeTruthy();
+    });
+
+    it('omits the footage line for events that have no footage', () => {
+        setup([log({ event_type: 'activated_share', detail_json: '{"scope_type":"all"}' })]);
+
+        expect(screen.queryByText('Rekaman')).toBeNull();
+    });
+
+    it('still shows the entry when an older row has no stored times', () => {
+        render(
+            <PlaybackTokenAuditLog
+                logs={[log({ event_type: 'watch_segment', detail_json: '{"filename":"old.mp4"}' })]}
+                tokens={[]}
+                formatTokenDate={() => 'X'}
+            />,
+        );
+
+        expect(screen.getByText('Menonton rekaman')).toBeTruthy();
+        expect(screen.queryByText('Rekaman')).toBeNull();
     });
 });
