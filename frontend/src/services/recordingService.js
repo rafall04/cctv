@@ -109,8 +109,19 @@ export const getSegments = async (cameraId, policy = REQUEST_POLICY.BLOCKING, co
 /**
  * Get stream URL untuk segment
  */
-export const getSegmentStreamUrl = (cameraId, filename, accessScope = 'public') => {
+/**
+ * Segments older than local retention live only in the Telegram archive and are served by a
+ * different route — the local one would 404 on them because the file was pruned off disk. The
+ * backend marks those rows `source: 'archive'`, so pass the segment and let this decide.
+ *
+ * The archive route authenticates from the playback-token COOKIE, not a header: a <video src>
+ * cannot send custom headers, which is why the token must already be activated on this device.
+ */
+export const getSegmentStreamUrl = (cameraId, filename, accessScope = 'public', segment = null) => {
     const baseUrl = getApiBaseUrl();
+    if (segment?.source === 'archive' && segment?.id) {
+        return `${baseUrl}/api/playback-archive/${segment.id}/stream`;
+    }
     return `${baseUrl}/api/recordings/${cameraId}/stream/${filename}${buildPlaybackQuery(accessScope)}`;
 };
 

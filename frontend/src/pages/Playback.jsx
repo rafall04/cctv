@@ -504,7 +504,7 @@ function Playback({
             return null;
         }
 
-        return recordingService.getSegmentStreamUrl(selectedCameraId, selectedSegment.filename, accessScope);
+        return recordingService.getSegmentStreamUrl(selectedCameraId, selectedSegment.filename, accessScope, selectedSegment);
     }, [accessScope, selectedCameraId, selectedSegment, selectedSegmentKey]);
 
     useEffect(() => {

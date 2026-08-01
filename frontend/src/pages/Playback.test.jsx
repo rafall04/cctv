@@ -866,7 +866,16 @@ describe('Playback', () => {
             expect(screen.getByTestId('video-segment').textContent).toBe('gate-2');
         });
 
-        expect(getSegmentStreamUrl).toHaveBeenCalledWith(2, 'gate-2.mp4', 'public_preview');
+        // The 4th argument is the segment itself — the stream URL builder needs it to tell an
+        // archived segment (served from Telegram) from a local one. Asserting its filename here
+        // strengthens this test rather than merely accommodating the new signature: the pairing of
+        // camera, filename AND segment must all move together, which is exactly the bug guarded.
+        expect(getSegmentStreamUrl).toHaveBeenCalledWith(
+            2,
+            'gate-2.mp4',
+            'public_preview',
+            expect.objectContaining({ filename: 'gate-2.mp4' })
+        );
         expect(getSegmentStreamUrl.mock.calls).not.toContainEqual([2, 'seg-2.mp4', 'public_preview']);
     });
 
