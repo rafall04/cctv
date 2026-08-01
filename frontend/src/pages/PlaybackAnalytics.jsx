@@ -16,6 +16,7 @@ import { REQUEST_POLICY } from '../services/requestPolicy';
 import { exportToCSV, mapPeriodToApi } from '../utils/admin/viewerAnalyticsAdapter';
 import { useAdminReconnectRefresh } from '../hooks/admin/useAdminReconnectRefresh';
 import { TIMESTAMP_STORAGE, useTimezone } from '../contexts/TimezoneContext';
+import { summarizeUserAgent } from '../utils/admin/deviceLabel.js';
 
 const TABS = [
     { id: 'overview', label: 'Overview' },
@@ -36,8 +37,28 @@ const PERIOD_OPTIONS = [
 const ACCESS_MODE_OPTIONS = [
     { value: '', label: 'Semua Akses' },
     { value: 'public_preview', label: 'Preview Publik' },
+    // token_full was missing here too, so the filter could not even ask for token viewers.
+    { value: 'token_full', label: 'Pakai Token' },
     { value: 'admin_full', label: 'Admin Full' },
 ];
+
+/** Raw mode strings read as database values; these read as what happened. */
+const ACCESS_MODE_LABELS = {
+    public_preview: { label: 'Preview publik', tone: 'bg-surface-sunken text-content-muted' },
+    token_full: { label: 'Pakai token', tone: 'bg-primary/15 text-primary' },
+    admin_full: { label: 'Admin', tone: 'bg-status-live/15 text-status-live' },
+};
+
+/** One label/value line, skipped entirely when there is no value — no column of dashes. */
+function HistoryLine({ label, children }) {
+    if (!children) return null;
+    return (
+        <div className="flex gap-2 text-xs">
+            <dt className="w-20 shrink-0 text-content-subtle">{label}</dt>
+            <dd className="min-w-0 flex-1 break-all text-content-muted">{children}</dd>
+        </div>
+    );
+}
 
 const SORT_OPTIONS = [
     { value: 'started_at:desc', label: 'Terbaru' },
@@ -379,22 +400,32 @@ export default function PlaybackAnalytics() {
                                     className="w-full rounded-xl border border-edge p-3 text-left transition-colors hover:bg-surface-sunken"
                                 >
                                     <div className="flex items-start justify-between gap-3">
-                                        <div>
+                                        <div className="min-w-0">
                                             <div className="font-semibold text-content">{session.camera_name}</div>
-                                            <div className="text-xs text-content-muted">{session.segment_filename}</div>
+                                            {/* The filename encodes the recording time, but nobody
+                                                should have to decode 20260801_214001.mp4 by eye. */}
+                                            <div className="text-xs text-content-muted">
+                                                Rekaman {formatDateTime(session.segment_started_at) || session.segment_filename}
+                                            </div>
                                         </div>
-                                        <span className="rounded-full bg-surface-sunken px-2.5 py-1 text-xs font-medium text-content">
-                                            {session.playback_access_mode}
+                                        <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${ACCESS_MODE_LABELS[session.playback_access_mode]?.tone || 'bg-surface-sunken text-content'}`}>
+                                            {ACCESS_MODE_LABELS[session.playback_access_mode]?.label || session.playback_access_mode}
                                         </span>
                                     </div>
-                                    <div className="mt-2 text-xs text-content-muted">
-                                        {session.ip_address} • {formatDateTime(session.started_at, { storage: TIMESTAMP_STORAGE.LOCAL_SQL })} • {formatWatchTime(session.duration_seconds)}
-                                    </div>
-                                    {/* Which token unlocked it. Before this existed, a token
-                                        holder's view was indistinguishable from an anonymous one. */}
-                                    {session.token_label && (
-                                        <div className="mt-1 text-xs font-medium text-primary">Token: {session.token_label}</div>
-                                    )}
+                                    {/*
+                                      * Everything below was already stored and simply not shown:
+                                      * user_agent (populated on all 146 rows), device_type, and the
+                                      * footage time. A row that says only "public_preview • 0m" is
+                                      * the reason this page could not answer who watched what.
+                                      */}
+                                    <dl className="mt-2 space-y-0.5">
+                                        <HistoryLine label="Ditonton">{formatWatchTime(session.duration_seconds)}</HistoryLine>
+                                        <HistoryLine label="Dibuka">{formatDateTime(session.started_at, { storage: TIMESTAMP_STORAGE.LOCAL_SQL })}</HistoryLine>
+                                        <HistoryLine label="Perangkat">{summarizeUserAgent(session.user_agent) || session.device_type}</HistoryLine>
+                                        <HistoryLine label="IP">{session.ip_address}</HistoryLine>
+                                        <HistoryLine label="Token">{session.token_label}</HistoryLine>
+                                        <HistoryLine label="Admin">{session.admin_username}</HistoryLine>
+                                    </dl>
                                 </button>
                             ))}
                         </div>

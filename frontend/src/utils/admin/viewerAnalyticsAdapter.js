@@ -10,12 +10,25 @@ export function formatDuration(seconds) {
     return `${days}d ${hours % 24}h`;
 }
 
+/**
+ * Watch time in the smallest unit that is still true.
+ *
+ * It used to floor everything to whole minutes, so a 37-second view rendered as "0m" — visually
+ * identical to a session that never played at all. Most playback views ARE short, so the analytics
+ * were reporting the bulk of real viewing as zero.
+ */
 export function formatWatchTime(seconds) {
-    if (!seconds) return '0m';
-    const hours = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
+    const total = Math.max(Math.round(Number(seconds) || 0), 0);
+    if (!total) return '0 dtk';
+    if (total < 60) return `${total} dtk`;
+
+    const hours = Math.floor(total / 3600);
+    const mins = Math.floor((total % 3600) / 60);
     if (hours > 0) return `${hours}h ${mins}m`;
-    return `${mins}m`;
+
+    // Keep the seconds alongside the minutes: "1m" and "1m 59s" are very different viewings.
+    const secs = total % 60;
+    return secs ? `${mins}m ${secs}dtk` : `${mins}m`;
 }
 
 export function formatDate(dateStr, options = {}) {
