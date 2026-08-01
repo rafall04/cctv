@@ -333,4 +333,6 @@ function safeTargets(raw) {
     }
 }
 
-export default { listUploads, getSummary, getUpload, openSegmentStream, parseRange };
+// Routes import the DEFAULT, so anything they call has to be listed here — a named export alone
+// is invisible to them and fails only at runtime, on the live page.
+export default { listUploads, countUploads, getSummary, getUpload, openSegmentStream, parseRange };
