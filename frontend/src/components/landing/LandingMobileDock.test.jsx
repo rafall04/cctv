@@ -53,6 +53,19 @@ describe('LandingMobileDock', () => {
         expect(screen.getByRole('button', { name: /Favorit 2/i })).toBeTruthy();
     });
 
+    /* Mirrors the admin dock's guard in layouts/AdminLayout.test.jsx. The raw z-[1200] this used to
+     * carry outranked z-modal (60), so a dialog opened from a public page — the playback camera
+     * picker — was covered by this bar. Verified on the live site that z-dock still wins the
+     * hit-test over Leaflet, so the big number bought nothing. */
+    it('renders on the named layering tier, below dialogs', () => {
+        render(<LandingMobileDock viewMode="grid" onViewModeChange={vi.fn()} />);
+
+        const dock = screen.getByTestId('landing-mobile-dock');
+        expect(dock.className).toContain('fixed');
+        expect(dock.className).toContain('z-dock');
+        expect(dock.className).not.toMatch(/z-\[\d+\]/);
+    });
+
     it('renders route links when item hrefs are provided', () => {
         render(
             <LandingMobileDock

@@ -10,9 +10,20 @@
  * toHaveTextContent / toBeDisabled would fail as unknown Chai properties.
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import PlaybackCameraPicker from './PlaybackCameraPicker.jsx';
+
+/* jsdom implements no scrollIntoView, so installing a spy is both the stub and the observation.
+ * Removed after every test rather than inline, so a failing assertion cannot leak it. */
+function spyOnScrollIntoView() {
+    const spy = vi.fn();
+    Element.prototype.scrollIntoView = spy;
+    return spy;
+}
+afterEach(() => {
+    delete Element.prototype.scrollIntoView;
+});
 
 const MAGETAN = 'KAB MAGETAN';
 const BOJONEGORO = 'KEC BOJONEGORO DAN SEKITARNYA';
@@ -131,6 +142,44 @@ describe('PlaybackCameraPicker dialog', () => {
         const current = rows().filter((r) => r.getAttribute('aria-current') === 'true');
         expect(current).toHaveLength(1);
         expect(current[0].textContent).toContain('S4_Ngariboyo');
+    });
+
+    it('keeps every area chip readable instead of pushing one off the edge', () => {
+        const { dialog } = openDialog();
+        const long = within(dialog).getByRole('button', { name: /KEC BOJONEGORO DAN SEKITARNYA 2/ });
+
+        // The label is clamped, the count is not, and the untruncated name stays reachable.
+        expect(long.getAttribute('title')).toBe(BOJONEGORO);
+        expect(long.querySelector('.truncate').textContent).toBe(BOJONEGORO);
+        expect(long.querySelector('.tabular-nums').className).toContain('shrink-0');
+    });
+
+    it('sends the list back to the top once results are narrowed', () => {
+        const { dialog, search } = openDialog();
+        const body = dialog.querySelector('.overflow-y-auto');
+        body.scrollTop = 500;
+
+        fireEvent.change(search, { target: { value: 'simpang' } });
+        expect(body.scrollTop).toBe(0);
+    });
+
+    /* These two belong together: without the positive case, the negative one would pass even if
+     * the reveal had been deleted outright. jsdom implements no scrollIntoView, so the spy IS the
+     * implementation here. */
+    it('reveals the current camera when the dialog opens', () => {
+        const reveal = spyOnScrollIntoView();
+        openDialog();
+        expect(reveal).toHaveBeenCalled();
+    });
+
+    it('stops yanking the list back to the current camera once the visitor is searching', () => {
+        const { rows, search } = openDialog();
+        const reveal = spyOnScrollIntoView();
+
+        fireEvent.change(search, { target: { value: 'ngariboyo' } });
+
+        expect(rows()).toHaveLength(1);
+        expect(reveal).not.toHaveBeenCalled();
     });
 
     it('reports the chosen camera and closes', () => {

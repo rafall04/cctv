@@ -105,7 +105,15 @@ export default function LandingMobileDock({
     return (
         <nav
             data-testid="landing-mobile-dock"
-            className="fixed inset-x-3 bottom-3 z-[1200] rounded-card border border-edge bg-surface px-2 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2 shadow-e2 sm:hidden"
+            /* z-dock (30), NOT the raw z-[1200] this used to carry — that number outranked every
+               dialog in the product (z-modal = 60), so the playback camera picker and any other
+               modal opened from a public page had its bottom ~120px covered by this bar.
+               The 1200 was assumed to be needed to clear Leaflet (whose controls paint at 1000).
+               Measured on the live site instead of assumed: at z-index 30 the dock still wins
+               document.elementFromPoint at its own centre on the map, grid AND playback views, so
+               nothing was clearing Leaflet — the map simply never stacks above it here.
+               The admin dock was already moved onto this named tier; this is the public twin. */
+            className="fixed inset-x-3 bottom-3 z-dock rounded-card border border-edge bg-surface px-2 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2 shadow-e2 sm:hidden"
             aria-label="Navigasi publik mobile"
         >
             <div className="mx-auto grid max-w-md grid-cols-5 gap-1 sm:max-w-none">

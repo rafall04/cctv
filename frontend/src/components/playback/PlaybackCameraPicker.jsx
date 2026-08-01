@@ -58,17 +58,19 @@ function SearchIcon() {
     );
 }
 
-function CameraRow({ camera, isSelected, onPick }) {
+function CameraRow({ camera, isSelected, revealOnMount, onPick }) {
     const rowRef = useRef(null);
     const location = distinctLocation(camera);
 
     // Open the dialog already showing where you are. Without this, picking the 30th camera means
-    // reopening the list at the top every time.
+    // reopening the list at the top every time. Only until the visitor searches or picks an area —
+    // after that they are looking for something else, and yanking the list back to the current
+    // camera would fight them.
     useEffect(() => {
         // Optional call, not just an optional ref: jsdom (and some older engines) do not implement
         // scrollIntoView at all, and a convenience scroll must never break the picker.
-        if (isSelected) rowRef.current?.scrollIntoView?.({ block: 'center' });
-    }, [isSelected]);
+        if (revealOnMount) rowRef.current?.scrollIntoView?.({ block: 'center' });
+    }, [revealOnMount]);
 
     return (
         <button
@@ -105,6 +107,9 @@ function CameraRow({ camera, isSelected, onPick }) {
 function PickerDialog({ cameras, selectedCamera, onPick, onClose }) {
     const [query, setQuery] = useState('');
     const [area, setArea] = useState('all');
+    /* Once the visitor narrows the list, the dialog stops being "where am I" and becomes "find me
+     * this" — which changes where the list should be scrolled. */
+    const narrowed = query.trim() !== '' || area !== 'all';
 
     const facets = useMemo(() => areaFacets(cameras), [cameras]);
     const groups = useMemo(
@@ -112,6 +117,13 @@ function PickerDialog({ cameras, selectedCamera, onPick, onClose }) {
         [cameras, area, query],
     );
     const matchCount = groups.reduce((total, group) => total + group.cameras.length, 0);
+
+    // Results start at the top. Without this the list kept the offset from revealing the current
+    // camera, so the first matches — and the first area heading — sat scrolled off above.
+    const bodyRef = useRef(null);
+    useEffect(() => {
+        if (narrowed && bodyRef.current) bodyRef.current.scrollTop = 0;
+    }, [narrowed, query, area]);
 
     // Focusing the field on a phone opens the keyboard over the list the visitor came to look at.
     // On a pointer device there is no such cost, so type-to-search works immediately there.
@@ -121,7 +133,7 @@ function PickerDialog({ cameras, selectedCamera, onPick, onClose }) {
     }, []);
 
     return (
-        <Modal title="Pilih Kamera" onClose={onClose} size="md" bodyClassName="">
+        <Modal title="Pilih Kamera" onClose={onClose} size="md" bodyClassName="" bodyRef={bodyRef}>
             <div className="sticky top-0 z-10 space-y-2 border-b border-edge bg-surface-overlay px-3 pb-2 pt-3">
                 <div className="flex items-center gap-2 rounded-control border border-edge bg-surface px-3 py-2 focus-within:border-transparent focus-within:ring-2 focus-within:ring-primary">
                     <SearchIcon />
@@ -146,13 +158,20 @@ function PickerDialog({ cameras, selectedCamera, onPick, onClose }) {
                                     type="button"
                                     aria-pressed={active}
                                     onClick={() => setArea(facet.key)}
-                                    className={`shrink-0 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                                    title={facet.label}
+                                    className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
                                         active
                                             ? 'border-primary bg-primary text-white'
                                             : 'border-edge text-content-muted hover:border-edge-strong hover:text-content'
                                     }`}
                                 >
-                                    {facet.label} <span className="tabular-nums opacity-75">{facet.count}</span>
+                                    {/* Area names here run to 29 characters ("KEC BOJONEGORO DAN
+                                        SEKITARNYA"), which pushed the last chip off the right edge
+                                        and read as broken rather than as scrollable. Clamping the
+                                        label keeps every chip visible at once; the count never
+                                        truncates, and the full name stays in the tooltip. */}
+                                    <span className="max-w-[8.5rem] truncate">{facet.label}</span>
+                                    <span className="shrink-0 tabular-nums opacity-75">{facet.count}</span>
                                 </button>
                             );
                         })}
@@ -176,14 +195,18 @@ function PickerDialog({ cameras, selectedCamera, onPick, onClose }) {
                                 </h3>
                             )}
                             <div className="space-y-0.5">
-                                {group.cameras.map((camera) => (
-                                    <CameraRow
-                                        key={camera.id}
-                                        camera={camera}
-                                        isSelected={camera.id === selectedCamera?.id}
-                                        onPick={onPick}
-                                    />
-                                ))}
+                                {group.cameras.map((camera) => {
+                                    const isSelected = camera.id === selectedCamera?.id;
+                                    return (
+                                        <CameraRow
+                                            key={camera.id}
+                                            camera={camera}
+                                            isSelected={isSelected}
+                                            revealOnMount={isSelected && !narrowed}
+                                            onPick={onPick}
+                                        />
+                                    );
+                                })}
                             </div>
                         </section>
                     ))
@@ -213,10 +236,14 @@ export default function PlaybackCameraPicker({ cameras, selectedCamera, onCamera
                 className="flex w-full items-center gap-3 rounded-control border border-edge bg-surface p-2 text-left transition-colors hover:border-edge-strong disabled:cursor-not-allowed disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
                 <span className="relative aspect-video w-20 shrink-0 overflow-hidden rounded-control bg-surface-sunken">
+                    {/* priority: this is one always-visible image identifying the camera you are
+                        watching, so it should not queue behind lazy-loading heuristics the way the
+                        36 images inside the dialog rightly do. */}
                     <CameraThumbnail
                         thumbnailPath={selectedCamera?.external_snapshot_url || selectedCamera?.thumbnail_path}
                         thumbnailVersion={selectedCamera?.thumbnail_updated_at}
                         cameraName={selectedCamera?.name || 'Kamera'}
+                        priority
                     />
                 </span>
 
