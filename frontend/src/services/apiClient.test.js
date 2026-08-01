@@ -192,10 +192,24 @@ describe('apiClient session refresh under concurrency', () => {
         apiClient = module.default;
         notify = vi.fn();
         module.setNotificationCallback(notify);
+        // Only someone who WAS logged in can have a session expire; a public visitor never had one.
+        localStorage.setItem('user', JSON.stringify({ id: 1 }));
     });
 
     afterEach(() => {
         vi.restoreAllMocks();
+        localStorage.clear();
+    });
+
+    it('stays silent for a visitor who was never logged in', async () => {
+        // The public playback share link legitimately 401s on admin-only endpoints. Telling that
+        // visitor to "log in again" is false, and it appeared twice over their video.
+        localStorage.removeItem('user');
+        vi.spyOn(axios, 'post').mockRejectedValue({ response: { status: 401 } });
+
+        await Promise.allSettled([reject401('/api/a')]);
+
+        expect(notify.mock.calls.filter(([, title]) => title === 'Session Expired')).toHaveLength(0);
     });
 
     it('sends ONE refresh for three simultaneous 401s, not three', async () => {
@@ -229,7 +243,9 @@ describe('apiClient session refresh under concurrency', () => {
         await Promise.allSettled([reject401('/api/a')]);
         expect(notify.mock.calls.filter(([, t]) => t === 'Session Expired')).toHaveLength(1);
 
-        // A successful response means the session is alive again — silence would then be wrong.
+        // Logging back in: the first expiry cleared `user`, exactly as a real logout does, and a
+        // successful response means the new session is alive. Silence would then be wrong.
+        localStorage.setItem('user', JSON.stringify({ id: 1 }));
         const ok = apiClient.interceptors.response.handlers.find((h) => h?.fulfilled);
         ok.fulfilled({ status: 200, data: {} });
 

@@ -28,7 +28,7 @@ describe('usePlaybackTokenAccess', () => {
         window.localStorage.clear();
     });
 
-    it('activates share key with current camera id and exposes allowed cameras', async () => {
+    it('activates a share key WITHOUT a camera, and exposes the cameras it allows', async () => {
         const setSearchParams = vi.fn();
         playbackTokenService.activateShareKey.mockResolvedValue({
             success: true,
@@ -58,7 +58,14 @@ describe('usePlaybackTokenAccess', () => {
             default_camera_id: 3,
             allowed_camera_ids: [3],
         }));
-        expect(playbackTokenService.activateShareKey).toHaveBeenCalledWith('CLIENT88', 3, expect.any(String));
+        // No camera id. A share link grants the token's whole set; tying activation to whichever
+        // camera happened to be selected made an area-scoped link fail outright when the page
+        // opened on a camera outside that area. Per-camera scope is still enforced on every
+        // segment and stream request.
+        expect(playbackTokenService.activateShareKey).toHaveBeenCalledWith('CLIENT88', null, expect.any(String));
+        // And exactly once — the effect used to re-run when the camera list loaded, so the second
+        // attempt's failure overwrote the first attempt's success.
+        expect(playbackTokenService.activateShareKey).toHaveBeenCalledTimes(1);
         expect(setSearchParams).not.toHaveBeenCalled();
     });
 });

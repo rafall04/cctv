@@ -388,7 +388,10 @@ describe('Playback', () => {
         );
 
         await waitFor(() => {
-            expect(activateShareKeyMock).toHaveBeenCalledWith('SANDI1234', 1, expect.any(String));
+            // No camera id: a share link grants the token's whole set, so activation must not be
+            // judged against whichever camera happened to be selected. The default camera the
+            // token itself names is still honoured — asserted on the next line.
+            expect(activateShareKeyMock).toHaveBeenCalledWith('SANDI1234', null, expect.any(String));
         });
         await waitFor(() => {
             expect(getSegments).toHaveBeenCalledWith(2, 'blocking', {}, 'public_preview');

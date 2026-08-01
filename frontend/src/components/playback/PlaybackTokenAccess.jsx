@@ -120,10 +120,20 @@ export default function PlaybackTokenAccess({
             </div>
             {(message || tokenStatus) && (
                 <div className="mt-2 text-xs text-gray-600 dark:text-gray-300">
+                    {/*
+                      * The suffixes describe an ACTIVE token, so they may only follow the active
+                      * message. Appending them to an error produced sentences like "Token playback
+                      * tidak valid tanpa tanggal kedaluwarsa - Akses: 14 kamera", which reads as a
+                      * bizarre reason for the failure rather than as two unrelated facts.
+                      */}
                     {message || 'Token aktif'}
-                    {tokenStatus?.expires_at ? ` sampai ${tokenStatus.expires_at}` : tokenStatus ? ' tanpa tanggal kedaluwarsa' : ''}
-                    {tokenStatus && activeCameraCount > 0 ? ` - Akses: ${activeCameraCount} kamera` : ''}
-                    {tokenStatus && activeRuleWindow ? ` - Window: ${activeRuleWindow} jam terakhir` : ''}
+                    {!message && tokenStatus && (
+                        <>
+                            {tokenStatus.expires_at ? ` sampai ${tokenStatus.expires_at}` : ' tanpa tanggal kedaluwarsa'}
+                            {activeCameraCount > 0 ? ` - Akses: ${activeCameraCount} kamera` : ''}
+                            {activeRuleWindow ? ` - Window: ${activeRuleWindow} jam terakhir` : ''}
+                        </>
+                    )}
                 </div>
             )}
         </form>

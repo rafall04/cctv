@@ -6,7 +6,7 @@
  * SideEffects: Activates HttpOnly playback token/session cookies and sends session heartbeat.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import playbackTokenService from '../../services/playbackTokenService.js';
 
 const PLAYBACK_CLIENT_ID_KEY = 'raf_playback_client_id';
@@ -40,6 +40,8 @@ export function usePlaybackTokenAccess({
     const [tokenStatus, setTokenStatus] = useState(null);
     const [tokenMessage, setTokenMessage] = useState('');
     const [isTokenBusy, setIsTokenBusy] = useState(false);
+    /** The URL credential already activated, so a re-render cannot fire a second attempt. */
+    const activatedCredentialRef = useRef(null);
 
     const activateToken = useCallback(async (rawToken, { silent = false, mode = 'token', cameraIdOverride = null } = {}) => {
         const token = String(rawToken || '').trim();
@@ -98,12 +100,29 @@ export function usePlaybackTokenAccess({
         const urlToken = searchParams.get('token');
         const urlShareKey = searchParams.get('share');
         const accessValue = urlShareKey || urlToken;
-        if (!accessValue) {
+        if (!accessValue || activatedCredentialRef.current === accessValue) {
             return;
         }
+        activatedCredentialRef.current = accessValue;
 
-        activateToken(accessValue, { silent: true, mode: urlShareKey ? 'share' : 'token', cameraIdOverride: cameraId });
-    }, [activateToken, cameraId, enabled, searchParams]);
+        /*
+         * Deliberately WITHOUT a camera.
+         *
+         * A share link grants the token's whole set of cameras; it is not a claim about the camera
+         * that happens to be selected when the page loads. Passing one made the backend check scope
+         * against it (validateRawTokenForCamera throws "tidak mencakup kamera ini" for cameraId > 0),
+         * so an area-scoped link opened on a camera outside that area was rejected outright — the
+         * visitor fell back to the 10-minute public preview holding a perfectly valid link.
+         *
+         * Worse, this effect depended on `cameraId`: it re-ran once the camera list loaded, so the
+         * second attempt's failure overwrote the first attempt's success in the UI. That is the
+         * paired activated_share + activation_failed at the same second in the audit log.
+         *
+         * Nothing is loosened by dropping it — every segment and stream request re-checks the
+         * camera against the token independently.
+         */
+        activateToken(accessValue, { silent: true, mode: urlShareKey ? 'share' : 'token' });
+    }, [activateToken, enabled, searchParams]);
 
     useEffect(() => {
         if (!enabled || !tokenStatus) {

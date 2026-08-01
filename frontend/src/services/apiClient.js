@@ -127,6 +127,16 @@ function refreshSession() {
 let sessionExpiredReported = false;
 
 function handleSessionExpired(error) {
+    /*
+     * Only someone who WAS logged in can have a session expire. Public pages (the playback share
+     * link, the landing map) legitimately hit 401 on admin-only endpoints, and telling a visitor
+     * with no account to "log in again" is both false and alarming — it appeared twice over the
+     * video on a shared playback link.
+     */
+    if (!localStorage.getItem('user')) {
+        return Promise.reject(error);
+    }
+
     if (!sessionExpiredReported) {
         sessionExpiredReported = true;
         localStorage.removeItem('user');
