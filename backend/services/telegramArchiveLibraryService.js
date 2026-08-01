@@ -20,6 +20,7 @@ import fs from 'fs';
 import path from 'path';
 import { query, queryOne } from '../database/connectionPool.js';
 import archiveCache from './archiveCacheService.js';
+import { sanitizeCameraThumbnailList } from './thumbnailPathService.js';
 
 /*
  * The bot token lives in the SIDECAR's .env, not the backend's. Read it from there rather than
@@ -218,11 +219,16 @@ export function getSummary(filters = {}) {
     // back. Only the date range is applied, via a conditional SUM, so a camera with nothing in the
     // range still appears (showing 0) instead of vanishing out from under the selection.
     const dates = buildDateClause(filters);
+    // Area, location and thumbnail travel with each camera so the picker can group by area and show
+    // a picture — for a junction camera the picture identifies the spot faster than any name.
     const cameras = query(
         `SELECT u.camera_id, COALESCE(c.name, 'Kamera ' || u.camera_id) AS camera_name,
+                c.location, c.thumbnail_path, c.thumbnail_updated_at, c.external_snapshot_url,
+                a.name AS area_name,
                 SUM(CASE WHEN ${dates.clause} THEN 1 ELSE 0 END) AS segments
          FROM telegram_archive_uploads u
          LEFT JOIN cameras c ON c.id = u.camera_id
+         LEFT JOIN areas a ON a.id = c.area_id
          WHERE u.status = ?
          GROUP BY u.camera_id
          ORDER BY segments DESC`,
@@ -232,11 +238,20 @@ export function getSummary(filters = {}) {
         total: totals.total || 0,
         playable: totals.playable || 0,
         bytes: totals.bytes || 0,
-        cameras: cameras.map((row) => ({
+        // snake_case for the camera's own fields on purpose: these ARE camera rows, and the shared
+        // picker + its matching helpers read `area_name` / `thumbnail_path` like everywhere else.
+        // Thumbnails are sanitized so a camera whose file has been swept renders its fallback icon
+        // rather than a broken image.
+        cameras: sanitizeCameraThumbnailList(cameras.map((row) => ({
             id: row.camera_id,
             name: row.camera_name,
             segments: row.segments,
-        })),
+            location: row.location || null,
+            area_name: row.area_name || null,
+            thumbnail_path: row.thumbnail_path || null,
+            thumbnail_updated_at: row.thumbnail_updated_at || null,
+            external_snapshot_url: row.external_snapshot_url || null,
+        }))),
     };
 }
 

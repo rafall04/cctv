@@ -19,6 +19,7 @@ import { useNotification } from '../contexts/NotificationContext';
 import archiveLibrary from '../services/telegramArchiveLibraryService';
 import { Badge, Button, Field, IconButton, Modal, PageHeader } from '../components/ui';
 import ArchiveVideo from '../components/admin/archive/ArchiveVideo';
+import PlaybackCameraPicker from '../components/playback/PlaybackCameraPicker';
 import { TableSkeleton } from '../components/ui/Skeleton';
 import { buildTimeline, findSegmentAt, formatDuration, segmentWindow } from '../utils/admin/archiveTimeline';
 
@@ -223,9 +224,10 @@ export default function TelegramArchiveLibrary() {
     // Shown once in the sticky day header instead of on every row. The select that carries this
     // name scrolls away; the day header does not, so the context survives a long list without
     // costing a line per card.
-    const selectedCameraName = useMemo(() => (
-        cameraId ? cameras.find((camera) => String(camera.id) === String(cameraId))?.name || null : null
+    const selectedCamera = useMemo(() => (
+        cameraId ? cameras.find((camera) => String(camera.id) === String(cameraId)) || null : null
     ), [cameraId, cameras]);
+    const selectedCameraName = selectedCamera?.name || null;
     const notPlayable = Math.max((summary?.total ?? 0) - (summary?.playable ?? 0), 0);
 
     // Gaps are only meaningful along ONE camera's timeline. Across a mixed feed, a "hole" between
@@ -313,25 +315,28 @@ export default function TelegramArchiveLibrary() {
             )}
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-                <Field
-                    as="select"
-                    label="Kamera"
-                    value={cameraId}
-                    onChange={(e) => { setCameraId(e.target.value); setHighlighted(null); }}
-                    className="min-w-0 sm:flex-1 sm:max-w-sm"
-                >
-                    <option value="">Semua kamera · {totalAllCameras} segmen</option>
-                    {/*
-                      * The unit is spelled out. Android renders this select as a full-screen list,
-                      * where a bare "· 102" beside a camera name reads as an ID or a road number
-                      * as easily as a count.
-                      */}
-                    {cameras.map((camera) => (
-                        <option key={camera.id} value={camera.id}>
-                            {camera.name} · {camera.segments} segmen
-                        </option>
-                    ))}
-                </Field>
+                {/*
+                  * Not a native <select>. Android renders one as a full-screen radio list where
+                  * 30-character camera names wrap to three ragged lines — 31 of them, with no way
+                  * to narrow. The playback page already replaced its own select with this picker
+                  * for exactly that reason; reusing it means one behaviour to maintain, and an
+                  * operator who learns the picker once knows it on both pages.
+                  */}
+                <div className="min-w-0 sm:flex-1 sm:max-w-sm">
+                    <span className="mb-1.5 block text-xs font-semibold text-content-muted">Kamera</span>
+                    <PlaybackCameraPicker
+                        cameras={cameras}
+                        selectedCamera={selectedCamera}
+                        onCameraChange={(camera) => {
+                            setCameraId(camera ? String(camera.id) : '');
+                            setHighlighted(null);
+                        }}
+                        // Which camera HAS footage is the question here, so the count replaces the
+                        // location on each row.
+                        metaFor={(camera) => `${camera.segments ?? 0} segmen`}
+                        allOption={{ label: 'Semua kamera', meta: `${totalAllCameras} segmen` }}
+                    />
+                </div>
 
                 <Field
                     type="date"

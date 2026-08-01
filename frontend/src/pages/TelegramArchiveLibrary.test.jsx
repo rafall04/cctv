@@ -98,7 +98,12 @@ describe('TelegramArchiveLibrary row density', () => {
         await waitFor(() => expect(screen.getAllByRole('listitem').length).toBeGreaterThan(0));
 
         listUploads.mockResolvedValue({ items: [segment(1, CAMERA_NAME, 16)], total: 226 });
-        fireEvent.change(screen.getByLabelText('Kamera'), { target: { value: '16' } });
+        // The native <select> is gone: choosing a camera now means opening the picker dialog and
+        // tapping its row, the same gesture as on the playback page.
+        fireEvent.click(document.querySelector('[aria-haspopup="dialog"]'));
+        fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', {
+            name: new RegExp(CAMERA_NAME),
+        }));
 
         await waitFor(() => expect(listUploads).toHaveBeenCalledWith(
             expect.objectContaining({ cameraId: '16' }),

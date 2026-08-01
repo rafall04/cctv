@@ -58,9 +58,11 @@ function SearchIcon() {
     );
 }
 
-function CameraRow({ camera, isSelected, revealOnMount, onPick }) {
+function CameraRow({ camera, isSelected, revealOnMount, metaFor, onPick }) {
     const rowRef = useRef(null);
-    const location = distinctLocation(camera);
+    // The sub-line answers "which one is this?" — normally the location. The archive asks a
+    // different question ("does this camera even have footage?"), so it substitutes its own.
+    const location = metaFor ? metaFor(camera) : distinctLocation(camera);
 
     // Open the dialog already showing where you are. Without this, picking the 30th camera means
     // reopening the list at the top every time. Only until the visitor searches or picks an area —
@@ -104,7 +106,7 @@ function CameraRow({ camera, isSelected, revealOnMount, onPick }) {
     );
 }
 
-function PickerDialog({ cameras, selectedCamera, onPick, onClose }) {
+function PickerDialog({ cameras, selectedCamera, metaFor, allOption, onPick, onClose }) {
     const [query, setQuery] = useState('');
     const [area, setArea] = useState('all');
     /* Once the visitor narrows the list, the dialog stops being "where am I" and becomes "find me
@@ -182,6 +184,30 @@ function PickerDialog({ cameras, selectedCamera, onPick, onClose }) {
             </div>
 
             <div className="px-2 pb-3 pt-2">
+                {/*
+                  * "All cameras" is a row, not a chip: it is a CHOICE of what to list, the same kind
+                  * of choice as picking one camera, and it belongs where the eye already is. Hidden
+                  * once the visitor narrows, because "all" contradicts an active filter.
+                  */}
+                {allOption && !narrowed && (
+                    <button
+                        type="button"
+                        onClick={() => onPick(null)}
+                        aria-current={!selectedCamera ? 'true' : undefined}
+                        className={`mb-1 flex w-full items-center gap-3 rounded-control px-2 py-3 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                            !selectedCamera ? 'bg-primary/10 ring-1 ring-primary' : 'hover:bg-surface-raised'
+                        }`}
+                    >
+                        <span className="min-w-0 flex-1">
+                            <span className="block text-sm font-medium text-content">{allOption.label}</span>
+                            {allOption.meta && (
+                                <span className="mt-0.5 block truncate text-xs text-content-muted">{allOption.meta}</span>
+                            )}
+                        </span>
+                        {!selectedCamera && <CheckIcon />}
+                    </button>
+                )}
+
                 {matchCount === 0 ? (
                     <p className="px-2 py-8 text-center text-sm text-content-muted">
                         Tidak ada kamera yang cocok dengan pencarian itu.
@@ -205,6 +231,7 @@ function PickerDialog({ cameras, selectedCamera, onPick, onClose }) {
                                             camera={camera}
                                             isSelected={isSelected}
                                             revealOnMount={isSelected && !narrowed}
+                                            metaFor={metaFor}
                                             onPick={onPick}
                                         />
                                     );
@@ -218,13 +245,21 @@ function PickerDialog({ cameras, selectedCamera, onPick, onClose }) {
     );
 }
 
-export default function PlaybackCameraPicker({ cameras, selectedCamera, onCameraChange }) {
+/**
+ * @param {Function} [metaFor] (camera) => string — overrides the per-row sub-line. Defaults to the
+ *   camera's distinct location.
+ * @param {{label: string, meta?: string}} [allOption] adds an "everything" row that picks `null`.
+ *   Playback always watches exactly one camera and omits it; the archive can list them all.
+ */
+export default function PlaybackCameraPicker({
+    cameras, selectedCamera, onCameraChange, metaFor = null, allOption = null,
+}) {
     const [open, setOpen] = useState(false);
     const list = Array.isArray(cameras) ? cameras : [];
 
     const handlePick = (camera) => {
         setOpen(false);
-        if (camera?.id !== selectedCamera?.id) onCameraChange(camera);
+        if ((camera?.id ?? null) !== (selectedCamera?.id ?? null)) onCameraChange(camera);
     };
 
     return (
@@ -254,10 +289,15 @@ export default function PlaybackCameraPicker({ cameras, selectedCamera, onCamera
                         {list.length === 0 ? 'Kamera' : `Kamera · ${list.length} tersedia`}
                     </span>
                     <span className="line-clamp-2 text-sm font-semibold leading-snug text-content">
-                        {selectedCamera?.name || 'Belum ada kamera'}
+                        {/* With an all-option the empty selection is a real state ("everything"),
+                            not the "no cameras exist" it means on playback. */}
+                        {selectedCamera?.name || (allOption ? allOption.label : 'Belum ada kamera')}
                     </span>
                     {selectedCamera?.area_name && (
                         <span className="block truncate text-xs text-content-muted">{selectedCamera.area_name}</span>
+                    )}
+                    {!selectedCamera && allOption?.meta && (
+                        <span className="block truncate text-xs text-content-muted">{allOption.meta}</span>
                     )}
                 </span>
 
@@ -268,6 +308,8 @@ export default function PlaybackCameraPicker({ cameras, selectedCamera, onCamera
                 <PickerDialog
                     cameras={list}
                     selectedCamera={selectedCamera}
+                    metaFor={metaFor}
+                    allOption={allOption}
                     onPick={handlePick}
                     onClose={() => setOpen(false)}
                 />

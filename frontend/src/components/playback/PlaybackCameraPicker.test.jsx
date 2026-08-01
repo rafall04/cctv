@@ -198,3 +198,84 @@ describe('PlaybackCameraPicker dialog', () => {
         expect(screen.queryByRole('dialog')).toBeNull();
     });
 });
+
+/*
+ * The archive page reuses this picker rather than keeping its own native <select> — the same
+ * unreadable-on-Android list this component was built to replace. These two options are what let
+ * one component serve both pages without either bending to the other's needs.
+ */
+describe('PlaybackCameraPicker reuse options', () => {
+    it('keeps showing locations by default, so playback is untouched', () => {
+        const { rows } = openDialog();
+
+        expect(namesOf(rows()).join(' ')).toContain('SIMPANG 4 RAJEKWESI');
+    });
+
+    it('substitutes a caller-supplied sub-line, so the archive can answer "has footage?"', () => {
+        const { rows } = openDialog({ metaFor: (camera) => `${camera.id * 10} segmen` });
+        const text = namesOf(rows()).join(' ');
+
+        expect(text).toContain('10 segmen');
+        expect(text).toContain('40 segmen');
+        // The location it replaced must be gone, not merely joined by the count.
+        expect(text).not.toContain('SIMPANG 4 RAJEKWESI');
+    });
+
+    it('has no "all cameras" row unless the caller asks — playback watches exactly one', () => {
+        const { dialog } = openDialog();
+
+        expect(within(dialog).queryByText('Semua kamera')).toBeNull();
+    });
+
+    it('offers an "all cameras" row that reports null, not a camera', () => {
+        const { dialog, onCameraChange } = openDialog({
+            allOption: { label: 'Semua kamera', meta: '5717 segmen' },
+        });
+
+        expect(within(dialog).getByText('5717 segmen')).toBeTruthy();
+        fireEvent.click(within(dialog).getByRole('button', { name: /Semua kamera/ }));
+
+        expect(onCameraChange).toHaveBeenCalledWith(null);
+    });
+
+    it('hides the "all" row once the list is narrowed, where it would contradict the filter', () => {
+        const { dialog, search } = openDialog({ allOption: { label: 'Semua kamera' } });
+        expect(within(dialog).getByRole('button', { name: /Semua kamera/ })).toBeTruthy();
+
+        fireEvent.change(search, { target: { value: 'strawberry' } });
+
+        expect(within(dialog).queryByRole('button', { name: /Semua kamera/ })).toBeNull();
+    });
+
+    it('treats "nothing selected" as the all-state on the trigger, not as an empty fleet', () => {
+        render(
+            <PlaybackCameraPicker
+                cameras={CAMERAS}
+                selectedCamera={null}
+                onCameraChange={vi.fn()}
+                allOption={{ label: 'Semua kamera', meta: '5717 segmen' }}
+            />,
+        );
+
+        const trigger = screen.getAllByRole('button')[0];
+        expect(trigger.textContent).toContain('Semua kamera');
+        expect(trigger.textContent).not.toContain('Belum ada kamera');
+    });
+
+    it('reports a real pick made from the all-state', () => {
+        const onCameraChange = vi.fn();
+        render(
+            <PlaybackCameraPicker
+                cameras={CAMERAS}
+                selectedCamera={null}
+                onCameraChange={onCameraChange}
+                allOption={{ label: 'Semua kamera' }}
+            />,
+        );
+        fireEvent.click(screen.getAllByRole('button')[0]);
+        const dialog = screen.getByRole('dialog');
+        fireEvent.click(within(dialog).getByRole('button', { name: /WISATA STRAWBERRY/ }));
+
+        expect(onCameraChange).toHaveBeenCalledWith(CAMERAS[1]);
+    });
+});
