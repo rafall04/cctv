@@ -56,9 +56,6 @@ describe('usePlaybackViewerTracking', () => {
             segmentFilename: '20260502_100000.mp4',
             segmentStartedAt: '2026-05-02T10:00:00.000Z',
             accessMode: 'public_preview',
-            // Reported alongside the mode so analytics can attribute the view. Null here: this
-            // case is an anonymous preview, which is exactly when there is no token to name.
-            tokenId: null,
         });
     });
 

@@ -182,3 +182,23 @@ describe('PlaybackTokenTable actions', () => {
         expect(screen.getByText('Belum ada token playback.')).toBeTruthy();
     });
 });
+
+/*
+ * "berapa jam ke belakang" was configurable all along (playback_window_hours, enforced in
+ * recordingPlaybackService), but the card never showed it — so the only way to learn a token was
+ * capped to one hour was to open the edit form and read a field labelled "Window Jam".
+ */
+describe('PlaybackTokenTable reach limit', () => {
+    it('states how far back a capped token may reach', () => {
+        setup({ tokens: [{ ...ACTIVE, playback_window_hours: 24 }] });
+
+        expect(screen.getByText('Maks. mundur')).toBeTruthy();
+        expect(screen.getByText('24 jam terakhir')).toBeTruthy();
+    });
+
+    it('says "Semua rekaman" when the token is uncapped, rather than leaving it blank', () => {
+        setup({ tokens: [{ ...ACTIVE, playback_window_hours: null }] });
+
+        expect(screen.getByText('Semua rekaman')).toBeTruthy();
+    });
+});

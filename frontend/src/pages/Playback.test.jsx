@@ -1283,7 +1283,6 @@ describe('Playback', () => {
                 segmentFilename: 'seg-2.mp4',
                 segmentStartedAt: '2026-03-05T10:20:00.000Z',
                 accessMode: 'public_preview',
-                tokenId: null,
             });
         });
     });
@@ -1339,7 +1338,6 @@ describe('Playback', () => {
             segmentFilename: 'seg-1.mp4',
             segmentStartedAt: '2026-03-05T10:00:00.000Z',
             accessMode: 'public_preview',
-            tokenId: null,
         });
     });
 

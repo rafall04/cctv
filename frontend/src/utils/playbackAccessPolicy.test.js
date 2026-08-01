@@ -42,25 +42,24 @@ describe('playbackAccessPolicy', () => {
 describe('resolveViewerTrackingScope', () => {
     it('reports the server-resolved mode over the page prop', () => {
         expect(resolveViewerTrackingScope({ accessMode: 'token_full', tokenId: 7 }, 'public_preview'))
-            .toEqual({ accessScope: 'token_full', tokenId: 7 });
+            // Only the mode travels; WHICH token is decided server-side from the request cookie.
+            .toEqual({ accessScope: 'token_full' });
     });
 
     it('falls back to the page prop until the policy has arrived', () => {
         // First paint has no policy yet; reporting nothing would lose the session entirely.
-        expect(resolveViewerTrackingScope(null, 'public_preview'))
-            .toEqual({ accessScope: 'public_preview', tokenId: null });
-        expect(resolveViewerTrackingScope(undefined, 'admin_full'))
-            .toEqual({ accessScope: 'admin_full', tokenId: null });
+        expect(resolveViewerTrackingScope(null, 'public_preview')).toEqual({ accessScope: 'public_preview' });
+        expect(resolveViewerTrackingScope(undefined, 'admin_full')).toEqual({ accessScope: 'admin_full' });
     });
 
     it('carries no token for a genuinely anonymous preview', () => {
         expect(resolveViewerTrackingScope({ accessMode: 'public_preview' }, 'public_preview'))
-            .toEqual({ accessScope: 'public_preview', tokenId: null });
+            .toEqual({ accessScope: 'public_preview' });
     });
 
     it('keeps admin views attributed to admin, not to a token', () => {
         expect(resolveViewerTrackingScope({ accessMode: 'admin_full', tokenId: null }, 'public_preview'))
-            .toEqual({ accessScope: 'admin_full', tokenId: null });
+            .toEqual({ accessScope: 'admin_full' });
     });
 
     it('exposes token_full as a real scope, which was the missing one', () => {

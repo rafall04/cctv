@@ -21,17 +21,16 @@ export function usePlaybackViewerTracking({
     cameraId,
     segment,
     accessScope,
-    tokenId = null,
 }) {
     const activeSessionIdRef = useRef(null);
     const activeKeyRef = useRef(null);
     const pendingKeyRef = useRef(null);
     const pendingTokenRef = useRef(0);
-    const latestRef = useRef({ cameraId, segment, accessScope, tokenId });
+    const latestRef = useRef({ cameraId, segment, accessScope });
 
     useEffect(() => {
-        latestRef.current = { cameraId, segment, accessScope, tokenId };
-    }, [accessScope, cameraId, segment, tokenId]);
+        latestRef.current = { cameraId, segment, accessScope };
+    }, [accessScope, cameraId, segment]);
 
     const stopSession = useCallback(async () => {
         const activeSessionId = activeSessionIdRef.current;
@@ -75,9 +74,6 @@ export function usePlaybackViewerTracking({
                 segmentFilename: current.segment.filename,
                 segmentStartedAt: current.segment.start_time || null,
                 accessMode: current.accessScope,
-                // The token that unlocked this footage, so analytics can answer "what did THIS
-                // token holder watch" instead of lumping them in with anonymous viewers.
-                tokenId: current.tokenId || null,
             });
 
             const latest = latestRef.current;

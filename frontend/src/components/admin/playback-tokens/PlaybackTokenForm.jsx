@@ -47,8 +47,14 @@ export default function PlaybackTokenForm({
                 </label>
                 <div className="grid grid-cols-2 gap-3">
                     <label className="block">
-                        <span className="mb-1 block text-sm font-medium text-content-muted">Window Jam</span>
-                        <input type="number" min="1" value={form.playback_window_hours} onChange={(event) => onUpdateForm('playback_window_hours', event.target.value)} placeholder="Kosong = full" className="w-full rounded-lg border border-edge-strong px-3 py-2 text-sm dark:bg-gray-950 dark:text-white" />
+                        {/*
+                          * "Window Jam" meant nothing to the operator who owns this form — it was
+                          * read as a time window to schedule, not as how far back the footage may
+                          * be reached. Same field, same behaviour; it just says what it does now.
+                          */}
+                        <span className="mb-1 block text-sm font-medium text-content-muted">Maksimal mundur (jam)</span>
+                        <input type="number" min="1" value={form.playback_window_hours} onChange={(event) => onUpdateForm('playback_window_hours', event.target.value)} placeholder="Kosong = semua rekaman" className="w-full rounded-lg border border-edge-strong px-3 py-2 text-sm dark:bg-gray-950 dark:text-white" />
+                        <span className="mt-1 block text-xs text-content-subtle">Mis. 24 = hanya rekaman 24 jam terakhir.</span>
                     </label>
                     <label className="block">
                         <span className="mb-1 block text-sm font-medium text-content-muted">Expired</span>
@@ -134,7 +140,7 @@ export default function PlaybackTokenForm({
                                 </label>
                                 {selectedCameraIds.has(camera.id) && (
                                     <div className="mt-2 grid gap-2 sm:grid-cols-3">
-                                        <input type="number" min="1" placeholder="Window jam" value={form.camera_rules[camera.id]?.playback_window_hours || ''} onChange={(event) => onUpdateCameraRule(camera.id, 'playback_window_hours', event.target.value)} className="rounded-lg border border-edge-strong px-2 py-1 text-xs dark:bg-gray-950 dark:text-white" />
+                                        <input type="number" min="1" placeholder="Maks. mundur (jam)" value={form.camera_rules[camera.id]?.playback_window_hours || ''} onChange={(event) => onUpdateCameraRule(camera.id, 'playback_window_hours', event.target.value)} className="rounded-lg border border-edge-strong px-2 py-1 text-xs dark:bg-gray-950 dark:text-white" />
                                         <input type="datetime-local" value={form.camera_rules[camera.id]?.expires_at || ''} onChange={(event) => onUpdateCameraRule(camera.id, 'expires_at', event.target.value)} className="rounded-lg border border-edge-strong px-2 py-1 text-xs dark:bg-gray-950 dark:text-white" />
                                         <input placeholder="Catatan" value={form.camera_rules[camera.id]?.note || ''} onChange={(event) => onUpdateCameraRule(camera.id, 'note', event.target.value)} className="rounded-lg border border-edge-strong px-2 py-1 text-xs dark:bg-gray-950 dark:text-white" />
                                     </div>

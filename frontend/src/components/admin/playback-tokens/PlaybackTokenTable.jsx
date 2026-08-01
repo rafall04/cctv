@@ -76,7 +76,7 @@ function TokenEditFields({
                                 </label>
                                 {selectedEditCameraIds.has(camera.id) && (
                                     <div className="mt-1 grid gap-1 sm:grid-cols-2">
-                                        <input type="number" min="1" placeholder="Window jam" value={editForm.camera_rules[camera.id]?.playback_window_hours || ''} onChange={(event) => onUpdateEditCameraRule(camera.id, 'playback_window_hours', event.target.value)} className="rounded-control border border-edge-strong bg-surface px-2 py-1 text-xs text-content" />
+                                        <input type="number" min="1" placeholder="Maks. mundur (jam)" value={editForm.camera_rules[camera.id]?.playback_window_hours || ''} onChange={(event) => onUpdateEditCameraRule(camera.id, 'playback_window_hours', event.target.value)} className="rounded-control border border-edge-strong bg-surface px-2 py-1 text-xs text-content" />
                                         <input placeholder="Catatan" value={editForm.camera_rules[camera.id]?.note || ''} onChange={(event) => onUpdateEditCameraRule(camera.id, 'note', event.target.value)} className="rounded-control border border-edge-strong bg-surface px-2 py-1 text-xs text-content" />
                                     </div>
                                 )}
@@ -147,6 +147,11 @@ function TokenCard({
                 ) : (
                     <dl className="space-y-1.5">
                         <Detail label="Akses">{scopeLabel(token)}</Detail>
+                        {/* How far back this token may reach. Invisible before, so the only way to
+                            know a token was capped to 1 hour was to open the edit form. */}
+                        <Detail label="Maks. mundur">
+                            {token.playback_window_hours ? `${token.playback_window_hours} jam terakhir` : 'Semua rekaman'}
+                        </Detail>
                         <Detail label="Berlaku">{formatTokenDate(token.expires_at)}</Detail>
                         <Detail label="Sesi">{formatPlaybackTokenSessionPolicy(token)}</Detail>
                         <Detail label="Timeout">{token.session_timeout_seconds || 60} detik</Detail>

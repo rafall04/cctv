@@ -45,14 +45,15 @@ export const DEFAULT_ADMIN_PLAYBACK_POLICY = {
  * the same question and is therefore the honest answer. Preferring the prop is what filed every
  * token view as anonymous, leaving production with 134 "public" sessions and zero token ones.
  *
- * @param {{accessMode?: string, tokenId?: number|null}|null} playbackPolicy resolved by the backend
+ * Only the MODE travels to the server. Which token it was is derived there from the request's own
+ * playback cookie — a client-supplied token id would let any visitor attribute their viewing to
+ * someone else's token, in the very data an operator uses to judge who watched what.
+ *
+ * @param {{accessMode?: string}|null} playbackPolicy resolved by the backend
  * @param {string} fallbackScope the page's static scope, used before the policy arrives
  */
 export function resolveViewerTrackingScope(playbackPolicy, fallbackScope) {
-    return {
-        accessScope: playbackPolicy?.accessMode || fallbackScope,
-        tokenId: playbackPolicy?.tokenId || null,
-    };
+    return { accessScope: playbackPolicy?.accessMode || fallbackScope };
 }
 
 export function isAdminPlaybackScope(accessScope) {

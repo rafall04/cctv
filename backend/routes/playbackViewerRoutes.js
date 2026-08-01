@@ -25,7 +25,10 @@ export default async function playbackViewerRoutes(fastify) {
                     },
                     segmentFilename: { type: 'string', minLength: 1 },
                     segmentStartedAt: { type: 'string' },
-                    accessMode: { type: 'string', enum: ['public_preview', 'admin_full'] },
+                    // token_full was missing here, so once the client started reporting it the
+                    // whole request was rejected with 400 and the session vanished — the very
+                    // viewers we wanted to attribute stopped being recorded at all.
+                    accessMode: { type: 'string', enum: ['public_preview', 'token_full', 'admin_full'] },
                 },
             },
         },
