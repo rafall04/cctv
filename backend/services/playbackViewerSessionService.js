@@ -15,7 +15,10 @@ const SESSION_TIMEOUT = 15;
 const CLEANUP_INTERVAL = 60000;
 const HISTORY_RETENTION_DAYS = 90;
 const RETENTION_RUN_INTERVAL_MS = 6 * 60 * 60 * 1000;
-const PLAYBACK_ACCESS_MODES = new Set(['public_preview', 'admin_full']);
+// token_full was missing, and normalizeAccessMode silently rewrote it to 'public_preview' — so a
+// token holder's view was filed as anonymous and Playback Analytics counted paying viewers as
+// public preview. On production that produced 134 "public" sessions and 0 token ones.
+const PLAYBACK_ACCESS_MODES = new Set(['public_preview', 'token_full', 'admin_full']);
 
 function getDate() {
     return getLocalDate();
@@ -95,8 +98,10 @@ function buildHistoryFilters({
 
     if (typeof search === 'string' && search.trim()) {
         const likeValue = `%${search.trim()}%`;
-        clauses.push('AND (camera_name LIKE ? OR segment_filename LIKE ? OR ip_address LIKE ? OR COALESCE(admin_username, \'\') LIKE ?)');
-        params.push(likeValue, likeValue, likeValue, likeValue);
+        // token_label included: searching by the token's name is the whole reason it is stored,
+        // and it is what answers "show me everything this customer watched".
+        clauses.push('AND (camera_name LIKE ? OR segment_filename LIKE ? OR ip_address LIKE ? OR COALESCE(admin_username, \'\') LIKE ? OR COALESCE(token_label, \'\') LIKE ?)');
+        params.push(likeValue, likeValue, likeValue, likeValue, likeValue);
     }
 
     return {
@@ -112,6 +117,7 @@ function resolveHistorySort(sortBy = 'started_at', sortDirection = 'desc') {
         playback_access_mode: 'playback_access_mode',
         ip_address: 'ip_address',
         admin_username: 'admin_username',
+        token_label: 'token_label',
         device_type: 'device_type',
         started_at: 'started_at',
         ended_at: 'ended_at',
@@ -196,9 +202,11 @@ class PlaybackViewerSessionService {
                 device_type,
                 admin_user_id,
                 admin_username,
+                token_id,
+                token_label,
                 started_at,
                 last_heartbeat
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [
             sessionId,
             payload.cameraId,
@@ -211,6 +219,9 @@ class PlaybackViewerSessionService {
             deviceType,
             payload.adminUserId || null,
             payload.adminUsername || null,
+            payload.tokenId || null,
+            // Copied, not joined: the history of what was watched has to outlive a deleted token.
+            payload.tokenLabel || null,
             timestamp,
             timestamp,
         ]);
@@ -261,10 +272,12 @@ class PlaybackViewerSessionService {
                 device_type,
                 admin_user_id,
                 admin_username,
+                token_id,
+                token_label,
                 started_at,
                 ended_at,
                 duration_seconds
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [
             session.camera_id,
             session.camera_name,
@@ -276,6 +289,8 @@ class PlaybackViewerSessionService {
             session.device_type,
             session.admin_user_id,
             session.admin_username,
+            session.token_id,
+            session.token_label,
             session.started_at,
             timestamp,
             durationSeconds,
@@ -410,6 +425,8 @@ class PlaybackViewerSessionService {
                 device_type,
                 admin_user_id,
                 admin_username,
+                token_id,
+                token_label,
                 started_at,
                 ended_at,
                 duration_seconds
@@ -471,6 +488,8 @@ class PlaybackViewerSessionService {
                 device_type,
                 admin_user_id,
                 admin_username,
+                token_id,
+                token_label,
                 started_at,
                 ended_at,
                 duration_seconds
@@ -610,6 +629,8 @@ class PlaybackViewerSessionService {
                 device_type,
                 admin_user_id,
                 admin_username,
+                token_id,
+                token_label,
                 started_at,
                 ended_at,
                 duration_seconds

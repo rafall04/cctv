@@ -294,6 +294,7 @@ export default function PlaybackAnalytics() {
                 fields={[
                     { label: 'Kamera', key: 'camera_name' },
                     { label: 'Segment', key: 'segment_filename' },
+                    { label: 'Token', key: 'token_label' },
                     { label: 'Mode Akses', key: 'playback_access_mode' },
                     { label: 'Viewer / IP', key: 'ip_address' },
                     { label: 'Admin', key: 'admin_username' },
@@ -389,6 +390,11 @@ export default function PlaybackAnalytics() {
                                     <div className="mt-2 text-xs text-content-muted">
                                         {session.ip_address} • {formatDateTime(session.started_at, { storage: TIMESTAMP_STORAGE.LOCAL_SQL })} • {formatWatchTime(session.duration_seconds)}
                                     </div>
+                                    {/* Which token unlocked it. Before this existed, a token
+                                        holder's view was indistinguishable from an anonymous one. */}
+                                    {session.token_label && (
+                                        <div className="mt-1 text-xs font-medium text-primary">Token: {session.token_label}</div>
+                                    )}
                                 </button>
                             ))}
                         </div>
@@ -422,6 +428,9 @@ export default function PlaybackAnalytics() {
                                             <div>Durasi: {formatWatchTime(session.duration_seconds || session.durationSeconds || 0)}</div>
                                             {(session.admin_username || session.adminUsername) && (
                                                 <div>Admin: {session.admin_username || session.adminUsername}</div>
+                                            )}
+                                            {(session.token_label || session.tokenLabel) && (
+                                                <div>Token: {session.token_label || session.tokenLabel}</div>
                                             )}
                                         </div>
                                     </div>

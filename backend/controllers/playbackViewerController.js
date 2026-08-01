@@ -1,8 +1,29 @@
 import playbackViewerSessionService from '../services/playbackViewerSessionService.js';
+import playbackTokenService from '../services/playbackTokenService.js';
 import cameraService from '../services/cameraService.js';
 
 function normalizeAccessMode(value) {
     return value === 'admin_full' ? 'admin_full' : 'public_preview';
+}
+
+/**
+ * Which playback token, if any, actually unlocked this camera for this request.
+ *
+ * Derived from the request's own playback cookie, NOT from anything the client sent. A body field
+ * would let any visitor attribute their viewing to someone else's token — and this feeds the
+ * analytics an operator uses to decide who is watching what.
+ *
+ * `touch: false` because this is bookkeeping, not an access event; the access itself is already
+ * recorded where the footage is served.
+ */
+function resolveViewerToken(request, cameraId) {
+    try {
+        const token = playbackTokenService.validateRequestForCamera(request, cameraId, { touch: false });
+        return token ? { id: token.id, label: token.label || null } : null;
+    } catch {
+        // 401/403 simply mean "no usable token on this request" — a public preview, not an error.
+        return null;
+    }
 }
 
 export async function startPlaybackViewerSession(request, reply) {
@@ -30,14 +51,21 @@ export async function startPlaybackViewerSession(request, reply) {
             return reply.code(400).send({ success: false, message: 'Camera is disabled' });
         }
 
+        // A valid token outranks whatever the client claimed: it is server-verified, so it is the
+        // honest answer for both the mode and the attribution.
+        const token = accessMode === 'admin_full' ? null : resolveViewerToken(request, cameraId);
+        const effectiveMode = token ? 'token_full' : accessMode;
+
         const sessionId = playbackViewerSessionService.startSession({
             cameraId,
             cameraName: camera.name,
             segmentFilename,
             segmentStartedAt,
-            accessMode,
-            adminUserId: accessMode === 'admin_full' ? request.user?.id || null : null,
-            adminUsername: accessMode === 'admin_full' ? request.user?.username || null : null,
+            accessMode: effectiveMode,
+            adminUserId: effectiveMode === 'admin_full' ? request.user?.id || null : null,
+            adminUsername: effectiveMode === 'admin_full' ? request.user?.username || null : null,
+            tokenId: token?.id || null,
+            tokenLabel: token?.label || null,
         }, request);
 
         return reply.send({

@@ -22,7 +22,7 @@ import GlobalAdScript from '../components/ads/GlobalAdScript';
 import InlineAdSlot from '../components/ads/InlineAdSlot';
 import { isAdsMobileViewport, shouldRenderAdSlot } from '../components/ads/adsConfig.js';
 import { getStreamCapabilities } from '../utils/cameraDelivery.js';
-import { isAdminPlaybackScope, PLAYBACK_ACCESS_SCOPES } from '../utils/playbackAccessPolicy.js';
+import { isAdminPlaybackScope, PLAYBACK_ACCESS_SCOPES, resolveViewerTrackingScope } from '../utils/playbackAccessPolicy.js';
 
 import PlaybackHeader from '../components/playback/PlaybackHeader';
 import PlaybackVideo from '../components/playback/PlaybackVideo';
@@ -265,7 +265,7 @@ function Playback({
     } = usePlaybackViewerTracking({
         cameraId: selectedCameraId,
         segment: selectedSegment,
-        accessScope,
+        ...resolveViewerTrackingScope(playbackPolicy, accessScope),
     });
 
     // Keep refs in sync

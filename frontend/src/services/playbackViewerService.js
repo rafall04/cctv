@@ -8,13 +8,14 @@ class PlaybackViewerService {
         this.heartbeatInterval = null;
     }
 
-    async startSession({ cameraId, segmentFilename, segmentStartedAt = null, accessMode = 'public_preview' }) {
+    async startSession({ cameraId, segmentFilename, segmentStartedAt = null, accessMode = 'public_preview', tokenId = null }) {
         try {
             const response = await apiClient.post('/api/playback-viewer/start', {
                 cameraId,
                 segmentFilename,
                 segmentStartedAt,
                 accessMode,
+                tokenId,
             });
 
             if (!response.data?.success) {

@@ -18,7 +18,6 @@ import { existsSync, statSync } from 'fs';
 import { isSafeRecordingFilePath } from './recordingPathSafetyPolicy.js';
 import { RECORDINGS_BASE_PATH } from './recordingPaths.js';
 import archivedSegmentSourceService from './archivedSegmentSourceService.js';
-import { recordSegmentWatch } from './playbackSegmentAuditService.js';
 
 const PUBLIC_PLAYBACK_MODES = new Set(['inherit', 'disabled', 'preview_only', 'admin_only']);
 const VALID_PREVIEW_MINUTES = new Set([0, 10, 20, 30, 60]);
@@ -577,16 +576,6 @@ class RecordingPlaybackService {
         }
 
         const stats = statSync(segment.file_path);
-
-        // Logged only after every access check has passed, so the trail records footage actually
-        // served rather than attempts. De-duplicated per clip inside the service: a video element
-        // issues many Range requests for one file.
-        recordSegmentWatch({
-            tokenId: access.tokenId || null,
-            cameraId,
-            segment,
-            request,
-        });
 
         return {
             segment: {
