@@ -11,6 +11,19 @@ package-lock.json
 yarn.lock
 pnpm-lock.yaml
 
+# ...except the frontend's, which CI installs from.
+#
+# With the lockfile ignored, `npm install` on a CI runner re-resolves every dependency from scratch
+# on every run, so no two runs are guaranteed to use the same versions and a green run proves
+# nothing about the next one. That is how c40a7f8 failed CI at `npm run build` and `npm test` while
+# the same commit passed lint, build AND test on Linux + Node 20.20.2 (the runner's own version)
+# with a fresh install, and passed on Windows twice.
+#
+# The committed lockfile was generated on Linux/Node 20 from that verified tree; it is v3, so it
+# records the win32/darwin/linux platform packages too and stays usable on every dev machine.
+# Regenerate it deliberately (`npm install`, commit the diff) — never let it drift silently.
+!frontend/package-lock.json
+
 # Environment variables
 .env
 .env.local

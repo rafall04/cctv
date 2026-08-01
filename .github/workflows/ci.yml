@@ -46,9 +46,25 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - run: npm install
+      # `npm ci`, not `npm install`: the lockfile is committed for exactly this reason. With it
+      # ignored, every run re-resolved every dependency, so a green run said nothing about the next.
+      - run: npm ci
       - run: npm run lint
-      - run: npm test
+      - name: Test
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee /tmp/frontend-test.log
+      # Job logs need an authenticated session to read; the run summary does not. Putting the tail
+      # of the failure here makes it readable (and screenshottable) by whoever hits it.
+      - name: Surface the failure in the run summary
+        if: failure()
+        run: |
+          {
+            echo '### Frontend (lint + test) failure'
+            echo '```'
+            tail -150 /tmp/frontend-test.log 2>/dev/null || echo 'No test log — it failed before the tests ran (npm ci or lint).'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
   e2e:
     # Real-browser overflow smoke (e2e/overflow.spec.js): asserts no public page can
@@ -65,7 +81,28 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - run: npm install
-      - run: npm run build
+      - run: npm ci
+      - name: Build
+        run: |
+          set -o pipefail
+          npm run build 2>&1 | tee /tmp/e2e-build.log
       - run: npx playwright install --with-deps chromium
-      - run: npm run test:e2e
+      - name: Overflow smoke
+        run: |
+          set -o pipefail
+          npm run test:e2e 2>&1 | tee /tmp/e2e-test.log
+      # Same reasoning as the frontend job: the run summary is readable without a session.
+      - name: Surface the failure in the run summary
+        if: failure()
+        run: |
+          {
+            echo '### e2e (mobile overflow smoke) failure'
+            echo '#### build'
+            echo '```'
+            tail -60 /tmp/e2e-build.log 2>/dev/null || echo 'No build log — it failed at npm ci.'
+            echo '```'
+            echo '#### test'
+            echo '```'
+            tail -120 /tmp/e2e-test.log 2>/dev/null || echo 'No test log — it failed before the tests ran.'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
