@@ -147,6 +147,16 @@ body {
          * canvas themed, the same slip degrades quietly instead of screaming.
          */
         background-color: rgb(var(--surface-sunken));
+        /*
+         * Pair the foreground with it. Theming only the background was half a decision: the canvas
+         * followed the theme while text fell back to the browser default black, so ANY element that
+         * did not name its own colour became black-on-dark in dark mode. Measured on prod, an access
+         * key rendered #000 on #08090b — contrast 1.05 against the 4.5 WCAG AA asks for, i.e. gone.
+         *
+         * Nothing changes in light mode (--content is near-black there, which is what was inherited
+         * anyway); dark mode simply stops being a trap for every element that omits a text class.
+         */
+        color: rgb(var(--content));
         /* Second line of defence next to the html rule above. */
         overflow-x: clip;
     }

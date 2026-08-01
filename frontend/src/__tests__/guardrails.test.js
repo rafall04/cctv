@@ -352,3 +352,43 @@ describe('guardrail: only real semantic tokens (typo-proofing)', () => {
         ).toEqual([]);
     });
 });
+
+describe('guardrail: a themed canvas must theme its text too', () => {
+    /*
+     * The bug this exists to prevent, in full, because it cost real time to find:
+     *
+     * `@layer base { body { background-color: rgb(var(--surface-sunken)); } }` themed the canvas but
+     * said nothing about colour, so text fell back to the browser default black. Every element that
+     * did not name its own text colour therefore inherited black — invisible on a dark canvas. It
+     * stayed hidden for months because almost every component happens to carry a `text-*` class; the
+     * one <code> that did not rendered #000 on #08090b, contrast 1.05 where WCAG AA wants 4.5.
+     *
+     * The rule is deliberately about PAIRING, not about specific values. Theming one half of the
+     * foreground/background pair is the mistake; which token you pick is a design decision.
+     */
+    // fs directly: the `read` helper above is scoped to another describe block.
+    const css = fs.readFileSync(path.join(SRC_ROOT, 'index.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+
+    const bodyRules = [...css.matchAll(/body\s*\{([^}]*)\}/g)].map((m) => m[1]).join('\n');
+
+    it('body sets a themed foreground wherever it sets a themed background', () => {
+        const themedBg = /background-color:\s*rgb\(var\(--surface/.test(bodyRules);
+        const themedFg = /(^|[^-])color:\s*rgb\(var\(--content/.test(bodyRules);
+
+        expect(
+            themedBg && !themedFg,
+            '\nbody themes its background but not its text colour.\n'
+            + 'Everything that omits a text-* class will inherit the browser default (black) and\n'
+            + 'disappear on the dark canvas. Add `color: rgb(var(--content));` next to it.\n',
+        ).toBe(false);
+    });
+
+    it('body does not hard-code a literal text colour', () => {
+        // A literal here re-creates the same trap from the other direction: it cannot follow the theme.
+        const literal = bodyRules.match(/(^|[^-])color:\s*(#[0-9a-f]{3,8}|black|white|rgb\(\s*\d)/i);
+        expect(
+            literal ? literal[0].trim() : null,
+            '\nbody hard-codes a text colour, so it cannot follow the theme. Use rgb(var(--content)).\n',
+        ).toBe(null);
+    });
+});
