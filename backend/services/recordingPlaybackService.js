@@ -218,6 +218,11 @@ class RecordingPlaybackService {
                 enabled,
                 enable_recording,
                 owner_user_id,
+                -- area_id decides AREA-scoped token access. Its absence here made this row reach
+                -- the token validator with area_id undefined, so every area token was denied for
+                -- every camera — and resolvePlaybackAccess swallows that 403 and silently serves
+                -- the public preview instead, which is why it looked like nothing was wrong.
+                area_id,
                 CASE
                     WHEN camera_class IN ('community', 'owner_private', 'subscriber') THEN camera_class
                     ELSE 'community'
