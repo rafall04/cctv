@@ -53,14 +53,52 @@ function telegramConfig() {
     };
 }
 
-/** Rows the archive page lists, newest first, optionally narrowed to one camera. */
-export function listUploads({ cameraId = null, status = 'ok', limit = 100, offset = 0 } = {}) {
+/**
+ * Shared WHERE for listing and counting, so the "load more" button can never disagree with the
+ * rows it is paging through.
+ *
+ * `from`/`to` filter on recorded_at — when the footage happened, which is what an operator is
+ * actually looking for. It is stored as a fixed-format ISO-8601 UTC string, so a plain string
+ * comparison against ISO bounds orders correctly. The CALLER converts the operator's local date
+ * into those UTC bounds; doing it here would silently assume the server's timezone.
+ */
+function buildUploadFilter({ cameraId = null, status = 'ok', from = null, to = null }) {
     const where = ['u.status = ?'];
     const params = [status];
     if (cameraId) {
         where.push('u.camera_id = ?');
         params.push(cameraId);
     }
+    if (from) {
+        where.push('u.recorded_at >= ?');
+        params.push(from);
+    }
+    if (to) {
+        where.push('u.recorded_at <= ?');
+        params.push(to);
+    }
+    return { clause: where.join(' AND '), params };
+}
+
+/**
+ * How many rows match — the page needs it to know whether "load more" has anything left, and to
+ * tell the operator how deep the archive actually goes. Without it the UI can only guess, which is
+ * exactly how the list silently stopped at the newest 100 rows while 4,932 sat behind it.
+ */
+export function countUploads(filters = {}) {
+    const { clause, params } = buildUploadFilter(filters);
+    const row = queryOne(
+        `SELECT COUNT(*) AS total FROM telegram_archive_uploads u WHERE ${clause}`,
+        params,
+    );
+    return row?.total ?? 0;
+}
+
+/** Rows the archive page lists, newest first, optionally narrowed to one camera and date range. */
+export function listUploads({
+    cameraId = null, status = 'ok', limit = 100, offset = 0, from = null, to = null,
+} = {}) {
+    const { clause, params } = buildUploadFilter({ cameraId, status, from, to });
     // Only rows that actually carry a file_id can be played back; the rest predate the uploader
     // recording it and are listed by the caller separately if wanted.
     const rows = query(
@@ -70,10 +108,10 @@ export function listUploads({ cameraId = null, status = 'ok', limit = 100, offse
          FROM telegram_archive_uploads u
          LEFT JOIN cameras c ON c.id = u.camera_id
          LEFT JOIN areas a ON a.id = c.area_id
-         WHERE ${where.join(' AND ')}
+         WHERE ${clause}
          ORDER BY u.uploaded_at DESC
          LIMIT ? OFFSET ?`,
-        [...params, Math.min(Number(limit) || 100, 500), Number(offset) || 0],
+        [...params, Math.min(Number(limit) || 100, 500), Math.max(Number(offset) || 0, 0)],
     );
 
     return rows.map((row) => ({

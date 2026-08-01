@@ -85,31 +85,64 @@ function SegmentRow({ row, win, highlighted, onPlay }) {
     );
 }
 
+// One request covers ~33 minutes of a 30-camera fleet, or ~2 weeks of a single camera. Big enough
+// that browsing rarely needs a second click, small enough to stay under the backend's 500 cap.
+const PAGE_SIZE = 200;
+
 export default function TelegramArchiveLibrary() {
     const { error: notifyError, warning: notifyWarning } = useNotification();
     const [summary, setSummary] = useState(null);
     const [rows, setRows] = useState([]);
+    const [total, setTotal] = useState(0);
     const [cameraId, setCameraId] = useState('');
+    const [from, setFrom] = useState('');
+    const [to, setTo] = useState('');
     const [jumpTo, setJumpTo] = useState('');
     const [highlighted, setHighlighted] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
     const [playing, setPlaying] = useState(null);
+
+    const filters = useMemo(() => ({
+        cameraId: cameraId || undefined,
+        from: archiveLibrary.dayBounds(from, 'start'),
+        to: archiveLibrary.dayBounds(to, 'end'),
+    }), [cameraId, from, to]);
 
     const load = useCallback(async () => {
         setLoading(true);
         try {
-            const [sum, list] = await Promise.all([
+            const [sum, page] = await Promise.all([
                 archiveLibrary.getSummary(),
-                archiveLibrary.listUploads({ cameraId: cameraId || undefined }),
+                archiveLibrary.listUploads({ ...filters, limit: PAGE_SIZE, offset: 0 }),
             ]);
             setSummary(sum);
-            setRows(list);
+            setRows(page.items);
+            setTotal(page.total);
         } catch (err) {
             notifyError('Gagal memuat arsip', err?.response?.data?.message || err.message);
         } finally {
             setLoading(false);
         }
-    }, [cameraId, notifyError]);
+    }, [filters, notifyError]);
+
+    // Paged by the CURRENT row count, so rows that arrive while browsing cannot shift the window
+    // and make a segment appear twice or get skipped.
+    const loadMore = useCallback(async () => {
+        setLoadingMore(true);
+        try {
+            const page = await archiveLibrary.listUploads({
+                ...filters, limit: PAGE_SIZE, offset: rows.length,
+            });
+            const seen = new Set(rows.map((row) => row.segmentId));
+            setRows((prev) => [...prev, ...page.items.filter((row) => !seen.has(row.segmentId))]);
+            setTotal(page.total);
+        } catch (err) {
+            notifyError('Gagal memuat lagi', err?.response?.data?.message || err.message);
+        } finally {
+            setLoadingMore(false);
+        }
+    }, [filters, rows, notifyError]);
 
     useEffect(() => { load(); }, [load]);
 
@@ -192,6 +225,23 @@ export default function TelegramArchiveLibrary() {
                     ))}
                 </Field>
 
+                <Field
+                    type="date"
+                    label="Dari tanggal"
+                    value={from}
+                    onChange={(e) => { setFrom(e.target.value); setHighlighted(null); }}
+                    max={to || undefined}
+                    className="w-40 shrink-0"
+                />
+                <Field
+                    type="date"
+                    label="Sampai tanggal"
+                    value={to}
+                    onChange={(e) => { setTo(e.target.value); setHighlighted(null); }}
+                    min={from || undefined}
+                    className="w-40 shrink-0"
+                />
+
                 <form onSubmit={handleJump} className="flex items-end gap-2">
                     <Field
                         label="Lompat ke jam"
@@ -204,6 +254,17 @@ export default function TelegramArchiveLibrary() {
                     <Button type="submit" disabled={!jumpTo.trim()}>Cari</Button>
                 </form>
             </div>
+
+            {(from || to) && (
+                <div className="flex items-center gap-3">
+                    <p className="text-xs text-content-subtle">
+                        Disaring per tanggal. &ldquo;Lompat ke jam&rdquo; hanya mencari di dalam hasil yang sudah dimuat.
+                    </p>
+                    <Button size="sm" variant="secondary" onClick={() => { setFrom(''); setTo(''); }}>
+                        Hapus filter
+                    </Button>
+                </div>
+            )}
 
             {!singleCamera && !loading && days.length > 0 && (
                 // Said HERE, where the absence of gap markers is what needs explaining — not as a
@@ -243,6 +304,26 @@ export default function TelegramArchiveLibrary() {
                         </ul>
                     </section>
                 ))
+            )}
+
+            {/*
+              * Always state how much is loaded against how much exists. The old page showed the
+              * newest 100 rows with no counter and no way forward, so a list that stopped at last
+              * night looked like an archive that stopped at last night.
+              */}
+            {!loading && rows.length > 0 && (
+                <div className="flex flex-col items-center gap-2 py-2">
+                    <p className="font-mono text-xs tabular-nums text-content-subtle">
+                        {rows.length} dari {total} segmen
+                    </p>
+                    {rows.length < total ? (
+                        <Button variant="secondary" onClick={loadMore} disabled={loadingMore}>
+                            {loadingMore ? 'Memuat…' : 'Muat lebih banyak'}
+                        </Button>
+                    ) : (
+                        <p className="text-xs text-content-subtle">Semua segmen sudah ditampilkan.</p>
+                    )}
+                </div>
             )}
 
             {playing && (

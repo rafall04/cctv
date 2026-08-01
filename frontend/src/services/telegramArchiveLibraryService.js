@@ -16,11 +16,29 @@ export async function getSummary() {
     return data?.data ?? null;
 }
 
-export async function listUploads({ cameraId, limit = 100, offset = 0 } = {}) {
+/**
+ * One page of the archive, newest first. Returns `total` alongside the rows so the caller can tell
+ * "that is everything" from "that is the first page of thousands" — the page used to ask for 100
+ * rows with no way to ask for more, which silently hid most of the archive.
+ *
+ * `from`/`to` are ISO-8601 UTC instants; convert the operator's local dates with dayBounds() so a
+ * chosen day means their day, not a UTC one.
+ */
+export async function listUploads({ cameraId, limit = 100, offset = 0, from, to } = {}) {
     const params = { limit, offset };
     if (cameraId) params.cameraId = cameraId;
+    if (from) params.from = from;
+    if (to) params.to = to;
     const { data } = await apiClient.get(BASE, { params });
-    return Array.isArray(data?.data) ? data.data : [];
+    const items = Array.isArray(data?.data) ? data.data : [];
+    return { items, total: Number(data?.meta?.total ?? items.length) };
+}
+
+/** Local calendar date (YYYY-MM-DD from <input type="date">) -> the UTC instants bounding that day. */
+export function dayBounds(date, edge) {
+    if (!date) return undefined;
+    const local = new Date(`${date}T${edge === 'end' ? '23:59:59.999' : '00:00:00.000'}`);
+    return Number.isNaN(local.getTime()) ? undefined : local.toISOString();
 }
 
 /**
@@ -31,4 +49,4 @@ export function streamUrl(segmentId) {
     return `${BASE}/${segmentId}/stream`;
 }
 
-export default { getSummary, listUploads, streamUrl };
+export default { getSummary, listUploads, streamUrl, dayBounds };

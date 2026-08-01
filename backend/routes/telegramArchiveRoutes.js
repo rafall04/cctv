@@ -76,14 +76,33 @@ export default async function telegramArchiveRoutes(fastify) {
     // unrestricted access to every archived recording.
 
     fastify.get('/library', { onRequest: guard }, async (request, reply) => {
-        const { cameraId, status, limit, offset } = request.query || {};
-        const data = archiveLibrary.listUploads({
+        const { cameraId, status, limit, offset, from, to } = request.query || {};
+        const filters = {
             cameraId: cameraId ? Number(cameraId) : null,
             status: status || 'ok',
-            limit: limit ? Number(limit) : 100,
-            offset: offset ? Number(offset) : 0,
+            // ISO-8601 UTC bounds over recorded_at. The browser converts the operator's local date
+            // into these, so a WIB day means a WIB day rather than a UTC one.
+            from: from || null,
+            to: to || null,
+        };
+        const requestedLimit = limit ? Number(limit) : 100;
+        const requestedOffset = offset ? Number(offset) : 0;
+        const data = archiveLibrary.listUploads({
+            ...filters,
+            limit: requestedLimit,
+            offset: requestedOffset,
         });
-        return reply.send({ success: true, data });
+        // `total` is what lets the page know more rows exist. Reporting only the page would leave
+        // the UI unable to tell "that is everything" from "that is the first 100 of 5,032".
+        return reply.send({
+            success: true,
+            data,
+            meta: {
+                total: archiveLibrary.countUploads(filters),
+                limit: requestedLimit,
+                offset: requestedOffset,
+            },
+        });
     });
 
     fastify.get('/library/summary', { onRequest: guard }, async (request, reply) => {
