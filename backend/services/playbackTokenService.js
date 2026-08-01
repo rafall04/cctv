@@ -1280,10 +1280,12 @@ class PlaybackTokenService {
         const cameraPolicy = normalizedCameraId > 0
             ? playbackTokenRuleService.resolveCameraAccess({
                 token: tokenWithRules,
-                camera: options.camera || {
-                    id: normalizedCameraId,
-                    public_playback_mode: options.publicPlaybackMode || 'inherit',
-                },
+                // Area scope is decided from the camera's area_id, so the stub below (which has
+                // none) made every area token deny every camera. Loaded only for that scope: the
+                // other scopes never read it, and this runs on every segment request.
+                camera: options.camera
+                    || (token.scope_type === 'area' && queryOne('SELECT id, area_id, public_playback_mode FROM cameras WHERE id = ?', [normalizedCameraId]))
+                    || { id: normalizedCameraId, public_playback_mode: options.publicPlaybackMode || 'inherit' },
             })
             : {
                 allowed: true,
