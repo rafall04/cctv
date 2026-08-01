@@ -69,3 +69,73 @@ describe('usePlaybackTokenAccess', () => {
         expect(setSearchParams).not.toHaveBeenCalled();
     });
 });
+
+/*
+ * The share key is now KEPT in the URL so a link survives a lost cookie. That makes signing out a
+ * two-part job: without stripping the param, the next reload would re-activate the very token the
+ * visitor just left, and "Keluar" would silently do nothing.
+ */
+describe('usePlaybackTokenAccess sign-out', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        window.localStorage.clear();
+    });
+
+    const clearWith = async (search) => {
+        const setSearchParams = vi.fn();
+        playbackTokenService.clearToken.mockResolvedValue({ success: true });
+        const onCleared = vi.fn();
+
+        const { result } = renderHook(() => usePlaybackTokenAccess({
+            enabled: true,
+            searchParams: new URLSearchParams(search),
+            setSearchParams,
+            cameraId: 3,
+            onActivated: vi.fn(),
+            onCleared,
+        }));
+
+        await result.current.clearToken();
+        return { setSearchParams, onCleared };
+    };
+
+    it('drops the share key from the URL, so the sign-out survives a reload', async () => {
+        // No key in the URL here: activating on mount would fight the clear under test.
+        const { setSearchParams } = await clearWith('cam=3-gate&mode=full');
+
+        expect(playbackTokenService.clearToken).toHaveBeenCalled();
+        const [updater, options] = setSearchParams.mock.calls[0];
+        // Replace, not push — signing out should not leave a Back button that re-grants access.
+        expect(options).toMatchObject({ replace: true });
+
+        const next = updater(new URLSearchParams('share=BJNKUUU&token=rafpb_x&cam=3-gate&mode=full'));
+        expect(next.get('share')).toBeNull();
+        expect(next.get('token')).toBeNull();
+        // Everything unrelated survives: the visitor stays on the camera they were watching.
+        expect(next.get('cam')).toBe('3-gate');
+        expect(next.get('mode')).toBe('full');
+    });
+
+    it('still tells the page access is gone, so segments reload as an anonymous visitor', async () => {
+        const { onCleared } = await clearWith('cam=3-gate');
+
+        expect(onCleared).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not fall over when the caller supplied no setSearchParams', async () => {
+        playbackTokenService.clearToken.mockResolvedValue({ success: true });
+        const onCleared = vi.fn();
+
+        const { result } = renderHook(() => usePlaybackTokenAccess({
+            enabled: true,
+            searchParams: new URLSearchParams('cam=3'),
+            cameraId: 3,
+            onActivated: vi.fn(),
+            onCleared,
+        }));
+
+        await result.current.clearToken();
+
+        expect(onCleared).toHaveBeenCalledTimes(1);
+    });
+});

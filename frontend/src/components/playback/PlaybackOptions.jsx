@@ -57,28 +57,10 @@ export default function PlaybackOptions({
             )}
 
             {/*
-              * With a token active there was NO panel at all — the visitor could not tell whether
-              * they held full access or how far back it reached, which is precisely what a paid or
-              * shared token is sold on. The limit is already in playback_policy; it was simply
-              * never shown.
+              * The token's reach used to be announced here too. It now lives ONLY in
+              * PlaybackTokenAccess, beside the buttons that act on that token — two panels stating
+              * the same limit a screen apart is exactly the kind of noise this page did not need.
               */}
-            {playbackPolicy?.accessMode === 'token_full' && (
-                <div className="rounded-control border border-edge border-l-2 border-l-status-live bg-surface-raised px-4 py-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-sm font-semibold text-content">Akses token aktif</span>
-                        <span className="text-[11px] font-medium tabular-nums text-status-live">
-                            {playbackPolicy.playbackWindowHours
-                                ? `Rekaman ${playbackPolicy.playbackWindowHours} jam terakhir`
-                                : 'Seluruh rekaman tersedia'}
-                        </span>
-                    </div>
-                    <p className="mt-1 text-xs leading-5 text-content-muted">
-                        {playbackPolicy.playbackWindowHours
-                            ? `Token ini dibatasi ${playbackPolicy.playbackWindowHours} jam ke belakang. Rekaman yang lebih lama dari itu tidak ditampilkan.`
-                            : 'Token ini tidak dibatasi waktu — seluruh rekaman yang masih tersimpan bisa diputar.'}
-                    </p>
-                </div>
-            )}
 
             <div className="flex items-center justify-between gap-3 rounded-control border border-edge p-3">
                 <div className="min-w-0 flex-1">

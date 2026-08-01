@@ -1096,8 +1096,8 @@ function Playback({
                         isBusy={isTokenBusy}
                         tokenStatus={tokenStatus}
                         message={tokenMessage}
-                        compact
-                    />
+                        playbackPolicy={playbackPolicy}
+                        compact />
                 )}
 
                 {showPlaybackNative && (

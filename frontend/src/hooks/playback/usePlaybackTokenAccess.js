@@ -32,6 +32,7 @@ function getOrCreateClientId() {
 export function usePlaybackTokenAccess({
     enabled,
     searchParams,
+    setSearchParams,
     cameraId,
     onActivated,
     onCleared,
@@ -84,13 +85,30 @@ export function usePlaybackTokenAccess({
             await playbackTokenService.clearToken();
             setTokenStatus(null);
             setTokenMessage('Token playback dibersihkan');
+
+            /*
+             * The credential has to leave the URL as well, or signing out does not survive a reload.
+             * The share key is deliberately kept in the address bar so a link stays self-sufficient —
+             * which means that on the next load it would activate again, undoing the sign-out the
+             * visitor just asked for. Dropping the param here is what makes "Keluar" mean it.
+             *
+             * activatedCredentialRef is left as-is on purpose: it still names the credential handled
+             * in this mount, so nothing re-fires before the strip lands.
+             */
+            setSearchParams?.((previous) => {
+                const next = new URLSearchParams(previous);
+                next.delete('share');
+                next.delete('token');
+                return next;
+            }, { replace: true });
+
             onCleared?.();
         } catch (error) {
             setTokenMessage(error?.response?.data?.message || 'Gagal membersihkan token');
         } finally {
             setIsTokenBusy(false);
         }
-    }, [enabled, onCleared]);
+    }, [enabled, onCleared, setSearchParams]);
 
     useEffect(() => {
         if (!enabled) {

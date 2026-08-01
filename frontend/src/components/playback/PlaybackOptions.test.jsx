@@ -1,40 +1,69 @@
 // @vitest-environment jsdom
 
 /*
- * Purpose: Prove a token holder is told how far back their access reaches.
+ * Purpose: Prove the options strip carries the public-preview notice and the auto-play toggle — and
+ *          no longer duplicates the token's reach.
  * Caller: Vitest frontend suite.
  * Deps: React Testing Library.
  * SideEffects: jsdom render only.
  *
- * With a token active there used to be NO panel at all: the visitor could not tell whether they
- * held full access or how far back it went — the very thing a shared or paid token is sold on.
- * The limit was already carried in playback_policy and simply never shown.
+ * The token's reach was briefly announced here AND in PlaybackTokenAccess, a screen apart. It now
+ * lives only beside the buttons that act on that token; see PlaybackTokenAccess.test.jsx.
  */
 
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import PlaybackOptions from './PlaybackOptions';
 
 const base = { autoPlayEnabled: false, onAutoPlayToggle: vi.fn() };
 
-describe('PlaybackOptions token reach', () => {
-    it('states the hour limit when the token is capped', () => {
+describe('PlaybackOptions', () => {
+    it('leaves the token reach to the access panel instead of repeating it', () => {
         render(<PlaybackOptions {...base} playbackPolicy={{ accessMode: 'token_full', playbackWindowHours: 24 }} />);
 
-        expect(screen.getByText('Akses token aktif')).toBeTruthy();
-        expect(screen.getByText('Rekaman 24 jam terakhir')).toBeTruthy();
-        expect(screen.getByText(/tidak ditampilkan/)).toBeTruthy();
-    });
-
-    it('says plainly when the token has no limit, rather than leaving it ambiguous', () => {
-        render(<PlaybackOptions {...base} playbackPolicy={{ accessMode: 'token_full', playbackWindowHours: null }} />);
-
-        expect(screen.getByText('Seluruh rekaman tersedia')).toBeTruthy();
-    });
-
-    it('shows nothing of the sort to an anonymous public visitor', () => {
-        render(<PlaybackOptions {...base} playbackPolicy={{ accessMode: 'public_preview', previewMinutes: 10 }} />);
-
         expect(screen.queryByText('Akses token aktif')).toBeNull();
+        expect(screen.queryByText('Rekaman 24 jam terakhir')).toBeNull();
+    });
+
+    it('warns a public visitor how short the preview is, with a way out', () => {
+        render(
+            <PlaybackOptions
+                {...base}
+                showPublicNotice
+                playbackPolicy={{
+                    accessMode: 'public_preview',
+                    previewMinutes: 10,
+                    notice: { enabled: true, title: 'Akses Playback Publik Terbatas', text: 'Hanya 10 menit terakhir.' },
+                }}
+            />,
+        );
+
+        expect(screen.getByText('Akses Playback Publik Terbatas')).toBeTruthy();
+        expect(screen.getByText('Preview 10 Menit')).toBeTruthy();
+        expect(screen.getByRole('button', { name: /Coba gratis 3 hari/ })).toBeTruthy();
+    });
+
+    it('keeps that notice off admin playback, which is not preview-limited', () => {
+        render(
+            <PlaybackOptions
+                {...base}
+                showPublicNotice={false}
+                playbackPolicy={{ accessMode: 'admin_full', notice: { enabled: true, text: 'x' } }}
+            />,
+        );
+
+        expect(screen.queryByText(/Akses Playback Publik Terbatas/)).toBeNull();
+    });
+
+    it('reports the auto-play state and toggles it', () => {
+        const onAutoPlayToggle = vi.fn();
+        render(<PlaybackOptions autoPlayEnabled onAutoPlayToggle={onAutoPlayToggle} />);
+
+        const toggle = screen.getByRole('switch', { name: 'Toggle auto-play' });
+        expect(toggle.getAttribute('aria-checked')).toBe('true');
+        expect(screen.getByText('Video akan otomatis lanjut ke segment berikutnya')).toBeTruthy();
+
+        fireEvent.click(toggle);
+        expect(onAutoPlayToggle).toHaveBeenCalledTimes(1);
     });
 });
