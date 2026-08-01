@@ -14,14 +14,14 @@ const {
     touchTokenUsageMock,
     logFailedActivationMock,
     stopPlaybackSessionMock,
-    assertPlaybackSessionMock,
+    findLiveSessionMock,
 } = vi.hoisted(() => ({
     validateRawTokenForCameraMock: vi.fn(),
     createPlaybackSessionMock: vi.fn(),
     touchTokenUsageMock: vi.fn(),
     logFailedActivationMock: vi.fn(),
     stopPlaybackSessionMock: vi.fn(),
-    assertPlaybackSessionMock: vi.fn(),
+    findLiveSessionMock: vi.fn(),
 }));
 
 vi.mock('../services/playbackTokenService.js', () => ({
@@ -33,8 +33,11 @@ vi.mock('../services/playbackTokenService.js', () => ({
         touchTokenUsage: touchTokenUsageMock,
         logFailedActivation: logFailedActivationMock,
         stopPlaybackSession: stopPlaybackSessionMock,
-        assertPlaybackSession: assertPlaybackSessionMock,
     },
+}));
+
+vi.mock('../services/playbackSessionReuseService.js', () => ({
+    findLiveSession: findLiveSessionMock,
 }));
 
 vi.mock('../utils/authCookieOptions.js', () => ({
@@ -73,7 +76,7 @@ describe('playbackTokenController', () => {
         touchTokenUsageMock.mockReset();
         logFailedActivationMock.mockReset();
         stopPlaybackSessionMock.mockReset();
-        assertPlaybackSessionMock.mockReset();
+        findLiveSessionMock.mockReset();
     });
 
     it('uses UTC SQL token expiry when calculating playback token cookie maxAge', async () => {
@@ -246,7 +249,7 @@ describe('activatePlaybackToken session reuse', () => {
     beforeEach(() => {
         validateRawTokenForCameraMock.mockReset();
         createPlaybackSessionMock.mockReset();
-        assertPlaybackSessionMock.mockReset();
+        findLiveSessionMock.mockReset();
         touchTokenUsageMock.mockReset();
     });
 
@@ -259,7 +262,7 @@ describe('activatePlaybackToken session reuse', () => {
 
     it('reuses the live session instead of burning another device slot', async () => {
         validateRawTokenForCameraMock.mockReturnValue(TOKEN);
-        assertPlaybackSessionMock.mockReturnValue({ id: 55, token_id: 9 });
+        findLiveSessionMock.mockReturnValue({ id: 55, token_id: 9, session_id: 'session-live' });
 
         const reply = buildReply();
         const payload = await activateWithCookie(reply, { raf_playback_session: 'session-live' });
@@ -267,19 +270,15 @@ describe('activatePlaybackToken session reuse', () => {
         expect(createPlaybackSessionMock).not.toHaveBeenCalled();
         expect(payload.session).toMatchObject({ session_id: 'session-live', reused: true });
         // The session is touched, so a refresh keeps it alive rather than letting it lapse.
-        expect(assertPlaybackSessionMock).toHaveBeenCalledWith(expect.objectContaining({ touch: true }));
+        expect(findLiveSessionMock).toHaveBeenCalledWith(expect.objectContaining({ token: TOKEN }));
         // Access is still granted — the cookies are re-issued exactly as on a fresh activation.
         expect(reply.cookies.map((cookie) => cookie.name)).toEqual(['raf_playback_token', 'raf_playback_session']);
     });
 
     it('mints a new session when the cookie no longer matches a live one', async () => {
         validateRawTokenForCameraMock.mockReturnValue(TOKEN);
-        // What assertPlaybackSession does for a stale/foreign session: throws 401.
-        assertPlaybackSessionMock.mockImplementation(() => {
-            const err = new Error('Session playback tidak aktif');
-            err.statusCode = 401;
-            throw err;
-        });
+        // A stale or foreign cookie simply matches no row.
+        findLiveSessionMock.mockReturnValue(null);
         createPlaybackSessionMock.mockReturnValue({ session_id: 'session-new', timeout_seconds: 120 });
 
         const reply = buildReply();
@@ -291,16 +290,15 @@ describe('activatePlaybackToken session reuse', () => {
         expect(payload.session.session_id).toBe('session-new');
     });
 
-    it('mints a session for an unlimited token, where assertPlaybackSession reports nothing', async () => {
+    it('reuses the session on an UNLIMITED token too, where the old check reported nothing', async () => {
         validateRawTokenForCameraMock.mockReturnValue(TOKEN);
-        // Unlimited mode returns null rather than throwing; that is not proof of a live session.
-        assertPlaybackSessionMock.mockReturnValue(null);
-        createPlaybackSessionMock.mockReturnValue({ session_id: 'session-unlimited', timeout_seconds: 120 });
-
+        // The regression this pins: assertPlaybackSession short-circuits to null for unlimited
+        // tokens, so production counted one refreshing browser as sessions 2 -> 3 -> 4.
+        findLiveSessionMock.mockReturnValue({ id: 56, token_id: 9, session_id: 'session-live' });
         const reply = buildReply();
-        const payload = await activateWithCookie(reply, {});
+        const payload = await activateWithCookie(reply, { raf_playback_session: 'session-live' });
 
-        expect(createPlaybackSessionMock).toHaveBeenCalledTimes(1);
-        expect(payload.session.session_id).toBe('session-unlimited');
+        expect(createPlaybackSessionMock).not.toHaveBeenCalled();
+        expect(payload.session).toMatchObject({ session_id: 'session-live', reused: true });
     });
 });

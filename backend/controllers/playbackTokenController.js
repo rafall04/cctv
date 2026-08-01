@@ -11,6 +11,7 @@ import playbackTokenService, {
     PLAYBACK_TOKEN_SESSION_COOKIE,
 } from '../services/playbackTokenService.js';
 import { deletePlaybackToken } from '../services/playbackTokenDeletionService.js';
+import { findLiveSession } from '../services/playbackSessionReuseService.js';
 import { parseUtcSql } from '../services/timeService.js';
 import { isHttpsRequest } from '../utils/authCookieOptions.js';
 
@@ -255,19 +256,10 @@ export async function activatePlaybackToken(request, reply) {
          * token that caps sessions. assertPlaybackSession only matches a live row for THIS token,
          * so a stale cookie or another token's session correctly falls through to a fresh session.
          */
-        let session = null;
-        try {
-            const live = playbackTokenService.assertPlaybackSession({ request, token: data, touch: true });
-            if (live) {
-                session = {
-                    session_id: request.cookies?.[PLAYBACK_TOKEN_SESSION_COOKIE],
-                    timeout_seconds: data.session_timeout_seconds,
-                    reused: true,
-                };
-            }
-        } catch {
-            session = null;
-        }
+        const live = findLiveSession({ request, token: data });
+        let session = live
+            ? { session_id: live.session_id, timeout_seconds: data.session_timeout_seconds, reused: true }
+            : null;
 
         if (!session) {
             session = playbackTokenService.createPlaybackSession({
