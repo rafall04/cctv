@@ -1,32 +1,49 @@
 /*
- * Purpose: Render the playback page header — camera picker, selected-camera summary, public access notice, and auto-play toggle.
+ * Purpose: Render the playback page header — title, share action, and the camera picker.
  * Caller: Playback page (public preview and admin full scope).
- * Deps: Caller-provided camera list, playback policy payload, and share/toggle handlers.
- * MainFuncs: PlaybackHeader.
- * SideEffects: Invokes caller-provided camera change, share, and auto-play toggle handlers.
+ * Deps: Caller-provided camera list and change/share handlers.
+ * MainFuncs: PlaybackHeader, cameraOptionLabel.
+ * SideEffects: Invokes caller-provided camera change and share handlers.
+ *
+ * Deliberately ends at the picker. The access notice and auto-play toggle moved to PlaybackOptions,
+ * which renders BELOW the video — so the picker sits directly above the player instead of the video
+ * being pushed under five stacked blocks.
+ *
+ * The selected-camera summary card that used to sit here was removed: it repeated the name and
+ * location the picker already shows on its selected option, so it cost a block of vertical space on
+ * a phone and told the visitor nothing new.
  */
+
+/**
+ * Most cameras are named after their location, so "NAME - LOCATION" rendered as
+ * "SIMPANG 4 BUNDARAN JETAK - SIMPANG 4 BUNDARAN JETAK" — every option a three-line wall of the
+ * same words twice. Append the location only when it actually adds something.
+ */
+export function cameraOptionLabel(camera) {
+    const name = String(camera?.name || '').trim();
+    const location = String(camera?.location || '').trim();
+    if (!location) return name;
+
+    const a = name.toUpperCase();
+    const b = location.toUpperCase();
+    if (a === b || a.includes(b) || b.includes(a)) return name;
+    return `${name} — ${location}`;
+}
 
 export default function PlaybackHeader({
     cameras,
     selectedCamera,
     onCameraChange,
-    autoPlayEnabled,
-    onAutoPlayToggle,
     onShare,
-    playbackPolicy = null,
-    showPublicNotice = false,
 }) {
-    // playbackPolicy.contact is no longer read here — the capped-playback notice now sends people to
-    // self-serve access instead of to an operator. The setting itself is left alone for other callers.
-
     return (
-        <div className="space-y-3 rounded-card border border-edge bg-surface p-3 sm:space-y-4 sm:p-4 md:p-6">
-            <div className="flex items-center justify-between">
-                <h1 className="text-lg font-semibold text-content sm:text-xl md:text-2xl">Playback Recording</h1>
+        <div className="space-y-3 rounded-card border border-edge bg-surface p-3 sm:p-4">
+            <div className="flex items-center justify-between gap-3">
+                <h1 className="text-lg font-semibold text-content sm:text-xl">Playback Recording</h1>
                 {onShare && (
                     <button
                         onClick={onShare}
-                        className="flex items-center gap-2 rounded-control border border-edge px-3 py-1.5 text-sm font-medium text-content transition-colors hover:border-edge-strong hover:bg-surface-raised"
+                        className="flex shrink-0 items-center gap-2 rounded-control border border-edge px-3 py-1.5 text-sm font-medium text-content transition-colors hover:border-edge-strong hover:bg-surface-raised"
                         title="Bagikan tautan playback"
                     >
                         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -37,109 +54,18 @@ export default function PlaybackHeader({
                 )}
             </div>
 
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                <label className="whitespace-nowrap text-sm font-medium text-content-muted">
-                    Pilih Kamera:
-                </label>
-                <select
-                    value={selectedCamera?.id || ''}
-                    onChange={(e) => {
-                        const camera = cameras.find(c => c.id === parseInt(e.target.value));
-                        onCameraChange(camera);
-                    }}
-                    className="flex-1 rounded-control border border-edge bg-surface px-4 py-2 text-content focus:border-transparent focus:ring-2 focus:ring-primary"
-                >
-                    {cameras.map((camera, idx) => (
-                        <option key={camera.id ?? `cam-${idx}`} value={camera.id}>
-                            {camera.name} - {camera.location || 'No location'}
-                        </option>
-                    ))}
-                </select>
-            </div>
-
-            {selectedCamera && (
-                <div className="rounded-control border border-edge bg-surface-raised p-2.5">
-                    {/* The codec badge that used to sit here was pinned to showWarning={false},
-                        so it could only ever announce "H.264/AVC" — decoration, never advice. */}
-                    <div className="text-sm font-semibold text-content">
-                        {selectedCamera.name}
-                    </div>
-                    {selectedCamera.location && (
-                        <div className="mt-1 flex items-center gap-1.5 text-sm text-content-muted">
-                            <svg className="h-4 w-4 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
-                            </svg>
-                            <span>{selectedCamera.location}</span>
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {showPublicNotice && playbackPolicy?.notice?.enabled && (
-                // Genuinely a warning, so it keeps a warning colour — but from the token
-                // layer, and as a left rule rather than a filled amber slab.
-                <div className="rounded-control border border-edge border-l-2 border-l-status-warn bg-surface-raised px-4 py-3 text-sm text-content">
-                    <div className="min-w-0 flex-1 space-y-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                            <span className="font-semibold">
-                                {playbackPolicy.notice.title || 'Akses Playback Publik Terbatas'}
-                            </span>
-                            {typeof playbackPolicy.previewMinutes === 'number' && (
-                                <span className="text-[11px] font-medium tabular-nums text-status-warn">
-                                    Preview {playbackPolicy.previewMinutes} Menit
-                                </span>
-                            )}
-                        </div>
-                        <p className="text-xs leading-5 text-content-muted sm:text-sm">
-                            {playbackPolicy.notice.text}
-                        </p>
-                        {/*
-                         * This notice is the only thing a visitor actually reads when playback is
-                         * capped, so the way OUT of the cap belongs here — and it is now the only
-                         * next step offered. The admin-contact button was removed deliberately:
-                         * self-serve exists, so sending people to chat an operator adds a manual
-                         * step that scales badly and leaves the visitor waiting.
-                         */}
-                        <a
-                            href="#akses-playback"
-                            className="mt-1 inline-flex items-center gap-2 rounded-control bg-primary px-3 py-1.5 text-xs font-medium text-white"
-                        >
-                            Coba gratis 3 hari atau beli akses
-                        </a>
-                    </div>
-                </div>
-            )}
-
-            {/* Was a blue→indigo gradient panel, which introduced a second accent colour
-                competing with the brand primary for a plain settings row. */}
-            <div className="rounded-control border border-edge p-3">
-                <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                        <div className="text-sm font-medium text-content">
-                            Auto-play Segment Berikutnya
-                        </div>
-                        <div className="text-xs text-content-muted">
-                            {autoPlayEnabled
-                                ? 'Video akan otomatis lanjut ke segment berikutnya'
-                                : 'Video akan berhenti di akhir segment'}
-                        </div>
-                    </div>
-
-                    <button
-                        onClick={onAutoPlayToggle}
-                        className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${autoPlayEnabled ? 'bg-primary' : 'bg-edge-strong'
-                            }`}
-                        role="switch"
-                        aria-checked={autoPlayEnabled}
-                        aria-label="Toggle auto-play"
-                    >
-                        <span
-                            className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white transition duration-200 ease-in-out ${autoPlayEnabled ? 'translate-x-5' : 'translate-x-0'
-                                }`}
-                        />
-                    </button>
-                </div>
-            </div>
+            <select
+                value={selectedCamera?.id || ''}
+                onChange={(e) => onCameraChange(cameras.find((c) => c.id === parseInt(e.target.value, 10)))}
+                aria-label="Pilih kamera"
+                className="w-full rounded-control border border-edge bg-surface px-3 py-2 text-content focus:border-transparent focus:ring-2 focus:ring-primary"
+            >
+                {cameras.map((camera, idx) => (
+                    <option key={camera.id ?? `cam-${idx}`} value={camera.id}>
+                        {cameraOptionLabel(camera)}
+                    </option>
+                ))}
+            </select>
         </div>
     );
 }

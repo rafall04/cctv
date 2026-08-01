@@ -30,6 +30,7 @@ import PlaybackTimeline from '../components/playback/PlaybackTimeline';
 import PlaybackSegmentList from '../components/playback/PlaybackSegmentList';
 import PlaybackUsageGuide from '../components/playback/PlaybackUsageGuide';
 import PlaybackTokenAccess from '../components/playback/PlaybackTokenAccess.jsx';
+import PlaybackOptions from '../components/playback/PlaybackOptions.jsx';
 import LandingMobileDock from '../components/landing/LandingMobileDock.jsx';
 import { useAdminReconnectRefresh } from '../hooks/admin/useAdminReconnectRefresh';
 import { buildWhatsappLink } from '../utils/whatsappLink.js';
@@ -1054,25 +1055,8 @@ function Playback({
                     cameras={visiblePlaybackCameras}
                     selectedCamera={selectedCamera}
                     onCameraChange={handleCameraChange}
-                    autoPlayEnabled={autoPlayEnabled}
-                    onAutoPlayToggle={handleAutoPlayToggle}
                     onShare={isAdminPlayback ? null : handleShare}
-                    playbackPolicy={playbackPolicy}
-                    showPublicNotice={!isAdminPlayback}
                 />
-
-                {!isAdminPlayback && (
-                    <PlaybackTokenAccess
-                        tokenInput={tokenInput}
-                        onTokenInputChange={setTokenInput}
-                        onActivate={activateToken}
-                        onClear={clearToken}
-                        isBusy={isTokenBusy}
-                        tokenStatus={tokenStatus}
-                        message={tokenMessage}
-                        compact
-                    />
-                )}
 
                 <PlaybackVideo
                     videoRef={videoRef}
@@ -1099,6 +1083,21 @@ function Playback({
                     formatTimestamp={formatTimestamp}
                     crossOriginMode={!isAdminPlayback ? 'use-credentials' : 'anonymous'}
                 />
+
+                <PlaybackOptions playbackPolicy={playbackPolicy} showPublicNotice={!isAdminPlayback} autoPlayEnabled={autoPlayEnabled} onAutoPlayToggle={handleAutoPlayToggle} />
+
+                {!isAdminPlayback && (
+                    <PlaybackTokenAccess
+                        tokenInput={tokenInput}
+                        onTokenInputChange={setTokenInput}
+                        onActivate={activateToken}
+                        onClear={clearToken}
+                        isBusy={isTokenBusy}
+                        tokenStatus={tokenStatus}
+                        message={tokenMessage}
+                        compact
+                    />
+                )}
 
                 {showPlaybackNative && (
                     <InlineAdSlot
