@@ -50,7 +50,7 @@ function GapRow({ item }) {
     );
 }
 
-function SegmentRow({ row, win, highlighted, onPlay }) {
+function SegmentRow({ row, win, highlighted, showCamera, onPlay }) {
     return (
         <li
             id={`seg-${row.segmentId}`}
@@ -64,11 +64,19 @@ function SegmentRow({ row, win, highlighted, onPlay }) {
               */}
             <div className="min-w-0 flex-1">
                 <p className="font-mono text-sm font-semibold tabular-nums text-content">{win.range}</p>
-                {/* Name on its own line: it was truncating at "CCTV ALANG ALANG KE…" while the row
-                  * still had room. A phone has height to spend, not width. */}
-                <p className="mt-0.5 truncate text-xs text-content-muted">{row.cameraName}</p>
+                {/*
+                  * Camera and area only earn their space when the list actually MIXES cameras. Once
+                  * one is picked, every row repeated the same name plus a truncated "KEC BOJONEG…",
+                  * spending two lines per card to say what the filter above already says — on a
+                  * phone that is most of the card telling you nothing.
+                  *
+                  * Name on its own line (when shown): it was truncating at "CCTV ALANG ALANG KE…"
+                  * while the row still had room. A phone has height to spend, not width.
+                  */}
+                {showCamera && <p className="mt-0.5 truncate text-xs text-content-muted">{row.cameraName}</p>}
                 <p className="mt-0.5 truncate font-mono text-xs tabular-nums text-content-subtle">
-                    {[win.duration, formatSize(row.fileSize), row.areaName].filter(Boolean).join(' · ')}
+                    {[win.duration, formatSize(row.fileSize), showCamera ? row.areaName : null]
+                        .filter(Boolean).join(' · ')}
                 </p>
             </div>
 
@@ -146,6 +154,12 @@ export default function TelegramArchiveLibrary() {
         () => cameras.reduce((sum, camera) => sum + (camera.segments || 0), 0),
         [cameras],
     );
+    // Shown once in the sticky day header instead of on every row. The select that carries this
+    // name scrolls away; the day header does not, so the context survives a long list without
+    // costing a line per card.
+    const selectedCameraName = useMemo(() => (
+        cameraId ? cameras.find((camera) => String(camera.id) === String(cameraId))?.name || null : null
+    ), [cameraId, cameras]);
     const notPlayable = Math.max((summary?.total ?? 0) - (summary?.playable ?? 0), 0);
 
     // Gaps are only meaningful along ONE camera's timeline. Across a mixed feed, a "hole" between
@@ -283,8 +297,13 @@ export default function TelegramArchiveLibrary() {
                 days.map((group) => (
                     <section key={group.key} className="space-y-2">
                         {/* Date once per group, not repeated on every row. */}
-                        <h2 className="sticky top-0 z-sticky bg-surface-sunken py-1 text-xs font-semibold uppercase tracking-wide text-content-subtle">
-                            {group.label}
+                        <h2 className="sticky top-0 z-sticky flex items-baseline gap-2 bg-surface-sunken py-1 text-xs font-semibold uppercase tracking-wide text-content-subtle">
+                            <span className="shrink-0">{group.label}</span>
+                            {selectedCameraName && (
+                                <span className="truncate font-normal normal-case tracking-normal">
+                                    {selectedCameraName}
+                                </span>
+                            )}
                         </h2>
                         <ul className="space-y-2">
                             {group.items.map((item, index) => (
@@ -296,6 +315,7 @@ export default function TelegramArchiveLibrary() {
                                         row={item.row}
                                         win={item.win}
                                         highlighted={highlighted === item.row.segmentId}
+                                        showCamera={!singleCamera}
                                         onPlay={setPlaying}
                                     />
                                 )
