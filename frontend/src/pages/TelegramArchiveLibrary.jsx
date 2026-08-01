@@ -17,13 +17,20 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNotification } from '../contexts/NotificationContext';
 import archiveLibrary from '../services/telegramArchiveLibraryService';
-import { Badge, Button, Field, Modal, PageHeader } from '../components/ui';
+import { Badge, Button, Field, IconButton, Modal, PageHeader } from '../components/ui';
+import ArchiveVideo from '../components/admin/archive/ArchiveVideo';
 import { TableSkeleton } from '../components/ui/Skeleton';
 import { buildTimeline, findSegmentAt, formatDuration, segmentWindow } from '../utils/admin/archiveTimeline';
 
 const DownloadIcon = () => (
-    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden="true">
+    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden="true">
         <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
+    </svg>
+);
+
+const NewTabIcon = () => (
+    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden="true">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5M21 3h-6m6 0v6m0-6L10.5 13.5" />
     </svg>
 );
 
@@ -314,9 +321,14 @@ export default function TelegramArchiveLibrary() {
                     className="min-w-0 sm:flex-1 sm:max-w-sm"
                 >
                     <option value="">Semua kamera · {totalAllCameras} segmen</option>
+                    {/*
+                      * The unit is spelled out. Android renders this select as a full-screen list,
+                      * where a bare "· 102" beside a camera name reads as an ID or a road number
+                      * as easily as a count.
+                      */}
                     {cameras.map((camera) => (
                         <option key={camera.id} value={camera.id}>
-                            {camera.name} · {camera.segments}
+                            {camera.name} · {camera.segments} segmen
                         </option>
                     ))}
                 </Field>
@@ -496,22 +508,26 @@ export default function TelegramArchiveLibrary() {
                     size="xl"
                     onClose={() => setPlaying(null)}
                     bodyClassName=""
-                    footer={(
+                    // Media, not a form: centred so the footage is not pinned to the bottom edge,
+                    // and a near-opaque scrim so the list behind stops competing with it. Matches
+                    // the public VideoPopup, so both players read as the same product.
+                    placement="center"
+                    scrim="media"
+                    // Both actions are SUBORDINATE to watching, and a footer would cost the video
+                    // ~60px of height on a phone for two escape hatches. Icons in the header keep
+                    // them one tap away without taking anything from the picture.
+                    headerActions={(
                         <>
-                            {/*
-                              * Both actions are SUBORDINATE. The primary action on this screen is
-                              * watching, and that is the video itself — a full-width brand-red bar
-                              * for an escape hatch competed with the footage it sits under.
-                              */}
-                            <Button
+                            <IconButton
+                                label="Buka di tab baru"
                                 size="sm"
                                 onClick={() => window.open(archiveLibrary.streamUrl(playing.segmentId), '_blank', 'noopener')}
                             >
-                                Tab baru
-                            </Button>
-                            <Button
+                                <NewTabIcon />
+                            </IconButton>
+                            <IconButton
+                                label="Unduh rekaman"
                                 size="sm"
-                                icon={<DownloadIcon />}
                                 onClick={() => {
                                     // Evidence work means keeping a copy, not just viewing one.
                                     const a = document.createElement('a');
@@ -520,26 +536,15 @@ export default function TelegramArchiveLibrary() {
                                     a.click();
                                 }}
                             >
-                                Unduh
-                            </Button>
+                                <DownloadIcon />
+                            </IconButton>
                         </>
                     )}
                 >
-                    {/*
-                      * aspect-video reserves the box BEFORE metadata arrives, so the sheet does not
-                      * resize under the finger the moment the first frame decodes.
-                      */}
-                    <div className="aspect-video w-full bg-black">
-                        <video
-                            key={playing.segmentId}
-                            src={archiveLibrary.streamUrl(playing.segmentId)}
-                            controls
-                            autoPlay
-                            playsInline
-                            preload="metadata"
-                            className="h-full w-full"
-                        />
-                    </div>
+                    <ArchiveVideo
+                        segmentId={playing.segmentId}
+                        src={archiveLibrary.streamUrl(playing.segmentId)}
+                    />
                 </Modal>
             )}
         </div>
