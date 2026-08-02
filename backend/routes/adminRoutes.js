@@ -9,6 +9,7 @@
 import { getDashboardStats, getTodayStats, testTelegramNotification, getTelegramConfig, updateTelegramConfig, previewNotificationDiagnostics, runNotificationDiagnosticsDrill, listNotificationDiagnosticsRuns, getViewerAnalytics, getViewerHistoryPage, getRealTimeViewers, getCameraHealthDebug, getRecordingHealth, getSecurityLogs, getSecurityStats, getCacheStats, clearCache, getTimezoneConfig, updateTimezoneConfig, exportDatabaseBackup, importDatabaseBackup, getBackupPreview } from '../controllers/adminController.js';
 import { generateApiKey, listApiKeys, deleteApiKey } from '../controllers/apiKeyController.js';
 import { clearPlaybackTokenSessions, createPlaybackToken, deletePlaybackTokenById, listPlaybackTokenAuditLogs, listPlaybackTokens, revokePlaybackToken, sharePlaybackToken, updatePlaybackToken } from '../controllers/playbackTokenController.js';
+import { createPlaybackProduct, listPlaybackProducts, updatePlaybackProduct } from '../controllers/playbackProductController.js';
 import { authMiddleware, requireAdmin } from '../middleware/authMiddleware.js';
 import { createApiKeySchema, apiKeyIdParamSchema } from '../middleware/schemaValidators.js';
 import mediaMtxService from '../services/mediaMtxService.js';
@@ -135,6 +136,26 @@ export default async function adminRoutes(fastify, options) {
     fastify.delete('/playback-tokens/:id', {
         onRequest: [authMiddleware, requireAdmin],
         handler: deletePlaybackTokenById,
+    });
+
+    /*
+     * Playback-access packages (the public "coba gratis / beli akses" catalogue). No DELETE by
+     * design — playback_orders references these rows, so `enabled = 0` is the removal, and it
+     * already hides a package from the catalogue, the trial claim and order creation alike.
+     */
+    fastify.get('/playback-products', {
+        onRequest: [authMiddleware, requireAdmin],
+        handler: listPlaybackProducts,
+    });
+
+    fastify.post('/playback-products', {
+        onRequest: [authMiddleware, requireAdmin],
+        handler: createPlaybackProduct,
+    });
+
+    fastify.put('/playback-products/:id', {
+        onRequest: [authMiddleware, requireAdmin],
+        handler: updatePlaybackProduct,
     });
 
     // Debug endpoint - raw MediaMTX data (for troubleshooting viewer count)

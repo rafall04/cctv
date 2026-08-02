@@ -46,6 +46,9 @@ export const AdminIcons = {
     ChartLine: ico(<>{p('M3 3v18h18')}{p('M7 14l3.5-4 3 2.5L21 6')}</>),
     Billing: ico(<>{p('M3 10h18M5 6h14a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2z')}{p('M7 15h3')}</>),
     Voucher: ico(<>{p('M4 8a2 2 0 012-2h12a2 2 0 012 2v1a2 2 0 000 4v1a2 2 0 01-2 2H6a2 2 0 01-2-2v-1a2 2 0 000-4V8z')}{p('M14 8v8')}</>),
+    // Price tag — the playback package catalogue. Its own glyph rather than reusing Billing's card:
+    // two identical icons in one sidebar defeat the point of having icons.
+    Tag: ico(<>{p('M7 3h5c.53 0 1.04.21 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z')}{p('M7.5 7.5h.01')}</>),
     Network: ico(<>{p('M12 4a2 2 0 100 4 2 2 0 000-4zM5 16a2 2 0 100 4 2 2 0 000-4zM19 16a2 2 0 100 4 2 2 0 000-4z')}{p('M12 8v4m0 0l-5 4m5-4l5 4')}</>),
     Sponsor: ico(p('M11 5.882V19.24a1 1 0 01-1.447.894L5 17.764V8.236l4.553-2.37A1 1 0 0111 5.882zM5 8.236H4a2 2 0 00-2 2v3.528a2 2 0 002 2h1M15 7a5 5 0 010 10')),
     Ads: ico(<>{p('M4 5h16a1 1 0 011 1v10a1 1 0 01-1 1H4a1 1 0 01-1-1V6a1 1 0 011-1z')}{p('M9 21h6M12 17v4')}</>),
@@ -91,6 +94,7 @@ export const NAV_GROUPS = [
             { label: 'Rekaman', path: '/admin/recordings', icon: AdminIcons.Recording },
             { label: 'Putar Ulang', path: '/admin/playback', icon: AdminIcons.Playback },
             { label: 'Token Putar Ulang', path: '/admin/playback-tokens', icon: AdminIcons.Key, adminOnly: true },
+            { label: 'Paket Akses Playback', path: '/admin/playback-products', icon: AdminIcons.Tag, adminOnly: true },
             { label: 'Arsip Rekaman', path: '/admin/arsip', icon: AdminIcons.Library, adminOnly: true },
             { label: 'Arsip ke Telegram', path: '/admin/telegram-archive', icon: AdminIcons.Archive, adminOnly: true },
         ],
