@@ -32,6 +32,21 @@ export const cameraService = {
         }
     },
 
+    /*
+     * Cameras whose upstream source is gone rather than merely offline (admin only). Its own
+     * endpoint because the admin camera list shares its runtime projection with both PUBLIC read
+     * models — this is staff-only detail about a third party's outage.
+     */
+    async getSourceHealth() {
+        try {
+            const response = await apiClient.get('/api/admin/cameras/source-health');
+            return response.data;
+        } catch (error) {
+            console.error('Get camera source health error:', error);
+            return { success: false, message: error.response?.data?.message || 'Gagal memuat status sumber kamera' };
+        }
+    },
+
     // Get camera by ID (admin only)
     async getCameraById(id) {
         try {

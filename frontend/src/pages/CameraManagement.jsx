@@ -9,6 +9,7 @@ SideEffects: Delegates camera mutations and stream refresh actions through the p
 import CameraFormModal from '../components/admin/cameras/CameraFormModal';
 import CameraGrid from '../components/admin/cameras/CameraGrid';
 import CameraManagementHeader from '../components/admin/cameras/CameraManagementHeader';
+import DeadSourcePanel from '../components/admin/cameras/DeadSourcePanel';
 import {
     CameraManagementEmptyState,
     CameraManagementErrorState,
@@ -65,6 +66,9 @@ export default function CameraManagement() {
     return (
         <div className="space-y-8">
             <CameraManagementHeader onAddCamera={openAddModal} />
+
+            {/* Renders nothing while every source is alive — see the component header. */}
+            <DeadSourcePanel />
 
             {!loading && !loadError && cameras.length > 0 && (
                 <div className="rounded-2xl border border-edge bg-white p-4 shadow-sm dark:bg-gray-800/60">

@@ -10,6 +10,7 @@ import { getDashboardStats, getTodayStats, testTelegramNotification, getTelegram
 import { generateApiKey, listApiKeys, deleteApiKey } from '../controllers/apiKeyController.js';
 import { clearPlaybackTokenSessions, createPlaybackToken, deletePlaybackTokenById, listPlaybackTokenAuditLogs, listPlaybackTokens, revokePlaybackToken, sharePlaybackToken, updatePlaybackToken } from '../controllers/playbackTokenController.js';
 import { createPlaybackProduct, listPlaybackProducts, updatePlaybackProduct } from '../controllers/playbackProductController.js';
+import { listDeadSources } from '../controllers/cameraSourceHealthController.js';
 import { authMiddleware, requireAdmin } from '../middleware/authMiddleware.js';
 import { createApiKeySchema, apiKeyIdParamSchema } from '../middleware/schemaValidators.js';
 import mediaMtxService from '../services/mediaMtxService.js';
@@ -156,6 +157,16 @@ export default async function adminRoutes(fastify, options) {
     fastify.put('/playback-products/:id', {
         onRequest: [authMiddleware, requireAdmin],
         handler: updatePlaybackProduct,
+    });
+
+    /*
+     * Cameras whose upstream source is gone, not merely offline. Staff-only: it details a third
+     * party's outage, and the admin camera list cannot carry it because that projection is shared
+     * with both public read models.
+     */
+    fastify.get('/cameras/source-health', {
+        onRequest: [authMiddleware, requireAdmin],
+        handler: listDeadSources,
     });
 
     // Debug endpoint - raw MediaMTX data (for troubleshooting viewer count)

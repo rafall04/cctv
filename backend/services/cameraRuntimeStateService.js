@@ -1,5 +1,6 @@
 import { execute, query, queryOne } from '../database/connectionPool.js';
 import { getTimezone } from './timezoneService.js';
+import { nextDeadStreak } from './cameraSourceDeadPolicy.js';
 
 function getTimestamp() {
     const timezone = getTimezone();
@@ -29,7 +30,28 @@ const SEED_THROTTLE_MS = 30 * 1000;
 class CameraRuntimeStateService {
     constructor() {
         this.tableSupport = null;
+        this.sourceDeadSupport = null;
         this._lastSeedAt = 0;
+    }
+
+    /**
+     * The dead-at-source columns arrived later than the table, so a database that has not run
+     * `npm run migrate` yet must keep writing runtime state rather than failing every health tick.
+     */
+    hasSourceDeadColumns() {
+        if (this.sourceDeadSupport !== null) {
+            return this.sourceDeadSupport;
+        }
+
+        try {
+            const columns = query('PRAGMA table_info(camera_runtime_state)').map((c) => c.name);
+            this.sourceDeadSupport = columns.includes('source_dead_since')
+                && columns.includes('source_dead_reason');
+        } catch {
+            this.sourceDeadSupport = false;
+        }
+
+        return this.sourceDeadSupport;
     }
 
     hasRuntimeTable() {
@@ -118,6 +140,8 @@ class CameraRuntimeStateService {
                 last_runtime_signal_at: fields.last_runtime_signal_at || null,
                 last_runtime_signal_type: fields.last_runtime_signal_type || null,
                 last_health_check_at: fields.last_health_check_at || null,
+                source_dead_since: null,
+                source_dead_reason: null,
                 updated_at: getTimestamp(),
             };
         }
@@ -135,26 +159,39 @@ class CameraRuntimeStateService {
             updated_at: timestamp,
         };
 
-        execute(`
-            INSERT INTO camera_runtime_state (
-                camera_id,
-                is_online,
-                monitoring_state,
-                monitoring_reason,
-                last_runtime_signal_at,
-                last_runtime_signal_type,
-                last_health_check_at,
-                updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(camera_id) DO UPDATE SET
-                is_online = excluded.is_online,
-                monitoring_state = excluded.monitoring_state,
-                monitoring_reason = excluded.monitoring_reason,
-                last_runtime_signal_at = excluded.last_runtime_signal_at,
-                last_runtime_signal_type = excluded.last_runtime_signal_type,
-                last_health_check_at = excluded.last_health_check_at,
-                updated_at = excluded.updated_at
-        `, [
+        /*
+         * "Dead at source" is derived here rather than by the caller because this is the one place
+         * every health outcome funnels through — a caller-side version would have to be repeated at
+         * each probe path and would drift the moment one of them was missed.
+         */
+        const streak = nextDeadStreak({
+            isOnline: nextState.is_online,
+            reason: nextState.monitoring_reason,
+            currentSince: current.source_dead_since ?? null,
+            currentReason: current.source_dead_reason ?? null,
+            /*
+             * UTC ISO, NOT the app-local `timestamp` the other columns use. This value is subtracted
+             * from a clock to produce "dead for 49 hours", and a local-time string parsed against a
+             * process in a different zone is wrong by exactly the offset. New persistence prefers
+             * UTC (SYSTEM_MAP, Data And Indexes) and these two columns are new.
+             */
+            timestamp: new Date().toISOString(),
+        });
+        nextState.source_dead_since = streak.since;
+        nextState.source_dead_reason = streak.reason;
+
+        // Column names come from this fixed list, never from input; the values stay parameterized.
+        const columns = [
+            'camera_id',
+            'is_online',
+            'monitoring_state',
+            'monitoring_reason',
+            'last_runtime_signal_at',
+            'last_runtime_signal_type',
+            'last_health_check_at',
+            'updated_at',
+        ];
+        const values = [
             cameraId,
             nextState.is_online,
             nextState.monitoring_state,
@@ -163,7 +200,23 @@ class CameraRuntimeStateService {
             nextState.last_runtime_signal_type,
             nextState.last_health_check_at,
             nextState.updated_at,
-        ]);
+        ];
+
+        if (this.hasSourceDeadColumns()) {
+            columns.push('source_dead_since', 'source_dead_reason');
+            values.push(streak.since, streak.reason);
+        }
+
+        const assignments = columns
+            .filter((column) => column !== 'camera_id')
+            .map((column) => `${column} = excluded.${column}`)
+            .join(', ');
+
+        execute(`
+            INSERT INTO camera_runtime_state (${columns.join(', ')})
+            VALUES (${columns.map(() => '?').join(', ')})
+            ON CONFLICT(camera_id) DO UPDATE SET ${assignments}
+        `, values);
 
         return nextState;
     }

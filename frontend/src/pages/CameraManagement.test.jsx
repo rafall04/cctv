@@ -12,6 +12,7 @@ const {
     deleteCamera,
     refreshCameraStream,
     getAllAreas,
+    getSourceHealth,
 } = vi.hoisted(() => ({
     getAllCameras: vi.fn(),
     getCameraById: vi.fn(),
@@ -20,6 +21,9 @@ const {
     deleteCamera: vi.fn(),
     refreshCameraStream: vi.fn(),
     getAllAreas: vi.fn(),
+    // The page now carries DeadSourcePanel, which fetches its own staff-only feed on mount.
+    // It resolves to "nothing dead" here so these cases stay about camera CRUD.
+    getSourceHealth: vi.fn().mockResolvedValue({ success: true, data: { total: 0, cameras: [] } }),
 }));
 
 vi.mock('../services/cameraService', () => ({
@@ -30,6 +34,7 @@ vi.mock('../services/cameraService', () => ({
         updateCamera,
         deleteCamera,
         refreshCameraStream,
+        getSourceHealth,
     },
 }));
 
