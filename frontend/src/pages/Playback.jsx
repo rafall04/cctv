@@ -676,15 +676,16 @@ function Playback({
         }
 
         /*
-         * The element check is what survives a remount: a ref records what we DID, not what is on
-         * screen, and refs never re-run an effect. When React replaced the <video>, this guard still
-         * read "already assigned" and the fresh element kept an EMPTY src — no request, no error,
-         * just a placeholder until the visitor reloaded or changed segment.
+         * Ask the ELEMENT, not the bookkeeping. This effect's own cleanup calls resetVideoElement(),
+         * which does removeAttribute('src') — so on a re-run where nothing "changed", cleanup
+         * stripped the source and then the body saw matching bookkeeping and returned early,
+         * leaving an empty src, NETWORK_EMPTY, and no error to show for it. The ref recorded what
+         * we DID; it could not know the cleanup had undone it. Also covers a remounted <video>.
          */
         if (
             playbackSourceRef.current.segmentKey === selectedSegmentKey
             && playbackSourceRef.current.streamUrl === nextStreamUrl
-            && playbackSourceRef.current.element === videoRef.current
+            && videoRef.current.getAttribute('src')
         ) {
             return;
         }
@@ -697,7 +698,6 @@ function Playback({
         playbackSourceRef.current = {
             segmentKey: selectedSegmentKey,
             streamUrl: nextStreamUrl,
-            element: videoRef.current,
         };
         const video = videoRef.current;
         let canPlayRetried = false;
