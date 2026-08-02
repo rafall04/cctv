@@ -185,6 +185,23 @@ export const adminService = {
     },
 
     /*
+     * Visitor verdicts per camera. Staff-only because the NEGATIVE count lives here and nowhere
+     * else — the public bar shows likes only.
+     */
+    async getCameraReactions() {
+        try {
+            const response = await apiClient.get('/api/admin/cameras/reactions');
+            return response.data;
+        } catch (error) {
+            console.error('Get camera reactions error:', error);
+            return {
+                success: false,
+                message: error.response?.data?.message || 'Gagal memuat penilaian kamera',
+            };
+        }
+    },
+
+    /*
      * What a given retention would cost on disk, measured from this fleet's own segments rather
      * than a fixed bitrate assumption — the numbers differ by ~20% between camera types.
      */

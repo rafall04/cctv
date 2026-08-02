@@ -44,6 +44,12 @@ vi.mock('../services/areaService', () => ({
     },
 }));
 
+// CameraFeedbackPanel fetches this on mount and renders nothing when nobody has complained.
+// Its own behaviour lives in CameraFeedbackPanel.test.jsx; here it only has to stay out of the way.
+vi.mock('../services/adminService', () => ({
+    adminService: { getCameraReactions: vi.fn().mockResolvedValue({ success: true, data: [] }) },
+}));
+
 vi.mock('../contexts/NotificationContext', () => ({
     useNotification: () => ({
         success: vi.fn(),

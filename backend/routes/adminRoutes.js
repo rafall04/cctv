@@ -12,6 +12,7 @@ import { clearPlaybackTokenSessions, createPlaybackToken, deletePlaybackTokenByI
 import { createPlaybackProduct, listPlaybackProducts, updatePlaybackProduct } from '../controllers/playbackProductController.js';
 import { listDeadSources } from '../controllers/cameraSourceHealthController.js';
 import { getRecordingCapacity } from '../controllers/recordingCapacityController.js';
+import { listCameraReactionSummary } from '../controllers/adminCameraFeedbackController.js';
 import { authMiddleware, requireAdmin } from '../middleware/authMiddleware.js';
 import { createApiKeySchema, apiKeyIdParamSchema } from '../middleware/schemaValidators.js';
 import mediaMtxService from '../services/mediaMtxService.js';
@@ -174,6 +175,12 @@ export default async function adminRoutes(fastify, options) {
     fastify.get('/recording-capacity', {
         onRequest: [authMiddleware, requireAdmin],
         handler: getRecordingCapacity,
+    });
+
+    // Visitor verdicts per camera. Staff-only because the NEGATIVE side lives here and nowhere else.
+    fastify.get('/cameras/reactions', {
+        onRequest: [authMiddleware, requireAdmin],
+        handler: listCameraReactionSummary,
     });
 
     // Debug endpoint - raw MediaMTX data (for troubleshooting viewer count)

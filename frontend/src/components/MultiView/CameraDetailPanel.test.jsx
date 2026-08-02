@@ -10,6 +10,16 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import CameraDetailPanel from './CameraDetailPanel';
 
+// The panel now hosts CameraReactionBar, which fetches on mount. Left unmocked it attempts a real
+// XHR under jsdom; the bar swallows the failure, but the noise would bury a genuine error here.
+// Its own behaviour is covered in CameraReactionBar.test.jsx.
+vi.mock('../../services/cameraFeedbackService', () => ({
+    default: {
+        getReaction: vi.fn().mockResolvedValue({ success: false }),
+        setReaction: vi.fn(),
+    },
+}));
+
 describe('CameraDetailPanel', () => {
     it('renders camera trust metadata and actions', () => {
         const onShare = vi.fn();

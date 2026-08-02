@@ -10,6 +10,7 @@ import CameraFormModal from '../components/admin/cameras/CameraFormModal';
 import CameraGrid from '../components/admin/cameras/CameraGrid';
 import CameraManagementHeader from '../components/admin/cameras/CameraManagementHeader';
 import DeadSourcePanel from '../components/admin/cameras/DeadSourcePanel';
+import CameraFeedbackPanel from '../components/admin/cameras/CameraFeedbackPanel';
 import {
     CameraManagementEmptyState,
     CameraManagementErrorState,
@@ -67,8 +68,9 @@ export default function CameraManagement() {
         <div className="space-y-8">
             <CameraManagementHeader onAddCamera={openAddModal} />
 
-            {/* Renders nothing while every source is alive — see the component header. */}
+            {/* Both render nothing while there is nothing wrong — see their component headers. */}
             <DeadSourcePanel />
+            <CameraFeedbackPanel />
 
             {!loading && !loadError && cameras.length > 0 && (
                 <div className="rounded-2xl border border-edge bg-white p-4 shadow-sm dark:bg-gray-800/60">

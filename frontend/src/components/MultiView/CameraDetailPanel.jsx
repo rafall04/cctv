@@ -8,6 +8,7 @@
 
 import { getPublicCameraQuality } from '../../utils/landingCameraInsights';
 import { buildAreaPath } from '../../utils/publicGrowthShare';
+import CameraReactionBar from './CameraReactionBar.jsx';
 
 function metric(camera, key) {
     return Number(camera?.[key] ?? camera?.viewer_stats?.[key] ?? 0);
@@ -85,6 +86,13 @@ export default function CameraDetailPanel({
                     </a>
                 </div>
             </div>
+
+            {/*
+              * Its own row rather than joined to the action buttons above: on a phone that row is
+              * already three items wide, and a five-item wrap would push the video further down the
+              * page it exists to show.
+              */}
+            <CameraReactionBar cameraId={camera?.id} />
         </section>
     );
 }
