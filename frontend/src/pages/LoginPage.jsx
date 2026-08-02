@@ -4,6 +4,7 @@ import { authService } from '../services/authService';
 import { useTheme } from '../contexts/ThemeContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useBranding } from '../contexts/BrandingContext';
+import { setPageTitle } from '../utils/pageTitle.js';
 
 // Icons
 const Icons = {
@@ -99,9 +100,7 @@ export default function LoginPage() {
      * The tab, a bookmark and a shared link all said "CCTV Publik Online" no matter which page the
      * visitor was on. AreaPublicPage already set its own title; this is the same idea.
      */
-    useEffect(() => {
-        document.title = 'Masuk Panel Admin - RAF';
-    }, []);
+    useEffect(() => setPageTitle('Masuk Panel Admin - RAF'), []);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [warning, setWarning] = useState('');

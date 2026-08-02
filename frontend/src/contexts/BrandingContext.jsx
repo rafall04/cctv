@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { brandingService } from '../services/brandingService';
+import { isPageTitleOwned } from '../utils/pageTitle.js';
 
 const BrandingContext = createContext();
 
@@ -59,7 +60,11 @@ export function BrandingProvider({ children }) {
             if (data) {
                 setBranding(data);
                 
-                document.title = data.meta_title || 'CCTV Online';
+                // Only when no page has claimed it. This fetch resolves late, so it used to
+                // overwrite whatever the page had just set.
+                if (!isPageTitleOwned()) {
+                    document.title = data.meta_title || 'CCTV Online';
+                }
                 updateMetaTag('description', data.meta_description);
                 updateMetaTag('keywords', data.meta_keywords);
                 updateMetaTag('og:title', data.meta_title, 'property');

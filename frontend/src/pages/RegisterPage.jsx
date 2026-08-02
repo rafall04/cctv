@@ -12,6 +12,7 @@ import { Link } from 'react-router-dom';
 import { authService } from '../services/authService';
 import userService from '../services/userService';
 import { useBranding } from '../contexts/BrandingContext';
+import { setPageTitle } from '../utils/pageTitle.js';
 
 const inputClass = 'w-full px-4 py-2.5 bg-surface-sunken border border-edge rounded-xl text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary';
 
@@ -32,9 +33,7 @@ export default function RegisterPage() {
      * said "CCTV Publik Online" regardless of where the visitor actually was. AreaPublicPage already
      * set its own; this is the same idea, nothing more.
      */
-    useEffect(() => {
-        document.title = 'Daftar Sewa CCTV - RAF';
-    }, []);
+    useEffect(() => setPageTitle('Daftar Sewa CCTV - RAF'), []);
     const { branding } = useBranding();
     /*
      * Built here rather than via buildWhatsappLink: that helper renders the branding-wide template,
