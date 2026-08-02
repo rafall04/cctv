@@ -12,13 +12,18 @@
  * identifiable people, and the operator carries that liability, not the author. A vote carries no
  * text, so there is nothing to moderate and nothing to take down.
  *
- * WHY THE PUBLIC ONLY SEES THE POSITIVE COUNT
- * A public dislike counter would sit on 36 feeds this operator does not own — they belong to
- * Bojonegoro and Magetan — and would read as the operator's failing. Five of them are dead at the
- * source right now and would collect a visible pile of dislikes nobody here can act on. The
- * negative vote is still recorded and still counted; it is a QUALITY signal for the operator
- * (`getAdminSummary`), which is the only place it can actually cause something to happen.
- * A voter always sees their OWN vote, either way, or the button could not show its state.
+ * BOTH COUNTS ARE PUBLIC — AN OWNER'S DECISION, 2026-08-02
+ * The first cut published likes only, reasoning that a visible dislike pile on feeds this operator
+ * does not own would read as their failing. The owner overruled it: the page should say what
+ * visitors actually reported. That is the stronger argument. A camera whose picture has gone
+ * useless is a fact about what a visitor is being offered, and hiding it while still showing the
+ * praise makes the counter an advertisement rather than a measurement — the same dishonesty the
+ * playback coverage guard exists to prevent elsewhere in this codebase.
+ *
+ * `getAdminSummary` therefore adds ranking and camera names for maintenance triage, not secrecy.
+ * If public dislikes are ever reconsidered, note what actually changes: brigading a specific feed
+ * becomes worth someone's time, and five cameras that are dead at the SOURCE will accumulate
+ * blame that nobody reading the page can act on.
  */
 
 import { query, queryOne, execute } from '../database/connectionPool.js';
@@ -81,7 +86,7 @@ function readMyValue(cameraId, deviceHash) {
 class CameraReactionService {
     /**
      * Cast, change, or withdraw this device's vote.
-     * @returns {{likes: number, myValue: number}} the public shape — never the dislike total.
+     * @returns {{likes: number, dislikes: number, myValue: number}} the public shape.
      */
     setReaction(cameraId, deviceHash, value) {
         if (!deviceHash) throw badRequest('Perangkat tidak dikenali');
@@ -112,19 +117,21 @@ class CameraReactionService {
         return this.getPublicSummary(cameraId, deviceHash);
     }
 
-    /** What a visitor may see: the fleet's positive count, plus their own vote whichever way it went. */
+    /** Both totals as voted, plus this device's own vote so the buttons can show their state. */
     getPublicSummary(cameraId, deviceHash) {
         requirePublicCamera(cameraId);
+        const counts = readCounts(cameraId);
         return {
-            likes: readCounts(cameraId).likes,
+            likes: counts.likes,
+            dislikes: counts.dislikes,
             myValue: readMyValue(cameraId, deviceHash),
         };
     }
 
     /**
-     * Staff view: both sides, worst first. This is the whole point of collecting the negative vote —
-     * "camera 25 has 30 dislikes and 2 likes" is a maintenance ticket that nothing else in the
-     * system would ever have raised.
+     * Staff view: the same two numbers the public sees, but ranked worst-first and joined to camera
+     * and area names. "Camera 25 — 30 bermasalah, 2 bagus" is a maintenance ticket; the public page
+     * shows the counts but cannot sort the fleet by them.
      */
     getAdminSummary() {
         const rows = query(`

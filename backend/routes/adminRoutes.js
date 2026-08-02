@@ -181,7 +181,7 @@ export default async function adminRoutes(fastify, options) {
         handler: getRecordingCapacity,
     });
 
-    // Visitor verdicts per camera. Staff-only because the NEGATIVE side lives here and nowhere else.
+    // Visitor verdicts ranked worst-first for triage. The counts themselves are public.
     fastify.get('/cameras/reactions', {
         onRequest: [authMiddleware, requireAdmin],
         handler: listCameraReactionSummary,

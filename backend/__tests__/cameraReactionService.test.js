@@ -62,7 +62,7 @@ afterEach(() => {
 
 describe('voting', () => {
     it('counts one like and reflects it back to the voter', () => {
-        expect(reactions.setReaction(1, DEVICE, 1)).toEqual({ likes: 1, myValue: 1 });
+        expect(reactions.setReaction(1, DEVICE, 1)).toEqual({ likes: 1, dislikes: 0, myValue: 1 });
     });
 
     /* The composite primary key is the rule; a second tap must move the vote, not add one. */
@@ -70,14 +70,14 @@ describe('voting', () => {
         reactions.setReaction(1, DEVICE, 1);
         const after = reactions.setReaction(1, DEVICE, -1);
 
-        expect(after).toEqual({ likes: 0, myValue: -1 });
+        expect(after).toEqual({ likes: 0, dislikes: 1, myValue: -1 });
         expect(db.prepare('SELECT COUNT(*) AS n FROM camera_reactions').get().n).toBe(1);
     });
 
     it('withdraws the vote entirely on 0', () => {
         reactions.setReaction(1, DEVICE, 1);
 
-        expect(reactions.setReaction(1, DEVICE, 0)).toEqual({ likes: 0, myValue: 0 });
+        expect(reactions.setReaction(1, DEVICE, 0)).toEqual({ likes: 0, dislikes: 0, myValue: 0 });
         expect(db.prepare('SELECT COUNT(*) AS n FROM camera_reactions').get().n).toBe(0);
     });
 
@@ -144,18 +144,14 @@ describe('what each audience is shown', () => {
     });
 
     /*
-     * The dislike total is deliberately absent from the public shape: it would sit on feeds this
-     * operator does not own and read as their failing. The voter still sees their OWN vote, or the
-     * button could not show its state.
+     * Both totals are public (owner's decision, 2026-08-02): showing the praise while withholding
+     * the complaints would make the counter an advertisement rather than a measurement.
      */
-    it('never hands the dislike total to a visitor, but does show them their own vote', () => {
-        const summary = reactions.getPublicSummary(1, DEVICE);
-
-        expect(summary).toEqual({ likes: 1, myValue: -1 });
-        expect(Object.keys(summary)).not.toContain('dislikes');
+    it('publishes both totals to a visitor, plus their own vote', () => {
+        expect(reactions.getPublicSummary(1, DEVICE)).toEqual({ likes: 1, dislikes: 2, myValue: -1 });
     });
 
-    it('gives staff both sides, worst camera first', () => {
+    it('gives staff the same numbers, but ranked worst camera first', () => {
         db.prepare("INSERT INTO cameras (id, name, area_id) VALUES (5, 'BAGUS', 3)").run();
         reactions.setReaction(5, DEVICE, 1);
 
@@ -168,6 +164,6 @@ describe('what each audience is shown', () => {
     it('reports an unvoted camera as zero rather than omitting the count', () => {
         db.prepare("INSERT INTO cameras (id, name) VALUES (6, 'BELUM DINILAI')").run();
 
-        expect(reactions.getPublicSummary(6, DEVICE)).toEqual({ likes: 0, myValue: 0 });
+        expect(reactions.getPublicSummary(6, DEVICE)).toEqual({ likes: 0, dislikes: 0, myValue: 0 });
     });
 });

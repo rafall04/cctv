@@ -5,9 +5,9 @@
  * MainFuncs: listCameraReactionSummary.
  * SideEffects: None — read-only.
  *
- * This is the only place the negative vote is ever shown. It is withheld from the public because a
- * visible dislike pile on a third party's feed reads as this operator's failing, and shown here
- * because "camera 25: 30 tidak, 2 suka" is a maintenance ticket nothing else in the system raises.
+ * Both counts are public as of 2026-08-02 (see cameraReactionService for why). What this adds is
+ * TRIAGE: the fleet ranked worst-first with camera and area names attached, which is a maintenance
+ * queue rather than a per-camera number a visitor happens to be looking at.
  */
 
 import cameraReactionService from '../services/cameraReactionService.js';

@@ -5,12 +5,11 @@
  * MainFuncs: CameraReactionBar.
  * SideEffects: One GET per camera opened; one POST per tap.
  *
- * WHY ONLY THE LIKE CARRIES A NUMBER
- * The dislike is recorded and it matters — it is how an operator learns a feed has gone blurry —
- * but it is reported to the admin panel, not printed here. These 36 feeds belong to Bojonegoro and
- * Magetan, not to this operator, and five of them are dead at the source right now; a visible pile
- * of dislikes on those would read as this site's failing and could not be acted on by anyone who
- * can see it. The voter still sees their OWN choice, or the button could not show its state.
+ * BOTH COUNTS ARE SHOWN — OWNER'S DECISION, 2026-08-02
+ * The first cut printed likes only. The owner overruled it so the page says what visitors actually
+ * reported: a camera whose picture has gone useless is a fact about what someone is being offered,
+ * and showing the praise while hiding the complaints turns the counter into an advertisement.
+ * The voter also sees their own choice, or the button could not show its state.
  *
  * FAILURE IS SILENCE
  * This sits directly under a live player. A feedback endpoint that is down must not render an
@@ -63,9 +62,9 @@ export default function CameraReactionBar({ cameraId }) {
                 <span aria-hidden="true">👍</span>
                 <span>Bagus</span>
                 {/*
-                  * The count is omitted at zero rather than printed as "0". On a fresh install all
-                  * 36 cameras would otherwise show a row of zeroes, which reads as "nobody likes
-                  * anything here" — a claim the data does not actually make.
+                  * Counts are omitted at zero rather than printed as "0". On a fresh install all 36
+                  * cameras would otherwise show a row of zeroes, which reads as a verdict ("nobody
+                  * rates anything here") when the truth is that nobody has voted yet.
                   */}
                 {state.likes > 0 && <span className="tabular-nums">{state.likes}</span>}
             </button>
@@ -80,6 +79,7 @@ export default function CameraReactionBar({ cameraId }) {
             >
                 <span aria-hidden="true">👎</span>
                 <span>Bermasalah</span>
+                {state.dislikes > 0 && <span className="tabular-nums">{state.dislikes}</span>}
             </button>
 
             {state.myValue !== 0 && (

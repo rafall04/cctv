@@ -19,20 +19,29 @@ vi.mock('../../services/cameraFeedbackService', () => ({
 
 beforeEach(() => {
     vi.clearAllMocks();
-    cameraFeedbackService.getReaction.mockResolvedValue({ success: true, data: { likes: 4, myValue: 0 } });
+    cameraFeedbackService.getReaction.mockResolvedValue({
+        success: true, data: { likes: 4, dislikes: 2, myValue: 0 },
+    });
 });
 
 describe('CameraReactionBar', () => {
-    it('shows the like count and no vote of its own before the visitor taps', async () => {
+    /*
+     * Both totals are printed (owner's decision, 2026-08-02): showing praise while hiding
+     * complaints would make the counter an advertisement rather than a measurement.
+     */
+    it('shows both counts and no vote of its own before the visitor taps', async () => {
         render(<CameraReactionBar cameraId={7} />);
 
         const like = await screen.findByRole('button', { name: 'Kamera ini bagus' });
         expect(like.getAttribute('aria-pressed')).toBe('false');
         expect(like.textContent).toContain('4');
+        expect(screen.getByRole('button', { name: 'Kamera ini bermasalah' }).textContent).toContain('2');
     });
 
     it('sends the vote and shows the result the server returned', async () => {
-        cameraFeedbackService.setReaction.mockResolvedValue({ success: true, data: { likes: 5, myValue: 1 } });
+        cameraFeedbackService.setReaction.mockResolvedValue({
+            success: true, data: { likes: 5, dislikes: 2, myValue: 1 },
+        });
         render(<CameraReactionBar cameraId={7} />);
 
         fireEvent.click(await screen.findByRole('button', { name: 'Kamera ini bagus' }));
@@ -45,8 +54,12 @@ describe('CameraReactionBar', () => {
 
     /* The same button is the undo — there is no separate "batal" control to find. */
     it('withdraws the vote when the chosen side is tapped again', async () => {
-        cameraFeedbackService.getReaction.mockResolvedValue({ success: true, data: { likes: 5, myValue: 1 } });
-        cameraFeedbackService.setReaction.mockResolvedValue({ success: true, data: { likes: 4, myValue: 0 } });
+        cameraFeedbackService.getReaction.mockResolvedValue({
+            success: true, data: { likes: 5, dislikes: 0, myValue: 1 },
+        });
+        cameraFeedbackService.setReaction.mockResolvedValue({
+            success: true, data: { likes: 4, dislikes: 0, myValue: 0 },
+        });
         render(<CameraReactionBar cameraId={7} />);
 
         fireEvent.click(await screen.findByRole('button', { name: 'Kamera ini bagus' }));
@@ -54,8 +67,10 @@ describe('CameraReactionBar', () => {
         await waitFor(() => expect(cameraFeedbackService.setReaction).toHaveBeenCalledWith(7, 0));
     });
 
-    it('records a problem report without printing a tally for it', async () => {
-        cameraFeedbackService.setReaction.mockResolvedValue({ success: true, data: { likes: 4, myValue: -1 } });
+    it('records a problem report and shows how many others said the same', async () => {
+        cameraFeedbackService.setReaction.mockResolvedValue({
+            success: true, data: { likes: 4, dislikes: 3, myValue: -1 },
+        });
         render(<CameraReactionBar cameraId={7} />);
 
         fireEvent.click(await screen.findByRole('button', { name: 'Kamera ini bermasalah' }));
@@ -63,17 +78,19 @@ describe('CameraReactionBar', () => {
         await waitFor(() => expect(cameraFeedbackService.setReaction).toHaveBeenCalledWith(7, -1));
         const dislike = screen.getByRole('button', { name: 'Kamera ini bermasalah' });
         expect(dislike.getAttribute('aria-pressed')).toBe('true');
-        // The visitor is never shown how many others said the same.
-        expect(dislike.textContent).not.toMatch(/\d/);
+        expect(dislike.textContent).toContain('3');
     });
 
-    /* A fresh install would otherwise show a row of zeroes, reading as "nobody likes anything". */
-    it('omits the count entirely at zero rather than printing 0', async () => {
-        cameraFeedbackService.getReaction.mockResolvedValue({ success: true, data: { likes: 0, myValue: 0 } });
+    /* "0" would read as a verdict; the truth is that nobody has voted yet. */
+    it('omits a count entirely at zero rather than printing 0', async () => {
+        cameraFeedbackService.getReaction.mockResolvedValue({
+            success: true, data: { likes: 0, dislikes: 0, myValue: 0 },
+        });
         render(<CameraReactionBar cameraId={7} />);
 
         const like = await screen.findByRole('button', { name: 'Kamera ini bagus' });
         expect(like.textContent).not.toMatch(/\d/);
+        expect(screen.getByRole('button', { name: 'Kamera ini bermasalah' }).textContent).not.toMatch(/\d/);
     });
 
     /** It sits under a live player: a broken endpoint must not put an error beside the video. */
