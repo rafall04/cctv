@@ -16,12 +16,25 @@
  */
 
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import PlaybackTokenAccess from './PlaybackTokenAccess';
 
 vi.mock('./PlaybackAccessPanel.jsx', () => ({
     default: () => <div data-testid="access-panel" />,
 }));
+
+/*
+ * Stubbed so the cases below stay about token state. Whether anything is on sale is a separate
+ * question, asserted on its own at the end of this file.
+ */
+let offerState = { ready: true, offered: true };
+vi.mock('../../hooks/playback/usePlaybackAccessOffer', () => ({
+    default: () => offerState,
+}));
+
+beforeEach(() => {
+    offerState = { ready: true, offered: true };
+});
 
 const TOKEN_POLICY = { accessMode: 'token_full', playbackWindowHours: 4 };
 
@@ -223,6 +236,34 @@ describe('PlaybackTokenAccess when the token does not reach this camera', () => 
 
     it('falls back to the activation payload only while no policy has arrived', () => {
         setup({ playbackPolicy: null, tokenStatus: { id: 5 } });
+
+        expect(screen.getByText('Akses playback aktif')).toBeTruthy();
+    });
+});
+
+/*
+ * With every package disabled, "Belum punya token? Coba gratis 3 hari atau beli akses" opened a
+ * panel with nothing in it — the invitation could not be kept. The catalogue decides whether the
+ * invitation is extended at all.
+ */
+describe('PlaybackTokenAccess when nothing is on sale', () => {
+    it('withdraws the invitation entirely rather than opening an empty panel', () => {
+        offerState = { ready: true, offered: false };
+
+        setup({ playbackPolicy: { accessMode: 'public_preview', previewMinutes: 10 }, tokenStatus: null });
+
+        expect(screen.queryByText(/Belum punya token/)).toBeNull();
+        expect(screen.queryByText(/Coba gratis 3 hari atau beli akses/)).toBeNull();
+    });
+
+    /*
+     * Nothing about the catalogue should disturb someone who already holds access: their token keeps
+     * working, and the panel is not part of that story.
+     */
+    it('leaves an existing token holder untouched', () => {
+        offerState = { ready: true, offered: false };
+
+        setup({ playbackPolicy: TOKEN_POLICY });
 
         expect(screen.getByText('Akses playback aktif')).toBeTruthy();
     });

@@ -20,6 +20,7 @@
 
 import { useState, useEffect } from 'react';
 import PlaybackAccessPanel from './PlaybackAccessPanel.jsx';
+import usePlaybackAccessOffer from '../../hooks/playback/usePlaybackAccessOffer';
 
 /** One labelled fact. Stacking these beats a run-on sentence: each value is findable at a glance. */
 function Fact({ label, value, onToggle, isOpen }) {
@@ -63,6 +64,8 @@ export default function PlaybackTokenAccess({
     /** Set by "Ganti token": the only way the form returns while access is still held. */
     const [isSwapping, setIsSwapping] = useState(false);
     const [showCameras, setShowCameras] = useState(false);
+    /** Nothing on sale means there is no invitation to extend — see usePlaybackAccessOffer. */
+    const { offered: accessOffered } = usePlaybackAccessOffer();
 
     /*
      * The capped-playback notice sits far above this box, so its call to action has to do two things
@@ -268,7 +271,7 @@ export default function PlaybackTokenAccess({
                             dalam token, atau masukkan token lain.
                         </p>
                     )}
-                    {!isSwapping && !heldButOutOfScope && (
+                    {!isSwapping && !heldButOutOfScope && accessOffered && (
                         <div id="akses-playback">
                             <button
                                 type="button"

@@ -11,12 +11,17 @@
  * picture, on the page whose entire job is showing a picture.
  */
 
+import usePlaybackAccessOffer from '../../hooks/playback/usePlaybackAccessOffer';
+
 export default function PlaybackOptions({
     playbackPolicy = null,
     showPublicNotice = false,
     autoPlayEnabled,
     onAutoPlayToggle,
 }) {
+    /** The notice still explains the limit when nothing is on sale; only the sales pitch goes. */
+    const { offered: accessOffered } = usePlaybackAccessOffer();
+
     return (
         <div className="space-y-3 rounded-card border border-edge bg-surface p-3 sm:p-4">
             {/*
@@ -51,14 +56,19 @@ export default function PlaybackOptions({
                      * while it was still COLLAPSED, so the visitor landed in the right place and saw
                      * nothing happen. The intent here is "open the access panel", and a hash cannot
                      * express that — nor re-fire when the hash is already set.
+                     *
+                     * Hidden entirely when no package is enabled: the panel it opens would be empty,
+                     * and the button names a free trial that the server would refuse.
                      */}
-                    <button
-                        type="button"
-                        onClick={() => window.dispatchEvent(new CustomEvent('playback:open-access'))}
-                        className="mt-2 inline-flex items-center gap-2 rounded-control bg-primary px-3 py-1.5 text-xs font-medium text-white"
-                    >
-                        Coba gratis 3 hari atau beli akses
-                    </button>
+                    {accessOffered && (
+                        <button
+                            type="button"
+                            onClick={() => window.dispatchEvent(new CustomEvent('playback:open-access'))}
+                            className="mt-2 inline-flex items-center gap-2 rounded-control bg-primary px-3 py-1.5 text-xs font-medium text-white"
+                        >
+                            Coba gratis 3 hari atau beli akses
+                        </button>
+                    )}
                 </div>
             )}
 

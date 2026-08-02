@@ -12,10 +12,24 @@
  */
 
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import PlaybackOptions from './PlaybackOptions';
 
+/*
+ * The catalogue lookup is stubbed so these cases stay about the NOTICE. Its real behaviour — the
+ * button disappearing when nothing is on sale — is asserted in its own case below and in
+ * usePlaybackAccessOffer.test.js.
+ */
+let offerState = { ready: true, offered: true };
+vi.mock('../../hooks/playback/usePlaybackAccessOffer', () => ({
+    default: () => offerState,
+}));
+
 const base = { autoPlayEnabled: false, onAutoPlayToggle: vi.fn() };
+
+beforeEach(() => {
+    offerState = { ready: true, offered: true };
+});
 
 describe('PlaybackOptions', () => {
     it('leaves the token reach to the access panel instead of repeating it', () => {
@@ -84,6 +98,31 @@ describe('PlaybackOptions notice honesty', () => {
         );
 
         expect(screen.queryByText('Akses Playback Publik Terbatas')).toBeNull();
+        expect(screen.queryByRole('button', { name: /Coba gratis 3 hari/ })).toBeNull();
+    });
+
+    /*
+     * The operator disabled every package. The limit itself is still true and still worth stating —
+     * it is the sales pitch that would be a lie, because the panel behind it is empty and the server
+     * refuses both the trial and any order.
+     */
+    it('keeps the limit but drops the sales pitch when no package is on sale', () => {
+        offerState = { ready: true, offered: false };
+
+        render(
+            <PlaybackOptions
+                {...base}
+                showPublicNotice
+                playbackPolicy={{
+                    accessMode: 'public_preview',
+                    previewMinutes: 10,
+                    notice: { enabled: true, title: 'Akses Playback Publik Terbatas', text: 'Hanya 10 menit terakhir.' },
+                }}
+            />,
+        );
+
+        expect(screen.getByText('Akses Playback Publik Terbatas')).toBeTruthy();
+        expect(screen.getByText('Hanya 10 menit terakhir.')).toBeTruthy();
         expect(screen.queryByRole('button', { name: /Coba gratis 3 hari/ })).toBeNull();
     });
 });

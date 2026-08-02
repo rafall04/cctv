@@ -246,6 +246,23 @@ export default function PlaybackAccessPanel({ onIssued = null }) {
                     </p>
                 </>
             )}
+
+            {/*
+              * Nothing on sale. The buttons that open this panel are hidden in the same situation
+              * (usePlaybackAccessOffer), so this is the narrow case where the catalogue was switched
+              * off while the panel was already open — and an empty box would read as broken.
+              *
+              * Naming the operator here contradicts 42992f6, which removed the "Hubungi Admin" button
+              * from the limit notice, and does so deliberately: that removal was justified by
+              * self-serve existing. With every package disabled it no longer does, and asking the
+              * operator is the only route left. Restore the silence, not the button, if selling resumes.
+              */}
+            {!access && !order && products.length === 0 && (
+                <p className="rounded-control border border-edge bg-surface-raised px-3 py-2 text-xs text-content-muted">
+                    Saat ini tidak ada paket akses playback yang dijual. Hubungi pengelola jika Anda
+                    membutuhkan akses rekaman.
+                </p>
+            )}
         </div>
     );
 }
