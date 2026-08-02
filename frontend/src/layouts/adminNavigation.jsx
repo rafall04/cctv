@@ -37,6 +37,11 @@ export const AdminIcons = {
     Area: ico(<>{p('M17.657 16.657L13.414 20.9a2 2 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z')}{p('M15 11a3 3 0 11-6 0 3 3 0 016 0z')}</>),
     Ronda: ico(<>{p('M4 8V6a2 2 0 012-2h2M16 4h2a2 2 0 012 2v2M20 16v2a2 2 0 01-2 2h-2M8 20H6a2 2 0 01-2-2v-2')}{p('M12 10a2 2 0 100 4 2 2 0 000-4z')}</>),
     Pulse: ico(p('M3 12h3l2.5-7 4 14 2.5-7H21')),
+    // A raised flag — what a visitor does when something is wrong with a camera.
+    Report: ico(p('M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 2H21l-3 6 3 6h-8.5l-1-2H5a2 2 0 00-2 2z')),
+    // Thumb — the one-tap verdict. Deliberately not the Feedback speech bubble: that route is the
+    // site-wide suggestion box, and two identical glyphs would make the icon column meaningless.
+    Verdict: ico(p('M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017a2 2 0 01-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5')),
     Recording: ico(<>{p('M7 4v16M17 4v16M3 8h4m10 0h4M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z')}</>),
     Playback: ico(<>{p('M14.752 11.168l-4.197-2.432A1 1 0 009 9.602v4.796a1 1 0 001.555.832l4.197-2.432a1 1 0 000-1.73z')}{p('M21 12a9 9 0 11-18 0 9 9 0 0118 0z')}</>),
     Key: ico(p('M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z')),
@@ -85,6 +90,8 @@ export const NAV_GROUPS = [
             { label: 'Area', path: '/admin/areas', icon: AdminIcons.Area },
             { label: 'Ronda Digital', path: '/admin/ronda', icon: AdminIcons.Ronda, adminOnly: true },
             { label: 'Diagnostik Kamera', path: '/admin/health-debug', icon: AdminIcons.Pulse },
+            { label: 'Laporan Kamera', path: '/admin/camera-reports', icon: AdminIcons.Report },
+            { label: 'Penilaian Kamera', path: '/admin/camera-reactions', icon: AdminIcons.Verdict },
         ],
     },
     {

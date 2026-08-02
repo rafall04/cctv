@@ -132,18 +132,62 @@ class CameraReportService {
         });
     }
 
-    /** Operator queue: open reports first, newest first within each group. */
-    listReports({ limit = 50 } = {}) {
+    /**
+     * Operator queue.
+     *
+     * @param {{status?: string, category?: string, cameraId?: number, page?: number,
+     *          limit?: number, sort?: 'newest'|'oldest'}} input
+     *
+     * `status: 'open'` is a pseudo-value meaning "anything not finished". The compact panel on the
+     * camera page and the "belum ditutup" tab both want that, and expressing it as two separate
+     * requests (baru + dibaca) would make the counts disagree the moment a third status appears.
+     *
+     * The summary is computed over the UNFILTERED table on purpose: an operator filtering to
+     * "buram" still needs to see that 12 reports are open overall, or the filter quietly becomes a
+     * blindfold.
+     */
+    listReports({ status = null, category = null, cameraId = null, page = 1, limit = 25, sort = 'newest' } = {}) {
+        const where = [];
+        const params = [];
+
+        if (status === 'open') {
+            where.push("r.status != 'selesai'");
+        } else if (STATUSES.includes(status)) {
+            where.push('r.status = ?');
+            params.push(status);
+        }
+        if (CATEGORIES[category]) {
+            where.push('r.category = ?');
+            params.push(category);
+        }
+        if (Number.isInteger(Number(cameraId)) && Number(cameraId) > 0) {
+            where.push('r.camera_id = ?');
+            params.push(Number(cameraId));
+        }
+
+        const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+        const safeLimit = Math.max(1, Math.min(Number(limit) || 25, 200));
+        const safePage = Math.max(1, Number(page) || 1);
+        const offset = (safePage - 1) * safeLimit;
+        const total = Number(queryOne(`SELECT COUNT(*) AS n FROM camera_reports r ${whereSql}`, params)?.n) || 0;
+
+        /*
+         * Unfinished always sorts above finished, whichever direction the operator picked. Date is
+         * how they scan WITHIN that split; a resolved report floating to the top because it happens
+         * to be the newest would bury the work that still needs doing.
+         */
         const rows = query(
             `SELECT r.id, r.camera_id, r.category, r.message, r.occurred_at, r.status, r.created_at,
                     c.name AS camera_name, a.name AS area_name
                FROM camera_reports r
           LEFT JOIN cameras c ON c.id = r.camera_id
           LEFT JOIN areas a ON a.id = c.area_id
+             ${whereSql}
            ORDER BY CASE WHEN r.status = 'selesai' THEN 1 ELSE 0 END ASC,
-                    r.created_at DESC
-              LIMIT ?`,
-            [Math.max(1, Math.min(Number(limit) || 50, 200))]
+                    r.created_at ${sort === 'oldest' ? 'ASC' : 'DESC'},
+                    r.id ${sort === 'oldest' ? 'ASC' : 'DESC'}
+              LIMIT ? OFFSET ?`,
+            [...params, safeLimit, offset]
         );
 
         return {
@@ -159,10 +203,45 @@ class CameraReportService {
                 status: row.status,
                 createdAt: row.created_at,
             })),
-            openCount: Number(
-                queryOne("SELECT COUNT(*) AS n FROM camera_reports WHERE status != 'selesai'")?.n
-            ) || 0,
+            pagination: {
+                page: safePage,
+                limit: safeLimit,
+                total,
+                totalPages: Math.max(1, Math.ceil(total / safeLimit)),
+            },
+            summary: this.getSummary(),
         };
+    }
+
+    /** Counts across the whole table — never narrowed by the caller's filter. */
+    getSummary() {
+        const byStatus = Object.fromEntries(STATUSES.map((s) => [s, 0]));
+        for (const row of query('SELECT status, COUNT(*) AS n FROM camera_reports GROUP BY status')) {
+            if (row.status in byStatus) byStatus[row.status] = Number(row.n) || 0;
+        }
+
+        const byCategory = Object.fromEntries(Object.keys(CATEGORIES).map((k) => [k, 0]));
+        for (const row of query('SELECT category, COUNT(*) AS n FROM camera_reports GROUP BY category')) {
+            if (row.category in byCategory) byCategory[row.category] = Number(row.n) || 0;
+        }
+
+        const total = Object.values(byStatus).reduce((sum, n) => sum + n, 0);
+        return { total, open: total - byStatus.selesai, byStatus, byCategory };
+    }
+
+    /** The cameras that have ever been reported — the filter list, so it names no empty options. */
+    listReportedCameras() {
+        return query(`
+            SELECT r.camera_id AS id, c.name, COUNT(*) AS reports
+              FROM camera_reports r
+         LEFT JOIN cameras c ON c.id = r.camera_id
+          GROUP BY r.camera_id, c.name
+          ORDER BY reports DESC, c.name ASC
+        `).map((row) => ({
+            id: row.id,
+            name: row.name || `#${row.id}`,
+            reports: Number(row.reports) || 0,
+        }));
     }
 
     updateReportStatus(id, status) {

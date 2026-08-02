@@ -40,15 +40,24 @@ const REACTIONS = [
     { id: 40, name: 'DISUKAI', areaName: null, likes: 12, dislikes: 0 },
 ];
 
+const listed = (reports, open = 1) => ({
+    success: true,
+    data: { reports, summary: { total: reports.length, open, byStatus: {}, byCategory: {} } },
+});
+const rated = (cameras) => ({
+    success: true,
+    data: { cameras, totals: { cameras: cameras.length, rated: cameras.length, likes: 0, dislikes: 0 } },
+});
+
 const empty = () => {
-    adminService.getCameraReports.mockResolvedValue({ success: true, data: { reports: [], openCount: 0 } });
-    adminService.getCameraReactions.mockResolvedValue({ success: true, data: [] });
+    adminService.getCameraReports.mockResolvedValue(listed([], 0));
+    adminService.getCameraReactions.mockResolvedValue(rated([]));
 };
 
 beforeEach(() => {
     vi.clearAllMocks();
-    adminService.getCameraReports.mockResolvedValue({ success: true, data: { reports: REPORTS, openCount: 1 } });
-    adminService.getCameraReactions.mockResolvedValue({ success: true, data: REACTIONS });
+    adminService.getCameraReports.mockResolvedValue(listed(REPORTS));
+    adminService.getCameraReactions.mockResolvedValue(rated(REACTIONS));
 });
 
 describe('CameraFeedbackPanel — reports', () => {
@@ -143,16 +152,31 @@ describe('CameraFeedbackPanel — negative votes', () => {
 
     /** A capped list that does not say it is capped reads as the whole story. */
     it('says so when the list is truncated', async () => {
-        adminService.getCameraReports.mockResolvedValue({ success: true, data: { reports: [], openCount: 0 } });
-        adminService.getCameraReactions.mockResolvedValue({
-            success: true,
-            data: Array.from({ length: 14 }, (_, i) => ({
-                id: i + 1, name: `KAM ${i + 1}`, areaName: null, likes: 0, dislikes: 14 - i,
+        adminService.getCameraReports.mockResolvedValue(listed([], 0));
+        adminService.getCameraReactions.mockResolvedValue(rated(
+            Array.from({ length: 14 }, (_, i) => ({
+                id: i + 1, name: `KAM ${i + 1}`, areaName: null, likes: 0, dislikes: 14 - i, total: 14 - i,
             })),
-        });
+        ));
         render(<CameraFeedbackPanel />);
 
-        expect(await screen.findByText(/Menampilkan 10 terburuk dari 14 kamera/)).toBeTruthy();
+        expect(await screen.findByText(/Menampilkan 5 terburuk dari 14 kamera/)).toBeTruthy();
+    });
+
+    /* The panel is deliberately partial; without these the caps would read as the whole story. */
+    it('offers a way through to the full pages', async () => {
+        render(<CameraFeedbackPanel />);
+
+        expect(await screen.findByRole('link', { name: 'Buka semua laporan' })).toBeTruthy();
+        expect(screen.getByRole('link', { name: 'Buka penilaian semua kamera' })).toBeTruthy();
+    });
+
+    /** The summary count comes from the server, not from the five rows that happen to be shown. */
+    it('states the true open total even though it lists only a few', async () => {
+        adminService.getCameraReports.mockResolvedValue(listed([REPORTS[0]], 12));
+        render(<CameraFeedbackPanel />);
+
+        expect(await screen.findByText('12 laporan belum ditutup')).toBeTruthy();
     });
 });
 

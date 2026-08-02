@@ -205,9 +205,18 @@ export const adminService = {
      * The visitor report queue. Never exposed publicly: the text comes from anonymous devices and
      * is safe to accept precisely because it is never rendered back to anyone but staff.
      */
-    async getCameraReports() {
+    /**
+     * @param {{status?: string, category?: string, cameraId?: number, page?: number,
+     *          limit?: number, sort?: string}} [params]
+     * Empty values are dropped rather than sent blank: the route schema rejects unknown shapes, and
+     * `?status=` would be a filter the operator never chose.
+     */
+    async getCameraReports(params = {}) {
         try {
-            const response = await apiClient.get('/api/admin/cameras/reports');
+            const query = Object.fromEntries(
+                Object.entries(params).filter(([, value]) => value !== '' && value !== null && value !== undefined),
+            );
+            const response = await apiClient.get('/api/admin/cameras/reports', { params: query });
             return response.data;
         } catch (error) {
             console.error('Get camera reports error:', error);

@@ -194,6 +194,22 @@ export default async function adminRoutes(fastify, options) {
      */
     fastify.get('/cameras/reports', {
         onRequest: [authMiddleware, requireAdmin],
+        schema: {
+            querystring: {
+                type: 'object',
+                properties: {
+                    // Values are checked against the service's own sets, not enumerated here — one
+                    // list to keep in step instead of two that can drift.
+                    status: { type: 'string', maxLength: 16 },
+                    category: { type: 'string', maxLength: 16 },
+                    cameraId: { type: 'integer', minimum: 1 },
+                    page: { type: 'integer', minimum: 1 },
+                    limit: { type: 'integer', minimum: 1, maximum: 200 },
+                    sort: { type: 'string', enum: ['newest', 'oldest'] },
+                },
+                additionalProperties: false,
+            },
+        },
         handler: listCameraReports,
     });
 

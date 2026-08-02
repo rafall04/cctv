@@ -164,26 +164,87 @@ describe('operator queue', () => {
     });
 
     it('carries the camera and a human label for the category', () => {
-        const { reports: list, openCount } = reports.listReports();
+        const { reports: list, summary } = reports.listReports();
 
-        expect(openCount).toBe(2);
+        expect(summary.open).toBe(2);
         expect(list[0].cameraName).toBe('PEREMPATAN');
         expect(list[0].areaName).toBe('KEC BOJONEGORO');
         expect(list.map((r) => r.categoryLabel)).toContain('Tidak tampil / mati');
     });
 
-    it('sinks resolved reports below the open ones', () => {
+    /* Work that still needs doing must never be buried by something already closed. */
+    it('sinks resolved reports below the open ones, whichever way dates are sorted', () => {
         const first = reports.listReports().reports[0];
         reports.updateReportStatus(first.id, 'selesai');
 
-        const { reports: list, openCount } = reports.listReports();
-
-        expect(openCount).toBe(1);
-        expect(list[list.length - 1].id).toBe(first.id);
+        for (const sort of ['newest', 'oldest']) {
+            const { reports: list, summary } = reports.listReports({ sort });
+            expect(summary.open).toBe(1);
+            expect(list[list.length - 1].id).toBe(first.id);
+        }
     });
 
     it('rejects a status that is not part of the workflow', () => {
         expect(() => reports.updateReportStatus(1, 'dibuang')).toThrow(/Status tidak valid/);
+    });
+
+    it('narrows to one status, one category, or one camera', () => {
+        db.prepare("INSERT INTO cameras (id, name) VALUES (17, 'LAIN')").run();
+        reports.submitReport(17, { category: 'buram', deviceHash: 'device-ccc' });
+
+        expect(reports.listReports({ category: 'buram' }).reports).toHaveLength(2);
+        expect(reports.listReports({ cameraId: 17 }).reports).toHaveLength(1);
+        expect(reports.listReports({ status: 'baru' }).reports).toHaveLength(3);
+    });
+
+    /* 'open' is one value, not two requests — a third status later must not change the meaning. */
+    it('treats "open" as everything not finished', () => {
+        const first = reports.listReports().reports[0];
+        reports.updateReportStatus(first.id, 'dibaca');
+        reports.updateReportStatus(reports.listReports().reports[1].id, 'selesai');
+
+        const open = reports.listReports({ status: 'open' }).reports;
+
+        expect(open).toHaveLength(1);
+        expect(open[0].status).toBe('dibaca');
+    });
+
+    it('ignores a filter value it does not recognise instead of returning nothing', () => {
+        expect(reports.listReports({ category: 'entahlah' }).reports).toHaveLength(2);
+        expect(reports.listReports({ status: 'ngawur' }).reports).toHaveLength(2);
+    });
+
+    it('pages through without losing the total', () => {
+        const firstPage = reports.listReports({ limit: 1, page: 1 });
+        const secondPage = reports.listReports({ limit: 1, page: 2 });
+
+        expect(firstPage.reports).toHaveLength(1);
+        expect(firstPage.pagination).toMatchObject({ page: 1, limit: 1, total: 2, totalPages: 2 });
+        expect(secondPage.reports[0].id).not.toBe(firstPage.reports[0].id);
+    });
+
+    /*
+     * The summary spans the WHOLE table even while a filter is applied. Narrowing it too would let
+     * a filter quietly become a blindfold: "0 open" while eleven reports wait under another tab.
+     */
+    it('keeps the summary honest about everything, not just the filtered slice', () => {
+        const filtered = reports.listReports({ category: 'mati' });
+
+        expect(filtered.reports).toHaveLength(1);
+        expect(filtered.summary.total).toBe(2);
+        expect(filtered.summary.byCategory.buram).toBe(1);
+        expect(filtered.summary.byCategory.mati).toBe(1);
+        expect(filtered.summary.byStatus.baru).toBe(2);
+    });
+
+    it('lists only cameras that have actually been reported, worst first', () => {
+        db.prepare("INSERT INTO cameras (id, name) VALUES (18, 'TIDAK PERNAH DILAPOR')").run();
+        reports.submitReport(16, { category: 'gelap', deviceHash: 'device-ddd' });
+
+        const cameras = reports.listReportedCameras();
+
+        expect(cameras.map((c) => c.id)).toEqual([16]);
+        expect(cameras[0]).toMatchObject({ name: 'PEREMPATAN', reports: 3 });
     });
 
     it('reports a missing report as 404 rather than failing silently', () => {

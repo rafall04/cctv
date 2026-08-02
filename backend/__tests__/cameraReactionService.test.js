@@ -155,10 +155,39 @@ describe('what each audience is shown', () => {
         db.prepare("INSERT INTO cameras (id, name, area_id) VALUES (5, 'BAGUS', 3)").run();
         reactions.setReaction(5, DEVICE, 1);
 
-        const summary = reactions.getAdminSummary();
+        const { cameras } = reactions.getAdminSummary();
 
-        expect(summary[0]).toMatchObject({ id: 1, likes: 1, dislikes: 2, areaName: 'KEC BOJONEGORO' });
-        expect(summary[1]).toMatchObject({ id: 5, likes: 1, dislikes: 0 });
+        expect(cameras[0]).toMatchObject({ id: 1, likes: 1, dislikes: 2, total: 3, areaName: 'KEC BOJONEGORO' });
+        expect(cameras[1]).toMatchObject({ id: 5, likes: 1, dislikes: 0, total: 1 });
+    });
+
+    /*
+     * An inner join from the reactions table would hide every unrated camera and make a sample of
+     * three look like the whole fleet. "36 cameras, 2 ever rated" is the fact that decides whether
+     * the leaderboard means anything at all.
+     */
+    it('includes cameras nobody has voted on, and counts how many were rated', () => {
+        db.prepare("INSERT INTO cameras (id, name) VALUES (7, 'BELUM DINILAI')").run();
+        db.prepare("INSERT INTO cameras (id, name, camera_class) VALUES (8, 'SEWA', 'subscriber')").run();
+
+        const { cameras, totals } = reactions.getAdminSummary();
+
+        expect(cameras.map((c) => c.id)).toContain(7);
+        expect(cameras.find((c) => c.id === 7)).toMatchObject({ likes: 0, dislikes: 0, total: 0 });
+        // Non-community cameras have no public verdict to report.
+        expect(cameras.map((c) => c.id)).not.toContain(8);
+        expect(totals).toMatchObject({ cameras: 2, rated: 1, likes: 1, dislikes: 2 });
+    });
+
+    /** Unrated cameras carry no verdict, so they sort below every camera that does. */
+    it('sinks unrated cameras below rated ones instead of tying them at zero complaints', () => {
+        db.prepare("INSERT INTO cameras (id, name) VALUES (7, 'BELUM DINILAI')").run();
+        db.prepare("INSERT INTO cameras (id, name) VALUES (5, 'DISUKAI')").run();
+        reactions.setReaction(5, DEVICE, 1);
+
+        const ids = reactions.getAdminSummary().cameras.map((c) => c.id);
+
+        expect(ids.indexOf(5)).toBeLessThan(ids.indexOf(7));
     });
 
     it('reports an unvoted camera as zero rather than omitting the count', () => {

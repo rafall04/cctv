@@ -6,10 +6,10 @@
  * MainFuncs: CameraFeedbackPanel.
  * SideEffects: Two GETs on mount; one PUT when a report is closed.
  *
- * This is the ONLY reader of either signal. The public bar prints likes and nothing else, and the
- * report text is never rendered on any public surface — which is exactly what makes accepting free
- * text from anonymous devices safe. Collecting a signal nobody reads would be worse than not
- * collecting it, so both halves land here.
+ * A SUMMARY, not the archive. It shows only what is still open and only the worst few, then hands
+ * off to /admin/camera-reports and /admin/camera-reactions for everything else. Putting the full
+ * queue here would bury camera CRUD — the reason anyone opened this page — under a list that grows
+ * without limit.
  *
  * Silent when there is nothing open, like DeadSourcePanel: a permanent "0 laporan" box on the
  * busiest admin page teaches people to skip the region where the real warning appears.
@@ -20,7 +20,8 @@ import { Badge, Button, Card, CardHeader } from '../../ui';
 import { adminService } from '../../../services/adminService';
 import { buildPlaybackMomentPath } from '../../../utils/playbackUrlState';
 
-const MAX_COMPLAINED_ROWS = 10;
+const MAX_COMPLAINED_ROWS = 5;
+const MAX_REPORT_ROWS = 5;
 
 /* Admin playback, not the public one: staff should land with full reach, not the 10-minute preview. */
 const momentPath = (report) => buildPlaybackMomentPath({
@@ -40,13 +41,18 @@ export default function CameraFeedbackPanel() {
     const [complained, setComplained] = useState([]);
     const [closingId, setClosingId] = useState(null);
 
+    const [openTotal, setOpenTotal] = useState(0);
+
     useEffect(() => {
         let alive = true;
-        adminService.getCameraReports().then((res) => {
-            if (alive && res?.success) setReports(res.data?.reports || []);
+        // Only the open ones, and only a handful: the full queue lives at /admin/camera-reports.
+        adminService.getCameraReports({ status: 'open', limit: MAX_REPORT_ROWS }).then((res) => {
+            if (!alive || !res?.success) return;
+            setReports(res.data?.reports || []);
+            setOpenTotal(res.data?.summary?.open ?? (res.data?.reports || []).length);
         });
         adminService.getCameraReactions().then((res) => {
-            if (alive && res?.success) setComplained((res.data || []).filter((c) => c.dislikes > 0));
+            if (alive && res?.success) setComplained((res.data?.cameras || []).filter((c) => c.dislikes > 0));
         });
         return () => { alive = false; };
     }, []);
@@ -75,7 +81,7 @@ export default function CameraFeedbackPanel() {
             {open.length > 0 && (
                 <section className="mt-3">
                     <h3 className="text-[11px] font-medium uppercase tracking-wide text-content-subtle">
-                        {open.length} laporan belum ditutup
+                        {openTotal} laporan belum ditutup
                     </h3>
                     <ul className="mt-2 divide-y divide-edge">
                         {open.map((report) => (
@@ -158,6 +164,19 @@ export default function CameraFeedbackPanel() {
                     )}
                 </section>
             )}
+
+            {/*
+              * The way out of a deliberately partial view. Without these the caps above would read
+              * as the whole story — the same failure the truncation notes exist to prevent.
+              */}
+            <div className="mt-4 flex flex-wrap gap-3 border-t border-edge pt-3">
+                <a href="/admin/camera-reports" className="text-xs font-medium text-primary underline underline-offset-2">
+                    Buka semua laporan
+                </a>
+                <a href="/admin/camera-reactions" className="text-xs font-medium text-primary underline underline-offset-2">
+                    Buka penilaian semua kamera
+                </a>
+            </div>
         </Card>
     );
 }

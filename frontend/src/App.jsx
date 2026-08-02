@@ -40,6 +40,8 @@ const ViewerAnalytics = lazyWithRetry(() => import('./pages/ViewerAnalytics'), '
 const PlaybackAnalytics = lazyWithRetry(() => import('./pages/PlaybackAnalytics'), 'playback-analytics');
 const PlaybackTokenManagement = lazyWithRetry(() => import('./pages/PlaybackTokenManagement'), 'playback-token-management');
 const PlaybackProductManagement = lazyWithRetry(() => import('./pages/PlaybackProductManagement'), 'playback-product-management');
+const CameraReportsManagement = lazyWithRetry(() => import('./pages/CameraReportsManagement'), 'camera-reports-management');
+const CameraReactionsOverview = lazyWithRetry(() => import('./pages/CameraReactionsOverview'), 'camera-reactions-overview');
 const NotificationDiagnostics = lazyWithRetry(() => import('./pages/NotificationDiagnostics'), 'notification-diagnostics');
 const UnifiedSettings = lazyWithRetry(() => import('./pages/UnifiedSettings'), 'unified-settings');
 const Dashboard = lazyWithRetry(() => import('./pages/Dashboard'), 'dashboard');
@@ -282,6 +284,22 @@ function App() {
                     element={
                         <AdminPageRoute adminOnly>
                             <PlaybackProductManagement />
+                        </AdminPageRoute>
+                    }
+                />
+                <Route
+                    path="/admin/camera-reports"
+                    element={
+                        <AdminPageRoute>
+                            <CameraReportsManagement />
+                        </AdminPageRoute>
+                    }
+                />
+                <Route
+                    path="/admin/camera-reactions"
+                    element={
+                        <AdminPageRoute>
+                            <CameraReactionsOverview />
                         </AdminPageRoute>
                     }
                 />

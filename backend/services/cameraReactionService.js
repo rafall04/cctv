@@ -129,33 +129,58 @@ class CameraReactionService {
     }
 
     /**
-     * Staff view: the same two numbers the public sees, but ranked worst-first and joined to camera
-     * and area names. "Camera 25 — 30 bermasalah, 2 bagus" is a maintenance ticket; the public page
-     * shows the counts but cannot sort the fleet by them.
+     * Staff view: the same two numbers the public sees, but for the WHOLE community fleet and
+     * ranked worst-first.
+     *
+     * LEFT JOIN from cameras, not an inner join from reactions. A camera nobody has voted on is a
+     * real answer — "36 cameras, 4 have ever been rated" is the fact an operator needs before
+     * drawing any conclusion from a leaderboard of three. Starting from the reactions table would
+     * silently drop every unrated camera and make a thin sample look like a complete picture.
+     *
+     * Ordering puts unrated cameras last: they carry no verdict, so they belong below the ones that
+     * do rather than tied at the top with zero complaints.
      */
     getAdminSummary() {
         const rows = query(`
-            SELECT r.camera_id                                        AS id,
+            SELECT c.id,
                    c.name,
-                   a.name                                             AS area_name,
-                   SUM(CASE WHEN r.value = 1 THEN 1 ELSE 0 END)       AS likes,
-                   SUM(CASE WHEN r.value = -1 THEN 1 ELSE 0 END)      AS dislikes,
-                   MAX(r.updated_at)                                  AS last_vote_at
-              FROM camera_reactions r
-              JOIN cameras c ON c.id = r.camera_id
+                   c.enabled,
+                   a.name                                              AS area_name,
+                   SUM(CASE WHEN r.value = 1 THEN 1 ELSE 0 END)        AS likes,
+                   SUM(CASE WHEN r.value = -1 THEN 1 ELSE 0 END)       AS dislikes,
+                   COUNT(r.device_hash)                                AS total,
+                   MAX(r.updated_at)                                   AS last_vote_at
+              FROM cameras c
          LEFT JOIN areas a ON a.id = c.area_id
-          GROUP BY r.camera_id, c.name, a.name
-          ORDER BY dislikes DESC, likes ASC, r.camera_id ASC
+         LEFT JOIN camera_reactions r ON r.camera_id = c.id
+             WHERE c.camera_class = 'community'
+          GROUP BY c.id, c.name, c.enabled, a.name
+          ORDER BY (COUNT(r.device_hash) = 0) ASC,
+                   dislikes DESC,
+                   likes ASC,
+                   c.id ASC
         `);
 
-        return rows.map((row) => ({
+        const cameras = rows.map((row) => ({
             id: row.id,
             name: row.name,
             areaName: row.area_name || null,
+            enabled: row.enabled === 1,
             likes: Number(row.likes) || 0,
             dislikes: Number(row.dislikes) || 0,
+            total: Number(row.total) || 0,
             lastVoteAt: row.last_vote_at || null,
         }));
+
+        return {
+            cameras,
+            totals: {
+                cameras: cameras.length,
+                rated: cameras.filter((camera) => camera.total > 0).length,
+                likes: cameras.reduce((sum, camera) => sum + camera.likes, 0),
+                dislikes: cameras.reduce((sum, camera) => sum + camera.dislikes, 0),
+            },
+        };
     }
 }
 

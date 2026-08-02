@@ -11,7 +11,7 @@
  */
 
 import cameraReactionService from '../services/cameraReactionService.js';
-import cameraReportService from '../services/cameraReportService.js';
+import cameraReportService, { CATEGORIES } from '../services/cameraReportService.js';
 import { logAdminAction } from '../services/securityAuditLogger.js';
 
 export async function listCameraReactionSummary(request, reply) {
@@ -23,10 +23,24 @@ export async function listCameraReactionSummary(request, reply) {
     }
 }
 
-/** The operator's queue of visitor reports. Open ones first — see cameraReportService.listReports. */
+/**
+ * The operator's queue of visitor reports. Open ones first — see cameraReportService.listReports.
+ *
+ * Filters arrive as query params and are validated INSIDE the service against its own category and
+ * status sets, so an unknown value is ignored rather than becoming an empty result the operator
+ * cannot explain.
+ */
 export async function listCameraReports(request, reply) {
     try {
-        return reply.send({ success: true, data: cameraReportService.listReports() });
+        const { status, category, cameraId, page, limit, sort } = request.query || {};
+        return reply.send({
+            success: true,
+            data: {
+                ...cameraReportService.listReports({ status, category, cameraId, page, limit, sort }),
+                categories: Object.entries(CATEGORIES).map(([key, label]) => ({ key, label })),
+                cameras: cameraReportService.listReportedCameras(),
+            },
+        });
     } catch (error) {
         console.error('List camera reports error:', error);
         return reply.code(500).send({ success: false, message: 'Gagal memuat laporan kamera' });
