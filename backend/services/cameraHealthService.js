@@ -2491,8 +2491,7 @@ class CameraHealthService {
 
         try {
             this.cleanupProbeCache();
-            // Pick up operator-tuned anti-flap windows (settings are cached 60s,
-            // so this is cheap) before evaluating alert transitions this tick.
+            // Pick up operator-tuned anti-flap windows (settings cached 60s, so this is cheap).
             try {
                 this.telegramAlertConfirmationMs = getTelegramAlertConfirmationMs();
             } catch (error) {
@@ -2510,15 +2509,16 @@ class CameraHealthService {
             }).map((camera) => camera.id);
             const dueCameras = this.getDetailedEnabledCamerasByIds(dueCameraIds);
 
-            const probeResults = await batchProbe(dueCameras, async (camera) => {
-                return this.evaluateCameraStatus(camera, activePaths);
-            });
+            const probeResults = await batchProbe(dueCameras, (camera) => this.evaluateCameraStatus(camera, activePaths));
 
             const finalResults = [];
             const finalResultsById = new Map();
             for (const probe of probeResults.filter(p => p.result.status === 'fulfilled')) {
                 const streamResult = probe.result.value;
-                const monitoring = await this.evaluateCameraMonitoringStatus(streamResult.camera, activePaths, streamResult);
+                // One camera must never cost the sweep: a throw here used to leave every other camera unchecked this tick.
+                const monitoring = await this.evaluateCameraMonitoringStatus(streamResult.camera, activePaths, streamResult)
+                    .catch((error) => { console.error(`[CameraHealth] Camera ${streamResult.camera.id} monitoring failed:`, error.message); return null; });
+                if (!monitoring) continue;
                 const finalResult = {
                     cameraId: streamResult.camera.id,
                     isOnline: streamResult.isOnline,

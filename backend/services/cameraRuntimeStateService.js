@@ -123,11 +123,40 @@ class CameraRuntimeStateService {
             timestamp,
         ]);
 
-        return queryOne(`
+        const inserted = queryOne(`
             SELECT *
             FROM camera_runtime_state
             WHERE camera_id = ?
         `, [cameraId]);
+
+        /*
+         * Read-back is NOT guaranteed to see the row we just wrote. connectionPool
+         * keeps separate read and write connections, so this SELECT can land on a
+         * snapshot taken before the INSERT — the exact hazard SYSTEM_MAP records for
+         * this module. It fired in production: 22 x
+         *   "[CameraHealth] Check failed: Cannot read properties of undefined
+         *    (reading 'last_runtime_signal_at')"
+         * because upsertRuntimeState read `current.last_runtime_signal_at` off the
+         * undefined this used to return. Its try/catch sits around the whole sweep,
+         * so ONE camera in that state stopped every remaining camera from being
+         * checked that tick.
+         *
+         * The values were just written, so returning them directly is both correct
+         * and cheaper than retrying the read. Contract: when the table exists, this
+         * never returns undefined.
+         */
+        return inserted || {
+            camera_id: cameraId,
+            is_online: isOnline,
+            monitoring_state: monitoringState,
+            monitoring_reason: monitoringReason,
+            last_runtime_signal_at: seed.last_runtime_signal_at || null,
+            last_runtime_signal_type: seed.last_runtime_signal_type || null,
+            last_health_check_at: seed.last_health_check_at || null,
+            source_dead_since: null,
+            source_dead_reason: null,
+            updated_at: timestamp,
+        };
     }
 
     upsertRuntimeState(cameraId, fields = {}) {

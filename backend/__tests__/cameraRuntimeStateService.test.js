@@ -37,6 +37,71 @@ describe('cameraRuntimeStateService', () => {
         });
     });
 
+    /*
+     * REGRESSION (production: 22 x "[CameraHealth] Check failed: Cannot read
+     * properties of undefined (reading 'last_runtime_signal_at')").
+     *
+     * cameraHealthService calls upsertRuntimeState for every camera from INSIDE a
+     * transaction(). connectionPool holds separate read and write connections, so
+     * within that transaction the read connection CANNOT see the row the write
+     * connection just inserted — for a camera with no runtime row yet this is a
+     * certainty, not a race. ensureRuntimeState then returned undefined, and
+     * upsertRuntimeState dereferenced it.
+     *
+     * The blast radius was the whole sweep: the health check's try/catch wraps the
+     * entire tick, and the upserts share one transaction, so a single camera in
+     * this state rolled back every camera's state and left the rest unchecked.
+     */
+    it('REGRESSION: returns the written row even when the read-back cannot see it', () => {
+        // hasRuntimeTable() memoizes into the singleton, so whether it consumes a
+        // queryOne call depends on test order. Reset it to make the mock sequence
+        // below mean the same thing however this file is run.
+        cameraRuntimeStateService.tableSupport = null;
+        vi.spyOn(connectionPool, 'execute').mockReturnValue({ changes: 1 });
+        vi.spyOn(connectionPool, 'queryOne')
+            .mockReturnValueOnce({ name: 'camera_runtime_state' }) // hasRuntimeTable
+            .mockReturnValueOnce(undefined)                        // existing row: none
+            .mockReturnValueOnce(undefined);                       // read-back: invisible in-transaction
+
+        const state = cameraRuntimeStateService.ensureRuntimeState(41, {
+            is_online: 1,
+            monitoring_state: 'online',
+            monitoring_reason: 'probe_ok',
+        });
+
+        expect(state).toBeDefined();
+        expect(state).toMatchObject({
+            camera_id: 41,
+            is_online: 1,
+            monitoring_state: 'online',
+            monitoring_reason: 'probe_ok',
+        });
+        // The field whose absence produced the production crash must be present.
+        expect(state).toHaveProperty('last_runtime_signal_at', null);
+    });
+
+    it('REGRESSION: upsert survives a runtime row that cannot be read back', () => {
+        // hasRuntimeTable() memoizes into the singleton, so whether it consumes a
+        // queryOne call depends on test order. Reset it to make the mock sequence
+        // below mean the same thing however this file is run.
+        cameraRuntimeStateService.tableSupport = null;
+        vi.spyOn(connectionPool, 'execute').mockReturnValue({ changes: 1 });
+        vi.spyOn(connectionPool, 'queryOne')
+            .mockReturnValueOnce({ name: 'camera_runtime_state' }) // hasRuntimeTable
+            .mockReturnValueOnce(undefined)                        // existing row: none
+            .mockReturnValueOnce(undefined)                        // read-back: invisible
+            .mockReturnValue(undefined);                           // any later reads
+
+        // These are exactly the fields cameraHealthService passes — note it never
+        // sends last_runtime_signal_at, which is why that was the field that threw.
+        expect(() => cameraRuntimeStateService.upsertRuntimeState(41, {
+            is_online: 1,
+            monitoring_state: 'online',
+            monitoring_reason: 'probe_ok',
+            last_health_check_at: '2026-08-03 00:00:00',
+        })).not.toThrow();
+    });
+
     it('upserts runtime state with latest health metadata', () => {
         vi.spyOn(connectionPool, 'queryOne')
             .mockReturnValueOnce({ name: 'camera_runtime_state' })

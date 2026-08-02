@@ -30,6 +30,7 @@ import {
     prepareRecordingStart,
 } from './recordingStarter.js';
 import { parseRecordingStderrLine } from './recordingStderrParser.js';
+import { redactUrlCredentials } from '../utils/logRedaction.js';
 import {
     RECORDING_LIFECYCLE_RECONCILE_INTERVAL_MS,
     RECORDING_SCHEDULED_CLEANUP_INITIAL_DELAY_MS as SCHEDULED_CLEANUP_INITIAL_DELAY_MS,
@@ -291,15 +292,39 @@ class RecordingService {
 
     handleRecordingStderr(cameraId, output) {
         this.updateRecordingDataTime(cameraId);
-        const parsed = parseRecordingStderrLine(output);
+        const text = String(output);
 
-        if (parsed.kind === 'segment_completed') {
-            console.log(`[FFmpeg] Detected segment completion (CLOSING): ${parsed.filename}`);
-            this.onSegmentCreated(cameraId, parsed.filename);
-        } else if (parsed.kind === 'segment_debug') {
-            console.log(`[FFmpeg Segment Debug] ${parsed.logLine}`);
-        } else if (parsed.kind === 'error') {
-            console.error(`[FFmpeg Camera ${cameraId}] ${parsed.logLine}`);
+        // Segment completion is matched against the WHOLE chunk on purpose: FFmpeg
+        // emits the filename ("Opening '<name>' for writing") and the completion
+        // marker ("Closing") on SEPARATE lines, so they only ever appear together
+        // at chunk level. Splitting first would silently kill this detection.
+        const chunk = parseRecordingStderrLine(text);
+        if (chunk.kind === 'segment_completed') {
+            console.log(`[FFmpeg] Detected segment completion (CLOSING): ${chunk.filename}`);
+            this.onSegmentCreated(cameraId, chunk.filename);
+        }
+
+        // Logging, though, has to be decided per line. The tailer hands us every
+        // byte that arrived since its last poll — routinely dozens of lines — and
+        // classifying that blob as one line meant a single matching word anywhere
+        // in it decided the fate of all of them, then reprinted the entire blob
+        // under one prefix. Measured on prod: of every 200,000 lines in the pm2
+        // log, 162,920 were raw FFmpeg chatter carried in on the back of just 326
+        // prefixed lines — 1.4 GB/day, on the same filesystem as the recordings.
+        for (const line of text.split(/\r?\n|\r/)) {
+            if (!line.trim()) {
+                continue;
+            }
+            const parsed = parseRecordingStderrLine(line);
+
+            // 'segment_debug' is FFmpeg narrating its own file I/O ("Opening …
+            // for writing") — 76,061 lines in 2.5 days on prod. Nothing consumes
+            // it: segments are discovered by recordingRecoveryScanner polling the
+            // pending directory, and the completion branch above is what turns a
+            // marker into an event. So it is dropped rather than printed.
+            if (parsed.kind === 'error') {
+                console.error(`[FFmpeg Camera ${cameraId}] ${redactUrlCredentials(parsed.logLine)}`);
+            }
         }
     }
 
@@ -311,7 +336,11 @@ class RecordingService {
 
         console.error(`FFmpeg process for camera ${cameraId} exited with code ${result.exitCode}`);
         console.error(`[Recording] Failure reason (${streamSource}): ${result.reason}`);
-        console.error(`Last FFmpeg output:\n${recordingProcessManager.getOutput(cameraId).slice(-1000)}`);
+        // The retained tail is raw FFmpeg text, and for an internal camera the very
+        // first line it echoes is the RTSP URL — credentials included. This is the
+        // single largest source of the plaintext passwords found in the production
+        // recorder log, so it gets redacted like every other FFmpeg line.
+        console.error(`Last FFmpeg output:\n${redactUrlCredentials(recordingProcessManager.getOutput(cameraId).slice(-1000))}`);
         this.markRecordingFailure(cameraId, result.reason);
         this.logRestart(cameraId, 'process_crashed', false);
     }

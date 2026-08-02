@@ -129,7 +129,15 @@ describe('recordingService external recording support', () => {
             streamSource: 'internal',
         });
 
-        expect(args.slice(0, 2)).toEqual(['-rtsp_transport', 'tcp']);
+        // The invariant is ordering, not position: -rtsp_transport is an INPUT
+        // option, so it only takes effect if FFmpeg sees it before -i. (It used to
+        // be asserted at index 0, which also silently pinned "no global options
+        // may precede it" — an unrelated constraint that broke the moment
+        // -loglevel was added.)
+        const transportIndex = args.indexOf('-rtsp_transport');
+        expect(transportIndex).toBeGreaterThan(-1);
+        expect(args[transportIndex + 1]).toBe('tcp');
+        expect(transportIndex).toBeLessThan(args.indexOf('-i'));
         expect(args).toContain('-stimeout'); // socket timeout so a stalled camera exits
         expect(args.indexOf('-stimeout')).toBeLessThan(args.indexOf('-i'));
         expect(args[args.indexOf('-i') + 1]).toBe('rtsp://user:pass@10.0.0.2/stream');
@@ -149,7 +157,10 @@ describe('recordingService external recording support', () => {
             rtspTransport: 'udp',
         });
 
-        expect(args.slice(0, 2)).toEqual(['-rtsp_transport', 'udp']);
+        const transportIndex = args.indexOf('-rtsp_transport');
+        expect(transportIndex).toBeGreaterThan(-1);
+        expect(args[transportIndex + 1]).toBe('udp');
+        expect(transportIndex).toBeLessThan(args.indexOf('-i'));
         expect(args[args.indexOf('-i') + 1]).toBe('rtsp://user:pass@10.0.0.2/stream');
     });
 
@@ -231,6 +242,75 @@ describe('recordingService external recording support', () => {
             filename: '20260511_211000.mp4.partial',
             sourceType: 'partial',
         }));
+    });
+
+    /*
+     * REGRESSION (production: 2.9 GB of pm2 log in 2.5 days, ~1.4 GB/day).
+     *
+     * The stderr tailer delivers a CHUNK — every byte that arrived since its last
+     * poll — not a line. handleRecordingStderr classified that whole chunk as if
+     * it were one line and printed all of it under a single prefix, so FFmpeg's
+     * info-level chatter rode into the log on the back of one matching line. In a
+     * 200,000-line prod sample only 326 lines carried a prefix; 162,920 were raw
+     * FFmpeg text dragged along with them. That log shares a filesystem with the
+     * recordings, and the emergency disk guard reclaims space by DELETING
+     * recordings — so log growth was on a path to destroying footage.
+     */
+    it('REGRESSION: a chunk of FFmpeg chatter produces no stdout at all', async () => {
+        const { recordingService } = await import('../services/recordingService.js');
+        const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+        recordingService.handleRecordingStderr(7, [
+            "[https @ 0x55] Opening 'https://example.test/live/out.m3u8' for reading",
+            "[hls @ 0x55] Skip ('#EXT-X-VERSION:3')",
+            "[hls @ 0x55] Skip ('#EXT-X-PROGRAM-DATE-TIME:2026-08-02T17:09:47.523+0000')",
+            "[https @ 0x55] Opening 'https://example.test/live/out_199802.ts' for reading",
+            'frame=5542169 fps= 25 q=-1.0 size=N/A time=61:34:58.62 bitrate=N/A speed=   1x',
+        ].join('\n'));
+
+        expect(logSpy).not.toHaveBeenCalled();
+        logSpy.mockRestore();
+    });
+
+    it('REGRESSION: an error line inside a noisy chunk is still reported, once', async () => {
+        const { recordingService } = await import('../services/recordingService.js');
+        const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        recordingService.handleRecordingStderr(7, [
+            "[hls @ 0x55] Skip ('#EXT-X-VERSION:3')",
+            'https://example.test/live/out.m3u8: Server returned 404 Not Found error',
+            "[hls @ 0x55] Skip ('#EXT-X-VERSION:3')",
+        ].join('\n'));
+
+        expect(errorSpy).toHaveBeenCalledTimes(1);
+        expect(errorSpy.mock.calls[0][0]).toContain('404 Not Found');
+        // The surrounding noise must NOT be dragged into the error line.
+        expect(errorSpy.mock.calls[0][0]).not.toContain('EXT-X-VERSION');
+        errorSpy.mockRestore();
+    });
+
+    /*
+     * REGRESSION (production: 189 plaintext camera passwords in the recorder log).
+     * The backend masks its own RTSP sources, so this was invisible there — but the
+     * recorder echoes FFmpeg's raw stderr, which quotes the input URL verbatim.
+     */
+    it('REGRESSION: FFmpeg error lines never leak RTSP credentials', async () => {
+        const { recordingService } = await import('../services/recordingService.js');
+        const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        recordingService.handleRecordingStderr(
+            7,
+            'rtsp://admin:SuperSecret123@10.0.0.4:554/stream1: Connection timed out error'
+        );
+
+        expect(errorSpy).toHaveBeenCalledTimes(1);
+        const logged = errorSpy.mock.calls[0][0];
+        expect(logged).not.toContain('SuperSecret123');
+        expect(logged).not.toContain('admin');
+        // Host, port and the actual failure stay readable — that is what makes it diagnosable.
+        expect(logged).toContain('10.0.0.4:554');
+        expect(logged).toContain('Connection timed out');
+        errorSpy.mockRestore();
     });
 
     it('delegates segment recovery through the recovery queue facade', async () => {

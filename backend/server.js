@@ -41,9 +41,11 @@ import { schemaErrorHandler } from './middleware/schemaValidators.js';
 import { customerAccessPolicyHook } from './middleware/customerAccessPolicy.js';
 import { getAccessInfo as getCameraAccessInfo, canViewLive as canViewCameraLive } from './services/cameraAccessService.js';
 import { resolveHlsViewerUser } from './services/hlsProxyService.js';
+import { parseThumbnailRequestPath } from './utils/thumbnailRequestPolicy.js';
 
 // Import services
 import { startDailyCleanup, stopDailyCleanup, logSecurityEvent, SECURITY_EVENTS } from './services/securityAuditLogger.js';
+import { startOperationalRetention, stopOperationalRetention } from './services/operationalRetentionService.js';
 import backupTelegramService from './services/backupTelegramService.js';
 import workerWatchdogService from './services/workerWatchdogService.js';
 import { getTimezone } from './services/timezoneService.js';
@@ -119,6 +121,25 @@ const fastify = Fastify({
                 }
             }
         },
+    /*
+     * Route schemas legitimately declare nullable numerics — a camera's latitude
+     * and longitude are `['number','null']` because a camera may not be placed on
+     * the map yet. AJV's strict mode treats a union type as a style violation and
+     * prints a warning per schema per boot, straight to stderr:
+     *
+     *   strict mode: use allowUnionTypes to allow union type keyword at
+     *   "#/properties/latitude" (strictTypes)
+     *
+     * Four lines every start, on the stream reserved for things a human must act
+     * on, about schemas that are behaving exactly as intended. Allowing the
+     * construct is the honest fix; the rest of strict mode (which catches real
+     * mistakes like unknown keywords) stays on.
+     */
+    ajv: {
+        customOptions: {
+            allowUnionTypes: true,
+        },
+    },
 });
 
 // ============================================
@@ -182,15 +203,27 @@ fastify.addHook('onSend', async (request, reply, payload) => {
 // camera snapshots must not be fetchable by guessing ids. Community thumbnails
 // stay public. Runs in onRequest, before the static handler below.
 fastify.addHook('onRequest', async (request, reply) => {
-    if (!request.url.startsWith('/api/thumbnails/')) {
+    const parsed = parseThumbnailRequestPath(request.url);
+    if (parsed.kind === 'not_thumbnail') {
         return;
     }
-    const fileName = request.url.slice('/api/thumbnails/'.length).split('?')[0];
-    const idMatch = /^(\d+)(?:_temp)?\.jpg$/i.exec(fileName);
-    if (!idMatch) {
-        return;
+
+    /*
+     * DENY BY DEFAULT. This hook used to `return` on any filename it did not
+     * recognise, handing the request straight to @fastify/static ungated — the
+     * precise shape of the two advisories open against the pinned version
+     * (GHSA-83w8-p2f5-377r, GHSA-8pvw-jcv7-9cmj). What it guards is the project's
+     * first invariant: a non-community camera must never surface publicly.
+     *
+     * 404, not 403: a missing thumbnail already 404s, so refusing this way tells a
+     * prober nothing about which camera ids exist.
+     */
+    if (parsed.kind === 'reject') {
+        reply.header('Cache-Control', 'no-store');
+        return reply.code(404).send({ success: false, message: 'Not found' });
     }
-    const info = getCameraAccessInfo(Number(idMatch[1]));
+
+    const info = getCameraAccessInfo(parsed.cameraId);
     if (!info || info.camera_class === 'community') {
         return;
     }
@@ -519,6 +552,12 @@ const start = async () => {
         startDailyCleanup();
         console.log('[Security] Daily audit log cleanup scheduled (90-day retention)');
 
+        // audit_logs and restart_logs had no owner at all: AUDIT_LOG_RETENTION_DAYS
+        // was parsed into config and then read by nothing, and recorder restart
+        // diagnostics accumulated at ~140 rows/day forever.
+        startOperationalRetention();
+        console.log('[Retention] Operational table retention scheduled (audit_logs, restart_logs)');
+
         // Daily off-box database backup. The DB holds real payments and months of history; every
         // guardrail in this repo protects against bugs, none protects against losing the disk.
         // Silent no-op until an admin sets a chat id in Settings, so it is safe to ship enabled.
@@ -632,7 +671,8 @@ const shutdown = async () => {
         billingService.stopBillingScheduler();
         telegramBotService.stop();
         stopDailyCleanup();
-        
+        stopOperationalRetention();
+
         // Cleanup MediaMTX paths to prevent zombie connections
         console.log('[Shutdown] Cleaning up MediaMTX paths...');
         try {

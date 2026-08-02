@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Purpose: HTTP handlers for admin playback token management and public token activation.
  * Caller: playbackTokenRoutes and adminRoutes.
  * Deps: playbackTokenService, timeService, and auth cookie option helper.
@@ -14,6 +14,7 @@ import { deletePlaybackToken } from '../services/playbackTokenDeletionService.js
 import { findLiveSession } from '../services/playbackSessionReuseService.js';
 import { parseUtcSql } from '../services/timeService.js';
 import { isHttpsRequest } from '../utils/authCookieOptions.js';
+import { logControllerError } from '../utils/controllerErrorLog.js';
 
 function getPlaybackTokenCookieOptions(request, maxAge = 30 * 24 * 60 * 60) {
     const isHttps = isHttpsRequest(request);
@@ -41,7 +42,7 @@ function resolveCookieMaxAge(tokenData) {
 // In-memory per-IP throttle for failed public activation attempts. Cheap
 // defence against brute-forcing the share-key namespace; combined with the
 // `activation_failed` audit row this turns silent guessing into both visible
-// and rate-limited behavior. The map is process-local — good enough for a
+// and rate-limited behavior. The map is process-local â€” good enough for a
 // single-process backend; multi-instance deployments would need Redis.
 const ACTIVATION_FAILURE_WINDOW_MS = 60_000;
 const ACTIVATION_FAILURE_LIMIT = 10;
@@ -100,7 +101,7 @@ export async function listPlaybackTokens(request, reply) {
     try {
         return reply.send({ success: true, data: playbackTokenService.listTokens() });
     } catch (error) {
-        console.error('List playback tokens error:', error);
+        logControllerError('List playback tokens', error);
         return reply.code(500).send({ success: false, message: 'Internal server error' });
     }
 }
@@ -110,7 +111,7 @@ export async function listPlaybackTokenAuditLogs(request, reply) {
         const data = playbackTokenService.listAuditLogs(request.query || {});
         return reply.send({ success: true, data });
     } catch (error) {
-        console.error('List playback token audit logs error:', error);
+        logControllerError('List playback token audit logs', error);
         return reply.code(500).send({ success: false, message: 'Internal server error' });
     }
 }
@@ -127,7 +128,7 @@ export async function createPlaybackToken(request, reply) {
             share_text: result.share_text,
         });
     } catch (error) {
-        console.error('Create playback token error:', error);
+        logControllerError('Create playback token', error);
         return reply.code(error.statusCode || 500).send({
             success: false,
             message: error.statusCode ? error.message : 'Internal server error',
@@ -140,7 +141,7 @@ export async function updatePlaybackToken(request, reply) {
         const data = playbackTokenService.updateTokenSettings(request.params.id, request.body || {}, request);
         return reply.send({ success: true, message: 'Token playback diperbarui', data });
     } catch (error) {
-        console.error('Update playback token error:', error);
+        logControllerError('Update playback token', error);
         return reply.code(error.statusCode || 500).send({
             success: false,
             message: error.statusCode ? error.message : 'Internal server error',
@@ -158,7 +159,7 @@ export async function sharePlaybackToken(request, reply) {
             share_text: result.share_text,
         });
     } catch (error) {
-        console.error('Share playback token error:', error);
+        logControllerError('Share playback token', error);
         return reply.code(error.statusCode || 500).send({
             success: false,
             message: error.statusCode ? error.message : 'Internal server error',
@@ -171,7 +172,7 @@ export async function revokePlaybackToken(request, reply) {
         const data = playbackTokenService.revokeToken(request.params.id, request);
         return reply.send({ success: true, message: 'Token playback dicabut', data });
     } catch (error) {
-        console.error('Revoke playback token error:', error);
+        logControllerError('Revoke playback token', error);
         return reply.code(error.statusCode || 500).send({
             success: false,
             message: error.statusCode ? error.message : 'Internal server error',
@@ -183,13 +184,13 @@ export async function deletePlaybackTokenById(request, reply) {
     try {
         const data = deletePlaybackToken(request.params.id, request);
         // The message names the token, because after a delete there is nothing left on screen to
-        // confirm which one went — and says plainly when a LIVE one was just cut off.
+        // confirm which one went â€” and says plainly when a LIVE one was just cut off.
         const message = data.wasActive
-            ? `Token "${data.label}" dihapus permanen — akses yang memakainya langsung terputus`
+            ? `Token "${data.label}" dihapus permanen â€” akses yang memakainya langsung terputus`
             : `Token "${data.label}" dihapus permanen`;
         return reply.send({ success: true, message, data });
     } catch (error) {
-        console.error('Delete playback token error:', error);
+        logControllerError('Delete playback token', error);
         return reply.code(error.statusCode || 500).send({
             success: false,
             message: error.statusCode ? error.message : 'Internal server error',
@@ -291,7 +292,7 @@ export async function activatePlaybackToken(request, reply) {
 
         return reply.send({ success: true, message: 'Token playback aktif', data, session });
     } catch (error) {
-        console.error('Activate playback token error:', error);
+        logControllerError('Activate playback token', error);
         return reply.code(error.statusCode || 500).send({
             success: false,
             message: error.statusCode ? error.message : 'Internal server error',
@@ -322,7 +323,7 @@ export async function heartbeatPlaybackToken(request, reply) {
 
         return reply.send({ success: true, data, session });
     } catch (error) {
-        console.error('Heartbeat playback token error:', error);
+        logControllerError('Heartbeat playback token', error);
         return reply.code(error.statusCode || 500).send({
             success: false,
             message: error.statusCode ? error.message : 'Internal server error',
@@ -333,7 +334,7 @@ export async function heartbeatPlaybackToken(request, reply) {
 export async function clearPlaybackToken(request, reply) {
     // Match the catch-and-return contract used by every other handler in this
     // file. `stopPlaybackSession` already swallows the missing-schema case,
-    // but anything else (locked DB, IO error) should not 500 raw — clearing
+    // but anything else (locked DB, IO error) should not 500 raw â€” clearing
     // cookies is best-effort and must always respond cleanly.
     try {
         playbackTokenService.stopPlaybackSession(request, 'stopped');
@@ -350,7 +351,7 @@ export async function clearPlaybackTokenSessions(request, reply) {
         const cleared = playbackTokenService.clearTokenSessions(request.params.id, request);
         return reply.send({ success: true, message: 'Session token dibersihkan', data: { cleared } });
     } catch (error) {
-        console.error('Clear playback token sessions error:', error);
+        logControllerError('Clear playback token sessions', error);
         return reply.code(error.statusCode || 500).send({
             success: false,
             message: error.statusCode ? error.message : 'Internal server error',

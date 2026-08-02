@@ -135,6 +135,35 @@ describe('recordingStarter.buildRecordingFfmpegArgs', () => {
         expect(args[args.length - 1]).toBe('/recordings/camera1/pending/%Y%m%d_%H%M%S.mp4.partial');
     });
 
+    /*
+     * REGRESSION: FFmpeg ran at its default `info` level, narrating every HLS
+     * segment fetch. Relayed into the recorder's stdout that came to 1.4 GB/day of
+     * pm2 log on production. `-stats` is what makes the quieter level safe: it
+     * forces the progress line out via a direct stderr write instead of av_log, so
+     * recordingHealthMonitor's freeze heartbeat survives. Measured on the prod
+     * binary: 3,998 -> 244 stderr bytes over 12s, with 3 heartbeats either way.
+     */
+    it('REGRESSION: quiets FFmpeg but keeps the progress heartbeat', async () => {
+        const { buildRecordingFfmpegArgs } = await import('../services/recordingStarter.js');
+        const args = buildRecordingFfmpegArgs({
+            cameraDir: '/recordings/camera1',
+            outputPattern: '/r/c1/%Y.mp4',
+            inputUrl: 'https://example.com/live.m3u8',
+            streamSource: 'external',
+        });
+
+        const level = args.indexOf('-loglevel');
+        expect(level).toBeGreaterThan(-1);
+        expect(args[level + 1]).toBe('error');
+        expect(args).toContain('-hide_banner');
+        // Without -stats the freeze detector loses its heartbeat and every recorder
+        // eventually looks stuck. -nostats must never appear here.
+        expect(args).toContain('-stats');
+        expect(args).not.toContain('-nostats');
+        // Global options must precede the input they apply to.
+        expect(level).toBeLessThan(args.indexOf('-i'));
+    });
+
     it('uses protocol whitelist for external streams', async () => {
         const { buildRecordingFfmpegArgs } = await import('../services/recordingStarter.js');
         const args = buildRecordingFfmpegArgs({

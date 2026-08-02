@@ -96,6 +96,24 @@ export function getRecordingSourceConfig(camera) {
     };
 }
 
+// Quiet FFmpeg down to what a human can act on, WITHOUT losing the progress line.
+//
+// `-stats` is the load-bearing flag, not decoration. FFmpeg's progress output is
+// the heartbeat recordingHealthMonitor uses to detect a frozen recorder, and at
+// `-loglevel error` the normal av_log path would swallow it. With `-stats` passed
+// explicitly FFmpeg bypasses av_log and writes the progress line straight to
+// stderr, so the heartbeat survives the quieter level. Verified on the production
+// binary (ffmpeg 4.4.2, real upstream, 12s run):
+//
+//                                 stderr bytes   lines   frame= heartbeats
+//   current (no -loglevel)               3,998      48                   3
+//   -hide_banner -loglevel error -stats    244       3                   3
+//
+// Same heartbeat, 94% less output, and a broken input still reports
+// "Server returned 404 Not Found". `-nostats` would break the freeze detector —
+// see the warning in recordingFfmpegLog.js.
+const RECORDING_LOG_ARGS = ['-hide_banner', '-loglevel', 'error', '-stats'];
+
 export function buildRecordingFfmpegArgs({ cameraDir, outputPattern, inputUrl, streamSource, rtspTransport = 'tcp' }) {
     const resolvedOutputPattern = outputPattern || join(cameraDir, '%Y%m%d_%H%M%S.mp4');
     const inputArgs = streamSource === 'external'
@@ -108,6 +126,7 @@ export function buildRecordingFfmpegArgs({ cameraDir, outputPattern, inputUrl, s
         });
 
     return [
+        ...RECORDING_LOG_ARGS,
         ...inputArgs,
         '-map', '0:v',
         '-c:v', 'copy',
