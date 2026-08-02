@@ -28,6 +28,8 @@ import PlaybackHeader from '../components/playback/PlaybackHeader';
 import PlaybackVideo from '../components/playback/PlaybackVideo';
 import PlaybackTimeline from '../components/playback/PlaybackTimeline';
 import PlaybackSegmentList from '../components/playback/PlaybackSegmentList';
+import PlaybackSegmentStepper from '../components/playback/PlaybackSegmentStepper.jsx';
+import PlaybackShareButton from '../components/playback/PlaybackShareButton.jsx';
 import PlaybackUsageGuide from '../components/playback/PlaybackUsageGuide';
 import PlaybackTokenAccess from '../components/playback/PlaybackTokenAccess.jsx';
 import PlaybackOptions from '../components/playback/PlaybackOptions.jsx';
@@ -1085,48 +1087,16 @@ function Playback({
                     crossOriginMode={!isAdminPlayback ? 'use-credentials' : 'anonymous'}
                 />
 
-                <PlaybackOptions playbackPolicy={playbackPolicy} showPublicNotice={!isAdminPlayback} autoPlayEnabled={autoPlayEnabled} onAutoPlayToggle={handleAutoPlayToggle} />
-
-                {!isAdminPlayback && (
-                    <PlaybackTokenAccess
-                        tokenInput={tokenInput}
-                        onTokenInputChange={setTokenInput}
-                        onActivate={activateToken}
-                        onClear={clearToken}
-                        isBusy={isTokenBusy}
-                        tokenStatus={tokenStatus}
-                        message={tokenMessage}
-                        playbackPolicy={playbackPolicy}
-                        compact />
-                )}
-
-                {showPlaybackNative && (
-                    <InlineAdSlot
-                        slotKey="playback-native"
-                        label="Sponsored"
-                        script={adsConfig.slots.playbackNative.script}
-                        minHeightClassName="min-h-[120px]"
-                    />
-                )}
-
-                {!isAdminPlayback && (
-                    <div className="flex justify-center">
-                        <button
-                            onClick={handleShare}
-                            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-content bg-surface-raised border border-edge hover:bg-surface-overlay rounded-control transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                            title="Bagikan tautan playback ini"
-                        >
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-                            </svg>
-                            Bagikan Link Playback
-                        </button>
-                    </div>
-                )}
-
-                <PlaybackUsageGuide
-                    isAdminPlayback={isAdminPlayback}
-                    playbackPolicy={playbackPolicy}
+                {/*
+                 * Ordered by how often a viewer needs it, not by when it was built: what moves the
+                 * picture (step, timeline, list) first, read-once chrome after. Five such blocks
+                 * used to sit between player and list, so changing segment meant scrolling to the
+                 * bottom of the page and back for every ten minutes of footage.
+                 */}
+                <PlaybackSegmentStepper
+                    segments={segments}
+                    selectedSegment={selectedSegment}
+                    onSegmentClick={handleSegmentClick}
                 />
 
                 <PlaybackTimeline
@@ -1144,6 +1114,34 @@ function Playback({
                     onSegmentClick={handleSegmentClick}
                     formatTimestamp={formatTimestamp}
                 />
+
+                {showPlaybackNative && (
+                    <InlineAdSlot
+                        slotKey="playback-native"
+                        label="Sponsored"
+                        script={adsConfig.slots.playbackNative.script}
+                        minHeightClassName="min-h-[120px]"
+                    />
+                )}
+
+                <PlaybackOptions playbackPolicy={playbackPolicy} showPublicNotice={!isAdminPlayback} autoPlayEnabled={autoPlayEnabled} onAutoPlayToggle={handleAutoPlayToggle} />
+
+                {!isAdminPlayback && (
+                    <PlaybackTokenAccess
+                        tokenInput={tokenInput}
+                        onTokenInputChange={setTokenInput}
+                        onActivate={activateToken}
+                        onClear={clearToken}
+                        isBusy={isTokenBusy}
+                        tokenStatus={tokenStatus}
+                        message={tokenMessage}
+                        playbackPolicy={playbackPolicy}
+                        compact />
+                )}
+
+                {!isAdminPlayback && <PlaybackShareButton onShare={handleShare} />}
+
+                <PlaybackUsageGuide isAdminPlayback={isAdminPlayback} playbackPolicy={playbackPolicy} />
 
                 {!isAdminPlayback && (
                     <LandingMobileDock
