@@ -114,11 +114,43 @@ export function getRecordingSourceConfig(camera) {
 // see the warning in recordingFfmpegLog.js.
 const RECORDING_LOG_ARGS = ['-hide_banner', '-loglevel', 'error', '-stats'];
 
+// Survive a hiccup on the far end instead of dying and leaving a hole in the recording.
+//
+// External cameras are third-party HLS endpoints reached over the public internet, and
+// they drop connections routinely: production logged 278 recorder exits in 2.5 days,
+// classified `upstream_unreachable` (212) and `ffmpeg_failed` (49). Every one of those
+// is a gap in the footage plus a respawn. Without these options FFmpeg treats a dropped
+// TCP connection as end-of-input and exits.
+//
+// These are HTTP-protocol options, so they apply to the external branch ONLY — RTSP has
+// its own reconnect semantics and its socket timeout is handled in
+// internalRtspTransportPolicy.
+//
+// The important property is what these do NOT retry. FFmpeg's reconnect covers transport
+// failures, not HTTP status codes (`-reconnect_on_http_error` would be needed for that,
+// and is deliberately not set). So the split lands exactly where it should:
+//
+//   connection refused / timed out  -> retried, recording continues
+//   404 / 403                       -> still fails immediately
+//
+// That second half matters: six cameras on this deployment are permanently dead at the
+// source (stable 404). If reconnect retried those, ffmpeg would sit there forever
+// holding a slot and never reach the failure handler — worse than the crashes being
+// fixed. Verified on the production binary (ffmpeg 4.4.2) against a real 404 URL:
+// exits in 0s with "Server returned 404 Not Found", identical to today's behaviour.
+// `-reconnect_delay_max 30` bounds the backoff so even transport retries give up.
+const EXTERNAL_RECONNECT_ARGS = [
+    '-reconnect', '1',
+    '-reconnect_streamed', '1',
+    '-reconnect_delay_max', '30',
+];
+
 export function buildRecordingFfmpegArgs({ cameraDir, outputPattern, inputUrl, streamSource, rtspTransport = 'tcp' }) {
     const resolvedOutputPattern = outputPattern || join(cameraDir, '%Y%m%d_%H%M%S.mp4');
     const inputArgs = streamSource === 'external'
         ? [
             '-protocol_whitelist', EXTERNAL_RECORDING_PROTOCOL_WHITELIST,
+            ...EXTERNAL_RECONNECT_ARGS,
             '-i', inputUrl,
         ]
         : buildFfmpegRtspInputArgs(inputUrl, rtspTransport, {

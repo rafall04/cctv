@@ -164,6 +164,57 @@ describe('recordingStarter.buildRecordingFfmpegArgs', () => {
         expect(level).toBeLessThan(args.indexOf('-i'));
     });
 
+    /*
+     * External cameras are third-party HLS endpoints on the public internet and they drop
+     * connections routinely — 278 recorder exits in 2.5 days on production, each one a hole
+     * in the footage. Without reconnect, FFmpeg reads a dropped TCP connection as
+     * end-of-input and exits.
+     */
+    it('REGRESSION: external recording reconnects through a dropped connection', async () => {
+        const { buildRecordingFfmpegArgs } = await import('../services/recordingStarter.js');
+        const args = buildRecordingFfmpegArgs({
+            cameraDir: '/recordings/camera1',
+            outputPattern: '/r/c1/%Y.mp4',
+            inputUrl: 'https://example.com/live.m3u8',
+            streamSource: 'external',
+        });
+
+        const rc = args.indexOf('-reconnect');
+        expect(rc).toBeGreaterThan(-1);
+        expect(args[rc + 1]).toBe('1');
+        expect(args).toContain('-reconnect_streamed');
+        const delay = args.indexOf('-reconnect_delay_max');
+        expect(delay).toBeGreaterThan(-1);
+        expect(args[delay + 1]).toBe('30');
+        // Protocol options only take effect ahead of the input they apply to.
+        expect(rc).toBeLessThan(args.indexOf('-i'));
+
+        /*
+         * And the half that must NOT be enabled. Six cameras here are permanently dead at
+         * the source (stable 404). `-reconnect_on_http_error` would make FFmpeg retry those
+         * forever, holding a recorder slot and never reaching the failure handler — strictly
+         * worse than the crash it replaced. Transport errors retry; HTTP status codes do not.
+         */
+        expect(args).not.toContain('-reconnect_on_http_error');
+    });
+
+    it('does NOT put HTTP reconnect options on an RTSP input', async () => {
+        const { buildRecordingFfmpegArgs } = await import('../services/recordingStarter.js');
+        const args = buildRecordingFfmpegArgs({
+            cameraDir: '/recordings/camera1',
+            outputPattern: '/r/c1/%Y.mp4',
+            inputUrl: 'rtsp://cam/stream',
+            streamSource: 'internal',
+            rtspTransport: 'tcp',
+        });
+
+        expect(args).not.toContain('-reconnect');
+        expect(args).not.toContain('-reconnect_streamed');
+        expect(args).not.toContain('-reconnect_delay_max');
+        // RTSP keeps its own socket-timeout mechanism instead.
+        expect(args).toContain('-stimeout');
+    });
+
     it('uses protocol whitelist for external streams', async () => {
         const { buildRecordingFfmpegArgs } = await import('../services/recordingStarter.js');
         const args = buildRecordingFfmpegArgs({
