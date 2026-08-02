@@ -9,7 +9,8 @@ export default function LandingPlaybackPanel({ Playback, cameras, selectedCamera
                 </div>
             }
         >
-            <Playback cameras={cameras} selectedCamera={selectedCamera} adsConfig={adsConfig} accessScope={accessScope} />
+            {/* LandingPage renders the mobile dock; Playback must not add a second one. */}
+            <Playback cameras={cameras} selectedCamera={selectedCamera} adsConfig={adsConfig} accessScope={accessScope} showMobileDock={false} />
         </Suspense>
     );
 }

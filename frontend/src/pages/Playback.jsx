@@ -62,6 +62,10 @@ function Playback({
     selectedCamera: propSelectedCamera,
     adsConfig = null,
     accessScope = PLAYBACK_ACCESS_SCOPES.PUBLIC_PREVIEW,
+    // Off when embedded in the landing page, which already renders a dock of its own. Both are
+    // `fixed bottom-3 z-dock`, so they stacked exactly: five dead links under five live buttons,
+    // announced twice by a screen reader. Also gates the bottom padding that clears OUR dock.
+    showMobileDock = true,
 }) {
     const [searchParams, setSearchParams] = useSearchParams();
     const location = useLocation();
@@ -1083,14 +1087,9 @@ function Playback({
                 />
             )}
             {/* pb-24 clears the fixed mobile dock, which otherwise sits over the last block on the page. */}
-            <div className="min-h-screen bg-surface-sunken py-2 pb-24 sm:py-6 sm:pb-6 md:py-8 md:pb-8 px-2 sm:px-4">
+            <div className={`min-h-screen bg-surface-sunken py-2 sm:py-6 md:py-8 px-2 sm:px-4 ${showMobileDock ? 'pb-24 sm:pb-6 md:pb-8' : ''}`}>
             <div className="max-w-7xl mx-auto space-y-3 sm:space-y-4 md:space-y-6">
-                <PlaybackHeader
-                    cameras={visiblePlaybackCameras}
-                    selectedCamera={selectedCamera}
-                    onCameraChange={handleCameraChange}
-                    onShare={isAdminPlayback ? null : handleShare}
-                />
+                <PlaybackHeader cameras={visiblePlaybackCameras} selectedCamera={selectedCamera} onCameraChange={handleCameraChange} onShare={isAdminPlayback ? null : handleShare} />
 
                 <PlaybackVideo
                     videoRef={attachVideo} containerRef={containerRef} isLoadingSegments={isWaitingForSegments}
@@ -1144,11 +1143,8 @@ function Playback({
 
                 <PlaybackUsageGuide isAdminPlayback={isAdminPlayback} playbackPolicy={playbackPolicy} />
 
-                {!isAdminPlayback && (
-                    <LandingMobileDock
-                        viewMode="playback"
-                        itemHrefs={publicDockHrefs}
-                    />
+                {!isAdminPlayback && showMobileDock && (
+                    <LandingMobileDock viewMode="playback" itemHrefs={publicDockHrefs} />
                 )}
             </div>
             </div>
