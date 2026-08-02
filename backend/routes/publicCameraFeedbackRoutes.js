@@ -11,6 +11,7 @@
  */
 
 import { getCameraReaction, setCameraReaction } from '../controllers/cameraReactionController.js';
+import { getReportCategories, submitCameraReport } from '../controllers/cameraReportController.js';
 
 const cameraIdParams = {
     type: 'object',
@@ -34,4 +35,30 @@ export default async function publicCameraFeedbackRoutes(fastify) {
             },
         },
     }, setCameraReaction);
+
+    /*
+     * Static and identical for everyone, so it is the one route here that may be cached. Declared
+     * before `/:id/report` would be ambiguous only if a camera could be named "report-categories";
+     * ids are integers, so the schema keeps them apart.
+     */
+    fastify.get('/report-categories', getReportCategories);
+
+    fastify.post('/:id/report', {
+        schema: {
+            params: cameraIdParams,
+            body: {
+                type: 'object',
+                required: ['category'],
+                properties: {
+                    category: { type: 'string', maxLength: 16 },
+                    message: { type: ['string', 'null'], maxLength: 500 },
+                    // Free-form on purpose: the browser's datetime-local gives a local wall-clock
+                    // string, and coercing it to an instant here would silently move an incident by
+                    // the visitor's offset. The operator reads it as the reporter wrote it.
+                    occurredAt: { type: ['string', 'null'], maxLength: 32 },
+                },
+                additionalProperties: false,
+            },
+        },
+    }, submitCameraReport);
 }

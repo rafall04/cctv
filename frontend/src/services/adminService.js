@@ -202,6 +202,36 @@ export const adminService = {
     },
 
     /*
+     * The visitor report queue. Never exposed publicly: the text comes from anonymous devices and
+     * is safe to accept precisely because it is never rendered back to anyone but staff.
+     */
+    async getCameraReports() {
+        try {
+            const response = await apiClient.get('/api/admin/cameras/reports');
+            return response.data;
+        } catch (error) {
+            console.error('Get camera reports error:', error);
+            return {
+                success: false,
+                message: error.response?.data?.message || 'Gagal memuat laporan kamera',
+            };
+        }
+    },
+
+    async updateCameraReport(id, status) {
+        try {
+            const response = await apiClient.put(`/api/admin/cameras/reports/${id}`, { status });
+            return response.data;
+        } catch (error) {
+            console.error('Update camera report error:', error);
+            return {
+                success: false,
+                message: error.response?.data?.message || 'Gagal memperbarui laporan',
+            };
+        }
+    },
+
+    /*
      * What a given retention would cost on disk, measured from this fleet's own segments rather
      * than a fixed bitrate assumption — the numbers differ by ~20% between camera types.
      */

@@ -10,13 +10,15 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import CameraDetailPanel from './CameraDetailPanel';
 
-// The panel now hosts CameraReactionBar, which fetches on mount. Left unmocked it attempts a real
-// XHR under jsdom; the bar swallows the failure, but the noise would bury a genuine error here.
-// Its own behaviour is covered in CameraReactionBar.test.jsx.
+// The panel now hosts CameraReactionBar and CameraReportForm, which talk to this service. Left
+// unmocked they attempt real XHRs under jsdom; both swallow the failure, but the noise would bury
+// a genuine error here. Their own behaviour lives in their own test files.
 vi.mock('../../services/cameraFeedbackService', () => ({
     default: {
         getReaction: vi.fn().mockResolvedValue({ success: false }),
         setReaction: vi.fn(),
+        getReportCategories: vi.fn().mockResolvedValue({ success: false }),
+        submitReport: vi.fn(),
     },
 }));
 

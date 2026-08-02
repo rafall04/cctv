@@ -1,72 +1,142 @@
 /*
- * Purpose: Surface the cameras visitors are complaining about — the only place the negative vote
- *          is ever shown.
+ * Purpose: The operator's side of visitor feedback — what people reported, and which cameras they
+ *          are voting down.
  * Caller: pages/CameraManagement.jsx.
- * Deps: adminService.getCameraReactions, components/ui.
+ * Deps: adminService (camera reports + reaction summary), components/ui.
  * MainFuncs: CameraFeedbackPanel.
- * SideEffects: One GET on mount.
+ * SideEffects: Two GETs on mount; one PUT when a report is closed.
  *
- * The public bar deliberately prints likes only (see CameraReactionBar). Collecting a signal that
- * nobody reads would be worse than not collecting it, so this panel is the other half of that
- * decision: "camera 25 — 30 bermasalah, 2 bagus" is a maintenance ticket nothing else raises.
+ * This is the ONLY reader of either signal. The public bar prints likes and nothing else, and the
+ * report text is never rendered on any public surface — which is exactly what makes accepting free
+ * text from anonymous devices safe. Collecting a signal nobody reads would be worse than not
+ * collecting it, so both halves land here.
  *
- * Silent while nobody is complaining, for the same reason DeadSourcePanel is: a permanent
- * "0 keluhan" box teaches people to skip the region where the warning eventually appears.
+ * Silent when there is nothing open, like DeadSourcePanel: a permanent "0 laporan" box on the
+ * busiest admin page teaches people to skip the region where the real warning appears.
  */
 
-import { useEffect, useState } from 'react';
-import { Badge, Card, CardHeader } from '../../ui';
+import { useCallback, useEffect, useState } from 'react';
+import { Badge, Button, Card, CardHeader } from '../../ui';
 import { adminService } from '../../../services/adminService';
 
-const MAX_ROWS = 10;
+const MAX_COMPLAINED_ROWS = 10;
+
+const when = (value) => {
+    const at = new Date(String(value || '').replace(' ', 'T'));
+    if (Number.isNaN(at.getTime())) return value || '';
+    return at.toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+};
 
 export default function CameraFeedbackPanel() {
-    const [cameras, setCameras] = useState(null);
+    const [reports, setReports] = useState([]);
+    const [complained, setComplained] = useState([]);
+    const [closingId, setClosingId] = useState(null);
 
     useEffect(() => {
         let alive = true;
+        adminService.getCameraReports().then((res) => {
+            if (alive && res?.success) setReports(res.data?.reports || []);
+        });
         adminService.getCameraReactions().then((res) => {
-            if (alive && res?.success) setCameras(res.data || []);
+            if (alive && res?.success) setComplained((res.data || []).filter((c) => c.dislikes > 0));
         });
         return () => { alive = false; };
     }, []);
 
-    const complained = (cameras || []).filter((camera) => camera.dislikes > 0);
-    if (!complained.length) return null;
+    const close = useCallback(async (id) => {
+        setClosingId(id);
+        const res = await adminService.updateCameraReport(id, 'selesai');
+        setClosingId(null);
+        if (res?.success) {
+            setReports((prev) => prev.map((r) => (r.id === id ? { ...r, status: 'selesai' } : r)));
+        }
+    }, []);
 
-    const shown = complained.slice(0, MAX_ROWS);
+    const open = reports.filter((report) => report.status !== 'selesai');
+    if (!open.length && !complained.length) return null;
+
+    const shownComplaints = complained.slice(0, MAX_COMPLAINED_ROWS);
 
     return (
         <Card>
             <CardHeader
-                title={(
-                    <span className="flex flex-wrap items-center gap-2">
-                        <span className="text-sm font-semibold text-content">
-                            {complained.length} kamera dikeluhkan pengunjung
-                        </span>
-                    </span>
-                )}
-                description="Pengunjung menandai kamera ini bermasalah — biasanya gambar buram, gelap, atau tidak tampil. Angka ini tidak pernah ditampilkan di halaman publik."
+                title={<span className="text-sm font-semibold text-content">Masukan pengunjung</span>}
+                description="Hanya terlihat di sini — laporan dan penilaian negatif tidak pernah ditampilkan di halaman publik."
             />
 
-            <ul className="mt-3 divide-y divide-edge">
-                {shown.map((camera) => (
-                    <li key={camera.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-2">
-                        <span className="text-sm font-medium text-content">{camera.name}</span>
-                        {camera.areaName && (
-                            <span className="text-xs text-content-subtle">{camera.areaName}</span>
-                        )}
-                        <Badge tone="warn">{camera.dislikes} bermasalah</Badge>
-                        {camera.likes > 0 && <Badge tone="idle">{camera.likes} bagus</Badge>}
-                    </li>
-                ))}
-            </ul>
+            {open.length > 0 && (
+                <section className="mt-3">
+                    <h3 className="text-[11px] font-medium uppercase tracking-wide text-content-subtle">
+                        {open.length} laporan belum ditutup
+                    </h3>
+                    <ul className="mt-2 divide-y divide-edge">
+                        {open.map((report) => (
+                            <li key={report.id} className="flex flex-wrap items-start gap-x-3 gap-y-1 py-2">
+                                <div className="min-w-0 flex-1">
+                                    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                                        <span className="text-sm font-medium text-content">{report.cameraName}</span>
+                                        {report.areaName && (
+                                            <span className="text-xs text-content-subtle">{report.areaName}</span>
+                                        )}
+                                        <Badge tone="warn">{report.categoryLabel}</Badge>
+                                        <span className="text-[11px] tabular-nums text-content-muted">
+                                            {when(report.createdAt)}
+                                        </span>
+                                    </div>
+                                    {/*
+                                      * The incident time is stated as the reporter wrote it, not
+                                      * reformatted: it is a wall-clock guess from a phone, and
+                                      * dressing it up as a precise instant would overstate it.
+                                      */}
+                                    {report.occurredAt && (
+                                        <p className="text-[11px] text-content-muted">
+                                            Kejadian sekitar: {report.occurredAt}
+                                        </p>
+                                    )}
+                                    {report.message && (
+                                        <p className="mt-0.5 break-words text-xs leading-5 text-content-muted">
+                                            {report.message}
+                                        </p>
+                                    )}
+                                </div>
+                                <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    loading={closingId === report.id}
+                                    onClick={() => close(report.id)}
+                                >
+                                    Selesai
+                                </Button>
+                            </li>
+                        ))}
+                    </ul>
+                </section>
+            )}
 
-            {/* Never truncate quietly: a capped list that does not say so reads as the whole story. */}
-            {complained.length > shown.length && (
-                <p className="mt-3 text-xs text-content-subtle">
-                    Menampilkan {shown.length} terburuk dari {complained.length} kamera yang dikeluhkan.
-                </p>
+            {complained.length > 0 && (
+                <section className="mt-4 border-t border-edge pt-3">
+                    <h3 className="text-[11px] font-medium uppercase tracking-wide text-content-subtle">
+                        {complained.length} kamera ditandai bermasalah
+                    </h3>
+                    <ul className="mt-2 divide-y divide-edge">
+                        {shownComplaints.map((camera) => (
+                            <li key={camera.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-2">
+                                <span className="text-sm font-medium text-content">{camera.name}</span>
+                                {camera.areaName && (
+                                    <span className="text-xs text-content-subtle">{camera.areaName}</span>
+                                )}
+                                <Badge tone="warn">{camera.dislikes} bermasalah</Badge>
+                                {camera.likes > 0 && <Badge tone="idle">{camera.likes} bagus</Badge>}
+                            </li>
+                        ))}
+                    </ul>
+                    {/* Never truncate quietly: a capped list that does not say so reads as everything. */}
+                    {complained.length > shownComplaints.length && (
+                        <p className="mt-2 text-xs text-content-subtle">
+                            Menampilkan {shownComplaints.length} terburuk dari {complained.length} kamera.
+                        </p>
+                    )}
+                </section>
             )}
         </Card>
     );

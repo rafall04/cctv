@@ -9,6 +9,7 @@
 import { getPublicCameraQuality } from '../../utils/landingCameraInsights';
 import { buildAreaPath } from '../../utils/publicGrowthShare';
 import CameraReactionBar from './CameraReactionBar.jsx';
+import CameraReportForm from './CameraReportForm.jsx';
 
 function metric(camera, key) {
     return Number(camera?.[key] ?? camera?.viewer_stats?.[key] ?? 0);
@@ -93,6 +94,7 @@ export default function CameraDetailPanel({
               * page it exists to show.
               */}
             <CameraReactionBar cameraId={camera?.id} />
+            <CameraReportForm cameraId={camera?.id} />
         </section>
     );
 }

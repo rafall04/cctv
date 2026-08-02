@@ -38,6 +38,29 @@ export const cameraFeedbackService = {
             return failure(error, 'Gagal menyimpan reaksi');
         }
     },
+
+    /*
+     * Fetched rather than hardcoded so the form's options and the server's accepted set cannot
+     * drift apart — a category the server rejects would be a dead radio button.
+     */
+    async getReportCategories() {
+        try {
+            const response = await apiClient.get('/api/public/cameras/report-categories');
+            return response.data;
+        } catch (error) {
+            return failure(error, 'Gagal memuat jenis laporan');
+        }
+    },
+
+    /** @param {{category: string, message?: string, occurredAt?: string}} payload */
+    async submitReport(cameraId, payload) {
+        try {
+            const response = await apiClient.post(`/api/public/cameras/${cameraId}/report`, payload);
+            return response.data;
+        } catch (error) {
+            return failure(error, 'Gagal mengirim laporan');
+        }
+    },
 };
 
 export default cameraFeedbackService;

@@ -12,7 +12,11 @@ import { clearPlaybackTokenSessions, createPlaybackToken, deletePlaybackTokenByI
 import { createPlaybackProduct, listPlaybackProducts, updatePlaybackProduct } from '../controllers/playbackProductController.js';
 import { listDeadSources } from '../controllers/cameraSourceHealthController.js';
 import { getRecordingCapacity } from '../controllers/recordingCapacityController.js';
-import { listCameraReactionSummary } from '../controllers/adminCameraFeedbackController.js';
+import {
+    listCameraReactionSummary,
+    listCameraReports,
+    updateCameraReport,
+} from '../controllers/adminCameraFeedbackController.js';
 import { authMiddleware, requireAdmin } from '../middleware/authMiddleware.js';
 import { createApiKeySchema, apiKeyIdParamSchema } from '../middleware/schemaValidators.js';
 import mediaMtxService from '../services/mediaMtxService.js';
@@ -181,6 +185,30 @@ export default async function adminRoutes(fastify, options) {
     fastify.get('/cameras/reactions', {
         onRequest: [authMiddleware, requireAdmin],
         handler: listCameraReactionSummary,
+    });
+
+    /*
+     * Visitor reports. Staff-only is not a preference here: the text is written by anonymous
+     * devices and is never rendered publicly, which is the entire reason accepting free text is
+     * safe at all. Exposing this queue would turn it into the comment wall it was designed to avoid.
+     */
+    fastify.get('/cameras/reports', {
+        onRequest: [authMiddleware, requireAdmin],
+        handler: listCameraReports,
+    });
+
+    fastify.put('/cameras/reports/:id', {
+        onRequest: [authMiddleware, requireAdmin],
+        schema: {
+            params: { type: 'object', required: ['id'], properties: { id: { type: 'integer', minimum: 1 } } },
+            body: {
+                type: 'object',
+                required: ['status'],
+                properties: { status: { type: 'string', enum: ['baru', 'dibaca', 'selesai'] } },
+                additionalProperties: false,
+            },
+        },
+        handler: updateCameraReport,
     });
 
     // Debug endpoint - raw MediaMTX data (for troubleshooting viewer count)

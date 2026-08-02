@@ -1,63 +1,123 @@
 // @vitest-environment jsdom
 
 /*
- * Purpose: Prove the negative vote reaches the one audience that can act on it, and stays away
- *          from everyone else.
+ * Purpose: Prove both halves of visitor feedback reach the one audience that can act on them, and
+ *          that the panel stays out of the way when there is nothing to act on.
  * Caller: Vitest frontend suite.
  * Deps: React Testing Library, mocked adminService.
  * SideEffects: jsdom render only.
  */
 
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import CameraFeedbackPanel from './CameraFeedbackPanel';
 import { adminService } from '../../../services/adminService';
 
 vi.mock('../../../services/adminService', () => ({
-    adminService: { getCameraReactions: vi.fn() },
+    adminService: {
+        getCameraReports: vi.fn(),
+        getCameraReactions: vi.fn(),
+        updateCameraReport: vi.fn(),
+    },
 }));
 
-const ROWS = [
-    { id: 25, name: 'JEMBATAN A', areaName: 'KEC BOJONEGORO', likes: 2, dislikes: 30, lastVoteAt: '2026-08-02 10:00:00' },
-    { id: 31, name: 'PASAR', areaName: 'KAB MAGETAN', likes: 0, dislikes: 4, lastVoteAt: '2026-08-02 09:00:00' },
-    { id: 40, name: 'DISUKAI', areaName: 'KAB MAGETAN', likes: 12, dislikes: 0, lastVoteAt: '2026-08-02 08:00:00' },
+const REPORTS = [
+    {
+        id: 9, cameraId: 16, cameraName: 'PEREMPATAN', areaName: 'KEC BOJONEGORO',
+        category: 'kejadian', categoryLabel: 'Ada kejadian di rekaman',
+        message: 'Serempetan motor', occurredAt: '2026-08-02T14:30',
+        status: 'baru', createdAt: '2026-08-02 15:00:00',
+    },
+    {
+        id: 8, cameraId: 25, cameraName: 'JEMBATAN', areaName: null,
+        category: 'buram', categoryLabel: 'Gambar buram',
+        message: null, occurredAt: null, status: 'selesai', createdAt: '2026-08-01 09:00:00',
+    },
 ];
+
+const REACTIONS = [
+    { id: 25, name: 'JEMBATAN', areaName: 'KEC BOJONEGORO', likes: 2, dislikes: 30 },
+    { id: 40, name: 'DISUKAI', areaName: null, likes: 12, dislikes: 0 },
+];
+
+const empty = () => {
+    adminService.getCameraReports.mockResolvedValue({ success: true, data: { reports: [], openCount: 0 } });
+    adminService.getCameraReactions.mockResolvedValue({ success: true, data: [] });
+};
 
 beforeEach(() => {
     vi.clearAllMocks();
-    adminService.getCameraReactions.mockResolvedValue({ success: true, data: ROWS });
+    adminService.getCameraReports.mockResolvedValue({ success: true, data: { reports: REPORTS, openCount: 1 } });
+    adminService.getCameraReactions.mockResolvedValue({ success: true, data: REACTIONS });
 });
 
-describe('CameraFeedbackPanel', () => {
+describe('CameraFeedbackPanel — reports', () => {
+    it('shows an open report with its camera, category and words', async () => {
+        render(<CameraFeedbackPanel />);
+
+        expect(await screen.findByText('1 laporan belum ditutup')).toBeTruthy();
+        expect(screen.getByText('PEREMPATAN')).toBeTruthy();
+        expect(screen.getByText('Ada kejadian di rekaman')).toBeTruthy();
+        expect(screen.getByText('Serempetan motor')).toBeTruthy();
+    });
+
+    /* The incident time is a wall-clock guess from a phone; it is shown as written, not reformatted. */
+    it('states the incident time exactly as the reporter gave it', async () => {
+        render(<CameraFeedbackPanel />);
+
+        expect(await screen.findByText('Kejadian sekitar: 2026-08-02T14:30')).toBeTruthy();
+    });
+
+    it('leaves already-closed reports out of the open list', async () => {
+        render(<CameraFeedbackPanel />);
+        await screen.findByText('PEREMPATAN');
+
+        expect(screen.getByText('1 laporan belum ditutup')).toBeTruthy();
+        expect(screen.queryByText('Gambar buram')).toBeNull();
+    });
+
+    it('closes a report and drops it from the list', async () => {
+        adminService.updateCameraReport.mockResolvedValue({ success: true, data: { id: 9, status: 'selesai' } });
+        render(<CameraFeedbackPanel />);
+        await screen.findByText('PEREMPATAN');
+
+        fireEvent.click(screen.getByRole('button', { name: 'Selesai' }));
+
+        await waitFor(() => expect(adminService.updateCameraReport).toHaveBeenCalledWith(9, 'selesai'));
+        await waitFor(() => expect(screen.queryByText('PEREMPATAN')).toBeNull());
+    });
+
+    it('keeps the report listed when closing it fails', async () => {
+        adminService.updateCameraReport.mockResolvedValue({ success: false, message: 'Sesi habis' });
+        render(<CameraFeedbackPanel />);
+        await screen.findByText('PEREMPATAN');
+
+        fireEvent.click(screen.getByRole('button', { name: 'Selesai' }));
+
+        await waitFor(() => expect(adminService.updateCameraReport).toHaveBeenCalled());
+        expect(screen.getByText('PEREMPATAN')).toBeTruthy();
+    });
+});
+
+describe('CameraFeedbackPanel — negative votes', () => {
     it('lists the complained-about cameras with both sides of the count', async () => {
         render(<CameraFeedbackPanel />);
 
-        expect(await screen.findByText('2 kamera dikeluhkan pengunjung')).toBeTruthy();
+        expect(await screen.findByText('1 kamera ditandai bermasalah')).toBeTruthy();
         expect(screen.getByText('30 bermasalah')).toBeTruthy();
         expect(screen.getByText('2 bagus')).toBeTruthy();
-        expect(screen.getByText('JEMBATAN A')).toBeTruthy();
     });
 
-    /* A camera nobody has complained about is not a maintenance ticket. */
-    it('leaves out cameras with no complaints at all', async () => {
+    it('leaves out cameras nobody has complained about', async () => {
         render(<CameraFeedbackPanel />);
-        await screen.findByText('JEMBATAN A');
+        await screen.findByText('1 kamera ditandai bermasalah');
 
         expect(screen.queryByText('DISUKAI')).toBeNull();
     });
 
-    it('renders nothing when nobody has complained', async () => {
-        adminService.getCameraReactions.mockResolvedValue({
-            success: true, data: [{ id: 1, name: 'OK', likes: 3, dislikes: 0 }],
-        });
-        const { container } = render(<CameraFeedbackPanel />);
-
-        await waitFor(() => expect(adminService.getCameraReactions).toHaveBeenCalled());
-        expect(container.innerHTML).toBe('');
-    });
-
     /** A capped list that does not say it is capped reads as the whole story. */
     it('says so when the list is truncated', async () => {
+        adminService.getCameraReports.mockResolvedValue({ success: true, data: { reports: [], openCount: 0 } });
         adminService.getCameraReactions.mockResolvedValue({
             success: true,
             data: Array.from({ length: 14 }, (_, i) => ({
@@ -68,8 +128,19 @@ describe('CameraFeedbackPanel', () => {
 
         expect(await screen.findByText(/Menampilkan 10 terburuk dari 14 kamera/)).toBeTruthy();
     });
+});
 
-    it('stays silent when the request fails', async () => {
+describe('CameraFeedbackPanel — silence', () => {
+    it('renders nothing when there is no open report and no complaint', async () => {
+        empty();
+        const { container } = render(<CameraFeedbackPanel />);
+
+        await waitFor(() => expect(adminService.getCameraReports).toHaveBeenCalled());
+        expect(container.innerHTML).toBe('');
+    });
+
+    it('stays silent when the requests fail', async () => {
+        adminService.getCameraReports.mockResolvedValue({ success: false, message: 'Sesi habis' });
         adminService.getCameraReactions.mockResolvedValue({ success: false, message: 'Sesi habis' });
         const { container } = render(<CameraFeedbackPanel />);
 
