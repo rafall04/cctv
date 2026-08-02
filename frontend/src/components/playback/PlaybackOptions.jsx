@@ -19,7 +19,13 @@ export default function PlaybackOptions({
 }) {
     return (
         <div className="space-y-3 rounded-card border border-edge bg-surface p-3 sm:p-4">
-            {showPublicNotice && playbackPolicy?.notice?.enabled && (
+            {/*
+              * The accessMode check stops the two panels contradicting each other. A token holder
+              * was shown "Akses Playback Publik Terbatas — Preview 10 Menit — Coba gratis 3 hari"
+              * directly above "Akses playback aktif — 4 jam terakhir", because the notice only ever
+              * asked whether it was ENABLED, never whether this visitor had already got past it.
+              */}
+            {showPublicNotice && playbackPolicy?.notice?.enabled && playbackPolicy.accessMode !== 'token_full' && (
                 // Genuinely a warning, so it keeps a warning colour — but as a left rule rather than
                 // a filled amber slab.
                 <div className="rounded-control border border-edge border-l-2 border-l-status-warn bg-surface-raised px-4 py-3 text-sm text-content">

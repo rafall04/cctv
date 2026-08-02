@@ -48,3 +48,32 @@ describe('PlaybackVideo', () => {
         expect(screen.getByTestId('playback-empty-state').className).toContain('pointer-events-none');
     });
 });
+
+/*
+ * Reported from a phone: opening a link showed "Belum ada rekaman" while the segment list was still
+ * being fetched. To the visitor that is indistinguishable from a page that has hung — they cannot
+ * tell whether to wait or to give up. A verdict must not be announced before it is known.
+ */
+describe('PlaybackVideo waiting state', () => {
+    it('says it is working while segments are still being fetched', () => {
+        render(<PlaybackVideo {...baseProps} isLoadingSegments />);
+
+        expect(screen.getByTestId('playback-loading-state')).toBeTruthy();
+        expect(screen.getByText('Memuat rekaman...')).toBeTruthy();
+        expect(screen.queryByText('Belum ada rekaman')).toBeNull();
+    });
+
+    it('delivers the verdict only once the fetch is done', () => {
+        render(<PlaybackVideo {...baseProps} isLoadingSegments={false} />);
+
+        expect(screen.getByText('Belum ada rekaman')).toBeTruthy();
+        expect(screen.queryByText('Memuat rekaman...')).toBeNull();
+    });
+
+    it('shows neither once a segment is playing', () => {
+        render(<PlaybackVideo {...baseProps} selectedSegment={{ id: 1, filename: 'a.mp4' }} isLoadingSegments />);
+
+        expect(screen.queryByTestId('playback-loading-state')).toBeNull();
+        expect(screen.queryByTestId('playback-empty-state')).toBeNull();
+    });
+});

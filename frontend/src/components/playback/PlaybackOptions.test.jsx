@@ -67,3 +67,23 @@ describe('PlaybackOptions', () => {
         expect(onAutoPlayToggle).toHaveBeenCalledTimes(1);
     });
 });
+
+describe('PlaybackOptions notice honesty', () => {
+    it('drops the public-preview pitch once the visitor holds a working token', () => {
+        render(
+            <PlaybackOptions
+                {...base}
+                showPublicNotice
+                playbackPolicy={{
+                    accessMode: 'token_full',
+                    playbackWindowHours: 4,
+                    previewMinutes: 10,
+                    notice: { enabled: true, title: 'Akses Playback Publik Terbatas', text: 'x' },
+                }}
+            />,
+        );
+
+        expect(screen.queryByText('Akses Playback Publik Terbatas')).toBeNull();
+        expect(screen.queryByRole('button', { name: /Coba gratis 3 hari/ })).toBeNull();
+    });
+});

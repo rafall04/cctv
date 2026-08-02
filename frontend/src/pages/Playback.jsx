@@ -271,6 +271,20 @@ function Playback({
         ...resolveViewerTrackingScope(playbackPolicy, accessScope),
     });
 
+    /*
+     * The <video> node lives in STATE as well as in the ref, and that is load-bearing: the
+     * source-assignment effect bails out while videoRef.current is null (every render of the
+     * loading/denied branches), and a ref change never re-runs an effect — so once the element
+     * finally mounted nothing brought that effect back and its src stayed EMPTY. No request, no
+     * error, just a stuck player. Whether it struck came down to whether segments arrived before
+     * or after the element mounted, which is why it looked random.
+     */
+    const [videoNode, setVideoNode] = useState(null);
+    const attachVideo = useCallback((node) => {
+        videoRef.current = node;
+        setVideoNode(node);
+    }, []);
+
     // Keep refs in sync
     useEffect(() => {
         selectedSegmentRef.current = selectedSegment;
@@ -776,7 +790,7 @@ function Playback({
                 resetVideoElement();
             }
         };
-    }, [clearBufferingState, loading, resetSourcePlaybackState, resetVideoElement, selectedCameraId, selectedPlaybackStreamUrl, selectedSegment, selectedSegmentKey]);
+    }, [clearBufferingState, loading, resetSourcePlaybackState, resetVideoElement, selectedCameraId, selectedPlaybackStreamUrl, selectedSegment, selectedSegmentKey, videoNode]);
 
     useEffect(() => {
         const video = videoRef.current;
@@ -1071,25 +1085,16 @@ function Playback({
                 />
 
                 <PlaybackVideo
-                    videoRef={videoRef}
-                    containerRef={containerRef}
-                    selectedCamera={selectedCamera}
-                    selectedSegment={selectedSegment}
-                    playbackSpeed={playbackSpeed}
-                    onSpeedChange={handleSpeedChange}
-                    onSnapshot={takeSnapshot}
-                    onToggleFullscreen={toggleFullscreen}
-                    isFullscreen={isFullscreen}
-                    isBuffering={isBuffering}
-                    isSeeking={isSeeking}
-                    videoError={videoError}
-                    errorType={errorType}
-                    currentTime={currentTime}
-                    duration={duration}
+                    videoRef={attachVideo} containerRef={containerRef} isLoadingSegments={loading}
+                    selectedCamera={selectedCamera} selectedSegment={selectedSegment}
+                    playbackSpeed={playbackSpeed} onSpeedChange={handleSpeedChange}
+                    onSnapshot={takeSnapshot} onToggleFullscreen={toggleFullscreen}
+                    isFullscreen={isFullscreen} isBuffering={isBuffering} isSeeking={isSeeking}
+                    videoError={videoError} errorType={errorType}
+                    currentTime={currentTime} duration={duration}
                     autoPlayNotification={autoPlayNotification}
                     onAutoPlayNotificationClose={() => setAutoPlayNotification(null)}
-                    seekWarning={seekWarning}
-                    onSeekWarningClose={() => setSeekWarning(null)}
+                    seekWarning={seekWarning} onSeekWarningClose={() => setSeekWarning(null)}
                     snapshotNotification={snapshotNotification}
                     onSnapshotNotificationClose={clearSnapshotNotification}
                     formatTimestamp={formatTimestamp}
@@ -1102,11 +1107,7 @@ function Playback({
                  * used to sit between player and list, so changing segment meant scrolling to the
                  * bottom of the page and back for every ten minutes of footage.
                  */}
-                <PlaybackSegmentStepper
-                    segments={segments}
-                    selectedSegment={selectedSegment}
-                    onSegmentClick={handleSegmentClick}
-                />
+                <PlaybackSegmentStepper segments={segments} selectedSegment={selectedSegment} onSegmentClick={handleSegmentClick} />
 
                 <PlaybackTimeline
                     segments={segments} selectedSegment={selectedSegment} currentTime={currentTime}

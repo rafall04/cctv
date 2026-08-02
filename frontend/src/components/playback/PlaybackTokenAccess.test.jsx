@@ -192,3 +192,38 @@ describe('PlaybackTokenAccess without access', () => {
         expect(onActivate).toHaveBeenCalledWith('rafpb_demo');
     });
 });
+
+/*
+ * Seen on a phone: "Akses Playback Publik Terbatas — Coba gratis 3 hari" rendered directly above
+ * "Akses playback aktif — 4 jam terakhir — 14 kamera". Both panels were describing different
+ * things — one the camera on screen, the other the token in hand — and read as a contradiction.
+ */
+describe('PlaybackTokenAccess when the token does not reach this camera', () => {
+    const OUT_OF_SCOPE = { accessMode: 'public_preview', previewMinutes: 10 };
+
+    it('believes the camera policy over the activation payload', () => {
+        setup({ playbackPolicy: OUT_OF_SCOPE, tokenStatus: { id: 5, scope_type: 'area' } });
+
+        expect(screen.queryByText('Akses playback aktif')).toBeNull();
+    });
+
+    it('explains WHY rather than selling a trial to someone who already paid', () => {
+        setup({ playbackPolicy: OUT_OF_SCOPE, tokenStatus: { id: 5, scope_type: 'area' } });
+
+        expect(screen.getByText(/tidak mencakup kamera ini/)).toBeTruthy();
+        expect(screen.queryByText(/Belum punya token/)).toBeNull();
+    });
+
+    it('still offers the trial to a visitor who genuinely holds nothing', () => {
+        setup({ playbackPolicy: OUT_OF_SCOPE, tokenStatus: null });
+
+        expect(screen.queryByText(/tidak mencakup kamera ini/)).toBeNull();
+        expect(screen.getByText(/Belum punya token/)).toBeTruthy();
+    });
+
+    it('falls back to the activation payload only while no policy has arrived', () => {
+        setup({ playbackPolicy: null, tokenStatus: { id: 5 } });
+
+        expect(screen.getByText('Akses playback aktif')).toBeTruthy();
+    });
+});

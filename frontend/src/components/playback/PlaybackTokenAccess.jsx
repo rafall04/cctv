@@ -65,7 +65,18 @@ export default function PlaybackTokenAccess({
         return () => window.removeEventListener('playback:open-access', open);
     }, []);
 
-    const hasAccess = playbackPolicy?.accessMode === 'token_full' || Boolean(tokenStatus);
+    /*
+     * The server's verdict for THIS camera wins whenever it has arrived. tokenStatus only says a
+     * token was activated at some point, which is not the same question: an area token opened on a
+     * camera outside its area produced "Akses playback aktif" sitting directly above the public
+     * preview notice for the very same camera. Believing tokenStatus over the policy is what made
+     * the page contradict itself.
+     */
+    const hasAccess = playbackPolicy?.accessMode
+        ? playbackPolicy.accessMode === 'token_full'
+        : Boolean(tokenStatus);
+    /** A token IS held — it simply does not reach the camera on screen. Saying so beats a sales pitch. */
+    const heldButOutOfScope = Boolean(tokenStatus) && !hasAccess;
 
     /*
      * Leaving must also close the swap form. Without this, signing out from inside "Ganti token" left
@@ -198,7 +209,13 @@ export default function PlaybackTokenAccess({
                      * and activates, so the visitor never has to read and retype what the app
                      * already knows. It stays on screen only because it is worth copying elsewhere.
                      */}
-                    {!isSwapping && (
+                    {heldButOutOfScope && (
+                        <p className="mt-1 text-xs leading-5 text-status-warn">
+                            Token Anda aktif, tetapi tidak mencakup kamera ini. Pilih kamera lain yang termasuk
+                            dalam token, atau masukkan token lain.
+                        </p>
+                    )}
+                    {!isSwapping && !heldButOutOfScope && (
                         <div id="akses-playback">
                             <button
                                 type="button"

@@ -12,6 +12,7 @@ export default function PlaybackVideo({
     containerRef,
     selectedCamera,
     selectedSegment,
+    isLoadingSegments = false,
     playbackSpeed,
     onSpeedChange,
     onSnapshot,
@@ -167,19 +168,35 @@ export default function PlaybackVideo({
                     muted
                 />
                 
+                {/*
+                  * "Belum ada rekaman" is a VERDICT, and it must not be announced before the answer
+                  * is known. While segments are still being fetched this said the camera had
+                  * nothing — indistinguishable, to the visitor, from the page being stuck. So the
+                  * loading state comes first and says plainly that work is in progress.
+                  */}
                 {!selectedSegment && !videoError && (
                     <div
-                        data-testid="playback-empty-state"
+                        data-testid={isLoadingSegments ? 'playback-loading-state' : 'playback-empty-state'}
                         className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-gradient-to-br from-slate-950 via-slate-950/95 to-black p-6"
                     >
                         <div className="max-w-sm text-center">
-                            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10 text-sky-200 ring-1 ring-white/15">
-                                <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                                </svg>
-                            </div>
-                            <h3 className="text-lg font-semibold text-white">Belum ada rekaman</h3>
-                            <p className="mt-2 text-sm text-slate-300">Pilih kamera lain atau coba lagi nanti.</p>
+                            {isLoadingSegments ? (
+                                <div className="mx-auto mb-4 h-14 w-14 animate-spin rounded-full border-4 border-white/15 border-t-sky-300" />
+                            ) : (
+                                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10 text-sky-200 ring-1 ring-white/15">
+                                    <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                    </svg>
+                                </div>
+                            )}
+                            <h3 className="text-lg font-semibold text-white">
+                                {isLoadingSegments ? 'Memuat rekaman...' : 'Belum ada rekaman'}
+                            </h3>
+                            <p className="mt-2 text-sm text-slate-300">
+                                {isLoadingSegments
+                                    ? 'Sedang mengambil daftar rekaman kamera ini.'
+                                    : 'Pilih kamera lain atau coba lagi nanti.'}
+                            </p>
                         </div>
                     </div>
                 )}
