@@ -184,6 +184,26 @@ export const adminService = {
         }
     },
 
+    /*
+     * What a given retention would cost on disk, measured from this fleet's own segments rather
+     * than a fixed bitrate assumption — the numbers differ by ~20% between camera types.
+     */
+    async getRecordingCapacity(policy = REQUEST_POLICY.BLOCKING, config = {}) {
+        try {
+            const response = await apiClient.get(
+                '/api/admin/recording-capacity',
+                getRequestPolicyConfig(policy, config)
+            );
+            return response.data;
+        } catch (error) {
+            console.error('Get recording capacity error:', error);
+            return {
+                success: false,
+                message: error.response?.data?.message || 'Gagal menghitung kebutuhan penyimpanan',
+            };
+        }
+    },
+
     async getRecordingHealth(policy = REQUEST_POLICY.BLOCKING, config = {}) {
         try {
             const response = await apiClient.get(

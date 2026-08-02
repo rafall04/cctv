@@ -13,6 +13,7 @@ import { TableSkeleton, StatCardSkeleton } from '../components/ui/Skeleton';
 import { useRecordingDashboardData } from '../hooks/admin/useRecordingDashboardData';
 import RecordingSummaryCards from '../components/admin/recordings/RecordingSummaryCards';
 import RecordingHealthPanel from '../components/admin/recordings/RecordingHealthPanel';
+import RecordingCapacityPanel from '../components/admin/recordings/RecordingCapacityPanel';
 import RecordingAssuranceSummary from '../components/admin/recordings/RecordingAssuranceSummary';
 import RecordingAssuranceTable from '../components/admin/recordings/RecordingAssuranceTable';
 import RecordingCameraGrid from '../components/admin/recordings/RecordingCameraGrid';
@@ -154,6 +155,7 @@ export default function RecordingDashboard() {
             )}
 
             <RecordingSummaryCards summary={summary} />
+            <RecordingCapacityPanel />
             <RecordingHealthPanel />
             <RecordingAssuranceSummary summary={assurance?.summary} />
             <RecordingAssuranceTable cameras={assurance?.cameras || []} />

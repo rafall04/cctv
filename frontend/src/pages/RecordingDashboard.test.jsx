@@ -33,6 +33,9 @@ vi.mock('../services/recordingService', () => ({
 
 vi.mock('../services/adminService', () => ({
     adminService: {
+        // RecordingCapacityPanel fetches this on mount; it renders nothing on a failed load, which
+        // keeps these cases about the dashboard rather than about storage projection.
+        getRecordingCapacity: vi.fn().mockResolvedValue({ success: false, message: 'not under test' }),
         getRecordingHealth: vi.fn().mockResolvedValue({
             success: true,
             data: {

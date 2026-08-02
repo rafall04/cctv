@@ -11,6 +11,7 @@ import { generateApiKey, listApiKeys, deleteApiKey } from '../controllers/apiKey
 import { clearPlaybackTokenSessions, createPlaybackToken, deletePlaybackTokenById, listPlaybackTokenAuditLogs, listPlaybackTokens, revokePlaybackToken, sharePlaybackToken, updatePlaybackToken } from '../controllers/playbackTokenController.js';
 import { createPlaybackProduct, listPlaybackProducts, updatePlaybackProduct } from '../controllers/playbackProductController.js';
 import { listDeadSources } from '../controllers/cameraSourceHealthController.js';
+import { getRecordingCapacity } from '../controllers/recordingCapacityController.js';
 import { authMiddleware, requireAdmin } from '../middleware/authMiddleware.js';
 import { createApiKeySchema, apiKeyIdParamSchema } from '../middleware/schemaValidators.js';
 import mediaMtxService from '../services/mediaMtxService.js';
@@ -167,6 +168,12 @@ export default async function adminRoutes(fastify, options) {
     fastify.get('/cameras/source-health', {
         onRequest: [authMiddleware, requireAdmin],
         handler: listDeadSources,
+    });
+
+    // What a given retention would actually cost on disk, measured from this fleet's own segments.
+    fastify.get('/recording-capacity', {
+        onRequest: [authMiddleware, requireAdmin],
+        handler: getRecordingCapacity,
     });
 
     // Debug endpoint - raw MediaMTX data (for troubleshooting viewer count)
