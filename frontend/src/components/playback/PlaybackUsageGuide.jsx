@@ -25,16 +25,10 @@ export default function PlaybackUsageGuide({ isAdminPlayback, playbackPolicy }) 
                         )}
                     </ul>
                     {/*
-                     * Rekaman jalan umum menunjukkan orang yang tidak pernah diminta persetujuannya.
-                     * Peringatan ini berdiri sendiri, bukan sekadar butir keempat dalam daftar tips.
+                     * The responsible-use warning moved OUT of here to directly under the player.
+                     * At the foot of the last block on the page it was read by nobody who came to
+                     * watch a clip and leave. See PlaybackResponsibleUseNotice.
                      */}
-                    <p className="mt-3 border-t border-blue-200 pt-3 text-xs font-semibold uppercase tracking-wide text-blue-900 dark:border-blue-800 dark:text-blue-100 sm:text-sm">
-                        Gunakan dengan bijak
-                    </p>
-                    <p className="mt-1 text-xs text-blue-800 dark:text-blue-200">
-                        Rekaman ini memuat orang dan kendaraan nyata. Jangan disebarkan ulang, dipotong di luar
-                        konteks, atau dipakai untuk mengganggu privasi siapa pun.
-                    </p>
                 </div>
             </div>
         </div>

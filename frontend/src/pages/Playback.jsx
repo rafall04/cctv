@@ -30,6 +30,7 @@ import PlaybackTimeline from '../components/playback/PlaybackTimeline';
 import PlaybackSegmentList from '../components/playback/PlaybackSegmentList';
 import PlaybackSegmentStepper from '../components/playback/PlaybackSegmentStepper.jsx';
 import PlaybackShareButton from '../components/playback/PlaybackShareButton.jsx';
+import PlaybackResponsibleUseNotice from '../components/playback/PlaybackResponsibleUseNotice.jsx';
 import PlaybackUsageGuide from '../components/playback/PlaybackUsageGuide';
 import PlaybackTokenAccess from '../components/playback/PlaybackTokenAccess.jsx';
 import PlaybackOptions from '../components/playback/PlaybackOptions.jsx';
@@ -1116,6 +1117,9 @@ function Playback({
                  * used to sit between player and list, so changing segment meant scrolling to the
                  * bottom of the page and back for every ten minutes of footage.
                  */}
+                {/* Above the controls on purpose: it is read before the first click, not after. */}
+                <PlaybackResponsibleUseNotice />
+
                 <PlaybackSegmentStepper segments={segments} selectedSegment={selectedSegment} onSegmentClick={handleSegmentClick} />
 
                 <PlaybackTimeline segments={segments} selectedSegment={selectedSegment} currentTime={currentTime} onSegmentClick={handleSegmentClick} onTimelineClick={handleTimelineClick} formatTimestamp={formatTimestamp} />
@@ -1138,6 +1142,7 @@ function Playback({
                         tokenInput={tokenInput} onTokenInputChange={setTokenInput}
                         onActivate={activateToken} onClear={clearToken} isBusy={isTokenBusy}
                         tokenStatus={tokenStatus} message={tokenMessage}
+                        cameras={visiblePlaybackCameras} onSelectCamera={handleCameraChange}
                         playbackPolicy={playbackPolicy} compact />
                 )}
 

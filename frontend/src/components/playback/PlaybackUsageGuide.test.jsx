@@ -38,18 +38,16 @@ describe('PlaybackUsageGuide', () => {
     });
 });
 
+/*
+ * The responsible-use warning no longer lives here — it moved directly under the player, where it
+ * is actually read. See PlaybackResponsibleUseNotice.test.jsx.
+ */
 describe('PlaybackUsageGuide responsible use', () => {
-    it('carries the warning as its own statement, not a fourth bullet among tips', () => {
+    it('leaves the warning to the notice under the player instead of repeating it', () => {
         render(<PlaybackUsageGuide isAdminPlayback={false} playbackPolicy={null} />);
 
-        expect(screen.getByText('Gunakan dengan bijak')).toBeTruthy();
-        expect(screen.getByText(/Jangan disebarkan ulang/)).toBeTruthy();
-    });
-
-    it('keeps the warning for admins too — it is the same footage of the same people', () => {
-        render(<PlaybackUsageGuide isAdminPlayback playbackPolicy={null} />);
-
-        expect(screen.getByText('Gunakan dengan bijak')).toBeTruthy();
+        expect(screen.queryByText('Gunakan dengan bijak')).toBeNull();
+        expect(screen.queryByText(/Jangan disebarkan ulang/)).toBeNull();
     });
 });
 

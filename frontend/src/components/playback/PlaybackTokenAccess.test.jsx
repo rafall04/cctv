@@ -227,3 +227,55 @@ describe('PlaybackTokenAccess when the token does not reach this camera', () => 
         expect(screen.getByText('Akses playback aktif')).toBeTruthy();
     });
 });
+
+/*
+ * "14 kamera" is half an answer: it says how many, never which. A viewer holding an area token had
+ * no way to learn what else the token let them watch except by trying cameras one at a time.
+ */
+describe('PlaybackTokenAccess camera coverage', () => {
+    const CAMERAS = [
+        { id: 1, name: 'SIMPANG 3 JAMBEAN', area_name: 'KEC BOJONEGORO' },
+        { id: 2, name: 'PEREMPATAN SOSRODILOGO', area_name: 'KEC BOJONEGORO' },
+        { id: 9, name: 'DI LUAR TOKEN', area_name: 'KAB MAGETAN' },
+    ];
+    const withCoverage = (extra = {}) => setup({
+        playbackPolicy: TOKEN_POLICY,
+        tokenStatus: { allowed_camera_ids: [1, 2] },
+        cameras: CAMERAS,
+        ...extra,
+    });
+
+    it('keeps the list closed until asked', () => {
+        withCoverage();
+
+        expect(screen.getByRole('button', { name: /2 kamera/ }).getAttribute('aria-expanded')).toBe('false');
+        expect(screen.queryByText('SIMPANG 3 JAMBEAN')).toBeNull();
+    });
+
+    it('names exactly the cameras the token covers, and no others', () => {
+        withCoverage();
+
+        fireEvent.click(screen.getByRole('button', { name: /2 kamera/ }));
+
+        expect(screen.getByText('SIMPANG 3 JAMBEAN')).toBeTruthy();
+        expect(screen.getByText('PEREMPATAN SOSRODILOGO')).toBeTruthy();
+        expect(screen.queryByText('DI LUAR TOKEN')).toBeNull();
+    });
+
+    it('switches to a camera when its name is chosen', () => {
+        const onSelectCamera = vi.fn();
+        withCoverage({ onSelectCamera });
+
+        fireEvent.click(screen.getByRole('button', { name: /2 kamera/ }));
+        fireEvent.click(screen.getByRole('button', { name: /PEREMPATAN SOSRODILOGO/ }));
+
+        expect(onSelectCamera).toHaveBeenCalledWith(CAMERAS[1]);
+    });
+
+    it('stays plain text when no camera can be named, rather than a button that opens nothing', () => {
+        setup({ playbackPolicy: TOKEN_POLICY, tokenStatus: { allowed_camera_ids: [77] }, cameras: CAMERAS });
+
+        expect(screen.queryByRole('button', { name: /1 kamera/ })).toBeNull();
+        expect(screen.getByText('1 kamera')).toBeTruthy();
+    });
+});

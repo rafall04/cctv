@@ -22,11 +22,26 @@ import { useState, useEffect } from 'react';
 import PlaybackAccessPanel from './PlaybackAccessPanel.jsx';
 
 /** One labelled fact. Stacking these beats a run-on sentence: each value is findable at a glance. */
-function Fact({ label, value }) {
+function Fact({ label, value, onToggle, isOpen }) {
     return (
         <div className="min-w-0">
             <dt className="text-[11px] font-medium uppercase tracking-wide text-content-subtle">{label}</dt>
-            <dd className="truncate text-sm font-medium text-content">{value}</dd>
+            <dd className="truncate text-sm font-medium text-content">
+                {/* "14 kamera" is half an answer until you can find out WHICH fourteen. */}
+                {onToggle ? (
+                    <button
+                        type="button"
+                        onClick={onToggle}
+                        aria-expanded={isOpen}
+                        className="inline-flex items-center gap-1 text-primary underline-offset-2 hover:underline"
+                    >
+                        {value}
+                        <svg className={`h-3.5 w-3.5 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+                ) : value}
+            </dd>
         </div>
     );
 }
@@ -40,11 +55,14 @@ export default function PlaybackTokenAccess({
     tokenStatus,
     message,
     playbackPolicy = null,
+    cameras = [],
+    onSelectCamera = null,
     compact = false,
 }) {
     const [showAccess, setShowAccess] = useState(false);
     /** Set by "Ganti token": the only way the form returns while access is still held. */
     const [isSwapping, setIsSwapping] = useState(false);
+    const [showCameras, setShowCameras] = useState(false);
 
     /*
      * The capped-playback notice sits far above this box, so its call to action has to do two things
@@ -115,12 +133,22 @@ export default function PlaybackTokenAccess({
         value: windowHours ? `${windowHours} jam terakhir` : 'Semua rekaman',
     }];
 
+    const allowedIds = tokenStatus?.allowed_camera_ids || tokenStatus?.camera_ids || [];
+    /*
+     * Only cameras we can actually name are listed. An id with no match is a camera this visitor
+     * cannot see anyway, and printing a bare number would be worse than saying nothing.
+     */
+    const tokenCameras = allowedIds
+        .map((id) => cameras.find((camera) => camera.id === id))
+        .filter(Boolean);
+
     if (tokenStatus) {
         facts.push({
             label: 'Cakupan',
             value: cameraCount > 0
                 ? `${cameraCount} kamera`
                 : (tokenStatus.scope_type === 'area' ? 'Per area' : 'Semua kamera'),
+            onToggle: tokenCameras.length > 0 ? () => setShowCameras((v) => !v) : null,
         });
         facts.push({
             label: 'Berlaku',
@@ -140,8 +168,33 @@ export default function PlaybackTokenAccess({
                 </div>
 
                 <dl className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                    {facts.map((fact) => <Fact key={fact.label} label={fact.label} value={fact.value} />)}
+                    {facts.map((fact) => (
+                        <Fact key={fact.label} label={fact.label} value={fact.value}
+                            onToggle={fact.onToggle} isOpen={fact.onToggle ? showCameras : undefined} />
+                    ))}
                 </dl>
+
+                {showCameras && tokenCameras.length > 0 && (
+                    <ul className="mt-3 max-h-56 divide-y divide-edge overflow-y-auto rounded-control border border-edge">
+                        {tokenCameras.map((camera) => (
+                            <li key={camera.id}>
+                                {/* Clickable because "which cameras may I watch" is nearly always
+                                    followed by "then show me that one". */}
+                                <button
+                                    type="button"
+                                    onClick={() => onSelectCamera?.(camera)}
+                                    disabled={!onSelectCamera}
+                                    className="w-full px-3 py-2 text-left text-sm text-content transition-colors hover:bg-surface-raised disabled:cursor-default disabled:hover:bg-transparent"
+                                >
+                                    <span className="block truncate">{camera.name}</span>
+                                    {camera.area_name && (
+                                        <span className="block truncate text-xs text-content-muted">{camera.area_name}</span>
+                                    )}
+                                </button>
+                            </li>
+                        ))}
+                    </ul>
+                )}
 
                 <p className="mt-3 text-xs leading-5 text-content-muted">
                     {windowHours
