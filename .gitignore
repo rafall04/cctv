@@ -24,6 +24,17 @@ pnpm-lock.yaml
 # Regenerate it deliberately (`npm install`, commit the diff) — never let it drift silently.
 !frontend/package-lock.json
 
+# ...and the backend's, for exactly the same reason.
+#
+# The backend was left unpinned when the frontend was fixed, so production installed
+# from a re-resolved tree every time — including the Fastify 4 -> 5 upgrade, where
+# "whatever npm picks today" would mean the deployed framework was never the one the
+# suite ran against. The backend also carries native modules (better-sqlite3, bcrypt),
+# whose resolved version decides whether the box downloads a prebuild or tries to
+# compile; prod runs Node 20 and has no toolchain, so that is not a detail.
+# Regenerate deliberately (`npm install`, commit the diff) — never let it drift.
+!backend/package-lock.json
+
 # Environment variables
 .env
 .env.local

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Purpose: API key validation middleware for private/admin-facing API requests.
  * Caller: backend/server.js security middleware registration and focused middleware tests.
  * Deps: apiKeyService.js, securityAuditLogger.js.
@@ -42,7 +42,7 @@ export const API_KEY_VALIDATOR_CONFIG = {
     // BEFORE any active API key exists in the database is rejected with
     // 403 instead of silently passing through. The historic behavior
     // (silent pass when api_keys is empty) is fine for first-time setup
-    // on a developer's laptop, but it's a sharp edge in production —
+    // on a developer's laptop, but it's a sharp edge in production â€”
     // forgetting to seed an API key would leave protected endpoints
     // wide open until someone noticed.
     requireKeys: process.env.API_KEY_REQUIRE_KEYS === 'true'
@@ -100,7 +100,7 @@ async function apiKeyValidatorPlugin(fastify, options) {
         
         // Setup-mode bypass: when no API keys exist yet we historically
         // let the request through so an operator can bootstrap the
-        // system. In production that's a footgun — forgetting to seed
+        // system. In production that's a footgun â€” forgetting to seed
         // a key leaves protected endpoints open. The requireKeys flag
         // (env: API_KEY_REQUIRE_KEYS=true) flips this into a hard 403.
         if (!hasActiveApiKeys()) {
@@ -161,7 +161,7 @@ async function apiKeyValidatorPlugin(fastify, options) {
 
 export const apiKeyValidatorMiddleware = fp(apiKeyValidatorPlugin, {
     name: 'api-key-validator',
-    fastify: '4.x',
+    fastify: '5.x',
 });
 
 /**

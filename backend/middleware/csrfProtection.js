@@ -1,4 +1,4 @@
-/**
+﻿/**
  * CSRF Protection Middleware
  * 
  * Implements CSRF token generation and validation to prevent
@@ -148,7 +148,7 @@ export function validateCsrfToken(request) {
 /**
  * Set CSRF token cookie on response.
  * `secure` is derived from the actual request protocol (like the auth
- * cookies) — a hardcoded Secure cookie is silently dropped by the browser
+ * cookies) â€” a hardcoded Secure cookie is silently dropped by the browser
  * over plain HTTP (LAN / direct-IP deployments), leaving csrf_token unset
  * and 403-ing every CSRF-protected POST.
  * @param {Object} reply - Fastify reply object
@@ -233,7 +233,7 @@ async function csrfPlugin(fastify, options = {}) {
 
 export const csrfMiddleware = fp(csrfPlugin, {
     name: 'csrf-protection',
-    fastify: '4.x',
+    fastify: '5.x',
 });
 
 /**

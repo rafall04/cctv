@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Rate Limiter Middleware
  * 
  * Implements sliding window rate limiting to protect against abuse and DoS attacks.
@@ -127,11 +127,11 @@ export function getRateLimitForType(endpointType) {
 /**
  * Resolve the REAL client IP for rate-limit bucketing.
  *
- * Root cause of the "everyone gets 429 on refresh" bug: behind Cloudflare →
- * cloudflared → nginx, the socket peer the backend sees is a single proxy hop
+ * Root cause of the "everyone gets 429 on refresh" bug: behind Cloudflare â†’
+ * cloudflared â†’ nginx, the socket peer the backend sees is a single proxy hop
  * (e.g. 172.17.11.2), which is NOT in TRUSTED_PROXY_CIDRS, so Fastify uses it
  * verbatim as request.ip. Every public visitor then shared ONE bucket
- * (`172.17.11.2:public`) → the 100/min limit was global, not per-user.
+ * (`172.17.11.2:public`) â†’ the 100/min limit was global, not per-user.
  *
  * Cloudflare stamps the genuine visitor IP in `CF-Connecting-IP` on every
  * proxied request, so we prefer it. Fallbacks (request.ip, first XFF hop) keep
@@ -339,7 +339,7 @@ export function logRateLimitViolation(details, request = null) {
  * Rate limiter middleware for Fastify.
  *
  * Implements sliding window rate limiting with different limits per endpoint type.
- * Wrapped with fastify-plugin so the onRequest hook is NOT encapsulated — without
+ * Wrapped with fastify-plugin so the onRequest hook is NOT encapsulated â€” without
  * fp() the hook only applies to routes inside this plugin's scope (none), which
  * silently disables rate limiting for the whole API.
  */
@@ -356,7 +356,7 @@ async function rateLimiterPlugin(fastify, options = {}) {
         }
 
         const url = request.url || '';
-        // Per-user key: the real visitor IP (CF-Connecting-IP), NOT the proxy hop —
+        // Per-user key: the real visitor IP (CF-Connecting-IP), NOT the proxy hop â€”
         // otherwise the whole public site shares one bucket. See resolveClientIp.
         const ip = resolveClientIp(request);
 
@@ -369,7 +369,7 @@ async function rateLimiterPlugin(fastify, options = {}) {
         }
         
         // Get rate limit config for this endpoint type.
-        // NOTE: must NOT be named `config` — that would shadow the imported
+        // NOTE: must NOT be named `config` â€” that would shadow the imported
         // module-level `config` for the whole hook scope (TDZ) and crash the
         // RATE_LIMIT_ENABLED check above with "Cannot access 'config'...".
         const limitConfig = getRateLimitForType(endpointType);
@@ -418,7 +418,7 @@ async function rateLimiterPlugin(fastify, options = {}) {
 
 export const rateLimiterMiddleware = fp(rateLimiterPlugin, {
     name: 'rate-limiter',
-    fastify: '4.x',
+    fastify: '5.x',
 });
 
 export default rateLimiterMiddleware;

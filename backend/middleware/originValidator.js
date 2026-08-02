@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Origin Validation Middleware
  * 
  * Validates Origin and Referer headers against allowed domains.
@@ -21,7 +21,7 @@ const DEFAULT_ALLOWED_ORIGINS = [
 /**
  * Get allowed origins from config or use defaults.
  *
- * The canonical list lives at config.security.allowedOrigins — parsed from the
+ * The canonical list lives at config.security.allowedOrigins â€” parsed from the
  * ALLOWED_ORIGINS env, or auto-generated from FRONTEND_DOMAIN / SERVER_IP /
  * PORT_PUBLIC. The old code read config.cors.allowedOrigins, which does not
  * exist (config.cors only has { origin, credentials }), so it ALWAYS fell back
@@ -179,7 +179,7 @@ async function originValidatorPlugin(fastify, _options) {
 
 export const originValidatorMiddleware = fp(originValidatorPlugin, {
     name: 'origin-validator',
-    fastify: '4.x',
+    fastify: '5.x',
 });
 
 // Export configuration for testing
