@@ -201,6 +201,8 @@ function Playback({
         onCleared: () => reloadSegments(selectedCameraId, { mode: 'initial' }),
     });
     const loading = camerasLoading;
+    /** The padding below exists solely to clear this dock, so the two must be decided together. */
+    const showDock = !isAdminPlayback && showMobileDock;
     /*
      * "Belum ada rekaman" is a VERDICT, shown only once an answer for THIS camera has arrived.
      * `loading` above is camerasLoading and says nothing about segments, so the page announced "no
@@ -1087,7 +1089,7 @@ function Playback({
                 />
             )}
             {/* pb-24 clears the fixed mobile dock, which otherwise sits over the last block on the page. */}
-            <div className={`min-h-screen bg-surface-sunken py-2 sm:py-6 md:py-8 px-2 sm:px-4 ${showMobileDock ? 'pb-24 sm:pb-6 md:pb-8' : ''}`}>
+            <div className={`min-h-screen bg-surface-sunken py-2 sm:py-6 md:py-8 px-2 sm:px-4 ${showDock ? 'pb-24 sm:pb-6 md:pb-8' : ''}`}>
             <div className="max-w-7xl mx-auto space-y-3 sm:space-y-4 md:space-y-6">
                 <PlaybackHeader cameras={visiblePlaybackCameras} selectedCamera={selectedCamera} onCameraChange={handleCameraChange} onShare={isAdminPlayback ? null : handleShare} />
 
@@ -1143,9 +1145,7 @@ function Playback({
 
                 <PlaybackUsageGuide isAdminPlayback={isAdminPlayback} playbackPolicy={playbackPolicy} />
 
-                {!isAdminPlayback && showMobileDock && (
-                    <LandingMobileDock viewMode="playback" itemHrefs={publicDockHrefs} />
-                )}
+                {showDock && <LandingMobileDock viewMode="playback" itemHrefs={publicDockHrefs} />}
             </div>
             </div>
         </>
