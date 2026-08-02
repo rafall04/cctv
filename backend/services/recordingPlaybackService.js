@@ -78,6 +78,35 @@ function assertRecordingSettingsAllowed(camera, data) {
     }
 }
 
+/*
+ * Purpose: Report a refused playback token once, not once per request.
+ * Keyed by camera + reason: a visitor changing cameras with one dead cookie is ONE fact, and
+ * repeating it every few seconds would bury it in the same way silence did.
+ */
+const TOKEN_REFUSAL_WINDOW_MS = 5 * 60 * 1000;
+const tokenRefusalSeen = new Map();
+
+function noteTokenRefusal(cameraId, statusCode, message) {
+    const key = `${cameraId}:${statusCode}:${message || ''}`;
+    const now = Date.now();
+    const last = tokenRefusalSeen.get(key);
+    if (last && now - last < TOKEN_REFUSAL_WINDOW_MS) {
+        return;
+    }
+
+    tokenRefusalSeen.set(key, now);
+    // Keep the map from growing without bound on a long-lived process.
+    if (tokenRefusalSeen.size > 500) {
+        for (const [k, seen] of tokenRefusalSeen) {
+            if (now - seen >= TOKEN_REFUSAL_WINDOW_MS) {
+                tokenRefusalSeen.delete(k);
+            }
+        }
+    }
+
+    console.log(`[playback] token refused for camera ${cameraId} (${statusCode}): ${message || 'no reason given'} — serving public preview instead`);
+}
+
 class RecordingPlaybackService {
     async startRecording(cameraId, duration_hours, request) {
         const camera = queryOne('SELECT * FROM cameras WHERE id = ?', [cameraId]);
@@ -308,6 +337,20 @@ class RecordingPlaybackService {
             if (statusCode !== 401 && statusCode !== 403) {
                 throw error;
             }
+            /*
+             * The fall-through is correct — a stale cookie must not be worse than no cookie — but
+             * it used to be SILENT, and that is what made this the most expensive line in the file.
+             * A token holder whose access was broken looked exactly like an ordinary anonymous
+             * visitor: no error, no log, the public preview served as if nothing had happened. A
+             * missing area_id in getPlaybackCamera hid behind this for hours; the symptom was
+             * "recordings just aren't there", and nothing anywhere said "a token was refused".
+             *
+             * console.log, not console.error: an expired or out-of-scope cookie is an EXPECTED
+             * condition, and stderr is reserved for what a human must act on. Rate-limited per
+             * camera+reason because /segments is hit on every camera change — one line per real
+             * change of state, not one per request.
+             */
+            noteTokenRefusal(camera.id, statusCode, error?.message);
             // tokenAccess stays null → falls through to the public-preview
             // resolution below, exactly as if no cookie were attached.
         }

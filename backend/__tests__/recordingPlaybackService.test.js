@@ -563,3 +563,90 @@ describe('recordingPlaybackService', () => {
         expect(source).not.toContain("../database/database.js");
     });
 });
+
+/*
+ * The fall-through itself is right: a stale cookie must never be worse than no cookie. What was
+ * wrong is that it happened in COMPLETE silence, so a token holder whose access was broken was
+ * indistinguishable from an ordinary anonymous visitor. A missing area_id hid behind this for
+ * hours — the symptom was "the recordings just aren't there", and nothing said a token was refused.
+ */
+describe('resolvePlaybackAccess leaves a trace when a token is refused', () => {
+    const refusedCamera = (id) => ({
+        id,
+        camera_class: 'community',
+        public_playback_mode: 'inherit',
+        public_playback_preview_minutes: 10,
+    });
+    const segmentRequest = (id) => ({
+        query: {}, url: `/api/recordings/${id}/segments`, cookies: { raf_playback_token: 'basi' },
+    });
+
+    const refuse = (statusCode, message) => {
+        validateRequestForCameraMock.mockImplementation(() => {
+            const err = new Error(message);
+            err.statusCode = statusCode;
+            throw err;
+        });
+    };
+
+    beforeEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    it('reports the refusal and still serves the public preview', () => {
+        const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+        refuse(403, 'Token tidak mencakup kamera ini');
+
+        const access = recordingPlaybackService.resolvePlaybackAccess(refusedCamera(701), segmentRequest(701));
+
+        // The behaviour is unchanged — that part was never the bug.
+        expect(access.accessMode).toBe('public_preview');
+        // What is new: somebody can now find out WHY.
+        expect(log).toHaveBeenCalledWith(expect.stringContaining('camera 701'));
+        expect(log).toHaveBeenCalledWith(expect.stringContaining('Token tidak mencakup kamera ini'));
+        expect(log).toHaveBeenCalledWith(expect.stringContaining('403'));
+    });
+
+    it('says it once, not once per request — /segments is hit on every camera change', () => {
+        const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+        refuse(401, 'Token playback tidak valid');
+
+        recordingPlaybackService.resolvePlaybackAccess(refusedCamera(702), segmentRequest(702));
+        recordingPlaybackService.resolvePlaybackAccess(refusedCamera(702), segmentRequest(702));
+        recordingPlaybackService.resolvePlaybackAccess(refusedCamera(702), segmentRequest(702));
+
+        expect(log.mock.calls.filter(([line]) => String(line).includes('camera 702'))).toHaveLength(1);
+    });
+
+    it('reports a different camera separately, so one dead cookie does not mask another fault', () => {
+        const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+        refuse(403, 'Token tidak mencakup kamera ini');
+
+        recordingPlaybackService.resolvePlaybackAccess(refusedCamera(703), segmentRequest(703));
+        recordingPlaybackService.resolvePlaybackAccess(refusedCamera(704), segmentRequest(704));
+
+        expect(log.mock.calls.filter(([line]) => String(line).includes('camera 703'))).toHaveLength(1);
+        expect(log.mock.calls.filter(([line]) => String(line).includes('camera 704'))).toHaveLength(1);
+    });
+
+    it('uses stdout, not stderr — an expired cookie is expected, not broken', () => {
+        vi.spyOn(console, 'log').mockImplementation(() => {});
+        const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+        refuse(401, 'Session playback tidak aktif');
+
+        recordingPlaybackService.resolvePlaybackAccess(refusedCamera(705), segmentRequest(705));
+
+        expect(err).not.toHaveBeenCalled();
+    });
+
+    it('still rethrows anything that is NOT a credential refusal', () => {
+        validateRequestForCameraMock.mockImplementation(() => {
+            const boom = new Error('database is locked');
+            boom.statusCode = 500;
+            throw boom;
+        });
+
+        expect(() => recordingPlaybackService.resolvePlaybackAccess(refusedCamera(706), segmentRequest(706)))
+            .toThrow('database is locked');
+    });
+});
