@@ -1410,3 +1410,55 @@ describe('Playback', () => {
 
 });
 
+
+/*
+ * Reported from the landing page: choosing another camera threw the visitor out of Simple view and
+ * back into Full. buildPlaybackSearchParams strips `mode` along with the other playback-only params,
+ * and the guard here then read `mode` back off the very object that had just been stripped — so it
+ * was ALWAYS null and the "fall back to full" branch ALWAYS fired.
+ */
+describe('Playback view mode across camera changes', () => {
+    it('keeps Simple view when the camera changes', async () => {
+        render(
+            <TestRouter initialEntries={['/playback?mode=simple&view=playback&cam=1']}>
+                <LocationProbe />
+                <Playback
+                    cameras={[
+                        { id: 1, name: 'Lobby', enable_recording: 1 },
+                        { id: 2, name: 'Gate', enable_recording: 1 },
+                    ]}
+                />
+            </TestRouter>
+        );
+
+        await screen.findByText('playback-header');
+        fireEvent.click(screen.getByRole('button', { name: 'ganti-kamera' }));
+
+        await waitFor(() => {
+            expect(screen.getByTestId('location-search').textContent).toContain('cam=2');
+        });
+        expect(screen.getByTestId('location-search').textContent).toContain('mode=simple');
+        expect(screen.getByTestId('location-search').textContent).not.toContain('mode=full');
+    });
+
+    it('still falls back to Full when the URL carries no usable mode', async () => {
+        render(
+            <TestRouter initialEntries={['/playback?mode=gibberish&view=playback&cam=1']}>
+                <LocationProbe />
+                <Playback
+                    cameras={[
+                        { id: 1, name: 'Lobby', enable_recording: 1 },
+                        { id: 2, name: 'Gate', enable_recording: 1 },
+                    ]}
+                />
+            </TestRouter>
+        );
+
+        await screen.findByText('playback-header');
+        fireEvent.click(screen.getByRole('button', { name: 'ganti-kamera' }));
+
+        await waitFor(() => {
+            expect(screen.getByTestId('location-search').textContent).toContain('mode=full');
+        });
+    });
+});

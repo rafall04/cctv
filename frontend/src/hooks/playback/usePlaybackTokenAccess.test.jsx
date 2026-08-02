@@ -26,6 +26,8 @@ describe('usePlaybackTokenAccess', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         window.localStorage.clear();
+        // Every mount now asks the cookie who it is; these tests are about other things.
+        playbackTokenService.heartbeatToken.mockResolvedValue({ success: false });
     });
 
     it('activates a share key WITHOUT a camera, and exposes the cameras it allows', async () => {
@@ -79,6 +81,7 @@ describe('usePlaybackTokenAccess sign-out', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         window.localStorage.clear();
+        playbackTokenService.heartbeatToken.mockResolvedValue({ success: false });
     });
 
     const clearWith = async (search) => {
@@ -137,5 +140,76 @@ describe('usePlaybackTokenAccess sign-out', () => {
         await result.current.clearToken();
 
         expect(onCleared).toHaveBeenCalledTimes(1);
+    });
+});
+
+/*
+ * A visitor arriving WITHOUT a key in the URL — the landing page, a second visit, any internal
+ * navigation — held a valid token the UI knew nothing about: the panel showed no label, no
+ * coverage, no expiry, and offered a free trial to someone who had already paid.
+ */
+describe('usePlaybackTokenAccess cookie hydration', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        window.localStorage.clear();
+    });
+
+    const mount = (search = '') => renderHook(() => usePlaybackTokenAccess({
+        enabled: true,
+        searchParams: new URLSearchParams(search),
+        setSearchParams: vi.fn(),
+        cameraId: 3,
+        onActivated: vi.fn(),
+        onCleared: vi.fn(),
+    }));
+
+    it('asks the cookie who it is and adopts the answer', async () => {
+        playbackTokenService.heartbeatToken.mockResolvedValue({
+            success: true,
+            data: { id: 9, label: 'BJN', scope_type: 'area', allowed_camera_ids: [1, 2] },
+        });
+
+        const { result } = mount();
+
+        await waitFor(() => {
+            expect(result.current.tokenStatus).toMatchObject({ label: 'BJN', allowed_camera_ids: [1, 2] });
+        });
+    });
+
+    it('stays silent for a visitor with no cookie — that is anonymous, not an error', async () => {
+        const denied = new Error('Token playback tidak aktif');
+        denied.response = { status: 401, data: { message: 'Token playback tidak aktif' } };
+        playbackTokenService.heartbeatToken.mockRejectedValue(denied);
+
+        const { result } = mount();
+
+        await waitFor(() => expect(playbackTokenService.heartbeatToken).toHaveBeenCalled());
+        expect(result.current.tokenStatus).toBeNull();
+        expect(result.current.tokenMessage).toBe('');
+    });
+
+    it('asks only once, however often the hook re-renders', async () => {
+        playbackTokenService.heartbeatToken.mockResolvedValue({ success: true, data: { id: 9 } });
+
+        const { rerender } = mount();
+        rerender();
+        rerender();
+
+        await waitFor(() => expect(playbackTokenService.heartbeatToken).toHaveBeenCalledTimes(1));
+    });
+
+    it('does not overwrite an activation that won the race', async () => {
+        // The share key activates with the authoritative payload; a slower hydrate must not clobber it.
+        playbackTokenService.activateShareKey.mockResolvedValue({
+            success: true, data: { id: 9, label: 'DARI AKTIVASI' },
+        });
+        let resolveHeartbeat;
+        playbackTokenService.heartbeatToken.mockReturnValue(new Promise((r) => { resolveHeartbeat = r; }));
+
+        const { result } = mount('share=BJNKUUU');
+        await waitFor(() => expect(result.current.tokenStatus?.label).toBe('DARI AKTIVASI'));
+
+        resolveHeartbeat({ success: true, data: { id: 9, label: 'DARI HEARTBEAT' } });
+        await waitFor(() => expect(result.current.tokenStatus?.label).toBe('DARI AKTIVASI'));
     });
 });

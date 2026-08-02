@@ -117,17 +117,18 @@ function Playback({
                 camera: camera ? createCameraSlug(camera) : cameraId,
                 timestamp,
             });
-            const nextMode = next.get('mode');
+            // From `previous`: buildPlaybackSearchParams strips `mode`, so reading it off `next`
+            // always yielded null and the fallback always fired — every camera change threw a
+            // visitor out of Simple view and back into Full.
+            const carriedMode = new URLSearchParams(previous).get('mode');
 
-            // `share` stays in the URL: it is the distribution artifact, and keeping it is what lets a
-            // refresh re-activate. Only the raw token — an admin's master credential — is swept away.
+            // `share` stays: it is the distribution artifact and lets a refresh re-activate. Only
+            // the raw token — an admin's master credential — is swept out of the address bar.
             if (stripRawToken) {
                 next.delete('token');
             }
 
-            if (!nextMode || !['full', 'simple'].includes(nextMode)) {
-                next.set('mode', 'full');
-            }
+            next.set('mode', ['full', 'simple'].includes(carriedMode) ? carriedMode : 'full');
 
             next.set('view', 'playback');
 
@@ -1136,7 +1137,6 @@ function Playback({
                 )}
 
                 <PlaybackOptions playbackPolicy={playbackPolicy} showPublicNotice={!isAdminPlayback} autoPlayEnabled={autoPlayEnabled} onAutoPlayToggle={handleAutoPlayToggle} />
-
                 {!isAdminPlayback && (
                     <PlaybackTokenAccess
                         tokenInput={tokenInput} onTokenInputChange={setTokenInput}

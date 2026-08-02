@@ -43,6 +43,8 @@ export function usePlaybackTokenAccess({
     const [isTokenBusy, setIsTokenBusy] = useState(false);
     /** The URL credential already activated, so a re-render cannot fire a second attempt. */
     const activatedCredentialRef = useRef(null);
+    /** The cookie has been asked about once; asking again on every render would be a request storm. */
+    const hydratedRef = useRef(false);
 
     const activateToken = useCallback(async (rawToken, { silent = false, mode = 'token', cameraIdOverride = null } = {}) => {
         const token = String(rawToken || '').trim();
@@ -141,6 +143,41 @@ export function usePlaybackTokenAccess({
          */
         activateToken(accessValue, { silent: true, mode: urlShareKey ? 'share' : 'token' });
     }, [activateToken, enabled, searchParams]);
+
+    /*
+     * Ask the cookie who it is, once per mount.
+     *
+     * tokenStatus was only ever filled by an activation performed on THIS page load. A visitor
+     * arriving without a key in the URL — the landing page, a second visit, any internal navigation
+     * — therefore held a perfectly valid token the UI knew nothing about: no label, no coverage, no
+     * expiry, and the "Coba gratis" pitch shown to someone who had already paid. The heartbeat
+     * endpoint already returns the whole token for whatever cookie the request carries.
+     *
+     * A failure here means no cookie, or a dead one. That is an anonymous visitor, not an error, so
+     * it stays silent. The functional update refuses to overwrite a live activation that raced us.
+     */
+    useEffect(() => {
+        if (!enabled || hydratedRef.current) {
+            return undefined;
+        }
+        hydratedRef.current = true;
+
+        let isActive = true;
+        (async () => {
+            try {
+                const response = await playbackTokenService.heartbeatToken();
+                if (isActive && response?.success && response.data) {
+                    setTokenStatus((current) => current || response.data);
+                }
+            } catch {
+                // No cookie, or a dead one. Nothing to say and nobody to say it to.
+            }
+        })();
+
+        return () => {
+            isActive = false;
+        };
+    }, [enabled]);
 
     useEffect(() => {
         if (!enabled || !tokenStatus) {
