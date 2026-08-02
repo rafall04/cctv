@@ -197,6 +197,14 @@ function Playback({
         onCleared: () => reloadSegments(selectedCameraId, { mode: 'initial' }),
     });
     const loading = camerasLoading;
+    /*
+     * "Belum ada rekaman" is a VERDICT, shown only once an answer for THIS camera has arrived.
+     * `loading` above is camerasLoading and says nothing about segments, so the page announced "no
+     * recordings" throughout the segment fetch — indistinguishable from a camera that has none.
+     * segmentsCameraId is set only when a response lands (a legitimately empty one included).
+     */
+    const isWaitingForSegments = !playbackDeniedMessage
+        && (loading || !selectedCameraId || segmentsCameraId !== selectedCameraId);
     const videoRef = useRef(null);
     const containerRef = useRef(null);
     const lastSeekTimeRef = useRef(0);
@@ -1085,7 +1093,7 @@ function Playback({
                 />
 
                 <PlaybackVideo
-                    videoRef={attachVideo} containerRef={containerRef} isLoadingSegments={loading}
+                    videoRef={attachVideo} containerRef={containerRef} isLoadingSegments={isWaitingForSegments}
                     selectedCamera={selectedCamera} selectedSegment={selectedSegment}
                     playbackSpeed={playbackSpeed} onSpeedChange={handleSpeedChange}
                     onSnapshot={takeSnapshot} onToggleFullscreen={toggleFullscreen}
@@ -1109,13 +1117,9 @@ function Playback({
                  */}
                 <PlaybackSegmentStepper segments={segments} selectedSegment={selectedSegment} onSegmentClick={handleSegmentClick} />
 
-                <PlaybackTimeline
-                    segments={segments} selectedSegment={selectedSegment} currentTime={currentTime}
-                    onSegmentClick={handleSegmentClick} onTimelineClick={handleTimelineClick}
-                    formatTimestamp={formatTimestamp}
-                />
+                <PlaybackTimeline segments={segments} selectedSegment={selectedSegment} currentTime={currentTime} onSegmentClick={handleSegmentClick} onTimelineClick={handleTimelineClick} formatTimestamp={formatTimestamp} />
 
-                <PlaybackSegmentList segments={segments} selectedSegment={selectedSegment} onSegmentClick={handleSegmentClick} formatTimestamp={formatTimestamp} />
+                <PlaybackSegmentList segments={segments} selectedSegment={selectedSegment} onSegmentClick={handleSegmentClick} isLoading={isWaitingForSegments} />
 
                 {showPlaybackNative && (
                     <InlineAdSlot
@@ -1130,15 +1134,10 @@ function Playback({
 
                 {!isAdminPlayback && (
                     <PlaybackTokenAccess
-                        tokenInput={tokenInput}
-                        onTokenInputChange={setTokenInput}
-                        onActivate={activateToken}
-                        onClear={clearToken}
-                        isBusy={isTokenBusy}
-                        tokenStatus={tokenStatus}
-                        message={tokenMessage}
-                        playbackPolicy={playbackPolicy}
-                        compact />
+                        tokenInput={tokenInput} onTokenInputChange={setTokenInput}
+                        onActivate={activateToken} onClear={clearToken} isBusy={isTokenBusy}
+                        tokenStatus={tokenStatus} message={tokenMessage}
+                        playbackPolicy={playbackPolicy} compact />
                 )}
 
                 {!isAdminPlayback && <PlaybackShareButton onShare={handleShare} />}

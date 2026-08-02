@@ -10,6 +10,7 @@ export default function PlaybackSegmentList({
     segments,
     selectedSegment,
     onSegmentClick,
+    isLoading = false,
 }) {
     const formatFileSize = (bytes) => {
         if (bytes === 0) return '0 B';
@@ -37,11 +38,21 @@ export default function PlaybackSegmentList({
 
     return (
         <div className="rounded-card border border-edge bg-surface p-3 sm:p-4 md:p-6">
+            {/*
+              * The count is withheld until it is known. "Segmen Rekaman (0)" during the fetch reads
+              * as a finished answer — the camera has nothing — when in truth nothing had been asked
+              * yet, which is precisely the misleading state this heading used to create.
+              */}
             <h2 className="mb-3 text-base font-semibold text-content sm:mb-4 sm:text-lg">
-                Segmen Rekaman ({segments.length})
+                Segmen Rekaman {isLoading ? '' : `(${segments.length})`}
             </h2>
 
-            {segments.length > 0 ? (
+            {isLoading ? (
+                <div className="py-8 text-center text-content-muted sm:py-12">
+                    <div className="mx-auto mb-3 h-10 w-10 animate-spin rounded-full border-4 border-edge border-t-primary sm:mb-4" />
+                    <p className="text-sm sm:text-base">Memuat daftar rekaman...</p>
+                </div>
+            ) : segments.length > 0 ? (
                 <div className="max-h-64 divide-y divide-edge overflow-y-auto sm:max-h-80 md:max-h-96">
                     {[...segments].sort((a, b) =>
                         new Date(b.start_time) - new Date(a.start_time)
