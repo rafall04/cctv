@@ -37,3 +37,31 @@ describe('PlaybackUsageGuide', () => {
         expect(screen.queryByText(/Preview Publik:/)).toBeNull();
     });
 });
+
+describe('PlaybackUsageGuide responsible use', () => {
+    it('carries the warning as its own statement, not a fourth bullet among tips', () => {
+        render(<PlaybackUsageGuide isAdminPlayback={false} playbackPolicy={null} />);
+
+        expect(screen.getByText('Gunakan dengan bijak')).toBeTruthy();
+        expect(screen.getByText(/Jangan disebarkan ulang/)).toBeTruthy();
+    });
+
+    it('keeps the warning for admins too — it is the same footage of the same people', () => {
+        render(<PlaybackUsageGuide isAdminPlayback playbackPolicy={null} />);
+
+        expect(screen.getByText('Gunakan dengan bijak')).toBeTruthy();
+    });
+});
+
+/*
+ * "Pilih segment di bawah" was accurate until the segment list moved ABOVE this guide. Left alone it
+ * would have pointed viewers at the bottom of the page — which is now the guide itself.
+ */
+describe('PlaybackUsageGuide segment directions', () => {
+    it('points at the controls where they actually are now', () => {
+        render(<PlaybackUsageGuide isAdminPlayback={false} playbackPolicy={null} />);
+
+        expect(screen.getByText(/Sebelumnya\/Berikutnya di bawah video/)).toBeTruthy();
+        expect(screen.queryByText(/Pilih segment di bawah untuk/)).toBeNull();
+    });
+});

@@ -18,11 +18,23 @@ export default function PlaybackUsageGuide({ isAdminPlayback, playbackPolicy }) 
                         <li className="flex items-start gap-2"><span className="flex-shrink-0 mt-0.5">&bull;</span><span><strong>Skip Video:</strong> Maksimal lompat 3 menit per sekali skip</span></li>
                         <li className="flex items-start gap-2"><span className="flex-shrink-0 mt-0.5">&bull;</span><span><strong>Timeline:</strong> Klik pada timeline untuk melompat ke waktu tertentu</span></li>
                         <li className="flex items-start gap-2"><span className="flex-shrink-0 mt-0.5">&bull;</span><span><strong>Kecepatan:</strong> Klik tombol di pojok kanan atas video (0.5x - 2x)</span></li>
-                        <li className="flex items-start gap-2"><span className="flex-shrink-0 mt-0.5">&bull;</span><span><strong>Segment:</strong> Pilih segment di bawah untuk melihat recording waktu berbeda</span></li>
+                        {/* "di bawah" was true until the segment list moved above this guide. */}
+                        <li className="flex items-start gap-2"><span className="flex-shrink-0 mt-0.5">&bull;</span><span><strong>Segment:</strong> Pakai tombol Sebelumnya/Berikutnya di bawah video, atau pilih dari daftar segmen</span></li>
                         {!isAdminPlayback && typeof playbackPolicy?.previewMinutes === 'number' && (
                             <li className="flex items-start gap-2"><span className="flex-shrink-0 mt-0.5">-</span><span><strong>Preview Publik:</strong> Hanya {playbackPolicy.previewMinutes} menit awal yang tersedia demi privasi</span></li>
                         )}
                     </ul>
+                    {/*
+                     * Rekaman jalan umum menunjukkan orang yang tidak pernah diminta persetujuannya.
+                     * Peringatan ini berdiri sendiri, bukan sekadar butir keempat dalam daftar tips.
+                     */}
+                    <p className="mt-3 border-t border-blue-200 pt-3 text-xs font-semibold uppercase tracking-wide text-blue-900 dark:border-blue-800 dark:text-blue-100 sm:text-sm">
+                        Gunakan dengan bijak
+                    </p>
+                    <p className="mt-1 text-xs text-blue-800 dark:text-blue-200">
+                        Rekaman ini memuat orang dan kendaraan nyata. Jangan disebarkan ulang, dipotong di luar
+                        konteks, atau dipakai untuk mengganggu privasi siapa pun.
+                    </p>
                 </div>
             </div>
         </div>

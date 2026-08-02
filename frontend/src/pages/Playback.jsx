@@ -661,9 +661,16 @@ function Playback({
             return;
         }
 
+        /*
+         * The element check is what survives a remount: a ref records what we DID, not what is on
+         * screen, and refs never re-run an effect. When React replaced the <video>, this guard still
+         * read "already assigned" and the fresh element kept an EMPTY src — no request, no error,
+         * just a placeholder until the visitor reloaded or changed segment.
+         */
         if (
             playbackSourceRef.current.segmentKey === selectedSegmentKey
             && playbackSourceRef.current.streamUrl === nextStreamUrl
+            && playbackSourceRef.current.element === videoRef.current
         ) {
             return;
         }
@@ -676,6 +683,7 @@ function Playback({
         playbackSourceRef.current = {
             segmentKey: selectedSegmentKey,
             streamUrl: nextStreamUrl,
+            element: videoRef.current,
         };
         const video = videoRef.current;
         let canPlayRetried = false;
@@ -1052,7 +1060,8 @@ function Playback({
                     script={adsConfig.slots.playbackPopunder.script}
                 />
             )}
-            <div className="min-h-screen bg-surface-sunken py-2 sm:py-6 md:py-8 px-2 sm:px-4">
+            {/* pb-24 clears the fixed mobile dock, which otherwise sits over the last block on the page. */}
+            <div className="min-h-screen bg-surface-sunken py-2 pb-24 sm:py-6 sm:pb-6 md:py-8 md:pb-8 px-2 sm:px-4">
             <div className="max-w-7xl mx-auto space-y-3 sm:space-y-4 md:space-y-6">
                 <PlaybackHeader
                     cameras={visiblePlaybackCameras}
@@ -1100,20 +1109,12 @@ function Playback({
                 />
 
                 <PlaybackTimeline
-                    segments={segments}
-                    selectedSegment={selectedSegment}
-                    currentTime={currentTime}
-                    onSegmentClick={handleSegmentClick}
-                    onTimelineClick={handleTimelineClick}
+                    segments={segments} selectedSegment={selectedSegment} currentTime={currentTime}
+                    onSegmentClick={handleSegmentClick} onTimelineClick={handleTimelineClick}
                     formatTimestamp={formatTimestamp}
                 />
 
-                <PlaybackSegmentList
-                    segments={segments}
-                    selectedSegment={selectedSegment}
-                    onSegmentClick={handleSegmentClick}
-                    formatTimestamp={formatTimestamp}
-                />
+                <PlaybackSegmentList segments={segments} selectedSegment={selectedSegment} onSegmentClick={handleSegmentClick} formatTimestamp={formatTimestamp} />
 
                 {showPlaybackNative && (
                     <InlineAdSlot
