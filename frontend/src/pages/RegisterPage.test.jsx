@@ -10,6 +10,10 @@ const { registerInfoMock, registerMock, loginMock } = vi.hoisted(() => ({
     loginMock: vi.fn(),
 }));
 
+vi.mock('../contexts/BrandingContext', () => ({
+    useBranding: () => ({ branding: { whatsapp_number: '6289685645956', company_name: 'RAF' } }),
+}));
+
 vi.mock('../services/authService', () => ({
     authService: {
         registerInfo: registerInfoMock,
@@ -81,5 +85,34 @@ describe('RegisterPage (approval-gated)', () => {
             expect(screen.getByText('Nomor HP sudah terdaftar')).toBeTruthy();
         });
         expect(screen.queryByText('Pendaftaran terkirim!')).toBeNull();
+    });
+});
+
+/*
+ * Registration stays gated on admin approval — this only shortens the wait by letting the applicant
+ * ask for it. The autocomplete attributes matter just as much: without them a password manager can
+ * neither fill the form nor offer to save the new credentials, and the login page next door already
+ * gets this right, so their absence here was an oversight rather than a decision.
+ */
+describe('RegisterPage form affordances', () => {
+    it('lets a password manager fill and save the form', async () => {
+        renderPage();
+        await screen.findByPlaceholderText('nama_warung');
+
+        expect(document.getElementById('reg-username').getAttribute('autocomplete')).toBe('username');
+        expect(document.getElementById('reg-email').getAttribute('autocomplete')).toBe('email');
+        // new-password, not current-password: this pair CREATES credentials.
+        expect(document.getElementById('reg-password').getAttribute('autocomplete')).toBe('new-password');
+        expect(document.getElementById('reg-confirm').getAttribute('autocomplete')).toBe('new-password');
+    });
+
+    it('asks for a phone number with a phone keypad, not a full keyboard', async () => {
+        renderPage();
+        await screen.findByPlaceholderText('nama_warung');
+
+        const phone = document.getElementById('reg-phone');
+        expect(phone.type).toBe('tel');
+        expect(phone.getAttribute('inputmode')).toBe('numeric');
+        expect(phone.getAttribute('autocomplete')).toBe('tel');
     });
 });
