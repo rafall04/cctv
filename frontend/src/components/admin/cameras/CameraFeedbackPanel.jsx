@@ -18,8 +18,16 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Badge, Button, Card, CardHeader } from '../../ui';
 import { adminService } from '../../../services/adminService';
+import { buildPlaybackMomentPath } from '../../../utils/playbackUrlState';
 
 const MAX_COMPLAINED_ROWS = 10;
+
+/* Admin playback, not the public one: staff should land with full reach, not the 10-minute preview. */
+const momentPath = (report) => buildPlaybackMomentPath({
+    camera: report.cameraId,
+    occurredAt: report.occurredAt,
+    basePath: '/admin/playback',
+});
 
 const when = (value) => {
     const at = new Date(String(value || '').replace(' ', 'T'));
@@ -87,10 +95,22 @@ export default function CameraFeedbackPanel() {
                                       * The incident time is stated as the reporter wrote it, not
                                       * reformatted: it is a wall-clock guess from a phone, and
                                       * dressing it up as a precise instant would overstate it.
+                                      *
+                                      * As a LINK it stops being a note and becomes the point of the
+                                      * whole feature — one click opens admin playback on that
+                                      * moment instead of leaving the operator to scrub for it.
                                       */}
                                     {report.occurredAt && (
                                         <p className="text-[11px] text-content-muted">
-                                            Kejadian sekitar: {report.occurredAt}
+                                            Kejadian sekitar:{' '}
+                                            {momentPath(report) ? (
+                                                <a
+                                                    href={momentPath(report)}
+                                                    className="font-medium text-primary underline underline-offset-2"
+                                                >
+                                                    {report.occurredAt}
+                                                </a>
+                                            ) : report.occurredAt}
                                         </p>
                                     )}
                                     {report.message && (

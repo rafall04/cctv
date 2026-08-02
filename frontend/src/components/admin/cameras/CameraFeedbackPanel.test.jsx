@@ -65,7 +65,33 @@ describe('CameraFeedbackPanel — reports', () => {
     it('states the incident time exactly as the reporter gave it', async () => {
         render(<CameraFeedbackPanel />);
 
-        expect(await screen.findByText('Kejadian sekitar: 2026-08-02T14:30')).toBeTruthy();
+        expect(await screen.findByRole('link', { name: '2026-08-02T14:30' })).toBeTruthy();
+    });
+
+    /*
+     * The point of collecting occurred_at at all: one click opens admin playback on that moment,
+     * instead of leaving the operator to scrub an archive for it. Admin playback, not public —
+     * staff should land with full reach rather than the 10-minute preview.
+     */
+    it('turns the incident time into a link that opens playback there', async () => {
+        render(<CameraFeedbackPanel />);
+
+        const link = await screen.findByRole('link', { name: '2026-08-02T14:30' });
+        const url = new URL(link.getAttribute('href'), 'https://example.test');
+        expect(url.pathname).toBe('/admin/playback');
+        expect(url.searchParams.get('cam')).toBe('16');
+        expect(Number(url.searchParams.get('t'))).toBe(new Date('2026-08-02T14:30').getTime());
+    });
+
+    it('leaves an unparseable time as plain text rather than an arbitrary link', async () => {
+        adminService.getCameraReports.mockResolvedValue({
+            success: true,
+            data: { reports: [{ ...REPORTS[0], occurredAt: 'kemarin sore' }], openCount: 1 },
+        });
+        render(<CameraFeedbackPanel />);
+
+        expect(await screen.findByText(/Kejadian sekitar:/)).toBeTruthy();
+        expect(screen.queryByRole('link', { name: 'kemarin sore' })).toBeNull();
     });
 
     it('leaves already-closed reports out of the open list', async () => {

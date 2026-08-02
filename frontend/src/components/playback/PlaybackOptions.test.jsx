@@ -27,8 +27,83 @@ vi.mock('../../hooks/playback/usePlaybackAccessOffer', () => ({
 
 const base = { autoPlayEnabled: false, onAutoPlayToggle: vi.fn() };
 
+const PREVIEW_POLICY = {
+    accessMode: 'public_preview',
+    previewMinutes: 10,
+    notice: { enabled: true, title: 'Akses Playback Publik Terbatas', text: 'Hanya 10 menit terakhir.' },
+};
+
+/** The component reads `?t=` off the address bar; jsdom lets us put one there. */
+const visitWithMoment = (ms) => window.history.replaceState({}, '', ms === null ? '/playback' : `/playback?t=${ms}`);
+
 beforeEach(() => {
     offerState = { ready: true, offered: true };
+    visitWithMoment(null);
+});
+
+/*
+ * The bug these cases exist for: when `?t=` falls outside the accessible segments,
+ * selectInitialSegment silently substitutes the LATEST one. A visitor who followed a shared link
+ * then watches recent footage believing it is the moment they were sent, and concludes the moment
+ * was nothing. Saying so is the fix; the offer is what makes saying so useful.
+ */
+describe('PlaybackOptions — a shared moment out of reach', () => {
+    const HOUR_AGO = () => Date.now() - 60 * 60 * 1000;
+
+    it('says the shared moment is not what is playing', () => {
+        visitWithMoment(HOUR_AGO());
+        render(<PlaybackOptions {...base} showPublicNotice playbackPolicy={PREVIEW_POLICY} />);
+
+        expect(screen.getByText('Momen yang dibagikan belum bisa dibuka')).toBeTruthy();
+        expect(screen.getByText(/Yang tampil sekarang rekaman terbaru, bukan momen tersebut/)).toBeTruthy();
+    });
+
+    it('offers the way to reach it, worded for that moment', () => {
+        visitWithMoment(HOUR_AGO());
+        render(<PlaybackOptions {...base} showPublicNotice playbackPolicy={PREVIEW_POLICY} />);
+
+        expect(screen.getByRole('button', { name: 'Buka akses ke momen ini' })).toBeTruthy();
+    });
+
+    /* Both blocks explain the same limit and offer the same button; one of them is enough. */
+    it('replaces the general preview notice rather than stacking on it', () => {
+        visitWithMoment(HOUR_AGO());
+        render(<PlaybackOptions {...base} showPublicNotice playbackPolicy={PREVIEW_POLICY} />);
+
+        expect(screen.queryByText('Akses Playback Publik Terbatas')).toBeNull();
+    });
+
+    it('stays quiet when the shared moment is still inside the preview', () => {
+        visitWithMoment(Date.now() - 60 * 1000);
+        render(<PlaybackOptions {...base} showPublicNotice playbackPolicy={PREVIEW_POLICY} />);
+
+        expect(screen.queryByText('Momen yang dibagikan belum bisa dibuka')).toBeNull();
+        expect(screen.getByText('Akses Playback Publik Terbatas')).toBeTruthy();
+    });
+
+    /** A token holder's reach is enforced by the backend, which 403s an out-of-window segment. */
+    it('says nothing to a token holder, whose limit is enforced elsewhere', () => {
+        visitWithMoment(HOUR_AGO());
+        render(<PlaybackOptions {...base} playbackPolicy={{ accessMode: 'token_full', playbackWindowHours: 24 }} />);
+
+        expect(screen.queryByText('Momen yang dibagikan belum bisa dibuka')).toBeNull();
+    });
+
+    it('says nothing when no moment was requested at all', () => {
+        render(<PlaybackOptions {...base} showPublicNotice playbackPolicy={PREVIEW_POLICY} />);
+
+        expect(screen.queryByText('Momen yang dibagikan belum bisa dibuka')).toBeNull();
+    });
+
+    /* Nothing on sale means the invitation cannot be kept — same rule as the general notice. */
+    it('states the problem but offers nothing when no package is sold', () => {
+        offerState = { ready: true, offered: false };
+        visitWithMoment(HOUR_AGO());
+        render(<PlaybackOptions {...base} showPublicNotice playbackPolicy={PREVIEW_POLICY} />);
+
+        expect(screen.getByText('Momen yang dibagikan belum bisa dibuka')).toBeTruthy();
+        expect(screen.queryByRole('button', { name: 'Buka akses ke momen ini' })).toBeNull();
+    });
 });
 
 describe('PlaybackOptions', () => {
