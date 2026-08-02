@@ -36,7 +36,18 @@ function fail(reply, error, fallbackMessage, logLabel) {
  */
 export async function listPlaybackProducts(request, reply) {
     try {
-        return reply.send({ success: true, data: playbackProductService.listAll() });
+        /*
+         * Coverage rides along with the list rather than sitting behind its own endpoint: the page
+         * cannot render an honest catalogue without it, so a second request would only create a
+         * window in which the two disagree.
+         */
+        return reply.send({
+            success: true,
+            data: {
+                products: playbackProductService.listAll(),
+                coverage: playbackProductService.getCoverage(),
+            },
+        });
     } catch (error) {
         return fail(reply, error, 'Gagal memuat daftar paket', 'List playback products error:');
     }
@@ -56,7 +67,11 @@ export async function createPlaybackProduct(request, reply) {
             price_rupiah: product.price_rupiah,
         }, request);
 
-        return reply.send({ success: true, message: 'Paket dibuat', data: product });
+        return reply.send({
+            success: true,
+            message: 'Paket dibuat',
+            data: playbackProductService.describeForAdmin(product),
+        });
     } catch (error) {
         return fail(reply, error, 'Gagal membuat paket', 'Create playback product error:');
     }
@@ -87,7 +102,11 @@ export async function updatePlaybackProduct(request, reply) {
             validity_days_after: product.validity_days,
         }, request);
 
-        return reply.send({ success: true, message: 'Paket diperbarui', data: product });
+        return reply.send({
+            success: true,
+            message: 'Paket diperbarui',
+            data: playbackProductService.describeForAdmin(product),
+        });
     } catch (error) {
         return fail(reply, error, 'Gagal memperbarui paket', 'Update playback product error:');
     }

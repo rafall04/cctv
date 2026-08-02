@@ -19,11 +19,16 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import playbackAccessService from '../../services/playbackAccessService';
+import { hoursToText } from '../../utils/durationText';
 
 const POLL_MS = 5000;
 
 const rupiah = (v) => `Rp ${Number(v || 0).toLocaleString('id-ID')}`;
-const depth = (h) => (!h ? '-' : h < 24 ? `${h} jam` : `${Math.round(h / 24)} hari`);
+/*
+ * Shared with the admin catalogue on purpose. The depth printed here and the coverage printed there
+ * are the same measurement, and rounding them differently would make one of the two a lie.
+ */
+const depth = hoursToText;
 
 export default function PlaybackAccessPanel({ onIssued = null }) {
     const [loading, setLoading] = useState(true);
@@ -235,6 +240,17 @@ export default function PlaybackAccessPanel({ onIssued = null }) {
                             <p className="mt-1 text-[11px] text-content-muted">
                                 Lihat ke belakang sampai {depth(p.windowHours)} · berlaku {p.validityDays} hari
                             </p>
+                            {/*
+                              * Said BEFORE the Beli button, not in the small print under it. The
+                              * package's depth is a ceiling the archive has not reached yet, and a
+                              * buyer who learns that after paying has been misled by omission.
+                              */}
+                            {p.exceedsCoverage && p.coverageHours > 0 && (
+                                <p className="mt-1 text-[11px] leading-4 text-status-warn">
+                                    Rekaman yang sudah tersimpan baru sampai {depth(p.coverageHours)} ke
+                                    belakang, dan terus bertambah setiap hari.
+                                </p>
+                            )}
                             <button type="button" onClick={() => buy(p.key)} disabled={!!busy}
                                 className="mt-2 w-full rounded-control bg-primary px-3 py-2 text-xs font-medium text-white disabled:opacity-50">
                                 {busy === p.key ? 'Memproses…' : 'Beli'}

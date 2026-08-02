@@ -14,9 +14,10 @@
 
 import { useState } from 'react';
 import { Badge, Button, Card, CardHeader, Field } from '../../ui';
+import { hoursToText } from '../../../utils/durationText';
 
 const rupiah = (v) => `Rp ${Number(v || 0).toLocaleString('id-ID')}`;
-const depth = (h) => (!h ? '-' : h < 24 ? `${h} jam` : `${Math.round(h / 24)} hari`);
+const depth = hoursToText;
 
 /** Empty string must not silently become 0 — send NaN so the backend's own validator rejects it. */
 const toInt = (v) => (String(v).trim() === '' ? NaN : Number(v));
@@ -68,6 +69,13 @@ export default function PlaybackProductCard({ product, saving = false, onSave, o
                         <Badge tone={product.enabled ? 'live' : 'idle'} dot>
                             {product.enabled ? 'Dijual' : 'Tidak dijual'}
                         </Badge>
+                        {/*
+                          * `warn`, not `fault`. Nothing is broken — the archive simply has not been
+                          * running long enough yet, and it closes the gap by one hour every hour.
+                          */}
+                        {product.exceeds_coverage && (
+                            <Badge tone="warn">Melebihi rekaman yang ada</Badge>
+                        )}
                     </span>
                 )}
                 description={product.description || null}
@@ -87,12 +95,22 @@ export default function PlaybackProductCard({ product, saving = false, onSave, o
             />
 
             {!editing ? (
-                <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    <Fact label="Harga" value={isTrial ? 'Gratis' : rupiah(product.price_rupiah)} />
-                    <Fact label="Lihat ke belakang" value={depth(product.window_hours)} />
-                    <Fact label="Masa berlaku" value={`${product.validity_days} hari`} />
-                    <Fact label="Urutan" value={product.sort_order} />
-                </dl>
+                <>
+                    <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                        <Fact label="Harga" value={isTrial ? 'Gratis' : rupiah(product.price_rupiah)} />
+                        <Fact label="Lihat ke belakang" value={depth(product.window_hours)} />
+                        <Fact label="Masa berlaku" value={`${product.validity_days} hari`} />
+                        <Fact label="Urutan" value={product.sort_order} />
+                    </dl>
+                    {product.exceeds_coverage && (
+                        <p className="mt-3 rounded-control border border-edge border-l-2 border-l-status-warn bg-surface-raised px-3 py-2 text-xs leading-5 text-content-muted">
+                            Menjanjikan {depth(product.window_hours)} ke belakang, sementara rekaman yang
+                            benar-benar bisa diputar baru sampai {depth(product.coverage_hours)}. Paket ini tetap
+                            dijual dan halaman publik menyebut angka sebenarnya — peringatan ini hilang sendiri
+                            begitu arsip cukup dalam.
+                        </p>
+                    )}
+                </>
             ) : (
                 <form onSubmit={submit} className="mt-4 space-y-3">
                     <Field
@@ -138,7 +156,9 @@ export default function PlaybackProductCard({ product, saving = false, onSave, o
                             step={1}
                             value={draft.window_hours ?? ''}
                             onChange={(e) => set({ window_hours: e.target.value })}
-                            hint="Sejauh apa pembeli boleh mundur. 24 = sehari, 720 = 30 hari."
+                            hint={product.coverage_hours
+                                ? `Sejauh apa pembeli boleh mundur. Rekaman yang tersedia sekarang: ${depth(product.coverage_hours)}.`
+                                : 'Sejauh apa pembeli boleh mundur. 24 = sehari, 720 = 30 hari.'}
                         />
                         <Field
                             label="Masa berlaku (hari)"

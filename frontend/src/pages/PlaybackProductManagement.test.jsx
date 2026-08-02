@@ -26,17 +26,29 @@ vi.mock('../contexts/NotificationContext', () => ({ useNotification: () => notif
 const TRIAL = {
     id: 1, key: 'trial', label: 'Coba Gratis', description: 'Satu jam.',
     price_rupiah: 0, window_hours: 1, validity_days: 3, is_trial: 1, enabled: 1, sort_order: 0,
+    coverage_hours: 56, exceeds_coverage: false,
 };
 const MONTHLY = {
     id: 4, key: 'monthly', label: 'Bulanan', description: '30 hari ke belakang.',
     price_rupiah: 75000, window_hours: 720, validity_days: 30, is_trial: 0, enabled: 0, sort_order: 3,
+    coverage_hours: 56, exceeds_coverage: true,
 };
+
+/** Mirrors production on 2026-08-02: 4h on disk, an archive running since 31 Jul, 31 of 36 cameras. */
+const COVERAGE = {
+    coverageHours: 56, localHours: 4, archiveHours: 56,
+    archiveContinuous: true, archiveStaleHours: null, archiveStart: '2026-07-31T03:29:22.000Z',
+    camerasRecording: 36, camerasArchived: 31, measurable: true,
+    measuredAt: '2026-08-02T11:25:00.000Z',
+};
+
+const listed = (products, coverage = COVERAGE) => ({ success: true, data: { products, coverage } });
 
 const cardFor = (name) => screen.getByText(name).closest('div.rounded-card');
 
 beforeEach(() => {
     vi.clearAllMocks();
-    playbackProductService.listProducts.mockResolvedValue({ success: true, data: [TRIAL, MONTHLY] });
+    playbackProductService.listProducts.mockResolvedValue(listed([TRIAL, MONTHLY]));
 });
 
 describe('PlaybackProductManagement listing', () => {
@@ -64,6 +76,47 @@ describe('PlaybackProductManagement listing', () => {
         expect(fact('Urutan')).toBe('3');
     });
 
+    /*
+     * The whole point of the coverage guard: `window_hours` is a promise and this is the fact. On
+     * 2026-08-02 production sold "Bulanan — 30 hari" against an archive 56 hours deep, and nothing
+     * on this page could have told the operator.
+     */
+    it('states how deep the footage really goes, not just what is promised', async () => {
+        render(<PlaybackProductManagement />);
+
+        expect(await screen.findByText(/Rekaman yang benar-benar bisa diputar sekarang: 56 jam/)).toBeTruthy();
+        expect(screen.getByText(/31 dari 36 kamera perekam/)).toBeTruthy();
+    });
+
+    it('warns by name when an ENABLED package promises deeper than that', async () => {
+        playbackProductService.listProducts.mockResolvedValue(listed([TRIAL, { ...MONTHLY, enabled: 1 }]));
+        render(<PlaybackProductManagement />);
+
+        expect(await screen.findByText('1 paket menjanjikan lebih dalam dari rekaman yang ada')).toBeTruthy();
+        expect(screen.getByText(/Bulanan \(30 hari\) melebihi 56 jam/)).toBeTruthy();
+        expect(within(cardFor('Bulanan')).getByText('Melebihi rekaman yang ada')).toBeTruthy();
+    });
+
+    /* A disabled package that over-promises is a draft, not a broken offer nobody can buy. */
+    it('stays quiet about a package that over-promises but is not sold', async () => {
+        render(<PlaybackProductManagement />);
+        await screen.findByText('Bulanan');
+
+        expect(screen.queryByText(/menjanjikan lebih dalam/)).toBeNull();
+    });
+
+    /** An archive that stopped leaves a hole, so it is reported as something to go and fix. */
+    it('says the archive is not counted when it has gone silent too long', async () => {
+        playbackProductService.listProducts.mockResolvedValue(listed([TRIAL], {
+            ...COVERAGE,
+            coverageHours: 4, archiveHours: 0, archiveContinuous: false, archiveStaleHours: 36,
+        }));
+        render(<PlaybackProductManagement />);
+
+        expect(await screen.findByText(/upload terakhir 36 jam lalu/)).toBeTruthy();
+        expect(screen.getByText(/Periksa sidecar tg-archive/)).toBeTruthy();
+    });
+
     it('surfaces a load failure instead of showing an empty catalogue', async () => {
         playbackProductService.listProducts.mockResolvedValue({ success: false, message: 'Sesi habis' });
         render(<PlaybackProductManagement />);
@@ -73,9 +126,7 @@ describe('PlaybackProductManagement listing', () => {
 
     /* Selling nothing is a valid configuration, so it is stated — not flagged as a fault. */
     it('says plainly when nothing at all is on sale', async () => {
-        playbackProductService.listProducts.mockResolvedValue({
-            success: true, data: [{ ...TRIAL, enabled: 0 }, MONTHLY],
-        });
+        playbackProductService.listProducts.mockResolvedValue(listed([{ ...TRIAL, enabled: 0 }, MONTHLY]));
         render(<PlaybackProductManagement />);
 
         expect(await screen.findByText('Tidak ada paket yang dijual')).toBeTruthy();

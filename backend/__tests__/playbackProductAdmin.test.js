@@ -29,12 +29,32 @@ vi.mock('../database/connectionPool.js', () => ({
 vi.mock('../services/playbackTokenService.js', () => ({ default: { createToken: vi.fn() } }));
 
 const { default: playbackProductService } = await import('../services/playbackProductService.js');
+const { default: playbackCoverageService } = await import('../services/playbackCoverageService.js');
 
 const PAID = { key: 'quarterly', label: 'Tiga Bulan', price_rupiah: 200000, window_hours: 2160, validity_days: 90 };
 
 beforeEach(() => {
     dbFile = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'pbprod-')), 'test.db');
     db = new Database(dbFile);
+
+    /*
+     * Both list methods now measure real footage depth before answering, so the catalogue cannot be
+     * read without a cameras table. Coverage itself is asserted in playbackCoverageService.test.js;
+     * here it only has to be answerable. The cache is module-level, so it is cleared per case or the
+     * first test's database would keep answering for the rest.
+     */
+    db.exec(`
+        CREATE TABLE cameras (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            camera_class TEXT NOT NULL DEFAULT 'community',
+            enabled INTEGER NOT NULL DEFAULT 1,
+            enable_recording INTEGER NOT NULL DEFAULT 1,
+            recording_duration_hours INTEGER NOT NULL DEFAULT 4
+        );
+    `);
+    db.prepare('INSERT INTO cameras (id) VALUES (1)').run();
+    playbackCoverageService.clearCache();
+
     db.exec(`
         CREATE TABLE playback_products (
             id INTEGER PRIMARY KEY AUTOINCREMENT,

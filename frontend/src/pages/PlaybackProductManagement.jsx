@@ -15,6 +15,7 @@ import { useState } from 'react';
 import { Alert, Button, Card, Field, Modal, PageHeader } from '../components/ui';
 import PlaybackProductCard from '../components/admin/playback-products/PlaybackProductCard.jsx';
 import { usePlaybackProductManagementPage } from '../hooks/admin/usePlaybackProductManagementPage.js';
+import { hoursToText } from '../utils/durationText';
 
 const EMPTY_DRAFT = {
     key: '',
@@ -27,6 +28,23 @@ const EMPTY_DRAFT = {
 };
 
 const toInt = (v) => (String(v).trim() === '' ? NaN : Number(v));
+
+/**
+ * Where the depth on offer actually comes from, in the operator's terms.
+ *
+ * The stale branch is the one worth reading twice: an archive that stopped does not shorten, it
+ * develops a HOLE between where local retention has rolled past and where the uploads ended. That
+ * is a fault to go and fix, not a smaller number to accept.
+ */
+function coverageDetail(coverage) {
+    if (coverage.archiveContinuous) {
+        return `Arsip Telegram menjangkau ${hoursToText(coverage.archiveHours)} untuk ${coverage.camerasArchived} dari ${coverage.camerasRecording} kamera perekam; disk lokal menahan ${hoursToText(coverage.localHours)} terakhir.`;
+    }
+    if (coverage.archiveStaleHours !== null) {
+        return `Arsip Telegram tidak ikut dihitung: upload terakhir ${hoursToText(coverage.archiveStaleHours)} lalu, lebih lama dari retensi lokal ${hoursToText(coverage.localHours)} — rentang di antaranya tidak tersimpan di mana pun. Periksa sidecar tg-archive.`;
+    }
+    return `Belum ada arsip Telegram, jadi yang tersedia hanya ${hoursToText(coverage.localHours)} di disk lokal.`;
+}
 
 export default function PlaybackProductManagement() {
     const page = usePlaybackProductManagementPage();
@@ -54,6 +72,12 @@ export default function PlaybackProductManagement() {
     }
 
     const sellingCount = page.products.filter((p) => p.enabled).length;
+    const coverage = page.coverage;
+    /*
+     * Only ENABLED packages. A disabled package that over-promises is a draft, not a broken offer —
+     * flagging it at the top would cry wolf about something nobody can currently buy.
+     */
+    const overPromising = page.products.filter((p) => p.enabled && p.exceeds_coverage);
 
     return (
         <div className="space-y-6 py-6">
@@ -77,6 +101,30 @@ export default function PlaybackProductManagement() {
                     karena riwayat pembayaran menunjuk ke barisnya; “Matikan” adalah cara menghapusnya.
                 </p>
             </Card>
+
+            {/*
+              * The number every package on this page is judged against. Stated before the catalogue
+              * because `window_hours` is a promise and this is the fact — an operator reading the
+              * list without it has no way to tell which of the two they are looking at.
+              */}
+            {coverage?.measurable && (
+                <Card padding="sm">
+                    <p className="text-xs leading-5 text-content-muted">
+                        <span className="font-semibold text-content">
+                            Rekaman yang benar-benar bisa diputar sekarang: {hoursToText(coverage.coverageHours)} ke belakang.
+                        </span>{' '}
+                        {coverageDetail(coverage)}
+                    </p>
+                </Card>
+            )}
+
+            {overPromising.length > 0 && (
+                <Alert
+                    type="warning"
+                    title={`${overPromising.length} paket menjanjikan lebih dalam dari rekaman yang ada`}
+                    message={`${overPromising.map((p) => `${p.label} (${hoursToText(p.window_hours)})`).join(', ')} melebihi ${hoursToText(coverage?.coverageHours)} yang tersedia. Paket tetap bisa dibeli dan halaman publik menyebut angka sebenarnya, tapi pembeli tidak akan menemukan rekaman selebih itu sampai arsip cukup dalam.`}
+                />
+            )}
 
             {page.loadError && <Alert type="error" title="Gagal memuat" message={page.loadError} />}
 

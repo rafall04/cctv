@@ -19,6 +19,7 @@
 
 import { query, queryOne, execute } from '../database/connectionPool.js';
 import playbackTokenService from './playbackTokenService.js';
+import playbackCoverageService from './playbackCoverageService.js';
 
 function badRequest(message) {
     const err = new Error(message);
@@ -47,8 +48,21 @@ function validateCommercials({ price, windowHours, validityDays, isTrial }) {
     if (!Number.isInteger(validityDays) || validityDays < 1) throw badRequest('Masa berlaku minimal 1 hari');
 }
 
+/**
+ * Does this package promise more depth than the system can actually serve?
+ *
+ * Deliberately NOT a validation error. The archive deepens by one hour every hour, so a package
+ * that over-promises today becomes honest on its own — refusing to save it would block an operator
+ * from setting up a catalogue in advance, and refusing to SELL it would quietly shut down their
+ * shop the moment an uploader hiccuped. The answer belongs in front of the operator and the buyer,
+ * not in a throw. `measurable: false` means we could not tell, which is never an accusation.
+ */
+function exceedsCoverage(row, coverage) {
+    return coverage.measurable && Number(row.window_hours) > coverage.coverageHours;
+}
+
 /** Public shape: never leaks internal ids or flags the buyer has no use for. */
-function presentPublic(row) {
+function presentPublic(row, coverage) {
     return {
         key: row.key,
         label: row.label,
@@ -57,18 +71,50 @@ function presentPublic(row) {
         windowHours: row.window_hours,
         validityDays: row.validity_days,
         isTrial: !!row.is_trial,
+        /*
+         * The buyer is told the real number too. "30 hari ke belakang" next to "rekaman tersedia
+         * sampai 2 hari ke belakang" is an honest offer; "30 hari" alone, today, is not.
+         */
+        coverageHours: coverage.measurable ? coverage.coverageHours : null,
+        exceedsCoverage: exceedsCoverage(row, coverage),
+    };
+}
+
+/** Admin shape: the raw row plus the same verdict, so the catalogue page can flag it in place. */
+function presentAdmin(row, coverage) {
+    return {
+        ...row,
+        coverage_hours: coverage.measurable ? coverage.coverageHours : null,
+        exceeds_coverage: exceedsCoverage(row, coverage),
     };
 }
 
 class PlaybackProductService {
     listPublic() {
+        const coverage = playbackCoverageService.getCoverage();
         return query(
             'SELECT * FROM playback_products WHERE enabled = 1 ORDER BY sort_order ASC, id ASC'
-        ).map(presentPublic);
+        ).map((row) => presentPublic(row, coverage));
     }
 
     listAll() {
-        return query('SELECT * FROM playback_products ORDER BY sort_order ASC, id ASC');
+        const coverage = playbackCoverageService.getCoverage();
+        return query('SELECT * FROM playback_products ORDER BY sort_order ASC, id ASC')
+            .map((row) => presentAdmin(row, coverage));
+    }
+
+    /** How deep the footage actually goes — the same reading the two lists above are judged against. */
+    getCoverage() {
+        return playbackCoverageService.getCoverage();
+    }
+
+    /**
+     * One row in admin shape. create/update return through here so a saved card carries the same
+     * verdict the list does — otherwise editing a package would make its warning disappear until
+     * the next page load.
+     */
+    describeForAdmin(row) {
+        return row ? presentAdmin(row, playbackCoverageService.getCoverage()) : row;
     }
 
     getByKey(key) {

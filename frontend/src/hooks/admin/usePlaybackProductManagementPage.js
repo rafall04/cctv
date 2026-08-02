@@ -18,6 +18,12 @@ import playbackProductService from '../../services/playbackProductService';
 export function usePlaybackProductManagementPage() {
     const { success: notifySuccess, error: notifyError } = useNotification();
     const [products, setProducts] = useState([]);
+    /*
+     * How deep the footage actually goes. It arrives WITH the list rather than from its own call:
+     * the page's job is to compare the two, and a second request would open a window in which the
+     * catalogue on screen is judged against a coverage reading it never came with.
+     */
+    const [coverage, setCoverage] = useState(null);
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState(null);
     const [savingId, setSavingId] = useState(null);
@@ -28,7 +34,8 @@ export function usePlaybackProductManagementPage() {
         setLoading(true);
         const res = await playbackProductService.listProducts();
         if (res?.success) {
-            setProducts(res.data || []);
+            setProducts(res.data?.products || []);
+            setCoverage(res.data?.coverage || null);
             setLoadError(null);
         } else {
             setLoadError(res?.message || 'Gagal memuat daftar paket');
@@ -83,6 +90,7 @@ export function usePlaybackProductManagementPage() {
 
     return {
         products,
+        coverage,
         loading,
         loadError,
         savingId,
