@@ -95,6 +95,13 @@ export default function LoginPage() {
     const { branding } = useBranding();
     const [formData, setFormData] = useState({ username: '', password: '' });
     const [showPassword, setShowPassword] = useState(false);
+    /*
+     * The tab, a bookmark and a shared link all said "CCTV Publik Online" no matter which page the
+     * visitor was on. AreaPublicPage already set its own title; this is the same idea.
+     */
+    useEffect(() => {
+        document.title = 'Masuk Panel Admin - RAF';
+    }, []);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [warning, setWarning] = useState('');
@@ -162,10 +169,10 @@ export default function LoginPage() {
     // Validate individual field (Requirements: 2.1, 2.2)
     const validateField = (name, value) => {
         if (name === 'username' && !value.trim()) {
-            return 'Username is required';
+            return 'Username wajib diisi';
         }
         if (name === 'password' && !value) {
-            return 'Password is required';
+            return 'Password wajib diisi';
         }
         return '';
     };
@@ -356,10 +363,10 @@ export default function LoginPage() {
                         <Icons.Lock />
                     </div>
                     <h1 className="text-3xl font-bold text-content mb-2">
-                        Welcome Back
+                        Selamat Datang
                     </h1>
                     <p className="text-content-muted">
-                        Sign in to {branding.company_name || 'CCTV System'} Admin Panel
+                        Masuk ke Panel Admin {branding.company_name || 'CCTV System'}
                     </p>
                 </div>
 
@@ -532,7 +539,7 @@ export default function LoginPage() {
                                     <span>Wait {formatTime(retryCountdown)}</span>
                                 </>
                             ) : (
-                                <span>Sign In</span>
+                                <span>Masuk</span>
                             )}
                         </button>
                     </form>

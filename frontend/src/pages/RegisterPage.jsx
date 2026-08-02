@@ -27,6 +27,14 @@ export default function RegisterPage() {
     const [errorList, setErrorList] = useState([]);
     const [submitting, setSubmitting] = useState(false);
     const [submitted, setSubmitted] = useState(false);
+    /*
+     * Every page kept the landing page's title, so a browser tab, a bookmark and a shared link all
+     * said "CCTV Publik Online" regardless of where the visitor actually was. AreaPublicPage already
+     * set its own; this is the same idea, nothing more.
+     */
+    useEffect(() => {
+        document.title = 'Daftar Sewa CCTV - RAF';
+    }, []);
     const { branding } = useBranding();
     /*
      * Built here rather than via buildWhatsappLink: that helper renders the branding-wide template,

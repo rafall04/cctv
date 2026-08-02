@@ -97,9 +97,14 @@ function AreaStatusPanel({ area, cameras, liveViewerCount }) {
                 <span className="font-mono text-xs font-semibold tabular-nums text-status-live">{onlinePercent}% online</span>
             </div>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {/*
+                  * "22 Online" beside "0 Live Sekarang" read as a contradiction, because the two
+                  * count different things: cameras that are up, and people watching right now.
+                  * Naming the unit in each label is what makes them stop arguing with each other.
+                  */}
                 <AreaStat label="Kamera Publik" value={cameraCount} />
-                <AreaStat label="Online" value={onlineCount} />
-                <AreaStat label="Live Sekarang" value={liveViewerCount} />
+                <AreaStat label="Kamera Online" value={onlineCount} />
+                <AreaStat label="Penonton Saat Ini" value={liveViewerCount} />
                 <AreaStat label="Total Ditonton" value={area?.total_views} />
             </div>
         </section>
@@ -422,11 +427,11 @@ export default function AreaPublicPage() {
                             </p>
                         </div>
                     </div>
-                    <div className="mt-5 grid gap-3 sm:grid-cols-3">
-                        <AreaStat label="Kamera Publik" value={area?.camera_count} />
-                        <AreaStat label="Online" value={area?.online_count} />
-                        <AreaStat label="Live Sekarang" value={liveViewerCount} />
-                    </div>
+                    {/*
+                      * The hero used to repeat the exact three numbers that AreaStatusPanel states
+                      * a screen below, percentage and all. One of them had to go, and the panel is
+                      * the one that also carries Total Ditonton and the online percentage.
+                      */}
                 </div>
             </section>
 
@@ -441,14 +446,21 @@ export default function AreaPublicPage() {
                 onCameraClick={handleCameraOpen}
             />
 
-            <AreaCameraSection
-                cameras={topCameras}
-                title={`Top CCTV ${area?.name || ''}`.trim()}
-                description="Kamera yang paling banyak dibuka oleh pengunjung."
-                metricLabel="views"
-                metricValue={getAreaCameraTotalViews}
-                onCameraClick={handleCameraOpen}
-            />
+            {/*
+              * A "most opened" ranking is a claim about what visitors did. With no views recorded
+              * at all it ranked nothing and simply asserted popularity that did not exist, so it is
+              * withheld until there is something real to rank.
+              */}
+            {Number(area?.total_views || 0) > 0 && (
+                <AreaCameraSection
+                    cameras={topCameras}
+                    title={`Top CCTV ${area?.name || ''}`.trim()}
+                    description="Kamera yang paling banyak dibuka oleh pengunjung."
+                    metricLabel="views"
+                    metricValue={getAreaCameraTotalViews}
+                    onCameraClick={handleCameraOpen}
+                />
+            )}
 
             <AreaCameraSection
                 cameras={newestCameras}
