@@ -41,6 +41,7 @@
   },
   "devDependencies": {
     "@types/node": "^20.14.10",
+    "@vitest/coverage-v8": "^4.1.10",
     "fast-check": "^4.5.2",
     "nodemon": "^3.1.0",
     "pino-pretty": "^13.1.3",
