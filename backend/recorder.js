@@ -190,6 +190,15 @@ async function shutdown(signal) {
         console.error('[Recorder] Database cleanup error:', error?.message || error);
     }
 
+    // Written synchronously for the same reason the fatal handler below is: console.log goes
+    // to a pm2 PIPE, Node buffers it, and the process.exit() on the next line throws that
+    // buffer away. The last lines of a shutdown — the ones saying it finished cleanly — are
+    // therefore the ones most likely to vanish. Verified: the connection-pool close line was
+    // being lost exactly this way, so the shutdown looked silent even though it worked.
+    try {
+        fs.writeSync(1, '[Recorder] Shutdown complete — recorders detached, database closed\n');
+    } catch { /* stdout already gone */ }
+
     process.exit(0);
 }
 

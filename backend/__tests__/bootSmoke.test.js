@@ -292,7 +292,14 @@ describeShutdown('shutdown smoke (POSIX only)', () => {
         // it — those were one try block, so a throw in the first took the second with it.
         expect(out.stdout, report('recorder.js did not detach its recorders', out))
             .toContain('[Recorder] Detached');
-        expect(out.stdout, report('recorder.js did not close its database', out))
-            .toContain('[ConnectionPool] All connections closed');
+        /*
+         * Asserted on the SYNCHRONOUS end-of-shutdown marker, not on the connection pool's
+         * own log line. That line is a console.log into a pm2 pipe immediately before
+         * process.exit(), so Node discards it — measured: the pool's "All connections closed"
+         * never made it out, even though the close itself ran. Asserting on it would have
+         * been asserting on buffer timing.
+         */
+        expect(out.stdout, report('recorder.js did not report a clean shutdown', out))
+            .toContain('[Recorder] Shutdown complete');
     }, READY_TIMEOUT_MS + 60_000);
 });
