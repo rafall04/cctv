@@ -58,6 +58,39 @@ export const PROXIED_ORIGIN_URL_FIELDS = [
     'external_snapshot_url',
 ];
 
+/**
+ * Shared so /api/cameras/active and /api/public/* cannot drift apart. Closing the leak on
+ * one public endpoint while the next one over still publishes the same URL is not hardening,
+ * it just moves where you have to look for it.
+ *
+ * `publicGrowthService` rows carry no `external_use_proxy` column, so pass the default the
+ * DB uses (`COALESCE(external_use_proxy, 1)`) rather than letting an absent field read as
+ * "not proxied" and keep the URL.
+ *
+ * @param {object} camera - public camera read model (mutated copy is returned)
+ * @param {{ assumeProxied?: boolean }} [options]
+ * @returns {object} camera without the origin URLs it must not publish
+ */
+export function stripProxiedOriginUrls(camera, { assumeProxied = false } = {}) {
+    if (!camera || typeof camera !== 'object') {
+        return camera;
+    }
+
+    const subject = assumeProxied && camera.external_use_proxy === undefined
+        ? { ...camera, external_use_proxy: 1 }
+        : camera;
+
+    if (!shouldHideOriginUrls(subject)) {
+        return camera;
+    }
+
+    const publicCamera = { ...camera };
+    for (const field of PROXIED_ORIGIN_URL_FIELDS) {
+        delete publicCamera[field];
+    }
+    return publicCamera;
+}
+
 export function stripInternalLandingFields(camera) {
     if (!camera || typeof camera !== 'object') {
         return camera;
@@ -67,10 +100,5 @@ export function stripInternalLandingFields(camera) {
     for (const field of PUBLIC_LANDING_INTERNAL_FIELDS) {
         delete publicCamera[field];
     }
-    if (shouldHideOriginUrls(publicCamera)) {
-        for (const field of PROXIED_ORIGIN_URL_FIELDS) {
-            delete publicCamera[field];
-        }
-    }
-    return publicCamera;
+    return stripProxiedOriginUrls(publicCamera);
 }

@@ -8,6 +8,7 @@
 
 import { query, queryOne } from '../database/connectionPool.js';
 import { PUBLIC_LIVE_SQL } from '../utils/cameraVisibility.js';
+import { stripProxiedOriginUrls } from './publicLandingProjection.js';
 
 const PUBLIC_CAMERA_COLUMNS = `
     c.id,
@@ -24,7 +25,6 @@ const PUBLIC_CAMERA_COLUMNS = `
     c.enable_recording,
     c.created_at,
     c.video_codec,
-    c.stream_key,
     c.thumbnail_path,
     c.thumbnail_updated_at,
     c.stream_source,
@@ -33,6 +33,10 @@ const PUBLIC_CAMERA_COLUMNS = `
     c.external_stream_url,
     c.external_embed_url,
     c.external_snapshot_url,
+    -- Same COALESCE default the landing projection uses. Selected so stripProxiedOriginUrls
+    -- decides on the camera's real policy instead of reading an absent column as "not proxied"
+    -- and publishing the origin URL anyway.
+    COALESCE(c.external_use_proxy, 1) AS external_use_proxy,
     a.name AS area_name,
     COALESCE(a.slug, LOWER(REPLACE(a.name, ' ', '-'))) AS area_slug,
     COALESCE(cvs.total_live_views, 0) AS total_views,
@@ -65,11 +69,25 @@ function assertArea(row, slug) {
     }
 }
 
+/*
+ * These rows go out on /api/public/discovery, /api/public/trending and /api/public/area/:slug —
+ * unauthenticated, same as the landing list. Two things were leaking here that the landing
+ * projection already withholds:
+ *
+ *  - `stream_key`, the MediaMTX path name that cameraAccessService.getByStreamKey resolves
+ *    access decisions against. It has no use in a public card at all.
+ *  - the origin `.m3u8` of streams the backend is supposed to be proxying, which makes the
+ *    proxy (and the access control in it) bypassable.
+ *
+ * Dropping the URLs is safe for exactly the reason SYSTEM_MAP records: public-growth cameras
+ * are already resolved through /api/stream/:id before a popup opens, precisely because they
+ * may lack standard stream URLs.
+ */
 function sanitizeCamera(row) {
     const liveViewers = Number(row.live_viewers || 0);
     const totalViews = Number(row.total_views || 0);
 
-    return {
+    return stripProxiedOriginUrls({
         id: row.id,
         name: row.name,
         description: row.description,
@@ -84,7 +102,6 @@ function sanitizeCamera(row) {
         enable_recording: row.enable_recording,
         created_at: row.created_at,
         video_codec: row.video_codec,
-        stream_key: row.stream_key,
         thumbnail_path: row.thumbnail_path,
         thumbnail_updated_at: row.thumbnail_updated_at,
         stream_source: row.stream_source,
@@ -93,6 +110,7 @@ function sanitizeCamera(row) {
         external_stream_url: row.external_stream_url,
         external_embed_url: row.external_embed_url,
         external_snapshot_url: row.external_snapshot_url,
+        external_use_proxy: row.external_use_proxy,
         area_name: row.area_name,
         area_slug: row.area_slug || toAreaSlug(row.area_name),
         total_views: totalViews,
@@ -101,7 +119,7 @@ function sanitizeCamera(row) {
             live_viewers: liveViewers,
             total_views: totalViews,
         },
-    };
+    });
 }
 
 function getActiveViewerJoin() {

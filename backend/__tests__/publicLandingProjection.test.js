@@ -11,7 +11,9 @@ import {
     PROXIED_ORIGIN_URL_FIELDS,
     PUBLIC_LANDING_INTERNAL_FIELDS,
     stripInternalLandingFields,
+    stripProxiedOriginUrls,
 } from '../services/publicLandingProjection.js';
+import { readFileSync } from 'fs';
 
 const proxiedExternalCamera = () => ({
     id: 15,
@@ -98,5 +100,46 @@ describe('stripInternalLandingFields', () => {
     it('passes through non-objects unchanged', () => {
         expect(stripInternalLandingFields(null)).toBeNull();
         expect(stripInternalLandingFields(undefined)).toBeUndefined();
+    });
+});
+
+/*
+ * The origin-URL rule has to hold on EVERY public endpoint, not just the landing list.
+ * It was first fixed only in stripInternalLandingFields, while /api/public/discovery went on
+ * publishing the same URLs — plus `stream_key` — from publicGrowthService. Closing one door
+ * and leaving the next one open is not hardening, so both now share one helper and this
+ * pins the second consumer against silently drifting back.
+ */
+describe('public growth payload (/api/public/*)', () => {
+    const source = readFileSync(new URL('../services/publicGrowthService.js', import.meta.url), 'utf8');
+
+    it('never selects or emits stream_key', () => {
+        // stream_key is the MediaMTX path name cameraAccessService resolves access against.
+        const code = source.split('\n').filter((line) => !line.trim().startsWith('*') && !line.trim().startsWith('//'));
+        expect(code.join('\n')).not.toMatch(/stream_key/);
+    });
+
+    it('routes its rows through the shared origin-URL strip', () => {
+        expect(source).toContain('stripProxiedOriginUrls');
+        // It must decide on the camera's real policy, not on an absent column.
+        expect(source).toMatch(/COALESCE\(c\.external_use_proxy, 1\)/);
+    });
+
+    it('strips origin URLs from a proxied external row the way the landing list does', () => {
+        const row = {
+            id: 7,
+            name: 'SIMPANG 4 TEUKU UMAR',
+            stream_source: 'external',
+            delivery_type: 'external_hls',
+            external_use_proxy: 1,
+            external_stream_url: 'https://origin.example.go.id/live/x.m3u8',
+            external_hls_url: 'https://origin.example.go.id/live/x.m3u8',
+        };
+
+        const result = stripProxiedOriginUrls(row);
+
+        expect(result).not.toHaveProperty('external_stream_url');
+        expect(result).not.toHaveProperty('external_hls_url');
+        expect(result.name).toBe('SIMPANG 4 TEUKU UMAR');
     });
 });
