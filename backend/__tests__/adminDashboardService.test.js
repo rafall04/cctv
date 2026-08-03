@@ -1,4 +1,4 @@
-﻿import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as database from '../database/connectionPool.js';
 import mediaMtxService from '../services/mediaMtxService.js';
 import viewerSessionService from '../services/viewerSessionService.js';

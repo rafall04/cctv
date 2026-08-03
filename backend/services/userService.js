@@ -1,4 +1,4 @@
-﻿import bcrypt from 'bcrypt';
+import bcrypt from 'bcrypt';
 import { query, queryOne, execute } from '../database/connectionPool.js';
 import { validatePassword, getPasswordRequirements } from './passwordValidator.js';
 import { addPasswordToHistory, wasPasswordUsedBefore } from './passwordHistory.js';

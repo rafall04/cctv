@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Input Sanitizer Middleware
  * 
  * Provides XSS prevention, Content-Type validation, request body size limiting,
@@ -30,7 +30,7 @@ const DANGEROUS_SCHEME_RE = /\b(javascript|vbscript)\s*:/gi;
 /**
  * Sanitize a string against stored XSS by removing HTML-tag-like spans and
  * dangerous URI schemes. Unlike full HTML-entity encoding, this does NOT
- * corrupt URLs, passwords, query strings, or JSON â€” it only strips markup.
+ * corrupt URLs, passwords, query strings, or JSON — it only strips markup.
  * Output escaping is still the renderer's job (React escapes by default).
  *
  * @param {string} str - String to sanitize

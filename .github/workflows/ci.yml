@@ -26,8 +26,15 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-      - run: npm install
+          # Matches production. The box moved to Node 22 LTS on 2026-08-03; Node 20 hit
+          # end-of-life on 2026-04-30 and no longer receives security patches, so a green
+          # run on 20 says less about the deployment every week.
+          node-version: '22'
+      # `npm ci`, not `npm install` — backend/package-lock.json is committed as of
+      # 2026-08-03. While it was ignored, every run re-resolved the whole tree, so a green
+      # run guaranteed nothing about the next; it is also what pins the native modules
+      # (better-sqlite3, bcrypt) to the versions the suite actually verified.
+      - run: npm ci
       # The suite expects a real SQLite schema at data/cctv.db (dev machines carry one;
       # CI starts empty — this was why 18 backend test files failed with "no such table"
       # on every run since the workflow was created). setup-db is non-interactive.
@@ -45,7 +52,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
       # `npm ci`, not `npm install`: the lockfile is committed for exactly this reason. With it
       # ignored, every run re-resolved every dependency, so a green run said nothing about the next.
       - run: npm ci
@@ -80,7 +87,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
       - run: npm ci
       - name: Build
         run: |

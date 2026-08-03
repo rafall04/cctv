@@ -1,4 +1,4 @@
-﻿import { query, queryOne, execute } from '../database/connectionPool.js';
+import { query, queryOne, execute } from '../database/connectionPool.js';
 import { getTimezone } from './timezoneService.js';
 import { normalizeExternalHealthMode } from '../utils/cameraDelivery.js';
 
@@ -369,7 +369,7 @@ class SettingsService {
 
         // The value is operator-editable via PUT /api/settings/:key, so a
         // malformed string must not crash the PUBLIC /api/settings/map-center
-        // endpoint â€” fall back to the default center instead.
+        // endpoint — fall back to the default center instead.
         try {
             const parsed = JSON.parse(setting.value);
             return (parsed && typeof parsed === 'object') ? parsed : fallback;

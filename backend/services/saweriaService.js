@@ -1,4 +1,4 @@
-﻿import { query, queryOne, execute } from '../database/connectionPool.js';
+import { query, queryOne, execute } from '../database/connectionPool.js';
 
 /**
  * Get Saweria settings

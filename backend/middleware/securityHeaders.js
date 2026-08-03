@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Security Headers Middleware
  * 
  * Implements security headers to protect against common web vulnerabilities:
@@ -122,7 +122,7 @@ export function getSecurityHeaders(url = '') {
  * Security headers middleware for Fastify.
  * Adds security headers to all responses and removes revealing headers.
  *
- * Wrapped with fastify-plugin so the onSend hook is NOT encapsulated â€” without
+ * Wrapped with fastify-plugin so the onSend hook is NOT encapsulated — without
  * fp() the hook would only apply to routes registered inside this plugin's
  * scope (i.e. none), silently disabling all security headers.
  */

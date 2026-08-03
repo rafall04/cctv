@@ -1,4 +1,4 @@
-﻿/**
+/**
  * API Key Service
  * 
  * Generates and validates API keys for frontend authentication.

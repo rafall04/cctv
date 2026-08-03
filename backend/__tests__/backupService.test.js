@@ -1,10 +1,10 @@
-﻿/*
- * Purpose: Lock in the data-safety behaviour of backup import â€” restoring a backup must never
+/*
+ * Purpose: Lock in the data-safety behaviour of backup import — restoring a backup must never
  *          destroy a live row, and must never interpolate un-whitelisted identifiers into SQL.
  * Caller:  Backend Vitest suite.
  * Deps:    better-sqlite3 (real in-memory DB), backupService.
  * MainFuncs: importBackup tests.
- * SideEffects: None â€” every test runs against a throwaway :memory: database.
+ * SideEffects: None — every test runs against a throwaway :memory: database.
  *
  * These tests exist because of a REAL incident (2026-06): an `INSERT OR REPLACE` deleted a live
  * customer row that merely collided on a UNIQUE column. The first test below is that exact
@@ -47,7 +47,7 @@ afterEach(() => {
     h.db = null;
 });
 
-describe('importBackup â€” data safety on restore', () => {
+describe('importBackup — data safety on restore', () => {
     it('REGRESSION (2026-06 incident): a backup row colliding on a UNIQUE column must NOT delete the live row', () => {
         // A real, live customer.
         h.db.prepare("INSERT INTO users (id, username, role) VALUES (5, 'budi', 'customer')").run();
@@ -124,7 +124,7 @@ describe('importBackup â€” data safety on restore', () => {
     });
 });
 
-describe('importBackup â€” identifiers are never trusted', () => {
+describe('importBackup — identifiers are never trusted', () => {
     it('rejects a table outside the backup whitelist instead of interpolating it', () => {
         const result = importBackup(
             backupOf({ 'users; DROP TABLE users; --': [{ id: 1 }], sqlite_master: [{ name: 'x' }] }),

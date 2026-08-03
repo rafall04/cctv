@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Password Expiry Service
  * Manages password expiration and warnings.
  * 

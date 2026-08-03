@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Purpose: Verify public settings routes stay available without admin authentication.
  * Caller: Backend focused settings route test gate.
  * Deps: Fastify, vitest, settingsRoutes.

@@ -1,4 +1,4 @@
-﻿import os from 'os';
+import os from 'os';
 import { query, queryOne } from '../database/connectionPool.js';
 import mediaMtxService from './mediaMtxService.js';
 import viewerSessionService from './viewerSessionService.js';

@@ -1,4 +1,4 @@
-﻿import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as database from '../database/connectionPool.js';
 import * as timezoneService from '../services/timezoneService.js';
 import settingsService from '../services/settingsService.js';
@@ -105,7 +105,7 @@ describe('settingsService.getMapDefaultCenter', () => {
     });
 
     it('falls back to the default center when the stored value is not valid JSON', () => {
-        // An operator can PUT any string for this key â€” a malformed value
+        // An operator can PUT any string for this key — a malformed value
         // must not crash the public /api/settings/map-center endpoint.
         vi.spyOn(database, 'queryOne').mockReturnValue({ value: 'not-json{' });
 

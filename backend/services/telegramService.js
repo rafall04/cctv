@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Purpose: Send Telegram alerts for camera status, feedback, and system events with multi-target routing.
  * Caller: cameraHealthService, feedback flows, admin Telegram config/test endpoints.
  * Deps: database settings table, timezoneService, Telegram Bot API, internal ingest policy resolver.
@@ -102,7 +102,7 @@ function normalizeTelegramRule(rule = {}) {
     // Default to 'any' so an unset rule covers ALL ingest modes (on_demand,
     // always_on, external). The previous ['always_on'] default silently
     // matched only always-on cameras, so on-demand local cameras (the
-    // majority) never produced an alert â€” the main Telegram precision gap.
+    // majority) never produced an alert — the main Telegram precision gap.
     const ingestModes = Array.isArray(rule.ingestModes) && rule.ingestModes.length > 0
         ? rule.ingestModes
         : ['any'];
@@ -171,7 +171,7 @@ function normalizeTelegramSettings(settings = {}) {
         // Operator-tunable anti-flap windows for camera DOWN/UP alerts.
         alertConfirmation: normalizeAlertConfirmation(settings.alertConfirmation),
         // Chat IDs allowed to COMMAND the bot (send /commands, tap approve/manage
-        // buttons). This is the bot's authorization gate â€” anything outside it is
+        // buttons). This is the bot's authorization gate — anything outside it is
         // ignored/denied. Empty here means "fall back to the monitoring chat"
         // (resolved by resolveCommandChatIds), so an operator who only set a
         // monitoring chat can manage customers from it with zero extra config.
@@ -197,7 +197,7 @@ function normalizeChatIdList(value) {
 
 /**
  * Resolve the bot command allow-list: the explicitly-configured commandChatIds,
- * or â€” when none are set â€” the monitoring chat as a sensible default so the
+ * or — when none are set — the monitoring chat as a sensible default so the
  * operator's existing chat can manage customers without extra setup.
  */
 function resolveCommandChatIds(settings) {
@@ -523,7 +523,7 @@ function setCooldown(key) {
 }
 
 /**
- * Low-level Telegram Bot API call â€” the single outbound HTTP path for the whole
+ * Low-level Telegram Bot API call — the single outbound HTTP path for the whole
  * app (sendMessage, editMessageText, answerCallbackQuery, getUpdates, ...).
  * Returns the parsed Telegram response ({ ok, result, description }) or null on
  * a missing token / transport failure / abort. `timeoutMs` overrides the default
@@ -601,7 +601,7 @@ async function sendToTelegram(message, chatId) {
 export async function sendCameraStatusNotifications(eventType, cameras = [], options = {}) {
     // When `options.detailed` is set the caller needs to know which cameras
     // matched a notification target (`routedCameraIds`) and which actually had
-    // a message delivered (`deliveredCameraIds`) â€” the camera health loop uses
+    // a message delivered (`deliveredCameraIds`) — the camera health loop uses
     // this to only advance a confirmed alert once it has truly been sent, and to
     // avoid retrying cameras that simply have no recipient. Other callers keep
     // getting the legacy boolean.
@@ -736,12 +736,12 @@ export async function sendCameraOfflineNotification(camera) {
     }
 
     const message = `
-ðŸ”´ <b>KAMERA OFFLINE</b>
-â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
-ðŸ“¹ <b>${camera.name}</b>
-${camera.location ? `ðŸ“ ${camera.location}` : ''}
-â° ${formatDateTime(new Date())}
-â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+🔴 <b>KAMERA OFFLINE</b>
+━━━━━━━━━━━━━━━━━━━━
+📹 <b>${camera.name}</b>
+${camera.location ? `📍 ${camera.location}` : ''}
+⏰ ${formatDateTime(new Date())}
+━━━━━━━━━━━━━━━━━━━━
 <i>Segera periksa koneksi kamera!</i>
     `.trim();
 
@@ -765,16 +765,16 @@ export async function sendCameraOnlineNotification(camera, downtime = null) {
     if (downtime && downtime > 0) {
         const minutes = Math.floor(downtime / 60);
         const seconds = downtime % 60;
-        downtimeText = minutes > 0 ? `\nâ± Downtime: ${minutes}m ${seconds}s` : `\nâ± Downtime: ${seconds}s`;
+        downtimeText = minutes > 0 ? `\n⏱ Downtime: ${minutes}m ${seconds}s` : `\n⏱ Downtime: ${seconds}s`;
     }
 
     const message = `
-ðŸŸ¢ <b>KAMERA ONLINE</b>
-â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
-ðŸ“¹ <b>${camera.name}</b>
-${camera.location ? `ðŸ“ ${camera.location}` : ''}
-â° ${formatDateTime(new Date())}${downtimeText}
-â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+🟢 <b>KAMERA ONLINE</b>
+━━━━━━━━━━━━━━━━━━━━
+📹 <b>${camera.name}</b>
+${camera.location ? `📍 ${camera.location}` : ''}
+⏰ ${formatDateTime(new Date())}${downtimeText}
+━━━━━━━━━━━━━━━━━━━━
 <i>Kamera kembali normal.</i>
     `.trim();
 
@@ -792,14 +792,14 @@ export async function sendMultipleCamerasOfflineNotification(cameras) {
     if (routed) return true;
     if (cameras.length === 1) return sendCameraOfflineNotification(cameras[0]);
 
-    const cameraList = cameras.map(c => `â€¢ ${c.name}`).join('\n');
+    const cameraList = cameras.map(c => `• ${c.name}`).join('\n');
     
     const message = `
-ðŸ”´ <b>${cameras.length} KAMERA OFFLINE</b>
-â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+🔴 <b>${cameras.length} KAMERA OFFLINE</b>
+━━━━━━━━━━━━━━━━━━━━
 ${cameraList}
-â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
-â° ${formatDateTime(new Date())}
+━━━━━━━━━━━━━━━━━━━━
+⏰ ${formatDateTime(new Date())}
 <i>Segera periksa koneksi!</i>
     `.trim();
 
@@ -812,14 +812,14 @@ export async function sendMultipleCamerasOnlineNotification(cameras) {
     if (routed) return true;
     if (cameras.length === 1) return sendCameraOnlineNotification(cameras[0]);
 
-    const cameraList = cameras.map(c => `â€¢ ${c.name}`).join('\n');
+    const cameraList = cameras.map(c => `• ${c.name}`).join('\n');
     
     const message = `
-ðŸŸ¢ <b>${cameras.length} KAMERA ONLINE</b>
-â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+🟢 <b>${cameras.length} KAMERA ONLINE</b>
+━━━━━━━━━━━━━━━━━━━━
 ${cameraList}
-â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
-â° ${formatDateTime(new Date())}
+━━━━━━━━━━━━━━━━━━━━
+⏰ ${formatDateTime(new Date())}
 <i>Semua kamera kembali normal.</i>
     `.trim();
 
@@ -828,15 +828,15 @@ ${cameraList}
 
 export async function sendFeedbackNotification(feedback) {
     const message = `
-ðŸ“¬ <b>Kritik & Saran Baru</b>
-â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
-ðŸ‘¤ <b>Nama:</b> ${feedback.name || 'Anonim'}
-ðŸ“§ <b>Email:</b> ${feedback.email || '-'}
-â° <b>Waktu:</b> ${formatDateTime(new Date(feedback.created_at))}
-â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
-ðŸ’¬ <b>Pesan:</b>
+📬 <b>Kritik & Saran Baru</b>
+━━━━━━━━━━━━━━━━━━━━
+👤 <b>Nama:</b> ${feedback.name || 'Anonim'}
+📧 <b>Email:</b> ${feedback.email || '-'}
+⏰ <b>Waktu:</b> ${formatDateTime(new Date(feedback.created_at))}
+━━━━━━━━━━━━━━━━━━━━
+💬 <b>Pesan:</b>
 ${feedback.message}
-â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+━━━━━━━━━━━━━━━━━━━━
 <i>ID: #${feedback.id}</i>
     `.trim();
 
@@ -845,12 +845,12 @@ ${feedback.message}
 
 export async function sendTestNotification(type = 'monitoring', options = {}) {
     const message = `
-âœ… <b>Test Notifikasi Berhasil</b>
-â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+✅ <b>Test Notifikasi Berhasil</b>
+━━━━━━━━━━━━━━━━━━━━
 Bot Telegram terhubung dengan baik.
 Tipe: ${type === 'monitoring' ? 'Monitoring Kamera' : 'Kritik & Saran'}
-â° ${formatDateTime(new Date())}
-â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+⏰ ${formatDateTime(new Date())}
+━━━━━━━━━━━━━━━━━━━━
     `.trim();
 
     if (type === 'feedback') {
@@ -867,7 +867,7 @@ Tipe: ${type === 'monitoring' ? 'Monitoring Kamera' : 'Kritik & Saran'}
 /**
  * Runtime context for the interactive bot (telegramBotService). Exposes whether
  * a token is configured and the resolved command allow-list. The raw token is
- * never returned here â€” callers send via callTelegramApi, which reads it.
+ * never returned here — callers send via callTelegramApi, which reads it.
  */
 export function getBotRuntimeConfig() {
     const settings = getTelegramSettings();
@@ -913,7 +913,7 @@ export function getTelegramStatus() {
         healthAlertTargetId: settings.healthAlertTargetId || '',
         alertConfirmation: normalizeAlertConfirmation(settings.alertConfirmation),
         // Bot command authorization: the saved allow-list plus the effective
-        // (post-fallback) list the bot actually honors â€” so the UI can show the
+        // (post-fallback) list the bot actually honors — so the UI can show the
         // monitoring-chat fallback when commandChatIds is empty.
         commandChatIds: settings.commandChatIds || [],
         effectiveCommandChatIds: resolveCommandChatIds(settings),

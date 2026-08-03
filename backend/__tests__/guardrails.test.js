@@ -140,6 +140,44 @@ describe('guardrail: data-safety patterns', () => {
     it('database/database.js stays deleted', () => {
         expect(fs.existsSync(path.join(BACKEND_ROOT, 'database', 'database.js'))).toBe(false);
     });
+
+    /*
+     * SOURCE FILES ARE UTF-8, NO BOM. Earned 2026-08-03.
+     *
+     * A bulk edit run through PowerShell 5.1 corrupted 32 files at once. `Get-Content -Raw`
+     * decodes a BOM-less file with the system ANSI codepage, so UTF-8 bytes came back as
+     * cp1252 text; `Set-Content -Encoding utf8` then re-encoded that — double-encoding every
+     * non-ASCII character — and prepended a BOM.
+     *
+     * It is not a cosmetic problem. The casualties included the emoji and bullets in the
+     * Telegram notification templates (🔴 🟢 📹 📍 •) and an em-dash inside an admin API
+     * response string — i.e. text users read. Tests stayed green throughout, because none of
+     * them assert on those characters. Only a byte-level check catches it.
+     */
+    it('no source file carries a UTF-8 BOM or double-encoded (mojibake) text', () => {
+        // Spelled as escapes on purpose: writing these as literal characters would put
+        // the exact bytes we are hunting into this file, and the guardrail would flag
+        // itself. \u00e2\u20ac leads a double-encoded em-dash/bullet; \u00c3 and \u00c2
+        // lead the double-encoded Latin-1 range.
+        const MOJIBAKE = /\u00e2\u20ac|\u00c3[\u00a9\u00a2\u00ab\u00bb]|\u00c2[\s\u00a0]/;
+        const withBom = [];
+        const withMojibake = [];
+
+        for (const d of ['services', 'controllers', 'routes', 'middleware', 'utils', 'database', '__tests__']) {
+            for (const file of walk(path.join(BACKEND_ROOT, d), ['.js'])) {
+                const buf = fs.readFileSync(file);
+                if (buf.length >= 3 && buf[0] === 0xEF && buf[1] === 0xBB && buf[2] === 0xBF) {
+                    withBom.push(rel(file));
+                }
+                if (MOJIBAKE.test(buf.toString('utf8'))) {
+                    withMojibake.push(rel(file));
+                }
+            }
+        }
+
+        expect(withBom, `Files must be UTF-8 without a BOM: ${withBom.join(', ')}`).toEqual([]);
+        expect(withMojibake, `Double-encoded text (edit these with a UTF-8-aware tool, not PowerShell Set-Content): ${withMojibake.join(', ')}`).toEqual([]);
+    });
 });
 
 describe('guardrail: auth perimeter stays tested (coverage-floor surrogate)', () => {

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Brute Force Protection Service
  * 
  * Tracks failed login attempts and implements account lockout mechanism.

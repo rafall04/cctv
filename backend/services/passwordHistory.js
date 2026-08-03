@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Password History Service
  * Manages password history to prevent reuse of previous passwords.
  * 

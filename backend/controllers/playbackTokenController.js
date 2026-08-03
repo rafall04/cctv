@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Purpose: HTTP handlers for admin playback token management and public token activation.
  * Caller: playbackTokenRoutes and adminRoutes.
  * Deps: playbackTokenService, timeService, and auth cookie option helper.
@@ -42,7 +42,7 @@ function resolveCookieMaxAge(tokenData) {
 // In-memory per-IP throttle for failed public activation attempts. Cheap
 // defence against brute-forcing the share-key namespace; combined with the
 // `activation_failed` audit row this turns silent guessing into both visible
-// and rate-limited behavior. The map is process-local â€” good enough for a
+// and rate-limited behavior. The map is process-local — good enough for a
 // single-process backend; multi-instance deployments would need Redis.
 const ACTIVATION_FAILURE_WINDOW_MS = 60_000;
 const ACTIVATION_FAILURE_LIMIT = 10;
@@ -184,9 +184,9 @@ export async function deletePlaybackTokenById(request, reply) {
     try {
         const data = deletePlaybackToken(request.params.id, request);
         // The message names the token, because after a delete there is nothing left on screen to
-        // confirm which one went â€” and says plainly when a LIVE one was just cut off.
+        // confirm which one went — and says plainly when a LIVE one was just cut off.
         const message = data.wasActive
-            ? `Token "${data.label}" dihapus permanen â€” akses yang memakainya langsung terputus`
+            ? `Token "${data.label}" dihapus permanen — akses yang memakainya langsung terputus`
             : `Token "${data.label}" dihapus permanen`;
         return reply.send({ success: true, message, data });
     } catch (error) {
@@ -334,7 +334,7 @@ export async function heartbeatPlaybackToken(request, reply) {
 export async function clearPlaybackToken(request, reply) {
     // Match the catch-and-return contract used by every other handler in this
     // file. `stopPlaybackSession` already swallows the missing-schema case,
-    // but anything else (locked DB, IO error) should not 500 raw â€” clearing
+    // but anything else (locked DB, IO error) should not 500 raw — clearing
     // cookies is best-effort and must always respond cleanly.
     try {
         playbackTokenService.stopPlaybackSession(request, 'stopped');

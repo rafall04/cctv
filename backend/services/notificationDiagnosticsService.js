@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Purpose: Provide admin diagnostics for Telegram camera notification routing and drill delivery.
  * Caller: adminController notification diagnostics handlers.
  * Deps: database camera/runtime tables, telegramService routing and send helpers.
