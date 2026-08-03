@@ -165,7 +165,7 @@ export default function RegisterPage() {
                             <form onSubmit={handleSubmit} className="mt-4 space-y-3">
                                 <div>
                                     <label htmlFor="reg-username" className="mb-1.5 block text-sm font-medium text-content-muted">Username</label>
-                                    <input id="reg-username" name="username" autoComplete="username" value={form.username} onChange={handleChange} required minLength={3} maxLength={50} pattern="[a-zA-Z0-9_-]+" className={inputClass} placeholder="nama_warung" />
+                                    <input id="reg-username" name="username" autoComplete="username" value={form.username} onChange={handleChange} required minLength={3} maxLength={50} pattern="[a-zA-Z0-9_\-]+" className={inputClass} placeholder="nama_warung" />
                                 </div>
                                 <div>
                                     <label htmlFor="reg-phone" className="mb-1.5 block text-sm font-medium text-content-muted">No. HP (WhatsApp)</label>

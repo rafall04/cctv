@@ -156,7 +156,7 @@ export default function PromoTab() {
             {showForm && (
                 <form onSubmit={handleCreate} className={`${cardClass} space-y-2`}>
                     <h3 className="font-semibold text-content">Kode Promo Baru</h3>
-                    <input name="code" value={form.code} onChange={handleChange} required pattern="[A-Za-z0-9_-]{3,30}" className={`${inputClass} uppercase`} placeholder="KODE (mis. HEMAT10)" />
+                    <input name="code" value={form.code} onChange={handleChange} required pattern="[A-Za-z0-9_\-]{3,30}" className={`${inputClass} uppercase`} placeholder="KODE (mis. HEMAT10)" />
                     <label className="block text-xs text-content-muted">
                         Tipe
                         <select name="type" value={form.type} onChange={handleChange} className={`mt-1 ${inputClass}`}>

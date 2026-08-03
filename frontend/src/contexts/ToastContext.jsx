@@ -64,7 +64,7 @@ function ToastContainer({ toasts, removeToast }) {
         <div
             role="status"
             aria-live="polite"
-            className="fixed top-20 left-1/2 -translate-x-1/2 z-[1002] flex flex-col gap-3 w-full max-w-sm px-4"
+            className="fixed top-20 left-1/2 -translate-x-1/2 z-toast flex flex-col gap-3 w-full max-w-sm px-4"
         >
             {toasts.map(toast => (
                 <Toast key={toast.id} {...toast} onClose={() => removeToast(toast.id)} />

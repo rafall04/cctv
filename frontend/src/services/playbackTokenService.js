@@ -21,13 +21,22 @@ function failure(error, fallback) {
     };
 }
 
+/*
+ * These three authenticate with the playback-token cookie, never the admin JWT, so a 401
+ * from them means "this playback token is not valid" — never "your login expired". Without
+ * this flag the shared interceptor treated their 401 as an expired JWT and chased it with a
+ * POST /api/auth/refresh, which an anonymous visitor also failed: one public page view
+ * produced two red console errors and a spurious session-expiry teardown.
+ */
+const PUBLIC_TOKEN_REQUEST = { skipAuthRefresh: true };
+
 export const playbackTokenService = {
     async activateToken(token, cameraId = null, clientId = '') {
         const response = await apiClient.post('/api/playback-token/activate', {
             token,
             camera_id: cameraId,
             client_id: clientId,
-        });
+        }, PUBLIC_TOKEN_REQUEST);
         return response.data;
     },
 
@@ -36,19 +45,19 @@ export const playbackTokenService = {
             share_key: shareKey,
             camera_id: cameraId,
             client_id: clientId,
-        });
+        }, PUBLIC_TOKEN_REQUEST);
         return response.data;
     },
 
     async heartbeatToken(cameraId = null) {
         const response = await apiClient.post('/api/playback-token/heartbeat', {
             camera_id: cameraId,
-        });
+        }, PUBLIC_TOKEN_REQUEST);
         return response.data;
     },
 
     async clearToken() {
-        const response = await apiClient.post('/api/playback-token/clear');
+        const response = await apiClient.post('/api/playback-token/clear', {}, PUBLIC_TOKEN_REQUEST);
         return response.data;
     },
 

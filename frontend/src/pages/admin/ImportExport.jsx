@@ -417,7 +417,7 @@ export default function ImportExport() {
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-content">Import Control Center</h1>
+                    <h1 className="text-2xl font-bold text-content">Pusat Kendali Impor</h1>
                     <p className="text-content-muted">Preview dulu, lalu commit hanya row yang memang valid dan eligible.</p>
                 </div>
             </div>

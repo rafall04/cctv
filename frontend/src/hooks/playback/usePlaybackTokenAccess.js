@@ -185,17 +185,30 @@ export function usePlaybackTokenAccess({
         }
 
         let isActive = true;
+        const clear = (message) => {
+            setTokenStatus(null);
+            setTokenMessage(message || 'Session token playback berakhir');
+            onCleared?.();
+        };
+
         const heartbeat = async () => {
             try {
-                await playbackTokenService.heartbeatToken(cameraId);
+                const response = await playbackTokenService.heartbeatToken(cameraId);
+                if (!isActive) {
+                    return;
+                }
+                // The cookie can also disappear outright (cleared, or expired past its
+                // Max-Age), which the backend answers 200 + `data: null` rather than 401.
+                // That is still "your session is over" and must clear the UI the same way.
+                if (!response?.data) {
+                    clear();
+                }
             } catch (error) {
                 if (!isActive) {
                     return;
                 }
 
-                setTokenStatus(null);
-                setTokenMessage(error?.response?.data?.message || 'Session token playback berakhir');
-                onCleared?.();
+                clear(error?.response?.data?.message);
             }
         };
 

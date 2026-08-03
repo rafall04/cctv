@@ -81,7 +81,7 @@ function ListModal({ title, items, type, onClose, onCameraClick }) {
     }, [onClose]);
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 dark:bg-black/80" onClick={onClose}>
+        <div className="fixed inset-0 z-modal flex items-center justify-center bg-black/80 p-4 dark:bg-black/80" onClick={onClose}>
             <div
                 ref={modalRef}
                 role="dialog"
@@ -250,11 +250,18 @@ export default function StatsBar({ onCameraClick }) {
                     onClick={() => setActiveModal('online')}
                     disableAnimations={disableAnimations}
                 />
+                {/*
+                  * Offline is idle grey, not fault red. This component's own dot map
+                  * (getStatusDot) and LandingCameraCard both paint offline as `status-idle`
+                  * and keep `status-fault` for `maintenance` — painting the offline NUMERAL
+                  * red gave one state two colours on the same screen, and spent the alarm
+                  * colour on the ordinary case of a third-party feed being down.
+                  */}
                 <Metric
                     value={stats.offline}
                     label="Offline"
                     ariaLabel={`${stats.offline} kamera offline`}
-                    valueClass={stats.offline > 0 ? 'text-status-fault' : 'text-content'}
+                    valueClass="text-status-idle"
                     onClick={() => setActiveModal('offline')}
                     disableAnimations={disableAnimations}
                 />

@@ -524,10 +524,18 @@ export default function MyWallet() {
                     </div>
                     <div className="rounded-2xl border border-edge bg-surface p-4">
                         <p className="text-xs text-content-muted">Perkiraan cukup untuk</p>
+                        {/*
+                          * A bare em-dash read as a broken value. There are two distinct reasons
+                          * the estimate is absent, and each has a real answer: no daily cost yet
+                          * (trial, or no camera added) means the balance is not being drawn down
+                          * at all, and anything else simply is not computable yet.
+                          */}
                         <p className="mt-1 text-xl font-bold text-content">
                             {summary?.estimated_days_left !== null && summary?.estimated_days_left !== undefined
                                 ? `±${summary.estimated_days_left} hari`
-                                : '—'}
+                                : (!summary?.daily_cost
+                                    ? <span className="text-base font-semibold text-content-muted">Belum ada biaya harian</span>
+                                    : <span className="text-base font-semibold text-content-muted">Belum bisa dihitung</span>)}
                         </p>
                     </div>
                 </div>

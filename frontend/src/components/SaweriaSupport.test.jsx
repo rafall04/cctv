@@ -14,7 +14,9 @@ describe('SaweriaSupport floating layout', () => {
     beforeEach(() => {
         vi.useFakeTimers();
         localStorage.clear();
-        localStorage.setItem('saweria_dont_show', 'true');
+        // Deliberately NOT setting `saweria_dont_show`. It used to be the shortcut into the
+        // banner branch (the other branch auto-opened the modal); the banner is now the only
+        // path, and that key means "suppress the ask entirely", which would hide the banner.
         globalThis.fetch = vi.fn().mockResolvedValue({
             ok: true,
             json: async () => ({ data: { enabled: true } }),
@@ -51,5 +53,30 @@ describe('SaweriaSupport floating layout', () => {
         // page; insets can only ever resolve to viewport-minus-margins.
         expect(banner.className).toContain('right-[6.5rem]');
         expect(banner.className).not.toContain('100vw');
+    });
+
+    /*
+     * The donation modal used to open itself over the page — on scroll past 100px, or after
+     * an 8s fallback for visitors who never scrolled. On a public CCTV page that is an
+     * interstitial nobody asked for, and on a phone it covered the whole viewport.
+     */
+    it('never opens the modal on its own — not on scroll, not on a timer', async () => {
+        render(<SaweriaSupport />);
+
+        await act(async () => {
+            await Promise.resolve();
+            await Promise.resolve();
+        });
+
+        await act(async () => {
+            window.scrollY = 400;
+            window.dispatchEvent(new Event('scroll'));
+            // Well past both old triggers: the 1.5s post-scroll delay and the 8s fallback.
+            vi.advanceTimersByTime(20000);
+            await Promise.resolve();
+        });
+
+        expect(screen.queryByText('Traktir Kopi Dong!')).toBeNull();
+        expect(screen.getByTestId('saweria-floating-banner')).toBeTruthy();
     });
 });

@@ -74,7 +74,14 @@ export default function CameraManagement() {
 
             {!loading && !loadError && cameras.length > 0 && (
                 <div className="rounded-2xl border border-edge bg-white p-4 shadow-sm dark:bg-gray-800/60">
-                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+                    {/*
+                      * Was `xl:grid-cols-6` with the search box spanning 2 — eight slots in six
+                      * columns, so every select was ~1/6 of the row and narrower than its own
+                      * longest option: "Semua Health Mode" rendered as "Semua Health Mo" with the
+                      * native chevron sitting on the clipped text. Four columns fits the same
+                      * eight slots in two clean rows with room for the labels.
+                      */}
+                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                         <input
                             type="text"
                             value={filters.search}
@@ -112,13 +119,13 @@ export default function CameraManagement() {
                             className="rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-sm text-content transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                         >
                             <option value="all">Semua Delivery</option>
-                            <option value="internal_hls">Internal HLS</option>
-                                    <option value="external_hls">External HLS</option>
-                                    <option value="external_flv">External FLV</option>
-                                    <option value="external_mjpeg">External MJPEG</option>
-                            <option value="external_embed">External Embed</option>
-                            <option value="external_jsmpeg">External JSMPEG</option>
-                            <option value="external_custom_ws">External Custom WS</option>
+                            <option value="internal_hls">HLS internal</option>
+                            <option value="external_hls">HLS eksternal</option>
+                            <option value="external_flv">FLV</option>
+                            <option value="external_mjpeg">MJPEG</option>
+                            <option value="external_embed">Embed</option>
+                            <option value="external_jsmpeg">JSMpeg</option>
+                            <option value="external_custom_ws">WebSocket</option>
                         </select>
                         <select
                             value={filters.healthMode}
@@ -127,11 +134,11 @@ export default function CameraManagement() {
                             className="rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-sm text-content transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                         >
                             <option value="all">Semua Health Mode</option>
-                            <option value="default">Default</option>
-                            <option value="passive_first">Passive First</option>
-                            <option value="hybrid_probe">Hybrid Probe</option>
-                            <option value="probe_first">Probe First</option>
-                            <option value="disabled">Disabled</option>
+                            <option value="default">Bawaan</option>
+                            <option value="passive_first">Pasif dulu</option>
+                            <option value="hybrid_probe">Hibrida</option>
+                            <option value="probe_first">Probe dulu</option>
+                            <option value="disabled">Nonaktif</option>
                         </select>
                         <select
                             value={filters.availabilityState}
@@ -141,9 +148,9 @@ export default function CameraManagement() {
                         >
                             <option value="all">Semua Availability</option>
                             <option value="online">Online</option>
-                            <option value="degraded">Degraded</option>
+                            <option value="degraded">Menurun</option>
                             <option value="offline">Offline</option>
-                            <option value="maintenance">Maintenance</option>
+                            <option value="maintenance">Perbaikan</option>
                         </select>
                         <select
                             value={filters.monitoringState}
@@ -151,13 +158,15 @@ export default function CameraManagement() {
                             onChange={(event) => setFilters((current) => ({ ...current, monitoringState: event.target.value }))}
                             className="rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-sm text-content transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                         >
+                            {/* Same vocabulary as MONITORING_LABEL in CameraCard, so the filter
+                                and the badge it filters on read as the same word. */}
                             <option value="all">Semua Monitoring</option>
-                            <option value="passive">Passive</option>
-                            <option value="probe_failed">Probe Failed</option>
-                            <option value="stale">Stale</option>
+                            <option value="passive">Pasif</option>
+                            <option value="probe_failed">Probe gagal</option>
+                            <option value="stale">Basi</option>
                             <option value="offline">Offline</option>
-                            <option value="unresolved">Unresolved</option>
-                            <option value="maintenance">Maintenance</option>
+                            <option value="unresolved">Belum terpetakan</option>
+                            <option value="maintenance">Perbaikan</option>
                         </select>
                     </div>
                     <div className="mt-3 text-xs text-content-muted">

@@ -251,7 +251,7 @@ export default function SponsorPackagePanel({ packages = [], onChanged }) {
                                     disabled={!!editingId}
                                     className={inputClasses()}
                                     placeholder="paket-sukamaju"
-                                    pattern="^[a-z0-9_-]{1,40}$"
+                                    pattern="^[a-z0-9_\-]{1,40}$"
                                     required
                                 />
                                 {editingId && (

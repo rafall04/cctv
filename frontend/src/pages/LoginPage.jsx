@@ -5,6 +5,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useBranding } from '../contexts/BrandingContext';
 import { setPageTitle } from '../utils/pageTitle.js';
+import { ERROR_MESSAGES } from '../hooks/useApiError';
 
 // Icons
 const Icons = {
@@ -78,15 +79,16 @@ const Icons = {
  * @returns {string} Formatted time string
  */
 function formatTime(seconds) {
+    // Indonesian has no plural suffix, which also removes the `second/seconds` branch.
     if (seconds < 60) {
-        return `${seconds} second${seconds !== 1 ? 's' : ''}`;
+        return `${seconds} detik`;
     }
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
     if (remainingSeconds === 0) {
-        return `${minutes} minute${minutes !== 1 ? 's' : ''}`;
+        return `${minutes} menit`;
     }
-    return `${minutes}m ${remainingSeconds}s`;
+    return `${minutes} menit ${remainingSeconds} detik`;
 }
 
 export default function LoginPage() {
@@ -227,7 +229,7 @@ export default function LoginPage() {
                 const destination = result.user?.role === 'customer' ? '/my' : '/admin/dashboard';
 
                 // Show success toast (Requirements: 2.10)
-                showSuccess('Login Successful', 'Welcome back! Redirecting...');
+                showSuccess('Berhasil Masuk', 'Selamat datang kembali! Mengalihkan...');
 
                 // Small delay to show the toast before redirect
                 setTimeout(() => {
@@ -240,10 +242,10 @@ export default function LoginPage() {
         } catch (err) {
             // Network error handling (Requirements: 2.6)
             if (!navigator.onLine || err.message === 'Network Error') {
-                setError('Unable to connect to server. Please check your connection.');
+                setError(ERROR_MESSAGES.NETWORK_ERROR);
             } else {
                 // Server error handling (Requirements: 2.7)
-                setError('Server error occurred. Please try again later.');
+                setError(ERROR_MESSAGES[500]);
             }
             setLoading(false);
         }
@@ -279,15 +281,15 @@ export default function LoginPage() {
         
         // Handle security errors (CSRF, API key issues)
         if (result.isSecurityError) {
-            setError(result.message || 'Security validation failed. Please refresh the page.');
-            setWarning('If this persists, please refresh the page.');
+            setError(result.message || 'Validasi keamanan gagal. Silakan muat ulang halaman.');
+            setWarning('Kalau terus berulang, muat ulang halamannya.');
             return;
         }
         
         // Handle invalid credentials (Requirements: 2.3)
         if (result.message?.toLowerCase().includes('invalid') || 
             result.message?.toLowerCase().includes('credentials')) {
-            setError('Invalid username or password. Please check your credentials.');
+            setError(ERROR_MESSAGES.INVALID_CREDENTIALS);
             return;
         }
         
@@ -457,7 +459,7 @@ export default function LoginPage() {
                                     onChange={handleChange}
                                     onBlur={handleBlur}
                                     className={getFieldClass('username')}
-                                    placeholder="Enter your username"
+                                    placeholder="Masukkan username Anda"
                                     disabled={isSubmitDisabled}
                                     autoComplete="username"
                                     aria-invalid={Boolean(fieldErrors.username)}
@@ -490,7 +492,7 @@ export default function LoginPage() {
                                     onChange={handleChange}
                                     onBlur={handleBlur}
                                     className={getPasswordFieldClass()}
-                                    placeholder="Enter your password"
+                                    placeholder="Masukkan kata sandi Anda"
                                     disabled={isSubmitDisabled}
                                     autoComplete="current-password"
                                     aria-invalid={Boolean(fieldErrors.password)}
@@ -556,14 +558,14 @@ export default function LoginPage() {
                             className="flex items-center justify-center gap-2 text-sm text-content-muted hover:text-primary hover:text-primary transition-colors"
                         >
                             <Icons.ArrowLeft />
-                            <span>Back to public view</span>
+                            <span>Kembali ke tampilan publik</span>
                         </a>
                     </div>
                 </div>
 
                 {/* Footer */}
                 <p className="text-center text-content-subtle text-xs mt-6">
-                    Authorized personnel only. All access is logged.
+                    Khusus petugas berwenang. Semua akses dicatat.
                 </p>
             </div>
         </div>

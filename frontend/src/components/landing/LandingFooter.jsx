@@ -1,4 +1,5 @@
 import { useCameras } from '../../contexts/CameraContext';
+import { Icons } from '../ui/Icons';
 import SponsorStrip from './SponsorStrip.jsx';
 import { buildWhatsappLink } from '../../utils/whatsappLink.js';
 
@@ -95,7 +96,7 @@ export default function Footer({ saweriaEnabled, saweriaLink, branding }) {
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-2 rounded-control bg-amber-500 px-6 py-3 font-semibold text-white transition-colors hover:bg-amber-600"
                         >
-                            <span className="text-xl">Kopi</span>
+                            <Icons.Coffee />
                             <span>Traktir Kopi</span>
                         </a>
                         <p className="max-w-md text-center text-xs text-content-muted">

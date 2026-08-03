@@ -106,7 +106,7 @@ export default function RecordingDashboard() {
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                     <div>
                         <p className="text-sm font-semibold text-primary">Recording Overview</p>
-                        <h1 className="mt-2 text-2xl font-bold text-content">Recording Dashboard</h1>
+                        <h1 className="mt-2 text-2xl font-bold text-content">Dasbor Rekaman</h1>
                         <p className="mt-1 text-sm text-content">
                             Monitor recording aktif, kapasitas segmen, dan auto-restart kamera.
                         </p>

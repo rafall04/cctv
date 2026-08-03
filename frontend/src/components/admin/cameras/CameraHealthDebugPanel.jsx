@@ -92,7 +92,7 @@ export default function CameraHealthDebugPanel({
                 <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
                     <div className="space-y-1">
                         <p className="text-sm font-semibold text-primary">Backend Health Pipeline</p>
-                        <h2 className="text-lg font-bold text-content">Problem-focused diagnostics</h2>
+                        <h2 className="text-lg font-bold text-content">Diagnostik terfokus masalah</h2>
                         <p className="text-sm text-content-muted">
                             Internal state, public availability, probe target, runtime evidence, dan domain backoff.
                         </p>

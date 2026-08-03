@@ -181,7 +181,7 @@ export default function BillingPlansTab({ plans, regSettings, run, busy }) {
                         </h3>
                         <div className="mt-3 space-y-2">
                             {editing === 'new' && (
-                                <input name="key" value={form.key} onChange={handleChange} required pattern="[a-z0-9_-]{2,40}" className={inputClass} placeholder="key unik (mis. premium)" />
+                                <input name="key" value={form.key} onChange={handleChange} required pattern="[a-z0-9_\-]{2,40}" className={inputClass} placeholder="key unik (mis. premium)" />
                             )}
                             <input name="name" value={form.name} onChange={handleChange} required minLength={2} className={inputClass} placeholder="Nama paket" />
                             <input name="description" value={form.description} onChange={handleChange} className={inputClass} placeholder="Deskripsi singkat (opsional)" />

@@ -70,7 +70,7 @@ describe('TelegramSettingsPanel', () => {
         renderPanel();
 
         expect(await screen.findByText('Telegram Bot')).toBeTruthy();
-        expect(screen.getByRole('link', { name: /Buka Notification Diagnostics/i }).getAttribute('href')).toBe('/admin/notification-diagnostics');
+        expect(screen.getByRole('link', { name: /Buka Diagnostik Notifikasi/i }).getAttribute('href')).toBe('/admin/notification-diagnostics');
         expect(screen.getByText('Multi Grup Monitoring')).toBeTruthy();
         expect(screen.getByText('Routing Policy')).toBeTruthy();
         expect(screen.getAllByText('AKTIF').length).toBeGreaterThan(0);

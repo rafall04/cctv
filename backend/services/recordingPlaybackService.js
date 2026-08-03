@@ -484,12 +484,15 @@ class RecordingPlaybackService {
             access
         );
 
-        if (segmentsAscending.length === 0) {
-            const err = new Error('No segments found');
-            err.statusCode = 404;
-            throw err;
-        }
-
+        /*
+         * An empty result is NOT a missing resource. A camera that simply has not recorded
+         * yet is a normal, expected state, and answering 404 made it indistinguishable from
+         * "Camera not found" (also 404) — the frontend had to string-match the message to
+         * tell them apart, and every visit to a fresh camera logged a console error on a
+         * page that was working correctly. Callers that genuinely cannot represent
+         * emptiness (generatePlaylist — an HLS playlist with no segments is meaningless)
+         * raise the 404 themselves.
+         */
         return {
             camera,
             access,
@@ -636,6 +639,14 @@ class RecordingPlaybackService {
 
     generatePlaylist(cameraId, request) {
         const { access, segmentsAscending } = this.getAccessibleSegments(cameraId, request);
+
+        // Unlike the JSON segment list, an HLS playlist cannot express "nothing here" —
+        // a player handed an empty manifest stalls rather than reporting the condition.
+        if (segmentsAscending.length === 0) {
+            const err = new Error('No segments found');
+            err.statusCode = 404;
+            throw err;
+        }
 
         let playlist = '#EXTM3U\n';
         playlist += '#EXT-X-VERSION:3\n';

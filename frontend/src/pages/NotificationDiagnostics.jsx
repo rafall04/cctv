@@ -108,7 +108,7 @@ export default function NotificationDiagnostics() {
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-2xl font-bold text-content">Notification Diagnostics</h1>
+                <h1 className="text-2xl font-bold text-content">Diagnostik Notifikasi</h1>
                 <p className="mt-1 text-sm text-content-muted">
                     Preview routing dan kirim drill Telegram untuk memastikan CCTV masuk ke grup yang tepat.
                 </p>
@@ -219,7 +219,7 @@ export default function NotificationDiagnostics() {
             )}
 
             <section className="rounded-lg border border-edge bg-surface p-4">
-                <h2 className="text-sm font-bold text-content">Recent Diagnostic Runs</h2>
+                <h2 className="text-sm font-bold text-content">Riwayat Diagnostik Terakhir</h2>
                 <div className="mt-3 overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
                         <thead>

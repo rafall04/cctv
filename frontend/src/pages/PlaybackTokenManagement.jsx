@@ -19,7 +19,7 @@ export default function PlaybackTokenManagement() {
     return (
         <div className="space-y-6 py-6">
             <div>
-                <h1 className="text-2xl font-bold text-content">Playback Tokens</h1>
+                <h1 className="text-2xl font-bold text-content">Token Putar Ulang</h1>
                 <p className="mt-1 text-sm text-content-muted">
                     Buat token playback publik dengan scope kamera, masa berlaku, policy device, dan template share.
                 </p>

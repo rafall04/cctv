@@ -27,6 +27,37 @@ export const PUBLIC_LANDING_INTERNAL_FIELDS = [
     'area_external_health_mode_override',
 ];
 
+/*
+ * Origin URLs of proxied external streams.
+ *
+ * `external_use_proxy = 1` means every viewer is supposed to reach the feed through the
+ * backend `/hls` proxy — that is what enforces access control, hides the third party from
+ * our traffic, and lets us keep serving when the origin blocks a hotlink. Publishing the
+ * origin `.m3u8` in GET /api/cameras/active handed anyone who opened the endpoint a way
+ * straight past all of it.
+ *
+ * Only stripped when the client provably does not need the URL:
+ *   - `delivery_type` is exactly 'external_hls' — the one type the HLS proxy serves, and an
+ *     explicit value, so frontend getEffectiveDeliveryType() short-circuits on it instead of
+ *     falling back to inferring the type FROM these URLs.
+ *   - the proxy is on. With `external_use_proxy = 0` the player streams direct and
+ *     resolveStreamUrl() genuinely needs the raw URL.
+ * The "Buka Sumber Resmi" link only renders in the fallback for formats the internal player
+ * cannot play, which by definition excludes this case.
+ */
+function shouldHideOriginUrls(camera) {
+    const proxied = camera.external_use_proxy === 1 || camera.external_use_proxy === true;
+    return camera.stream_source === 'external'
+        && camera.delivery_type === 'external_hls'
+        && proxied;
+}
+
+export const PROXIED_ORIGIN_URL_FIELDS = [
+    'external_stream_url',
+    'external_hls_url',
+    'external_snapshot_url',
+];
+
 export function stripInternalLandingFields(camera) {
     if (!camera || typeof camera !== 'object') {
         return camera;
@@ -35,6 +66,11 @@ export function stripInternalLandingFields(camera) {
     const publicCamera = { ...camera };
     for (const field of PUBLIC_LANDING_INTERNAL_FIELDS) {
         delete publicCamera[field];
+    }
+    if (shouldHideOriginUrls(publicCamera)) {
+        for (const field of PROXIED_ORIGIN_URL_FIELDS) {
+            delete publicCamera[field];
+        }
     }
     return publicCamera;
 }

@@ -118,7 +118,7 @@ describe('RecordingDashboard', () => {
     it('merender header overview dan pill update dengan tone dark-mode yang eksplisit', () => {
         render(<RecordingDashboard />);
 
-        expect(screen.getByText('Recording Dashboard')).toBeTruthy();
+        expect(screen.getByText('Dasbor Rekaman')).toBeTruthy();
         expect(screen.getByText(/Monitor recording aktif/i).className).toMatch(/text-content/);
         expect(screen.getByText(/Update terakhir:/i).className).toMatch(/text-content-muted/);
         expect(screen.getByRole('button', { name: /Refresh/i }).className).toMatch(/text-content/);

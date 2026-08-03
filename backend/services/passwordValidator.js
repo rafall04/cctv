@@ -59,46 +59,48 @@ export function validatePassword(password, username = '') {
     const errors = [];
     
     // Check if password is provided
+    // Indonesian: these strings are shown verbatim to the user on the public /daftar
+    // form and in the admin password-change flow, both of which are Indonesian.
     if (!password || typeof password !== 'string') {
-        return { valid: false, errors: ['Password is required'] };
+        return { valid: false, errors: ['Kata sandi wajib diisi'] };
     }
-    
+
     // Check minimum length (Requirement 6.1)
     if (password.length < PASSWORD_POLICY.minLength) {
-        errors.push(`Password must be at least ${PASSWORD_POLICY.minLength} characters`);
+        errors.push(`Kata sandi minimal ${PASSWORD_POLICY.minLength} karakter`);
     }
-    
+
     // Check for uppercase letter (Requirement 6.2)
     if (PASSWORD_POLICY.requireUppercase && !/[A-Z]/.test(password)) {
-        errors.push('Password must contain at least one uppercase letter');
+        errors.push('Kata sandi harus memuat minimal satu huruf besar');
     }
-    
+
     // Check for lowercase letter (Requirement 6.2)
     if (PASSWORD_POLICY.requireLowercase && !/[a-z]/.test(password)) {
-        errors.push('Password must contain at least one lowercase letter');
+        errors.push('Kata sandi harus memuat minimal satu huruf kecil');
     }
-    
+
     // Check for number (Requirement 6.2)
     if (PASSWORD_POLICY.requireNumbers && !/[0-9]/.test(password)) {
-        errors.push('Password must contain at least one number');
+        errors.push('Kata sandi harus memuat minimal satu angka');
     }
-    
+
     // Check for special character (Requirement 6.2)
     if (PASSWORD_POLICY.requireSpecial) {
         const specialCharRegex = /[!@#$%^&*()_+\-=\[\]{}|;:'",.<>?/`~]/;
         if (!specialCharRegex.test(password)) {
-            errors.push('Password must contain at least one special character (!@#$%^&*()_+-=[]{}|;:\'",.<>?/`~)');
+            errors.push('Kata sandi harus memuat minimal satu karakter spesial (!@#$%^&*()_+-=[]{}|;:\'",.<>?/`~)');
         }
     }
-    
+
     // Check against common passwords (Requirement 6.3)
     if (isCommonPassword(password)) {
-        errors.push('Password is too common. Please choose a more unique password');
+        errors.push('Kata sandi terlalu umum. Pilih kata sandi yang lebih unik');
     }
-    
+
     // Check if password contains username (Requirement 6.4)
     if (username && containsUsername(password, username)) {
-        errors.push('Password cannot contain your username');
+        errors.push('Kata sandi tidak boleh memuat username Anda');
     }
     
     return {
@@ -210,29 +212,31 @@ export function getPasswordStrength(password) {
  * @returns {string[]} List of requirements
  */
 export function getPasswordRequirements() {
+    // Indonesian: this list is rendered verbatim on the PUBLIC /daftar form, where an
+    // English policy block sat in the middle of an otherwise Indonesian page.
     const requirements = [];
-    
-    requirements.push(`At least ${PASSWORD_POLICY.minLength} characters`);
-    
+
+    requirements.push(`Minimal ${PASSWORD_POLICY.minLength} karakter`);
+
     if (PASSWORD_POLICY.requireUppercase) {
-        requirements.push('At least one uppercase letter (A-Z)');
+        requirements.push('Ada huruf besar (A-Z)');
     }
-    
+
     if (PASSWORD_POLICY.requireLowercase) {
-        requirements.push('At least one lowercase letter (a-z)');
+        requirements.push('Ada huruf kecil (a-z)');
     }
-    
+
     if (PASSWORD_POLICY.requireNumbers) {
-        requirements.push('At least one number (0-9)');
+        requirements.push('Ada angka (0-9)');
     }
-    
+
     if (PASSWORD_POLICY.requireSpecial) {
-        requirements.push('At least one special character (!@#$%^&*...)');
+        requirements.push('Ada karakter spesial (!@#$%^&*...)');
     }
-    
-    requirements.push('Cannot be a commonly used password');
-    requirements.push('Cannot contain your username');
-    
+
+    requirements.push('Bukan kata sandi yang umum dipakai');
+    requirements.push('Tidak boleh memuat username Anda');
+
     return requirements;
 }
 

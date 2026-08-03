@@ -333,7 +333,7 @@ export default function TelegramSettingsPanel() {
                                     to="/admin/notification-diagnostics"
                                     className="inline-flex items-center rounded-xl border border-edge-strong px-3 py-2 text-sm font-semibold text-content hover:bg-surface-sunken"
                                 >
-                                    Buka Notification Diagnostics
+                                    Buka Diagnostik Notifikasi
                                 </Link>
                                 <button
                                     onClick={() => setIsEditing(true)}

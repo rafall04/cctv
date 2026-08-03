@@ -159,7 +159,7 @@ describe('PlaybackAnalytics', () => {
         render(<PlaybackAnalytics />);
 
         await waitFor(() => {
-            expect(screen.getByText('Playback Analytics')).toBeTruthy();
+            expect(screen.getByText('Analitik Putar Ulang')).toBeTruthy();
         });
 
         expect(getPlaybackViewerAnalyticsMock).toHaveBeenCalledWith('7days', {}, expect.anything());
@@ -179,7 +179,7 @@ describe('PlaybackAnalytics', () => {
     it('memuat tab history dari endpoint playback history terpisah', async () => {
         render(<PlaybackAnalytics />);
 
-        await screen.findByText('Playback Analytics');
+        await screen.findByText('Analitik Putar Ulang');
         fireEvent.click(screen.getByRole('button', { name: 'History' }));
 
         await waitFor(() => {
@@ -196,7 +196,7 @@ describe('PlaybackAnalytics', () => {
     it('tetap menampilkan playback history page 2 setelah pagination diklik', async () => {
         render(<PlaybackAnalytics />);
 
-        await screen.findByText('Playback Analytics');
+        await screen.findByText('Analitik Putar Ulang');
         fireEvent.click(screen.getByRole('button', { name: 'History' }));
 
         await screen.findByText('Riwayat Playback');

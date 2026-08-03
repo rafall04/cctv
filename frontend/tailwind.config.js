@@ -97,9 +97,17 @@ export default {
                 dock: '30',        // mobile bottom dock
                 scrim: '40',       // dim layer behind the shell drawer
                 shell: '50',       // app shell: sidebar, mobile top bar, net banner
-                modal: '60',       // dialogs — deliberately ABOVE the shell
-                toast: '70',       // transient feedback outranks everything local
                 'map-chrome': '1100', // floating chrome over Leaflet (its controls: 1000)
+                // `fab` and above have to clear Leaflet's 1000 AND map-chrome, because a
+                // floating widget or a dialog may be open while a map is on screen.
+                fab: '1200',       // floating widgets: feedback bubble, donation banner, PWA prompt
+                // modal was 60 and toast was 70. That put every dialog UNDER the floating
+                // widgets, which had escalated to raw z-[99997..99999] on their own: opening
+                // the landing stats drill-down left the donation banner and feedback bubble
+                // punching through it, and a tap meant for the dialog hit "Traktir Kopi".
+                // Dialogs must outrank chrome, so they now sit above the fab tier.
+                modal: '1300',     // dialogs — above the shell, the map, and every floating widget
+                toast: '1400',     // transient feedback outranks everything local
                 popup: '1000000',  // full-screen video popup
                 dialog: '1000010', // confirm/alert — the last word, over the popup
             },

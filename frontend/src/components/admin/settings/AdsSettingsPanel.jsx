@@ -324,7 +324,7 @@ export default function AdsSettingsPanel() {
               * card wrapping cards just costs another 24px of gutter on a phone. */}
             <form onSubmit={handleSubmit} className="space-y-4">
                 <SectionCard
-                    title="Master Controls"
+                    title="Kendali Utama"
                     description="Kontrol global untuk mengaktifkan iklan dan target device."
                 >
                     <CheckboxField
@@ -368,7 +368,7 @@ export default function AdsSettingsPanel() {
                 </SectionCard>
 
                 <SectionCard
-                    title="Popup Layout Policy"
+                    title="Kebijakan Tata Letak Popup"
                     description="Atur perilaku iklan saat popup video dibuka agar player tetap menjadi fokus utama."
                 >
                     <CheckboxField

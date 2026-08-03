@@ -208,6 +208,50 @@ describe('recordingPlaybackService', () => {
         expect(queryMock.mock.calls[0][0]).toContain('LIMIT ?');
     });
 
+    /*
+     * REGRESSION: an empty segment list is a normal state, not a missing resource.
+     *
+     * getAccessibleSegments used to throw 404 "No segments found" whenever a camera had
+     * nothing recorded yet, which is what every fresh camera looks like. That made the
+     * condition indistinguishable from 404 "Camera not found" without string-matching the
+     * message, and printed a red console error on /playback and /admin/playback while both
+     * pages were working correctly. generatePlaylist keeps its 404 — an HLS manifest with no
+     * segments cannot express "nothing here" and would just stall the player.
+     */
+    it('returns an empty segment list with a policy instead of throwing 404', () => {
+        queryOneMock
+            .mockReturnValueOnce({
+                id: 9,
+                name: 'CCTV TAMAN',
+                public_playback_mode: 'inherit',
+                public_playback_preview_minutes: null,
+            })
+            .mockReturnValueOnce({ value: '628111111111' });
+        queryMock.mockReturnValueOnce([]);
+
+        const result = recordingPlaybackService.getSegments(9, { query: {} });
+
+        expect(result.segments).toEqual([]);
+        expect(result.total_segments).toBe(0);
+        expect(result.camera_id).toBe(9);
+        expect(result.playback_policy).toEqual(expect.objectContaining({ segmentCount: 0 }));
+    });
+
+    it('still 404s the HLS playlist when there is nothing to put in it', () => {
+        queryOneMock
+            .mockReturnValueOnce({
+                id: 9,
+                name: 'CCTV TAMAN',
+                public_playback_mode: 'inherit',
+                public_playback_preview_minutes: null,
+            })
+            .mockReturnValueOnce({ value: '628111111111' });
+        queryMock.mockReturnValueOnce([]);
+
+        expect(() => recordingPlaybackService.generatePlaylist(9, { query: {} }))
+            .toThrowError(expect.objectContaining({ statusCode: 404 }));
+    });
+
     it('strips file_path from segment rows before returning them to a client', () => {
         // The repository SELECT still includes file_path because the
         // server-side streaming path needs it, but exposing the absolute

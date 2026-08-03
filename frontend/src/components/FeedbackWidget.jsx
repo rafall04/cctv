@@ -86,7 +86,7 @@ export default function FeedbackWidget() {
             {/* Floating Button */}
             <button
                 onClick={() => setIsOpen(true)}
-                className={`fixed bottom-24 right-4 z-[99999] p-4 rounded-full shadow-e2 transition-colors sm:bottom-6 sm:right-6 ${
+                className={`fixed bottom-24 right-4 z-fab p-4 rounded-full shadow-e2 transition-colors sm:bottom-6 sm:right-6 ${
                     isOpen ? 'scale-0 opacity-0' : 'scale-100 opacity-100'
                 } bg-primary text-white hover:opacity-90`}
                 title="Kritik & Saran"
@@ -103,7 +103,7 @@ export default function FeedbackWidget() {
                  * initial containing block, which is exactly what grows once a page starts
                  * overflowing. `left-4 right-4` can only ever be viewport minus its margins.
                  */
-                className={`fixed bottom-24 left-4 right-4 z-[99999] transition-all duration-300 sm:bottom-6 sm:left-auto sm:right-6 sm:w-96 ${
+                className={`fixed bottom-24 left-4 right-4 z-fab transition-all duration-300 sm:bottom-6 sm:left-auto sm:right-6 sm:w-96 ${
                     isOpen ? 'scale-100 opacity-100' : 'scale-0 opacity-0 pointer-events-none'
                 }`}
             >

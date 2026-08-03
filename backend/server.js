@@ -358,10 +358,13 @@ fastify.get('/health', async (request, reply) => {
         timestamp: now.toISOString(),
         timestampLocal: localTime.toISOString().replace('Z', `+0${offset}:00`),
         timezone: `${timezone} (${timezoneName}, UTC+${offset})`,
+        // Report what is ACTUALLY configured: these were hardcoded `true`, so the probe an
+        // operator trusts to confirm the security posture kept saying "fine" with rate
+        // limiting and CSRF switched off.
         security: {
-            rateLimiting: true,
+            rateLimiting: config.security?.rateLimitEnabled !== false,
             apiKeyValidation: config.security?.apiKeyValidationEnabled !== false,
-            csrfProtection: true,
+            csrfProtection: config.security?.csrfEnabled !== false,
             securityHeaders: true
         }
     };

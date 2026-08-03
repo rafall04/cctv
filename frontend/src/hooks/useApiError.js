@@ -12,32 +12,34 @@ import { useCallback } from 'react';
 /**
  * Error message mapping for HTTP status codes and error types
  */
+// Indonesian: every string here is rendered straight to the user, on public pages
+// (login, registration) as well as the admin panel — both are Indonesian everywhere else.
 export const ERROR_MESSAGES = {
     // Network errors
-    NETWORK_ERROR: 'Unable to connect to server. Please check your connection.',
-    TIMEOUT_ERROR: 'Request timed out. Please try again.',
-    
+    NETWORK_ERROR: 'Tidak bisa terhubung ke server. Periksa koneksi Anda.',
+    TIMEOUT_ERROR: 'Permintaan melebihi batas waktu. Coba lagi.',
+
     // Auth errors
-    INVALID_CREDENTIALS: 'Invalid username or password. Please check your credentials.',
-    SESSION_EXPIRED: 'Your session has expired. Please log in again.',
-    ACCOUNT_LOCKED: 'Account temporarily locked. Try again in {time}.',
-    RATE_LIMITED: 'Too many attempts. Please wait {time} before trying again.',
-    
+    INVALID_CREDENTIALS: 'Username atau kata sandi salah. Periksa kembali data Anda.',
+    SESSION_EXPIRED: 'Sesi Anda sudah berakhir. Silakan masuk lagi.',
+    ACCOUNT_LOCKED: 'Akun dikunci sementara. Coba lagi dalam {time}.',
+    RATE_LIMITED: 'Terlalu banyak percobaan. Tunggu {time} sebelum mencoba lagi.',
+
     // HTTP status errors
-    400: 'Invalid request. Please check your input.',
-    401: 'Your session has expired. Please log in again.',
-    403: "You don't have permission to perform this action.",
-    404: 'The requested resource was not found.',
-    409: 'A conflict occurred. The resource may already exist.',
-    422: 'Invalid data provided. Please check your input.',
-    429: 'Too many requests. Please wait before trying again.',
-    500: 'Server error occurred. Please try again later.',
-    502: 'Server is temporarily unavailable. Please try again later.',
-    503: 'Service unavailable. Please try again later.',
-    504: 'Request timed out. Please try again.',
+    400: 'Permintaan tidak valid. Periksa isian Anda.',
+    401: 'Sesi Anda sudah berakhir. Silakan masuk lagi.',
+    403: 'Anda tidak punya izin untuk tindakan ini.',
+    404: 'Data yang diminta tidak ditemukan.',
+    409: 'Terjadi konflik. Data mungkin sudah ada.',
+    422: 'Data yang dikirim tidak valid. Periksa isian Anda.',
+    429: 'Terlalu banyak permintaan. Tunggu sebentar sebelum mencoba lagi.',
+    500: 'Terjadi kesalahan di server. Coba lagi nanti.',
+    502: 'Server sedang tidak tersedia. Coba lagi nanti.',
+    503: 'Layanan sedang tidak tersedia. Coba lagi nanti.',
+    504: 'Permintaan melebihi batas waktu. Coba lagi.',
     
     // Default
-    DEFAULT: 'An unexpected error occurred. Please try again.',
+    DEFAULT: 'Terjadi kesalahan yang tidak terduga. Coba lagi.',
 };
 
 /**

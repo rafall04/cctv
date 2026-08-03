@@ -67,46 +67,29 @@ const SaweriaSupport = memo(function SaweriaSupport() {
         return () => { isMounted = false; };
     }, []);
 
-    // Show logic after ready
+    /*
+     * Show the corner banner — never seize the screen.
+     *
+     * This used to open the full-screen modal at `scrollY > 100` (+1.5s), with an 8s
+     * fallback for people who did not scroll at all, so ANY first-time visitor to a public
+     * CCTV page got a donation interstitial dropped over the thing they came to look at,
+     * without ever asking for it. On a phone it covered the whole viewport.
+     *
+     * The banner carries the same ask, is dismissible, minimises, and stays out of the way.
+     * The modal is still available with its fuller copy and its "Jangan Tampilkan Lagi"
+     * option — but now only when the visitor opens it themselves, from the banner header.
+     */
     useEffect(() => {
-        if (!isReady) return;
+        if (!isReady) return undefined;
+        // "Jangan Tampilkan Lagi" now means what it says: it suppresses the ask entirely.
+        // It used to hide only the modal and then show the banner anyway.
+        if (localStorage.getItem(STORAGE_KEY) === 'true') return undefined;
 
-        const dontShow = localStorage.getItem(STORAGE_KEY);
-
-        if (dontShow === 'true') {
-            // Show banner after delay
-            const timer = setTimeout(() => {
-                setShowBanner(true);
-                setBannerMinimized(localStorage.getItem(BANNER_MINIMIZED_KEY) === 'true');
-            }, 3000);
-            return () => clearTimeout(timer);
-        }
-
-        // Show modal after scroll or timeout
-        let hasScrolled = false;
-
-        const handleScroll = () => {
-            if (!hasScrolled && window.scrollY > 100) {
-                hasScrolled = true;
-                const timer = setTimeout(() => setShowModal(true), 1500);
-                window.removeEventListener('scroll', handleScroll);
-                return () => clearTimeout(timer);
-            }
-        };
-
-        const fallbackTimer = setTimeout(() => {
-            if (!hasScrolled) {
-                setShowModal(true);
-            }
-            window.removeEventListener('scroll', handleScroll);
-        }, 8000);
-
-        window.addEventListener('scroll', handleScroll, { passive: true });
-
-        return () => {
-            clearTimeout(fallbackTimer);
-            window.removeEventListener('scroll', handleScroll);
-        };
+        const timer = setTimeout(() => {
+            setShowBanner(true);
+            setBannerMinimized(localStorage.getItem(BANNER_MINIMIZED_KEY) === 'true');
+        }, 3000);
+        return () => clearTimeout(timer);
     }, [isReady]);
 
     const handleModalClose = () => {
@@ -117,7 +100,7 @@ const SaweriaSupport = memo(function SaweriaSupport() {
     const handleModalDontShow = () => {
         setShowModal(false);
         localStorage.setItem(STORAGE_KEY, 'true');
-        setTimeout(() => setShowBanner(true), 2000);
+        setShowBanner(false);
     };
 
     const handleSupport = () => {
@@ -145,7 +128,7 @@ const SaweriaSupport = memo(function SaweriaSupport() {
         <>
             {/* Modal - Simplified, no animations */}
             {showModal && (
-                <div className="fixed inset-0 z-[999999] flex items-center justify-center p-4 bg-black/70">
+                <div className="fixed inset-0 z-modal flex items-center justify-center p-4 bg-black/70">
                     <div className="absolute inset-0" onClick={handleModalClose} />
 
                     <div className="relative bg-surface border border-edge rounded-card shadow-e2 max-w-sm w-full max-h-[90vh] overflow-y-auto">
@@ -195,7 +178,7 @@ const SaweriaSupport = memo(function SaweriaSupport() {
                     data-testid="saweria-floating-banner"
                     // Same rule as FeedbackWidget: a fixed element must never be sized with
                     // `100vw`, because it escapes the root overflow guard and can widen the page.
-                    className={`fixed bottom-24 left-4 z-[99998] sm:bottom-24 sm:left-auto sm:right-6 ${bannerMinimized ? 'w-14' : 'right-[6.5rem] max-w-52 sm:right-6 sm:w-64 sm:max-w-none'}`}
+                    className={`fixed bottom-24 left-4 z-fab sm:bottom-24 sm:left-auto sm:right-6 ${bannerMinimized ? 'w-14' : 'right-[6.5rem] max-w-52 sm:right-6 sm:w-64 sm:max-w-none'}`}
                 >
                     {bannerMinimized ? (
                         <button
@@ -207,10 +190,16 @@ const SaweriaSupport = memo(function SaweriaSupport() {
                     ) : (
                         <div className="bg-surface rounded-card shadow-e2 overflow-hidden border border-edge">
                             <div className="bg-amber-500 p-3 flex items-center justify-between">
-                                <div className="flex items-center gap-2">
+                                {/* The only way the modal opens now: the visitor asks for it. */}
+                                <button
+                                    type="button"
+                                    onClick={() => setShowModal(true)}
+                                    className="flex items-center gap-2 text-left"
+                                    aria-label="Selengkapnya tentang dukungan"
+                                >
                                     <CoffeeIcon />
                                     <span className="text-white font-bold text-sm">Dukung Kami</span>
-                                </div>
+                                </button>
                                 <div className="flex gap-1">
                                     <button onClick={handleBannerMinimize} className="w-6 h-6 rounded bg-white/20 text-white flex items-center justify-center">
                                         <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>

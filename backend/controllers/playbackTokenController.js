@@ -303,6 +303,22 @@ export async function activatePlaybackToken(request, reply) {
 export async function heartbeatPlaybackToken(request, reply) {
     try {
         const cameraId = request.body?.camera_id || request.query?.cameraId || 0;
+
+        /*
+         * The playback page calls this once on mount to ask "does this browser already
+         * hold a token?". For a visitor who never had one there is nothing to
+         * authenticate, so "no" is a valid ANSWER, not a failure — answering 401 made
+         * every anonymous visit print a red console error on a page that was working
+         * perfectly, because a browser logs a failed response regardless of the JS
+         * `catch` around it.
+         *
+         * A cookie that IS present but no longer validates stays 401: that genuinely is
+         * an expired session, and the periodic heartbeat relies on it to clear the UI.
+         */
+        if (!request.cookies?.[PLAYBACK_TOKEN_COOKIE]) {
+            return reply.send({ success: true, data: null });
+        }
+
         const data = playbackTokenService.validateRequestForCamera(request, cameraId || 0, {
             touch: false,
             requireSession: false,

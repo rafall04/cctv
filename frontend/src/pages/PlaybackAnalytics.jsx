@@ -364,7 +364,7 @@ export default function PlaybackAnalytics() {
             />
 
             <AnalyticsWorkspaceHeader
-                title="Playback Analytics"
+                title="Analitik Putar Ulang"
                 description="Pantau siapa yang menonton playback publik dan admin secara terpisah dari live."
                 lastUpdate={lastUpdate}
                 filters={(

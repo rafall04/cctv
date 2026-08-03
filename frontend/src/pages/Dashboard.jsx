@@ -9,7 +9,7 @@ SideEffects: Fetches dashboard stats through useDashboardData.
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Alert } from '../components/ui/Alert';
-import { Button, Card, PageHeader } from '../components/ui';
+import { Button, PageHeader } from '../components/ui';
 import { QuickStatsCards } from '../components/QuickStatsCards';
 import { DateRangeSelector } from '../components/DateRangeSelector';
 import { DashboardInitialSkeleton } from '../components/admin/dashboard/DashboardSkeletons';
@@ -77,26 +77,6 @@ function DashboardErrorState({ error, isRetrying, onRetry }) {
                 {isRetrying ? 'Mencoba lagi…' : 'Coba lagi'}
             </Button>
         </div>
-    );
-}
-
-function MediaServerWarning() {
-    return (
-        <Card className="border-status-fault/30 bg-status-fault/10">
-            <div className="flex items-start gap-3">
-                <span className="mt-0.5 shrink-0 text-status-fault">
-                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden="true">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                    </svg>
-                </span>
-                <div className="min-w-0">
-                    <h2 className="text-sm font-semibold text-status-fault">MediaMTX offline</h2>
-                    <p className="mt-1 text-sm text-content-muted">
-                        Server media tidak merespons. Status transport stream akan terbatas sampai koneksi pulih.
-                    </p>
-                </div>
-            </div>
-        </Card>
     );
 }
 
@@ -175,8 +155,14 @@ export default function Dashboard() {
                 />
             )}
 
-            {stats && !stats.mtxConnected && <MediaServerWarning />}
-
+            {/*
+              * The standalone MediaMTX banner that used to sit here said exactly what the
+              * "Media server offline" entry in DashboardAttentionItems (right below) already
+              * says. With the Stream Aktif empty state and the Status Sistem readout, one
+              * fact was being announced four times, and on a phone that filled the first
+              * third of the screen. The attention list is where conditions belong — it
+              * groups this with "N kamera offline" instead of shouting it separately.
+              */}
             {/*
               * The old header carried three buttons — Tambah Kamera, Analytics, Settings — that all
               * just navigated to destinations already in the sidebar AND the mobile dock. Refresh is

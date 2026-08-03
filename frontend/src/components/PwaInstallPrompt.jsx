@@ -139,7 +139,7 @@ export default function PwaInstallPrompt({ delayMs = DEFAULT_DELAY_MS }) {
     return (
         <div
             data-testid="pwa-install-prompt"
-            className={`fixed left-4 right-4 z-[99997] rounded-2xl border border-sky-200 bg-white p-4 shadow-2xl dark:border-sky-500/20 dark:bg-gray-900 sm:left-auto sm:right-6 sm:max-w-sm ${config.className}`}
+            className={`fixed left-4 right-4 z-fab rounded-2xl border border-sky-200 bg-white p-4 shadow-2xl dark:border-sky-500/20 dark:bg-gray-900 sm:left-auto sm:right-6 sm:max-w-sm ${config.className}`}
         >
             <div className="flex items-start gap-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-sky-600 dark:bg-sky-500/10 dark:text-sky-300">
