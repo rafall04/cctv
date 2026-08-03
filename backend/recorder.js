@@ -173,11 +173,21 @@ async function shutdown(signal) {
         console.error('[Recorder] Detach error:', error?.message || error);
     }
 
+    // Separate blocks on purpose. Sharing one meant a throw from the scheduler skipped the
+    // DB close entirely — the later step silently paying for the earlier one's failure.
+    // Nothing is lost when that happens (process.exit hands the fds back and SQLite
+    // recovers the WAL on next open), but the WAL goes uncheckpointed and the failure that
+    // caused it is the one thing you would want reported cleanly.
     try {
         recordingScheduler.stop();
+    } catch (error) {
+        console.error('[Recorder] Scheduler stop error:', error?.message || error);
+    }
+
+    try {
         closeDbConnections();
     } catch (error) {
-        console.error('[Recorder] Cleanup error:', error?.message || error);
+        console.error('[Recorder] Database cleanup error:', error?.message || error);
     }
 
     process.exit(0);

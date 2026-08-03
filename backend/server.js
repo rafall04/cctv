@@ -660,18 +660,25 @@ const shutdown = async () => {
     console.log('\n[Server] Shutting down gracefully...');
     
     try {
-        // Stop all background services
+        // Each stopper guarded individually: unprotected, ONE of these throwing jumped
+        // straight to the outer catch and exit(1), skipping every later stage — MediaMTX
+        // cleanup, the session closes, the database close, fastify.close(). One misbehaving
+        // stopper must not turn a graceful shutdown into an abrupt one.
         console.log('[Shutdown] Stopping background services...');
-        mediaMtxService.stopAutoSync();
-        streamWarmer.stopAll();
-        cameraHealthService.stop();
-        viewerSessionService.stopCleanup();
-        playbackViewerSessionService.stopCleanup();
-        thumbnailService.stop();
-        billingService.stopBillingScheduler();
-        telegramBotService.stop();
-        stopDailyCleanup();
-        stopOperationalRetention();
+        for (const [name, stop] of Object.entries({
+            mediaMtxAutoSync: () => mediaMtxService.stopAutoSync(),
+            streamWarmer: () => streamWarmer.stopAll(),
+            cameraHealth: () => cameraHealthService.stop(),
+            viewerSessions: () => viewerSessionService.stopCleanup(),
+            playbackViewerSessions: () => playbackViewerSessionService.stopCleanup(),
+            thumbnails: () => thumbnailService.stop(),
+            billingScheduler: () => billingService.stopBillingScheduler(),
+            telegramBot: () => telegramBotService.stop(),
+            securityLogCleanup: stopDailyCleanup,
+            operationalRetention: stopOperationalRetention,
+        })) {
+            try { stop(); } catch (e) { console.error(`[Shutdown] Failed to stop ${name}:`, e?.message || e); }
+        }
 
         // Cleanup MediaMTX paths to prevent zombie connections
         console.log('[Shutdown] Cleaning up MediaMTX paths...');

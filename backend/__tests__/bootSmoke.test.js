@@ -131,6 +131,23 @@ async function waitFor(predicate, out, timeoutMs) {
     return false;
 }
 
+/**
+ * Send SIGTERM and wait for the process to actually leave.
+ *
+ * Shutdown had no coverage at all, which is where a whole class of bug lives: every stage
+ * of it is a best-effort cleanup, so one stage throwing can silently skip the ones after
+ * it — including closing the database. Booting a process and then killing it with SIGKILL
+ * (as this file used to) proves nothing about that path.
+ */
+async function terminate(child, out, timeoutMs = 20_000) {
+    child.kill('SIGTERM');
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline && !out.exited) {
+        await new Promise((r) => setTimeout(r, 100));
+    }
+    return out.exited;
+}
+
 function report(label, out) {
     return [
         `${label} did not stay up.`,
@@ -211,4 +228,71 @@ describe('boot smoke', () => {
         // With every camera disabled it must not have started any recorder.
         expect(out.stdout).toContain('Auto-start complete: 0 started');
     }, READY_TIMEOUT_MS + STAY_ALIVE_MS + 30_000);
+});
+
+/*
+ * SHUTDOWN SMOKE — the other half nothing covered.
+ *
+ * Every shutdown stage is a best-effort cleanup, so an unguarded throw in an early stage
+ * silently skips the ones after it, database close included. Booting a process and then
+ * SIGKILLing it (which is all this file used to do) proves nothing about that path.
+ *
+ * POSIX only, and skipped rather than weakened on Windows: `child.kill('SIGTERM')` there
+ * maps to TerminateProcess, so the child never runs its handler at all — it exits with
+ * code=null signal=SIGTERM no matter how correct the shutdown code is. Asserting anything
+ * about shutdown on Windows would be asserting on the OS, not on this project. CI runs
+ * ubuntu-latest and production is Ubuntu, so this does run where it counts.
+ */
+const describeShutdown = process.platform === 'win32' ? describe.skip : describe;
+
+describeShutdown('shutdown smoke (POSIX only)', () => {
+    it('server.js closes its database and exits 0 on SIGTERM', async () => {
+        const { dir, dbPath } = makeThrowawayDb();
+        const port = await freePort();
+        const { child, out } = launch('server.js', baseEnv(dbPath, {
+            PORT: String(port),
+            HOST: '127.0.0.1',
+            RECORDING_WORKER_ENABLED: 'false',
+        }));
+        spawned.push({ child, dir });
+
+        const booted = await waitFor(
+            async () => out.stdout.includes(SERVER_BOOT_COMPLETE),
+            out,
+            READY_TIMEOUT_MS
+        );
+        expect(booted, report('server.js never finished booting', out)).toBe(true);
+
+        const exited = await terminate(child, out);
+        expect(exited, report('server.js did not exit on SIGTERM', out)).not.toBeNull();
+        expect(exited.code, report('server.js exited non-zero on SIGTERM', out)).toBe(0);
+        expect(out.stdout, report('server.js did not close its database', out))
+            .toContain('[Shutdown] Database connections closed');
+        expect(out.stdout, report('server.js did not finish shutting down', out))
+            .toContain('Graceful shutdown completed');
+    }, READY_TIMEOUT_MS + 60_000);
+
+    it('recorder.js detaches its recorders AND closes its database on SIGTERM', async () => {
+        const { dir, dbPath } = makeThrowawayDb();
+        const { child, out } = launch('recorder.js', baseEnv(dbPath));
+        spawned.push({ child, dir });
+
+        const ready = await waitFor(
+            async () => out.stdout.includes(RECORDER_BOOT_COMPLETE),
+            out,
+            READY_TIMEOUT_MS
+        );
+        expect(ready, report('recorder.js readiness', out)).toBe(true);
+
+        const exited = await terminate(child, out);
+
+        expect(exited, report('recorder.js did not exit on SIGTERM', out)).not.toBeNull();
+        expect(exited.code, report('recorder.js exited non-zero on SIGTERM', out)).toBe(0);
+        // Detach must happen (ffmpeg survives the restart) AND the DB must still close after
+        // it — those were one try block, so a throw in the first took the second with it.
+        expect(out.stdout, report('recorder.js did not detach its recorders', out))
+            .toContain('[Recorder] Detached');
+        expect(out.stdout, report('recorder.js did not close its database', out))
+            .toContain('[ConnectionPool] All connections closed');
+    }, READY_TIMEOUT_MS + 60_000);
 });

@@ -8,6 +8,11 @@ describe('cameraRuntimeStateService', () => {
     });
 
     it('creates a seeded runtime row when state does not exist', () => {
+        // hasRuntimeTable() memoizes into the singleton, so whether it consumes a queryOne
+        // call depends on which test ran first. Without this reset the mock sequence below
+        // means something different in a full-suite run than it does in a focused one —
+        // which is exactly how this passed alone and failed in the suite.
+        cameraRuntimeStateService.tableSupport = null;
         const queryOneSpy = vi.spyOn(connectionPool, 'queryOne');
         const executeSpy = vi.spyOn(connectionPool, 'execute').mockReturnValue({ changes: 1 });
 
