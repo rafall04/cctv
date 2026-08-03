@@ -561,17 +561,9 @@ const start = async () => {
         startOperationalRetention();
         console.log('[Retention] Operational table retention scheduled (audit_logs, restart_logs)');
 
-        // Daily off-box database backup. The DB holds real payments and months of history; every
-        // guardrail in this repo protects against bugs, none protects against losing the disk.
-        // Silent no-op until an admin sets a chat id in Settings, so it is safe to ship enabled.
-        const scheduleDailyBackup = () => {
-            setTimeout(async () => {
-                await backupTelegramService.runScheduledBackup();
-                scheduleDailyBackup();
-            }, 24 * 60 * 60 * 1000).unref();
-        };
-        scheduleDailyBackup();
-        console.log('[Backup] Daily Telegram database backup scheduled (24h interval)');
+        // Off-box database backup. Scheduling lives in the service (it owns the "is one due?"
+        // decision), and it reports its real state rather than claiming to be scheduled.
+        backupTelegramService.startScheduledBackups();
 
         // Worker watchdog. Restart policies bring a dead worker back but tell nobody it keeps
         // dying, and the workers live under three different supervisors (pm2/systemd/docker), so

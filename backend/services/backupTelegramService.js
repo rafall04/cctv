@@ -33,7 +33,12 @@ const TELEGRAM_DOCUMENT_LIMIT_BYTES = 50 * 1024 * 1024;
 export const BACKUP_SETTING_KEYS = {
     enabled: 'backup_telegram_enabled',
     chatId: 'backup_telegram_chat_id',
+    lastRunAt: 'backup_telegram_last_run_at',
 };
+
+// A backup is due when the last SUCCESSFUL one is older than this. Persisted rather than held in
+// memory on purpose — see scheduleDailyBackup in server.js for the restart problem it solves.
+export const BACKUP_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 function readSetting(key, fallback = '') {
     try {
@@ -50,6 +55,33 @@ export function getBackupTelegramConfig() {
         enabled: raw === true || raw === 'true' || raw === 1 || raw === '1',
         chatId: String(readSetting(BACKUP_SETTING_KEYS.chatId, '') || '').trim(),
     };
+}
+
+/**
+ * When did the last SUCCESSFUL backup finish?
+ * @returns {number|null} epoch ms, or null if one has never completed
+ */
+export function getLastBackupAt() {
+    const raw = readSetting(BACKUP_SETTING_KEYS.lastRunAt, '');
+    const parsed = Date.parse(String(raw || ''));
+    return Number.isFinite(parsed) ? parsed : null;
+}
+
+/**
+ * Is a scheduled backup owed right now?
+ *
+ * This is the whole reason the timestamp is persisted. The scheduler used to be a single
+ * `setTimeout(..., 24h)` anchored at boot, so the backup only ever happened if the process
+ * survived a full day uninterrupted — and this backend had restarted 36 times. A box that
+ * restarts more often than daily would have produced backups FOREVER NEVER while logging that
+ * they were scheduled. Anchoring on the last success instead makes it restart-proof: at most one
+ * backup per interval, and at least one per interval as long as the process is up at some point.
+ *
+ * @param {number} [now] epoch ms, injectable for tests
+ */
+export function isBackupDue(now = Date.now()) {
+    const last = getLastBackupAt();
+    return last === null || now - last >= BACKUP_INTERVAL_MS;
 }
 
 /**
@@ -136,14 +168,26 @@ export async function sendDatabaseBackup({ chatId = null, reason = 'manual' } = 
 }
 
 /** Daily entry point. Silent + harmless when the operator has not enabled it. */
-export async function runScheduledBackup() {
+export async function runScheduledBackup({ now = Date.now(), force = false } = {}) {
     const config = getBackupTelegramConfig();
     if (!config.enabled || !config.chatId) {
         return { skipped: true, reason: 'not_configured' };
     }
 
+    // The scheduler now ticks hourly rather than daily (so a restart cannot starve the backup),
+    // which makes this the thing that keeps it to one per day. The admin "send now" route calls
+    // sendDatabaseBackup directly and is deliberately not subject to it.
+    if (!force && !isBackupDue(now)) {
+        return { skipped: true, reason: 'not_due' };
+    }
+
     try {
         const result = await sendDatabaseBackup({ chatId: config.chatId, reason: 'terjadwal' });
+        settingsService.updateSetting(
+            BACKUP_SETTING_KEYS.lastRunAt,
+            new Date(now).toISOString(),
+            'Waktu backup database terjadwal terakhir yang BERHASIL terkirim'
+        );
         console.log(`[Backup] Database backup sent to Telegram (${(result.bytes / 1048576).toFixed(1)} MB)`);
         return result;
     } catch (error) {
@@ -154,4 +198,48 @@ export async function runScheduledBackup() {
     }
 }
 
-export default { createDatabaseSnapshot, sendDatabaseBackup, runScheduledBackup, getBackupTelegramConfig, BACKUP_SETTING_KEYS };
+/**
+ * Arm the recurring backup and report the REAL state at boot.
+ *
+ * The scheduler used to be a single `setTimeout(..., 24h)` in server.js, anchored at boot and
+ * re-armed after each run — so a backup only ever happened if the process survived a full
+ * uninterrupted day. Production had booted 36 times and produced ZERO backups while printing
+ * "Daily Telegram database backup scheduled" on every one of those boots. Ticking hourly and
+ * letting isBackupDue() decide makes it restart-proof: at most one per day, at least one per day
+ * as long as the process is up at some point.
+ *
+ * The boot line says what is true. "Scheduled" on a box with no chat id is the same false
+ * reassurance /health used to give about rate limiting — an operator reads it, believes the
+ * database leaves the box, and finds out otherwise on the day the disk dies.
+ *
+ * @returns {{ configured: boolean }}
+ */
+export function startScheduledBackups({ tickMs = 60 * 60 * 1000, firstTickMs = 5 * 60 * 1000 } = {}) {
+    const tick = () => runScheduledBackup()
+        .catch((error) => console.error('[Backup] Scheduled backup tick failed:', error.message));
+
+    setTimeout(tick, firstTickMs).unref();
+    setInterval(tick, tickMs).unref();
+
+    const config = getBackupTelegramConfig();
+    const configured = Boolean(config.enabled && config.chatId);
+    if (configured) {
+        const last = getLastBackupAt();
+        console.log(`[Backup] Off-box backup active (last success: ${last ? new Date(last).toISOString() : 'belum pernah'})`);
+    } else {
+        console.warn('[Backup] TIDAK DIKONFIGURASI — tidak ada salinan database yang keluar dari box ini. Set chat id + aktifkan di Pengaturan > Backup.');
+    }
+    return { configured };
+}
+
+export default {
+    createDatabaseSnapshot,
+    startScheduledBackups,
+    sendDatabaseBackup,
+    runScheduledBackup,
+    getBackupTelegramConfig,
+    getLastBackupAt,
+    isBackupDue,
+    BACKUP_SETTING_KEYS,
+    BACKUP_INTERVAL_MS,
+};

@@ -37,6 +37,12 @@ vi.mock('../services/settingsService.js', () => ({
             }
             return { value: h.settings.get(key) };
         },
+        // Writes go back into the same map, so "did the last-run timestamp actually persist?"
+        // is observable — that timestamp is what makes the schedule survive a restart.
+        updateSetting: (key, value) => {
+            h.settings.set(key, String(value));
+            return { key, value };
+        },
     },
 }));
 
@@ -270,5 +276,99 @@ describe('runScheduledBackup', () => {
         // You only find out a backup was broken when you need it, so this one has to shout.
         expect(err).toHaveBeenCalled();
         expect(err.mock.calls[0][0]).toContain('FAILED');
+    });
+});
+
+/*
+ * THE BUG THIS SUITE EXISTED ALONGSIDE AND NEVER CAUGHT.
+ *
+ * The scheduler was one `setTimeout(..., 24h)` anchored at boot, so a backup only happened if the
+ * process survived a full uninterrupted day. Production had booted 36 times and produced ZERO
+ * backups — data/backups was empty — while logging "Daily Telegram database backup scheduled" on
+ * every one of those boots. Every test above passed the whole time, because they all call
+ * runScheduledBackup() directly and never asked when, or whether, anything would call it.
+ *
+ * Anchoring on the last SUCCESSFUL run instead of on boot is what makes it restart-proof, so that
+ * is what these pin.
+ */
+describe('backup schedule survives restarts', () => {
+    const configure = () => {
+        h.settings.set(service.BACKUP_SETTING_KEYS.enabled, 'true');
+        h.settings.set(service.BACKUP_SETTING_KEYS.chatId, '-1009999');
+        vi.spyOn(console, 'log').mockImplementation(() => {});
+    };
+
+    it('is due when one has never run', () => {
+        expect(service.getLastBackupAt()).toBeNull();
+        expect(service.isBackupDue()).toBe(true);
+    });
+
+    it('records the timestamp of a successful run, so a fresh boot can see it', async () => {
+        configure();
+        const now = Date.parse('2026-08-03T10:00:00.000Z');
+
+        await service.runScheduledBackup({ now });
+
+        // Persisted through settings — NOT held in a module variable a restart would wipe.
+        expect(h.settings.get(service.BACKUP_SETTING_KEYS.lastRunAt)).toBe('2026-08-03T10:00:00.000Z');
+        expect(service.getLastBackupAt()).toBe(now);
+    });
+
+    it('does not send again within the interval, however many times the box reboots', async () => {
+        configure();
+        const now = Date.parse('2026-08-03T10:00:00.000Z');
+        await service.runScheduledBackup({ now });
+        expect(h.sent).toHaveLength(1);
+
+        // Every one of these stands for a restart that used to re-arm a fresh 24h timer.
+        for (const offsetHours of [1, 5, 12, 23]) {
+            const result = await service.runScheduledBackup({ now: now + offsetHours * 3600_000 });
+            expect(result).toEqual({ skipped: true, reason: 'not_due' });
+        }
+        expect(h.sent).toHaveLength(1);
+    });
+
+    it('sends again once the interval has genuinely elapsed', async () => {
+        configure();
+        const now = Date.parse('2026-08-03T10:00:00.000Z');
+        await service.runScheduledBackup({ now });
+
+        const later = now + service.BACKUP_INTERVAL_MS;
+        expect(service.isBackupDue(later)).toBe(true);
+        await service.runScheduledBackup({ now: later });
+        expect(h.sent).toHaveLength(2);
+    });
+
+    it('a failed send does NOT mark the day as done', async () => {
+        configure();
+        const sender = await import('../services/telegramDocumentSender.js');
+        vi.spyOn(sender, 'sendTelegramDocument').mockRejectedValue(new Error('Telegram 502'));
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        await service.runScheduledBackup({ now: Date.parse('2026-08-03T10:00:00.000Z') });
+
+        // Otherwise one bad night would silently cost a whole day of protection.
+        expect(service.getLastBackupAt()).toBeNull();
+        expect(service.isBackupDue()).toBe(true);
+    });
+
+    it('startScheduledBackups WARNS when nothing will ever be sent', () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        vi.spyOn(console, 'log').mockImplementation(() => {});
+
+        expect(service.startScheduledBackups()).toEqual({ configured: false });
+
+        // The old boot line claimed "scheduled" here — the same false reassurance /health used to
+        // give about rate limiting.
+        expect(warn).toHaveBeenCalled();
+        expect(warn.mock.calls[0][0]).toContain('TIDAK DIKONFIGURASI');
+    });
+
+    it('startScheduledBackups reports active once it is configured', () => {
+        configure();
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+        expect(service.startScheduledBackups()).toEqual({ configured: true });
+        expect(warn).not.toHaveBeenCalled();
     });
 });
