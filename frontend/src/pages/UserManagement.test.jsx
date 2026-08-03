@@ -60,7 +60,7 @@ describe('UserManagement', () => {
         fireEvent.submit(screen.getByLabelText('Nama pengguna').closest('form'));
 
         await waitFor(() => {
-            expect(screen.getByText('Username already taken')).toBeTruthy();
+            expect(screen.getByText('Username sudah dipakai')).toBeTruthy();
         });
     });
 });

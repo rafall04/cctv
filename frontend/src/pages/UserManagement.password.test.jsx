@@ -22,7 +22,9 @@ describe('UserManagement.validatePassword (mirrors backend policy)', () => {
     it('rejects a password containing the username (the "green but rejected" case)', () => {
         const res = validatePassword('Admin1234567!', 'admin');
         expect(res.isValid).toBe(false);
-        expect(res.errors).toContain('Password cannot contain the username');
+        // Worded exactly as backend services/passwordValidator.js words it — the mirror only
+        // helps if the meter and the server rejection say the same sentence.
+        expect(res.errors).toContain('Kata sandi tidak boleh memuat username Anda');
         expect(res.requirements.noUsername).toBe(false);
         // The same password is fine for an unrelated username.
         expect(validatePassword('Admin1234567!', 'budi').isValid).toBe(true);

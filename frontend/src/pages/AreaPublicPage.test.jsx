@@ -104,7 +104,7 @@ describe('AreaPublicPage', () => {
         expect(screen.getByRole('link', { name: /Kembali ke CCTV Publik/i }).getAttribute('href')).toBe('/');
         expect(screen.getByRole('heading', { level: 2, name: /Status Area/i })).toBeTruthy();
         expect(screen.getByRole('heading', { level: 2, name: /Sedang Ramai di KAB SURABAYA/i })).toBeTruthy();
-        expect(screen.getByRole('heading', { level: 2, name: /Top CCTV KAB SURABAYA/i })).toBeTruthy();
+        expect(screen.getByRole('heading', { level: 2, name: /Paling Sering Dibuka di KAB SURABAYA/i })).toBeTruthy();
         expect(screen.getByRole('heading', { level: 2, name: /Kamera Baru KAB SURABAYA/i })).toBeTruthy();
         expect(screen.getByRole('heading', { level: 2, name: /Semua CCTV Area/i })).toBeTruthy();
         expect(screen.getAllByText(/2 kamera/i).length).toBeGreaterThan(0);
@@ -186,8 +186,8 @@ describe('AreaPublicPage', () => {
 
         renderPage();
 
-        await waitFor(() => expect(screen.getByRole('button', { name: /Share Area/i })).toBeTruthy());
-        fireEvent.click(screen.getByRole('button', { name: /Share Area/i }));
+        await waitFor(() => expect(screen.getByRole('button', { name: /Bagikan Area/i })).toBeTruthy());
+        fireEvent.click(screen.getByRole('button', { name: /Bagikan Area/i }));
 
         await waitFor(() => {
             expect(nativeShare).toHaveBeenCalledTimes(1);

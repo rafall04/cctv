@@ -64,14 +64,14 @@ export function validatePassword(password, username = '') {
     };
 
     if (!password) {
-        return { isValid: false, errors: ['Password is required'], requirements };
+        return { isValid: false, errors: ['Kata sandi wajib diisi'], requirements };
     }
 
     // Check minimum length
     if (password.length >= PASSWORD_REQUIREMENTS.minLength) {
         requirements.minLength = true;
     } else {
-        errors.push(`Password must be at least ${PASSWORD_REQUIREMENTS.minLength} characters`);
+        errors.push(`Kata sandi minimal ${PASSWORD_REQUIREMENTS.minLength} karakter`);
     }
 
     // Check uppercase
@@ -79,7 +79,7 @@ export function validatePassword(password, username = '') {
         if (/[A-Z]/.test(password)) {
             requirements.hasUppercase = true;
         } else {
-            errors.push('Password must contain at least one uppercase letter');
+            errors.push('Kata sandi harus memuat minimal satu huruf besar');
         }
     }
 
@@ -88,7 +88,7 @@ export function validatePassword(password, username = '') {
         if (/[a-z]/.test(password)) {
             requirements.hasLowercase = true;
         } else {
-            errors.push('Password must contain at least one lowercase letter');
+            errors.push('Kata sandi harus memuat minimal satu huruf kecil');
         }
     }
 
@@ -97,7 +97,7 @@ export function validatePassword(password, username = '') {
         if (/[0-9]/.test(password)) {
             requirements.hasNumber = true;
         } else {
-            errors.push('Password must contain at least one number');
+            errors.push('Kata sandi harus memuat minimal satu angka');
         }
     }
 
@@ -106,7 +106,7 @@ export function validatePassword(password, username = '') {
         if (/[!@#$%^&*()_+\-=[\]{}|;:'",.<>?/`~]/.test(password)) {
             requirements.hasSpecial = true;
         } else {
-            errors.push('Password must contain at least one special character');
+            errors.push('Kata sandi harus memuat minimal satu karakter spesial');
         }
     }
 
@@ -115,7 +115,7 @@ export function validatePassword(password, username = '') {
     const uname = String(username || '').trim().toLowerCase();
     if (uname.length >= 3 && password.toLowerCase().includes(uname)) {
         requirements.noUsername = false;
-        errors.push('Password cannot contain the username');
+        errors.push('Kata sandi tidak boleh memuat username Anda');
     }
 
     return {
@@ -142,18 +142,18 @@ function PasswordRequirementsDisplay({ password, username = '' }) {
     const { requirements } = validatePassword(password || '', username);
 
     const items = [
-        { key: 'minLength', label: `At least ${PASSWORD_REQUIREMENTS.minLength} characters`, met: requirements.minLength },
-        { key: 'hasUppercase', label: 'One uppercase letter', met: requirements.hasUppercase },
-        { key: 'hasLowercase', label: 'One lowercase letter', met: requirements.hasLowercase },
-        { key: 'hasNumber', label: 'One number', met: requirements.hasNumber },
+        { key: 'minLength', label: `Minimal ${PASSWORD_REQUIREMENTS.minLength} karakter`, met: requirements.minLength },
+        { key: 'hasUppercase', label: 'Ada huruf besar', met: requirements.hasUppercase },
+        { key: 'hasLowercase', label: 'Ada huruf kecil', met: requirements.hasLowercase },
+        { key: 'hasNumber', label: 'Ada angka', met: requirements.hasNumber },
     ];
 
     if (PASSWORD_REQUIREMENTS.requireSpecial) {
-        items.push({ key: 'hasSpecial', label: 'One special character', met: requirements.hasSpecial });
+        items.push({ key: 'hasSpecial', label: 'Ada karakter spesial', met: requirements.hasSpecial });
     }
 
     if (username) {
-        items.push({ key: 'noUsername', label: 'Does not contain the username', met: requirements.noUsername });
+        items.push({ key: 'noUsername', label: 'Tidak memuat username', met: requirements.noUsername });
     }
 
     return (
@@ -213,7 +213,7 @@ export default function UserManagement() {
             if (response.success) setUsers(response.data);
         } catch (err) {
             console.error('Load users error:', err);
-            setLoadError('Failed to load users. Please try again.');
+            setLoadError('Gagal memuat daftar pengguna. Coba lagi.');
         } finally {
             setLoading(false);
         }
@@ -263,11 +263,11 @@ export default function UserManagement() {
         
         // Username validation
         if (!formData.username || formData.username.trim() === '') {
-            errors.username = 'Username is required';
+            errors.username = 'Username wajib diisi';
         } else if (formData.username.length < 3) {
-            errors.username = 'Username must be at least 3 characters';
+            errors.username = 'Username minimal 3 karakter';
         } else if (!/^[a-zA-Z0-9_]+$/.test(formData.username)) {
-            errors.username = 'Username can only contain letters, numbers, and underscores';
+            errors.username = 'Username hanya boleh berisi huruf, angka, dan garis bawah';
         }
 
         // Password validation (only for new users)
@@ -299,43 +299,43 @@ export default function UserManagement() {
                     email: formData.email || undefined,
                 });
                 if (result.success) {
-                    success('User Updated', `${formData.username} has been updated successfully`);
+                    success('Pengguna Diperbarui', `${formData.username} berhasil diperbarui`);
                     setShowModal(false);
                     loadUsers();
                 } else {
                     // Handle duplicate username
                     if (result.message?.toLowerCase().includes('username')) {
-                        setFieldErrors({ ...fieldErrors, username: 'Username already taken' });
+                        setFieldErrors({ ...fieldErrors, username: 'Username sudah dipakai' });
                     } else {
                         setError(result.message);
                     }
-                    showError('Update Failed', result.message || 'Failed to update user');
+                    showError('Gagal Memperbarui', result.message || 'Gagal memperbarui pengguna');
                 }
             } else {
                 result = await userService.createUser(formData);
                 if (result.success) {
-                    success('User Created', `${formData.username} has been created successfully`);
+                    success('Pengguna Dibuat', `${formData.username} berhasil dibuat`);
                     setShowModal(false);
                     loadUsers();
                 } else {
                     // Handle duplicate username
                     if (result.message?.toLowerCase().includes('username')) {
-                        setFieldErrors({ ...fieldErrors, username: 'Username already taken' });
+                        setFieldErrors({ ...fieldErrors, username: 'Username sudah dipakai' });
                     } else {
                         setError(result.message);
                     }
-                    showError('Creation Failed', result.message || 'Failed to create user');
+                    showError('Gagal Membuat', result.message || 'Gagal membuat pengguna');
                 }
             }
         } catch (err) {
-            const errorMsg = err.response?.data?.message || 'Something went wrong';
+            const errorMsg = err.response?.data?.message || 'Terjadi kesalahan';
             // Handle duplicate username from API error
             if (errorMsg.toLowerCase().includes('username')) {
-                setFieldErrors({ ...fieldErrors, username: 'Username already taken' });
+                setFieldErrors({ ...fieldErrors, username: 'Username sudah dipakai' });
             } else {
                 setError(errorMsg);
             }
-            showError('Error', errorMsg);
+            showError('Kesalahan', errorMsg);
         } finally {
             setSubmitting(false);
         }
@@ -347,7 +347,7 @@ export default function UserManagement() {
         
         // Validate password match
         if (passwordData.password !== passwordData.confirmPassword) {
-            setPasswordError('Passwords do not match');
+            setPasswordError('Kata sandi tidak cocok');
             return;
         }
         
@@ -362,12 +362,12 @@ export default function UserManagement() {
         try {
             const result = await userService.changeUserPassword(passwordUser.id, passwordData.password);
             if (result.success) {
-                success('Password Changed', `Password for ${passwordUser.username} has been updated`);
+                success('Kata Sandi Diubah', `Kata sandi ${passwordUser.username} berhasil diubah`);
                 setShowPasswordModal(false);
             } else {
                 const msg = result.errors?.[0] || result.message;
                 setPasswordError(msg);
-                showError('Password Change Failed', msg || 'Failed to change password');
+                showError('Gagal Mengubah Kata Sandi', msg || 'Gagal mengubah kata sandi');
             }
         } catch (err) {
             const data = err.response?.data;
@@ -375,7 +375,7 @@ export default function UserManagement() {
             // common-password) instead of the generic "does not meet requirements".
             const errorMsg = (Array.isArray(data?.errors) && data.errors[0]) || data?.message || 'Failed to change password';
             setPasswordError(errorMsg);
-            showError('Error', errorMsg);
+            showError('Kesalahan', errorMsg);
         } finally {
             setSubmitting(false);
         }
@@ -391,18 +391,18 @@ export default function UserManagement() {
     };
 
     const handleDelete = async (user) => {
-        if (!(await confirm({ title: `Delete user "${user.username}"?`, message: 'This action cannot be undone.', confirmLabel: 'Delete', tone: 'danger' }))) return;
+        if (!(await confirm({ title: `Hapus pengguna "${user.username}"?`, message: 'Tindakan ini tidak bisa dibatalkan.', confirmLabel: 'Hapus', tone: 'danger' }))) return;
         try {
             const result = await userService.deleteUser(user.id);
             if (result.success) {
-                success('User Deleted', `${user.username} has been removed`);
+                success('Pengguna Dihapus', `${user.username} berhasil dihapus`);
                 loadUsers();
             } else {
-                showError('Delete Failed', result.message || 'Failed to delete user');
+                showError('Gagal Menghapus', result.message || 'Gagal menghapus pengguna');
             }
         } catch (err) {
             const errorMsg = err.response?.data?.message || 'Failed to delete user';
-            showError('Error', errorMsg);
+            showError('Kesalahan', errorMsg);
         }
     };
 

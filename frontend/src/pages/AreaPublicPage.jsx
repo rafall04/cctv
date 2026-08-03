@@ -96,7 +96,13 @@ function AreaStatusPanel({ area, cameras, liveViewerCount }) {
                 </div>
                 <span className="font-mono text-xs font-semibold tabular-nums text-status-live">{onlinePercent}% online</span>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {/*
+              * Two columns from the smallest screen, not from `sm`. Stacked one-per-row these four
+              * numbers ate ~800px of a phone — the landing page states the same kind of data in a
+              * 2x2 board, and there is no reason this page should be twice as tall to say less.
+              * The camera grid below deliberately keeps `sm:` : those cards carry long names.
+              */}
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                 {/*
                   * "22 Online" beside "0 Live Sekarang" read as a contradiction, because the two
                   * count different things: cameras that are up, and people watching right now.
@@ -407,7 +413,7 @@ export default function AreaPublicPage() {
                                 onClick={handleShare}
                                 className="inline-flex w-fit rounded-control bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-600"
                             >
-                                Share Area
+                                Bagikan Area
                             </button>
                             {shareMessage && (
                                 <span role="status" className="text-xs font-medium text-content-muted">
@@ -454,7 +460,9 @@ export default function AreaPublicPage() {
             {Number(area?.total_views || 0) > 0 && (
                 <AreaCameraSection
                     cameras={topCameras}
-                    title={`Top CCTV ${area?.name || ''}`.trim()}
+                    // Parallels its sibling above ("Sedang Ramai di …") and says the same thing as
+                    // its own description, instead of leaving an English "Top" on a public page.
+                    title={`Paling Sering Dibuka di ${area?.name || ''}`.trim()}
                     description="Kamera yang paling banyak dibuka oleh pengunjung."
                     metricLabel="views"
                     metricValue={getAreaCameraTotalViews}
