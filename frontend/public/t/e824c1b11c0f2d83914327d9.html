@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
+<meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex">
+<meta name="referrer" content="no-referrer">
+<title>Topologi Jaringan CCTV — RAF</title>
+<link rel="icon" href="/favicon.svg">
+<style>
+  :root{
+    --paper:#EDF1F0; --surface:#FFFFFF; --surface-2:#F4F8F7;
+    --edge:#D2DCDA; --edge-soft:#E3EAE9;
+    --ink:#0B181A; --ink-2:#47605E; --ink-3:#6B8380;
+    --accent:#0B6F78; --accent-soft:#DCEDEE;
+    --rtsp:#A2481F; --rtsp-soft:#F6E7DF; --rtsp-edge:#E4C9BA;
+    --archive:#4B5896;
+    --ok:#2C7A58; --ok-soft:#DCEFE5;
+    --grid:#0B181A0D;
+    --sans:"Segoe UI",-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif;
+    --mono:ui-monospace,"Cascadia Mono",Consolas,"Segoe UI Mono",Menlo,monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --paper:#08100F; --surface:#0F1A1C; --surface-2:#142225;
+      --edge:#24373A; --edge-soft:#1B2B2E;
+      --ink:#E7EFED; --ink-2:#9DB3B0; --ink-3:#7B918E;
+      --accent:#4FC3C9; --accent-soft:#0E2D31;
+      --rtsp:#E28A58; --rtsp-soft:#2E1D14; --rtsp-edge:#4A2E1F;
+      --archive:#98A2E2;
+      --ok:#5FCB99; --ok-soft:#122C22;
+      --grid:#E7EFED12;
+    }
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    background:var(--paper); color:var(--ink); font-family:var(--sans);
+    font-size:16px; line-height:1.6; overflow-x:clip;
+  }
+  .wrap{max-width:1240px;margin:0 auto;padding:clamp(24px,5vw,56px) clamp(14px,4vw,36px) 64px;
+        display:flex;flex-direction:column;gap:clamp(24px,4vw,36px)}
+
+  header{display:flex;flex-direction:column;gap:10px}
+  .eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--accent)}
+  h1{font-size:clamp(26px,5vw,40px);line-height:1.08;letter-spacing:-.025em;font-weight:700;text-wrap:balance}
+  .lede{font-size:clamp(15.5px,2vw,18px);line-height:1.55;color:var(--ink-2);max-width:62ch}
+  .meta{display:flex;flex-wrap:wrap;gap:6px 20px;padding-top:14px;border-top:1px solid var(--edge);
+        font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+  .meta b{color:var(--ink-2);font-weight:500}
+
+  .card{background:var(--surface);border:1px solid var(--edge);border-radius:4px}
+  .hint{display:none;padding:12px 16px 0;font-family:var(--mono);font-size:11px;
+        letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
+  @media (max-width:960px){.hint{display:block}}
+  .scroll{overflow-x:auto;padding:10px}
+  .scroll svg{display:block;min-width:940px;width:100%;height:auto}
+  .scroll svg text{font-family:var(--sans)}
+  .scroll svg .mono,.scroll svg .mono text{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .scroll svg .sans,.scroll svg .sans text{font-family:var(--sans)}
+
+  .actions{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+  .btn{display:inline-flex;align-items:center;gap:9px;padding:11px 18px;border-radius:4px;
+       background:var(--accent);color:var(--paper);text-decoration:none;font-size:15px;font-weight:600}
+  .btn:hover{filter:brightness(1.08)}
+  .btn:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+  .note{font-size:14px;color:var(--ink-3)}
+
+  footer{border-top:1px solid var(--edge);padding-top:18px;display:flex;flex-direction:column;gap:6px}
+  footer p{font-size:13px;color:var(--ink-3);max-width:76ch}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <p class="eyebrow">Topologi Jaringan</p>
+    <h1>Bagaimana CCTV desa terhubung — dari kamera sampai layar warga</h1>
+    <p class="lede">
+      Kamera berada di jaringan tertutup dan tidak punya jalan keluar ke internet.
+      Yang keluar hanya video siap-tonton dan salinan rekaman ke penyimpanan cloud.
+    </p>
+    <div class="meta">
+      <span>Desa Dander &amp; Tanjungharjo</span>
+      <span>Angka dibaca dari sistem berjalan &middot; <b>3 Agustus 2026</b></span>
+    </div>
+  </header>
+
+  <div class="card">
+    <p class="hint">← Geser untuk melihat seluruh diagram →</p>
+    <div class="scroll">
+<svg width="1400" height="920" viewBox="0 0 1400 920" xmlns="http://www.w3.org/2000/svg" class="sans">
+  <defs>
+    <pattern id="g" width="28" height="28" patternUnits="userSpaceOnUse">
+      <path d="M28 0H0V28" fill="none" stroke="var(--grid)" stroke-width="1"/>
+    </pattern>
+    <marker id="aR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10z" fill="var(--rtsp)"/></marker>
+    <marker id="aT" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10z" fill="var(--accent)"/></marker>
+    <marker id="aV" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10z" fill="var(--archive)"/></marker>
+    <marker id="aN" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10z" fill="var(--ink-2)"/></marker>
+
+    <!-- reusable CCTV camera icon -->
+    <g id="cam">
+      <rect x="0" y="2" width="30" height="15" rx="3" fill="var(--surface)" stroke="var(--rtsp)" stroke-width="2"/>
+      <circle cx="26" cy="9.5" r="3" fill="var(--rtsp)"/>
+      <path d="M30 6 l7 -3 v13 l-7 -3" fill="var(--surface)" stroke="var(--rtsp)" stroke-width="2" stroke-linejoin="round"/>
+      <path d="M10 17 v6" stroke="var(--rtsp)" stroke-width="2"/>
+      <path d="M3 23 h14" stroke="var(--rtsp)" stroke-width="2" stroke-linecap="round"/>
+    </g>
+  </defs>
+
+  <rect width="1400" height="920" fill="url(#g)"/>
+
+  <!-- ===================== TITLE ===================== -->
+  <text x="60" y="52" class="mono" font-size="13" letter-spacing="3" fill="var(--accent)">TOPOLOGI JARINGAN</text>
+  <text x="60" y="88" font-size="31" font-weight="700" letter-spacing="-.6" fill="var(--ink)">CCTV Desa Dander &amp; Tanjungharjo</text>
+  <text x="1340" y="52" class="mono" font-size="13" letter-spacing="1.6" text-anchor="end" fill="var(--ink-3)">3 AGUSTUS 2026</text>
+  <text x="1340" y="86" class="mono" font-size="15" text-anchor="end" fill="var(--ink-2)">11 kamera · 3 VLAN · 1 server</text>
+  <line x1="60" y1="112" x2="1340" y2="112" stroke="var(--edge)"/>
+
+  <!-- ===================== CAMERA GROUPS ===================== -->
+  <!-- group A -->
+  <rect x="130" y="140" width="240" height="150" rx="4" fill="var(--rtsp-soft)" stroke="var(--rtsp-edge)"/>
+  <text x="250" y="167" class="mono" font-size="13" letter-spacing="1.4" text-anchor="middle" fill="var(--rtsp)">VLAN KAMERA 1</text>
+  <use href="#cam" x="231" y="188"/>
+  <text x="250" y="245" class="mono" font-size="15" text-anchor="middle" fill="var(--ink)">192.168.12.x</text>
+  <text x="250" y="270" font-size="15" text-anchor="middle" fill="var(--ink-2)">1 kamera</text>
+
+  <!-- group B -->
+  <rect x="440" y="140" width="240" height="150" rx="4" fill="var(--rtsp-soft)" stroke="var(--rtsp-edge)"/>
+  <text x="560" y="167" class="mono" font-size="13" letter-spacing="1.4" text-anchor="middle" fill="var(--rtsp)">VLAN KAMERA 2</text>
+  <use href="#cam" x="481" y="188"/>
+  <use href="#cam" x="541" y="188"/>
+  <use href="#cam" x="601" y="188"/>
+  <text x="560" y="245" class="mono" font-size="15" text-anchor="middle" fill="var(--ink)">192.168.13.x</text>
+  <text x="560" y="270" font-size="15" text-anchor="middle" fill="var(--ink-2)">7 kamera</text>
+
+  <!-- group C -->
+  <rect x="750" y="140" width="240" height="150" rx="4" fill="var(--rtsp-soft)" stroke="var(--rtsp-edge)"/>
+  <text x="870" y="167" class="mono" font-size="13" letter-spacing="1.4" text-anchor="middle" fill="var(--rtsp)">VLAN KAMERA 3</text>
+  <use href="#cam" x="791" y="188"/>
+  <use href="#cam" x="851" y="188"/>
+  <use href="#cam" x="911" y="188"/>
+  <text x="870" y="245" class="mono" font-size="15" text-anchor="middle" fill="var(--ink)">192.168.14.x</text>
+  <text x="870" y="270" font-size="15" text-anchor="middle" fill="var(--ink-2)">3 kamera</text>
+
+  <!-- ===================== LINKS: cameras -> mikrotik ===================== -->
+  <g stroke="var(--rtsp)" stroke-width="2.2" fill="none">
+    <path d="M250 290 V330 H560"/>
+    <path d="M870 290 V330 H560"/>
+    <path d="M560 290 V386" marker-end="url(#aR)"/>
+  </g>
+  <rect x="576" y="332" width="52" height="24" rx="3" fill="var(--paper)"/>
+  <text x="582" y="349" class="mono" font-size="14" fill="var(--rtsp)">RTSP</text>
+
+  <!-- ===================== MIKROTIK ===================== -->
+  <rect x="452" y="388" width="216" height="96" rx="5" fill="var(--surface)" stroke="var(--ink-2)" stroke-width="2"/>
+  <!-- router glyph -->
+  <rect x="474" y="410" width="42" height="26" rx="3" fill="none" stroke="var(--ink-2)" stroke-width="2"/>
+  <path d="M480 423 h30 M498 415 l12 8 l-12 8" fill="none" stroke="var(--ink-2)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+  <text x="530" y="422" font-size="19" font-weight="700" fill="var(--ink)">MikroTik</text>
+  <text x="530" y="440" class="mono" font-size="13" fill="var(--ink-3)">RouterOS</text>
+  <line x1="474" y1="452" x2="646" y2="452" stroke="var(--edge-soft)"/>
+  <circle cx="482" cy="468" r="3.5" fill="var(--rtsp)"/><text x="493" y="473" class="mono" font-size="12" fill="var(--ink-2)">VLAN kamera</text>
+  <circle cx="590" cy="468" r="3.5" fill="var(--accent)"/><text x="601" y="473" class="mono" font-size="12" fill="var(--ink-2)">server</text>
+
+  <!-- ===================== LINK: mikrotik -> server ===================== -->
+  <path d="M560 486 V596" stroke="var(--rtsp)" stroke-width="2.2" fill="none" marker-end="url(#aR)"/>
+  <rect x="576" y="528" width="128" height="24" rx="3" fill="var(--paper)"/>
+  <text x="582" y="545" class="mono" font-size="14" fill="var(--rtsp)">RTSP · VLAN server</text>
+
+  <!-- ===================== SERVER ===================== -->
+  <rect x="424" y="598" width="272" height="122" rx="5" fill="var(--surface)" stroke="var(--accent)" stroke-width="2"/>
+  <rect x="424" y="598" width="272" height="4" fill="var(--accent)"/>
+  <!-- server glyph -->
+  <rect x="448" y="624" width="34" height="46" rx="3" fill="none" stroke="var(--accent)" stroke-width="2"/>
+  <path d="M454 634 h22 M454 645 h22 M454 656 h14" stroke="var(--accent)" stroke-width="2" stroke-linecap="round"/>
+  <circle cx="479" cy="656" r="2.6" fill="var(--accent)"/>
+  <text x="496" y="638" font-size="19" font-weight="700" fill="var(--ink)">PC Server CCTV</text>
+  <text x="496" y="659" font-size="14" fill="var(--ink-2)">Media server · perekam ·</text>
+  <text x="496" y="678" font-size="14" fill="var(--ink-2)">aplikasi web</text>
+  <text x="448" y="702" class="mono" font-size="13" fill="var(--ink-3)">semua port streaming → localhost</text>
+
+  <!-- ===================== LINK: mikrotik -> internet (WAN) ===================== -->
+  <path d="M670 436 H828" stroke="var(--ink-2)" stroke-width="2.2" fill="none" marker-end="url(#aN)"/>
+  <rect x="700" y="404" width="122" height="24" rx="3" fill="var(--paper)"/>
+  <text x="706" y="421" class="mono" font-size="14" fill="var(--ink-2)">WAN · keluar</text>
+
+  <!-- ===================== INTERNET ===================== -->
+  <path d="M866 452 a26 26 0 0 1 4 -51 a34 34 0 0 1 63 -12 a28 28 0 0 1 25 33 a24 24 0 0 1 -12 30 z"
+        fill="var(--surface)" stroke="var(--ink-2)" stroke-width="2" stroke-linejoin="round"/>
+  <text x="916" y="430" font-size="17" font-weight="650" text-anchor="middle" fill="var(--ink)">Internet</text>
+
+  <!-- ===================== LINKS: internet -> cloud & users ===================== -->
+  <path d="M968 424 H1016 V286 H1074" stroke="var(--archive)" stroke-width="2.2" fill="none" marker-end="url(#aV)"/>
+  <path d="M968 448 H1016 V618 H1074" stroke="var(--accent)" stroke-width="2.4" fill="none" marker-end="url(#aT)"/>
+
+  <rect x="938" y="338" width="122" height="24" rx="3" fill="var(--paper)"/>
+  <text x="944" y="355" class="mono" font-size="14" fill="var(--archive)">unggah rekaman</text>
+  <rect x="944" y="470" width="116" height="24" rx="3" fill="var(--paper)"/>
+  <text x="950" y="487" class="mono" font-size="14" fill="var(--accent)">HTTPS · HLS</text>
+
+  <!-- ===================== CLOUD STORAGE ===================== -->
+  <rect x="1076" y="222" width="264" height="128" rx="5" fill="var(--surface)" stroke="var(--archive)" stroke-width="2"/>
+  <rect x="1076" y="222" width="264" height="4" fill="var(--archive)"/>
+  <path d="M1104 288 a15 15 0 0 1 2 -29 a19 19 0 0 1 36 -7 a16 16 0 0 1 14 19 a14 14 0 0 1 -7 17 z"
+        fill="none" stroke="var(--archive)" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M1128 282 v-16 m-6 6 l6 -7 l6 7" fill="none" stroke="var(--archive)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="1170" y="264" font-size="19" font-weight="700" fill="var(--ink)">Penyimpanan</text>
+  <text x="1170" y="286" font-size="19" font-weight="700" fill="var(--ink)">Cloud</text>
+  <text x="1100" y="322" class="mono" font-size="13" fill="var(--ink-2)">arsip rekaman jangka panjang</text>
+  <text x="1100" y="342" class="mono" font-size="13" fill="var(--ink-2)">273,6 GB naik / 24 jam</text>
+
+  <!-- ===================== USERS ===================== -->
+  <rect x="1076" y="556" width="264" height="128" rx="5" fill="var(--surface)" stroke="var(--accent)" stroke-width="2"/>
+  <rect x="1076" y="556" width="264" height="4" fill="var(--accent)"/>
+  <!-- phone -->
+  <rect x="1100" y="586" width="26" height="42" rx="4" fill="none" stroke="var(--accent)" stroke-width="2"/>
+  <path d="M1109 592 h8" stroke="var(--accent)" stroke-width="2" stroke-linecap="round"/>
+  <!-- laptop -->
+  <rect x="1134" y="590" width="38" height="26" rx="3" fill="none" stroke="var(--accent)" stroke-width="2"/>
+  <path d="M1128 622 h50" stroke="var(--accent)" stroke-width="2" stroke-linecap="round"/>
+  <text x="1190" y="600" font-size="19" font-weight="700" fill="var(--ink)">Warga</text>
+  <text x="1190" y="622" font-size="19" font-weight="700" fill="var(--ink)">&amp; Admin</text>
+  <text x="1100" y="656" class="mono" font-size="13" fill="var(--ink-2)">cukup browser, tanpa aplikasi</text>
+  <text x="1100" y="676" class="mono" font-size="13" fill="var(--ink-2)">tanpa IP publik / port forward</text>
+
+  <!-- ===================== FIREWALL NOTE ===================== -->
+  <rect x="60" y="388" width="330" height="140" rx="4" fill="var(--surface)" stroke="var(--edge)" stroke-dasharray="4 4"/>
+  <text x="84" y="418" class="mono" font-size="13" letter-spacing="1.4" fill="var(--ink-3)">FIREWALL DI MIKROTIK</text>
+  <text x="84" y="452" font-size="15" fill="var(--ink-2)">VLAN kamera → Internet</text>
+  <rect x="286" y="436" width="82" height="22" rx="3" fill="var(--rtsp-soft)"/>
+  <text x="295" y="452" class="mono" font-size="13" font-weight="700" fill="var(--rtsp)">DITOLAK</text>
+  <text x="84" y="492" font-size="15" fill="var(--ink-2)">Server → VLAN kamera</text>
+  <rect x="272" y="476" width="96" height="22" rx="3" fill="var(--ok-soft)"/>
+  <text x="281" y="492" class="mono" font-size="13" font-weight="700" fill="var(--ok)">DIIZINKAN</text>
+
+  <!-- dead-end stub: the camera bus has nowhere to go but the router -->
+  <path d="M250 330 H240" stroke="var(--rtsp)" stroke-width="1.8" stroke-dasharray="6 5" fill="none" opacity=".6"/>
+  <circle cx="222" cy="330" r="12" fill="var(--paper)" stroke="var(--rtsp)" stroke-width="1.8"/>
+  <path d="M216 324 l12 12 M228 324 l-12 12" stroke="var(--rtsp)" stroke-width="2"/>
+  <text x="222" y="360" font-size="13" text-anchor="middle" fill="var(--rtsp)">tidak ada jalur ke internet</text>
+
+  <!-- ===================== LEGEND ===================== -->
+  <line x1="60" y1="792" x2="1340" y2="792" stroke="var(--edge)"/>
+  <g stroke-width="3" stroke-linecap="round">
+    <path d="M62 830 h30" stroke="var(--rtsp)"/>
+    <path d="M472 830 h30" stroke="var(--accent)"/>
+    <path d="M872 830 h30" stroke="var(--archive)"/>
+    <path d="M1160 830 h30" stroke="var(--ink-2)"/>
+  </g>
+  <text x="104" y="836" font-size="15" fill="var(--ink-2)">RTSP — jaringan tertutup, tidak pernah ke internet</text>
+  <text x="514" y="836" font-size="15" fill="var(--ink-2)">HTTPS / HLS — video publik terenkripsi</text>
+  <text x="914" y="836" font-size="15" fill="var(--ink-2)">Arsip ke cloud</text>
+  <text x="1202" y="836" font-size="15" fill="var(--ink-2)">Jalur WAN</text>
+  <text x="60" y="876" class="mono" font-size="13" fill="var(--ink-3)">Alamat RTSP &amp; kata sandi kamera tidak pernah keluar dari server — penonton hanya menerima video HLS.</text>
+</svg>
+    </div>
+  </div>
+
+  <div class="actions">
+    <a class="btn" href="./e824c1b11c0f2d83914327d9.png" download="topologi-jaringan-cctv.png">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/>
+      </svg>
+      Unduh gambar (PNG)
+    </a>
+    <span class="note">2800 &times; 1840 px — cukup tajam untuk dicetak atau dikirim lewat pesan.</span>
+  </div>
+
+  <footer>
+    <p>
+      Jumlah kamera, alamat segmen VLAN, dan volume arsip pada diagram ini dibaca langsung
+      dari sistem yang sedang berjalan pada 3 Agustus 2026 — bukan angka contoh.
+    </p>
+    <p>
+      Halaman ini tidak tertaut dari mana pun dan tidak diindeks mesin pencari.
+      Hanya penerima tautan yang dapat membukanya.
+    </p>
+  </footer>
+
+</div>
+</body>
+</html>
