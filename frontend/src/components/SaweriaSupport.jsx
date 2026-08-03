@@ -1,15 +1,25 @@
 /*
- * Purpose: Render optional public Saweria support modal and floating banner without colliding with other mobile public actions.
+ * Purpose: Ask for support on the public pages without ever taking the screen hostage — the
+ *          banner arrives open, settles into a bubble on its own, and the full modal is kept
+ *          for the one moment a visitor has actually received something.
  * Caller: Public landing full/simple pages.
- * Deps: React hooks, browser fetch/localStorage/window.open.
+ * Deps: React hooks, localStorage/window.open, animationControl, saweriaConfig.
  * MainFuncs: SaweriaSupport.
- * SideEffects: Fetches Saweria config, stores banner preferences, opens Saweria external link, and registers temporary scroll/timer handlers.
+ * SideEffects: Reads the shared Saweria config, stores banner preferences, opens the external link,
+ *              registers the peek/collapse timers.
  */
 
-import { useState, useEffect, useMemo, memo } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback, memo } from 'react';
+import { shouldDisableAnimations } from '../utils/animationControl';
+import { isSaweriaEnabled, SAWERIA_SUPPRESSED_KEY, SAWERIA_URL } from '../utils/saweriaConfig';
 
-const STORAGE_KEY = 'saweria_dont_show';
+const STORAGE_KEY = SAWERIA_SUPPRESSED_KEY;
 const BANNER_MINIMIZED_KEY = 'saweria_banner_minimized';
+
+// How long the banner stays open before folding itself away. Long enough to read the ask
+// and reach for the button, short enough that ignoring it costs nothing.
+const PEEK_MS = 9000;
+const BANNER_DELAY_MS = 3000;
 
 // Simple icon - no multiple variations
 const CoffeeIcon = () => (
@@ -25,6 +35,11 @@ const SaweriaSupport = memo(function SaweriaSupport() {
     const [bannerMinimized, setBannerMinimized] = useState(false);
     const [isEnabled, setIsEnabled] = useState(false);
     const [isReady, setIsReady] = useState(false);
+    // Set the moment a pointer or a tap reaches the card, so the auto-collapse never fires
+    // out from under someone who is actually reading it.
+    const bannerTouchedRef = useRef(false);
+    const markBannerTouched = useCallback(() => { bannerTouchedRef.current = true; }, []);
+    const disableAnimations = shouldDisableAnimations();
 
     // Simplified - just use one variation
     const modalContent = useMemo(() => ({
@@ -32,65 +47,67 @@ const SaweriaSupport = memo(function SaweriaSupport() {
         subtitle: 'Biar semangat maintain server & kamera 24/7',
     }), []);
 
-    // Fetch config once with timeout
+    // Shared with SupportInlineNote inside the video popup, so the two asks cost ONE request
+    // per page load between them rather than one each every time a popup opens.
     useEffect(() => {
         let isMounted = true;
-
-        const fetchConfig = async () => {
-            try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 3000);
-
-                const response = await fetch('/api/saweria/config', {
-                    signal: controller.signal
-                }).catch(() => null);
-
-                clearTimeout(timeoutId);
-
-                if (isMounted && response?.ok) {
-                    const data = await response.json().catch(() => null);
-                    if (data?.data?.enabled === true) {
-                        setIsEnabled(true);
-                    }
-                }
-            } catch (e) {
-                // Use default - enabled
-            } finally {
-                if (isMounted) {
-                    setIsReady(true);
-                }
-            }
-        };
-
-        fetchConfig();
-
+        isSaweriaEnabled().then((on) => {
+            if (!isMounted) return;
+            setIsEnabled(on);
+            setIsReady(true);
+        });
         return () => { isMounted = false; };
     }, []);
 
     /*
-     * Show the corner banner — never seize the screen.
+     * Peek, then settle. The ask is visible early — it just never holds the screen.
      *
      * This used to open the full-screen modal at `scrollY > 100` (+1.5s), with an 8s
      * fallback for people who did not scroll at all, so ANY first-time visitor to a public
-     * CCTV page got a donation interstitial dropped over the thing they came to look at,
-     * without ever asking for it. On a phone it covered the whole viewport.
+     * CCTV page got a donation interstitial dropped over the thing they came to look at.
+     * On a phone it covered the whole viewport.
      *
-     * The banner carries the same ask, is dismissible, minimises, and stays out of the way.
-     * The modal is still available with its fuller copy and its "Jangan Tampilkan Lagi"
-     * option — but now only when the visitor opens it themselves, from the banner header.
+     * What actually made that intrusive was not that it existed: it dimmed the page, blocked
+     * interaction, arrived BEFORE the visitor had received anything, and demanded a click to
+     * go away. So the banner now enters OPEN (icon, headline, button — the whole ask, plainly
+     * visible), and folds itself into the coffee bubble after PEEK_MS. Ignoring it costs
+     * nothing, which is the entire difference between "present" and "in the way".
+     *
+     * A visitor who has already collapsed it before keeps that preference and never sees the
+     * peek again.
      */
     useEffect(() => {
         if (!isReady) return undefined;
-        // "Jangan Tampilkan Lagi" now means what it says: it suppresses the ask entirely.
-        // It used to hide only the modal and then show the banner anyway.
+        // "Jangan Tampilkan Lagi" means what it says: it suppresses the ask entirely.
         if (localStorage.getItem(STORAGE_KEY) === 'true') return undefined;
 
-        const timer = setTimeout(() => {
+        const timers = [];
+        timers.push(setTimeout(() => {
+            const alreadyMinimized = localStorage.getItem(BANNER_MINIMIZED_KEY) === 'true';
             setShowBanner(true);
-            setBannerMinimized(localStorage.getItem(BANNER_MINIMIZED_KEY) === 'true');
-        }, 3000);
-        return () => clearTimeout(timer);
+            setBannerMinimized(alreadyMinimized);
+
+            if (!alreadyMinimized) {
+                timers.push(setTimeout(() => {
+                    // Touching it counts as intent: someone reading or hovering the card is not
+                    // someone the widget should fold away mid-thought.
+                    if (bannerTouchedRef.current) return;
+                    setBannerMinimized(true);
+                }, PEEK_MS));
+            }
+        }, BANNER_DELAY_MS));
+
+        return () => timers.forEach(clearTimeout);
     }, [isReady]);
+
+    /*
+     * There is deliberately NO "show the modal after they close a stream" hook here.
+     *
+     * That moment is the right one to ask — but the ask now lives INSIDE the video popup as a
+     * single quiet line under the actions (VideoPopup), which reaches the same person at the
+     * same instant without opening anything over them. Once the inline line exists, a modal
+     * fired at the same moment is both redundant and the more intrusive of the two.
+     */
 
     const handleModalClose = () => {
         setShowModal(false);
@@ -104,23 +121,30 @@ const SaweriaSupport = memo(function SaweriaSupport() {
     };
 
     const handleSupport = () => {
-        window.open('https://saweria.co/raflialdi', '_blank', 'noopener,noreferrer');
+        window.open(SAWERIA_URL, '_blank', 'noopener,noreferrer');
         setShowModal(false);
         setTimeout(() => setShowBanner(true), 2000);
     };
 
+    /*
+     * Collapsing by hand is a preference and is remembered — that visitor gets the bubble
+     * straight away next time, no peek. The automatic fold deliberately does NOT write this
+     * key: it means "you did not react", not "you told me to stay small".
+     */
     const handleBannerMinimize = () => {
+        markBannerTouched();
         setBannerMinimized(true);
         localStorage.setItem(BANNER_MINIMIZED_KEY, 'true');
     };
 
     const handleBannerMaximize = () => {
+        markBannerTouched();
         setBannerMinimized(false);
         localStorage.setItem(BANNER_MINIMIZED_KEY, 'false');
     };
 
     const handleBannerClose = () => setShowBanner(false);
-    const handleBannerSupport = () => window.open('https://saweria.co/raflialdi', '_blank', 'noopener,noreferrer');
+    const handleBannerSupport = () => window.open(SAWERIA_URL, '_blank', 'noopener,noreferrer');
 
     if (!isReady || !isEnabled) return null;
 
@@ -178,7 +202,12 @@ const SaweriaSupport = memo(function SaweriaSupport() {
                     data-testid="saweria-floating-banner"
                     // Same rule as FeedbackWidget: a fixed element must never be sized with
                     // `100vw`, because it escapes the root overflow guard and can widen the page.
-                    className={`fixed bottom-24 left-4 z-fab sm:bottom-24 sm:left-auto sm:right-6 ${bannerMinimized ? 'w-14' : 'right-[6.5rem] max-w-52 sm:right-6 sm:w-64 sm:max-w-none'}`}
+                    className={`fixed bottom-24 left-4 z-fab sm:bottom-24 sm:left-auto sm:right-6 ${bannerMinimized ? 'w-14' : 'right-[6.5rem] max-w-52 sm:right-6 sm:w-64 sm:max-w-none'} ${disableAnimations ? '' : 'animate-slide-up'}`}
+                    // Reading or reaching for it counts as intent, so the peek timer stands down.
+                    // Pointer + touch, because a phone never fires mouseenter.
+                    onMouseEnter={markBannerTouched}
+                    onTouchStart={markBannerTouched}
+                    onFocusCapture={markBannerTouched}
                 >
                     {bannerMinimized ? (
                         <button

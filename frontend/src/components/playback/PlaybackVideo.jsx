@@ -298,7 +298,7 @@ export default function PlaybackVideo({
                                 <div className="flex items-center gap-3">
                                     <h2 className="text-white font-bold text-lg">{selectedCamera?.name}</h2>
                                     {selectedCamera?.video_codec && (
-                                        <CodecBadge codec={selectedCamera.video_codec} size="sm" showWarning={false} />
+                                        <CodecBadge codec={selectedCamera.video_codec} size="sm" />
                                     )}
                                 </div>
                                 <button onClick={onToggleFullscreen} className="p-2 hover:bg-white/20 rounded-xl text-white bg-white/10">

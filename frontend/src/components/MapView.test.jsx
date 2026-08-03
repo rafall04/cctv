@@ -418,7 +418,7 @@ describe('MapView area filter visibility', () => {
         expect(screen.queryByText('Menghubungkan...')).toBeNull();
         expect(screen.queryByTitle('Zoom In')).toBeNull();
         expect(screen.queryByTitle('Fullscreen')).toBeNull();
-        expect(screen.getByTitle('Tutup')).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'Tutup' })).toBeTruthy();
         expect(startSessionMock).not.toHaveBeenCalledWith(4);
     });
 
@@ -438,7 +438,7 @@ describe('MapView area filter visibility', () => {
         expect(screen.queryByText('Menghubungkan...')).toBeNull();
         expect(screen.queryByTitle('Zoom In')).toBeNull();
         expect(screen.queryByTitle('Fullscreen')).toBeNull();
-        expect(screen.getByTitle('Tutup')).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'Tutup' })).toBeTruthy();
         expect(startSessionMock).not.toHaveBeenCalledWith(3);
     });
 
@@ -541,10 +541,10 @@ describe('MapView area filter visibility', () => {
         fireEvent.click(screen.getByTestId('marker--7.1507-111.8815'));
 
         await waitFor(() => {
-            expect(screen.getByTitle('Tutup')).toBeTruthy();
+            expect(screen.getByRole('button', { name: 'Tutup' })).toBeTruthy();
         });
 
-        fireEvent.click(screen.getByTitle('Tutup'));
+        fireEvent.click(screen.getByRole('button', { name: 'Tutup' }));
 
         await act(async () => {
             await Promise.resolve();

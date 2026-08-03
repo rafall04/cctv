@@ -1204,20 +1204,14 @@ function VideoPopup({
                             <div className="flex items-center gap-2 flex-1 min-w-0">
                                 <h3 className="text-content font-bold text-sm sm:text-base truncate">{camera.name}</h3>
                                 {camera.video_codec && (
-                                    <CodecBadge codec={camera.video_codec} size="sm" showWarning={true} />
+                                    <CodecBadge codec={camera.video_codec} size="sm" />
                                 )}
                             </div>
-                            {/* Status badges */}
+                            {/* Identity + status + dismiss. Nothing else: the share icon that used to
+                                sit here duplicated the labelled "Bagikan" button in CameraDetailPanel
+                                below, where it reads as one of a set with "Tambah favorit" / "Buka
+                                area" instead of as an unlabelled glyph. */}
                             <div className="flex items-center gap-1 shrink-0">
-                                <button
-                                    onClick={handleShare}
-                                    className="p-1.5 hover:bg-surface-raised rounded-lg"
-                                    aria-label="Bagikan link kamera" title="Bagikan link kamera"
-                                >
-                                    <svg className="w-4 h-4 text-content-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-                                    </svg>
-                                </button>
                                 <span className={`inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded text-[10px] font-bold ${statusDisplay.color}`}>
                                     <span className={`w-1.5 h-1.5 rounded-full ${statusDisplay.dotColor} ${renderStatus === 'live' && !disableAnimations ? 'animate-pulse' : ''}`} />
                                     {statusDisplay.label}
@@ -1236,23 +1230,20 @@ function VideoPopup({
                                 </button>
                             </div>
                         </div>
-                        {/* Location + Area */}
-                        {(camera.location || camera.area_name) && (
-                            <div className="flex items-center gap-2 mt-1.5">
-                                {camera.location && (
-                                    <span className="text-content-muted text-xs flex items-center gap-1 truncate">
-                                        <Icons.MapPin />
-                                        <span className="truncate">{camera.location}</span>
-                                    </span>
-                                )}
-                                {camera.area_name && (
-                                    <span className="px-1.5 py-0.5 bg-primary/20 text-primary-600 dark:text-primary-400 rounded text-[10px] font-medium shrink-0">
-                                        {camera.area_name}
-                                    </span>
-                                )}
+                        {/* Location only.
+                            The area badge and the viewer-stats row that used to follow are both
+                            repeated verbatim by CameraDetailPanel a few hundred pixels below —
+                            the area as that panel's heading (with its own "Buka area" link), the
+                            counts as "N live · N views". Saying each of them twice on one screen
+                            is how this header grew to compete with the picture it frames. */}
+                        {camera.location && (
+                            <div className="mt-1.5 flex items-center gap-2">
+                                <span className="text-content-muted text-xs flex items-center gap-1 truncate">
+                                    <Icons.MapPin />
+                                    <span className="truncate">{camera.location}</span>
+                                </span>
                             </div>
                         )}
-                        <CameraViewerStatsBadges camera={camera} className="mt-2" />
                     </div>
                 )}
 
@@ -1411,7 +1402,7 @@ function VideoPopup({
                                     <div className="flex items-center gap-3 flex-wrap">
                                         <h2 className="text-white font-bold text-lg">{camera.name}</h2>
                                         {camera.video_codec && (
-                                            <CodecBadge codec={camera.video_codec} size="sm" showWarning={true} />
+                                            <CodecBadge codec={camera.video_codec} size="sm" />
                                         )}
                                         <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-bold ${statusDisplay.color}`}>
                                             <span className={`w-1.5 h-1.5 rounded-full ${statusDisplay.dotColor}`} />
@@ -1539,10 +1530,11 @@ function VideoPopup({
                                 </button>
                             )}
 
-                            {/* Close Button */}
-                            <button onClick={onClose} aria-label="Tutup" className="p-1.5 bg-surface-raised hover:bg-surface-overlay rounded-lg text-content transition-colors" title="Tutup">
-                                <Icons.X />
-                            </button>
+                            {/* The close button that used to sit here was the SECOND one on screen —
+                                the sticky header already carries one, ~40px above it, and that one
+                                stays reachable while scrolling. This row is for controls that act on
+                                the video (zoom / snapshot / fullscreen); dismissing the dialog is not
+                                one of them and belongs where every dialog puts it: top-right. */}
                         </div>
                     </div>
                 </div>

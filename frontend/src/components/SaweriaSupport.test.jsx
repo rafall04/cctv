@@ -6,7 +6,7 @@
  * SideEffects: Mocks fetch, timers, localStorage, and window.open.
  */
 
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import SaweriaSupport from './SaweriaSupport';
 
@@ -27,6 +27,55 @@ describe('SaweriaSupport floating layout', () => {
     afterEach(() => {
         vi.useRealTimers();
         vi.restoreAllMocks();
+    });
+
+    /** Advance to the moment the banner has just appeared, still open. */
+    const renderAndPeek = async () => {
+        render(<SaweriaSupport />);
+        await act(async () => {
+            await Promise.resolve();
+            await Promise.resolve();
+        });
+        await act(async () => {
+            vi.advanceTimersByTime(3000);
+            await Promise.resolve();
+        });
+    };
+
+    /*
+     * "Peek, then settle" is the whole reason the ask can be visible early without being
+     * intrusive: it arrives OPEN so the visitor actually sees it, then folds itself away so
+     * ignoring it costs nothing. Both halves are load-bearing — a banner that never opens is
+     * invisible, one that never folds is the nagging corner ad it replaced.
+     */
+    it('arrives open, then folds itself into the bubble when ignored', async () => {
+        await renderAndPeek();
+
+        // Open: the full ask is readable.
+        expect(screen.getByText('Dukung Kami')).toBeTruthy();
+        expect(screen.getByText('Traktir Kopi')).toBeTruthy();
+
+        await act(async () => {
+            vi.advanceTimersByTime(9000);
+            await Promise.resolve();
+        });
+
+        // Settled: the card is gone, the bubble remains — nothing was dismissed by the user.
+        expect(screen.queryByText('Dukung Kami')).toBeNull();
+        expect(screen.getByTestId('saweria-floating-banner').className).toContain('w-14');
+    });
+
+    it('stays open when the visitor is actually touching it', async () => {
+        await renderAndPeek();
+        const banner = screen.getByTestId('saweria-floating-banner');
+
+        fireEvent.mouseEnter(banner);
+        await act(async () => {
+            vi.advanceTimersByTime(9000);
+            await Promise.resolve();
+        });
+
+        expect(screen.getByText('Dukung Kami')).toBeTruthy();
     });
 
     it('places the banner on the left on mobile and keeps desktop right-side stacking', async () => {

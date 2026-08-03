@@ -215,7 +215,7 @@ describe('VideoPopup non-live states', () => {
         expect(screen.getByTestId('grid-video-body')).toBeTruthy();
         expect(screen.queryByTitle('Zoom In')).toBeNull();
         expect(screen.queryByTitle('Fullscreen')).toBeNull();
-        expect(screen.getByTitle('Tutup')).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'Tutup' })).toBeTruthy();
         expect(startSessionMock).not.toHaveBeenCalled();
     });
 
@@ -235,7 +235,7 @@ describe('VideoPopup non-live states', () => {
         expect(screen.getByTestId('grid-video-body')).toBeTruthy();
         expect(screen.queryByTitle('Zoom In')).toBeNull();
         expect(screen.queryByTitle('Fullscreen')).toBeNull();
-        expect(screen.getByTitle('Tutup')).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'Tutup' })).toBeTruthy();
         expect(startSessionMock).not.toHaveBeenCalled();
     });
 
@@ -475,7 +475,12 @@ describe('VideoPopup non-live states', () => {
         });
     });
 
-    it('menampilkan statistik penonton di header popup kamera', async () => {
+    /*
+     * The counts used to be rendered TWICE — CameraViewerStatsBadges in the sticky header and
+     * again in CameraDetailPanel below. The header copy is gone; this now pins that the popup
+     * still states them exactly once, in the compact form the cards use.
+     */
+    it('menampilkan statistik penonton sekali saja, dalam format ringkas', async () => {
         startSessionMock.mockResolvedValue('viewer-session');
         stopSessionMock.mockResolvedValue(undefined);
 
@@ -493,8 +498,8 @@ describe('VideoPopup non-live states', () => {
             />
         );
 
-        expect(screen.getAllByText('4 live').length).toBeGreaterThan(0);
-        expect(screen.getAllByText('21.5k views').length).toBeGreaterThan(0);
+        expect(screen.getAllByText('4 live')).toHaveLength(1);
+        expect(screen.getAllByText('21.5k views')).toHaveLength(1);
     });
 
     it('tidak membuat session manual untuk internal HLS karena sudah dilacak HLS proxy', async () => {
@@ -625,7 +630,7 @@ describe('VideoPopup non-live states', () => {
             />
         );
 
-        const footer = screen.getByTitle('Tutup').closest('.shrink-0');
+        const footer = screen.getByTitle('Fullscreen').closest('.shrink-0');
 
         await waitFor(() => {
             expect(screen.getByText('popup bottom order ad')).toBeTruthy();

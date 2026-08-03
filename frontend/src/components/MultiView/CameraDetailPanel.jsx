@@ -8,8 +8,10 @@
 
 import { getPublicCameraQuality } from '../../utils/landingCameraInsights';
 import { buildAreaPath } from '../../utils/publicGrowthShare';
+import { formatCompactCount } from '../common/CameraViewerStatsBadges.jsx';
 import CameraReactionBar from './CameraReactionBar.jsx';
 import CameraReportForm from './CameraReportForm.jsx';
+import SupportInlineNote from './SupportInlineNote.jsx';
 
 function metric(camera, key) {
     return Number(camera?.[key] ?? camera?.viewer_stats?.[key] ?? 0);
@@ -58,9 +60,12 @@ export default function CameraDetailPanel({
                             {quality.label}
                         </span>
                         <span className="text-content-subtle" aria-hidden="true">·</span>
-                        <span className="tabular-nums text-content-muted">{liveViewers} live</span>
+                        {/* Compact form, shared with the camera cards: this row is now the ONLY
+                            place the popup states the counts (the header used to repeat them),
+                            so it has to be the one that reads well at 21500 → "21.5k". */}
+                        <span className="tabular-nums text-content-muted">{formatCompactCount(liveViewers)} live</span>
                         <span className="text-content-subtle" aria-hidden="true">·</span>
-                        <span className="tabular-nums text-content-muted">{totalViews} views</span>
+                        <span className="tabular-nums text-content-muted">{formatCompactCount(totalViews)} views</span>
                         {hasPlayback && (
                             <>
                                 <span className="text-content-subtle" aria-hidden="true">·</span>
@@ -95,6 +100,12 @@ export default function CameraDetailPanel({
               */}
             <CameraReactionBar cameraId={camera?.id} />
             <CameraReportForm cameraId={camera?.id} />
+            {/*
+              * Last thing in the panel, above the related-cameras strip: the visitor has the
+              * stream, the actions and the feedback controls before they reach the ask, so it
+              * reads as a footnote to the experience rather than a toll on it.
+              */}
+            <SupportInlineNote />
         </section>
     );
 }

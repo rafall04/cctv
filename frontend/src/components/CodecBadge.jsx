@@ -6,20 +6,38 @@ import { getCodecDisplayName, canPlayCodec, getCodecWarning } from '../utils/cod
  * 
  * Displays video codec badge with browser compatibility warning
  * 
+ * Renders NOTHING when the codec plays fine here — see the note in the body.
+ *
  * @param {Object} props
  * @param {string} props.codec - 'h264' or 'h265'
  * @param {string} props.size - 'sm' | 'md' | 'lg'
- * @param {boolean} props.showWarning - Show warning icon for unsupported codecs
  */
-export default function CodecBadge({ codec = 'h264', size = 'sm', showWarning = true }) {
+export default function CodecBadge({ codec = 'h264', size = 'sm' }) {
     const [showTooltip, setShowTooltip] = useState(false);
-    
+
     if (!codec) return null;
-    
+
     const support = canPlayCodec(codec);
     const warning = getCodecWarning(codec);
     const displayName = getCodecDisplayName(codec);
-    
+
+    /*
+     * Silent unless this browser may actually fail to play the stream.
+     *
+     * The badge used to print the codec name for EVERY camera and merely attach a warning icon
+     * when relevant — two jobs in one, and the first is noise: all 36 production cameras are
+     * H.264, so it announced "H.264/AVC" on 100% of them while warning about nothing. That is
+     * the same conclusion LandingCameraCard already reached ("a badge on 100% of items is
+     * decoration, not information"); the popup and playback surfaces never caught up.
+     *
+     * Going quiet in the normal case is what makes the H.265 case LOUD: on Chrome/Firefox the
+     * warning now stands alone instead of sitting beside a badge that cried wolf everywhere.
+     * Nothing about the safety net changes — getCodecWarning still fires pre-emptively, and a
+     * genuine decode failure still lands on the "Codec Tidak Didukung" panel from
+     * publicPopupState.
+     */
+    if (!warning) return null;
+
     // Size classes
     const sizeClasses = {
         sm: 'px-2 py-0.5 text-xs',
@@ -43,7 +61,9 @@ export default function CodecBadge({ codec = 'h264', size = 'sm', showWarning = 
     
     const badgeClass = `${sizeClasses[size]} ${codecColors[codec] || codecColors.h264} rounded border font-semibold inline-flex items-center gap-1.5`;
     
-    const hasWarning = showWarning && warning && (support === 'none' || support === 'partial');
+    // `warning` is non-null by the guard above; this only distinguishes the two failing tiers
+    // from a hypothetical future warning that is not about playability.
+    const hasWarning = support === 'none' || support === 'partial';
     
     return (
         <div className="relative inline-flex items-center gap-2">
