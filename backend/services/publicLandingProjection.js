@@ -52,10 +52,17 @@ function shouldHideOriginUrls(camera) {
         && proxied;
 }
 
+/*
+ * ONLY the stream origins. `external_snapshot_url` deliberately does NOT belong here: it is a
+ * still image, it never touches the HLS proxy, and the public UI uses it as the PREFERRED
+ * thumbnail source — LandingCameraCard, LandingHeroSpotlight and PlaybackCameraPicker all read
+ * `external_snapshot_url || thumbnail_path`, and LandingHero gates the whole spotlight on that
+ * pair being present. Stripping it cost cameras their picture (and the hero its slot) while
+ * buying no protection at all.
+ */
 export const PROXIED_ORIGIN_URL_FIELDS = [
     'external_stream_url',
     'external_hls_url',
-    'external_snapshot_url',
 ];
 
 /**

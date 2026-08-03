@@ -62,6 +62,19 @@ describe('stripInternalLandingFields', () => {
         expect(result.availability_state).toBe('online');
     });
 
+    /*
+     * REGRESSION on the fix itself: `external_snapshot_url` was briefly stripped alongside the
+     * stream origins. It is a still image that never goes near the HLS proxy, and the public UI
+     * prefers it OVER thumbnail_path (LandingCameraCard / LandingHeroSpotlight /
+     * PlaybackCameraPicker all read `external_snapshot_url || thumbnail_path`, and LandingHero
+     * hides the whole spotlight when neither exists). Removing it cost pictures and bought
+     * nothing.
+     */
+    it('keeps external_snapshot_url — it is the preferred public thumbnail, not a stream origin', () => {
+        const result = stripInternalLandingFields(proxiedExternalCamera());
+        expect(result.external_snapshot_url).toBe('https://origin.example.go.id/snap.jpg');
+    });
+
     it('accepts a boolean external_use_proxy as well as 1', () => {
         const result = stripInternalLandingFields({ ...proxiedExternalCamera(), external_use_proxy: true });
         expect(result).not.toHaveProperty('external_stream_url');
