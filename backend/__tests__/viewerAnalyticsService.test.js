@@ -110,6 +110,23 @@ describe('viewerAnalyticsService.getAnalytics — period filtering', () => {
         expect(result.overview.totalSessions).toBe(6);
     });
 
+    /*
+     * REGRESSION, found by running this service against production data.
+     *
+     * `2026-13-99` passes the shape check — four digits, two, two — but is not a date.
+     * `new Date()` returned Invalid Date and `toISOString()` threw RangeError, which
+     * getAnalytics' own catch swallowed: the admin got a completely empty dashboard, with
+     * nothing but a stack trace in the log to explain it. A date the calendar does not have
+     * must degrade to the same 7-day fallback as any other unusable input.
+     */
+    it.each(['date:2026-13-99', 'date:2026-02-30', 'date:0000-00-00'])(
+        '%s is calendar-invalid and falls back instead of blanking the dashboard',
+        (period) => {
+            const result = service.getAnalytics(period);
+            expect(result.overview.totalSessions).toBe(6);
+        }
+    );
+
     it('aggregates watch time and session extremes for the window', () => {
         const result = service.getAnalytics('today');
         expect(result.overview.totalWatchTime).toBe(425);

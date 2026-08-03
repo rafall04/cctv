@@ -63,8 +63,27 @@ class ViewerAnalyticsService {
 
         if (period.startsWith('date:')) {
             const customDate = period.substring(5);
-            if (/^\d{4}-\d{2}-\d{2}$/.test(customDate)) {
-                const prevDate = new Date(customDate);
+            const parsedDate = new Date(customDate);
+            /*
+             * The shape check alone is not enough, and it fails in two different ways.
+             *
+             *   2026-13-99  -> Invalid Date; toISOString() throws RangeError. That threw
+             *                  inside getAnalytics, its catch swallowed it, and the admin
+             *                  got a silently empty dashboard with only a stack trace to
+             *                  explain it. Caught by running this service on production.
+             *   2026-02-30  -> NOT invalid: JavaScript rolls it over to 2026-03-02. The
+             *                  query then asked for a day that does not exist and honestly
+             *                  returned nothing — but by a different route than the case
+             *                  above, so two equally impossible dates behaved differently.
+             *
+             * Round-tripping the parsed date back to a string catches both: a date the
+             * calendar does not have never comes back as what was asked for.
+             */
+            const roundTrips = !Number.isNaN(parsedDate.getTime())
+                && parsedDate.toISOString().slice(0, 10) === customDate;
+
+            if (/^\d{4}-\d{2}-\d{2}$/.test(customDate) && roundTrips) {
+                const prevDate = new Date(parsedDate);
                 prevDate.setDate(prevDate.getDate() - 1);
                 current = onDate(customDate);
                 previous = onDate(prevDate.toISOString().split('T')[0]);
