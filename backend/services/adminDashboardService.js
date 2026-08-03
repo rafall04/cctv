@@ -4,15 +4,24 @@ import mediaMtxService from './mediaMtxService.js';
 import viewerSessionService from './viewerSessionService.js';
 import { getTimezone, formatDateTime } from './timezoneService.js';
 
-// Guard: every date interpolated into analytics SQL must be a strict YYYY-MM-DD literal.
-// Values here are server-generated (getDateWithOffset), so this is defense-in-depth that
-// makes SQL injection structurally impossible.
+// Dates are BOUND, not interpolated — see the same note in viewerAnalyticsService. The
+// guard is kept because it still turns a malformed date into a named error instead of a
+// silently empty result set.
 function sqlDate(value) {
     if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
         throw new Error(`Unsafe SQL date literal: ${String(value)}`);
     }
     return value;
 }
+
+// A period resolves to a SQL fragment plus the values its placeholders consume.
+const NO_FILTER = { sql: '', params: [] };
+const onDate = (date) => ({ sql: 'AND date(started_at) = ?', params: [sqlDate(date)] });
+const sinceDate = (date) => ({ sql: 'AND date(started_at) >= ?', params: [sqlDate(date)] });
+const betweenDates = (from, to) => ({
+    sql: 'AND date(started_at) >= ? AND date(started_at) < ?',
+    params: [sqlDate(from), sqlDate(to)],
+});
 
 export function getCameraOperationalState(camera) {
     if (camera?.status === 'maintenance') {
@@ -331,49 +340,49 @@ class AdminDashboardService {
             };
         }
 
-        let dateFilter = '';
-        let previousDateFilter = '';
+        let current = NO_FILTER;
+        let previous = NO_FILTER;
         const todayDate = getDateWithOffset(0);
 
         switch (period) {
             case 'yesterday':
-                dateFilter = `AND date(started_at) = '${getDateWithOffset(-1)}'`;
-                previousDateFilter = `AND date(started_at) = '${getDateWithOffset(-2)}'`;
+                current = onDate(getDateWithOffset(-1));
+                previous = onDate(getDateWithOffset(-2));
                 break;
             case '7days':
-                dateFilter = `AND date(started_at) >= '${getDateWithOffset(-7)}'`;
-                previousDateFilter = `AND date(started_at) >= '${getDateWithOffset(-14)}' AND date(started_at) < '${getDateWithOffset(-7)}'`;
+                current = sinceDate(getDateWithOffset(-7));
+                previous = betweenDates(getDateWithOffset(-14), getDateWithOffset(-7));
                 break;
             case '30days':
-                dateFilter = `AND date(started_at) >= '${getDateWithOffset(-30)}'`;
-                previousDateFilter = `AND date(started_at) >= '${getDateWithOffset(-60)}' AND date(started_at) < '${getDateWithOffset(-30)}'`;
+                current = sinceDate(getDateWithOffset(-30));
+                previous = betweenDates(getDateWithOffset(-60), getDateWithOffset(-30));
                 break;
             case 'today':
             default:
-                dateFilter = `AND date(started_at) = '${todayDate}'`;
-                previousDateFilter = `AND date(started_at) = '${getDateWithOffset(-1)}'`;
+                current = onDate(todayDate);
+                previous = onDate(getDateWithOffset(-1));
                 break;
         }
 
         const currentSessionsResult = query(`
-            SELECT 
+            SELECT
                 COUNT(*) as total_sessions,
                 COUNT(DISTINCT ip_address) as unique_viewers,
                 AVG(duration_seconds) as avg_duration,
                 SUM(duration_seconds) as total_watch_time
             FROM viewer_session_history
-            WHERE 1=1 ${dateFilter}
-        `);
+            WHERE 1=1 ${current.sql}
+        `, current.params);
 
         const compareSessionsResult = query(`
-            SELECT 
+            SELECT
                 COUNT(*) as total_sessions,
                 COUNT(DISTINCT ip_address) as unique_viewers,
                 AVG(duration_seconds) as avg_duration,
                 SUM(duration_seconds) as total_watch_time
             FROM viewer_session_history
-            WHERE 1=1 ${previousDateFilter}
-        `);
+            WHERE 1=1 ${previous.sql}
+        `, previous.params);
 
         const viewerStats = viewerSessionService.getViewerStats();
         const activeNow = viewerStats.activeViewers;

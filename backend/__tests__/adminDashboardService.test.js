@@ -10,6 +10,65 @@ import {
     getCameraStatusBreakdown,
 } from '../services/adminDashboardService.js';
 
+describe('adminDashboardService period filters are bound, not interpolated', () => {
+    /*
+     * This service (and viewerAnalyticsService) were the last two places pasting date
+     * values straight into SQL text. The fix was deferred for months with the note "these
+     * analytics services have no tests to verify a rewrite" — so the values below are the
+     * verification that was missing: the SQL must carry placeholders, and the dates must
+     * arrive as bound parameters in the right order.
+     */
+    const dayOffset = (days) => {
+        const d = new Date();
+        d.setDate(d.getDate() + days);
+        return d.toLocaleDateString('sv-SE', { timeZone: 'Asia/Jakarta' });
+    };
+
+    async function captureSessionQueries(period) {
+        vi.spyOn(timezoneService, 'getTimezone').mockReturnValue('Asia/Jakarta');
+        vi.spyOn(viewerSessionService, 'getViewerStats').mockReturnValue({ activeViewers: 0, sessions: [] });
+        const calls = [];
+        vi.spyOn(database, 'query').mockImplementation((sql, params) => {
+            calls.push({ sql, params });
+            return [];
+        });
+        vi.spyOn(database, 'queryOne').mockReturnValue({});
+
+        await adminDashboardService.getTodayStats(period);
+        return calls.filter((c) => c.sql.includes('viewer_session_history'));
+    }
+
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    it.each([
+        ['today', () => [[dayOffset(0)], [dayOffset(-1)]]],
+        ['yesterday', () => [[dayOffset(-1)], [dayOffset(-2)]]],
+        ['7days', () => [[dayOffset(-7)], [dayOffset(-14), dayOffset(-7)]]],
+        ['30days', () => [[dayOffset(-30)], [dayOffset(-60), dayOffset(-30)]]],
+    ])('period %s binds the right dates', async (period, expected) => {
+        const [currentQuery, previousQuery] = await captureSessionQueries(period);
+        const [currentParams, previousParams] = expected();
+
+        expect(currentQuery.params).toEqual(currentParams);
+        expect(previousQuery.params).toEqual(previousParams);
+
+        // The dates must not also be sitting in the SQL text.
+        for (const { sql, params } of [currentQuery, previousQuery]) {
+            for (const p of params) {
+                expect(sql).not.toContain(p);
+            }
+            expect(sql).toContain('?');
+        }
+    });
+
+    it('an unknown period falls back to today rather than dropping the filter', async () => {
+        const [currentQuery] = await captureSessionQueries('nonsense');
+        expect(currentQuery.params).toEqual([dayOffset(0)]);
+    });
+});
+
 describe('adminDashboardService camera status helpers', () => {
     it('menghitung kamera external online dari is_online tanpa path MediaMTX', () => {
         const cameras = [

@@ -7,15 +7,31 @@ import { getTimezone } from './timezoneService.js';
  * Responsible for querying and standardizing analytics from viewer sessions.
  */
 
-// Guard: every date interpolated into analytics SQL must be a strict YYYY-MM-DD literal.
-// These values are server-generated (getDate/getDateWithOffset) or regex-validated (customDate),
-// so this is defense-in-depth that makes SQL injection structurally impossible.
+// Dates are BOUND, not interpolated. They used to be pasted into the SQL text behind a
+// strict YYYY-MM-DD guard, which made injection structurally impossible but left the
+// project's "parameterized SQL only" rule broken and the guard load-bearing. Now the SQL
+// carries `?` and the value travels beside it, so nothing about the string depends on the
+// value being well-formed.
+//
+// The guard stays anyway: it is cheap, and it still catches a malformed date early —
+// where the error names the problem — instead of letting it become an empty result set
+// that looks like "no traffic that day".
 function sqlDate(value) {
     if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
         throw new Error(`Unsafe SQL date literal: ${String(value)}`);
     }
     return value;
 }
+
+// A period resolves to a SQL fragment plus the values its placeholders consume. Callers
+// must splice the params in the same order the fragments appear in their statement.
+const NO_FILTER = { sql: '', params: [] };
+const onDate = (date) => ({ sql: 'AND date(started_at) = ?', params: [sqlDate(date)] });
+const sinceDate = (date) => ({ sql: 'AND date(started_at) >= ?', params: [sqlDate(date)] });
+const betweenDates = (from, to) => ({
+    sql: 'AND date(started_at) >= ? AND date(started_at) < ?',
+    params: [sqlDate(from), sqlDate(to)],
+});
 
 function getDate() {
     const timezone = getTimezone();
@@ -40,59 +56,66 @@ class ViewerAnalyticsService {
      * @param {string} period - 'today', 'yesterday', '7days', '30days', 'all', or 'date:YYYY-MM-DD'
      */
     #parsePeriodFilters(period) {
-        let dateFilter = '';
-        let previousDateFilter = '';
+        let current = NO_FILTER;
+        let previous = NO_FILTER;
         let periodDays = 0;
         const todayDate = getDate();
 
         if (period.startsWith('date:')) {
             const customDate = period.substring(5);
             if (/^\d{4}-\d{2}-\d{2}$/.test(customDate)) {
-                dateFilter = `AND date(started_at) = '${sqlDate(customDate)}'`;
                 const prevDate = new Date(customDate);
                 prevDate.setDate(prevDate.getDate() - 1);
-                const prevDateStr = prevDate.toISOString().split('T')[0];
-                previousDateFilter = `AND date(started_at) = '${sqlDate(prevDateStr)}'`;
+                current = onDate(customDate);
+                previous = onDate(prevDate.toISOString().split('T')[0]);
                 periodDays = 1;
             } else {
-                dateFilter = `AND date(started_at) >= '${getDateWithOffset(-7)}'`;
-                previousDateFilter = `AND date(started_at) >= '${getDateWithOffset(-14)}' AND date(started_at) < '${getDateWithOffset(-7)}'`;
+                current = sinceDate(getDateWithOffset(-7));
+                previous = betweenDates(getDateWithOffset(-14), getDateWithOffset(-7));
                 periodDays = 7;
             }
         } else {
             switch (period) {
                 case 'today':
-                    dateFilter = `AND date(started_at) = '${todayDate}'`;
-                    previousDateFilter = `AND date(started_at) = '${getDateWithOffset(-1)}'`;
+                    current = onDate(todayDate);
+                    previous = onDate(getDateWithOffset(-1));
                     periodDays = 1;
                     break;
                 case 'yesterday':
-                    dateFilter = `AND date(started_at) = '${getDateWithOffset(-1)}'`;
-                    previousDateFilter = `AND date(started_at) = '${getDateWithOffset(-2)}'`;
+                    current = onDate(getDateWithOffset(-1));
+                    previous = onDate(getDateWithOffset(-2));
                     periodDays = 1;
                     break;
                 case '7days':
-                    dateFilter = `AND date(started_at) >= '${getDateWithOffset(-7)}'`;
-                    previousDateFilter = `AND date(started_at) >= '${getDateWithOffset(-14)}' AND date(started_at) < '${getDateWithOffset(-7)}'`;
+                    current = sinceDate(getDateWithOffset(-7));
+                    previous = betweenDates(getDateWithOffset(-14), getDateWithOffset(-7));
                     periodDays = 7;
                     break;
                 case '30days':
-                    dateFilter = `AND date(started_at) >= '${getDateWithOffset(-30)}'`;
-                    previousDateFilter = `AND date(started_at) >= '${getDateWithOffset(-60)}' AND date(started_at) < '${getDateWithOffset(-30)}'`;
+                    current = sinceDate(getDateWithOffset(-30));
+                    previous = betweenDates(getDateWithOffset(-60), getDateWithOffset(-30));
                     periodDays = 30;
                     break;
                 default:
-                    dateFilter = '';
-                    previousDateFilter = '';
+                    current = NO_FILTER;
+                    previous = NO_FILTER;
                     periodDays = 0;
             }
         }
-        return { dateFilter, previousDateFilter, periodDays, todayDate };
+
+        return {
+            dateFilter: current.sql,
+            dateParams: current.params,
+            previousDateFilter: previous.sql,
+            previousDateParams: previous.params,
+            periodDays,
+            todayDate,
+        };
     }
 
-    #getOverview(dateFilter) {
+    #getOverview(dateFilter, dateParams) {
         return queryOne(`
-            SELECT 
+            SELECT
                 COUNT(*) as total_sessions,
                 COUNT(DISTINCT ip_address) as unique_visitors,
                 COALESCE(SUM(duration_seconds), 0) as total_watch_time,
@@ -100,24 +123,26 @@ class ViewerAnalyticsService {
                 COALESCE(MAX(duration_seconds), 0) as longest_session
             FROM viewer_session_history
             WHERE 1=1 ${dateFilter}
-        `) || {};
+        `, dateParams) || {};
     }
 
-    #getPreviousOverview(previousDateFilter) {
+    #getPreviousOverview(previousDateFilter, previousDateParams) {
         return queryOne(`
-            SELECT 
+            SELECT
                 COUNT(*) as total_sessions,
                 COUNT(DISTINCT ip_address) as unique_visitors,
                 COALESCE(SUM(duration_seconds), 0) as total_watch_time,
                 COALESCE(AVG(duration_seconds), 0) as avg_session_duration
             FROM viewer_session_history
             WHERE 1=1 ${previousDateFilter}
-        `) || {};
+        `, previousDateParams) || {};
     }
 
-    #getRetentionMetrics(dateFilter, todayDate) {
+    #getRetentionMetrics(dateFilter, dateParams, todayDate) {
+        // Param order follows the order the placeholders appear in the statement: the
+        // subquery's date(?) comes before the outer WHERE's filter.
         return queryOne(`
-            SELECT 
+            SELECT
                 COUNT(DISTINCT CASE WHEN visit_count = 1 THEN h1.ip_address END) as new_visitors,
                 COUNT(DISTINCT CASE WHEN visit_count > 1 THEN h1.ip_address END) as returning_visitors,
                 COUNT(DISTINCT CASE WHEN h1.duration_seconds < 10 THEN h1.ip_address END) as bounced_visitors,
@@ -126,11 +151,11 @@ class ViewerAnalyticsService {
             LEFT JOIN (
                 SELECT ip_address, COUNT(*) as visit_count
                 FROM viewer_session_history
-                WHERE date(started_at) <= date('${todayDate}')
+                WHERE date(started_at) <= date(?)
                 GROUP BY ip_address
             ) h2 ON h1.ip_address = h2.ip_address
             WHERE 1=1 ${dateFilter}
-        `) || {};
+        `, [sqlDate(todayDate), ...dateParams]) || {};
     }
 
     #calculateTrend(current, previous) {
@@ -140,10 +165,16 @@ class ViewerAnalyticsService {
 
     getAnalytics(period = '7days', activeViewers = 0, activeSessions = []) {
         try {
-            const { dateFilter, previousDateFilter, periodDays, todayDate } = this.#parsePeriodFilters(period);
+            const {
+                dateFilter, dateParams,
+                previousDateFilter, previousDateParams,
+                periodDays, todayDate,
+            } = this.#parsePeriodFilters(period);
 
-            const overview = this.#getOverview(dateFilter);
-            const previousOverview = periodDays > 0 ? this.#getPreviousOverview(previousDateFilter) : null;
+            const overview = this.#getOverview(dateFilter, dateParams);
+            const previousOverview = periodDays > 0
+                ? this.#getPreviousOverview(previousDateFilter, previousDateParams)
+                : null;
 
             const trends = previousOverview ? {
                 totalSessions: this.#calculateTrend(overview.total_sessions, previousOverview.total_sessions),
@@ -152,7 +183,7 @@ class ViewerAnalyticsService {
                 avgSessionDuration: this.#calculateTrend(overview.avg_session_duration, previousOverview.avg_session_duration)
             } : null;
 
-            const retentionMetrics = this.#getRetentionMetrics(dateFilter, todayDate);
+            const retentionMetrics = this.#getRetentionMetrics(dateFilter, dateParams, todayDate);
             const bounceRate = retentionMetrics.total_unique_visitors > 0
                 ? Math.round((retentionMetrics.bounced_visitors / retentionMetrics.total_unique_visitors) * 100)
                 : 0;
@@ -170,7 +201,7 @@ class ViewerAnalyticsService {
                 WHERE 1=1 ${dateFilter}
                 GROUP BY date(started_at)
                 ORDER BY date ASC
-            `);
+            `, dateParams);
 
             const sessionsByHour = query(`
                 SELECT 
@@ -180,7 +211,7 @@ class ViewerAnalyticsService {
                 WHERE 1=1 ${dateFilter}
                 GROUP BY strftime('%H', started_at)
                 ORDER BY hour ASC
-            `);
+            `, dateParams);
 
             const activityHeatmap = query(`
                 SELECT 
@@ -192,7 +223,7 @@ class ViewerAnalyticsService {
                 WHERE 1=1 ${dateFilter}
                 GROUP BY strftime('%w', started_at), strftime('%H', started_at)
                 ORDER BY day_of_week, hour
-            `);
+            `, dateParams);
 
             const topCameras = query(`
                 SELECT 
@@ -205,7 +236,7 @@ class ViewerAnalyticsService {
                 WHERE 1=1 ${dateFilter}
                 GROUP BY camera_id, camera_name
                 ORDER BY total_views DESC LIMIT 10
-            `);
+            `, dateParams);
 
             const deviceBreakdown = query(`
                 SELECT 
@@ -214,7 +245,7 @@ class ViewerAnalyticsService {
                 FROM viewer_session_history
                 WHERE 1=1 ${dateFilter}
                 GROUP BY device_type ORDER BY count DESC
-            `);
+            `, [...dateParams, ...dateParams]);
 
             const topVisitors = query(`
                 SELECT 
@@ -225,14 +256,14 @@ class ViewerAnalyticsService {
                 FROM viewer_session_history
                 WHERE 1=1 ${dateFilter}
                 GROUP BY ip_address ORDER BY total_sessions DESC LIMIT 20
-            `);
+            `, dateParams);
 
             const recentSessions = query(`
                 SELECT id, camera_id, camera_name, ip_address, device_type, started_at, ended_at, duration_seconds
                 FROM viewer_session_history
                 WHERE 1=1 ${dateFilter}
                 ORDER BY started_at DESC LIMIT 50
-            `);
+            `, dateParams);
 
             const peakHours = query(`
                 SELECT strftime('%H', started_at) as hour, COUNT(*) as sessions, COUNT(DISTINCT ip_address) as unique_visitors
@@ -240,7 +271,7 @@ class ViewerAnalyticsService {
                 WHERE 1=1 ${dateFilter}
                 GROUP BY strftime('%H', started_at)
                 ORDER BY sessions DESC LIMIT 5
-            `);
+            `, dateParams);
 
             const cameraPerformance = query(`
                 SELECT 
@@ -255,7 +286,7 @@ class ViewerAnalyticsService {
                 WHERE 1=1 ${dateFilter}
                 GROUP BY camera_id, camera_name
                 ORDER BY total_sessions DESC
-            `);
+            `, dateParams);
 
             // activeViewers and activeSessions are passed as arguments to avoid circular dependency
 

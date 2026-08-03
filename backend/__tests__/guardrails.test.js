@@ -184,7 +184,13 @@ describe('guardrail: auth perimeter stays tested (coverage-floor surrogate)', ()
     // The auth front door was 0-tests on a paying-customer system. These floors stop the tests being
     // silently deleted/gutted. True %-coverage thresholds need @vitest/coverage-v8 (not installed) +
     // CI running `--coverage`; until then this dependency-free test-count ratchet is the floor.
-    const FLOOR = { authService: 10, sessionManager: 10, bruteForceProtection: 10, apiKeyService: 8 };
+    // securityAuditLogger joined 2026-08-03. It was the one service in this perimeter with
+    // no tests at all, which was backwards: it is the thing that records what every other
+    // control did, and a lockout nobody can prove happened is not much of a lockout.
+    const FLOOR = {
+        authService: 10, sessionManager: 10, bruteForceProtection: 10,
+        apiKeyService: 8, securityAuditLogger: 15,
+    };
     for (const [name, min] of Object.entries(FLOOR)) {
         it(`${name} keeps >= ${min} test cases`, () => {
             const file = path.join(BACKEND_ROOT, '__tests__', `${name}.test.js`);
