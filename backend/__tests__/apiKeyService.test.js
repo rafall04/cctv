@@ -1,8 +1,8 @@
-/**
+﻿/**
  * Purpose: Lock down API-key generation/validation/revocation (auth perimeter, previously 0 tests).
  * Caller: backend test gate; part of the auth front-door coverage backfill.
  * Deps: vitest, better-sqlite3 (in-memory), mocked database.js.
- * SideEffects: In-memory database only — never touches prod data.
+ * SideEffects: In-memory database only â€” never touches prod data.
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 
@@ -11,7 +11,7 @@ const { db } = await vi.hoisted(async () => {
     return { db: new Database(':memory:') };
 });
 
-vi.mock('../database/database.js', () => ({
+vi.mock('../database/connectionPool.js', () => ({
     query: (sql, params = []) => db.prepare(sql).all(params),
     queryOne: (sql, params = []) => db.prepare(sql).get(params),
     execute: (sql, params = []) => db.prepare(sql).run(params),
@@ -44,7 +44,7 @@ beforeEach(() => {
     )`);
 });
 
-describe('apiKeyService — primitives', () => {
+describe('apiKeyService â€” primitives', () => {
     it('generates a unique 64-char hex key', () => {
         const a = generateApiKey();
         const b = generateApiKey();
@@ -67,8 +67,8 @@ describe('apiKeyService — primitives', () => {
     });
 });
 
-describe('apiKeyService — lifecycle', () => {
-    it('create → validate round-trips and returns the raw key once', () => {
+describe('apiKeyService â€” lifecycle', () => {
+    it('create â†’ validate round-trips and returns the raw key once', () => {
         const created = createApiKey('frontend');
         expect(created.apiKey).toMatch(/^[a-f0-9]{64}$/);
         const v = validateApiKey(created.apiKey);

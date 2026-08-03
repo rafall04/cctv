@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Password Expiry Service
  * Manages password expiration and warnings.
  * 
@@ -9,7 +9,7 @@
  * - Return warning when password near expiry
  */
 
-import { queryOne, execute } from '../database/database.js';
+import { queryOne, execute } from '../database/connectionPool.js';
 import { PASSWORD_POLICY } from './passwordValidator.js';
 
 /**

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Password History Service
  * Manages password history to prevent reuse of previous passwords.
  * 
@@ -9,7 +9,7 @@
  */
 
 import bcrypt from 'bcrypt';
-import { query, execute } from '../database/database.js';
+import { query, execute } from '../database/connectionPool.js';
 import { PASSWORD_POLICY } from './passwordValidator.js';
 
 /**

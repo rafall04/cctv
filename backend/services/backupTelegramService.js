@@ -18,7 +18,7 @@ import { createReadStream, createWriteStream, existsSync, mkdirSync, statSync, u
 import { pipeline } from 'stream/promises';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
-import { db } from '../database/database.js';
+import { pool } from '../database/connectionPool.js';
 import settingsService from './settingsService.js';
 import { sendTelegramDocument, isTelegramTokenConfigured } from './telegramDocumentSender.js';
 
@@ -70,7 +70,11 @@ export async function createDatabaseSnapshot({ now = new Date() } = {}) {
         if (existsSync(stale)) unlinkSync(stale);
     }
 
-    db.prepare('VACUUM INTO ?').run(rawPath);
+    // VACUUM INTO needs a real read-write handle, which the readonly pool cannot give —
+    // so this is the one place that reaches for the writer directly rather than going
+    // through query/execute. It also cannot run inside a transaction, which is why the
+    // backup is only ever driven from the scheduler, never from inside one.
+    pool.getWriteConnection().prepare('VACUUM INTO ?').run(rawPath);
 
     try {
         await pipeline(createReadStream(rawPath), createGzip({ level: 6 }), createWriteStream(gzPath));

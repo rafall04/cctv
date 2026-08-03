@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Purpose: Verify Telegram multi-target camera notification routing and on-demand filtering.
  * Caller: Backend Vitest suite for services/telegramService.js.
  * Deps: Vitest, mocked database settings, mocked timezone, global fetch.
@@ -20,7 +20,7 @@ const ORIGINAL_TELEGRAM_ENV = {
     TELEGRAM_FEEDBACK_CHAT_ID: process.env.TELEGRAM_FEEDBACK_CHAT_ID,
 };
 
-vi.mock('../database/database.js', () => ({
+vi.mock('../database/connectionPool.js', () => ({
     queryOne: queryOneMock,
     execute: executeMock,
 }));

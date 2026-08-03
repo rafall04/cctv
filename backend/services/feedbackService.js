@@ -1,4 +1,4 @@
-import { query, queryOne, execute } from '../database/database.js';
+﻿import { query, queryOne, execute } from '../database/connectionPool.js';
 import { sendFeedbackNotification } from './telegramService.js';
 
 class FeedbackService {

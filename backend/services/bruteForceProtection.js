@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Brute Force Protection Service
  * 
  * Tracks failed login attempts and implements account lockout mechanism.
@@ -6,7 +6,7 @@
  * Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7
  */
 
-import { execute, query, queryOne } from '../database/database.js';
+import { execute, query, queryOne } from '../database/connectionPool.js';
 import { logAccountLockout, logAuthAttempt } from './securityAuditLogger.js';
 
 /**

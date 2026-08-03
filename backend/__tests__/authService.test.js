@@ -22,12 +22,10 @@ vi.mock('../database/connectionPool.js', () => ({
     execute: (sql, params = []) => db.prepare(sql).run(params),
     transaction: (cb) => db.transaction(cb),
 }));
-vi.mock('../database/database.js', () => ({
-    query: (sql, params = []) => db.prepare(sql).all(params),
-    queryOne: (sql, params = []) => db.prepare(sql).get(params),
-    execute: (sql, params = []) => db.prepare(sql).run(params),
-    transaction: (cb) => db.transaction(cb),
-}));
+// The second mock that used to sit here — an identical factory for
+// ../database/database.js — is gone with that module's last importer. authService's
+// transitive dependencies (passwordHistory, passwordExpiry, bruteForceProtection) now
+// read through connectionPool, so the mock above covers them.
 
 vi.mock('../services/securityAuditLogger.js', () => ({
     logAuthAttempt: vi.fn(), logSessionCreated: vi.fn(), logSessionRefreshed: vi.fn(),

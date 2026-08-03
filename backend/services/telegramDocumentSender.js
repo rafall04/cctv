@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Purpose: Upload a file to a Telegram chat as a document (multipart), for backups and exports.
  * Caller: backupTelegramService.
  * Deps: database settings (`telegram_config`), global fetch/FormData.
@@ -15,7 +15,7 @@
  * The token is read from the same settings row telegramService uses, and never leaves this module.
  */
 
-import { queryOne } from '../database/database.js';
+import { queryOne } from '../database/connectionPool.js';
 import { config } from '../config/config.js';
 
 const UPLOAD_TIMEOUT_MS = 5 * 60 * 1000;
@@ -27,7 +27,7 @@ function readBotToken() {
         const fromDb = row ? String(JSON.parse(row.value)?.botToken || '').trim() : '';
         if (fromDb) return fromDb;
     } catch {
-        // Unreadable/!JSON settings must not crash a backup — fall through to env.
+        // Unreadable/!JSON settings must not crash a backup â€” fall through to env.
     }
     return String(config.telegram?.botToken || process.env.TELEGRAM_BOT_TOKEN || '').trim();
 }

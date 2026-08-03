@@ -23,12 +23,8 @@ const existsSyncMock = vi.fn();
 const statSyncMock = vi.fn();
 const validateRequestForCameraMock = vi.fn();
 
-vi.mock('../database/database.js', () => ({
-    query: queryMock,
-    queryOne: queryOneMock,
-    execute: executeMock,
-}));
-
+// The identical ../database/database.js mock that used to sit here is gone along with
+// that module's last importer — everything now reads through connectionPool.
 vi.mock('../database/connectionPool.js', () => ({
     query: queryMock,
     queryOne: queryOneMock,

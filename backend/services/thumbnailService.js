@@ -1,4 +1,4 @@
-/*
+﻿/*
 Purpose: Generate and maintain camera thumbnail images from internal RTSP/HLS and external stream sources.
 Caller: Backend startup thumbnail scheduler, camera recovery hooks, and thumbnail refresh actions.
 Deps: ffmpeg, filesystem thumbnail storage, database camera rows, timeService, delivery and internal RTSP policy utilities.
@@ -12,7 +12,7 @@ import { existsSync, mkdirSync, unlinkSync, copyFileSync } from 'fs';
 import { join } from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-import { query, execute } from '../database/database.js';
+import { query, execute } from '../database/connectionPool.js';
 import { config } from '../config/config.js';
 import { getEffectiveDeliveryType, getPrimaryExternalStreamUrl } from '../utils/cameraDelivery.js';
 import { resolveInternalIngestPolicy } from '../utils/internalIngestPolicy.js';
@@ -200,7 +200,7 @@ class ThumbnailService {
              * Ask the policy for the socket timeout instead of splicing a literal `-stimeout`.
              * The hand-rolled splice bypassed the version-aware naming entirely, so an ffmpeg 5+
              * upgrade (where -stimeout was removed) would have killed every RTSP thumbnail while
-             * the recorders — which do go through this helper — kept working.
+             * the recorders â€” which do go through this helper â€” kept working.
              */
             args.push(...buildFfmpegRtspInputArgs(sourceUrl, rtspTransport, {
                 socketTimeoutMicros: 10_000_000,
@@ -452,7 +452,7 @@ class ThumbnailService {
                          * Two separate reasons this used to flood stderr (2,532/day, ~20 per camera):
                          *
                          * 1. `unsupported_delivery_type` (and the missing-source variants) is not a
-                         *    failure at all — it states that this camera's delivery type cannot
+                         *    failure at all â€” it states that this camera's delivery type cannot
                          *    produce a thumbnail. That is a fixed fact about its configuration, not
                          *    an event, so it never belongs on stderr.
                          * 2. A camera that keeps timing out re-reports the SAME failure every sweep.

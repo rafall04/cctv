@@ -84,6 +84,30 @@ vi.mock('../services/timezoneService.js', () => ({
     getTimezone: vi.fn(() => 'Asia/Jakarta'),
 }));
 
+/*
+ * cameraHealthService asks settingsService for the per-delivery-type health defaults
+ * (resolveExternalHealthMode). settingsService used to read through database.js, which
+ * this file never mocked — so these tests were quietly running against the REAL database
+ * connection and whatever rows happened to be in the dev DB. Now that it reads through
+ * connectionPool, that hidden dependency surfaced as an undefined result set.
+ *
+ * Stubbing it here is the honest fix: it makes the tests hermetic AND pins the defaults
+ * they were implicitly relying on, instead of letting an unstubbed query() consume the
+ * mockReturnValueOnce values the cases below set up for the camera queries.
+ */
+vi.mock('../services/settingsService.js', () => ({
+    default: {
+        getExternalHealthDefaults: vi.fn(() => ({
+            external_mjpeg: 'passive_first',
+            external_hls: 'hybrid_probe',
+            external_flv: 'passive_first',
+            external_embed: 'passive_first',
+            external_jsmpeg: 'disabled',
+            external_custom_ws: 'disabled',
+        })),
+    },
+}));
+
 vi.mock('../services/cameraRuntimeStateService.js', () => ({
     default: {
         upsertRuntimeState: upsertRuntimeStateMock,

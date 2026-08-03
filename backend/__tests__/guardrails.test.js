@@ -115,6 +115,31 @@ describe('guardrail: data-safety patterns', () => {
             .filter((r) => !REAL_MONEY_ALLOW.has(r));
         expect(offenders, `Money columns must be INTEGER rupiah, not REAL: ${offenders.join(', ')}`).toEqual([]);
     });
+    /*
+     * ONE DATABASE LAYER, NOT TWO.
+     *
+     * `database/database.js` was a second connection layer with an identical API. Two
+     * layers meant two live handles to the same file and two sets of pragmas — and that
+     * drift was not theoretical: a busy_timeout mismatch between them was a real
+     * incident. The 17 modules that used it now read through connectionPool, and the
+     * module is deleted.
+     *
+     * It only became safe to converge once connectionPool learned to serve reads from
+     * the writer while a transaction is open (see connectionPoolIsolation.test.js);
+     * before that, moving a module would have silently broken read-your-own-writes
+     * inside transactions. If anyone reintroduces the file, this fails.
+     */
+    it('no module imports the deleted second DB layer', () => {
+        const offenders = ['services', 'controllers', 'routes', 'middleware', 'utils', 'database']
+            .flatMap((d) => walk(path.join(BACKEND_ROOT, d), ['.js']))
+            .filter((f) => /database\/database\.js|from ['"]\.\.?\/+database\.js['"]/.test(read(f)))
+            .map(rel);
+        expect(offenders, `Use database/connectionPool.js — database.js is deleted: ${offenders.join(', ')}`).toEqual([]);
+    });
+
+    it('database/database.js stays deleted', () => {
+        expect(fs.existsSync(path.join(BACKEND_ROOT, 'database', 'database.js'))).toBe(false);
+    });
 });
 
 describe('guardrail: auth perimeter stays tested (coverage-floor surrogate)', () => {

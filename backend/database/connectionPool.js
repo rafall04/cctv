@@ -5,15 +5,20 @@
  * and reduce connection overhead.
  * 
  * Features:
- * - Read connection pool (up to 5 connections)
+ * - Read connection pool (ceiling of 5; see the note below on what it actually reaches)
  * - Single write connection (SQLite limitation)
- * - Automatic connection reuse
+ * - Reads inside an open write transaction are served by the writer, so callers always
+ *   read back their own uncommitted writes
  * - Graceful cleanup on shutdown
- * 
- * Performance Impact:
- * - 60-80% faster query execution
- * - Reduced lock contention
- * - Better concurrent request handling
+ *
+ * ON THE POOL SIZE — measured, not assumed
+ * ----------------------------------------
+ * better-sqlite3 is synchronous, and Node runs one thing at a time, so a query has
+ * always released its connection before the next one can ask for one. The pool
+ * therefore never grows past ONE connection: after 20 consecutive queries the stats
+ * report `readPoolSize: 1`. The "60-80% faster" claim that used to sit here was never
+ * measured and cannot be produced by this design; the pool is kept because it is
+ * harmless and would start to matter if reads ever moved off-thread.
  */
 
 import Database from 'better-sqlite3';
@@ -139,12 +144,46 @@ class DatabaseConnectionPool {
     }
 
     /**
+     * A read issued while the writer holds an open transaction MUST go through the
+     * writer, not the read pool.
+     *
+     * The read pool is made of separate `readonly` connections. In WAL mode they see
+     * the latest COMMITTED snapshot — which is why a plain write-then-read works fine
+     * (measured: visible). Inside `transaction()` the rows are not committed yet, so
+     * those connections cannot see them, and the caller reads back nothing.
+     *
+     * That is not hypothetical. cameraHealthService upserts runtime state for every
+     * camera inside one transaction; the read-back returned undefined and production
+     * logged 22 x "[CameraHealth] Check failed: Cannot read properties of undefined
+     * (reading 'last_runtime_signal_at')". Because the upserts shared that transaction,
+     * one camera rolled back the whole tick.
+     *
+     * Routing these reads through the write connection gives connectionPool the same
+     * read-your-own-writes guarantee database.js has always had on its single
+     * connection — which is what made converging the two layers safe.
+     */
+    inWriteTransaction() {
+        return Boolean(this.writeConnection && this.writeConnection.inTransaction);
+    }
+
+    /**
      * Execute a read query (SELECT)
      * @param {string} sql - SQL query
      * @param {Array} params - Query parameters
      * @returns {Array} Query results
      */
     query(sql, params = []) {
+        if (this.inWriteTransaction()) {
+            this.stats.totalQueries++;
+            this.stats.writeHits++;
+            try {
+                return this.writeConnection.prepare(sql).all(params);
+            } catch (error) {
+                console.error('[ConnectionPool] Query error:', error);
+                throw error;
+            }
+        }
+
         const conn = this.getReadConnection();
         try {
             const result = conn.prepare(sql).all(params);
@@ -164,6 +203,17 @@ class DatabaseConnectionPool {
      * @returns {Object|undefined} Single row result
      */
     queryOne(sql, params = []) {
+        if (this.inWriteTransaction()) {
+            this.stats.totalQueries++;
+            this.stats.writeHits++;
+            try {
+                return this.writeConnection.prepare(sql).get(params);
+            } catch (error) {
+                console.error('[ConnectionPool] QueryOne error:', error);
+                throw error;
+            }
+        }
+
         const conn = this.getReadConnection();
         try {
             const result = conn.prepare(sql).get(params);

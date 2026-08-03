@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Purpose: Provide admin diagnostics for Telegram camera notification routing and drill delivery.
  * Caller: adminController notification diagnostics handlers.
  * Deps: database camera/runtime tables, telegramService routing and send helpers.
@@ -6,7 +6,7 @@
  * SideEffects: Drill mode sends Telegram messages and writes notification_diagnostic_runs audit rows.
  */
 
-import { execute, query, queryOne } from '../database/database.js';
+import { execute, query, queryOne } from '../database/connectionPool.js';
 import {
     inspectCameraNotificationRouting,
     sendCameraStatusNotifications,

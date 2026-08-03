@@ -1,9 +1,9 @@
-/**
+﻿/**
  * Backup Service
  * Export/Import complete database backup for migration
  */
 
-import { query, queryOne, execute, transaction } from '../database/database.js';
+import { query, queryOne, execute, transaction } from '../database/connectionPool.js';
 import { existsSync, mkdirSync, writeFileSync, readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -15,7 +15,7 @@ const __dirname = dirname(__filename);
  * Tables a backup may read or write.
  *
  * This list is also the IMPORT WHITELIST. SQL identifiers cannot be bound as parameters, so
- * table/column names reach the statement by interpolation — and importBackup's input is the raw
+ * table/column names reach the statement by interpolation â€” and importBackup's input is the raw
  * request body (admin endpoint), i.e. attacker-controlled. Anything not named here is rejected
  * rather than interpolated. Keep export and import on this one list so they cannot drift.
  */
@@ -155,7 +155,7 @@ export function importBackup(backupData, options = {}) {
                         if (mode === 'replace') {
                             /*
                              * NEVER an INSERT-OR-REPLACE upsert. On ANY primary-key *or* UNIQUE conflict
-                             * SQLite DELETEs the conflicting row before inserting — so restoring a
+                             * SQLite DELETEs the conflicting row before inserting â€” so restoring a
                              * backup could destroy a live row that merely shared a username/email,
                              * and fire ON DELETE CASCADE on its children. That is exactly how a real
                              * customer row was lost in 2026-06 (see AGENTS.md "Production data safety").

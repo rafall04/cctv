@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Purpose: Verify public settings routes stay available without admin authentication.
  * Caller: Backend focused settings route test gate.
  * Deps: Fastify, vitest, settingsRoutes.
@@ -11,7 +11,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const queryOneMock = vi.fn();
 
-vi.mock('../database/database.js', () => ({
+vi.mock('../database/connectionPool.js', () => ({
     queryOne: queryOneMock,
     execute: vi.fn(),
 }));

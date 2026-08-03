@@ -1,8 +1,8 @@
-/**
+﻿/**
  * Purpose: Lock down the brute-force/account-lockout behaviour (auth perimeter, previously 0 tests).
  * Caller: backend test gate; part of the auth front-door coverage backfill.
  * Deps: vitest, better-sqlite3 (in-memory), mocked database.js + securityAuditLogger.
- * SideEffects: In-memory database only — never touches prod data.
+ * SideEffects: In-memory database only â€” never touches prod data.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -11,7 +11,7 @@ const { db } = await vi.hoisted(async () => {
     return { db: new Database(':memory:') };
 });
 
-vi.mock('../database/database.js', () => ({
+vi.mock('../database/connectionPool.js', () => ({
     query: (sql, params = []) => db.prepare(sql).all(params),
     queryOne: (sql, params = []) => db.prepare(sql).get(params),
     execute: (sql, params = []) => db.prepare(sql).run(params),
@@ -54,7 +54,7 @@ beforeEach(() => {
     )`);
 });
 
-describe('bruteForceProtection — tracking & counts', () => {
+describe('bruteForceProtection â€” tracking & counts', () => {
     it('records a failed attempt for both username and ip', () => {
         const { usernameAttempts, ipAttempts } = trackFailedAttempt('alice', '1.2.3.4');
         expect(usernameAttempts).toBe(1);
@@ -85,7 +85,7 @@ describe('bruteForceProtection — tracking & counts', () => {
     });
 });
 
-describe('bruteForceProtection — lockout', () => {
+describe('bruteForceProtection â€” lockout', () => {
     it('does not lock below the username threshold', () => {
         for (let i = 0; i < BRUTE_FORCE_CONFIG.maxAttempts.username - 1; i++) trackFailedAttempt('alice', null);
         expect(checkLockout('alice', null).locked).toBe(false);
@@ -134,7 +134,7 @@ describe('bruteForceProtection — lockout', () => {
     });
 });
 
-describe('bruteForceProtection — progressive delay & cleanup', () => {
+describe('bruteForceProtection â€” progressive delay & cleanup', () => {
     it('progressive delay follows the configured ladder and caps', () => {
         expect(getProgressiveDelay(0)).toBe(0);
         expect(getProgressiveDelay(1)).toBe(BRUTE_FORCE_CONFIG.progressiveDelay[0]);

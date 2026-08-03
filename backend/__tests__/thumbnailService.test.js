@@ -1,4 +1,4 @@
-/*
+﻿/*
 Purpose: Regression coverage for thumbnail source selection and FFmpeg argument construction.
 Caller: Vitest backend suite.
 Deps: Mocked child_process, filesystem, database, and backend config.
@@ -29,7 +29,7 @@ vi.mock('fs', () => ({
     copyFileSync: copyFileSyncMock,
 }));
 
-vi.mock('../database/database.js', () => ({
+vi.mock('../database/connectionPool.js', () => ({
     query: queryMock,
     execute: executeMock,
 }));

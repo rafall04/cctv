@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Purpose: Verify admin Telegram notification diagnostics preview, drill, and audit behavior.
  * Caller: Backend Vitest suite for services/notificationDiagnosticsService.js.
  * Deps: Vitest, mocked database helpers, mocked telegramService.
@@ -22,7 +22,7 @@ const {
     mockSendCameraStatusNotifications: vi.fn(),
 }));
 
-vi.mock('../database/database.js', () => ({
+vi.mock('../database/connectionPool.js', () => ({
     queryOne: mockQueryOne,
     query: mockQuery,
     execute: mockExecute,

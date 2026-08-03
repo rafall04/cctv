@@ -1,4 +1,4 @@
-/**
+﻿/**
  * API Key Service
  * 
  * Generates and validates API keys for frontend authentication.
@@ -8,7 +8,7 @@
  */
 
 import crypto from 'crypto';
-import { execute, query, queryOne } from '../database/database.js';
+import { execute, query, queryOne } from '../database/connectionPool.js';
 
 /**
  * API Key configuration
