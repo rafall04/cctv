@@ -9,7 +9,7 @@
  * - Return warning when password near expiry
  */
 
-import { queryOne, execute } from '../database/connectionPool.js';
+import { query, queryOne, execute } from '../database/connectionPool.js';
 import { PASSWORD_POLICY } from './passwordValidator.js';
 
 /**
@@ -146,15 +146,16 @@ export function getUsersWithExpiredPasswords() {
     try {
         const expiryDate = new Date(Date.now() - PASSWORD_EXPIRY_CONFIG.maxAgeMs);
         
-        const users = queryOne(
-            `SELECT id, username, password_changed_at 
-             FROM users 
-             WHERE password_changed_at IS NOT NULL 
+        // `query`, not `queryOne`: this returns a LIST. It used to fetch a single row and wrap
+        // it as `users ? [users] : []`, so it reported one overdue account no matter how many
+        // there were — an admin rotation report would have quietly understated the problem.
+        return query(
+            `SELECT id, username, password_changed_at
+             FROM users
+             WHERE password_changed_at IS NOT NULL
              AND password_changed_at < ?`,
             [expiryDate.toISOString()]
         );
-        
-        return users ? [users] : [];
     } catch (error) {
         console.error('Error getting users with expired passwords:', error);
         return [];
@@ -171,16 +172,15 @@ export function getUsersWithPasswordsExpiringSoon(withinDays = PASSWORD_EXPIRY_C
         const warningDate = new Date(Date.now() - PASSWORD_EXPIRY_CONFIG.maxAgeMs + (withinDays * 24 * 60 * 60 * 1000));
         const expiryDate = new Date(Date.now() - PASSWORD_EXPIRY_CONFIG.maxAgeMs);
         
-        const users = queryOne(
-            `SELECT id, username, password_changed_at 
-             FROM users 
-             WHERE password_changed_at IS NOT NULL 
+        // Same fix as above — a list function must not be built on queryOne.
+        return query(
+            `SELECT id, username, password_changed_at
+             FROM users
+             WHERE password_changed_at IS NOT NULL
              AND password_changed_at < ?
              AND password_changed_at >= ?`,
             [warningDate.toISOString(), expiryDate.toISOString()]
         );
-        
-        return users ? [users] : [];
     } catch (error) {
         console.error('Error getting users with passwords expiring soon:', error);
         return [];

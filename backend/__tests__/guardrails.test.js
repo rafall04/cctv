@@ -187,9 +187,13 @@ describe('guardrail: auth perimeter stays tested (coverage-floor surrogate)', ()
     // securityAuditLogger joined 2026-08-03. It was the one service in this perimeter with
     // no tests at all, which was backwards: it is the thing that records what every other
     // control did, and a lockout nobody can prove happened is not much of a lockout.
+    // passwordExpiry joined 2026-08-03 for the same reason securityAuditLogger did: it is part
+    // of this perimeter and sat at 0%. Writing those tests immediately turned up a latent
+    // defect — both "list the affected users" functions were built on queryOne and reported a
+    // single overdue account however many there were.
     const FLOOR = {
         authService: 10, sessionManager: 10, bruteForceProtection: 10,
-        apiKeyService: 8, securityAuditLogger: 15,
+        apiKeyService: 8, securityAuditLogger: 15, passwordExpiry: 12,
     };
     for (const [name, min] of Object.entries(FLOOR)) {
         it(`${name} keeps >= ${min} test cases`, () => {
