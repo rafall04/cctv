@@ -154,3 +154,8 @@ deployment/client.config.sh
 # Python bytecode (sidecar)
 __pycache__/
 *.pyc
+
+# Berkas lomba BIA 2026 (proposal + surat pernyataan keaslian).
+# Memuat data pribadi: nama lengkap, alamat rumah, nomor HP, email.
+# Repo ini PUBLIC di GitHub — berkas ini TIDAK BOLEH ikut ter-commit.
+dokumen-bia2026/
