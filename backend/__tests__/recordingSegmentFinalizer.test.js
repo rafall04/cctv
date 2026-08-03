@@ -35,10 +35,23 @@ const diagnostics = { upsertDiagnostic: vi.fn(), clearDiagnostic: vi.fn() };
 vi.mock('child_process', () => ({ exec: execMock, spawn: spawnMock }));
 vi.mock('fs', () => ({ promises: fsPromisesMock, existsSync: vi.fn(() => true), unlinkSync: vi.fn() }));
 
+/*
+ * The fake ffmpeg signals completion on a MICROTASK, not a timer.
+ *
+ * This used to be `setTimeout(..., 0)`, which vi.useFakeTimers() also controls — so whether the
+ * `close` event ever fired depended on the fake clock still being inside the window when the spawn
+ * happened, several awaited fs calls into the flow. Under parallel load that interleaving shifted
+ * and the test failed intermittently (2 of ~19 full-suite runs; never once in 15 isolated runs,
+ * which is what proved it was scheduling and not logic).
+ *
+ * A promise continuation is never faked, and it is safe here because recordingRemuxer attaches
+ * its `close` listener synchronously in the same block as spawn() — so the listener is always
+ * in place before this resolves.
+ */
 function createProcess(exitCode = 0) {
     const child = new EventEmitter();
     child.stderr = new EventEmitter();
-    setTimeout(() => child.emit('close', exitCode), 0);
+    Promise.resolve().then(() => child.emit('close', exitCode));
     return child;
 }
 

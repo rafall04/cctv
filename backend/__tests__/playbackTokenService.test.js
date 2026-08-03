@@ -35,7 +35,9 @@ describe('playbackTokenService', () => {
                 created_by: 1,
                 created_at: '2026-05-05 12:00:00',
                 updated_at: '2026-05-05 12:00:00',
-            });
+            })
+                // Terminal default: without it vi.spyOn falls through to the REAL database.
+                .mockReturnValue(undefined);
         const { default: playbackTokenService } = await import('../services/playbackTokenService.js');
 
         const result = playbackTokenService.createToken(
@@ -78,7 +80,9 @@ describe('playbackTokenService', () => {
                 created_by: 1,
                 created_at: '2026-05-05 12:00:00',
                 updated_at: '2026-05-05 12:00:00',
-            });
+            })
+                // Terminal default: without it vi.spyOn falls through to the REAL database.
+                .mockReturnValue(undefined);
         const { default: playbackTokenService } = await import('../services/playbackTokenService.js');
 
         const result = playbackTokenService.createToken(
@@ -122,7 +126,9 @@ describe('playbackTokenService', () => {
                 created_by: 1,
                 created_at: '2026-05-05 12:00:00',
                 updated_at: '2026-05-05 12:00:00',
-            });
+            })
+                // Terminal default: without it vi.spyOn falls through to the REAL database.
+                .mockReturnValue(undefined);
         const { default: playbackTokenService } = await import('../services/playbackTokenService.js');
 
         const result = playbackTokenService.createToken(
@@ -164,7 +170,9 @@ describe('playbackTokenService', () => {
                 created_by: 1,
                 created_at: '2026-05-05 12:00:00',
                 updated_at: '2026-05-05 12:00:00',
-            });
+            })
+                // Terminal default: without it vi.spyOn falls through to the REAL database.
+                .mockReturnValue(undefined);
         const { default: playbackTokenService } = await import('../services/playbackTokenService.js');
 
         const result = playbackTokenService.createToken(
@@ -209,7 +217,9 @@ describe('playbackTokenService', () => {
                 created_by: 1,
                 created_at: '2026-05-05 12:00:00',
                 updated_at: '2026-05-05 12:00:00',
-            });
+            })
+                // Terminal default: without it vi.spyOn falls through to the REAL database.
+                .mockReturnValue(undefined);
         const { default: playbackTokenService } = await import('../services/playbackTokenService.js');
 
         const result = playbackTokenService.createToken(
@@ -264,7 +274,9 @@ describe('playbackTokenService', () => {
                 created_by: 1,
                 created_at: '2026-05-05 12:00:00',
                 updated_at: '2026-05-05 12:00:00',
-            });
+            })
+                // Terminal default: without it vi.spyOn falls through to the REAL database.
+                .mockReturnValue(undefined);
         vi.spyOn(connectionPool, 'query').mockReturnValue([
             { id: 1168, name: 'CCTV ALANG ALANG' },
         ]);
@@ -366,7 +378,9 @@ describe('playbackTokenService', () => {
                 created_by: 1,
                 created_at: '2026-05-05 12:00:00',
                 updated_at: '2026-05-05 12:00:00',
-            });
+            })
+                // Terminal default: without it vi.spyOn falls through to the REAL database.
+                .mockReturnValue(undefined);
         const { default: playbackTokenService } = await import('../services/playbackTokenService.js');
 
         const result = playbackTokenService.buildRepeatShareText(17, {
@@ -505,7 +519,9 @@ describe('playbackTokenService', () => {
         vi.spyOn(connectionPool, 'query')
             .mockReturnValueOnce([
                 { id: 1, last_seen_at: '2026-05-05 12:00:00' },
-            ]);
+            ])
+                // Terminal default: without it vi.spyOn falls through to the REAL database.
+                .mockReturnValue([]);
         const { default: playbackTokenService } = await import('../services/playbackTokenService.js');
 
         expect(() => playbackTokenService.createPlaybackSession({
@@ -527,7 +543,9 @@ describe('playbackTokenService', () => {
         vi.spyOn(connectionPool, 'query')
             .mockReturnValueOnce([
                 { id: 1, last_seen_at: '2026-05-05 11:59:00' },
-            ]);
+            ])
+                // Terminal default: without it vi.spyOn falls through to the REAL database.
+                .mockReturnValue([]);
         const { default: playbackTokenService } = await import('../services/playbackTokenService.js');
 
         const session = playbackTokenService.createPlaybackSession({
@@ -560,7 +578,9 @@ describe('playbackTokenService', () => {
             token_id: 44,
             last_seen_at: new Date().toISOString(),
             expires_at: new Date(Date.now() + 60_000).toISOString(),
-        });
+        })
+            // Terminal default: without it vi.spyOn falls through to the REAL database.
+            .mockReturnValue(undefined);
         const { default: playbackTokenService } = await import('../services/playbackTokenService.js');
 
         const row = playbackTokenService.assertPlaybackSession({
@@ -616,7 +636,9 @@ describe('playbackTokenService', () => {
 
     it('requires an active playback session for limited token stream requests', async () => {
         vi.spyOn(connectionPool, 'execute').mockReturnValue({ changes: 1 });
-        vi.spyOn(connectionPool, 'queryOne').mockReturnValueOnce(null);
+        vi.spyOn(connectionPool, 'queryOne').mockReturnValueOnce(null)
+            // Terminal default: without it vi.spyOn falls through to the REAL database.
+            .mockReturnValue(undefined);
         const { default: playbackTokenService } = await import('../services/playbackTokenService.js');
 
         expect(() => playbackTokenService.assertPlaybackSession({
@@ -677,7 +699,9 @@ describe('playbackTokenService', () => {
                 created_by: 1,
                 created_at: '2026-05-05 12:00:00',
                 updated_at: '2026-05-05 12:05:00',
-            });
+            })
+            // Terminal default: without it vi.spyOn falls through to the REAL database.
+            .mockReturnValue(undefined);
         const { default: playbackTokenService } = await import('../services/playbackTokenService.js');
 
         const updated = playbackTokenService.updateTokenSettings(51, {
@@ -743,7 +767,9 @@ describe('playbackTokenService', () => {
             created_by: 1,
             created_at: '2026-05-05 12:00:00',
             updated_at: '2026-05-05 12:00:00',
-        });
+        })
+            // Terminal default: without it vi.spyOn falls through to the REAL database.
+            .mockReturnValue(undefined);
         const { default: playbackTokenService } = await import('../services/playbackTokenService.js');
 
         expect(() => playbackTokenService.updateTokenSettings(52, {

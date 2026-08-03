@@ -238,6 +238,61 @@ describe('guardrail: a mock cannot prove a constraint (real-dependency tests)', 
     }
 });
 
+describe('guardrail: a DB spy never falls through to the real database', () => {
+    /*
+     * Earned 2026-08-03, after chasing "flaky" backend tests that were nothing of the sort.
+     *
+     * `vi.spyOn(pool, 'queryOne').mockReturnValueOnce(a).mockReturnValueOnce(b)` calls THROUGH to
+     * the real function once that queue is exhausted. So a chain with no terminal default does not
+     * return undefined on the third call — it queries the developer's actual backend/data/cctv.db.
+     * The test then depends on two things it never declares: how many DB calls the code happened to
+     * make (which shifts with test ordering under parallel load), and what rows happen to exist
+     * locally.
+     *
+     * That is not theoretical. cameraRuntimeStateService's regression test returned a
+     * `monitoring_reason` that CHANGED between two consecutive runs — `media_sequence_progressing`,
+     * then `provider_backoff_active` — values no fixture in the repo contains, because it was
+     * reading live rows written by the health service. Five different tests across four files were
+     * blamed on "load" before this was found.
+     *
+     * A terminal `.mockReturnValue(...)` costs one line and makes the mock total.
+     */
+    const DB_FNS = new Set(['queryOne', 'query']);
+    const ONCE = /mockReturnValueOnce|mockResolvedValueOnce|mockImplementationOnce/;
+    const TERMINAL = /mockReturnValue\(|mockResolvedValue\(|mockImplementation\(/;
+
+    it('every Once-chain on query/queryOne ends in a terminal default', () => {
+        const offenders = [];
+        for (const name of fs.readdirSync(path.join(BACKEND_ROOT, '__tests__')).filter((f) => f.endsWith('.js'))) {
+            const lines = read(path.join(BACKEND_ROOT, '__tests__', name)).split('\n');
+            lines.forEach((line, i) => {
+                const m = line.match(/spyOn\(\s*(\w+)\s*,\s*'(\w+)'\s*\)/);
+                if (!m || !DB_FNS.has(m[2]) || !/pool|database|connection|db/i.test(m[1])) return;
+
+                let chain = '';
+                for (let j = i; j < Math.min(i + 120, lines.length); j += 1) {
+                    chain += lines[j];
+                    if (lines[j].includes(';')) break;
+                }
+                const withoutOnce = chain
+                    .replace(/mockReturnValueOnce\(/g, 'X(')
+                    .replace(/mockResolvedValueOnce\(/g, 'X(')
+                    .replace(/mockImplementationOnce\(/g, 'X(');
+                if (ONCE.test(chain) && !TERMINAL.test(withoutOnce)) {
+                    offenders.push(`${name}:${i + 1} — spyOn(${m[1]}, '${m[2]}')`);
+                }
+            });
+        }
+
+        expect(
+            offenders,
+            '\nThese spy chains fall through to the REAL database once their Once-queue runs dry,'
+            + '\nwhich makes the test depend on local DB contents and on test ordering.'
+            + `\nAdd a terminal .mockReturnValue(undefined) / .mockReturnValue([]):\n  ${offenders.join('\n  ')}\n`
+        ).toEqual([]);
+    });
+});
+
 describe('guardrail: data-destroying paths stay tested', () => {
     /*
      * backupService could DELETE a live row on restore (INSERT OR REPLACE) and had ZERO tests for

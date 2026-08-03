@@ -24,7 +24,15 @@ describe('cameraRuntimeStateService', () => {
                 is_online: 1,
                 monitoring_state: 'online',
                 monitoring_reason: 'seed_from_camera',
-            });
+            })
+            // TERMINAL DEFAULT, and it is load-bearing. `vi.spyOn` keeps calling THROUGH to the
+            // real function once the `Once` queue is exhausted — so a fourth queryOne here does
+            // not return undefined, it queries the developer's actual backend/data/cctv.db.
+            // That is how this test failed intermittently: whether the queue ran dry depended on
+            // test ordering under load, and what came back depended on whatever rows happened to
+            // be in that database. Proven the hard way — with real cameras seeded locally it
+            // returned a monitoring_reason that CHANGED between runs.
+            .mockReturnValue(undefined);
 
         const state = cameraRuntimeStateService.ensureRuntimeState(12, {
             is_online: 1,
@@ -66,7 +74,8 @@ describe('cameraRuntimeStateService', () => {
         vi.spyOn(connectionPool, 'queryOne')
             .mockReturnValueOnce({ name: 'camera_runtime_state' }) // hasRuntimeTable
             .mockReturnValueOnce(undefined)                        // existing row: none
-            .mockReturnValueOnce(undefined);                       // read-back: invisible in-transaction
+            .mockReturnValueOnce(undefined)                        // read-back: invisible in-transaction
+            .mockReturnValue(undefined);                           // never fall through to the real DB
 
         const state = cameraRuntimeStateService.ensureRuntimeState(41, {
             is_online: 1,

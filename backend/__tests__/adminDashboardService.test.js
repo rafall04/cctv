@@ -246,7 +246,9 @@ describe('adminDashboardService dashboard stats', () => {
     it('mengembalikan recent logs dengan tanggal penuh dan jam tanpa mengubah urutan', async () => {
         vi.spyOn(database, 'queryOne')
             .mockReturnValueOnce({ total: 3, active: 2, disabled: 1 })
-            .mockReturnValueOnce({ total: 2 });
+            .mockReturnValueOnce({ total: 2 })
+                // Terminal default: without it vi.spyOn falls through to the REAL database.
+                .mockReturnValue(undefined);
 
         vi.spyOn(database, 'query')
             .mockReturnValueOnce([
@@ -278,7 +280,9 @@ describe('adminDashboardService dashboard stats', () => {
                     username: 'aldi',
                     created_at: '2026-03-08T11:05:42.000Z',
                 },
-            ]);
+            ])
+                // Terminal default: without it vi.spyOn falls through to the REAL database.
+                .mockReturnValue([]);
 
         vi.spyOn(mediaMtxService, 'getStats').mockResolvedValue({ paths: [] });
         vi.spyOn(viewerSessionService, 'getViewerStats').mockReturnValue({

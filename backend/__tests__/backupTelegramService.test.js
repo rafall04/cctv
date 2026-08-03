@@ -52,12 +52,32 @@ let service;
 // The service resolves its output dir relative to its OWN module path (backend/data/backups),
 // not to DATABASE_PATH — so that is where the assertions have to look. Checking for leftover
 // `snapshot_*` files specifically keeps this tolerant of anything else living in there.
+// (On disk the files are `snapshot_<stamp>.db[.gz]`; `cctv_<stamp>.db.gz` is only the name the
+// upload is given, so the on-disk prefix is the right thing to filter on.)
 const backupDir = new URL('../data/backups/', import.meta.url);
 const leftoverSnapshots = () => {
     try {
         return readdirSync(backupDir).filter((f) => f.startsWith('snapshot_'));
     } catch {
         return []; // never created = nothing left behind
+    }
+};
+
+/*
+ * Because BACKUP_DIR is a REAL shared directory, a snapshot one test forgets does not just
+ * affect the next assertion — it survives the process and fails every future run until someone
+ * deletes it by hand. That is exactly what happened: the "produces a gzip" test below created a
+ * snapshot and never removed it, and whether the leak was VISIBLE depended on the wall clock,
+ * because the filename stamp has one-second resolution. Land the next test in the same second
+ * and it silently overwrote the leak; land it a second later and the file survived and broke
+ * every `leftoverSnapshots()` assertion from then on, in this run and all subsequent ones.
+ *
+ * So no test is allowed to depend on another's timing: the directory is swept clean before each
+ * one, and again at the end so a run never hands debris to the next.
+ */
+const clearSnapshots = () => {
+    for (const file of leftoverSnapshots()) {
+        try { rmSync(new URL(file, backupDir), { force: true }); } catch { /* already gone */ }
     }
 };
 
@@ -78,12 +98,14 @@ beforeAll(async () => {
 
 afterAll(() => {
     try { rmSync(dir, { recursive: true, force: true }); } catch { /* disposable */ }
+    clearSnapshots();
 });
 
 beforeEach(() => {
     h.settings.clear();
     h.sent.length = 0;
     h.tokenConfigured = true;
+    clearSnapshots();
 });
 
 afterEach(() => {
@@ -132,6 +154,8 @@ describe('createDatabaseSnapshot', () => {
         expect(db.prepare('SELECT amount, ref FROM payments WHERE id = 7').get())
             .toEqual({ amount: 7000, ref: 'INV-7' });
         db.close();
+        // Was the one snapshot in this file nobody deleted — see clearSnapshots() above.
+        rmSync(snapshot.path, { force: true });
     });
 
     it('never leaves the uncompressed copy behind — it is a second full database on the same disk', async () => {
