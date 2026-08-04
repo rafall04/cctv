@@ -1,3 +1,5 @@
+import { getSecuritySettings } from './securitySettingsService.js';
+
 /**
  * Password Validator Service
  * Validates passwords against security policies.
@@ -13,6 +15,16 @@
 /**
  * Password policy configuration
  */
+/*
+ * DEFAULTS ONLY. minLength / maxAge / historyCount used to be the live policy here while
+ * PASSWORD_MIN_LENGTH, PASSWORD_MAX_AGE_DAYS and PASSWORD_HISTORY_COUNT sat in .env being read by
+ * nothing — an operator could set PASSWORD_MIN_LENGTH=20 and passwords of 12 kept being accepted.
+ * getPasswordPolicy() below is the live one (admin panel -> .env -> these).
+ *
+ * The character-class requirements stay fixed on purpose: they are not worth a knob, and every one
+ * of them is mirrored by frontend UserManagement's live checklist, which cannot ask the server per
+ * keystroke.
+ */
 export const PASSWORD_POLICY = {
     minLength: 12,
     requireUppercase: true,
@@ -23,6 +35,21 @@ export const PASSWORD_POLICY = {
     historyCount: 5,
     specialChars: '!@#$%^&*()_+-=[]{}|;:\'",.<>?/`~'
 };
+
+/**
+ * The password policy in force right now. Re-read per call so a change saved in the admin panel
+ * applies to the very next password set.
+ * @returns {typeof PASSWORD_POLICY}
+ */
+export function getPasswordPolicy() {
+    const s = getSecuritySettings();
+    return {
+        ...PASSWORD_POLICY,
+        minLength: s.passwordMinLength,
+        maxAge: s.passwordMaxAgeDays * 24 * 60 * 60 * 1000,
+        historyCount: s.passwordHistoryCount,
+    };
+}
 
 /**
  * Top 100 most common passwords (subset of top 10000)
@@ -66,27 +93,27 @@ export function validatePassword(password, username = '') {
     }
 
     // Check minimum length (Requirement 6.1)
-    if (password.length < PASSWORD_POLICY.minLength) {
-        errors.push(`Kata sandi minimal ${PASSWORD_POLICY.minLength} karakter`);
+    if (password.length < getPasswordPolicy().minLength) {
+        errors.push(`Kata sandi minimal ${getPasswordPolicy().minLength} karakter`);
     }
 
     // Check for uppercase letter (Requirement 6.2)
-    if (PASSWORD_POLICY.requireUppercase && !/[A-Z]/.test(password)) {
+    if (getPasswordPolicy().requireUppercase && !/[A-Z]/.test(password)) {
         errors.push('Kata sandi harus memuat minimal satu huruf besar');
     }
 
     // Check for lowercase letter (Requirement 6.2)
-    if (PASSWORD_POLICY.requireLowercase && !/[a-z]/.test(password)) {
+    if (getPasswordPolicy().requireLowercase && !/[a-z]/.test(password)) {
         errors.push('Kata sandi harus memuat minimal satu huruf kecil');
     }
 
     // Check for number (Requirement 6.2)
-    if (PASSWORD_POLICY.requireNumbers && !/[0-9]/.test(password)) {
+    if (getPasswordPolicy().requireNumbers && !/[0-9]/.test(password)) {
         errors.push('Kata sandi harus memuat minimal satu angka');
     }
 
     // Check for special character (Requirement 6.2)
-    if (PASSWORD_POLICY.requireSpecial) {
+    if (getPasswordPolicy().requireSpecial) {
         const specialCharRegex = /[!@#$%^&*()_+\-=\[\]{}|;:'",.<>?/`~]/;
         if (!specialCharRegex.test(password)) {
             errors.push('Kata sandi harus memuat minimal satu karakter spesial (!@#$%^&*()_+-=[]{}|;:\'",.<>?/`~)');
@@ -216,21 +243,21 @@ export function getPasswordRequirements() {
     // English policy block sat in the middle of an otherwise Indonesian page.
     const requirements = [];
 
-    requirements.push(`Minimal ${PASSWORD_POLICY.minLength} karakter`);
+    requirements.push(`Minimal ${getPasswordPolicy().minLength} karakter`);
 
-    if (PASSWORD_POLICY.requireUppercase) {
+    if (getPasswordPolicy().requireUppercase) {
         requirements.push('Ada huruf besar (A-Z)');
     }
 
-    if (PASSWORD_POLICY.requireLowercase) {
+    if (getPasswordPolicy().requireLowercase) {
         requirements.push('Ada huruf kecil (a-z)');
     }
 
-    if (PASSWORD_POLICY.requireNumbers) {
+    if (getPasswordPolicy().requireNumbers) {
         requirements.push('Ada angka (0-9)');
     }
 
-    if (PASSWORD_POLICY.requireSpecial) {
+    if (getPasswordPolicy().requireSpecial) {
         requirements.push('Ada karakter spesial (!@#$%^&*...)');
     }
 

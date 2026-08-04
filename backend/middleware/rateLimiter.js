@@ -15,6 +15,7 @@
 
 import fp from 'fastify-plugin';
 import { config } from '../config/config.js';
+import { getSecuritySettings } from '../services/securitySettingsService.js';
 import { logRateLimitViolation as auditLogRateLimitViolation } from '../services/securityAuditLogger.js';
 
 /**
@@ -113,13 +114,16 @@ export function getRateLimitForType(endpointType) {
         return null;
     }
     const base = RATE_LIMIT_CONFIG[endpointType] || RATE_LIMIT_CONFIG.public;
-    const envMax = {
-        public: config.security?.rateLimitPublic,
-        auth: config.security?.rateLimitAuth,
-        admin: config.security?.rateLimitAdmin,
+    // Admin panel -> .env -> the RATE_LIMIT_CONFIG fallback above. Resolved per call, so a limit
+    // changed in Settings applies to the very next request without a restart.
+    const settings = getSecuritySettings();
+    const configuredMax = {
+        public: settings.rateLimitPublic,
+        auth: settings.rateLimitAuth,
+        admin: settings.rateLimitAdmin,
     }[endpointType];
     return {
-        max: Number.isFinite(envMax) && envMax > 0 ? envMax : base.max,
+        max: Number.isFinite(configuredMax) && configuredMax > 0 ? configuredMax : base.max,
         window: base.window,
     };
 }
@@ -351,7 +355,7 @@ async function rateLimiterPlugin(fastify, options = {}) {
     fastify.addHook('onRequest', async (request, reply) => {
         // Honor the RATE_LIMIT_ENABLED kill-switch so operators can disable it
         // without a code change or redeploy.
-        if (config.security?.rateLimitEnabled === false) {
+        if (getSecuritySettings().rateLimitEnabled === false) {
             return;
         }
 

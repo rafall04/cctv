@@ -8,9 +8,17 @@
 
 import { execute, query, queryOne } from '../database/connectionPool.js';
 import { logAccountLockout, logAuthAttempt } from './securityAuditLogger.js';
+import { getSecuritySettings } from './securitySettingsService.js';
 
 /**
  * Brute force protection configuration
+ */
+/*
+ * DEFAULTS ONLY. These four numbers used to be the live policy, which meant the matching env vars
+ * (MAX_LOGIN_ATTEMPTS, LOCKOUT_DURATION_MINUTES, …) were read by nothing — an operator could set
+ * them and nothing changed. The effective values now come from getBruteForceConfig() below, which
+ * resolves DB -> env -> these. Kept exported because the numbers here ARE the defaults and the
+ * test asserts against them.
  */
 export const BRUTE_FORCE_CONFIG = {
     maxAttempts: {
@@ -24,6 +32,24 @@ export const BRUTE_FORCE_CONFIG = {
     trackingWindow: 15 * 60 * 1000, // 15 minutes in ms
     progressiveDelay: [1000, 2000, 4000, 8000] // ms delays
 };
+
+/**
+ * The policy actually in force right now, re-read per call so a change saved in the admin panel
+ * applies to the very next login attempt without a restart.
+ * @returns {typeof BRUTE_FORCE_CONFIG}
+ */
+export function getBruteForceConfig() {
+    const s = getSecuritySettings();
+    return {
+        maxAttempts: { username: s.maxLoginAttempts, ip: s.maxIpAttempts },
+        lockoutDuration: {
+            username: s.lockoutDurationMinutes * 60 * 1000,
+            ip: s.ipBlockDurationMinutes * 60 * 1000,
+        },
+        trackingWindow: BRUTE_FORCE_CONFIG.trackingWindow,
+        progressiveDelay: BRUTE_FORCE_CONFIG.progressiveDelay,
+    };
+}
 
 /**
  * Track a failed login attempt
@@ -139,7 +165,7 @@ export function checkLockout(username, ip) {
     // Check username lockout (5 failed attempts = 30 min lockout)
     if (username) {
         const usernameAttempts = getFailedAttemptCount(username, 'username');
-        if (usernameAttempts >= BRUTE_FORCE_CONFIG.maxAttempts.username) {
+        if (usernameAttempts >= getBruteForceConfig().maxAttempts.username) {
             const unlockAt = getUnlockTime(username, 'username');
             if (unlockAt && unlockAt > new Date()) {
                 return {
@@ -155,7 +181,7 @@ export function checkLockout(username, ip) {
     // Check IP lockout (10 failed attempts = 1 hour lockout)
     if (ip) {
         const ipAttempts = getFailedAttemptCount(ip, 'ip');
-        if (ipAttempts >= BRUTE_FORCE_CONFIG.maxAttempts.ip) {
+        if (ipAttempts >= getBruteForceConfig().maxAttempts.ip) {
             const unlockAt = getUnlockTime(ip, 'ip');
             if (unlockAt && unlockAt > new Date()) {
                 return {
@@ -197,8 +223,8 @@ export function getUnlockTime(identifier, identifierType) {
     
     const lastAttemptTime = new Date(lastAttempt.attempt_time);
     const lockoutDuration = identifierType === 'username' 
-        ? BRUTE_FORCE_CONFIG.lockoutDuration.username 
-        : BRUTE_FORCE_CONFIG.lockoutDuration.ip;
+        ? getBruteForceConfig().lockoutDuration.username 
+        : getBruteForceConfig().lockoutDuration.ip;
     
     return new Date(lastAttemptTime.getTime() + lockoutDuration);
 }
@@ -216,13 +242,13 @@ export function checkAndTriggerLockout(username, ip, request = null) {
     // Check username threshold
     if (username) {
         const usernameAttempts = getFailedAttemptCount(username, 'username');
-        if (usernameAttempts >= BRUTE_FORCE_CONFIG.maxAttempts.username) {
+        if (usernameAttempts >= getBruteForceConfig().maxAttempts.username) {
             result.usernameLocked = true;
             logAccountLockout({
                 username,
                 lockType: 'username',
                 attempts: usernameAttempts,
-                duration_minutes: BRUTE_FORCE_CONFIG.lockoutDuration.username / 60000
+                duration_minutes: getBruteForceConfig().lockoutDuration.username / 60000
             }, request);
         }
     }
@@ -230,13 +256,13 @@ export function checkAndTriggerLockout(username, ip, request = null) {
     // Check IP threshold
     if (ip) {
         const ipAttempts = getFailedAttemptCount(ip, 'ip');
-        if (ipAttempts >= BRUTE_FORCE_CONFIG.maxAttempts.ip) {
+        if (ipAttempts >= getBruteForceConfig().maxAttempts.ip) {
             result.ipLocked = true;
             logAccountLockout({
                 ip_address: ip,
                 lockType: 'ip',
                 attempts: ipAttempts,
-                duration_minutes: BRUTE_FORCE_CONFIG.lockoutDuration.ip / 60000
+                duration_minutes: getBruteForceConfig().lockoutDuration.ip / 60000
             }, request);
         }
     }
@@ -255,8 +281,8 @@ export function getRemainingAttempts(username, ip) {
     const ipAttempts = ip ? getFailedAttemptCount(ip, 'ip') : 0;
     
     return {
-        usernameRemaining: Math.max(0, BRUTE_FORCE_CONFIG.maxAttempts.username - usernameAttempts),
-        ipRemaining: Math.max(0, BRUTE_FORCE_CONFIG.maxAttempts.ip - ipAttempts)
+        usernameRemaining: Math.max(0, getBruteForceConfig().maxAttempts.username - usernameAttempts),
+        ipRemaining: Math.max(0, getBruteForceConfig().maxAttempts.ip - ipAttempts)
     };
 }
 

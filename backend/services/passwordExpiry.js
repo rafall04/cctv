@@ -10,10 +10,17 @@
  */
 
 import { query, queryOne, execute } from '../database/connectionPool.js';
-import { PASSWORD_POLICY } from './passwordValidator.js';
+import { getPasswordPolicy } from './passwordValidator.js';
 
 /**
  * Password expiry configuration
+ */
+/*
+ * DEFAULTS ONLY — and this was the THIRD copy of "how old may a password get": once in
+ * config.security.passwordMaxAgeDays (from .env, read by nothing), once in
+ * passwordValidator.PASSWORD_POLICY.maxAge, and once here, which is the copy that actually
+ * expires anyone. They agreed at 90 days purely by luck. getExpiryConfig() below is now the
+ * single live answer; `warningDays` stays fixed because nothing has ever varied it.
  */
 export const PASSWORD_EXPIRY_CONFIG = {
     maxAgeDays: 90,                    // Password expires after 90 days
@@ -21,6 +28,20 @@ export const PASSWORD_EXPIRY_CONFIG = {
     maxAgeMs: 90 * 24 * 60 * 60 * 1000, // 90 days in milliseconds
     warningMs: 14 * 24 * 60 * 60 * 1000 // 14 days in milliseconds
 };
+
+/**
+ * Live expiry policy: the max age comes from the admin panel (-> .env -> default).
+ * @returns {typeof PASSWORD_EXPIRY_CONFIG}
+ */
+export function getExpiryConfig() {
+    const maxAgeMs = getPasswordPolicy().maxAge;
+    return {
+        maxAgeDays: Math.round(maxAgeMs / (24 * 60 * 60 * 1000)),
+        warningDays: PASSWORD_EXPIRY_CONFIG.warningDays,
+        maxAgeMs,
+        warningMs: PASSWORD_EXPIRY_CONFIG.warningMs,
+    };
+}
 
 /**
  * Check if user's password is expired
@@ -45,7 +66,7 @@ export function checkPasswordExpiry(userId) {
         }
         
         const passwordChangedAt = new Date(user.password_changed_at);
-        const expiresAt = new Date(passwordChangedAt.getTime() + PASSWORD_EXPIRY_CONFIG.maxAgeMs);
+        const expiresAt = new Date(passwordChangedAt.getTime() + getExpiryConfig().maxAgeMs);
         const now = new Date();
         
         const msRemaining = expiresAt.getTime() - now.getTime();
@@ -82,7 +103,7 @@ export function checkPasswordExpiryWarning(userId) {
         return { shouldWarn: false, daysRemaining: null, message: null };
     }
     
-    if (expiryStatus.daysRemaining <= PASSWORD_EXPIRY_CONFIG.warningDays) {
+    if (expiryStatus.daysRemaining <= getExpiryConfig().warningDays) {
         return {
             shouldWarn: true,
             daysRemaining: expiryStatus.daysRemaining,
@@ -144,7 +165,7 @@ export function getPasswordAgeDays(userId) {
  */
 export function getUsersWithExpiredPasswords() {
     try {
-        const expiryDate = new Date(Date.now() - PASSWORD_EXPIRY_CONFIG.maxAgeMs);
+        const expiryDate = new Date(Date.now() - getExpiryConfig().maxAgeMs);
         
         // `query`, not `queryOne`: this returns a LIST. It used to fetch a single row and wrap
         // it as `users ? [users] : []`, so it reported one overdue account no matter how many
@@ -167,10 +188,10 @@ export function getUsersWithExpiredPasswords() {
  * @param {number} withinDays - Number of days to check
  * @returns {Array} List of users with passwords expiring soon
  */
-export function getUsersWithPasswordsExpiringSoon(withinDays = PASSWORD_EXPIRY_CONFIG.warningDays) {
+export function getUsersWithPasswordsExpiringSoon(withinDays = getExpiryConfig().warningDays) {
     try {
-        const warningDate = new Date(Date.now() - PASSWORD_EXPIRY_CONFIG.maxAgeMs + (withinDays * 24 * 60 * 60 * 1000));
-        const expiryDate = new Date(Date.now() - PASSWORD_EXPIRY_CONFIG.maxAgeMs);
+        const warningDate = new Date(Date.now() - getExpiryConfig().maxAgeMs + (withinDays * 24 * 60 * 60 * 1000));
+        const expiryDate = new Date(Date.now() - getExpiryConfig().maxAgeMs);
         
         // Same fix as above — a list function must not be built on queryOne.
         return query(

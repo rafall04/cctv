@@ -26,6 +26,7 @@ import { FormSkeleton } from '../components/ui/Skeleton';
 const GeneralSettingsPanel = lazy(() => import('../components/admin/settings/GeneralSettingsPanel'));
 const TimezoneSettingsTab = lazy(() => import('../components/admin/settings/TimezoneSettingsTab'));
 const BackupSettingsTab = lazy(() => import('../components/admin/settings/BackupSettingsTab'));
+const SecuritySettingsPanel = lazy(() => import('../components/admin/settings/SecuritySettingsPanel'));
 const StreamHealthSettingsPanel = lazy(() => import('../components/admin/settings/StreamHealthSettingsPanel'));
 const PlaybackSettingsPanel = lazy(() => import('../components/admin/settings/PlaybackSettingsPanel'));
 const TelegramSettingsPanel = lazy(() => import('../components/admin/settings/TelegramSettingsPanel'));
@@ -37,6 +38,7 @@ const TABS = [
     { id: 'general', label: 'Umum', Panel: GeneralSettingsPanel },
     { id: 'timezone', label: 'Zona Waktu', Panel: TimezoneSettingsTab },
     { id: 'backup', label: 'Cadangan', Panel: BackupSettingsTab },
+    { id: 'security', label: 'Keamanan', Panel: SecuritySettingsPanel },
     { id: 'health', label: 'Kesehatan Stream', Panel: StreamHealthSettingsPanel },
     { id: 'playback', label: 'Putar Ulang', Panel: PlaybackSettingsPanel },
     { id: 'telegram', label: 'Bot Telegram', Panel: TelegramSettingsPanel },

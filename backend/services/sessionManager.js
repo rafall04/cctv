@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { query, queryOne, execute } from '../database/connectionPool.js';
 import { config } from '../config/config.js';
+import { getSecuritySettings } from './securitySettingsService.js';
 import { 
     logSessionInvalidated, 
     logTokenBlacklisted 
@@ -15,7 +16,12 @@ import {
  */
 
 // Session configuration
-const SESSION_CONFIG = {
+/*
+ * DEFAULTS ONLY — the live values come from getSessionConfig(). These three were hardcoded here
+ * while JWT_EXPIRATION / JWT_REFRESH_EXPIRATION / SESSION_ABSOLUTE_TIMEOUT_HOURS sat in .env being
+ * read by nothing, so changing them had no effect whatsoever.
+ */
+const SESSION_DEFAULTS = {
     accessTokenExpiry: '1h',           // 1 hour for access token
     refreshTokenExpiry: '7d',          // 7 days for refresh token
     absoluteTimeout: 24 * 60 * 60 * 1000, // 24 hours absolute timeout
@@ -73,7 +79,7 @@ export function createAccessToken(fastify, user, fingerprint, sessionCreatedAt) 
         sessionCreatedAt: sessionCreatedAt,
         type: 'access'
     }, {
-        expiresIn: SESSION_CONFIG.accessTokenExpiry
+        expiresIn: getSessionConfig().accessTokenExpiry
     });
 }
 
@@ -93,7 +99,7 @@ export function createRefreshToken(fastify, user, fingerprint, sessionCreatedAt)
         sessionCreatedAt: sessionCreatedAt,
         type: 'refresh'
     }, {
-        expiresIn: SESSION_CONFIG.refreshTokenExpiry
+        expiresIn: getSessionConfig().refreshTokenExpiry
     });
 }
 
@@ -142,7 +148,7 @@ export function isSessionExpired(tokenPayload) {
     }
     
     const sessionAge = Date.now() - tokenPayload.sessionCreatedAt;
-    return sessionAge > SESSION_CONFIG.absoluteTimeout;
+    return sessionAge > getSessionConfig().absoluteTimeout;
 }
 
 /**
@@ -166,7 +172,7 @@ export function blacklistToken(token, userId = null, reason = 'logout', expiresA
     const tokenHash = hashToken(token);
     
     // Default expiry: 7 days from now (matches refresh token expiry)
-    const expiry = expiresAt || new Date(Date.now() + parseDuration(SESSION_CONFIG.refreshTokenExpiry));
+    const expiry = expiresAt || new Date(Date.now() + parseDuration(getSessionConfig().refreshTokenExpiry));
     
     try {
         execute(
@@ -330,11 +336,22 @@ export function rotateTokens(fastify, oldAccessToken, oldRefreshToken, user, fin
 }
 
 /**
- * Get session configuration
+ * Session policy in force right now: admin panel -> .env -> SESSION_DEFAULTS.
+ *
+ * This used to return a copy of a hardcoded object, which is why JWT_EXPIRATION,
+ * JWT_REFRESH_EXPIRATION and SESSION_ABSOLUTE_TIMEOUT_HOURS could sit in .env doing nothing.
+ * Re-read per call, so a lifetime changed in Settings applies to the next token minted.
+ *
  * @returns {Object} Session configuration
  */
 export function getSessionConfig() {
-    return { ...SESSION_CONFIG };
+    const s = getSecuritySettings();
+    return {
+        accessTokenExpiry: s.accessTokenExpiry,
+        refreshTokenExpiry: s.refreshTokenExpiry,
+        absoluteTimeout: s.sessionAbsoluteTimeoutHours * 60 * 60 * 1000,
+        fingerprintFields: SESSION_DEFAULTS.fingerprintFields,
+    };
 }
 
 export default {

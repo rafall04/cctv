@@ -47,6 +47,7 @@ import { parseThumbnailRequestPath } from './utils/thumbnailRequestPolicy.js';
 import { startDailyCleanup, stopDailyCleanup, logSecurityEvent, SECURITY_EVENTS } from './services/securityAuditLogger.js';
 import { startOperationalRetention, stopOperationalRetention } from './services/operationalRetentionService.js';
 import backupTelegramService from './services/backupTelegramService.js';
+import { getSecuritySettings } from './services/securitySettingsService.js';
 import workerWatchdogService from './services/workerWatchdogService.js';
 import { getTimezone } from './services/timezoneService.js';
 import { closeAll as closeDbConnections, getStats as getDbStats } from './database/connectionPool.js';
@@ -75,6 +76,7 @@ import voucherAdminRoutes from './routes/voucherAdminRoutes.js';
 import rondaAdminRoutes from './routes/rondaAdminRoutes.js';
 import telegramArchiveRoutes from './routes/telegramArchiveRoutes.js';
 import backupTelegramRoutes from './routes/backupTelegramRoutes.js';
+import securitySettingsRoutes from './routes/securitySettingsRoutes.js';
 import recordingRoutes from './routes/recordingRoutes.js';
 import playbackTokenRoutes from './routes/playbackTokenRoutes.js';
 import playbackAccessRoutes from './routes/playbackAccessRoutes.js';
@@ -362,7 +364,7 @@ fastify.get('/health', async (request, reply) => {
         // operator trusts to confirm the security posture kept saying "fine" with rate
         // limiting and CSRF switched off.
         security: {
-            rateLimiting: config.security?.rateLimitEnabled !== false,
+            rateLimiting: getSecuritySettings().rateLimitEnabled !== false,
             apiKeyValidation: config.security?.apiKeyValidationEnabled !== false,
             csrfProtection: config.security?.csrfEnabled !== false,
             securityHeaders: true
@@ -410,6 +412,7 @@ await fastify.register(voucherAdminRoutes, { prefix: '/api/admin/voucher' });
 await fastify.register(rondaAdminRoutes, { prefix: '/api/admin/ronda' });
 await fastify.register(telegramArchiveRoutes, { prefix: '/api/admin/telegram-archive' });
 await fastify.register(backupTelegramRoutes, { prefix: '/api/admin/backup' });
+await fastify.register(securitySettingsRoutes, { prefix: '/api/admin/settings' });
 await fastify.register(billingWebhookRoutes, { prefix: '/api/billing' });
 // thumbnailRoutes removed - @fastify/static handles /api/thumbnails/* automatically
 

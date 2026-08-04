@@ -10,7 +10,7 @@
 
 import bcrypt from 'bcrypt';
 import { query, execute } from '../database/connectionPool.js';
-import { PASSWORD_POLICY } from './passwordValidator.js';
+import { getPasswordPolicy } from './passwordValidator.js';
 
 /**
  * Add password to history
@@ -50,7 +50,7 @@ export async function wasPasswordUsedBefore(userId, newPassword) {
              WHERE user_id = ? 
              ORDER BY created_at DESC 
              LIMIT ?`,
-            [userId, PASSWORD_POLICY.historyCount]
+            [userId, getPasswordPolicy().historyCount]
         );
         
         // Check each historical password
@@ -111,7 +111,7 @@ function cleanupOldPasswords(userId) {
              WHERE user_id = ? 
              ORDER BY created_at DESC 
              LIMIT ?`,
-            [userId, PASSWORD_POLICY.historyCount]
+            [userId, getPasswordPolicy().historyCount]
         );
         
         if (toKeep.length === 0) return;
