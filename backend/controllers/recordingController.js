@@ -90,7 +90,17 @@ export async function getSegments(request, reply) {
 
         return reply.send({ success: true, data: segmentsData });
     } catch (error) {
-        console.error('Get segments error:', error);
+        /*
+         * A refused or out-of-scope playback request is an EXPECTED condition, not a fault: it is
+         * what the access rules are FOR. Sending every one of them to stderr with a stack is how
+         * an error log becomes 98% noise and hides the one line that mattered — the lesson this
+         * project already paid for once. Owner-scope denials made these frequent enough to notice.
+         */
+        if (error.statusCode >= 400 && error.statusCode < 500) {
+            console.log(`[playback] segments ditolak (${error.statusCode}): ${error.message}`);
+        } else {
+            console.error('Get segments error:', error);
+        }
         if (error.statusCode === 401) {
             return reply.code(401).send({ success: false, message: error.message });
         }
