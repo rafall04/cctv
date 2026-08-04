@@ -450,7 +450,7 @@
             <th scope="col" class="num">Maks kamera</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody id="baris-paket">
           <tr>
             <td>Trial Gratis</td><td>Coba dulu sebelum berlangganan</td>
             <td class="num">Rp 0 <span class="dim">· 3 hari</span></td>
@@ -693,6 +693,12 @@
 
     <div class="actions">
       <a class="btn" href="https://cctvku.raf.my.id/daftar">Buka halaman pendaftaran</a>
+      <a class="btn btn-ghost" href="https://wa.me/6289685645956?text=Halo%2C%20saya%20mau%20tanya%20soal%20sewa%20CCTV.">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M12 2a10 10 0 0 0-8.6 15l-1.3 4.8 5-1.3A10 10 0 1 0 12 2zm5.8 14.2c-.2.7-1.2 1.3-2 1.4-.5.1-1.2.1-3.9-1-2.7-1.2-4.4-4-4.5-4.2-.1-.2-1-1.4-1-2.6s.6-1.8.9-2.1c.2-.2.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.2.1.3 0 .5l-.3.5-.4.4c-.1.1-.3.3-.1.6.1.3.7 1.2 1.5 1.9 1 .9 1.8 1.2 2.1 1.3.2.1.4.1.6-.1l.8-.9c.2-.2.4-.2.6-.1l2 .9c.2.1.4.2.4.3.1.2.1.6-.1 1.3z"/>
+        </svg>
+        Tanya lewat WhatsApp
+      </a>
       <span class="note">Belum yakin? Tanyakan dulu — pengecekan IP publik tidak dipungut biaya.</span>
     </div>
   </section>
@@ -711,9 +717,10 @@
   <footer>
     <p>
       Dua sumber angka, supaya jelas: jumlah kamera, segmen VLAN, dan volume arsip pada diagram
-      pertama dibaca dari instalasi Desa Dander &amp; Tanjungharjo per 3 Agustus 2026. Daftar harga
-      paket, batas kamera, dan ketentuan masa coba dibaca dari sistem sewa yang menagih, per
-      4 Agustus 2026. Keduanya angka sebenarnya, bukan contoh.
+      pertama dibaca dari instalasi Desa Dander &amp; Tanjungharjo per 3 Agustus 2026. Tabel harga
+      paket <b>dibaca langsung dari sistem yang menagih setiap kali halaman ini dibuka</b> — jadi
+      yang Anda lihat adalah tarif yang berlaku saat itu juga, bukan salinan yang bisa basi.
+      Bila halaman dibuka tanpa internet, yang tampil adalah tarif per 4 Agustus 2026.
     </p>
     <p>
       Halaman ini tidak tertaut dari mana pun dan tidak diindeks mesin pencari.
@@ -722,5 +729,63 @@
   </footer>
 
 </div>
+
+<script>
+/*
+ * Read the price list from the panel instead of trusting the numbers typed above.
+ *
+ * The table rendered server-side stays in the HTML as the FALLBACK, and it is deliberately correct
+ * at the time of writing: this page is also downloaded and opened as a file, or forwarded to
+ * someone offline, and in those cases the fetch simply cannot run. A page that blanked its own
+ * prices on a failed request would be worse than one showing yesterday's.
+ *
+ * This exists because the hand-typed version drifted badly — advertising Rp 15.000 while billing
+ * charged Rp 25.000. Now editing a price in the panel is enough; nobody has to remember this file.
+ */
+(function () {
+    var UNTUK_SIAPA = {
+        trial: 'Coba dulu sebelum berlangganan',
+        basic: 'Rumah, satu titik pantau',
+        hemat: 'Rumah besar atau toko',
+        bisnis: 'Kantor, gudang, banyak titik',
+    };
+    var rupiah = function (n) { return 'Rp ' + Number(n).toLocaleString('id-ID'); };
+
+    var tbody = document.getElementById('baris-paket');
+    if (!tbody || !window.fetch) return;
+
+    var batal = new AbortController();
+    var jam = setTimeout(function () { batal.abort(); }, 6000);
+
+    fetch('/api/public/billing/plans', { signal: batal.signal })
+        .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+        .then(function (res) {
+            var paket = res && res.success && res.data;
+            // An empty catalog is not an update — keep the fallback rather than show nothing.
+            if (!paket || !paket.length) return;
+
+            tbody.innerHTML = paket.map(function (p) {
+                var tonton = p.is_trial
+                    ? rupiah(p.price_per_camera) + ' <span class="dim">· ' + p.trial_days + ' hari</span>'
+                    : rupiah(p.price_per_camera);
+                var rekam = p.recording_price_per_camera
+                    ? '+ ' + rupiah(p.recording_price_per_camera)
+                    : '<span class="dim">—</span>';
+                var total = p.is_trial
+                    ? 'Gratis'
+                    : rupiah(p.price_per_camera + p.recording_price_per_camera);
+                var siapa = p.description || UNTUK_SIAPA[p.key] || '';
+
+                return '<tr><td>' + p.name + '</td><td>' + siapa + '</td>'
+                    + '<td class="num">' + tonton + '</td>'
+                    + '<td class="num">' + rekam + '</td>'
+                    + '<td class="num tot">' + total + '</td>'
+                    + '<td class="num">' + p.max_cameras + '</td></tr>';
+            }).join('');
+        })
+        .catch(function () { /* offline, dibuka sebagai berkas, atau backend sedang sibuk — biarkan tabel bawaan */ })
+        .then(function () { clearTimeout(jam); });
+}());
+</script>
 </body>
 </html>
