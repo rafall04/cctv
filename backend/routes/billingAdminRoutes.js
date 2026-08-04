@@ -159,6 +159,11 @@ export default async function billingAdminRoutes(fastify) {
                     name: { type: 'string', minLength: 2, maxLength: 60 },
                     description: { type: 'string', maxLength: 200 },
                     price_per_camera: { type: 'integer', minimum: 0 },
+                    // Must be listed here or ajv silently DELETES it: Fastify defaults to
+                    // removeAdditional, so an unlisted field makes the request succeed with 200
+                    // and save nothing at all. That is how the panel could show the input, send
+                    // it, and never change the price.
+                    recording_price_per_camera: { type: 'integer', minimum: 0 },
                     max_cameras: { type: 'integer', minimum: 1, maximum: 100 },
                     is_trial: { type: 'boolean' },
                     trial_days: { type: ['integer', 'null'], minimum: 1, maximum: 90 },
@@ -179,6 +184,7 @@ export default async function billingAdminRoutes(fastify) {
                     name: { type: 'string', minLength: 2, maxLength: 60 },
                     description: { type: 'string', maxLength: 200 },
                     price_per_camera: { type: 'integer', minimum: 0 },
+                    recording_price_per_camera: { type: 'integer', minimum: 0 },
                     max_cameras: { type: 'integer', minimum: 1, maximum: 100 },
                     is_trial: { type: 'boolean' },
                     trial_days: { type: ['integer', 'null'], minimum: 1, maximum: 90 },
