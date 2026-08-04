@@ -230,6 +230,13 @@ export default function MyCameras() {
                                         {camera.is_public ? (
                                             <span className="shrink-0 rounded-full bg-primary-100 px-2 py-0.5 text-[10px] font-medium text-primary dark:bg-sky-900/40 text-primary">🌐 Publik</span>
                                         ) : null}
+                                        {/*
+                                          * Without this badge two cameras sit side by side at
+                                          * different prices with nothing saying why one costs more.
+                                          */}
+                                        {camera.enable_recording === 1 ? (
+                                            <span className="shrink-0 rounded-full bg-status-warn/15 px-2 py-0.5 text-[10px] font-medium text-status-warn">⏺ Merekam</span>
+                                        ) : null}
                                     </div>
                                     <p className="truncate text-xs text-content-muted">
                                         {camera.location || '—'}
@@ -237,6 +244,21 @@ export default function MyCameras() {
                                     {camera.monthly_price && (
                                         <p className="mt-1 text-xs font-medium text-content-muted">
                                             {formatRupiah(camera.monthly_price)}/bulan
+                                            {camera.enable_recording === 1 && (
+                                                <span className="text-content-subtle"> · termasuk rekam</span>
+                                            )}
+                                        </p>
+                                    )}
+                                    {/*
+                                      * An offline camera used to be a dead end: a red badge and no
+                                      * next step. The guide is the next step, so say so here rather
+                                      * than wait for the customer to ask.
+                                      */}
+                                    {!suspended && camera.is_online === 0 && (
+                                        <p className="mt-2 text-xs text-content-muted">
+                                            Belum tersambung —{' '}
+                                            <Link to="/my/panduan" className="text-primary underline">lihat panduan</Link>{' '}
+                                            pengaturan router.
                                         </p>
                                     )}
                                     {suspended && (

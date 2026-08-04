@@ -31,6 +31,7 @@ class CameraRuntimeStateService {
     constructor() {
         this.tableSupport = null;
         this.sourceDeadSupport = null;
+        this.lastOnlineSupport = null;
         this._lastSeedAt = 0;
     }
 
@@ -38,6 +39,26 @@ class CameraRuntimeStateService {
      * The dead-at-source columns arrived later than the table, so a database that has not run
      * `npm run migrate` yet must keep writing runtime state rather than failing every health tick.
      */
+    /*
+     * `last_online_at` only ever moves forward, and only when the camera is actually up. That is
+     * the whole point: billing needs "did this camera work today", and every existing field
+     * answers a different question — `last_online_check` is refreshed on every probe (online or
+     * not), and `is_online` is a right-now snapshot that would misjudge a camera which was up all
+     * day but happened to blink when the charge ran.
+     */
+    hasLastOnlineColumn() {
+        if (this.lastOnlineSupport === undefined || this.lastOnlineSupport === null) {
+            try {
+                this.lastOnlineSupport = query('PRAGMA table_info(camera_runtime_state)')
+                    .map((c) => c.name)
+                    .includes('last_online_at');
+            } catch {
+                this.lastOnlineSupport = false;
+            }
+        }
+        return this.lastOnlineSupport;
+    }
+
     hasSourceDeadColumns() {
         if (this.sourceDeadSupport !== null) {
             return this.sourceDeadSupport;
@@ -234,6 +255,16 @@ class CameraRuntimeStateService {
         if (this.hasSourceDeadColumns()) {
             columns.push('source_dead_since', 'source_dead_reason');
             values.push(streak.since, streak.reason);
+        }
+
+        if (this.hasLastOnlineColumn()) {
+            // Stamped only while up, and never cleared when the camera goes down — going offline
+            // must not erase the evidence that it worked earlier today.
+            nextState.last_online_at = nextState.is_online
+                ? timestamp
+                : (current.last_online_at ?? null);
+            columns.push('last_online_at');
+            values.push(nextState.last_online_at);
         }
 
         const assignments = columns

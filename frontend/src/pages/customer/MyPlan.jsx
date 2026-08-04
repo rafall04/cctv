@@ -146,6 +146,22 @@ export default function MyPlan() {
                             <ul className="mt-2 space-y-1 text-sm text-content-muted">
                                 <li>✓ Maks. {plan.max_cameras} kamera</li>
                                 <li>✓ Live streaming 24 jam</li>
+                                {/*
+                                  * The surcharge is stated here because it is charged here. Showing
+                                  * only the watch price made this page understate what the customer
+                                  * actually pays — they would read Rp20.000 and then meet Rp28.000
+                                  * on their camera card with nothing explaining the gap.
+                                  */}
+                                {plan.is_trial !== 1 && plan.recording_price_per_camera > 0 && (
+                                    <li>
+                                        + {formatRupiah(plan.recording_price_per_camera)} bila kamera merekam
+                                        <span className="block text-xs text-content-subtle">
+                                            {plan.recording_retention_days > 0
+                                                ? `Rekaman disimpan ${plan.recording_retention_days} hari`
+                                                : 'Lama penyimpanan belum ditetapkan'}
+                                        </span>
+                                    </li>
+                                )}
                                 {plan.description && <li>✓ {plan.description}</li>}
                             </ul>
                             <button

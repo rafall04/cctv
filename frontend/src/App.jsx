@@ -61,6 +61,7 @@ const MyWallet = lazyWithRetry(() => import('./pages/customer/MyWallet'), 'my-wa
 const MyPlan = lazyWithRetry(() => import('./pages/customer/MyPlan'), 'my-plan');
 const MyAccount = lazyWithRetry(() => import('./pages/customer/MyAccount'), 'my-account');
 const MyPanduan = lazyWithRetry(() => import('./pages/customer/MyPanduan'), 'my-panduan');
+const MyRecordings = lazyWithRetry(() => import('./pages/customer/MyRecordings'), 'my-recordings');
 const RegisterPage = lazyWithRetry(() => import('./pages/RegisterPage'), 'register-page');
 // Playback (recordingService + full playback component/hook tree, ~72 KB raw) is lazy so it stays OUT
 // of the eager App chunk that every public-landing visit downloads + parses. Both the public /playback
@@ -184,6 +185,14 @@ function App() {
                     element={
                         <CustomerPageRoute>
                             <MyPanduan />
+                        </CustomerPageRoute>
+                    }
+                />
+                <Route
+                    path="/my/rekaman"
+                    element={
+                        <CustomerPageRoute>
+                            <MyRecordings />
                         </CustomerPageRoute>
                     }
                 />

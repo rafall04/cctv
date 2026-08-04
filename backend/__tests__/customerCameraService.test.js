@@ -75,6 +75,8 @@ function seedSchema() {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             key TEXT NOT NULL UNIQUE, name TEXT NOT NULL, description TEXT,
             price_per_camera INTEGER NOT NULL DEFAULT 0,
+            recording_price_per_camera INTEGER NOT NULL DEFAULT 0,
+            recording_retention_days INTEGER NOT NULL DEFAULT 0,
             max_cameras INTEGER NOT NULL DEFAULT 1,
             is_trial INTEGER NOT NULL DEFAULT 0, trial_days INTEGER,
             active INTEGER NOT NULL DEFAULT 1, sort_order INTEGER NOT NULL DEFAULT 100,
@@ -92,6 +94,7 @@ function seedSchema() {
             billing_status TEXT,
             area_id INTEGER,
             is_public INTEGER NOT NULL DEFAULT 0,
+            enable_recording INTEGER NOT NULL DEFAULT 0,
             updated_at TEXT
         );
         CREATE TABLE areas (

@@ -344,8 +344,18 @@ describe('recordingPlaybackService', () => {
 
         expect(access.accessMode).toBe('public_denied');
         expect(access.deniedReason).toBe('camera_admin_only');
-        // Token validation must not even be consulted for rented cameras.
-        expect(validateRequestForCameraMock).not.toHaveBeenCalled();
+        /*
+         * This used to assert the validator was never CALLED, as the cheapest proof that no token
+         * could reach a rented camera. Rented cameras now have exactly one opening — a link the
+         * camera's own owner minted for that one camera — so the validator is consulted and the
+         * answer is then checked against scope_type and created_by.
+         *
+         * The protection is unchanged and still asserted above: this token carries neither, so it
+         * is refused. The ways that refusal can be attacked (an 'all'-scoped token, another
+         * customer's token, an admin's token, a suspended rental) are covered in
+         * playbackOwnerAccess.test.js.
+         */
+        expect(validateRequestForCameraMock).toHaveBeenCalled();
     });
 
     it('blocks public playback for admin-only cameras', () => {

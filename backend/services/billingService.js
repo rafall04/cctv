@@ -24,6 +24,7 @@ import walletService from './walletService.js';
 import cameraService from './cameraService.js';
 import { invalidateCameraAccessCache } from './cameraAccessService.js';
 import { getTimezone } from './timezoneService.js';
+import settingsService from './settingsService.js';
 import { logAdminAction } from './securityAuditLogger.js';
 
 const HOURLY_TICK_MS = 60 * 60 * 1000;
@@ -388,6 +389,39 @@ class BillingService {
      * subscription + camera state to the outcome. Shared by the hourly tick,
      * assignment day-one billing, manual reactivation, and topup resume.
      */
+    /**
+     * Did this camera work at all on the billing day?
+     *
+     * Answered from camera_runtime_state.last_online_at, which is stamped only while the camera is
+     * actually up. Deliberately NOT from `is_online`: the daily charge runs at one arbitrary
+     * moment, so a snapshot would give a free day to a camera that was up for 23 hours and blinked
+     * at the wrong second, and bill one that has been dead since morning but answered once just now.
+     *
+     * A camera with no record at all has never been seen online, and never delivered the service —
+     * so it counts as not working, not as working-by-default.
+     */
+    _bekerjaHariIni(cameraId, today) {
+        let row;
+        try {
+            row = queryOne(
+                'SELECT last_online_at FROM camera_runtime_state WHERE camera_id = ?',
+                [cameraId]
+            );
+        } catch {
+            /*
+             * No health table or column at all (a fresh DB, or migrations not yet run). Then
+             * "did this camera work today" is not merely false, it is UNKNOWABLE — and answering
+             * "it did not" would make every subscription free for as long as the schema stayed
+             * behind, silently. Unknown therefore falls back to charging, which an operator
+             * notices and can refund; the opposite failure hides itself.
+             */
+            return true;
+        }
+        if (!row?.last_online_at) return false;
+        // Both sides are compared as local calendar days, the same unit last_charged_date uses.
+        return localDateString(new Date(row.last_online_at)) === today;
+    }
+
     _chargeAndSync(subscription, today) {
         const daily = dailyCostOf(subscription.monthly_price);
 
@@ -412,6 +446,21 @@ class BillingService {
         if (daily <= 0) {
             this._markActiveWithoutCharge(subscription, today);
             return { status: 'active', charged: false };
+        }
+
+        /*
+         * A camera that never came up today delivered nothing, so the day is not charged. The
+         * subscription stays ACTIVE — the outage is usually the customer's internet, not a reason
+         * to suspend them — it simply costs nothing.
+         *
+         * Switchable from the panel because it is a commercial choice, not a technical one: some
+         * operators sell availability (you pay for the slot being reserved) rather than delivery.
+         * The default is not to charge, because billing for a service that produced no video is
+         * exactly what a customer would call being cheated.
+         */
+        if (settingsService.getBillingSkipOfflineDays() && !this._bekerjaHariIni(subscription.camera_id, today)) {
+            this._markActiveWithoutCharge(subscription, today);
+            return { status: 'active', charged: false, reason: 'kamera_offline_seharian' };
         }
 
         try {

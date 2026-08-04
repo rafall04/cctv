@@ -23,7 +23,11 @@ const getApiBaseUrl = () => {
 };
 
 const buildPlaybackQuery = (accessScope = 'public') => {
-    return accessScope === 'admin_full' ? '?scope=admin' : '';
+    if (accessScope === 'admin_full') return '?scope=admin';
+    // A rental customer replaying their OWN camera. The server re-checks ownership, billing state
+    // and camera class — this only asks for that path, it does not grant anything.
+    if (accessScope === 'owner_full') return '?scope=owner';
+    return '';
 };
 
 // ============================================

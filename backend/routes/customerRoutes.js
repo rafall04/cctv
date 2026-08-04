@@ -25,6 +25,9 @@ import {
     validatePromo,
     redeemPromo,
     getSetupInfo,
+    listMyPlaybackTokens,
+    createMyPlaybackToken,
+    revokeMyPlaybackToken,
 } from '../controllers/customerController.js';
 import { authMiddleware, requireCustomerOrAdmin } from '../middleware/authMiddleware.js';
 
@@ -67,6 +70,21 @@ export default async function customerRoutes(fastify) {
     // Router-setup details. Behind the guard because the value must NOT ship inside the public
     // JS bundle — see getSetupInfo for why a guarded page alone would not have hidden it.
     fastify.get('/setup-info', { onRequest: guard }, getSetupInfo);
+
+    // Share links for the customer's OWN cameras. Scope, ownership and quota are decided in the
+    // controller from the session — never from the request body.
+    fastify.get('/playback-tokens', { onRequest: guard }, listMyPlaybackTokens);
+    fastify.post('/playback-tokens', { onRequest: guard }, createMyPlaybackToken);
+    fastify.post('/playback-tokens/:id/revoke', {
+        onRequest: guard,
+        schema: {
+            params: {
+                type: 'object',
+                required: ['id'],
+                properties: { id: { type: 'string', pattern: '^[0-9]+$' } },
+            },
+        },
+    }, revokeMyPlaybackToken);
 
     // Plan (paket) self-service
     fastify.get('/plan', { onRequest: guard }, getMyPlan);

@@ -8,8 +8,9 @@
  * SideEffects: Plan/setting mutations via billingAdminService.
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import billingAdminService from '../../services/billingAdminService';
+import { settingsService as appSettingsService } from '../../services/settingsService';
 
 const inputClass = 'w-full px-3 py-2 bg-surface-sunken border border-edge rounded-xl text-sm text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary';
 const cardClass = 'bg-surface border border-edge rounded-2xl p-4';
@@ -29,6 +30,19 @@ const EMPTY_PLAN = {
 export default function BillingPlansTab({ plans, regSettings, run, busy }) {
     const [editing, setEditing] = useState(null); // null | 'new' | plan object
     const [form, setForm] = useState(EMPTY_PLAN);
+    // Billing rule, not a plan property, so it is read straight from the generic settings store.
+    const [lewatiOffline, setLewatiOffline] = useState(true);
+
+    useEffect(() => {
+        appSettingsService.getAllSettings()
+            .then((res) => {
+                const rows = Array.isArray(res) ? res : (res?.data ?? []);
+                const row = rows.find((s) => s.key === 'billing_skip_offline_days');
+                // Absent means default-on: a day with no video is not charged.
+                setLewatiOffline(row ? row.value !== false && row.value !== 'false' : true);
+            })
+            .catch(() => { /* biarkan bawaan; kartunya tetap bisa dipakai */ });
+    }, []);
 
     const openNew = () => {
         setForm(EMPTY_PLAN);
@@ -177,7 +191,36 @@ export default function BillingPlansTab({ plans, regSettings, run, busy }) {
 
             <div className="space-y-4">
                 <div className={cardClass}>
-                    <h3 className="font-semibold text-content">Registrasi Mandiri</h3>
+                    <h3 className="font-semibold text-content">Penagihan Harian</h3>
+                    <label className="mt-2 flex items-start gap-2 text-sm text-content-muted">
+                        <input
+                            type="checkbox"
+                            className="mt-1"
+                            checked={lewatiOffline}
+                            disabled={busy}
+                            onChange={(e) => {
+                                const nilai = e.target.checked;
+                                setLewatiOffline(nilai);
+                                run(
+                                    () => appSettingsService.updateSetting(
+                                        'billing_skip_offline_days',
+                                        nilai,
+                                        'Hari yang kameranya tidak pernah online tidak ditagih'
+                                    ),
+                                    nilai ? 'Hari kamera mati tidak akan ditagih' : 'Hari kamera mati tetap ditagih'
+                                );
+                            }}
+                        />
+                        <span>
+                            Jangan tagih hari saat kamera tidak pernah online
+                            <span className="mt-0.5 block text-xs text-content-subtle">
+                                Langganan tetap aktif — gangguan internet pelanggan bukan alasan menangguhkan.
+                                Kamera yang sempat hidup sebentar saja tetap ditagih penuh hari itu.
+                            </span>
+                        </span>
+                    </label>
+
+                    <h3 className="mt-5 border-t border-edge pt-4 font-semibold text-content">Registrasi Mandiri</h3>
                     <p className="mt-1 text-xs text-content-muted">
                         Pelanggan baru daftar sendiri lewat halaman <code>/daftar</code>.
                     </p>

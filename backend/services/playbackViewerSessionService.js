@@ -18,7 +18,7 @@ const RETENTION_RUN_INTERVAL_MS = 6 * 60 * 60 * 1000;
 // token_full was missing, and normalizeAccessMode silently rewrote it to 'public_preview' — so a
 // token holder's view was filed as anonymous and Playback Analytics counted paying viewers as
 // public preview. On production that produced 134 "public" sessions and 0 token ones.
-const PLAYBACK_ACCESS_MODES = new Set(['public_preview', 'token_full', 'admin_full']);
+const PLAYBACK_ACCESS_MODES = new Set(['public_preview', 'token_full', 'admin_full', 'owner_full']);
 
 function getDate() {
     return getLocalDate();

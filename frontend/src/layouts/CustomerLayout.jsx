@@ -53,6 +53,7 @@ export default function CustomerLayout({ children }) {
     const tabs = [
         { label: 'Kamera Saya', path: '/my' },
         { label: 'Paket', path: '/my/paket' },
+        { label: 'Rekaman', path: '/my/rekaman' },
         { label: 'Saldo & Tagihan', path: '/my/wallet' },
         { label: 'Panduan', path: '/my/panduan' },
         { label: 'Akun', path: '/my/akun' },
@@ -90,12 +91,19 @@ export default function CustomerLayout({ children }) {
                         </button>
                     </div>
                 </div>
-                <nav className="mx-auto flex max-w-5xl gap-1 px-4">
+                {/*
+                  * Six tabs do not fit a phone. Without scrolling the last one ("Akun") sits past
+                  * the edge and is simply unreachable — and the page-level overflow check does NOT
+                  * catch it, because the document width stays correct while the nav clips its own
+                  * content. [contain:paint] keeps this strip from widening the document, which is
+                  * the failure that makes mobile browsers zoom the whole page out.
+                  */}
+                <nav className="mx-auto flex max-w-5xl gap-1 overflow-x-auto whitespace-nowrap px-4 [contain:paint] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                     {tabs.map((tab) => (
                         <Link
                             key={tab.path}
                             to={tab.path}
-                            className={`border-b-2 px-3 py-2 text-sm font-medium transition-colors ${location.pathname === tab.path
+                            className={`shrink-0 border-b-2 px-3 py-2 text-sm font-medium transition-colors ${location.pathname === tab.path
                                 ? 'border-primary text-primary'
                                 : 'border-transparent text-content-muted hover:text-content'
                             }`}

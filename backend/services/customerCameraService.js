@@ -142,10 +142,12 @@ class CustomerCameraService {
 
         // Tenancy + billing wiring: subscriber class, owner, plan-priced subscription
         // (day-one charge / trial handling happens inside assignSubscription).
+        // No explicit price: assignSubscription derives it from the plan and the camera's own
+        // recording flag. Passing price_per_camera here would hard-code the watch-only tariff and
+        // quietly drop the recording surcharge the day customer cameras can record.
         const subscription = billingService.assignSubscription({
             camera_id: created.id,
             user_id: user.id,
-            monthly_price: planState.plan.price_per_camera,
         }, request);
 
         return {

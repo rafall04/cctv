@@ -18,6 +18,7 @@ import { existsSync, statSync } from 'fs';
 import { isSafeRecordingFilePath } from './recordingPathSafetyPolicy.js';
 import { RECORDINGS_BASE_PATH } from './recordingPaths.js';
 import archivedSegmentSourceService from './archivedSegmentSourceService.js';
+import { resolveOwnerScopeAccess, resolveOwnerIssuedTokenAccess } from './rentalPlaybackAccessPolicy.js';
 
 const PUBLIC_PLAYBACK_MODES = new Set(['inherit', 'disabled', 'preview_only', 'admin_only']);
 const VALID_PREVIEW_MINUTES = new Set([0, 10, 20, 30, 60]);
@@ -256,6 +257,8 @@ class RecordingPlaybackService {
                     WHEN camera_class IN ('community', 'owner_private', 'subscriber') THEN camera_class
                     ELSE 'community'
                 END as camera_class,
+                -- Owner playback is gated on this: a suspended rental must not keep serving history.
+                billing_status,
                 public_playback_mode,
                 public_playback_preview_minutes
             FROM cameras
@@ -276,7 +279,8 @@ class RecordingPlaybackService {
     }
 
     resolvePlaybackAccess(camera, request = {}) {
-        const requestedScope = request?.query?.scope === 'admin' ? 'admin' : 'public';
+        const rawScope = request?.query?.scope;
+        const requestedScope = rawScope === 'admin' || rawScope === 'owner' ? rawScope : 'public';
 
         if (requestedScope === 'admin') {
             // Staff only. `customer` JWTs are authenticated but must never
@@ -300,11 +304,28 @@ class RecordingPlaybackService {
             };
         }
 
-        // Rented/private cameras never expose public playback — not even via
-        // playback tokens (those are a public-hub sharing feature). The rental
-        // product is live-only; recordings stay staff-only. This sits BEFORE
-        // token validation so an 'all'-scoped token cannot unlock them.
+        // The camera's owner may replay their own footage — the one deliberate opening in the
+        // subscriber live-only rule. Conditions and rationale: rentalPlaybackAccessPolicy.
+        if (requestedScope === 'owner') {
+            return resolveOwnerScopeAccess(camera, request);
+        }
+
+        // Declared before the rental block below, which validates owner-issued tokens too.
+        const isPlaylistRequest = request?.url?.includes('/playlist.m3u8');
+        const shouldTouchToken = request?.url?.includes('/segments') || isPlaylistRequest;
+
         if (camera.camera_class && camera.camera_class !== 'community') {
+            // One exception: a link the camera's own owner minted for this camera. The conditions
+            // (and why each exists) live in rentalPlaybackAccessPolicy.
+            const lewatTokenPemilik = resolveOwnerIssuedTokenAccess(camera, request, {
+                touch: shouldTouchToken,
+                eventType: isPlaylistRequest ? 'access_playlist' : 'access_segments',
+                camera,
+            }, noteTokenRefusal);
+            if (lewatTokenPemilik) {
+                return lewatTokenPemilik;
+            }
+
             return {
                 accessMode: 'public_denied',
                 isPublicPreview: false,
@@ -315,8 +336,6 @@ class RecordingPlaybackService {
             };
         }
 
-        const isPlaylistRequest = request?.url?.includes('/playlist.m3u8');
-        const shouldTouchToken = request?.url?.includes('/segments') || isPlaylistRequest;
         // Cookie-based validation: a stale/revoked/out-of-scope playback
         // cookie must NOT lock the visitor out of public preview. The
         // explicit /activate path already returns the 401/403 properly; here
@@ -470,7 +489,8 @@ class RecordingPlaybackService {
     getAccessibleSegments(cameraId, request) {
         const { camera, access } = this.resolvePlaybackContext(cameraId, request);
         const previewLimit = getPreviewSegmentLimit(access.previewMinutes);
-        const queryOptions = access.accessMode === 'admin_full'
+        // owner_full sees the same full history as staff — for their own camera only.
+        const queryOptions = access.accessMode === 'admin_full' || access.accessMode === 'owner_full'
             ? { cameraId, order: 'oldest', limit: 1000, returnAscending: true }
             : access.accessMode === 'token_full'
                 ? { cameraId, order: 'oldest', limit: 1000, returnAscending: true }
@@ -529,7 +549,7 @@ class RecordingPlaybackService {
      * instantly while the archived one costs a re-download from Telegram — same footage, worse trip.
      */
     mergeArchivedSegments(localSegments, cameraId, access) {
-        if (access?.accessMode !== 'token_full' && access?.accessMode !== 'admin_full') {
+        if (!['token_full', 'admin_full', 'owner_full'].includes(access?.accessMode)) {
             return localSegments;
         }
 
@@ -578,7 +598,7 @@ class RecordingPlaybackService {
             throw err;
         }
 
-        if (access.accessMode !== 'admin_full') {
+        if (access.accessMode !== 'admin_full' && access.accessMode !== 'owner_full') {
             if (access.accessMode === 'token_full') {
                 const cutoffIso = access.playbackWindowHours
                     ? new Date(Date.now() - access.playbackWindowHours * 60 * 60 * 1000).toISOString()

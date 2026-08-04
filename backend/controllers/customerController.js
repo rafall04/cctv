@@ -16,6 +16,7 @@ import paymentService from '../services/paymentService.js';
 import promoService from '../services/promoService.js';
 import paymentSettingsService from '../services/paymentSettingsService.js';
 import cameraHealthService from '../services/cameraHealthService.js';
+import playbackTokenService from '../services/playbackTokenService.js';
 import { sanitizeCameraThumbnailList } from '../services/thumbnailPathService.js';
 
 function handleError(reply, error, fallback) {
@@ -53,6 +54,8 @@ const CUSTOMER_CAMERA_PROJECTION = `
     c.thumbnail_updated_at,
     c.area_id,
     c.is_public,
+    -- Surfaced so the portal can explain why two cameras on one plan cost different amounts.
+    c.enable_recording,
     a.name AS area_name
 `;
 
@@ -252,5 +255,119 @@ export async function getSetupInfo(request, reply) {
         return reply.send({ success: true, data: { server_ip: ip || null } });
     } catch (error) {
         return handleError(reply, error, 'Get setup info error:');
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Share links a customer mints for THEIR OWN cameras
+// ---------------------------------------------------------------------------
+/*
+ * A shop owner handing footage to their staff or to the police is a real need, and routing every
+ * one of those through us does not scale. But this is the highest-risk surface in the portal:
+ * a link leaves our system entirely, so what it can reach must be decided here, never by the
+ * client.
+ *
+ * Three rules, all enforced server-side:
+ *  - the camera list is INTERSECTED with what this customer owns; a forged camera_id is dropped
+ *    rather than trusted, so the worst a tampered request achieves is a token for nothing;
+ *  - scope is forced to 'selected'. An 'all' or 'area' token would be refused by the playback
+ *    gate anyway, but minting one at all would be a trap waiting for someone to widen that gate;
+ *  - a quota, because one account must not be able to mint links without bound.
+ */
+const KUOTA_TOKEN_PELANGGAN = 10;
+
+function kameraMilik(userId, cameraIds) {
+    const diminta = (Array.isArray(cameraIds) ? cameraIds : [])
+        .map((id) => Number.parseInt(id, 10))
+        .filter((id) => Number.isInteger(id) && id > 0);
+    if (diminta.length === 0) return [];
+
+    const placeholders = diminta.map(() => '?').join(', ');
+    return query(
+        `SELECT id FROM cameras
+         WHERE owner_user_id = ? AND camera_class = 'subscriber' AND id IN (${placeholders})`,
+        [userId, ...diminta]
+    ).map((row) => row.id);
+}
+
+/*
+ * Scoped query rather than playbackTokenService.listTokens(): that method takes no filter, returns
+ * EVERY token in the system and caps at 200 rows. Filtering its output afterwards would both leak
+ * other people's tokens on the way through and silently lose this customer's once the global count
+ * passed the cap.
+ */
+function tokenMilikPelanggan(userId) {
+    return query(
+        `SELECT id, label, token_prefix, share_key_prefix, scope_type, camera_ids_json,
+                playback_window_hours, expires_at, revoked_at, last_used_at, use_count,
+                client_note, created_at
+         FROM playback_tokens
+         WHERE created_by = ?
+         ORDER BY created_at DESC, id DESC`,
+        [userId]
+    ).map((row) => ({
+        ...row,
+        camera_ids: JSON.parse(row.camera_ids_json || '[]'),
+        is_active: !row.revoked_at && (!row.expires_at || new Date(row.expires_at).getTime() > Date.now()),
+    }));
+}
+
+export async function listMyPlaybackTokens(request, reply) {
+    try {
+        return reply.send({ success: true, data: tokenMilikPelanggan(request.user.id) });
+    } catch (error) {
+        return handleError(reply, error, 'List customer playback tokens error:');
+    }
+}
+
+export async function createMyPlaybackToken(request, reply) {
+    try {
+        const userId = request.user.id;
+        const cameraIds = kameraMilik(userId, request.body?.camera_ids);
+        if (cameraIds.length === 0) {
+            const err = new Error('Pilih minimal satu kamera milik Anda');
+            err.statusCode = 400;
+            throw err;
+        }
+
+        const aktif = tokenMilikPelanggan(userId).filter((t) => t.is_active).length;
+        if (aktif >= KUOTA_TOKEN_PELANGGAN) {
+            const err = new Error(`Maksimal ${KUOTA_TOKEN_PELANGGAN} tautan aktif. Cabut yang lama dulu.`);
+            err.statusCode = 400;
+            throw err;
+        }
+
+        const hasil = playbackTokenService.createToken({
+            label: String(request.body?.label || 'Tautan rekaman').slice(0, 60),
+            scope_type: 'selected',
+            camera_ids: cameraIds,
+            preset: 'custom',
+            playback_window_hours: Math.min(Number(request.body?.playback_window_hours) || 24, 168),
+            expires_at: request.body?.expires_at,
+            client_note: String(request.body?.client_note || '').slice(0, 120),
+        }, request);
+
+        return reply.send({ success: true, message: 'Tautan dibuat', data: hasil?.data ?? hasil });
+    } catch (error) {
+        return handleError(reply, error, 'Create customer playback token error:');
+    }
+}
+
+export async function revokeMyPlaybackToken(request, reply) {
+    try {
+        const id = Number.parseInt(request.params.id, 10);
+        // Ownership is re-checked here rather than trusted from the URL: revoking is destructive,
+        // and a customer must not be able to kill a link they did not create.
+        const milik = tokenMilikPelanggan(request.user.id).some((t) => Number(t.id) === id);
+        if (!milik) {
+            const err = new Error('Tautan tidak ditemukan');
+            err.statusCode = 404;
+            throw err;
+        }
+
+        playbackTokenService.revokeToken(id, request);
+        return reply.send({ success: true, message: 'Tautan dicabut' });
+    } catch (error) {
+        return handleError(reply, error, 'Revoke customer playback token error:');
     }
 }

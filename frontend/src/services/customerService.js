@@ -92,6 +92,23 @@ export const customerService = {
         const response = await apiClient.get('/api/customer/areas');
         return response.data;
     },
+
+    // Share links for the customer's own cameras. The server decides scope, ownership and quota
+    // from the session — camera_ids sent here are intersected with what this customer owns.
+    async getPlaybackTokens() {
+        const response = await apiClient.get('/api/customer/playback-tokens');
+        return response.data;
+    },
+
+    async createPlaybackToken(payload) {
+        const response = await apiClient.post('/api/customer/playback-tokens', payload);
+        return response.data;
+    },
+
+    async revokePlaybackToken(id) {
+        const response = await apiClient.post(`/api/customer/playback-tokens/${id}/revoke`);
+        return response.data;
+    },
 };
 
 export default customerService;

@@ -614,6 +614,25 @@ class SettingsService {
 
         return result;
     }
+
+    /**
+     * Should a day on which the camera never came online be charged?
+     *
+     * Commercial choice, not a technical one, so it lives in the panel. Default FALSE-to-charge
+     * (i.e. skip the charge) because billing for a day that produced no video at all is the thing
+     * a customer would fairly call being cheated. Operators who sell availability rather than
+     * delivery can flip it in Pengaturan.
+     */
+    getBillingSkipOfflineDays() {
+        try {
+            const row = queryOne('SELECT value FROM settings WHERE key = ?', ['billing_skip_offline_days']);
+            if (!row) return true;
+            return parseBoolean(row.value, true);
+        } catch {
+            // A missing settings table (fresh/test DB) must not make everybody pay by accident.
+            return true;
+        }
+    }
 }
 
 export default new SettingsService();
