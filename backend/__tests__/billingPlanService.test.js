@@ -75,6 +75,7 @@ function seedSchema() {
             description TEXT,
             price_per_camera INTEGER NOT NULL DEFAULT 0,
             recording_price_per_camera INTEGER NOT NULL DEFAULT 0,
+            recording_retention_days INTEGER NOT NULL DEFAULT 0,
             max_cameras INTEGER NOT NULL DEFAULT 1,
             is_trial INTEGER NOT NULL DEFAULT 0,
             trial_days INTEGER,
@@ -189,6 +190,35 @@ describe('billingPlanService', () => {
 
             // and the plans that predate the column are untouched
             expect(billingPlanService.getPlanByKey('basic').recording_price_per_camera).toBe(0);
+        });
+
+        it('stores how many days of recording the plan promises', () => {
+            const plan = billingPlanService.createPlan({
+                key: 'rekam7', name: 'Rekam 7 Hari', price_per_camera: 20000,
+                recording_price_per_camera: 10000, recording_retention_days: 7, max_cameras: 3,
+            });
+            expect(plan.recording_retention_days).toBe(7);
+
+            const diubah = billingPlanService.updatePlan(plan.id, { recording_retention_days: 14 });
+            expect(diubah.recording_retention_days).toBe(14);
+        });
+
+        it('defaults retention to 0 — "belum ditetapkan", never an invented promise', () => {
+            const plan = billingPlanService.createPlan({
+                key: 'tanpa-retensi', name: 'Tanpa Retensi', price_per_camera: 9000, max_cameras: 2,
+            });
+            expect(plan.recording_retention_days).toBe(0);
+        });
+
+        it('menolak retensi di luar 0-365 hari', () => {
+            // Valid everywhere else, so the retention bound is the only thing that can reject it.
+            const buat = (hari) => () => billingPlanService.createPlan({
+                key: 'retensi-uji', name: 'Uji Retensi', price_per_camera: 1000, max_cameras: 1,
+                recording_retention_days: hari,
+            });
+            expect(buat(-1)).toThrow('Retensi rekaman harus bilangan bulat 0-365 hari');
+            expect(buat(366)).toThrow('Retensi rekaman harus bilangan bulat 0-365 hari');
+            expect(buat(1.5)).toThrow('Retensi rekaman harus bilangan bulat 0-365 hari');
         });
 
         it('stores the recording surcharge independently of the watch price', () => {

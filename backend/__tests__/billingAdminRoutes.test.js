@@ -117,6 +117,34 @@ describe('harga rekaman menembus skema rute', () => {
         await app.close();
     });
 
+    it('PUT /plans/:id meneruskan recording_retention_days ke handler', async () => {
+        // Added the day after the surcharge bug, through the same three layers — so the same
+        // silent-strip failure would repeat exactly here if the schema were forgotten again.
+        const app = await buildApp();
+        const res = await app.inject({
+            method: 'PUT',
+            url: '/api/admin/billing/plans/2',
+            payload: { recording_retention_days: 7 },
+        });
+
+        expect(res.statusCode).toBe(200);
+        expect(updatePlanMock.mock.calls[0][0].body).toEqual({ recording_retention_days: 7 });
+        await app.close();
+    });
+
+    it('retensi di luar 0-365 hari ditolak di perbatasan', async () => {
+        const app = await buildApp();
+        const res = await app.inject({
+            method: 'PUT',
+            url: '/api/admin/billing/plans/2',
+            payload: { recording_retention_days: 400 },
+        });
+
+        expect(res.statusCode).toBe(400);
+        expect(updatePlanMock).not.toHaveBeenCalled();
+        await app.close();
+    });
+
     it('field yang benar-benar asing tetap dibuang diam-diam (ini mekanismenya)', async () => {
         // Documents the behaviour that caused the bug, so the next reader does not have to
         // rediscover why an unlisted field produces a 200 and no change.

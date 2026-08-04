@@ -341,6 +341,55 @@ describe('guardrail: runtime-settings consumers are tested against an isolated d
     });
 });
 
+describe('guardrail: a plan field the service understands is never dropped by the route schema', () => {
+    /*
+     * Earned 2026-08-04, twice in two days, on the money path.
+     *
+     * Fastify defaults ajv to `removeAdditional: true`. With `additionalProperties: false` — which
+     * the plan routes use — a field the schema does not list is not rejected, it is silently
+     * DELETED: the PUT returns 200, the panel looks like it saved, and the value never changes.
+     * `recording_price_per_camera` shipped that way with six passing tests, because every one of
+     * them called billingPlanService directly and none crossed the HTTP schema.
+     *
+     * So this compares the two lists mechanically: every column normalizePlanPayload can write must
+     * appear in BOTH plan body schemas. The next column added cannot repeat the mistake quietly.
+     */
+    const routeSrc = read(path.join(BACKEND_ROOT, 'routes/billingAdminRoutes.js'));
+    const serviceSrc = read(path.join(BACKEND_ROOT, 'services/billingPlanService.js'));
+
+    // Fields normalizePlanPayload assigns — these are exactly what updatePlan will try to write.
+    const understood = [...new Set(
+        (serviceSrc.match(/^\s*out\.(\w+)\s*=/gm) || []).map((m) => m.replace(/^\s*out\./, '').replace(/\s*=$/, ''))
+    )];
+
+    const schemaFor = (marker) => {
+        const start = routeSrc.indexOf(marker);
+        if (start === -1) return null;
+        const block = routeSrc.slice(start, routeSrc.indexOf('}, ', start));
+        return new Set((block.match(/^\s{20}(\w+):\s*\{/gm) || []).map((m) => m.trim().replace(/:\s*\{$/, '')));
+    };
+
+    it('normalizePlanPayload writes nothing the POST/PUT schemas would strip', () => {
+        expect(understood.length).toBeGreaterThan(5); // the extractor itself must not silently find nothing
+
+        const gaps = [];
+        for (const [label, marker] of [['POST /plans', "fastify.post('/plans'"], ['PUT /plans/:id', "fastify.put('/plans/:id'"]]) {
+            const allowed = schemaFor(marker);
+            expect(allowed, `tidak menemukan skema untuk ${label}`).toBeTruthy();
+            for (const field of understood) {
+                if (!allowed.has(field)) gaps.push(`${label} tidak mendaftarkan "${field}"`);
+            }
+        }
+
+        expect(
+            gaps,
+            '\nThese fields are understood by billingPlanService but missing from a plan route schema.'
+            + '\najv will DELETE them from the request body and answer 200, so the panel will appear to'
+            + `\nsave and change nothing:\n  ${gaps.join('\n  ')}\n`
+        ).toEqual([]);
+    });
+});
+
 describe('guardrail: data-destroying paths stay tested', () => {
     /*
      * backupService could DELETE a live row on restore (INSERT OR REPLACE) and had ZERO tests for

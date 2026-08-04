@@ -26,6 +26,9 @@ export async function listPublicPlans(request, reply) {
             // Rupiah stays INTEGER end to end; formatting is the page's job, not the API's.
             price_per_camera: plan.price_per_camera,
             recording_price_per_camera: plan.recording_price_per_camera ?? 0,
+            // 0 means the depth has not been decided yet; the page must say so rather than
+            // print "0 hari", which would read as "we keep nothing".
+            recording_retention_days: plan.recording_retention_days ?? 0,
             max_cameras: plan.max_cameras,
             is_trial: plan.is_trial === 1,
             trial_days: plan.trial_days,

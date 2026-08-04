@@ -22,6 +22,7 @@ const EMPTY_PLAN = {
     key: '', name: '', description: '',
     price_per_camera: 20000,
     recording_price_per_camera: 0,
+    recording_retention_days: 0,
     max_cameras: 1, is_trial: false, trial_days: '', sort_order: 100,
 };
 
@@ -41,6 +42,7 @@ export default function BillingPlansTab({ plans, regSettings, run, busy }) {
             description: plan.description || '',
             price_per_camera: plan.price_per_camera,
             recording_price_per_camera: plan.recording_price_per_camera ?? 0,
+            recording_retention_days: plan.recording_retention_days ?? 0,
             max_cameras: plan.max_cameras,
             is_trial: plan.is_trial === 1,
             trial_days: plan.trial_days ?? '',
@@ -65,6 +67,7 @@ export default function BillingPlansTab({ plans, regSettings, run, busy }) {
             // so an operator who ticks "trial" after typing a price cannot save a
             // contradictory row.
             recording_price_per_camera: form.is_trial ? 0 : parseInt(form.recording_price_per_camera, 10) || 0,
+            recording_retention_days: form.is_trial ? 0 : parseInt(form.recording_retention_days, 10) || 0,
             max_cameras: parseInt(form.max_cameras, 10),
             is_trial: !!form.is_trial,
             trial_days: form.is_trial ? parseInt(form.trial_days, 10) : null,
@@ -95,6 +98,7 @@ export default function BillingPlansTab({ plans, regSettings, run, busy }) {
                                 <th className="px-3 py-2">Paket</th>
                                 <th className="px-3 py-2 text-right">Harga tonton</th>
                                 <th className="px-3 py-2 text-right">Harga rekam</th>
+                                <th className="px-3 py-2 text-center">Rekaman disimpan</th>
                                 <th className="px-3 py-2 text-center">Maks kamera</th>
                                 <th className="px-3 py-2 text-center">Trial</th>
                                 <th className="px-3 py-2 text-center">Status</th>
@@ -115,6 +119,21 @@ export default function BillingPlansTab({ plans, regSettings, run, busy }) {
                                         {plan.is_trial === 1 || !plan.recording_price_per_camera
                                             ? <span className="text-content-subtle">—</span>
                                             : `+${formatRupiah(plan.recording_price_per_camera)}`}
+                                    </td>
+                                    <td className="px-3 py-2 text-center">
+                                        {/*
+                                          * A plan that charges for recording but promises no depth is
+                                          * the dishonest case — flag it here rather than let it reach
+                                          * a customer unnoticed.
+                                          */}
+                                        {plan.recording_retention_days
+                                            ? `${plan.recording_retention_days} hari`
+                                            : (
+                                                <span className={plan.recording_price_per_camera && plan.is_trial !== 1
+                                                    ? 'text-status-warn' : 'text-content-subtle'}>
+                                                    belum ditetapkan
+                                                </span>
+                                            )}
                                     </td>
                                     <td className="px-3 py-2 text-center">{plan.max_cameras}</td>
                                     <td className="px-3 py-2 text-center">
@@ -215,6 +234,17 @@ export default function BillingPlansTab({ plans, regSettings, run, busy }) {
                                     <input name="recording_price_per_camera" type="number" min="0" step="1000" value={form.recording_price_per_camera} onChange={handleChange} className={`mt-1 ${inputClass}`} />
                                     <span className="mt-1 block text-content-subtle">
                                         0 = rekaman tidak dikenakan biaya tambahan. Ditagihkan di atas harga tonton, per kamera.
+                                    </span>
+                                </label>
+                            )}
+                            {!form.is_trial && (
+                                <label className="block text-xs text-content-muted">
+                                    Rekaman disimpan berapa hari
+                                    <input name="recording_retention_days" type="number" min="0" max="365" value={form.recording_retention_days} onChange={handleChange} className={`mt-1 ${inputClass}`} />
+                                    <span className="mt-1 block text-content-subtle">
+                                        Tampil di daftar harga yang dibaca calon pelanggan. Isi hanya bila
+                                        Anda yakin bisa menepatinya — 0 berarti belum ditetapkan, dan
+                                        halaman akan menulisnya apa adanya, bukan &ldquo;0 hari&rdquo;.
                                     </span>
                                 </label>
                             )}

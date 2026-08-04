@@ -91,6 +91,18 @@ function normalizePlanPayload(data, { partial = false } = {}) {
         }
         out.recording_price_per_camera = price;
     }
+    // How many days of recording the plan actually includes. 0 means "belum ditetapkan" and is
+    // rendered as such, never as "0 hari" — selling a recording surcharge without stating the
+    // depth is the part a customer would fairly call dishonest, and a wrong number is worse than
+    // an honest blank. Capped at a year so a typo cannot promise a decade of storage.
+    if (has('recording_retention_days')) {
+        const raw = data.recording_retention_days;
+        const days = raw === null || raw === '' ? 0 : Number(raw);
+        if (!Number.isInteger(days) || days < 0 || days > 365) {
+            throw badRequest('Retensi rekaman harus bilangan bulat 0-365 hari');
+        }
+        out.recording_retention_days = days;
+    }
     if (has('max_cameras') || !partial) {
         const max = Number(data.max_cameras);
         if (!Number.isInteger(max) || max < 1 || max > 100) {
@@ -162,14 +174,16 @@ class BillingPlanService {
 
         const result = execute(
             `INSERT INTO billing_plans (key, name, description, price_per_camera, recording_price_per_camera,
-                                        max_cameras, is_trial, trial_days, active, sort_order)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                                        recording_retention_days, max_cameras, is_trial, trial_days,
+                                        active, sort_order)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 key,
                 payload.name,
                 payload.description ?? null,
                 payload.price_per_camera,
                 payload.recording_price_per_camera ?? 0,
+                payload.recording_retention_days ?? 0,
                 payload.max_cameras,
                 payload.is_trial,
                 payload.trial_days ?? null,

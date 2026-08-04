@@ -69,8 +69,22 @@ describe('GET /api/public/billing/plans', () => {
         const { body } = await get();
         expect(Object.keys(body.data[0]).sort()).toEqual([
             'description', 'is_trial', 'key', 'max_cameras', 'name',
-            'price_per_camera', 'recording_price_per_camera', 'trial_days',
+            'price_per_camera', 'recording_price_per_camera', 'recording_retention_days', 'trial_days',
         ]);
+    });
+
+    it('publishes the recording retention the plan promises', async () => {
+        listPlansMock.mockReturnValue([{ ...ROW, recording_retention_days: 7 }]);
+        const { body } = await get();
+        expect(body.data[0].recording_retention_days).toBe(7);
+    });
+
+    it('reports an unset retention as 0 so the page can say "belum ditetapkan"', async () => {
+        // Never invent a depth here: 0 is the signal the page turns into honest prose, whereas a
+        // guessed number would become a promise nobody agreed to.
+        listPlansMock.mockReturnValue([{ ...ROW, recording_retention_days: null }]);
+        const { body } = await get();
+        expect(body.data[0].recording_retention_days).toBe(0);
     });
 
     it('treats a plan predating the recording column as 0, not null', async () => {

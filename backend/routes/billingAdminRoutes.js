@@ -164,6 +164,7 @@ export default async function billingAdminRoutes(fastify) {
                     // and save nothing at all. That is how the panel could show the input, send
                     // it, and never change the price.
                     recording_price_per_camera: { type: 'integer', minimum: 0 },
+                    recording_retention_days: { type: 'integer', minimum: 0, maximum: 365 },
                     max_cameras: { type: 'integer', minimum: 1, maximum: 100 },
                     is_trial: { type: 'boolean' },
                     trial_days: { type: ['integer', 'null'], minimum: 1, maximum: 90 },
@@ -185,6 +186,7 @@ export default async function billingAdminRoutes(fastify) {
                     description: { type: 'string', maxLength: 200 },
                     price_per_camera: { type: 'integer', minimum: 0 },
                     recording_price_per_camera: { type: 'integer', minimum: 0 },
+                    recording_retention_days: { type: 'integer', minimum: 0, maximum: 365 },
                     max_cameras: { type: 'integer', minimum: 1, maximum: 100 },
                     is_trial: { type: 'boolean' },
                     trial_days: { type: ['integer', 'null'], minimum: 1, maximum: 90 },
