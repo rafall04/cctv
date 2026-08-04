@@ -122,6 +122,39 @@
   .pick-a-a{color:var(--accent);background:var(--accent-soft)}
   .pick-a-b{color:var(--archive);background:var(--archive-soft)}
 
+  /* ---------- syarat wajib ---------- */
+  .req{border:1px solid var(--rtsp-edge);background:var(--rtsp-soft);border-radius:4px;
+       padding:18px 20px;display:flex;flex-direction:column;gap:12px}
+  .req h3{font-size:17px;font-weight:700;color:var(--ink);letter-spacing:-.01em}
+  .req p{font-size:14.8px;line-height:1.55;color:var(--ink-2);max-width:70ch}
+  .req ul{list-style:none;display:flex;flex-direction:column;gap:9px}
+  .req li{position:relative;padding-left:26px;font-size:14.6px;line-height:1.5;color:var(--ink-2)}
+  .req li b{color:var(--ink);font-weight:650}
+  .req li::before{position:absolute;left:0;top:0;font-weight:700;font-size:13px}
+  .req li.y::before{content:"✓";color:var(--ok)}
+  .req li.n::before{content:"✕";color:var(--rtsp)}
+
+  /* ---------- langkah pendaftaran ---------- */
+  /* 320px, not 260px: at desktop width 260 yields four columns and six steps leave two dead
+     cells hanging in the second row. 320 gives three, so the grid closes as 3 + 3. */
+  .steps{list-style:none;counter-reset:s;display:grid;
+         grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:1px;background:var(--edge);
+         border:1px solid var(--edge);border-radius:4px;overflow:hidden}
+  .steps li{counter-increment:s;background:var(--surface);padding:18px 20px 20px;
+            display:flex;flex-direction:column;gap:7px}
+  .steps li::before{content:counter(s);font-family:var(--mono);font-size:12px;font-weight:700;
+                    width:24px;height:24px;border-radius:50%;display:flex;align-items:center;
+                    justify-content:center;background:var(--accent-soft);color:var(--accent)}
+  .steps b{font-size:15.5px;font-weight:700;color:var(--ink);letter-spacing:-.01em}
+  .steps p{font-size:14.3px;line-height:1.5;color:var(--ink-2)}
+  .steps code{font-family:var(--mono);font-size:13px;background:var(--surface-2);
+              border:1px solid var(--edge-soft);border-radius:3px;padding:1px 5px;color:var(--ink)}
+  .steps .sub{font-size:13.4px;line-height:1.5;color:var(--ink-3)}
+
+  /* total kolom harga — supaya tidak perlu menghitung sendiri */
+  td.tot,th.tot{background:var(--accent-soft)}
+  td.tot{font-weight:700;color:var(--ink)}
+
   footer{border-top:1px solid var(--edge);padding-top:18px;display:flex;flex-direction:column;gap:6px}
   footer p{font-size:13px;color:var(--ink-3);max-width:76ch}
 </style>
@@ -133,12 +166,14 @@
     <p class="eyebrow">Topologi Jaringan</p>
     <h1>Bagaimana CCTV desa terhubung — dari kamera sampai layar warga</h1>
     <p class="lede">
-      Kamera berada di jaringan tertutup dan tidak punya jalan keluar ke internet.
-      Yang keluar hanya video siap-tonton dan salinan rekaman ke penyimpanan cloud.
+      Diagram di bawah adalah bentuk lengkapnya: server berdiri di lokasi Anda, kamera terkurung
+      di jaringan tertutup tanpa jalan keluar ke internet. Yang keluar hanya video siap-tonton dan
+      salinan rekaman ke cloud. Kalau Anda menyewa, bentuknya berbeda —
+      <a href="#topologi-sewa" style="color:var(--accent)">ada diagramnya sendiri di bawah</a>.
     </p>
     <div class="meta">
-      <span>Desa Dander &amp; Tanjungharjo</span>
-      <span>Angka dibaca dari sistem berjalan &middot; <b>3 Agustus 2026</b></span>
+      <span>Contoh terpasang: Desa Dander &amp; Tanjungharjo &middot; <b>3 Agustus 2026</b></span>
+      <span>Harga paket sewa &middot; <b>4 Agustus 2026</b></span>
     </div>
   </header>
 
@@ -378,11 +413,13 @@
         </div>
         <ul class="feat">
           <li class="y">Langsung tonton dari HP lewat browser, tanpa aplikasi</li>
-          <li class="y"><b>Rekaman tersedia sebagai tambahan</b> — disimpan 7 hari, cukup untuk
-              kejadian yang biasanya segera disadari</li>
+          <li class="y"><b>Rekaman tersedia sebagai tambahan</b> — yang terbaru ada di server, selebihnya
+              langsung disalin ke arsip cloud, jadi kedalamannya tidak dibatasi disk kami</li>
           <li class="y">Halaman pribadi — kamera Anda tidak muncul di halaman publik</li>
           <li class="y">Bayar di muka, dipotong harian; berhenti kapan saja</li>
-          <li class="y">Masa coba gratis 7 hari, sekali per akun</li>
+          <li class="y">Masa coba gratis 3 hari, 1 kamera, sekali per akun</li>
+          <li class="w"><b>Wajib punya IP publik</b> di lokasi kamera — ini syarat mati, bukan
+              anjuran. Rinciannya di bagian berikutnya</li>
           <li class="w">Rekaman mengikuti koneksi di lokasi kamera. Tiap ISP beda kestabilannya —
               saat sambungan putus, potongan itu tidak terekam, lalu menyambung sendiri begitu pulih</li>
           <li class="w">Rekaman diambilkan tim kami saat Anda perlu; menelusuri sendiri dari
@@ -390,8 +427,8 @@
           <li class="n">Jumlah kamera mengikuti batas paket</li>
         </ul>
         <div class="opt-foot">
-          <div class="ff"><span class="ff-k">Biaya tonton</span><span class="ff-v">Mulai Rp 8.000 per kamera per bulan</span></div>
-          <div class="ff"><span class="ff-k">Biaya rekam</span><span class="ff-v">Tambahan tetap per kamera di atas harga tonton — penyimpanannya yang menentukan, bukan jumlah kameranya</span></div>
+          <div class="ff"><span class="ff-k">Biaya tonton</span><span class="ff-v">Mulai Rp 15.000 per kamera per bulan</span></div>
+          <div class="ff"><span class="ff-k">Biaya rekam</span><span class="ff-v">Tambahan Rp 10.000–15.000 per kamera di atas harga tonton — penyimpanannya yang menentukan, bukan jumlah kameranya</span></div>
           <div class="ff"><span class="ff-k">Kami urus</span><span class="ff-v">Server, penyimpanan, jaringan inti, pembaruan, dan pemantauan kamera</span></div>
           <div class="ff"><span class="ff-k">Penentu mutu rekaman</span><span class="ff-v">Koneksi di lokasi kamera — yang menentukan bukan kecepatan unduh, tapi <b>upload yang stabil</b></span></div>
           <div class="ff"><span class="ff-k">Perlu dicatat</span><span class="ff-v">Saldo habis → siaran berhenti dalam ±30 detik; begitu diisi ulang, jalan lagi otomatis</span></div>
@@ -401,23 +438,47 @@
 
     <div class="table-wrap">
       <table>
-        <caption>Paket sewa yang aktif saat ini — harga di bawah untuk <b>tonton langsung</b>; rekaman dihitung sebagai tambahan per kamera</caption>
+        <caption>Paket sewa yang aktif saat ini. Semua angka <b>per kamera per bulan</b> — kolom terakhir
+                 adalah yang benar-benar Anda bayar bila kamera itu ikut direkam.</caption>
         <thead>
           <tr>
             <th scope="col">Paket</th>
             <th scope="col">Untuk siapa</th>
-            <th scope="col" class="num">Harga / kamera / bulan</th>
+            <th scope="col" class="num">Tonton saja</th>
+            <th scope="col" class="num">Tambahan rekam</th>
+            <th scope="col" class="num tot">Tonton + rekam</th>
             <th scope="col" class="num">Maks kamera</th>
           </tr>
         </thead>
         <tbody>
-          <tr><td>Trial Gratis</td><td>Coba dulu sebelum berlangganan</td><td class="num">Rp 0 <span class="dim">· 7 hari</span></td><td class="num">3</td></tr>
-          <tr><td>Basic</td><td>Rumah, satu titik pantau</td><td class="num">Rp 15.000</td><td class="num">1</td></tr>
-          <tr><td>Hemat</td><td>Rumah besar atau toko</td><td class="num">Rp 12.000</td><td class="num">3</td></tr>
-          <tr><td>Bisnis</td><td>Kantor, gudang, banyak titik</td><td class="num">Rp 8.000</td><td class="num">10</td></tr>
+          <tr>
+            <td>Trial Gratis</td><td>Coba dulu sebelum berlangganan</td>
+            <td class="num">Rp 0 <span class="dim">· 3 hari</span></td>
+            <td class="num dim">—</td><td class="num tot">Gratis</td><td class="num">1</td>
+          </tr>
+          <tr>
+            <td>Basic</td><td>Rumah, satu titik pantau</td>
+            <td class="num">Rp 25.000</td><td class="num">+ Rp 15.000</td>
+            <td class="num tot">Rp 40.000</td><td class="num">1</td>
+          </tr>
+          <tr>
+            <td>Hemat</td><td>Rumah besar atau toko</td>
+            <td class="num">Rp 20.000</td><td class="num">+ Rp 12.000</td>
+            <td class="num tot">Rp 32.000</td><td class="num">3</td>
+          </tr>
+          <tr>
+            <td>Bisnis</td><td>Kantor, gudang, banyak titik</td>
+            <td class="num">Rp 15.000</td><td class="num">+ Rp 10.000</td>
+            <td class="num tot">Rp 25.000</td><td class="num">10</td>
+          </tr>
         </tbody>
       </table>
     </div>
+    <p class="note">
+      Tambahan rekam dihitung per kamera, bukan sekali untuk semua — jadi kamera yang hanya ditonton
+      tetap dibayar dengan tarif tonton saja. Satu kamera yang merekam terus-menerus menghasilkan
+      sekitar <b>214 GB arsip per bulan</b>; itu yang menentukan besar tambahannya.
+    </p>
 
     <div class="pick">
       <div class="pick-row">
@@ -440,6 +501,202 @@
 
   </section>
 
+  <!-- ============ TOPOLOGI SAAT SEWA ============ -->
+  <section id="topologi-sewa">
+    <div class="sec-head">
+      <p class="eyebrow">Kalau Anda menyewa</p>
+      <h2>Bentuknya berbeda — dan ada satu syarat yang tidak bisa ditawar</h2>
+      <p class="lede" style="font-size:16.5px">
+        Tanpa server di lokasi Anda, kamera harus bisa kami jangkau dari luar. Artinya arah
+        sambungannya terbalik dari diagram pertama: bukan server yang datang ke kamera lewat kabel
+        sendiri, tapi server kami yang menarik RTSP kamera Anda melewati internet.
+      </p>
+    </div>
+
+    <div class="card">
+      <p class="hint">← Geser untuk melihat seluruh diagram →</p>
+      <div class="scroll">
+<svg width="1180" height="520" viewBox="0 0 1180 520" xmlns="http://www.w3.org/2000/svg" class="sans">
+  <defs>
+    <marker id="s-aR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10z" fill="var(--rtsp)"/></marker>
+    <marker id="s-aT" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10z" fill="var(--accent)"/></marker>
+    <marker id="s-aV" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10z" fill="var(--archive)"/></marker>
+    <g id="s-cam">
+      <rect x="0" y="2" width="30" height="15" rx="3" fill="var(--surface)" stroke="var(--rtsp)" stroke-width="2"/>
+      <circle cx="26" cy="9.5" r="3" fill="var(--rtsp)"/>
+      <path d="M30 6 l7 -3 v13 l-7 -3" fill="var(--surface)" stroke="var(--rtsp)" stroke-width="2" stroke-linejoin="round"/>
+      <path d="M10 17 v6" stroke="var(--rtsp)" stroke-width="2"/>
+      <path d="M3 23 h14" stroke="var(--rtsp)" stroke-width="2" stroke-linecap="round"/>
+    </g>
+  </defs>
+
+  <text x="40" y="40" class="mono" font-size="13" letter-spacing="3" fill="var(--archive)">TOPOLOGI SAAT SEWA</text>
+  <text x="40" y="72" font-size="24" font-weight="700" letter-spacing="-.5" fill="var(--ink)">Kamera Anda · server kami</text>
+  <line x1="40" y1="88" x2="1140" y2="88" stroke="var(--edge)"/>
+
+  <!-- ============ DI LOKASI ANDA ============ -->
+  <rect x="40" y="108" width="320" height="186" rx="5" fill="var(--surface)" stroke="var(--rtsp-edge)" stroke-width="2"/>
+  <rect x="40" y="108" width="320" height="4" fill="var(--rtsp)"/>
+  <text x="60" y="136" class="mono" font-size="12" letter-spacing="1.6" fill="var(--rtsp)">DI LOKASI ANDA</text>
+
+  <use href="#s-cam" x="72" y="164"/>
+  <text x="66" y="216" font-size="14" font-weight="650" fill="var(--ink)">Kamera IP</text>
+  <text x="66" y="234" class="mono" font-size="12" fill="var(--ink-3)">RTSP</text>
+
+  <!-- router -->
+  <rect x="230" y="162" width="46" height="28" rx="3" fill="none" stroke="var(--ink-2)" stroke-width="2"/>
+  <path d="M237 176 h32 M257 168 l12 8 l-12 8" fill="none" stroke="var(--ink-2)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+  <text x="222" y="216" font-size="14" font-weight="650" fill="var(--ink)">Router / ONT</text>
+  <rect x="222" y="226" width="92" height="20" rx="3" fill="var(--ok-soft)"/>
+  <text x="230" y="240" class="mono" font-size="11.5" font-weight="700" fill="var(--ok)">IP PUBLIK</text>
+
+  <path d="M118 176 H222" stroke="var(--rtsp)" stroke-width="2.2" fill="none" marker-end="url(#s-aR)"/>
+
+  <!-- ============ INTERNET ============ -->
+  <path d="M436 232 a24 24 0 0 1 4 -47 a31 31 0 0 1 58 -11 a26 26 0 0 1 23 30 a22 22 0 0 1 -11 28 z"
+        fill="var(--surface)" stroke="var(--ink-2)" stroke-width="2" stroke-linejoin="round"/>
+  <text x="482" y="212" font-size="16" font-weight="650" text-anchor="middle" fill="var(--ink)">Internet</text>
+
+  <path d="M360 200 H428" stroke="var(--rtsp)" stroke-width="2.2" fill="none" marker-end="url(#s-aR)"/>
+  <rect x="360" y="158" width="70" height="22" rx="3" fill="var(--paper)"/>
+  <text x="366" y="174" class="mono" font-size="12.5" fill="var(--rtsp)">RTSP</text>
+
+  <path d="M528 200 H632" stroke="var(--rtsp)" stroke-width="2.2" fill="none" marker-end="url(#s-aR)"/>
+  <rect x="536" y="158" width="98" height="22" rx="3" fill="var(--paper)"/>
+  <text x="542" y="174" class="mono" font-size="12.5" fill="var(--rtsp)">kami tarik</text>
+
+  <!-- ============ SERVER KAMI ============ -->
+  <rect x="640" y="108" width="340" height="186" rx="5" fill="var(--surface)" stroke="var(--accent)" stroke-width="2"/>
+  <rect x="640" y="108" width="340" height="4" fill="var(--accent)"/>
+  <text x="660" y="136" class="mono" font-size="12" letter-spacing="1.6" fill="var(--accent)">SERVER KAMI</text>
+  <rect x="664" y="158" width="34" height="46" rx="3" fill="none" stroke="var(--accent)" stroke-width="2"/>
+  <path d="M670 168 h22 M670 179 h22 M670 190 h14" stroke="var(--accent)" stroke-width="2" stroke-linecap="round"/>
+  <circle cx="695" cy="190" r="2.6" fill="var(--accent)"/>
+  <text x="714" y="172" font-size="15" font-weight="650" fill="var(--ink)">Ubah RTSP → HLS</text>
+  <text x="714" y="194" font-size="15" font-weight="650" fill="var(--ink)">Rekam &amp; arsipkan</text>
+  <text x="664" y="232" class="mono" font-size="12" fill="var(--ink-3)">alamat &amp; sandi kamera berhenti di sini</text>
+  <text x="664" y="252" class="mono" font-size="12" fill="var(--ink-3)">penonton tidak pernah menerimanya</text>
+
+  <!-- ============ KELUARAN ============ -->
+  <path d="M810 294 V330 H700 V352" stroke="var(--accent)" stroke-width="2.4" fill="none" marker-end="url(#s-aT)"/>
+  <path d="M810 294 V330 H962 V352" stroke="var(--archive)" stroke-width="2.2" fill="none" marker-end="url(#s-aV)"/>
+
+  <rect x="470" y="354" width="230" height="112" rx="5" fill="var(--surface)" stroke="var(--accent)" stroke-width="2"/>
+  <rect x="470" y="354" width="230" height="4" fill="var(--accent)"/>
+  <rect x="494" y="380" width="24" height="38" rx="4" fill="none" stroke="var(--accent)" stroke-width="2"/>
+  <path d="M502 386 h8" stroke="var(--accent)" stroke-width="2" stroke-linecap="round"/>
+  <rect x="526" y="384" width="34" height="24" rx="3" fill="none" stroke="var(--accent)" stroke-width="2"/>
+  <path d="M520 414 h46" stroke="var(--accent)" stroke-width="2" stroke-linecap="round"/>
+  <text x="580" y="396" font-size="16" font-weight="700" fill="var(--ink)">Anda</text>
+  <text x="488" y="444" class="mono" font-size="11.5" fill="var(--ink-2)">halaman pribadi · cukup browser</text>
+  <!-- Label sits ON the arrow it names (x≈700), not adrift to the left where it collided with
+       the failure box — a mistake only visible once rendered. -->
+  <rect x="706" y="316" width="74" height="22" rx="3" fill="var(--paper)"/>
+  <text x="712" y="332" class="mono" font-size="12.5" fill="var(--accent)">HLS</text>
+
+  <rect x="850" y="354" width="230" height="112" rx="5" fill="var(--surface)" stroke="var(--archive)" stroke-width="2"/>
+  <rect x="850" y="354" width="230" height="4" fill="var(--archive)"/>
+  <path d="M878 418 a14 14 0 0 1 2 -27 a17 17 0 0 1 33 -6 a15 15 0 0 1 13 17 a13 13 0 0 1 -6 16 z"
+        fill="none" stroke="var(--archive)" stroke-width="2" stroke-linejoin="round"/>
+  <text x="940" y="396" font-size="16" font-weight="700" fill="var(--ink)">Arsip cloud</text>
+  <text x="868" y="444" class="mono" font-size="11.5" fill="var(--ink-2)">rekaman lama, di luar disk kami</text>
+
+  <!-- ============ YANG TIDAK BISA ============ -->
+  <rect x="40" y="330" width="380" height="160" rx="4" fill="var(--rtsp-soft)" stroke="var(--rtsp-edge)" stroke-dasharray="4 4"/>
+  <text x="62" y="358" class="mono" font-size="12" letter-spacing="1.6" fill="var(--rtsp)">YANG MEMBUATNYA GAGAL</text>
+
+  <circle cx="74" cy="386" r="10" fill="var(--paper)" stroke="var(--rtsp)" stroke-width="1.8"/>
+  <path d="M69 381 l10 10 M79 381 l-10 10" stroke="var(--rtsp)" stroke-width="2"/>
+  <text x="94" y="391" font-size="14.5" fill="var(--ink-2)">Internet CGNAT — IP dipakai ramai-ramai</text>
+
+  <circle cx="74" cy="422" r="10" fill="var(--paper)" stroke="var(--rtsp)" stroke-width="1.8"/>
+  <path d="M69 417 l10 10 M79 417 l-10 10" stroke="var(--rtsp)" stroke-width="2"/>
+  <text x="94" y="427" font-size="14.5" fill="var(--ink-2)">IP lokal saja (192.168.x, 10.x)</text>
+
+  <!-- Two lines: as one line this ran past the box edge and under the "Anda" card. -->
+  <text x="62" y="458" class="mono" font-size="12" fill="var(--ink-3)">IP publik dinamis tetap bisa —</text>
+  <text x="62" y="476" class="mono" font-size="12" fill="var(--ink-3)">pakai DDNS, kami arahkan ke namanya.</text>
+</svg>
+      </div>
+    </div>
+
+    <div class="req">
+      <h3>Syarat wajib: internet di lokasi kamera harus punya IP publik</h3>
+      <p>
+        Server kami menarik video dari kamera Anda. Kalau kamera itu tidak punya alamat yang bisa
+        dihubungi dari luar, tidak ada yang bisa kami tarik — dan tidak ada jalan memutarnya dari
+        sisi kami. Ini satu-satunya syarat teknis yang benar-benar mengunci.
+      </p>
+      <ul>
+        <li class="y"><b>IP publik statis</b> — paling gampang, langsung kami pakai</li>
+        <li class="y"><b>IP publik dinamis + DDNS</b> — juga bisa; kami arahkan ke nama DDNS-nya,
+            berubahnya IP diikuti otomatis</li>
+        <li class="n"><b>CGNAT</b> — tidak bisa. Banyak paket internet rumahan memakai ini: satu IP
+            dipakai bersama banyak pelanggan, jadi kamera Anda tidak punya alamat sendiri</li>
+        <li class="n"><b>Hanya IP lokal</b> (192.168.x.x, 10.x.x.x) — tidak bisa dijangkau dari luar</li>
+      </ul>
+      <p class="note" style="color:var(--ink-3)">
+        Belum yakin punya yang mana? Kirim saja nama provider dan paket internet Anda — kami cek
+        dulu sebelum Anda membayar apa pun. Kalau ternyata CGNAT, biasanya bisa diminta ke ISP
+        untuk dipindah ke IP publik, kadang dengan biaya tambahan dari mereka.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============ CARA MENDAFTAR ============ -->
+  <section id="daftar">
+    <div class="sec-head">
+      <p class="eyebrow">Kalau sudah cocok</p>
+      <h2>Cara mendaftar — enam langkah</h2>
+      <p class="lede" style="font-size:16.5px">
+        Pendaftaran bisa Anda lakukan sendiri lewat halaman kami. Tidak perlu memasang aplikasi
+        apa pun, dan belum ada uang yang keluar sampai masa coba habis.
+      </p>
+    </div>
+
+    <ol class="steps">
+      <li>
+        <b>Buka halaman pendaftaran</b>
+        <p>Lewat HP atau laptop, buka <code>cctvku.raf.my.id/daftar</code>.</p>
+      </li>
+      <li>
+        <b>Isi data Anda</b>
+        <p>Username, nomor HP yang aktif di WhatsApp, dan kata sandi. Email boleh dikosongkan.</p>
+        <p class="sub">Nomor WhatsApp dipakai untuk menghubungi Anda soal kamera — pastikan benar.</p>
+      </li>
+      <li>
+        <b>Buat kata sandi yang diterima</b>
+        <p>Minimal 12 karakter, ada huruf besar, huruf kecil, angka, dan satu karakter spesial —
+           serta tidak memuat username Anda.</p>
+      </li>
+      <li>
+        <b>Tunggu persetujuan admin</b>
+        <p>Akun baru tidak langsung bisa masuk. Kami periksa dulu, lalu Anda kami kabari lewat
+           WhatsApp.</p>
+      </li>
+      <li>
+        <b>Masuk dan pakai masa coba</b>
+        <p>Begitu disetujui, akun Anda otomatis dapat <b>Trial Gratis: 3 hari, 1 kamera</b>,
+           sekali per akun.</p>
+      </li>
+      <li>
+        <b>Kirim data kamera, lalu isi saldo</b>
+        <p>Beri tahu kami IP publik atau nama DDNS, port, dan sandi kamera Anda — kami yang
+           mendaftarkannya. Setelah masa coba, isi saldo untuk lanjut.</p>
+        <p class="sub">Saldo dipotong harian. Kalau habis, siaran berhenti dalam ±30 detik dan
+           jalan lagi otomatis begitu diisi.</p>
+      </li>
+    </ol>
+
+    <div class="actions">
+      <a class="btn" href="https://cctvku.raf.my.id/daftar">Buka halaman pendaftaran</a>
+      <span class="note">Belum yakin? Tanyakan dulu — pengecekan IP publik tidak dipungut biaya.</span>
+    </div>
+  </section>
+
   <div class="actions">
     <a class="btn btn-ghost" href="./e824c1b11c0f2d83914327d9-perbandingan.png" download="perbandingan-cctv.png">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -453,8 +710,10 @@
 
   <footer>
     <p>
-      Jumlah kamera, alamat segmen VLAN, volume arsip, dan daftar harga paket pada halaman ini
-      dibaca langsung dari sistem yang sedang berjalan pada 3 Agustus 2026 — bukan angka contoh.
+      Dua sumber angka, supaya jelas: jumlah kamera, segmen VLAN, dan volume arsip pada diagram
+      pertama dibaca dari instalasi Desa Dander &amp; Tanjungharjo per 3 Agustus 2026. Daftar harga
+      paket, batas kamera, dan ketentuan masa coba dibaca dari sistem sewa yang menagih, per
+      4 Agustus 2026. Keduanya angka sebenarnya, bukan contoh.
     </p>
     <p>
       Halaman ini tidak tertaut dari mana pun dan tidak diindeks mesin pencari.
