@@ -417,7 +417,7 @@
               langsung disalin ke arsip cloud, jadi kedalamannya tidak dibatasi disk kami</li>
           <li class="y">Halaman pribadi — kamera Anda tidak muncul di halaman publik</li>
           <li class="y">Bayar di muka, dipotong harian; berhenti kapan saja</li>
-          <li class="y">Masa coba gratis 3 hari, 1 kamera, sekali per akun</li>
+          <li class="y">Masa coba gratis <span class="masa-coba">3 hari, 1 kamera</span>, sekali per akun</li>
           <li class="w"><b>Wajib punya IP publik</b> di lokasi kamera — ini syarat mati, bukan
               anjuran. Rinciannya di bagian berikutnya</li>
           <li class="w">Rekaman mengikuti koneksi di lokasi kamera. Tiap ISP beda kestabilannya —
@@ -679,8 +679,8 @@
       </li>
       <li>
         <b>Masuk dan pakai masa coba</b>
-        <p>Begitu disetujui, akun Anda otomatis dapat <b>Trial Gratis: 3 hari, 1 kamera</b>,
-           sekali per akun.</p>
+        <p>Begitu disetujui, akun Anda otomatis dapat <b>Trial Gratis: <span class="masa-coba">3 hari,
+           1 kamera</span></b>, sekali per akun.</p>
       </li>
       <li>
         <b>Kirim data kamera, lalu isi saldo</b>
@@ -782,6 +782,17 @@
                     + '<td class="num tot">' + total + '</td>'
                     + '<td class="num">' + p.max_cameras + '</td></tr>';
             }).join('');
+
+            // The trial terms are quoted in prose too, and drifted the same way the prices did
+            // (the page promised 7 days / 3 cameras against an actual 3 / 1). Same source, so the
+            // sentences cannot disagree with the table above them.
+            var trial = paket.filter(function (p) { return p.is_trial; })[0];
+            if (trial && trial.trial_days) {
+                var teks = trial.trial_days + ' hari, ' + trial.max_cameras + ' kamera';
+                Array.prototype.forEach.call(document.querySelectorAll('.masa-coba'), function (el) {
+                    el.textContent = teks;
+                });
+            }
         })
         .catch(function () { /* offline, dibuka sebagai berkas, atau backend sedang sibuk — biarkan tabel bawaan */ })
         .then(function () { clearTimeout(jam); });
