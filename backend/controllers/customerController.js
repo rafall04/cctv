@@ -233,3 +233,24 @@ export async function deleteMyCamera(request, reply) {
         return handleError(reply, error, 'Delete own camera error:');
     }
 }
+
+/**
+ * Setup details a customer needs to configure their own router — currently just the address they
+ * must allow through to their camera.
+ *
+ * Deliberately an authenticated API call rather than a constant in the React page: a component
+ * compiles into a JS chunk that anyone can download WITHOUT logging in, so "put it on a guarded
+ * route" hides the page, not the content. It matters here because the site sits behind a
+ * Cloudflare Tunnel — publishing the egress address would undo the origin hiding that buys.
+ *
+ * No hardcoded fallback on purpose. If the value is not configured the page says so and asks the
+ * customer to contact us, which is safer than confidently printing an address that has since moved.
+ */
+export async function getSetupInfo(request, reply) {
+    try {
+        const ip = (process.env.EGRESS_PUBLIC_IP || '').trim();
+        return reply.send({ success: true, data: { server_ip: ip || null } });
+    } catch (error) {
+        return handleError(reply, error, 'Get setup info error:');
+    }
+}

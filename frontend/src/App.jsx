@@ -60,6 +60,7 @@ const MyCameras = lazyWithRetry(() => import('./pages/customer/MyCameras'), 'my-
 const MyWallet = lazyWithRetry(() => import('./pages/customer/MyWallet'), 'my-wallet');
 const MyPlan = lazyWithRetry(() => import('./pages/customer/MyPlan'), 'my-plan');
 const MyAccount = lazyWithRetry(() => import('./pages/customer/MyAccount'), 'my-account');
+const MyPanduan = lazyWithRetry(() => import('./pages/customer/MyPanduan'), 'my-panduan');
 const RegisterPage = lazyWithRetry(() => import('./pages/RegisterPage'), 'register-page');
 // Playback (recordingService + full playback component/hook tree, ~72 KB raw) is lazy so it stays OUT
 // of the eager App chunk that every public-landing visit downloads + parses. Both the public /playback
@@ -170,6 +171,19 @@ function App() {
                     element={
                         <CustomerPageRoute>
                             <MyAccount />
+                        </CustomerPageRoute>
+                    }
+                />
+                {/*
+                  * Behind the customer guard on purpose: the guide names our server IP and explains
+                  * that customers forward a camera's RTSP port to it. Public pages carry only what a
+                  * prospect needs to self-qualify.
+                  */}
+                <Route
+                    path="/my/panduan"
+                    element={
+                        <CustomerPageRoute>
+                            <MyPanduan />
                         </CustomerPageRoute>
                     }
                 />

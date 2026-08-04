@@ -54,6 +54,7 @@ export default function CustomerLayout({ children }) {
         { label: 'Kamera Saya', path: '/my' },
         { label: 'Paket', path: '/my/paket' },
         { label: 'Saldo & Tagihan', path: '/my/wallet' },
+        { label: 'Panduan', path: '/my/panduan' },
         { label: 'Akun', path: '/my/akun' },
     ];
 

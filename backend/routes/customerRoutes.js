@@ -24,6 +24,7 @@ import {
     listMyAreas,
     validatePromo,
     redeemPromo,
+    getSetupInfo,
 } from '../controllers/customerController.js';
 import { authMiddleware, requireCustomerOrAdmin } from '../middleware/authMiddleware.js';
 
@@ -63,6 +64,9 @@ export default async function customerRoutes(fastify) {
     fastify.get('/wallet', { onRequest: guard }, getMyWallet);
     fastify.get('/payments', { onRequest: guard }, getMyPayments);
     fastify.get('/payment-options', { onRequest: guard }, getPaymentOptions);
+    // Router-setup details. Behind the guard because the value must NOT ship inside the public
+    // JS bundle — see getSetupInfo for why a guarded page alone would not have hidden it.
+    fastify.get('/setup-info', { onRequest: guard }, getSetupInfo);
 
     // Plan (paket) self-service
     fastify.get('/plan', { onRequest: guard }, getMyPlan);
