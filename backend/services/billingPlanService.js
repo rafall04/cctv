@@ -76,6 +76,21 @@ function normalizePlanPayload(data, { partial = false } = {}) {
         }
         out.price_per_camera = price;
     }
+    // Recording surcharge — a second, independent price for the same camera.
+    // Optional even on create (unlike price_per_camera) so every plan that existed
+    // before this feature keeps working untouched and defaults to 0 = no surcharge.
+    // SCOPE: the catalog stores and the panel edits this today; the charging engine
+    // still bills price_per_camera alone. Wiring it into _chargeAndSync (and
+    // repricing live subscriptions when it changes, the way price_per_camera does
+    // below) is a separate change against the money path.
+    if (has('recording_price_per_camera')) {
+        const raw = data.recording_price_per_camera;
+        const price = raw === null || raw === '' ? 0 : Number(raw);
+        if (!Number.isInteger(price) || price < 0) {
+            throw badRequest('Harga rekaman per kamera harus bilangan bulat >= 0 (rupiah)');
+        }
+        out.recording_price_per_camera = price;
+    }
     if (has('max_cameras') || !partial) {
         const max = Number(data.max_cameras);
         if (!Number.isInteger(max) || max < 1 || max > 100) {
@@ -146,13 +161,15 @@ class BillingPlanService {
         }
 
         const result = execute(
-            `INSERT INTO billing_plans (key, name, description, price_per_camera, max_cameras, is_trial, trial_days, active, sort_order)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO billing_plans (key, name, description, price_per_camera, recording_price_per_camera,
+                                        max_cameras, is_trial, trial_days, active, sort_order)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 key,
                 payload.name,
                 payload.description ?? null,
                 payload.price_per_camera,
+                payload.recording_price_per_camera ?? 0,
                 payload.max_cameras,
                 payload.is_trial,
                 payload.trial_days ?? null,

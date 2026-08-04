@@ -74,6 +74,7 @@ function seedSchema() {
             name TEXT NOT NULL,
             description TEXT,
             price_per_camera INTEGER NOT NULL DEFAULT 0,
+            recording_price_per_camera INTEGER NOT NULL DEFAULT 0,
             max_cameras INTEGER NOT NULL DEFAULT 1,
             is_trial INTEGER NOT NULL DEFAULT 0,
             trial_days INTEGER,
@@ -176,6 +177,71 @@ describe('billingPlanService', () => {
 
             const sub = db.prepare('SELECT monthly_price FROM camera_subscriptions WHERE camera_id = 7').get();
             expect(sub.monthly_price).toBe(17000);
+        });
+
+        // --- recording surcharge (admin-editable second price dimension) ---
+
+        it('defaults the recording surcharge to 0 so no existing plan is silently repriced', () => {
+            const plan = billingPlanService.createPlan({
+                key: 'tanpa-rekam', name: 'Tanpa Rekam', price_per_camera: 9000, max_cameras: 2,
+            });
+            expect(plan.recording_price_per_camera).toBe(0);
+
+            // and the plans that predate the column are untouched
+            expect(billingPlanService.getPlanByKey('basic').recording_price_per_camera).toBe(0);
+        });
+
+        it('stores the recording surcharge independently of the watch price', () => {
+            const plan = billingPlanService.createPlan({
+                key: 'rekam', name: 'Rekam', price_per_camera: 8000,
+                recording_price_per_camera: 12000, max_cameras: 10,
+            });
+            expect(plan.price_per_camera).toBe(8000);
+            expect(plan.recording_price_per_camera).toBe(12000);
+
+            const updated = billingPlanService.updatePlan(plan.id, { recording_price_per_camera: 15000 });
+            expect(updated.recording_price_per_camera).toBe(15000);
+            // changing one price must not disturb the other
+            expect(updated.price_per_camera).toBe(8000);
+        });
+
+        it('rejects a non-integer or negative recording surcharge (money is INTEGER rupiah)', () => {
+            for (const bad of [-1, 1500.5, 'gratis']) {
+                expect(() => billingPlanService.createPlan({
+                    key: `bad-${String(bad).replace(/\W/g, '')}`, name: 'Bad',
+                    price_per_camera: 1000, recording_price_per_camera: bad, max_cameras: 1,
+                })).toThrowError(expect.objectContaining({ statusCode: 400 }));
+            }
+        });
+
+        it('treats an empty surcharge field from the form as 0, not as a validation error', () => {
+            // The admin form sends '' when the operator clears the input; that must mean
+            // "no surcharge", otherwise clearing the field would be impossible.
+            const plan = billingPlanService.createPlan({
+                key: 'kosong', name: 'Kosong', price_per_camera: 5000,
+                recording_price_per_camera: '', max_cameras: 1,
+            });
+            expect(plan.recording_price_per_camera).toBe(0);
+        });
+
+        it('does NOT reprice live subscriptions yet — charging still bills the watch price alone', () => {
+            // Pins the documented scope boundary: the catalog carries the number, the
+            // money path does not use it yet. If a later change wires it into
+            // _chargeAndSync, this expectation is the one that must be updated
+            // deliberately rather than a surcharge appearing on bills by accident.
+            db.prepare("UPDATE users SET plan_id = 3 WHERE id = 42").run();
+            db.prepare(`INSERT INTO camera_subscriptions (camera_id, user_id, monthly_price, status)
+                        VALUES (8, 42, 20000, 'active')`).run();
+
+            billingPlanService.updatePlan(3, { recording_price_per_camera: 9000 });
+
+            const sub = db.prepare('SELECT monthly_price FROM camera_subscriptions WHERE camera_id = 8').get();
+            expect(sub.monthly_price).toBe(20000);
+        });
+
+        it('lets the admin reorder the catalog via sort_order', () => {
+            billingPlanService.updatePlan(3, { sort_order: 0 });
+            expect(billingPlanService.listPlans()[0].key).toBe('hemat');
         });
     });
 
