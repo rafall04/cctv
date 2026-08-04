@@ -222,16 +222,18 @@ class BillingPlanService {
         values.push(id);
         execute(`UPDATE billing_plans SET ${updates.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, values);
 
-        // Repricing existing subscriptions on price change keeps "paket = harga"
-        // truthful for every customer already on this plan.
-        if (payload.price_per_camera !== undefined && payload.price_per_camera !== plan.price_per_camera) {
-            execute(
-                `UPDATE camera_subscriptions
-                 SET monthly_price = ?, updated_at = CURRENT_TIMESTAMP
-                 WHERE status != 'cancelled'
-                   AND user_id IN (SELECT id FROM users WHERE plan_id = ?)`,
-                [payload.price_per_camera, id]
-            );
+        // Repricing existing subscriptions on price change keeps "paket = harga" truthful for
+        // every customer already on this plan. BOTH prices matter: editing only the surcharge
+        // must reprice too, and the recompute is per camera — the old flat
+        // `SET monthly_price = <price_per_camera>` would have erased the recording surcharge from
+        // every subscription the moment anyone touched a plan price.
+        const hargaBerubah = payload.price_per_camera !== undefined
+            && payload.price_per_camera !== plan.price_per_camera;
+        const rekamBerubah = payload.recording_price_per_camera !== undefined
+            && payload.recording_price_per_camera !== plan.recording_price_per_camera;
+
+        if (hargaBerubah || rekamBerubah) {
+            billingService.repriceSubscriptionsForPlan(id);
         }
 
         if (request) {

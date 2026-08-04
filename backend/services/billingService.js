@@ -63,13 +63,108 @@ class BillingService {
     }
 
     // ------------------------------------------------------------------
+    // Pricing: one price per subscription, never a second charge path
+    // ------------------------------------------------------------------
+    /*
+     * A recording camera costs more to run, so plans carry a surcharge on top of the watch price.
+     * That surcharge is folded into `monthly_price` rather than deducted separately, deliberately:
+     *
+     *  - _chargeAndSync already owns the daily deduction, the trial gate, suspension on an empty
+     *    wallet, and same-day idempotence via last_charged_date. A second deduction path would
+     *    double every place money can go wrong.
+     *  - dailyCostOf() stays the single rounding point. Rounding two halves separately drifts from
+     *    rounding the sum, and a rupiah a day is a difference nobody can explain to a customer.
+     *  - The wallet history stays one readable line per camera per day.
+     *
+     * Which cameras pay it is not a new concept either: cameras.enable_recording already exists.
+     */
+    monthlyPriceFor(cameraId) {
+        const row = queryOne(
+            `SELECT COALESCE(c.enable_recording, 0) AS merekam,
+                    p.price_per_camera, p.recording_price_per_camera
+             FROM cameras c
+             JOIN camera_subscriptions s ON s.camera_id = c.id
+             JOIN users u ON u.id = s.user_id
+             JOIN billing_plans p ON p.id = u.plan_id
+             WHERE c.id = ?`,
+            [cameraId]
+        );
+        if (!row) return null; // no subscription, or owner has no plan — nothing to reprice
+
+        const surcharge = row.merekam === 1 ? (row.recording_price_per_camera ?? 0) : 0;
+        return row.price_per_camera + surcharge;
+    }
+
+    /**
+     * Price a camera would carry on a given user's plan, before any subscription row exists.
+     * monthlyPriceFor() reads through the existing subscription, so assignment needs this variant.
+     */
+    _planPriceFor(userId, cameraId) {
+        const row = queryOne(
+            `SELECT COALESCE(c.enable_recording, 0) AS merekam,
+                    p.price_per_camera, p.recording_price_per_camera
+             FROM cameras c, users u
+             JOIN billing_plans p ON p.id = u.plan_id
+             WHERE c.id = ? AND u.id = ?`,
+            [cameraId, userId]
+        );
+        if (!row) return 0; // no plan yet — free until one is chosen, same as the trial path
+        return row.price_per_camera + (row.merekam === 1 ? (row.recording_price_per_camera ?? 0) : 0);
+    }
+
+    /** Re-derive one camera's price, e.g. after its recording flag was switched. */
+    repriceSubscriptionForCamera(cameraId) {
+        const price = this.monthlyPriceFor(cameraId);
+        if (price === null) return null;
+
+        execute(
+            `UPDATE camera_subscriptions
+             SET monthly_price = ?, updated_at = CURRENT_TIMESTAMP
+             WHERE camera_id = ? AND status != 'cancelled'`,
+            [price, cameraId]
+        );
+        return price;
+    }
+
+    /**
+     * Re-derive every subscription on a plan after its prices change.
+     *
+     * This replaced a flat `SET monthly_price = <price_per_camera>` across the whole plan, which
+     * would have wiped the recording surcharge off every subscription the first time an admin
+     * edited any plan price — silently, since the catalog would still advertise the surcharge.
+     * The CASE re-reads each camera's own flag, so recording and non-recording cameras on the same
+     * plan land on their own correct price.
+     */
+    repriceSubscriptionsForPlan(planId) {
+        const result = execute(
+            `UPDATE camera_subscriptions
+             SET monthly_price = (
+                     SELECT p.price_per_camera
+                            + CASE WHEN COALESCE(c.enable_recording, 0) = 1
+                                   THEN COALESCE(p.recording_price_per_camera, 0) ELSE 0 END
+                     FROM cameras c, billing_plans p
+                     WHERE c.id = camera_subscriptions.camera_id AND p.id = ?
+                 ),
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE status != 'cancelled'
+               AND user_id IN (SELECT id FROM users WHERE plan_id = ?)`,
+            [planId, planId]
+        );
+        return result.changes;
+    }
+
+    // ------------------------------------------------------------------
     // Admin: assignment & lifecycle
     // ------------------------------------------------------------------
 
     assignSubscription({ camera_id, user_id, monthly_price }, request = null) {
         const cameraId = Number(camera_id);
         const userId = Number(user_id);
-        const price = Number(monthly_price);
+        // An explicit price is an admin override (a negotiated discount, say) and always wins.
+        // Omit it and the plan decides, surcharge included — so a caller that does not want to
+        // re-derive the pricing rules simply leaves it out instead of guessing.
+        const priceDiberikan = monthly_price !== undefined && monthly_price !== null && monthly_price !== '';
+        const price = priceDiberikan ? Number(monthly_price) : this._planPriceFor(userId, cameraId);
 
         if (!Number.isInteger(cameraId) || cameraId <= 0) {
             const err = new Error('camera_id is required');

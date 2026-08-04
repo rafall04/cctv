@@ -90,6 +90,7 @@ function seedSchema() {
             owner_user_id INTEGER,
             camera_class TEXT NOT NULL DEFAULT 'community',
             billing_status TEXT,
+            enable_recording INTEGER NOT NULL DEFAULT 0,
             updated_at TEXT DEFAULT CURRENT_TIMESTAMP
         );
         CREATE TABLE wallets (
@@ -254,19 +255,26 @@ describe('billingPlanService', () => {
             expect(plan.recording_price_per_camera).toBe(0);
         });
 
-        it('does NOT reprice live subscriptions yet — charging still bills the watch price alone', () => {
-            // Pins the documented scope boundary: the catalog carries the number, the
-            // money path does not use it yet. If a later change wires it into
-            // _chargeAndSync, this expectation is the one that must be updated
-            // deliberately rather than a surcharge appearing on bills by accident.
+        it('reprices live subscriptions — the surcharge now reaches the money path', () => {
+            // This test used to pin the OPPOSITE, as the deliberate marker of an unfinished
+            // feature: "the catalog carries the number, the money path does not use it yet …
+            // if a later change wires it into charging, this expectation is the one that must be
+            // updated deliberately rather than a surcharge appearing on bills by accident."
+            //
+            // That change is here. The surcharge is folded into monthly_price and derived per
+            // camera from cameras.enable_recording, so a recording camera pays it and a
+            // watch-only camera on the same plan does not. Full coverage of the pricing rules
+            // lives in billingRecordingPrice.test.js.
             db.prepare("UPDATE users SET plan_id = 3 WHERE id = 42").run();
+            db.prepare('UPDATE cameras SET enable_recording = 1 WHERE id = 8').run();
             db.prepare(`INSERT INTO camera_subscriptions (camera_id, user_id, monthly_price, status)
                         VALUES (8, 42, 20000, 'active')`).run();
 
+            const paket = billingPlanService.getPlanById(3);
             billingPlanService.updatePlan(3, { recording_price_per_camera: 9000 });
 
             const sub = db.prepare('SELECT monthly_price FROM camera_subscriptions WHERE camera_id = 8').get();
-            expect(sub.monthly_price).toBe(20000);
+            expect(sub.monthly_price).toBe(paket.price_per_camera + 9000);
         });
 
         it('lets the admin reorder the catalog via sort_order', () => {

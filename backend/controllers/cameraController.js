@@ -7,6 +7,7 @@
  */
 
 import cameraService from '../services/cameraService.js';
+import billingService from '../services/billingService.js';
 
 // Get all cameras (admin only - includes disabled cameras)
 export async function getAllCameras(request, reply) {
@@ -71,6 +72,15 @@ export async function updateCamera(request, reply) {
     try {
         const { id } = request.params;
         const result = await cameraService.updateCamera(id, request.body, request);
+
+        // Recording carries a per-camera surcharge, so switching it changes what this camera
+        // costs. Repricing lives here rather than in cameraService because billingService
+        // imports cameraService — doing it the other way round would close an import cycle.
+        // Only admins reach this route; customers cannot touch enable_recording at all.
+        if (Object.prototype.hasOwnProperty.call(request.body || {}, 'enable_recording')) {
+            billingService.repriceSubscriptionForCamera(Number(id));
+        }
+
         return reply.send({
             success: true,
             message: 'Camera updated successfully',
