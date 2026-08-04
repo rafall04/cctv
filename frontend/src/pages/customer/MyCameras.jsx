@@ -273,21 +273,21 @@ export default function MyCameras() {
                                             onClick={() => togglePublic(camera)}
                                             disabled={busyId === camera.id}
                                             title={camera.is_public ? 'Sembunyikan dari hub publik' : 'Tampilkan di hub publik'}
-                                            className="rounded-lg px-2 py-1 text-xs text-primary transition-colors hover:bg-primary-100 disabled:opacity-50 text-primary dark:hover:bg-sky-900/30"
+                                            className="inline-flex min-h-[36px] items-center rounded-lg px-3 py-2 text-xs text-primary transition-colors hover:bg-primary-100 disabled:opacity-50 text-primary dark:hover:bg-sky-900/30"
                                         >
                                             {camera.is_public ? '🔒 Privatkan' : '🌐 Publikkan'}
                                         </button>
                                         <button
                                             onClick={() => setFormCamera(camera)}
                                             disabled={busyId === camera.id}
-                                            className="rounded-lg px-2 py-1 text-xs text-content-muted transition-colors hover:bg-surface-sunken disabled:opacity-50"
+                                            className="inline-flex min-h-[36px] items-center rounded-lg px-3 py-2 text-xs text-content-muted transition-colors hover:bg-surface-sunken disabled:opacity-50"
                                         >
                                             ✏️ Edit
                                         </button>
                                         <button
                                             onClick={() => handleDelete(camera)}
                                             disabled={busyId === camera.id}
-                                            className="rounded-lg px-2 py-1 text-xs text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-900/30"
+                                            className="inline-flex min-h-[36px] items-center rounded-lg px-3 py-2 text-xs text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-900/30"
                                         >
                                             🗑 Hapus
                                         </button>

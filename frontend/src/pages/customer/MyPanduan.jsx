@@ -164,7 +164,10 @@ export default function MyPanduan() {
                         dibuka di port luar <Kode>8554</Kode>. Ganti sesuai punya Anda.
                     </p>
                     <p className="font-semibold text-content">Lewat terminal — paling cepat</p>
-                    <pre className="overflow-x-auto rounded-control border border-edge bg-surface-sunken p-4 font-mono text-xs leading-relaxed text-content">
+                    {/* [contain:paint] is required, not decorative: a horizontal scroll strip without it
+                        widens the whole document on a phone, and the browser answers by zooming the
+                        entire page out. */}
+                    <pre className="overflow-x-auto [contain:paint] rounded-control border border-edge bg-surface-sunken p-4 font-mono text-xs leading-relaxed text-content">
 {`/ip firewall nat
 add chain=dstnat action=dst-nat \\
     protocol=tcp dst-port=8554 \\
@@ -198,7 +201,7 @@ add chain=dstnat action=dst-nat \\
                         Isinya sama saja: teruskan port dari luar ke IP kamera di dalam. Yang berbeda
                         hanya nama menunya, dan itu berubah menurut merek <i>dan</i> firmware ISP.
                     </p>
-                    <div className="overflow-x-auto rounded-control border border-edge">
+                    <div className="overflow-x-auto [contain:paint] rounded-control border border-edge">
                         <table className="w-full min-w-[440px] text-sm">
                             <thead>
                                 <tr className="text-left text-xs uppercase text-content-muted">
@@ -221,7 +224,7 @@ add chain=dstnat action=dst-nat \\
                     </div>
 
                     <p className="mt-2 font-semibold text-content">Isian yang diminta, apa pun mereknya</p>
-                    <div className="overflow-x-auto rounded-control border border-edge">
+                    <div className="overflow-x-auto [contain:paint] rounded-control border border-edge">
                         <table className="w-full min-w-[440px] text-sm">
                             <tbody className="divide-y divide-edge">
                                 {isian(ipTampil).map(([k, v]) => (
