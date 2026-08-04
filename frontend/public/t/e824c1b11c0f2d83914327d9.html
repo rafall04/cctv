@@ -15,7 +15,7 @@
     --accent:#0B6F78; --accent-soft:#DCEDEE;
     --rtsp:#A2481F; --rtsp-soft:#F6E7DF; --rtsp-edge:#E4C9BA;
     --archive:#4B5896; --archive-soft:#E4E6F4;
-    --ok:#2C7A58; --ok-soft:#DCEFE5;
+    --ok:#2C7A58; --ok-soft:#DCEFE5; --warn:#8A6415; --warn-soft:#F7EDD4;
     --grid:#0B181A0D;
     --sans:"Segoe UI",-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif;
     --mono:ui-monospace,"Cascadia Mono",Consolas,"Segoe UI Mono",Menlo,monospace;
@@ -28,7 +28,7 @@
       --accent:#4FC3C9; --accent-soft:#0E2D31;
       --rtsp:#E28A58; --rtsp-soft:#2E1D14; --rtsp-edge:#4A2E1F;
       --archive:#98A2E2; --archive-soft:#1A1E38;
-      --ok:#5FCB99; --ok-soft:#122C22;
+      --ok:#5FCB99; --ok-soft:#122C22; --warn:#D9AC4E; --warn-soft:#2E2510;
       --grid:#E7EFED12;
     }
   }
@@ -93,6 +93,7 @@
                    line-height:19px;text-align:center}
   .feat li.y::before{content:"✓";background:var(--ok-soft);color:var(--ok)}
   .feat li.n::before{content:"✕";background:var(--rtsp-soft);color:var(--rtsp)}
+  .feat li.w::before{content:"!";background:var(--warn-soft);color:var(--warn)}
 
   .opt-foot{border-top:1px solid var(--edge-soft);background:var(--surface-2);
             padding:16px 22px 18px;display:flex;flex-direction:column;gap:11px}
@@ -335,7 +336,9 @@
       <h2>Punya server sendiri, atau cukup sewa ke kami</h2>
       <p class="lede" style="font-size:16.5px">
         Diagram di atas adalah bentuk lengkapnya — server berdiri di lokasi Anda. Tapi tidak semua
-        tempat membutuhkan itu. Berikut bedanya, apa adanya, termasuk yang tidak Anda dapat.
+        tempat membutuhkan itu. <b style="color:var(--ink);font-weight:650">Keduanya bisa merekam</b>;
+        yang membedakan adalah lewat mana rekaman itu berjalan, dan apa akibatnya saat internet
+        sedang tidak bersahabat. Berikut bedanya apa adanya, termasuk yang belum bisa kami janjikan.
       </p>
     </div>
 
@@ -349,9 +352,12 @@
              persis seperti diagram di atas.</p>
         </div>
         <ul class="feat">
-          <li class="y">Rekaman tersimpan dan bisa diputar ulang kapan saja</li>
+          <li class="y"><b>Rekaman tidak lewat internet</b> — kamera dan server berada di satu
+              jaringan, jadi gangguan ISP tidak memutus rekaman</li>
+          <li class="y">Bisa diputar ulang sendiri kapan saja, langsung dari halaman Anda</li>
           <li class="y">Arsip naik otomatis ke cloud, tidak dibatasi kapasitas disk lokal</li>
           <li class="y">Kamera terkurung di VLAN — tidak terjangkau dari internet</li>
+          <li class="y">Mutu rekaman = mutu asli kamera; tidak dikompres ulang demi menghemat jalur</li>
           <li class="y">Bisa ditayangkan untuk publik bila memang untuk warga</li>
           <li class="y">Jumlah kamera tidak dibatasi paket</li>
         </ul>
@@ -372,15 +378,20 @@
         </div>
         <ul class="feat">
           <li class="y">Langsung tonton dari HP lewat browser, tanpa aplikasi</li>
+          <li class="y"><b>Rekaman bisa ditambahkan</b> — tidak hanya siaran langsung</li>
           <li class="y">Halaman pribadi — kamera Anda tidak muncul di halaman publik</li>
           <li class="y">Bayar di muka, dipotong harian; berhenti kapan saja</li>
           <li class="y">Masa coba gratis 7 hari, sekali per akun</li>
-          <li class="n">Siaran langsung saja — rekaman dan putar ulang <b>tidak termasuk</b></li>
+          <li class="w">Rekaman mengikuti koneksi di lokasi kamera. Tiap ISP beda kestabilannya —
+              saat sambungan putus, potongan itu tidak terekam, lalu menyambung sendiri begitu pulih</li>
+          <li class="w">Rekaman diambilkan tim kami saat Anda perlu; menelusuri sendiri dari
+              halaman Anda belum tersedia</li>
           <li class="n">Jumlah kamera mengikuti batas paket</li>
         </ul>
         <div class="opt-foot">
           <div class="ff"><span class="ff-k">Biaya</span><span class="ff-v">Mulai Rp 8.000 per kamera per bulan</span></div>
-          <div class="ff"><span class="ff-k">Kami urus</span><span class="ff-v">Server, jaringan inti, pembaruan, dan pemantauan kamera</span></div>
+          <div class="ff"><span class="ff-k">Kami urus</span><span class="ff-v">Server, penyimpanan, jaringan inti, pembaruan, dan pemantauan kamera</span></div>
+          <div class="ff"><span class="ff-k">Penentu mutu rekaman</span><span class="ff-v">Koneksi di lokasi kamera — yang menentukan bukan kecepatan unduh, tapi <b>upload yang stabil</b></span></div>
           <div class="ff"><span class="ff-k">Perlu dicatat</span><span class="ff-v">Saldo habis → siaran berhenti dalam ±30 detik; begitu diisi ulang, jalan lagi otomatis</span></div>
         </div>
       </article>
@@ -408,11 +419,19 @@
 
     <div class="pick">
       <div class="pick-row">
-        <span class="pick-q">Butuh bukti rekaman — kejadian, sengketa, laporan?</span>
+        <span class="pick-q">Rekaman tidak boleh bolong walau internet di lokasi sedang gangguan?</span>
         <span class="pick-a pick-a-a">Server di lokasi Anda</span>
       </div>
       <div class="pick-row">
-        <span class="pick-q">Cukup memantau langsung dari HP, tanpa mau repot perangkat?</span>
+        <span class="pick-q">Rekaman untuk berjaga-jaga, dan koneksi di lokasi sudah cukup baik?</span>
+        <span class="pick-a pick-a-b">Sewa ke kami</span>
+      </div>
+      <div class="pick-row">
+        <span class="pick-q">Ingin menelusuri rekaman sendiri, kapan pun, tanpa minta ke kami?</span>
+        <span class="pick-a pick-a-a">Server di lokasi Anda</span>
+      </div>
+      <div class="pick-row">
+        <span class="pick-q">Tidak mau mengurus perangkat, listrik, dan tempat server?</span>
         <span class="pick-a pick-a-b">Sewa ke kami</span>
       </div>
     </div>
