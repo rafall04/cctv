@@ -89,7 +89,10 @@ export function logSecurityEvent(eventType, details = {}, request = null) {
         ip_address: details.ip_address || request?.ip || request?.headers?.['x-forwarded-for'] || 'unknown',
         user_agent: details.user_agent || request?.headers?.['user-agent'] || 'unknown',
         fingerprint: details.fingerprint || generateFingerprint(request),
-        username: details.username || null,
+        // Fall back to the authenticated caller. Every generic ADMIN_ACTION row used to land with
+        // username NULL — the endpoint and the payload were recorded, but not who did it — because
+        // only callers that passed an explicit `username` in details ever filled this column.
+        username: details.username || details.adminUsername || request?.user?.username || null,
         endpoint: details.endpoint || request?.url || null,
         details: typeof details === 'string' ? details : JSON.stringify(details)
     };

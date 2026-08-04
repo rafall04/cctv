@@ -293,6 +293,54 @@ describe('guardrail: a DB spy never falls through to the real database', () => {
     });
 });
 
+describe('guardrail: runtime-settings consumers are tested against an isolated database', () => {
+    /*
+     * Earned 2026-08-04, the same day the settings themselves moved into the DB.
+     *
+     * Security policy now resolves DB → env → default through securitySettingsService, so every
+     * consumer of it reads the `settings` table on each call. A test that imports one of those
+     * modules WITHOUT isolating the database silently asserts against whatever the developer's
+     * cctv.db happens to hold — and stays green right up until an admin saves something in
+     * Pengaturan → Keamanan.
+     *
+     * That is exactly how it surfaced: rateLimiterConfig's "falls back to defaults when env values
+     * are absent" went red because a saved rateLimitAdmin=300 outranked the 60 it expected. The
+     * test was right about the env layer and wrong about its own isolation.
+     */
+    const CONSUMERS = [
+        'middleware/rateLimiter.js',
+        'services/bruteForceProtection.js',
+        'services/sessionManager.js',
+        'services/passwordValidator.js',
+        'services/passwordExpiry.js',
+        'services/securitySettingsService.js',
+    ].map((p) => path.basename(p, '.js'));
+
+    // guardrails.test.js greps source text by name; it never imports these modules.
+    const NOT_A_CONSUMER = new Set(['guardrails.test.js']);
+    const ISOLATED = /vi\.mock\(\s*['"][^'"]*connectionPool\.js['"]|:memory:/;
+
+    it('any test importing a settings consumer mocks the database', () => {
+        const offenders = [];
+        for (const name of fs.readdirSync(path.join(BACKEND_ROOT, '__tests__')).filter((f) => f.endsWith('.js'))) {
+            if (NOT_A_CONSUMER.has(name)) continue;
+            const src = read(path.join(BACKEND_ROOT, '__tests__', name));
+            const imported = CONSUMERS.filter((m) => new RegExp(`(import|from)\\s*\\(?\\s*['"][^'"]*/${m}\\.js['"]`).test(src));
+            if (imported.length && !ISOLATED.test(src)) {
+                offenders.push(`${name} — imports ${imported.join(', ')}`);
+            }
+        }
+
+        expect(
+            offenders,
+            '\nThese tests import a module that reads the runtime `settings` table, but do not isolate'
+            + '\nthe database — so they assert against the local cctv.db and will flip the moment an'
+            + '\nadmin saves a security setting. Add vi.mock of connectionPool.js (or an in-memory DB):'
+            + `\n  ${offenders.join('\n  ')}\n`
+        ).toEqual([]);
+    });
+});
+
 describe('guardrail: data-destroying paths stay tested', () => {
     /*
      * backupService could DELETE a live row on restore (INSERT OR REPLACE) and had ZERO tests for

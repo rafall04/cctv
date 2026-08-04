@@ -113,6 +113,25 @@ describe('logSecurityEvent', () => {
         expect(db.prepare('SELECT ip_address FROM security_logs').get().ip_address).toBe('198.51.100.3');
     });
 
+    it('names the authenticated caller when details omit a username', () => {
+        // Regression: every generic ADMIN_ACTION landed with username NULL. The endpoint and the
+        // payload were there, so the row looked fine — but it never said who did it.
+        logger.logAdminAction(
+            { action: 'voucher_profile_deleted', profileId: 3 },
+            { ...fakeRequest(), url: '/api/admin/voucher/profiles/3', user: { id: 1, username: 'admin' } }
+        );
+
+        const row = db.prepare('SELECT * FROM security_logs').get();
+        expect(row.event_type).toBe(logger.SECURITY_EVENTS.ADMIN_ACTION);
+        expect(row.username).toBe('admin');
+        expect(row.endpoint).toBe('/api/admin/voucher/profiles/3');
+    });
+
+    it('lets an explicit username outrank the request user', () => {
+        logger.logSecurityEvent('TEST', { username: 'ditentukan' }, { ...fakeRequest(), user: { username: 'admin' } });
+        expect(db.prepare('SELECT username FROM security_logs').get().username).toBe('ditentukan');
+    });
+
     it('records unknowns instead of failing when there is no request at all', () => {
         expect(() => logger.logSecurityEvent('TEST', {})).not.toThrow();
         const row = db.prepare('SELECT * FROM security_logs').get();

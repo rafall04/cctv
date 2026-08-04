@@ -8,6 +8,17 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import Fastify from 'fastify';
 
+// This file is about the ENV layer. rateLimiter now resolves DB → env → default through
+// securitySettingsService, so without this mock the assertions read the developer's real cctv.db
+// and start failing the moment an admin saves anything in Pengaturan → Keamanan. (It did: a saved
+// rateLimitAdmin=300 turned "falls back to defaults" red.) An empty settings table keeps the
+// resolution deterministic and env-only.
+vi.mock('../database/connectionPool.js', () => ({
+    queryOne: () => undefined,
+    query: () => [],
+    execute: () => ({ changes: 0 }),
+}));
+
 const ORIGINAL_ENV = { ...process.env };
 
 async function loadRateLimiter(envOverrides) {

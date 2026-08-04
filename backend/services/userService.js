@@ -225,18 +225,24 @@ class UserService {
             throw err;
         }
 
-        const user = queryOne('SELECT id, username FROM users WHERE id = ?', [id]);
+        const user = queryOne('SELECT id, username, role FROM users WHERE id = ?', [id]);
         if (!user) {
             const err = new Error('User not found');
             err.statusCode = 404;
             throw err;
         }
 
-        const adminCount = queryOne('SELECT COUNT(*) as count FROM users WHERE role = ?', ['admin']);
-        if (adminCount.count <= 1) {
-            const err = new Error('Cannot delete the last admin user');
-            err.statusCode = 400;
-            throw err;
+        // Only the LAST ADMIN is protected. This used to count admins globally and refuse every
+        // deletion whenever that count was 1 — so on a single-admin install (which production is)
+        // no viewer and no customer could ever be deleted, and the error blamed an admin account
+        // the operator was not even touching.
+        if (user.role === 'admin') {
+            const adminCount = queryOne('SELECT COUNT(*) as count FROM users WHERE role = ?', ['admin']);
+            if (adminCount.count <= 1) {
+                const err = new Error('Cannot delete the last admin user');
+                err.statusCode = 400;
+                throw err;
+            }
         }
 
         execute('DELETE FROM users WHERE id = ?', [id]);
