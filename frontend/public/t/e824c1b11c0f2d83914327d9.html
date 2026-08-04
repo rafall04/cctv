@@ -14,7 +14,7 @@
     --ink:#0B181A; --ink-2:#47605E; --ink-3:#6B8380;
     --accent:#0B6F78; --accent-soft:#DCEDEE;
     --rtsp:#A2481F; --rtsp-soft:#F6E7DF; --rtsp-edge:#E4C9BA;
-    --archive:#4B5896;
+    --archive:#4B5896; --archive-soft:#E4E6F4;
     --ok:#2C7A58; --ok-soft:#DCEFE5;
     --grid:#0B181A0D;
     --sans:"Segoe UI",-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif;
@@ -27,7 +27,7 @@
       --ink:#E7EFED; --ink-2:#9DB3B0; --ink-3:#7B918E;
       --accent:#4FC3C9; --accent-soft:#0E2D31;
       --rtsp:#E28A58; --rtsp-soft:#2E1D14; --rtsp-edge:#4A2E1F;
-      --archive:#98A2E2;
+      --archive:#98A2E2; --archive-soft:#1A1E38;
       --ok:#5FCB99; --ok-soft:#122C22;
       --grid:#E7EFED12;
     }
@@ -64,7 +64,62 @@
        background:var(--accent);color:var(--paper);text-decoration:none;font-size:15px;font-weight:600}
   .btn:hover{filter:brightness(1.08)}
   .btn:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+  .btn-ghost{background:transparent;color:var(--accent);border:1px solid var(--accent)}
   .note{font-size:14px;color:var(--ink-3)}
+
+  /* ---------- pilihan pemakaian ---------- */
+  section{display:flex;flex-direction:column;gap:22px}
+  .sec-head{display:flex;flex-direction:column;gap:9px}
+  h2{font-size:clamp(20px,3vw,27px);line-height:1.18;letter-spacing:-.018em;font-weight:700;text-wrap:balance}
+
+  .opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
+  .opt{background:var(--surface);border:1px solid var(--edge);border-radius:4px;
+       display:flex;flex-direction:column;overflow:hidden}
+  .opt-a{border-top:3px solid var(--accent)}
+  .opt-b{border-top:3px solid var(--archive)}
+  .opt-top{padding:20px 22px 16px;display:flex;flex-direction:column;gap:8px}
+  .opt-tag{align-self:flex-start;font-family:var(--mono);font-size:11px;letter-spacing:.11em;
+           text-transform:uppercase;padding:4px 9px;border-radius:3px}
+  .tag-a{color:var(--accent);background:var(--accent-soft)}
+  .tag-b{color:var(--archive);background:var(--archive-soft)}
+  .opt h3{font-size:21px;font-weight:700;letter-spacing:-.015em}
+  .opt-sub{font-size:15px;line-height:1.5;color:var(--ink-2)}
+
+  .feat{list-style:none;padding:4px 22px 18px;display:flex;flex-direction:column;gap:11px;flex:1}
+  .feat li{position:relative;padding-left:28px;font-size:14.8px;line-height:1.5;color:var(--ink-2)}
+  .feat li b{color:var(--ink);font-weight:650}
+  .feat li::before{position:absolute;left:0;top:-1px;width:19px;height:19px;border-radius:50%;
+                   display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;
+                   line-height:19px;text-align:center}
+  .feat li.y::before{content:"✓";background:var(--ok-soft);color:var(--ok)}
+  .feat li.n::before{content:"✕";background:var(--rtsp-soft);color:var(--rtsp)}
+
+  .opt-foot{border-top:1px solid var(--edge-soft);background:var(--surface-2);
+            padding:16px 22px 18px;display:flex;flex-direction:column;gap:11px}
+  .ff{display:flex;flex-direction:column;gap:2px}
+  .ff-k{font-family:var(--mono);font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-3)}
+  .ff-v{font-size:14.5px;line-height:1.45;color:var(--ink-2)}
+
+  /* ---------- tabel paket ---------- */
+  .table-wrap{overflow-x:auto;border:1px solid var(--edge);border-radius:4px;background:var(--surface)}
+  table{border-collapse:collapse;width:100%;min-width:520px}
+  caption{text-align:left;padding:16px 18px 0;font-size:13px;color:var(--ink-3)}
+  th,td{text-align:left;padding:11px 18px;font-size:14.5px;border-bottom:1px solid var(--edge-soft)}
+  thead th{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;
+           color:var(--ink-3);font-weight:500;white-space:nowrap}
+  tbody tr:last-child td{border-bottom:none}
+  td.num,th.num{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .dim{color:var(--ink-3)}
+
+  /* ---------- mana yang cocok ---------- */
+  .pick{display:flex;flex-direction:column;gap:1px;background:var(--edge);
+        border:1px solid var(--edge);border-radius:4px;overflow:hidden}
+  .pick-row{background:var(--surface);padding:15px 20px;display:flex;flex-wrap:wrap;gap:8px 16px;
+            align-items:center;justify-content:space-between}
+  .pick-q{font-size:15px;color:var(--ink-2)}
+  .pick-a{font-size:14.5px;font-weight:650;white-space:nowrap;padding:4px 12px;border-radius:3px}
+  .pick-a-a{color:var(--accent);background:var(--accent-soft)}
+  .pick-a-b{color:var(--archive);background:var(--archive-soft)}
 
   footer{border-top:1px solid var(--edge);padding-top:18px;display:flex;flex-direction:column;gap:6px}
   footer p{font-size:13px;color:var(--ink-3);max-width:76ch}
@@ -268,15 +323,117 @@
            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/>
       </svg>
-      Unduh gambar (PNG)
+      Unduh diagram (PNG)
     </a>
     <span class="note">2800 &times; 1840 px — cukup tajam untuk dicetak atau dikirim lewat pesan.</span>
   </div>
 
+  <!-- ============ PILIHAN PEMAKAIAN ============ -->
+  <section id="pilihan">
+    <div class="sec-head">
+      <p class="eyebrow">Dua cara memakainya</p>
+      <h2>Punya server sendiri, atau cukup sewa ke kami</h2>
+      <p class="lede" style="font-size:16.5px">
+        Diagram di atas adalah bentuk lengkapnya — server berdiri di lokasi Anda. Tapi tidak semua
+        tempat membutuhkan itu. Berikut bedanya, apa adanya, termasuk yang tidak Anda dapat.
+      </p>
+    </div>
+
+    <div class="opts">
+      <!-- OPSI A -->
+      <article class="opt opt-a">
+        <div class="opt-top">
+          <span class="opt-tag tag-a">Perangkat milik Anda</span>
+          <h3>Server di lokasi Anda</h3>
+          <p class="opt-sub">Kamera, MikroTik, dan satu PC server berdiri di tempat Anda —
+             persis seperti diagram di atas.</p>
+        </div>
+        <ul class="feat">
+          <li class="y">Rekaman tersimpan dan bisa diputar ulang kapan saja</li>
+          <li class="y">Arsip naik otomatis ke cloud, tidak dibatasi kapasitas disk lokal</li>
+          <li class="y">Kamera terkurung di VLAN — tidak terjangkau dari internet</li>
+          <li class="y">Bisa ditayangkan untuk publik bila memang untuk warga</li>
+          <li class="y">Jumlah kamera tidak dibatasi paket</li>
+        </ul>
+        <div class="opt-foot">
+          <div class="ff"><span class="ff-k">Biaya</span><span class="ff-v">Investasi perangkat di awal, lalu listrik &amp; internet jalan</span></div>
+          <div class="ff"><span class="ff-k">Anda siapkan</span><span class="ff-v">Tempat server, listrik, koneksi internet dengan upload stabil</span></div>
+          <div class="ff"><span class="ff-k">Sudah berjalan</span><span class="ff-v">Desa Dander &amp; Tanjungharjo — 11 kamera, 1 server, 273,6 GB terarsip per hari</span></div>
+        </div>
+      </article>
+
+      <!-- OPSI B -->
+      <article class="opt opt-b">
+        <div class="opt-top">
+          <span class="opt-tag tag-b">Tanpa server di tempat Anda</span>
+          <h3>Sewa ke kami</h3>
+          <p class="opt-sub">Kamera Anda didaftarkan ke sistem kami. Tidak ada perangkat server
+             yang perlu Anda beli, tempatkan, atau rawat.</p>
+        </div>
+        <ul class="feat">
+          <li class="y">Langsung tonton dari HP lewat browser, tanpa aplikasi</li>
+          <li class="y">Halaman pribadi — kamera Anda tidak muncul di halaman publik</li>
+          <li class="y">Bayar di muka, dipotong harian; berhenti kapan saja</li>
+          <li class="y">Masa coba gratis 7 hari, sekali per akun</li>
+          <li class="n">Siaran langsung saja — rekaman dan putar ulang <b>tidak termasuk</b></li>
+          <li class="n">Jumlah kamera mengikuti batas paket</li>
+        </ul>
+        <div class="opt-foot">
+          <div class="ff"><span class="ff-k">Biaya</span><span class="ff-v">Mulai Rp 8.000 per kamera per bulan</span></div>
+          <div class="ff"><span class="ff-k">Kami urus</span><span class="ff-v">Server, jaringan inti, pembaruan, dan pemantauan kamera</span></div>
+          <div class="ff"><span class="ff-k">Perlu dicatat</span><span class="ff-v">Saldo habis → siaran berhenti dalam ±30 detik; begitu diisi ulang, jalan lagi otomatis</span></div>
+        </div>
+      </article>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <caption>Paket sewa yang aktif saat ini</caption>
+        <thead>
+          <tr>
+            <th scope="col">Paket</th>
+            <th scope="col">Untuk siapa</th>
+            <th scope="col" class="num">Harga / kamera / bulan</th>
+            <th scope="col" class="num">Maks kamera</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Trial Gratis</td><td>Coba dulu sebelum berlangganan</td><td class="num">Rp 0 <span class="dim">· 7 hari</span></td><td class="num">3</td></tr>
+          <tr><td>Basic</td><td>Rumah, satu titik pantau</td><td class="num">Rp 15.000</td><td class="num">1</td></tr>
+          <tr><td>Hemat</td><td>Rumah besar atau toko</td><td class="num">Rp 12.000</td><td class="num">3</td></tr>
+          <tr><td>Bisnis</td><td>Kantor, gudang, banyak titik</td><td class="num">Rp 8.000</td><td class="num">10</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="pick">
+      <div class="pick-row">
+        <span class="pick-q">Butuh bukti rekaman — kejadian, sengketa, laporan?</span>
+        <span class="pick-a pick-a-a">Server di lokasi Anda</span>
+      </div>
+      <div class="pick-row">
+        <span class="pick-q">Cukup memantau langsung dari HP, tanpa mau repot perangkat?</span>
+        <span class="pick-a pick-a-b">Sewa ke kami</span>
+      </div>
+    </div>
+
+  </section>
+
+  <div class="actions">
+    <a class="btn btn-ghost" href="./e824c1b11c0f2d83914327d9-perbandingan.png" download="perbandingan-cctv.png">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/>
+      </svg>
+      Unduh perbandingan (PNG)
+    </a>
+    <span class="note">Untuk dikirim lewat WhatsApp tanpa harus membuka tautan.</span>
+  </div>
+
   <footer>
     <p>
-      Jumlah kamera, alamat segmen VLAN, dan volume arsip pada diagram ini dibaca langsung
-      dari sistem yang sedang berjalan pada 3 Agustus 2026 — bukan angka contoh.
+      Jumlah kamera, alamat segmen VLAN, volume arsip, dan daftar harga paket pada halaman ini
+      dibaca langsung dari sistem yang sedang berjalan pada 3 Agustus 2026 — bukan angka contoh.
     </p>
     <p>
       Halaman ini tidak tertaut dari mana pun dan tidak diindeks mesin pencari.
