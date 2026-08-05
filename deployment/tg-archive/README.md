@@ -65,6 +65,16 @@ recordingSegmentFinalizer (app)  ──atomic rename──►  recordings/camera
 Which group each camera lands in. Edited live — the uploader re-reads the file on
 change, **no restart needed**.
 
+> **The live file is `/opt/tg-archive/routes.json`, outside this repo**, and the
+> admin panel (Arsip Rekaman ke Telegram) writes to exactly that path. The copy in
+> this folder is `routes.example.json`: shape only, every route disabled, chat IDs
+> as placeholders.
+>
+> It used to be a plain `routes.json` here and it drifted — one route to a group
+> that no longer exists, while production ran three entirely different ones.
+> Copying it over the live file would have stopped archiving **silently**: cameras
+> matching no route are simply marked `no_route`, nothing errors.
+
 ```json
 {"routes": [
   {"id":"selatan-ahass","enabled":true,"scope":"camera","cameraId":1441,
@@ -119,10 +129,11 @@ Check what is actually wired before trusting it:
 
 ### Adding a camera or a whole area later
 
-Edit `routes.json` only — no restart, no redeploy:
+Do it from the admin panel (**Arsip Rekaman ke Telegram**) — it writes the same
+file and validates the shape. By hand works too; no restart, no redeploy:
 
 ```bash
-nano /opt/tg-archive/routes.json
+nano /opt/tg-archive/routes.json        # the LIVE file, not the repo copy
 /opt/tg-archive/uploader.py --routes    # confirm before walking away
 ```
 

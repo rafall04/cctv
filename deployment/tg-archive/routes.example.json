@@ -1,0 +1,51 @@
+{
+  "_comment": [
+    "CONTOH — bukan konfigurasi yang berjalan. JANGAN disalin ke /opt/tg-archive.",
+    "",
+    "Rute yang benar-benar dipakai ada di /opt/tg-archive/routes.json, di luar repo,",
+    "dan diedit lewat panel admin: Arsip Rekaman ke Telegram. Berkas ini hanya",
+    "menerangkan bentuknya.",
+    "",
+    "Kenapa dipisah: berkas ini pernah berupa routes.json biasa dan ikut basi —",
+    "berisi satu rute ke grup yang sudah tidak ada, sementara produksi memakai tiga",
+    "rute yang sama sekali lain. Menyalinnya akan menghentikan pengarsipan tanpa",
+    "suara: kamera yang tidak cocok rute mana pun berstatus 'no_route', dan tidak ada",
+    "yang gagal dengan berisik. Chat ID asli juga tidak perlu ikut tersimpan di git.",
+    "",
+    "Cara kerja routing:",
+    "  scope: 'camera' (paling spesifik) > 'area' > 'all'.",
+    "  Grup paling spesifik yang mengunggah; grup lain yang ikut cocok dapat salinan",
+    "  lewat copyMessage sehingga TIDAK memakan bandwidth upload tambahan.",
+    "  Berkas dibaca ulang otomatis saat berubah — tidak perlu restart service.",
+    "  Kamera yang tidak cocok rute mana pun tidak dikirim (status 'no_route').",
+    "",
+    "chatId diisi id grup Telegram (diawali tanda minus). Bot harus sudah menjadi",
+    "anggota grup itu, dan perlu hak admin 'Delete Messages' bila kelak arsip satu",
+    "pelanggan perlu dihapus."
+  ],
+  "routes": [
+    {
+      "id": "contoh-satu-kamera",
+      "enabled": false,
+      "scope": "camera",
+      "cameraId": 0,
+      "chatId": "-100XXXXXXXXXX",
+      "label": "Contoh: arsip satu kamera tertentu"
+    },
+    {
+      "id": "contoh-satu-area",
+      "enabled": false,
+      "scope": "area",
+      "areaId": 0,
+      "chatId": "-100XXXXXXXXXX",
+      "label": "Contoh: arsip seluruh kamera dalam satu area"
+    },
+    {
+      "id": "contoh-tampung-semua",
+      "enabled": false,
+      "scope": "all",
+      "chatId": "-100XXXXXXXXXX",
+      "label": "Contoh: penampung semua kamera"
+    }
+  ]
+}

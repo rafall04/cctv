@@ -390,6 +390,39 @@ describe('guardrail: a plan field the service understands is never dropped by th
     });
 });
 
+describe('guardrail: no live-looking Telegram archive routes inside the repo', () => {
+    /*
+     * The archive's real routing lives at /opt/tg-archive/routes.json, outside the repo, and the
+     * admin panel writes to that exact path. A copy named `routes.json` used to sit in
+     * deployment/tg-archive/ and drifted: one route pointing at a group that no longer exists
+     * (getChat answered "chat not found"), while production ran three entirely different ones.
+     *
+     * Copying that file over the live one would stop archiving SILENTLY — a camera matching no
+     * route is marked `no_route` and nothing errors. So the repo keeps an example only, with every
+     * route disabled and placeholder chat IDs, and this fails if either rule is broken again.
+     */
+    const DIR = path.join(BACKEND_ROOT, '..', 'deployment', 'tg-archive');
+
+    it('keeps an example, never a file named routes.json', () => {
+        expect(fs.existsSync(path.join(DIR, 'routes.json')),
+            '\ndeployment/tg-archive/routes.json is back. Live routing belongs at'
+            + '\n/opt/tg-archive/routes.json (panel-edited); the repo keeps routes.example.json only.\n')
+            .toBe(false);
+        expect(fs.existsSync(path.join(DIR, 'routes.example.json'))).toBe(true);
+    });
+
+    it('the example carries no real chat id and nothing enabled', () => {
+        const doc = JSON.parse(read(path.join(DIR, 'routes.example.json')));
+        const nyata = doc.routes.filter((r) => !/X{4,}/.test(String(r.chatId)));
+        const aktif = doc.routes.filter((r) => r.enabled);
+
+        expect(nyata.map((r) => r.id),
+            '\nA real chat id in the example is both a leak and a copy-paste trap.').toEqual([]);
+        expect(aktif.map((r) => r.id),
+            '\nAn enabled example route invites being copied as-is.').toEqual([]);
+    });
+});
+
 describe('guardrail: data-destroying paths stay tested', () => {
     /*
      * backupService could DELETE a live row on restore (INSERT OR REPLACE) and had ZERO tests for
