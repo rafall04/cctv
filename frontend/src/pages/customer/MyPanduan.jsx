@@ -2,16 +2,16 @@
  * Purpose: Customer "Panduan" page — the full walkthrough for opening camera access
  *          (MikroTik dst-nat, ONT port forwarding, DDNS) so our server can pull the RTSP.
  * Caller: App.jsx /my/panduan route inside CustomerLayout.
- * Deps: none (static content; the server IP comes from runtime config).
+ * Deps: none (static content).
  * MainFuncs: MyPanduan.
  * SideEffects: None.
  *
  * WHY THIS LIVES BEHIND LOGIN
  * ---------------------------
- * This page names our server's public IP and explains that customers forward a camera's RTSP
- * port to it. On a public page that is a free map for anyone scanning: which address to watch,
- * and what kind of device sits behind the forwards. Nobody who has not signed up needs it either
- * — the public page carries only what a prospect must know to self-qualify (public IP, not CGNAT).
+ * It explains that customers forward a camera's RTSP port outward, which on a public page is a
+ * map for anyone scanning: what kind of device sits behind those forwards, and roughly where to
+ * look. Nobody who has not signed up needs it either — the public page carries only what a
+ * prospect must know to self-qualify (public IP, not CGNAT).
  */
 
 import { useState } from 'react';
@@ -256,9 +256,9 @@ add chain=dstnat action=dst-nat \\
 
             <Kartu judul="Sudah selesai — lalu apa" aksen>
                 <p>
-                    Jangan repot menguji sendiri lewat pengecek port online: kalau Anda sudah membatasi
-                    ke IP kami — dan memang seharusnya — pengecek dari luar akan melaporkan port
-                    tertutup. Itu justru tanda pengaturannya benar. Biar kami yang menguji.
+                    Tidak perlu menguji sendiri lewat pengecek port online — hasilnya sering
+                    membingungkan dan bukan bukti siarannya jalan. Kirimkan datanya ke kami, kami
+                    yang menguji dari sisi server dan mengabari begitu kameranya masuk.
                 </p>
                 <p className="font-semibold text-content">Kirimkan ini ke kami:</p>
                 <ul className="flex list-disc flex-col gap-1 pl-5">
