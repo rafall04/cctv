@@ -24,7 +24,6 @@ import {
     listMyAreas,
     validatePromo,
     redeemPromo,
-    getSetupInfo,
     listMyPlaybackTokens,
     createMyPlaybackToken,
     revokeMyPlaybackToken,
@@ -67,9 +66,6 @@ export default async function customerRoutes(fastify) {
     fastify.get('/wallet', { onRequest: guard }, getMyWallet);
     fastify.get('/payments', { onRequest: guard }, getMyPayments);
     fastify.get('/payment-options', { onRequest: guard }, getPaymentOptions);
-    // Router-setup details. Behind the guard because the value must NOT ship inside the public
-    // JS bundle — see getSetupInfo for why a guarded page alone would not have hidden it.
-    fastify.get('/setup-info', { onRequest: guard }, getSetupInfo);
 
     // Share links for the customer's OWN cameras. Scope, ownership and quota are decided in the
     // controller from the session — never from the request body.

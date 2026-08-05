@@ -14,14 +14,12 @@
  * — the public page carries only what a prospect must know to self-qualify (public IP, not CGNAT).
  */
 
-import { useEffect, useState } from 'react';
-import apiClient from '../../services/apiClient';
+import { useState } from 'react';
 
-// Placeholder shown until the real address arrives from the authenticated endpoint. The address
-// itself is NEVER a constant here: this component compiles into a JS chunk that anybody can
-// download without logging in, so baking it in would publish it to the whole internet — verified,
-// not assumed (an earlier draft leaked it into dist/assets/MyPanduan-*.js).
-const IP_MEMUAT = '(memuat…)';
+// The server address is deliberately ABSENT from this page — not hidden, absent. The owner does
+// not want their public IP published anywhere a customer could screenshot or forward, and the only
+// way to guarantee that is for no code path to carry it at all. Customers who want the tighter
+// source restriction are pointed at WhatsApp instead.
 
 const ONT_MEREK = [
     { merek: 'ZTE (F609, F660, F670L)', menu: 'Application → Port Forwarding', catatan: 'sebagian firmware: Security → Port Forwarding' },
@@ -30,13 +28,12 @@ const ONT_MEREK = [
     { merek: 'Merek lain', menu: 'Cari kata Port Forwarding, Virtual Server, NAT, atau Port Mapping', catatan: null },
 ];
 
-const isian = (ipServer) => [
+const ISIAN = [
     ['Nama / Application Name', 'CCTV RAF (bebas)'],
     ['Protocol', 'TCP'],
     ['External / WAN Port', '8554'],
     ['Internal / LAN Port', '554'],
     ['Internal / Server IP', 'IP kamera Anda, mis. 192.168.1.50'],
-    ['Source IP (bila tersedia)', ipServer],
     ['Enable / Status', 'aktif'],
 ];
 
@@ -55,23 +52,6 @@ const Kartu = ({ judul, children, aksen = false }) => (
 
 export default function MyPanduan() {
     const [caraAktif, setCaraAktif] = useState('mikrotik');
-    const [ipServer, setIpServer] = useState(IP_MEMUAT);
-
-    useEffect(() => {
-        let batal = false;
-        apiClient.get('/api/customer/setup-info')
-            .then(({ data }) => {
-                if (batal) return;
-                // A missing value must read as missing, never as a confident wrong address.
-                setIpServer(data?.data?.server_ip || null);
-            })
-            .catch(() => { if (!batal) setIpServer(null); });
-        return () => { batal = true; };
-    }, []);
-
-    const ipTampil = ipServer === IP_MEMUAT
-        ? IP_MEMUAT
-        : (ipServer || 'hubungi kami untuk alamatnya');
 
     return (
         <div className="flex flex-col gap-4">
@@ -127,17 +107,26 @@ export default function MyPanduan() {
                 <h2 className="mb-2 text-lg font-bold text-content">Satu aturan yang jangan dilewati</h2>
                 <div className="flex flex-col gap-3 text-sm leading-relaxed text-content-muted">
                     <p>
-                        Membuka port kamera ke seluruh internet berarti siapa pun yang memindai alamat
-                        Anda bisa mencoba masuk — dan kamera CCTV termasuk sasaran favorit pemindai
-                        otomatis. Yang perlu menjangkau kamera Anda cuma satu alamat:
+                        Membuka port kamera ke internet berarti siapa pun yang memindai alamat Anda
+                        bisa mencoba masuk — dan kamera CCTV termasuk sasaran favorit pemindai
+                        otomatis. Dua hal ini wajib, bukan anjuran:
                     </p>
-                    <p className="rounded-control border border-edge bg-surface-sunken px-4 py-3 font-mono text-base font-bold text-content">
-                        {ipTampil}
-                    </p>
+                    <ul className="flex list-disc flex-col gap-2 pl-5">
+                        <li><b className="text-content">Ganti sandi bawaan pabrik</b> dengan yang kuat. Sandi bawaan kamera adalah hal pertama yang dicoba pemindai.</li>
+                        <li><b className="text-content">Pakai port luar yang tidak umum</b> seperti <Kode>8554</Kode>, bukan <Kode>554</Kode>.</li>
+                    </ul>
                     <p>
-                        Batasi forwarding hanya ke alamat itu. Kalau perangkat Anda tidak menyediakan
-                        pilihan tersebut, tetap bisa jalan — tapi wajib memakai sandi kamera yang kuat
-                        dan port luar yang tidak umum seperti <Kode>8554</Kode>, bukan <Kode>554</Kode>.
+                        Router Anda mungkin juga bisa membatasi akses hanya ke alamat server kami,
+                        sehingga port itu tertutup bagi siapa pun selain kami. Itu cara paling aman —{' '}
+                        <a
+                            href="https://wa.me/6289685645956?text=Halo%2C%20saya%20mau%20membatasi%20forwarding%20kamera%20ke%20alamat%20server%20RAF."
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-primary underline"
+                        >
+                            hubungi kami
+                        </a>{' '}
+                        dan kami bantu menyiapkannya.
                     </p>
                 </div>
             </section>
@@ -172,7 +161,6 @@ export default function MyPanduan() {
 add chain=dstnat action=dst-nat \\
     protocol=tcp dst-port=8554 \\
     in-interface=ether1-WAN \\
-    src-address=${ipTampil} \\
     to-addresses=192.168.1.50 to-ports=554 \\
     comment="RTSP kamera ke server RAF"`}
                     </pre>
@@ -185,7 +173,6 @@ add chain=dstnat action=dst-nat \\
                     <p className="font-mono text-xs text-content">IP → Firewall → tab NAT → tombol +</p>
                     <ul className="flex list-disc flex-col gap-2 pl-5">
                         <li>Tab <b className="text-content">General</b>: Chain <Kode>dstnat</Kode>, Protocol <Kode>tcp</Kode>, Dst. Port <Kode>8554</Kode>, In. Interface = WAN Anda</li>
-                        <li>Masih di General: Src. Address <Kode>{ipTampil}</Kode></li>
                         <li>Tab <b className="text-content">Action</b>: Action <Kode>dst-nat</Kode>, To Addresses <Kode>192.168.1.50</Kode>, To Ports <Kode>554</Kode></li>
                     </ul>
                     <p className="text-xs text-content-subtle">
@@ -227,7 +214,7 @@ add chain=dstnat action=dst-nat \\
                     <div className="overflow-x-auto [contain:paint] rounded-control border border-edge">
                         <table className="w-full min-w-[440px] text-sm">
                             <tbody className="divide-y divide-edge">
-                                {isian(ipTampil).map(([k, v]) => (
+                                {ISIAN.map(([k, v]) => (
                                     <tr key={k}>
                                         <td className="px-3 py-2 text-content-muted">{k}</td>
                                         <td className="px-3 py-2 font-mono text-xs text-content">{v}</td>
