@@ -9,12 +9,21 @@
  * The server decides, not this page: every request carries scope=owner and the backend re-checks
  * that the caller owns the camera, that it is a rental camera, and that billing is active. This
  * page only asks — it cannot grant itself anything by passing a different id.
+ *
+ * WHY IT ASKS FOR A SLICE
+ * `owner_full` reaches the Telegram archive as well as the disk, so an unscoped request is the
+ * camera's ENTIRE history — ~1,400 segments / ~240 KB on production — rendered as one list. The
+ * page asks for a range instead, and shows the whole span as a coverage strip so narrowing the
+ * list can never hide a day that has no footage. Same split as the staff playback page.
  */
 
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import customerService from '../../services/customerService';
 import { getSegments, getSegmentStreamUrl } from '../../services/recordingService';
+import PlaybackCoverageStrip from '../../components/playback/PlaybackCoverageStrip';
+import PlaybackRangePicker from '../../components/playback/PlaybackRangePicker';
+import { rollingRange } from '../../utils/playbackDayRange';
 
 const SCOPE = 'owner_full';
 
@@ -35,6 +44,8 @@ export default function MyRecordings() {
     const [cameras, setCameras] = useState([]);
     const [aktif, setAktif] = useState(null);
     const [segments, setSegments] = useState([]);
+    const [coverage, setCoverage] = useState(null);
+    const [rentang, setRentang] = useState(() => rollingRange());
     const [diputar, setDiputar] = useState(null);
     const [loading, setLoading] = useState(true);
     const [memuatSegmen, setMemuatSegmen] = useState(false);
@@ -55,23 +66,33 @@ export default function MyRecordings() {
             .finally(() => setLoading(false));
     }, []);
 
-    const muatSegmen = useCallback(async (cameraId) => {
+    const muatSegmen = useCallback(async (cameraId, slice) => {
         if (!cameraId) return;
         setMemuatSegmen(true);
         setDiputar(null);
         setPesan(null);
         try {
-            const res = await getSegments(cameraId, undefined, {}, SCOPE);
-            // The endpoint answers { data: { segments, total_segments, playback_policy } } — not a
-            // bare array. Assuming the array crashed this page on first render, which is exactly
-            // what a browser walk catches and a passing unit suite does not.
+            const res = await getSegments(cameraId, undefined, {}, SCOPE, slice);
+            // The endpoint answers { data: { segments, total_segments, coverage, playback_policy } }
+            // — not a bare array. Assuming the array crashed this page on first render, which is
+            // exactly what a browser walk catches and a passing unit suite does not.
             const daftar = res?.data?.segments ?? [];
+            const peta = res?.data?.coverage ?? null;
             setSegments(daftar);
+            setCoverage(peta);
             if (daftar.length === 0) {
-                setPesan({ tipe: 'info', teks: 'Belum ada rekaman tersimpan untuk kamera ini.' });
+                /*
+                 * "Belum ada rekaman" and "none in the range you picked" are different facts, and
+                 * saying the first when the second is true would tell an owner their footage does
+                 * not exist. The coverage map is what tells them apart.
+                 */
+                setPesan(peta?.runs?.length
+                    ? { tipe: 'info', teks: 'Tidak ada rekaman pada rentang ini. Pilih tanggal lain, atau klik bagian hijau pada peta di atas.' }
+                    : { tipe: 'info', teks: 'Belum ada rekaman tersimpan untuk kamera ini.' });
             }
         } catch (err) {
             setSegments([]);
+            setCoverage(null);
             const status = err?.response?.status;
             setPesan({
                 tipe: 'error',
@@ -84,7 +105,11 @@ export default function MyRecordings() {
         }
     }, []);
 
-    useEffect(() => { muatSegmen(aktif); }, [aktif, muatSegmen]);
+    useEffect(() => { muatSegmen(aktif, rentang); }, [aktif, rentang, muatSegmen]);
+
+    // The picker hands back null for its rolling preset; rebuild it so the window is measured from
+    // now rather than from whenever the page happened to load.
+    const gantiRentang = useCallback((next) => setRentang(next || rollingRange()), []);
 
     const muatTautan = useCallback(() => {
         customerService.getPlaybackTokens()
@@ -246,6 +271,19 @@ export default function MyRecordings() {
                     <span className="text-xs text-content-muted">
                         {memuatSegmen ? 'Memuat…' : `${segments.length} potongan`}
                     </span>
+                </div>
+
+                {/*
+                  * The strip speaks for the days the list is NOT showing, so it is never filtered by
+                  * the picker beside it — that is the whole reason narrowing the list is safe.
+                  */}
+                <div className="border-b border-edge px-4 pt-4">
+                    <PlaybackCoverageStrip
+                        coverage={coverage}
+                        range={rentang}
+                        onRangeChange={gantiRentang}
+                    />
+                    <PlaybackRangePicker range={rentang} onRangeChange={gantiRentang} />
                 </div>
                 <ul className="divide-y divide-edge">
                     {segments.map((s) => (
