@@ -22,6 +22,7 @@ import GlobalAdScript from '../components/ads/GlobalAdScript';
 import InlineAdSlot from '../components/ads/InlineAdSlot';
 import { isAdsMobileViewport, shouldRenderAdSlot } from '../components/ads/adsConfig.js';
 import { getStreamCapabilities } from '../utils/cameraDelivery.js';
+import { toggleElementFullscreen } from '../utils/fullscreen.js';
 import { isAdminPlaybackScope, PLAYBACK_ACCESS_SCOPES, resolveViewerTrackingScope } from '../utils/playbackAccessPolicy.js';
 
 import PlaybackHeader from '../components/playback/PlaybackHeader';
@@ -176,6 +177,7 @@ function Playback({
         seekTargetSeconds,
         playbackPolicy,
         playbackDeniedMessage,
+        dayScope,
         reload: reloadSegments,
     } = usePlaybackSegments({
         cameraId: selectedCameraId,
@@ -933,13 +935,13 @@ function Playback({
         }
     };
 
-    const formatTimestamp = (timestamp) => {
+    const formatTimestamp = useCallback((timestamp) => {
         return formatTime(timestamp, {
             hour: '2-digit',
             minute: '2-digit',
             second: '2-digit'
         });
-    };
+    }, [formatTime]);
 
     useEffect(() => {
         const handleFullscreenChange = () => {
@@ -949,17 +951,7 @@ function Playback({
         return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
     }, []);
 
-    const toggleFullscreen = async () => {
-        try {
-            if (!document.fullscreenElement) {
-                await containerRef.current?.requestFullscreen?.();
-            } else {
-                await document.exitFullscreen?.();
-            }
-        } catch (err) {
-            console.error('Fullscreen error:', err);
-        }
-    };
+    const toggleFullscreen = () => toggleElementFullscreen(containerRef.current);
 
     const handleTimelineClick = (targetTime) => {
         if (!videoRef.current) return;
@@ -1123,7 +1115,7 @@ function Playback({
 
                 <PlaybackSegmentStepper segments={segments} selectedSegment={selectedSegment} onSegmentClick={handleSegmentClick} />
 
-                <PlaybackTimeline segments={segments} selectedSegment={selectedSegment} currentTime={currentTime} onSegmentClick={handleSegmentClick} onTimelineClick={handleTimelineClick} formatTimestamp={formatTimestamp} />
+                <PlaybackTimeline segments={segments} selectedSegment={selectedSegment} currentTime={currentTime} onSegmentClick={handleSegmentClick} onTimelineClick={handleTimelineClick} formatTimestamp={formatTimestamp} dayScope={dayScope} />
 
                 <PlaybackSegmentList segments={segments} selectedSegment={selectedSegment} onSegmentClick={handleSegmentClick} isLoading={isWaitingForSegments} />
 

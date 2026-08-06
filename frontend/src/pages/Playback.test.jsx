@@ -356,7 +356,7 @@ describe('Playback', () => {
             expect(activateTokenMock).toHaveBeenCalledWith('SANDI1234', null, expect.any(String));
         });
         await waitFor(() => {
-            expect(getSegments).toHaveBeenCalledWith(2, 'blocking', {}, 'public_preview');
+            expect(getSegments).toHaveBeenCalledWith(2, 'blocking', {}, 'public_preview', expect.objectContaining({ key: 'rolling:24' }));
         });
         await waitFor(() => {
             expect(screen.getByTestId('location-search').textContent).toContain('cam=2');
@@ -394,7 +394,7 @@ describe('Playback', () => {
             expect(activateShareKeyMock).toHaveBeenCalledWith('SANDI1234', null, expect.any(String));
         });
         await waitFor(() => {
-            expect(getSegments).toHaveBeenCalledWith(2, 'blocking', {}, 'public_preview');
+            expect(getSegments).toHaveBeenCalledWith(2, 'blocking', {}, 'public_preview', expect.objectContaining({ key: 'rolling:24' }));
         });
         await waitFor(() => {
             expect(screen.getByTestId('location-search').textContent).toContain('cam=2');
@@ -956,7 +956,7 @@ describe('Playback', () => {
             expect(screen.getByTestId('video-segment').textContent).toBe('gate-2');
         });
 
-        expect(getSegments).toHaveBeenCalledWith(2, 'blocking', {}, 'public_preview');
+        expect(getSegments).toHaveBeenCalledWith(2, 'blocking', {}, 'public_preview', expect.objectContaining({ key: 'rolling:24' }));
     });
 
     it('mengabaikan respons segmen lama yang datang terlambat setelah user pindah kamera', async () => {

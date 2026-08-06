@@ -1,0 +1,74 @@
+/**
+ * Purpose: Turn a caller's requested time range into bounds the segment listing can trust, and
+ *          intersect it with whatever depth that caller is actually entitled to.
+ * Caller: recordingPlaybackService, recordingCoverageRunsService.
+ * Deps: none — pure.
+ * MainFuncs: parsePlaybackRange, intersectWithAccessWindow, isWithinRange.
+ * SideEffects: none.
+ *
+ * WHY A RANGE EXISTS AT ALL
+ * An unscoped listing hands the browser every segment the caller may see. On production that was
+ * ~1,065 rows / 239 KB per camera, refetched every 10 seconds by the page's background poll, and
+ * rendered as ~9,000 DOM nodes. The footage is worth keeping reachable; sending all of it at once,
+ * every ten seconds, is not.
+ *
+ * THE BOUNDS ARE ISO-8601 UTC STRINGS, AND THAT IS DELIBERATE
+ * `recording_segments.start_time` and `telegram_archive_uploads.recorded_at` are both stored in one
+ * fixed ISO-8601 UTC format, so a plain string comparison is chronological. The CALLER converts the
+ * operator's local day into those bounds — doing it here would silently adopt the server's timezone,
+ * and the server is not where the operator is standing.
+ */
+
+/** Reject anything that is not a parseable instant, so a typo narrows nothing instead of everything. */
+function toIso(value) {
+    if (value === undefined || value === null || value === '') return null;
+    const parsed = Date.parse(String(value));
+    return Number.isFinite(parsed) ? new Date(parsed).toISOString() : null;
+}
+
+/**
+ * @param {object} query request query string params
+ * @returns {{from: string|null, to: string|null}|null} null when the caller asked for no narrowing
+ */
+export function parsePlaybackRange(query = {}) {
+    const from = toIso(query?.from);
+    const to = toIso(query?.to);
+    if (!from && !to) return null;
+
+    // A reversed pair is a mistake, not a request for an empty result: honour the wider reading
+    // rather than answering "no footage" for a range that does contain some.
+    if (from && to && from > to) return { from: to, to: from };
+    return { from, to };
+}
+
+/**
+ * Narrow a requested range by the caller's entitlement.
+ *
+ * A token sold with 7 days of depth may ask for a day three weeks back; it must not receive it just
+ * because it named the date. The window is the ceiling, the request only ever tightens it.
+ */
+export function intersectWithAccessWindow(range, { playbackWindowHours = null, now = Date.now() } = {}) {
+    const windowFrom = playbackWindowHours
+        ? new Date(now - playbackWindowHours * 60 * 60 * 1000).toISOString()
+        : null;
+
+    if (!range) return windowFrom ? { from: windowFrom, to: null } : null;
+    if (!windowFrom) return range;
+
+    return {
+        from: range.from && range.from > windowFrom ? range.from : windowFrom,
+        to: range.to,
+    };
+}
+
+/** @param {{start_time: string}} segment */
+export function isWithinRange(segment, range) {
+    if (!range) return true;
+    const at = segment?.start_time;
+    if (!at) return false;
+    if (range.from && at < range.from) return false;
+    if (range.to && at > range.to) return false;
+    return true;
+}
+
+export default { parsePlaybackRange, intersectWithAccessWindow, isWithinRange };

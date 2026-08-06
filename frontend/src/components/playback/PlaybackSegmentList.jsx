@@ -4,37 +4,97 @@
  * Deps: Caller-provided segment array and selection handler; Intl date/time formatting.
  * MainFuncs: PlaybackSegmentList.
  * SideEffects: Invokes the caller-provided segment click handler.
+ *
+ * WHY THE MEMOISATION IS LOAD-BEARING
+ * The page re-renders on every `timeupdate` — about four times a second while a segment plays. This
+ * list depends on none of that, but it used to re-sort the whole array (≈21,000 `new Date()`
+ * allocations at admin scope) and rebuild every row on each of those renders. `toLocaleDateString`
+ * and `toLocaleTimeString` each construct a fresh `Intl.DateTimeFormat` internally, so ~1,065 rows
+ * cost ~3,200 formatter constructions per render. Both formatters are now built once at module
+ * scope, the sort is memoised on `segments`, and each row is behind `memo` so changing the
+ * selection repaints two rows instead of the whole list.
  */
 
-export default function PlaybackSegmentList({
+import { memo, useMemo } from 'react';
+
+const DATE_FORMAT = new Intl.DateTimeFormat('id-ID', {
+    weekday: 'short',
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+});
+
+const TIME_FORMAT = new Intl.DateTimeFormat('id-ID', {
+    hour: '2-digit',
+    minute: '2-digit',
+});
+
+const SIZE_UNITS = ['B', 'KB', 'MB', 'GB'];
+
+function formatFileSize(bytes) {
+    if (!bytes) return '0 B';
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    return `${Math.round((bytes / 1024 ** i) * 100) / 100} ${SIZE_UNITS[i]}`;
+}
+
+const SegmentRow = memo(function SegmentRow({ segment, isSelected, onSegmentClick }) {
+    const isLikelyCompatible = segment.duration >= 60;
+
+    return (
+        <button
+            onClick={() => onSegmentClick(segment)}
+            aria-current={isSelected ? 'true' : undefined}
+            /*
+             * Rows were `border-2` boxes with their own icon tile, which made a
+             * long scrolling list read as a stack of cards. A shared divider plus
+             * a left accent on the active row keeps the eye on the content.
+             */
+            className={`w-full border-l-2 py-2.5 pl-3 pr-2 text-left transition-colors sm:py-3 ${isSelected
+                ? 'border-l-primary bg-primary/5'
+                : 'border-l-transparent hover:bg-surface-raised'
+                }`}
+        >
+            <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <span className="truncate text-sm font-medium text-content">
+                            {DATE_FORMAT.format(new Date(segment.start_time))}
+                        </span>
+                        <span className="text-xs tabular-nums text-content-muted sm:text-sm">
+                            {TIME_FORMAT.format(new Date(segment.start_time))} - {TIME_FORMAT.format(new Date(segment.end_time))}
+                        </span>
+                        {!isLikelyCompatible && (
+                            <span className="shrink-0 text-xs font-medium text-status-warn">
+                                Mungkin tak bisa diputar
+                            </span>
+                        )}
+                    </div>
+                    <div className="truncate text-xs tabular-nums text-content-subtle sm:text-sm">
+                        Durasi: {Math.round(segment.duration / 60)} menit • Ukuran: {formatFileSize(segment.file_size)}
+                    </div>
+                </div>
+
+                {isSelected && (
+                    <span className="flex shrink-0 items-center gap-1.5 text-xs font-medium text-primary sm:gap-2 sm:text-sm">
+                        <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden="true"></span>
+                        <span className="hidden sm:inline">Diputar</span>
+                    </span>
+                )}
+            </div>
+        </button>
+    );
+});
+
+function PlaybackSegmentList({
     segments,
     selectedSegment,
     onSegmentClick,
     isLoading = false,
 }) {
-    const formatFileSize = (bytes) => {
-        if (bytes === 0) return '0 B';
-        const k = 1024;
-        const sizes = ['B', 'KB', 'MB', 'GB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
-    };
-
-    const formatSegmentDate = (timestamp) => {
-        return new Date(timestamp).toLocaleDateString('id-ID', {
-            weekday: 'short',
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric'
-        });
-    };
-
-    const formatSegmentTime = (timestamp) => {
-        return new Date(timestamp).toLocaleTimeString('id-ID', {
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-    };
+    const newestFirst = useMemo(
+        () => [...segments].sort((a, b) => new Date(b.start_time) - new Date(a.start_time)),
+        [segments],
+    );
 
     return (
         <div className="rounded-card border border-edge bg-surface p-3 sm:p-4 md:p-6">
@@ -52,59 +112,16 @@ export default function PlaybackSegmentList({
                     <div className="mx-auto mb-3 h-10 w-10 animate-spin rounded-full border-4 border-edge border-t-primary sm:mb-4" />
                     <p className="text-sm sm:text-base">Memuat daftar rekaman...</p>
                 </div>
-            ) : segments.length > 0 ? (
+            ) : newestFirst.length > 0 ? (
                 <div className="max-h-64 divide-y divide-edge overflow-y-auto sm:max-h-80 md:max-h-96">
-                    {[...segments].sort((a, b) =>
-                        new Date(b.start_time) - new Date(a.start_time)
-                    ).map((segment, idx) => {
-                        const isLikelyCompatible = segment.duration >= 60;
-                        const isSelected = selectedSegment?.id === segment.id;
-
-                        return (
-                            <button
-                                key={segment.id ?? `segment-${idx}`}
-                                onClick={() => onSegmentClick(segment)}
-                                aria-current={isSelected ? 'true' : undefined}
-                                /*
-                                 * Rows were `border-2` boxes with their own icon tile, which made a
-                                 * long scrolling list read as a stack of cards. A shared divider plus
-                                 * a left accent on the active row keeps the eye on the content.
-                                 */
-                                className={`w-full border-l-2 py-2.5 pl-3 pr-2 text-left transition-colors sm:py-3 ${isSelected
-                                    ? 'border-l-primary bg-primary/5'
-                                    : 'border-l-transparent hover:bg-surface-raised'
-                                    }`}
-                            >
-                                <div className="flex items-center justify-between gap-2">
-                                    <div className="min-w-0 flex-1">
-                                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                                            <span className="truncate text-sm font-medium text-content">
-                                                {formatSegmentDate(segment.start_time)}
-                                            </span>
-                                            <span className="text-xs tabular-nums text-content-muted sm:text-sm">
-                                                {formatSegmentTime(segment.start_time)} - {formatSegmentTime(segment.end_time)}
-                                            </span>
-                                            {!isLikelyCompatible && (
-                                                <span className="shrink-0 text-xs font-medium text-status-warn">
-                                                    Mungkin tak bisa diputar
-                                                </span>
-                                            )}
-                                        </div>
-                                        <div className="truncate text-xs tabular-nums text-content-subtle sm:text-sm">
-                                            Durasi: {Math.round(segment.duration / 60)} menit • Ukuran: {formatFileSize(segment.file_size)}
-                                        </div>
-                                    </div>
-
-                                    {isSelected && (
-                                        <span className="flex shrink-0 items-center gap-1.5 text-xs font-medium text-primary sm:gap-2 sm:text-sm">
-                                            <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden="true"></span>
-                                            <span className="hidden sm:inline">Diputar</span>
-                                        </span>
-                                    )}
-                                </div>
-                            </button>
-                        );
-                    })}
+                    {newestFirst.map((segment, idx) => (
+                        <SegmentRow
+                            key={segment.id ?? `segment-${idx}`}
+                            segment={segment}
+                            isSelected={selectedSegment?.id === segment.id}
+                            onSegmentClick={onSegmentClick}
+                        />
+                    ))}
                 </div>
             ) : (
                 <div className="py-8 text-center text-content-muted sm:py-12">
@@ -118,3 +135,5 @@ export default function PlaybackSegmentList({
         </div>
     );
 }
+
+export default memo(PlaybackSegmentList);

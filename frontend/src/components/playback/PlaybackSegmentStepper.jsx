@@ -15,7 +15,13 @@
  * "Sebelumnya" means EARLIER IN TIME, matching the recording the viewer is watching rather than the
  * order of the list above it. The list is sorted newest-first, so earlier is a HIGHER index there —
  * hence the sort here is its own, and deliberately not shared.
+ *
+ * Memoised for the same reason as its neighbours: the page re-renders about four times a second
+ * while a segment plays, and this component's own sort over ~1,065 segments has nothing to do with
+ * the clock.
  */
+
+import { memo, useMemo } from 'react';
 
 const formatRange = (segment) => {
     const time = (value) => new Date(value).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
@@ -45,17 +51,22 @@ function StepButton({ label, hint, disabled, onClick, children }) {
     );
 }
 
-export default function PlaybackSegmentStepper({
+function PlaybackSegmentStepper({
     segments = [],
     selectedSegment,
     onSegmentClick,
 }) {
+    // Oldest first, so "previous" is simply one step back. Before the early return: every hook has
+    // to run on every render (React error #310).
+    const ordered = useMemo(
+        () => [...segments].sort((a, b) => new Date(a.start_time) - new Date(b.start_time)),
+        [segments],
+    );
+
     if (!segments.length) {
         return null;
     }
 
-    // Oldest first, so "previous" is simply one step back.
-    const ordered = [...segments].sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
     const current = ordered.findIndex((segment) => segment.id === selectedSegment?.id);
     const older = current > 0 ? ordered[current - 1] : null;
     const newer = current >= 0 && current < ordered.length - 1 ? ordered[current + 1] : null;
@@ -103,3 +114,5 @@ export default function PlaybackSegmentStepper({
         </div>
     );
 }
+
+export default memo(PlaybackSegmentStepper);

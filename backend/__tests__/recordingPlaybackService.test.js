@@ -314,6 +314,43 @@ describe('recordingPlaybackService', () => {
         expect(result.segments).toHaveLength(2);
     });
 
+    /*
+     * The list is what the page ships and re-ships every ten seconds; the coverage bar is what
+     * keeps it honest about everything outside the day on screen. Narrowing the first must never
+     * narrow the second, or a missing day becomes invisible the moment a date is picked.
+     */
+    it('narrows the LIST to the requested day while coverage still spans both days', () => {
+        queryOneMock.mockReturnValueOnce({
+            id: 10,
+            name: 'CCTV ALUN',
+            public_playback_mode: 'admin_only',
+            public_playback_preview_minutes: null,
+        });
+        // findPlaybackSegments, then archive, then the two coverage reads.
+        queryMock
+            .mockReturnValueOnce([
+                { id: 1, filename: 'first.mp4', start_time: '2026-03-19T10:00:00.000Z', end_time: '2026-03-19T10:10:00.000Z', duration: 600, file_path: 'a', file_size: 100, created_at: '2026-03-19T10:00:00.000Z' },
+                { id: 2, filename: 'second.mp4', start_time: '2026-03-20T10:10:00.000Z', end_time: '2026-03-20T10:20:00.000Z', duration: 600, file_path: 'b', file_size: 100, created_at: '2026-03-20T10:10:00.000Z' },
+            ])
+            .mockReturnValueOnce([])
+            .mockReturnValueOnce([
+                { from_at: '2026-03-19T10:00:00.000Z', to_at: '2026-03-19T10:10:00.000Z', duration: 600 },
+                { from_at: '2026-03-20T10:10:00.000Z', to_at: '2026-03-20T10:20:00.000Z', duration: 600 },
+            ])
+            .mockReturnValueOnce([]);
+
+        const result = recordingPlaybackService.getSegments(10, {
+            query: { scope: 'admin', from: '2026-03-20T00:00:00.000Z', to: '2026-03-20T23:59:59.999Z' },
+            user: { id: 1, role: 'admin' },
+        });
+
+        expect(result.segments.map((segment) => segment.id)).toEqual([2]);
+        expect(result.total_segments).toBe(1);
+        expect(result.coverage.start).toBe('2026-03-19T10:00:00.000Z');
+        expect(result.coverage.end).toBe('2026-03-20T10:20:00.000Z');
+        expect(result.coverage.runs).toHaveLength(2);
+    });
+
     it('rejects admin playback scope for authenticated non-staff (customer) users', () => {
         queryOneMock.mockReturnValueOnce({
             id: 10,

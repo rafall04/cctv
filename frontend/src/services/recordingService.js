@@ -101,10 +101,23 @@ export const getRecordingAssurance = async (policy = REQUEST_POLICY.BLOCKING, co
 
 /**
  * Get segments untuk camera (untuk playback)
+ *
+ * `range` ({from, to} as ISO UTC, either side optional) narrows the LIST only — the response's
+ * `coverage` still describes the whole reachable span. Without it an admin scope shipped every
+ * segment it could reach: ~1,065 rows / 239 KB per camera on production, re-fetched every ten
+ * seconds by the background poll below. The bounds are built from the operator's LOCAL day by the
+ * caller, because the server has no way to know which day they mean.
  */
-export const getSegments = async (cameraId, policy = REQUEST_POLICY.BLOCKING, config = {}, accessScope = 'public') => {
+export const getSegments = async (
+    cameraId, policy = REQUEST_POLICY.BLOCKING, config = {}, accessScope = 'public', range = null,
+) => {
+    const params = new URLSearchParams(buildPlaybackQuery(accessScope).replace(/^\?/, ''));
+    if (range?.from) params.set('from', range.from);
+    if (range?.to) params.set('to', range.to);
+    const search = params.toString();
+
     const response = await apiClient.get(
-        `/api/recordings/${cameraId}/segments${buildPlaybackQuery(accessScope)}`,
+        `/api/recordings/${cameraId}/segments${search ? `?${search}` : ''}`,
         getRequestPolicyConfig(policy, config)
     );
     return response.data;

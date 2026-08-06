@@ -19,7 +19,17 @@ import { isSafeRecordingFilePath } from './recordingPathSafetyPolicy.js';
 import { RECORDINGS_BASE_PATH } from './recordingPaths.js';
 import archivedSegmentSourceService from './archivedSegmentSourceService.js';
 import { resolveOwnerScopeAccess, resolveOwnerIssuedTokenAccess } from './rentalPlaybackAccessPolicy.js';
+import recordingCoverageRunsService from './recordingCoverageRunsService.js';
+import { intersectWithAccessWindow, isWithinRange, parsePlaybackRange } from './playbackRangePolicy.js';
+import { noteTokenRefusal } from './playbackTokenRefusalLog.js';
 
+/**
+ * Scopes that reach past the public preview: they may name a date range, they get archived segments
+ * merged in, and they are shown the whole-span coverage map. Kept as one set because these three
+ * decisions must never drift apart — a scope that can browse days but gets no coverage map would be
+ * narrowed with nothing left to say which days are missing.
+ */
+const DEEP_PLAYBACK_MODES = new Set(['admin_full', 'owner_full', 'token_full']);
 const PUBLIC_PLAYBACK_MODES = new Set(['inherit', 'disabled', 'preview_only', 'admin_only']);
 const VALID_PREVIEW_MINUTES = new Set([0, 10, 20, 30, 60]);
 const RECORDABLE_DELIVERY_TYPES = new Set(['internal_hls', 'external_hls']);
@@ -77,35 +87,6 @@ function assertRecordingSettingsAllowed(camera, data) {
             throw err;
         }
     }
-}
-
-/*
- * Purpose: Report a refused playback token once, not once per request.
- * Keyed by camera + reason: a visitor changing cameras with one dead cookie is ONE fact, and
- * repeating it every few seconds would bury it in the same way silence did.
- */
-const TOKEN_REFUSAL_WINDOW_MS = 5 * 60 * 1000;
-const tokenRefusalSeen = new Map();
-
-function noteTokenRefusal(cameraId, statusCode, message) {
-    const key = `${cameraId}:${statusCode}:${message || ''}`;
-    const now = Date.now();
-    const last = tokenRefusalSeen.get(key);
-    if (last && now - last < TOKEN_REFUSAL_WINDOW_MS) {
-        return;
-    }
-
-    tokenRefusalSeen.set(key, now);
-    // Keep the map from growing without bound on a long-lived process.
-    if (tokenRefusalSeen.size > 500) {
-        for (const [k, seen] of tokenRefusalSeen) {
-            if (now - seen >= TOKEN_REFUSAL_WINDOW_MS) {
-                tokenRefusalSeen.delete(k);
-            }
-        }
-    }
-
-    console.log(`[playback] token refused for camera ${cameraId} (${statusCode}): ${message || 'no reason given'} — serving public preview instead`);
 }
 
 class RecordingPlaybackService {
@@ -486,23 +467,31 @@ class RecordingPlaybackService {
         return { camera, access };
     }
 
-    getAccessibleSegments(cameraId, request) {
+    /**
+     * @param {{from: string|null, to: string|null}|null} [range] the slice the caller asked to see,
+     *   already intersected with its entitlement. Null means "everything you may reach".
+     */
+    getAccessibleSegments(cameraId, request, requestedRange = null) {
         const { camera, access } = this.resolvePlaybackContext(cameraId, request);
+        /*
+         * A public preview is defined by its own minute limit, never by dates. Honouring a range
+         * there could answer with an EMPTY preview for a camera that simply has not recorded today.
+         */
+        const range = DEEP_PLAYBACK_MODES.has(access.accessMode) ? requestedRange : null;
         const previewLimit = getPreviewSegmentLimit(access.previewMinutes);
         // owner_full sees the same full history as staff — for their own camera only.
-        const queryOptions = access.accessMode === 'admin_full' || access.accessMode === 'owner_full'
+        const queryOptions = DEEP_PLAYBACK_MODES.has(access.accessMode)
             ? { cameraId, order: 'oldest', limit: 1000, returnAscending: true }
-            : access.accessMode === 'token_full'
-                ? { cameraId, order: 'oldest', limit: 1000, returnAscending: true }
-                : { cameraId, order: 'latest', limit: previewLimit, returnAscending: true };
+            : { cameraId, order: 'latest', limit: previewLimit, returnAscending: true };
         const segmentsAscending = this.applyPlaybackWindow(
             this.mergeArchivedSegments(
                 recordingSegmentRepository.findPlaybackSegments(queryOptions),
                 cameraId,
-                access
+                access,
+                range
             ),
             access
-        );
+        ).filter((segment) => isWithinRange(segment, range));
 
         /*
          * An empty result is NOT a missing resource. A camera that simply has not recorded
@@ -548,15 +537,14 @@ class RecordingPlaybackService {
      * Local rows WIN on a tie. A recent segment exists in both places, and the on-disk copy streams
      * instantly while the archived one costs a re-download from Telegram — same footage, worse trip.
      */
-    mergeArchivedSegments(localSegments, cameraId, access) {
-        if (!['token_full', 'admin_full', 'owner_full'].includes(access?.accessMode)) {
+    mergeArchivedSegments(localSegments, cameraId, access, range = null) {
+        if (!DEEP_PLAYBACK_MODES.has(access?.accessMode)) {
             return localSegments;
         }
 
-        const sinceMs = access.playbackWindowHours
-            ? Date.now() - access.playbackWindowHours * 60 * 60 * 1000
-            : null;
-        const archived = archivedSegmentSourceService.listArchivedSegments(cameraId, { sinceMs });
+        const archived = archivedSegmentSourceService.listArchivedSegments(cameraId, {
+            range: intersectWithAccessWindow(range, access),
+        });
         if (archived.length === 0) {
             return localSegments;
         }
@@ -576,14 +564,28 @@ class RecordingPlaybackService {
         return segments.filter((segment) => new Date(segment.start_time).getTime() >= cutoffMs);
     }
 
+    /**
+     * `from`/`to` in the query narrow the LIST only. `coverage` deliberately ignores them and
+     * describes the whole reachable span: a bar that only ever draws the day already on screen
+     * cannot show that another day is missing, which is the one thing the bar is for.
+     *
+     * Only for scopes that can actually reach that depth. Handing a public preview a map of ten
+     * days it may not watch would both mislead the visitor and publish our retention.
+     */
     getSegments(cameraId, request) {
-        const { camera, access, segmentsAscending, segmentsDescending } = this.getAccessibleSegments(cameraId, request);
+        const { camera, access, segmentsAscending, segmentsDescending } = this.getAccessibleSegments(
+            cameraId, request, parsePlaybackRange(request?.query),
+        );
+        const canBrowseDepth = DEEP_PLAYBACK_MODES.has(access.accessMode);
 
         return {
             camera_id: camera.id,
             camera_name: camera.name,
             segments: segmentsDescending.map(toPublicSegment),
             total_segments: segmentsDescending.length,
+            coverage: canBrowseDepth
+                ? recordingCoverageRunsService.getCoverage(camera.id, intersectWithAccessWindow(null, access))
+                : null,
             playback_policy: this.buildPlaybackPolicy(access, camera, segmentsAscending),
         };
     }

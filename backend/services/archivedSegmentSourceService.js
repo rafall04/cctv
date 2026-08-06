@@ -22,37 +22,55 @@ import { query } from '../database/connectionPool.js';
 
 class ArchivedSegmentSourceService {
     /**
-     * Archived segments for one camera, newest-relevant first is NOT assumed — the caller sorts.
-     * `sinceMs` lets the caller skip rows it will discard anyway; the playback window is still
-     * applied by the caller so this stays a pure source, not a second policy.
+     * Archived segments for one camera, returned oldest-first — the caller merges and re-sorts.
+     * `range` is ISO-8601 UTC bounds ({from, to}, either side optional): the caller's entitlement
+     * already intersected with whatever day it is showing, so the query reads only what will be
+     * rendered. The playback window is still re-applied by the caller, so this stays a pure source
+     * rather than a second copy of the policy.
+     *
+     * The LIMIT is taken off the NEWEST end. It used to order ASC and cut there, which quietly kept
+     * the OLDEST `limit` rows: on production each camera had ~1,400 archived segments, so 334-431 of
+     * the most recent ones were dropped — precisely the stretch local retention had already pruned
+     * off disk. The playback timeline then drew a 42-63 hour band of red "Hilang" over footage that
+     * was sitting in the archive the whole time. An archive is read from the recent end; a cap that
+     * discards the newest rows is never the one an operator wants.
      */
-    listArchivedSegments(cameraId, { sinceMs = null, limit = 1000 } = {}) {
+    listArchivedSegments(cameraId, { range = null, limit = 1000 } = {}) {
         const id = Number.parseInt(cameraId, 10);
         if (!Number.isInteger(id) || id <= 0) {
             return [];
         }
 
         const params = [id];
-        let sinceClause = '';
-        if (Number.isFinite(sinceMs)) {
-            sinceClause = 'AND u.recorded_at >= ?';
-            params.push(new Date(sinceMs).toISOString());
+        const bounds = [];
+        if (range?.from) {
+            bounds.push('AND u.recorded_at >= ?');
+            params.push(range.from);
+        }
+        if (range?.to) {
+            bounds.push('AND u.recorded_at <= ?');
+            params.push(range.to);
         }
         params.push(Math.max(1, Math.min(Number(limit) || 1000, 5000)));
 
         try {
-            return query(
+            const rows = query(
                 `SELECT u.segment_id, u.camera_id, u.filename, u.file_size,
                         u.recorded_at, u.recorded_until, u.duration_seconds, u.uploaded_at
                    FROM telegram_archive_uploads u
                   WHERE u.camera_id = ?
                     AND u.status = 'ok'
                     AND u.file_id IS NOT NULL
-                    ${sinceClause}
-                  ORDER BY u.recorded_at ASC
+                    ${bounds.join(' ')}
+                  ORDER BY u.recorded_at DESC
                   LIMIT ?`,
                 params
-            ).map((row) => ({
+            );
+            // Selected newest-first so the cap bites the far end of history; handed back oldest-first
+            // because that is the order the merge and the timeline read in.
+            if (!Array.isArray(rows)) return [];
+            rows.reverse();
+            return rows.map((row) => ({
                 id: row.segment_id,
                 camera_id: row.camera_id,
                 filename: row.filename,
