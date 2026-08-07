@@ -200,7 +200,11 @@ function PlaybackTimeline({
                         range={dayScope.range}
                         onRangeChange={dayScope.setRange}
                     />
-                    <PlaybackRangePicker range={dayScope.range} onRangeChange={dayScope.setRange} />
+                    <PlaybackRangePicker
+                        range={dayScope.range}
+                        onRangeChange={dayScope.setRange}
+                        coverage={dayScope.coverage}
+                    />
                 </>
             )}
 

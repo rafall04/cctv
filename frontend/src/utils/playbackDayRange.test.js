@@ -15,12 +15,59 @@ import {
     DEFAULT_RANGE_HOURS,
     dateInputValue,
     dayKeyOf,
+    daysWithRecordings,
     localDayRange,
     rangeForDateInput,
     rangesEqual,
     rollingRange,
     shiftDay,
 } from './playbackDayRange';
+
+/* Local parts in, wire format out — the same direction the real coverage payload is read. */
+const iso = (year, month, day, hour, minute = 0) => new Date(year, month, day, hour, minute).toISOString();
+
+describe('daysWithRecordings', () => {
+    it('claims every local day a run spans, not just the day it started on', () => {
+        const days = daysWithRecordings([{ from: iso(2026, 7, 1, 9), to: iso(2026, 7, 3, 17) }]);
+        expect([...days].sort()).toEqual(['2026-08-01', '2026-08-02', '2026-08-03']);
+    });
+
+    it('counts a run that crosses local midnight as both days', () => {
+        const days = daysWithRecordings([{ from: iso(2026, 7, 5, 23, 40), to: iso(2026, 7, 6, 0, 20) }]);
+        expect([...days].sort()).toEqual(['2026-08-05', '2026-08-06']);
+    });
+
+    it('leaves the hole between two runs out', () => {
+        const days = daysWithRecordings([
+            { from: iso(2026, 7, 1, 9), to: iso(2026, 7, 1, 17) },
+            { from: iso(2026, 7, 4, 9), to: iso(2026, 7, 4, 17) },
+        ]);
+        expect(days.has('2026-08-02')).toBe(false);
+        expect(days.has('2026-08-03')).toBe(false);
+        expect(days.has('2026-08-04')).toBe(true);
+    });
+
+    it('skips runs it cannot place instead of dotting the epoch', () => {
+        const days = daysWithRecordings([
+            { from: null, to: iso(2026, 7, 6, 9) },
+            { from: 'not-a-date', to: 'nonsense' },
+            { from: iso(2026, 7, 6, 12), to: iso(2026, 7, 6, 9) }, // ends before it starts
+        ]);
+        expect(days.size).toBe(0);
+    });
+
+    it('survives a corrupt span without spinning', () => {
+        // A `from` at the epoch would walk ~20k days; the guard stops it well short.
+        const days = daysWithRecordings([{ from: new Date(0).toISOString(), to: iso(2026, 7, 6, 9) }]);
+        expect(days.size).toBeLessThanOrEqual(3660);
+    });
+
+    it('is empty for anything that is not a list of runs', () => {
+        expect(daysWithRecordings(null).size).toBe(0);
+        expect(daysWithRecordings(undefined).size).toBe(0);
+        expect(daysWithRecordings([]).size).toBe(0);
+    });
+});
 
 describe('rollingRange', () => {
     it('ends open at now and reaches back the asked-for hours', () => {

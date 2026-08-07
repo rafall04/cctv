@@ -283,7 +283,7 @@ export default function MyRecordings() {
                         range={rentang}
                         onRangeChange={gantiRentang}
                     />
-                    <PlaybackRangePicker range={rentang} onRangeChange={gantiRentang} />
+                    <PlaybackRangePicker range={rentang} onRangeChange={gantiRentang} coverage={coverage} />
                 </div>
                 <ul className="divide-y divide-edge">
                     {segments.map((s) => (

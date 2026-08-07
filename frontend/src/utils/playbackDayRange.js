@@ -63,6 +63,48 @@ export function rangeForDateInput(value) {
     return localDayRange(new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
 }
 
+/**
+ * Runaway guard for daysWithRecordings: one corrupt `from` at the epoch would otherwise spin ~20k
+ * times and fill the grid with meaningless dots. Ten years is far past anything we retain.
+ */
+const MAX_RUN_DAYS = 3660;
+
+/**
+ * Every LOCAL day touched by a coverage run, as 'YYYY-MM-DD' keys.
+ *
+ * A run is a span, not a day: one that starts 23:40 and ends 00:20 covers TWO days, and the archive
+ * regularly hands back runs measured in days. Walking the span with setDate keeps that correct
+ * across month ends and DST, which arithmetic on 86_400_000 does not.
+ *
+ * @param {Array<{from: string, to: string}>} runs
+ * @returns {Set<string>}
+ */
+export function daysWithRecordings(runs) {
+    const days = new Set();
+    if (!Array.isArray(runs)) return days;
+
+    for (const run of runs) {
+        /*
+         * Date.parse, NOT new Date(): `new Date(null)` is the epoch rather than Invalid Date, so a
+         * run with a missing bound would sail through and dot every day since 1970.
+         */
+        const fromMs = Date.parse(run?.from);
+        const toMs = Date.parse(run?.to);
+        if (!Number.isFinite(fromMs) || !Number.isFinite(toMs) || toMs < fromMs) continue;
+
+        const from = new Date(fromMs);
+        const to = new Date(toMs);
+
+        const cursor = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+        const last = new Date(to.getFullYear(), to.getMonth(), to.getDate());
+        for (let guard = 0; cursor <= last && guard < MAX_RUN_DAYS; guard += 1) {
+            days.add(dayKeyOf(cursor));
+            cursor.setDate(cursor.getDate() + 1);
+        }
+    }
+    return days;
+}
+
 /** Same slice? Compared by key so a re-created rolling window does not look like a new request. */
 export function rangesEqual(a, b) {
     if (a === b) return true;
