@@ -237,6 +237,78 @@ describe('recordingPlaybackService', () => {
         expect(result.playback_policy).toEqual(expect.objectContaining({ segmentCount: 0 }));
     });
 
+    /*
+     * RETENTION DEPTH IS NOT PUBLIC INFORMATION.
+     *
+     * `coverage` names every day the archive still holds. Anyone who can read it can measure
+     * exactly how long we keep footage, and the frontend draws it as a calendar of pickable days.
+     * That map belongs to staff, the camera's owner and token holders — never to an anonymous
+     * visitor, however much the archive actually contains. Asserted here rather than left to the
+     * DEEP_PLAYBACK_MODES set alone, because adding one mode to that set is a one-line change that
+     * would otherwise publish our retention silently.
+     */
+    describe('coverage is withheld from the public surface', () => {
+        const CAMERA = {
+            id: 9,
+            name: 'CCTV TAMAN',
+            public_playback_mode: 'inherit',
+            public_playback_preview_minutes: null,
+        };
+        const SEGMENT = {
+            id: 2, filename: 'a.mp4',
+            start_time: '2026-03-20T10:10:00.000Z', end_time: '2026-03-20T10:20:00.000Z',
+            duration: 600, file_path: 'b', file_size: 100, created_at: '2026-03-20T10:10:00.000Z',
+        };
+        const RUN_ROW = { from_at: '2026-03-20T10:10:00.000Z', to_at: '2026-03-20T10:20:00.000Z', duration: 600 };
+
+        /*
+         * Answer by SQL rather than by call order: the listing and the two coverage reads are three
+         * separate queries whose order is an implementation detail, and a positional mock silently
+         * returns the wrong shape the moment that order changes.
+         */
+        const answerBySql = () => queryMock.mockImplementation((sql) => {
+            if (sql.includes('telegram_archive_uploads')) return [];
+            if (sql.includes('AS from_at')) return [RUN_ROW];
+            return [SEGMENT];
+        });
+
+        it('gives an anonymous visitor segments but no coverage map', () => {
+            queryOneMock.mockReturnValueOnce(CAMERA).mockReturnValueOnce({ value: '628111111111' });
+            // Coverage rows ARE available here; the scope, not the data, is what withholds them.
+            answerBySql();
+
+            const result = recordingPlaybackService.getSegments(9, { query: {} });
+
+            expect(result.playback_policy.accessMode).toBe('public_preview');
+            expect(result.segments).toHaveLength(1);
+            expect(result.coverage).toBeNull();
+        });
+
+        it('gives an authenticated admin the coverage map', () => {
+            queryOneMock.mockReturnValue(CAMERA);
+            answerBySql();
+
+            const result = recordingPlaybackService.getSegments(9, {
+                query: { scope: 'admin' },
+                user: { id: 1, role: 'admin' },
+            });
+
+            expect(result.playback_policy.accessMode).toBe('admin_full');
+            expect(result.coverage).not.toBeNull();
+            expect(result.coverage.runs).toHaveLength(1);
+        });
+
+        it('refuses admin scope to a customer JWT, so no coverage leaks that way either', () => {
+            queryOneMock.mockReturnValue(CAMERA);
+            queryMock.mockReturnValue([]);
+
+            expect(() => recordingPlaybackService.getSegments(9, {
+                query: { scope: 'admin' },
+                user: { id: 42, role: 'customer' },
+            })).toThrow('Unauthorized playback access');
+        });
+    });
+
     it('still 404s the HLS playlist when there is nothing to put in it', () => {
         queryOneMock
             .mockReturnValueOnce({

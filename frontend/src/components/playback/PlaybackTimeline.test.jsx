@@ -115,4 +115,49 @@ describe('PlaybackTimeline', () => {
 
         expect(screen.getByTitle('Hilang: 110 menit')).toBeTruthy();
     });
+
+    /*
+     * THE PUBLIC SURFACE MUST NOT LEARN HOW DEEP THE ARCHIVE GOES.
+     *
+     * The backend already withholds `coverage` from public_preview, so `dayScope` arrives empty.
+     * This asserts the other half: with nothing to browse, the timeline renders neither the
+     * whole-span strip nor the day calendar. Both would let an anonymous visitor read our exact
+     * retention off the screen, and the calendar would additionally offer days it cannot serve.
+     */
+    it('shows no coverage strip and no day calendar to a scope without coverage', () => {
+        render(
+            <PlaybackTimeline
+                segments={[segment(1, '01:00', '01:10')]}
+                selectedSegment={null}
+                onSegmentClick={vi.fn()}
+                onTimelineClick={vi.fn()}
+                formatTimestamp={formatTimestamp}
+                dayScope={null}
+            />,
+        );
+
+        expect(screen.queryByText('Seluruh rekaman tersimpan')).toBeNull();
+        expect(screen.queryByLabelText('Tanggal rekaman')).toBeNull();
+        expect(screen.queryByText('24 jam terakhir')).toBeNull();
+    });
+
+    it('shows them once a scope really can browse other days', () => {
+        render(
+            <PlaybackTimeline
+                segments={[segment(1, '01:00', '01:10')]}
+                selectedSegment={null}
+                onSegmentClick={vi.fn()}
+                onTimelineClick={vi.fn()}
+                formatTimestamp={formatTimestamp}
+                dayScope={{
+                    coverage: { runs: [{ from: at('01:00'), to: at('01:10') }] },
+                    range: null,
+                    setRange: vi.fn(),
+                }}
+            />,
+        );
+
+        expect(screen.getByText('Seluruh rekaman tersimpan')).toBeTruthy();
+        expect(screen.getByLabelText('Tanggal rekaman')).toBeTruthy();
+    });
 });
