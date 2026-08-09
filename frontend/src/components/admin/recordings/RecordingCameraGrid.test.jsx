@@ -13,6 +13,9 @@ describe('RecordingCameraGrid', () => {
                         id: 7,
                         name: 'CCTV LAPANGAN DANDER',
                         location: 'Dander',
+                        // runtime_status is the honest per-camera signal (from recording_process_state);
+                        // the red badge must follow a LIVE recorder, not the recording_status column.
+                        runtime_status: { isRecording: true },
                         recording_status: 'recording',
                         recording_duration_hours: 10,
                         storage: {
@@ -31,6 +34,30 @@ describe('RecordingCameraGrid', () => {
         expect(screen.getByText('Duration:').className).toMatch(/text-content/);
         expect(screen.getByText('Recording Enabled:')).toBeTruthy();
         expect(screen.getByTestId('recording-status-7').className).toContain('dark:text-red-100');
+    });
+
+    it('does NOT show a red Recording badge when the DB column says recording but no live process exists', () => {
+        // Regression: 15 production cameras were stuck recording_status='recording' with no ffmpeg.
+        // The badge must follow the live process (runtime_status), never the stale intent column.
+        render(
+            <RecordingCameraGrid
+                recordings={[
+                    {
+                        id: 8,
+                        name: 'CCTV MATI DIAM-DIAM',
+                        location: 'Dander',
+                        recording_status: 'recording',   // stale intent
+                        runtime_status: { isRecording: false, status: 'stopped' },
+                        recording_duration_hours: 4,
+                        storage: { segmentCount: 0, totalSize: 0 },
+                    },
+                ]}
+                onStartRecording={vi.fn()}
+                onStopRecording={vi.fn()}
+            />
+        );
+
+        expect(screen.getByTestId('recording-status-8').className).not.toContain('dark:text-red-100');
     });
 
     it('membuka quick edit dan menyimpan pengaturan recording per kamera', async () => {

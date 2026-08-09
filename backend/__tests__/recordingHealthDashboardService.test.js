@@ -7,6 +7,7 @@
  * SideEffects: None — all dependencies are stubbed.
  */
 import { describe, expect, it } from 'vitest';
+import Database from 'better-sqlite3';
 import { createRecordingHealthDashboardService } from '../services/recordingHealthDashboardService.js';
 
 const NOW = Date.UTC(2026, 4, 22, 10, 0, 0);
@@ -183,12 +184,12 @@ describe('recordingHealthDashboardService.getSnapshot', () => {
         expect(snap.status.level).toBe('critical');
     });
 
-    it('aggregates recording process counts, restarts, and storage', () => {
+    it('aggregates recording process counts (from recording_process_state), restarts, and storage', () => {
         const snap = buildService({
             queryFn: makeQuery({
-                'FROM cameras': [
-                    { status: 'recording', count: 800 },
-                    { status: 'stopped', count: 48 },
+                // The process section now counts REAL recorders, not the cameras.recording_status column.
+                'recording_process_state': [
+                    { status: 'recording', count: 22 },
                 ],
                 'GROUP BY success': [
                     { success: 1, count: 30 },
@@ -203,13 +204,13 @@ describe('recordingHealthDashboardService.getSnapshot', () => {
             }),
         }).getSnapshot(NOW);
 
-        expect(snap.recordingProcesses.recording).toBe(800);
-        expect(snap.recordingProcesses.stopped).toBe(48);
+        expect(snap.recordingProcesses.recording).toBe(22);
         expect(snap.restarts.last24h).toEqual({ total: 32, succeeded: 30, failed: 2 });
         expect(snap.restarts.recent).toHaveLength(1);
         expect(snap.storage.totalSegments).toBe(12000);
         expect(snap.storage.totalSizeGB).toBe(5);
     });
+
 
     it('degrades a failing section to a safe fallback instead of throwing', () => {
         const snap = buildService({
@@ -223,5 +224,115 @@ describe('recordingHealthDashboardService.getSnapshot', () => {
         // Other sections are unaffected.
         expect(snap.scheduler.running).toBe(true);
         expect(snap.status.level).toBe('ok');
+    });
+});
+
+// A substring-matched mock never executes SQL, so it cannot catch a typo in the new queries and it
+// cannot prove the restart/segment windows actually filter. These run the REAL SQL on a temp DB.
+describe('recordingHealthDashboardService.getSnapshot — real SQLite', () => {
+    const NOW_MS = Date.UTC(2026, 7, 8, 12, 0, 0);
+    const iso = (msAgo) => new Date(NOW_MS - msAgo).toISOString();
+
+    function makeDb() {
+        const db = new Database(':memory:');
+        db.exec(`
+            CREATE TABLE cameras (
+                id INTEGER PRIMARY KEY, enabled INTEGER, enable_recording INTEGER,
+                is_online INTEGER, recording_status TEXT, last_recording_start TEXT
+            );
+            CREATE TABLE recording_process_state (
+                camera_id INTEGER PRIMARY KEY, status TEXT, pid INTEGER
+            );
+            CREATE TABLE restart_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, camera_id INTEGER, reason TEXT,
+                restart_time TEXT, recovery_time TEXT, success INTEGER
+            );
+            CREATE TABLE recording_segments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, camera_id INTEGER, start_time TEXT,
+                file_size INTEGER
+            );
+            CREATE TABLE recording_recovery_diagnostics (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, camera_id INTEGER, filename TEXT,
+                reason TEXT, terminal_state TEXT, quarantined_path TEXT, updated_at TEXT, active INTEGER
+            );
+        `);
+        return db;
+    }
+
+    // Scheduler whose lastRunAt is anchored to THIS block's clock, so tasks are not spuriously
+    // flagged overdue (the shared healthyScheduler() helper is anchored to the other block's NOW).
+    function freshScheduler() {
+        return {
+            isRunning: () => true,
+            getAllStats: () => [
+                { name: 'scanner', intervalMs: 60000, runCount: 10, lastRunAt: NOW_MS - 5000, lastDurationMs: 20, lastError: null },
+            ],
+        };
+    }
+
+    function serviceFor(db) {
+        return createRecordingHealthDashboardService({
+            scheduler: freshScheduler(),
+            recoveryService: emptyRecoveryService(),
+            diagnosticsRepository: emptyDiagnosticsRepository(),
+            queryFn: (sql, params = []) => db.prepare(sql).all(params),
+            queryOneFn: (sql, params = []) => db.prepare(sql).get(params),
+            logger: { error: () => {} },
+        });
+    }
+
+    it('counts real recorder processes and validates every section query executes', () => {
+        const db = makeDb();
+        // 3 cameras enabled for recording; only 2 have a live process row.
+        db.exec(`
+            INSERT INTO cameras (id, enabled, enable_recording, is_online, recording_status, last_recording_start) VALUES
+                (1, 1, 1, 1, 'recording', '${iso(3 * 3600 * 1000)}'),
+                (2, 1, 1, 1, 'recording', '${iso(3 * 3600 * 1000)}'),
+                (3, 1, 1, 1, 'recording', '${iso(3 * 3600 * 1000)}');
+            INSERT INTO recording_process_state (camera_id, status, pid) VALUES (1, 'recording', 111), (2, 'recording', 222);
+        `);
+        // Cameras 1 and 2 produced a fresh segment; camera 3 produced none in the window → silent failure.
+        db.prepare('INSERT INTO recording_segments (camera_id, start_time, file_size) VALUES (?, ?, ?)').run(1, iso(5 * 60 * 1000), 10);
+        db.prepare('INSERT INTO recording_segments (camera_id, start_time, file_size) VALUES (?, ?, ?)').run(2, iso(5 * 60 * 1000), 20);
+
+        const snap = serviceFor(db).getSnapshot(NOW_MS);
+
+        // recordingProcesses reflects the process table (2), not the 3 'recording' rows in cameras.
+        expect(snap.recordingProcesses.recording).toBe(2);
+        expect(snap.integrity.expectedRecording).toBe(3);
+        expect(snap.integrity.liveButNoRecentSegments).toBe(1); // camera 3
+        expect(snap.status.level).toBe('warning');
+        expect(snap.status.reasons.join(' ')).toContain('producing no segments');
+    });
+
+    it('flags a single-camera restart loop and honours the 24h ISO window', () => {
+        const db = makeDb();
+        const ins = db.prepare('INSERT INTO restart_logs (camera_id, reason, restart_time, success) VALUES (?, ?, ?, ?)');
+        for (let i = 0; i < 30; i += 1) ins.run(37, 'stream_frozen', iso(i * 60 * 1000), 1); // 30 in the last 30 min
+        ins.run(37, 'stream_frozen', iso(26 * 3600 * 1000), 1);                               // 1 older than 24h → excluded
+        ins.run(5, 'process_crashed', iso(10 * 60 * 1000), 0);
+
+        const snap = serviceFor(db).getSnapshot(NOW_MS);
+
+        expect(snap.restarts.topCamera24h).toEqual({ camera_id: 37, count: 30 }); // the 26h-old row excluded
+        expect(snap.status.level).toBe('warning');
+        expect(snap.status.reasons.join(' ')).toContain('camera 37');
+    });
+
+    it('stays ok when processes match, restarts are few, and every live camera produces segments', () => {
+        const db = makeDb();
+        db.exec(`
+            INSERT INTO cameras (id, enabled, enable_recording, is_online, recording_status, last_recording_start) VALUES
+                (1, 1, 1, 1, 'recording', '${iso(3 * 3600 * 1000)}');
+            INSERT INTO recording_process_state (camera_id, status, pid) VALUES (1, 'recording', 111);
+        `);
+        db.prepare('INSERT INTO recording_segments (camera_id, start_time, file_size) VALUES (?, ?, ?)').run(1, iso(5 * 60 * 1000), 10);
+        db.prepare('INSERT INTO restart_logs (camera_id, reason, restart_time, success) VALUES (?, ?, ?, ?)').run(1, 'stream_frozen', iso(60 * 1000), 1);
+
+        const snap = serviceFor(db).getSnapshot(NOW_MS);
+
+        expect(snap.status.level).toBe('ok');
+        expect(snap.status.reasons).toEqual([]);
+        expect(snap.integrity.liveButNoRecentSegments).toBe(0);
     });
 });

@@ -19,6 +19,9 @@ function createDeps(overrides = {}) {
     const stopRecording = vi.fn().mockResolvedValue({ success: true });
     const restartRecording = vi.fn().mockResolvedValue({ success: true });
     const logger = { log: vi.fn(), error: vi.fn(), warn: vi.fn() };
+    // Segment count is 0 by default so a frozen camera can never "confirm recovery" unless a test
+    // explicitly bumps it — which is exactly the production behaviour we are asserting.
+    const countSegments = vi.fn(() => 0);
 
     return {
         processStatus,
@@ -27,6 +30,7 @@ function createDeps(overrides = {}) {
         startRecording,
         stopRecording,
         restartRecording,
+        countSegments,
         logger,
         deps: {
             processManager,
@@ -34,6 +38,7 @@ function createDeps(overrides = {}) {
             startRecording,
             stopRecording,
             restartRecording,
+            countSegments,
             isShuttingDown: () => false,
             logger,
             ...overrides,
@@ -289,50 +294,146 @@ describe('recordingHealthMonitor.tick', () => {
         expect(monitor.getState(7).suspendedReason).toBe('waiting_retry');
     });
 
-    it('caps the no-media cooldown so a recovered camera resumes quickly', async () => {
+    it('caps the no-media cooldown for a BRIEF blip (below the suspend threshold)', async () => {
         const { deps, processManager, queryOne } = createDeps();
         processManager.getStatus.mockReturnValue({ status: 'recording', isRecording: true });
         queryOne.mockReturnValue({ is_tunnel: 0, is_online: 1, enabled: 1, enable_recording: 1 });
         const monitor = createRecordingHealthMonitor(deps);
         const state = monitor.ensureState(7);
         state.lastDataTime = 0;
-        state.consecutiveFailureCount = 3; // next freeze -> count 4 -> uncapped cooldown would be 120s
+        state.consecutiveFailureCount = 1; // next freeze -> count 2, still below the threshold (3)
 
         await monitor.tick(1_000_000);
 
-        // computeCooldownMs(4) = 120_000, but capped to RECORDING_NO_MEDIA_MAX_COOLDOWN_MS (60_000).
-        expect(monitor.getState(7).cooldownUntil).toBe(1_000_000 + 60_000);
+        // computeCooldownMs(2) = 30_000, and the clamp keeps the brisk retry — a real blip recovers fast.
+        expect(monitor.getState(7).cooldownUntil).toBe(1_000_000 + 30_000);
     });
 
-    it('clears the failure count after sustained healthy data since the last restart', async () => {
+    it('does NOT cap the cooldown once the breaker has tripped (persistent dead source)', async () => {
         const { deps, processManager, queryOne } = createDeps();
         processManager.getStatus.mockReturnValue({ status: 'recording', isRecording: true });
         queryOne.mockReturnValue({ is_tunnel: 0, is_online: 1, enabled: 1, enable_recording: 1 });
+        const monitor = createRecordingHealthMonitor(deps);
+        const state = monitor.ensureState(7);
+        state.lastDataTime = 0;
+        state.consecutiveFailureCount = 3; // next freeze -> count 4 -> AT/above threshold, no clamp
+
+        await monitor.tick(1_000_000);
+
+        // computeCooldownMs(4) = 120_000, left unclamped so a dead upstream backs off instead of
+        // being hammered every 60s. This is what breaks the 45-75s restart loop on production.
+        expect(monitor.getState(7).cooldownUntil).toBe(1_000_000 + 120_000);
+    });
+
+    it('clears the failure count once a NEW segment lands after the confirm window', async () => {
+        const { deps, processManager, queryOne, countSegments } = createDeps();
+        processManager.getStatus.mockReturnValue({ status: 'recording', isRecording: true });
+        queryOne.mockReturnValue({ is_tunnel: 0, is_online: 1, enabled: 1, enable_recording: 1 });
+        countSegments.mockReturnValue(6); // one more than the baseline set below
         const monitor = createRecordingHealthMonitor(deps);
         const state = monitor.ensureState(7);
         state.consecutiveFailureCount = 2;
         state.lastRestartAt = 1000;
         state.lastDataTime = 100_000; // data fresh at tick time
+        state.segmentBaseline = 5;   // a completed segment appeared since the restart
 
-        await monitor.tick(100_000); // healthy, and 99_000ms since restart exceeds the confirm window
+        await monitor.tick(100_000); // healthy, past the confirm window, AND a segment completed
 
         expect(monitor.getState(7).consecutiveFailureCount).toBe(0);
         expect(monitor.getState(7).suspendedReason).toBeNull();
     });
 
-    it('does not clear the failure count until the recovery-confirm window passes', async () => {
-        const { deps, processManager, queryOne } = createDeps();
+    it('does NOT clear the failure count on stderr bytes alone — a completed segment is required', async () => {
+        // The core cam37 fix: a frozen stream still emits error chatter (counts as "data"), so time
+        // alone must never reset the breaker. Without a new segment, the count is preserved.
+        const { deps, processManager, queryOne, countSegments } = createDeps();
         processManager.getStatus.mockReturnValue({ status: 'recording', isRecording: true });
         queryOne.mockReturnValue({ is_tunnel: 0, is_online: 1, enabled: 1, enable_recording: 1 });
+        countSegments.mockReturnValue(5); // unchanged from baseline — no segment completed
+        const monitor = createRecordingHealthMonitor(deps);
+        const state = monitor.ensureState(7);
+        state.consecutiveFailureCount = 2;
+        state.lastRestartAt = 1000;
+        state.lastDataTime = 100_000;
+        state.segmentBaseline = 5;
+
+        await monitor.tick(100_000); // healthy bytes, past the window, but NO new segment
+
+        expect(monitor.getState(7).consecutiveFailureCount).toBe(2);
+    });
+
+    it('does not clear the failure count until the recovery-confirm window passes', async () => {
+        const { deps, processManager, queryOne, countSegments } = createDeps();
+        processManager.getStatus.mockReturnValue({ status: 'recording', isRecording: true });
+        queryOne.mockReturnValue({ is_tunnel: 0, is_online: 1, enabled: 1, enable_recording: 1 });
+        countSegments.mockReturnValue(99); // even with a segment, the window has not passed
         const monitor = createRecordingHealthMonitor(deps);
         const state = monitor.ensureState(7);
         state.consecutiveFailureCount = 2;
         state.lastRestartAt = 90_000;
         state.lastDataTime = 100_000;
+        state.segmentBaseline = 5;
 
         await monitor.tick(100_000); // only 10_000ms since restart — below the confirm window
 
         expect(monitor.getState(7).consecutiveFailureCount).toBe(2);
+    });
+
+    it('clears a lingering suspended reason (count already 0) on healthy data without a new segment', async () => {
+        // The offline→online path zeroes the counter but leaves suspendedReason set. There is no
+        // breaker to protect once count is 0, so this cosmetic reason should clear on data alone —
+        // otherwise a recovered camera reads as suspended until it next stops.
+        const { deps, processManager, queryOne, countSegments } = createDeps();
+        processManager.getStatus.mockReturnValue({ status: 'recording', isRecording: true });
+        queryOne.mockReturnValue({ is_tunnel: 0, is_online: 1, enabled: 1, enable_recording: 1 });
+        countSegments.mockReturnValue(5); // no new segment
+        const monitor = createRecordingHealthMonitor(deps);
+        const state = monitor.ensureState(7);
+        state.consecutiveFailureCount = 0;
+        state.suspendedReason = 'camera_offline';
+        state.lastRestartAt = 1000;
+        state.lastDataTime = 100_000;
+        state.segmentBaseline = 5;
+
+        await monitor.tick(100_000);
+
+        expect(monitor.getState(7).suspendedReason).toBeNull();
+    });
+
+    it('REGRESSION (cam37): a stream that re-freezes before completing a segment reaches suspend', async () => {
+        // Reproduces the production loop: the camera streams stderr for ~45s, re-freezes, restarts,
+        // and NEVER completes a 600s segment. The old time-only reset zeroed the count each cycle so
+        // the breaker never tripped; with segment-gated recovery the count climbs to the threshold.
+        const { deps, processManager, queryOne, countSegments, restartRecording, stopRecording } = createDeps();
+        processManager.getStatus.mockReturnValue({ status: 'recording', isRecording: true });
+        queryOne.mockReturnValue({ is_tunnel: 0, is_online: 1, enabled: 1, enable_recording: 1 });
+        countSegments.mockReturnValue(0); // never produces a segment
+        // restartRecording emulates the real facade: it stamps lastRestartAt and re-baselines via markStarted.
+        restartRecording.mockImplementation(async (cameraId) => {
+            const s = monitor.ensureState(cameraId);
+            s.lastRestartAt = lastTick;
+            monitor.markStarted(cameraId, lastTick);
+            return { success: true };
+        });
+        const monitor = createRecordingHealthMonitor(deps);
+        monitor.ensureState(7);
+
+        let lastTick = 0;
+        // Simulate repeated freeze→restart cycles. Each cycle: data goes stale, tick restarts it.
+        for (let i = 0; i < 5; i += 1) {
+            lastTick = i * 120_000 + 60_000;
+            const s = monitor.getState(7) || monitor.ensureState(7);
+            s.lastDataTime = lastTick - 60_000; // stale beyond the 30s internal freeze timeout
+            // clear cooldown so each cycle is allowed to act
+            s.cooldownUntil = 0;
+            // eslint-disable-next-line no-await-in-loop
+            await monitor.tick(lastTick);
+        }
+
+        const finalState = monitor.getState(7);
+        expect(finalState.consecutiveFailureCount).toBeGreaterThanOrEqual(3);
+        // Once the breaker trips it stops restarting and suspends instead.
+        expect(stopRecording).toHaveBeenCalledWith(7, { removeHealthState: false, reason: 'stream_frozen' });
     });
 
     it('REGRESSION: the breaker can still trip when a camera is online but never records', async () => {

@@ -343,6 +343,24 @@ class RecordingService {
         console.error(`Last FFmpeg output:\n${redactUrlCredentials(recordingProcessManager.getOutput(cameraId).slice(-1000))}`);
         this.markRecordingFailure(cameraId, result.reason);
         this.logRestart(cameraId, 'process_crashed', false);
+
+        // Reflect the death in cameras.recording_status. Only startRecording/stopRecording used to
+        // write this column, so a process that DIED ON ITS OWN (crash, 404 upstream, non-zero exit)
+        // left the row frozen at 'recording' forever — the value became "last intent that spawned",
+        // not a status. On production 15 of 17 zero-segment cameras were stuck 'recording' this way,
+        // and every admin panel that reads the column reported them as healthily recording.
+        // Guarded on the current value so it is idempotent and cannot clobber a concurrent restart:
+        // the crash close for the OLD process is always awaited/handled before the NEW start writes
+        // 'recording' (restartRecording awaits the close; crash-recovery only starts from the tick
+        // after the close set 'stopped'), so this only ever fires while the row is genuinely stale.
+        try {
+            execute(
+                "UPDATE cameras SET recording_status = 'stopped' WHERE id = ? AND recording_status = 'recording'",
+                [cameraId]
+            );
+        } catch (error) {
+            console.error(`[Recording] Failed to reset recording_status for camera ${cameraId}:`, error?.message || error);
+        }
     }
 
     onSegmentCreated(cameraId, filename) {
@@ -494,6 +512,32 @@ class RecordingService {
      *  publish its state for the API, which can no longer read the in-memory map. */
     getActiveRecordingCameraIds() {
         return recordingProcessManager.getActiveCameraIds();
+    }
+
+    /**
+     * Correct cameras.recording_status for any camera the recorder is NOT actually running.
+     *
+     * recording_status is written optimistically on start; handleRecordingClosed resets it on an
+     * unclean exit, but that only covers processes that fire a close event in THIS worker. A row
+     * left 'recording' by an older build, or a process lost across a hard crash, would otherwise
+     * report 'recording' with no ffmpeg behind it. The worker owns every recorder, so its live
+     * active set is the source of truth: anything 'recording' in the DB but absent from it is stale.
+     *
+     * startRecording adds the camera to the process map BEFORE it writes 'recording', so a genuinely
+     * starting camera is always in activeIds by the time its row says 'recording' — there is no
+     * window where this would wrongly demote a healthy recorder. Returns the number of rows fixed.
+     */
+    reconcileRecordingStatusColumn() {
+        const activeIds = new Set(this.getActiveRecordingCameraIds());
+        const rows = query("SELECT id FROM cameras WHERE recording_status = 'recording'");
+        let corrected = 0;
+        for (const row of rows) {
+            if (!activeIds.has(row.id)) {
+                execute("UPDATE cameras SET recording_status = 'stopped' WHERE id = ?", [row.id]);
+                corrected += 1;
+            }
+        }
+        return corrected;
     }
 
     getRecordingStatus(cameraId) {

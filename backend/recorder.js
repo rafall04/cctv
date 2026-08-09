@@ -78,6 +78,14 @@ function publishState() {
                 workerState.clearProcessState(row.camera_id);
             }
         }
+
+        // Belt-and-suspenders for cameras.recording_status: handleRecordingClosed already resets it
+        // on a close event, but this also heals rows a close never fires for (older build, process
+        // lost across a hard crash). Cheap — it only writes when a row is actually stale.
+        const corrected = recordingService.reconcileRecordingStatusColumn();
+        if (corrected > 0) {
+            console.log(`[Recorder] Corrected recording_status for ${corrected} stale camera row(s)`);
+        }
     } catch (error) {
         console.error('[Recorder] Failed publishing process state:', error?.message || error);
     }

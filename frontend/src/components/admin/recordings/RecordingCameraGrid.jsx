@@ -29,7 +29,10 @@ function RecordingQuickEditCard({
     updatingCameraId,
 }) {
     const cameraId = recording.id || recording.camera_id;
-    const isRecording = recording.runtime_status?.isRecording || recording.recording_status === 'recording';
+    // Only the live process counts (runtime_status ← recording_process_state). Falling back to the
+    // recording_status column showed a red "Recording" badge on cameras that had no ffmpeg and were
+    // producing no files — the exact over-report this dashboard is meant to expose, not hide.
+    const isRecording = recording.runtime_status?.isRecording === true;
     const segmentCount = recording.storage?.segmentCount || recording.segment_count || 0;
     const totalSize = recording.storage?.totalSize || recording.total_size || 0;
     const oldestSegment = recording.storage?.oldestSegment || recording.oldest_segment;

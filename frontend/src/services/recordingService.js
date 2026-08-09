@@ -137,6 +137,17 @@ export const getSegments = async (
 export const getSegmentStreamUrl = (cameraId, filename, accessScope = 'public', segment = null) => {
     const baseUrl = getApiBaseUrl();
     if (segment?.source === 'archive' && segment?.id) {
+        // Archived (Telegram) segments are served by TWO different routes depending on who is
+        // watching, and both authenticate from a COOKIE because a <video src> cannot send headers:
+        //  - admin playback → the admin library route, authenticated by the staff JWT cookie.
+        //  - public playback → the public archive route, authenticated by the playback-token cookie.
+        // Admin traffic used to be sent to the public route too, which only accepts a playback token
+        // and never a staff session — so an admin saw a full segment list whose videos all 401'd.
+        // Local retention is only ~4h while the archive holds weeks, so on any past date almost every
+        // row an admin picked was archive-sourced and unplayable. Route admins to their own endpoint.
+        if (accessScope === 'admin_full') {
+            return `${baseUrl}/api/admin/telegram-archive/library/${segment.id}/stream`;
+        }
         return `${baseUrl}/api/playback-archive/${segment.id}/stream`;
     }
     return `${baseUrl}/api/recordings/${cameraId}/stream/${filename}${buildPlaybackQuery(accessScope)}`;

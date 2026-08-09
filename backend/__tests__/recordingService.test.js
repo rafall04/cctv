@@ -313,6 +313,52 @@ describe('recordingService external recording support', () => {
         errorSpy.mockRestore();
     });
 
+    /*
+     * REGRESSION (production: 15 of 17 zero-segment cameras stuck recording_status='recording').
+     * A process that dies on its own (crash/404/non-zero exit) routes through handleRecordingClosed,
+     * which previously never touched the DB — so the column froze at 'recording' with no ffmpeg behind
+     * it, and every admin panel reported the dead camera as healthily recording.
+     */
+    it('resets recording_status to stopped when ffmpeg exits unexpectedly', async () => {
+        const { recordingService } = await import('../services/recordingService.js');
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        recordingService.handleRecordingClosed(42, { reason: 'process_crashed', exitCode: 1 }, 'external');
+
+        const updateCall = executeMock.mock.calls.find(
+            ([sql]) => /UPDATE cameras SET recording_status = 'stopped'/.test(sql) && /recording_status = 'recording'/.test(sql)
+        );
+        expect(updateCall).toBeTruthy();
+        expect(updateCall[1]).toEqual([42]);
+    });
+
+    it('does NOT reset recording_status for a clean lifecycle stop (restart/shutdown)', async () => {
+        const { recordingService } = await import('../services/recordingService.js');
+        vi.spyOn(console, 'log').mockImplementation(() => {});
+
+        recordingService.handleRecordingClosed(42, { reason: 'restart_requested', exitCode: 0 }, 'external');
+
+        const updateCall = executeMock.mock.calls.find(
+            ([sql]) => /UPDATE cameras SET recording_status = 'stopped'/.test(sql)
+        );
+        expect(updateCall).toBeUndefined();
+    });
+
+    it('reconcileRecordingStatusColumn demotes only rows with no live recorder', async () => {
+        const { recordingService } = await import('../services/recordingService.js');
+        // DB says cameras 1, 2, 3 are 'recording'; the worker actually holds only camera 2.
+        queryMock.mockReturnValue([{ id: 1 }, { id: 2 }, { id: 3 }]);
+        vi.spyOn(recordingService, 'getActiveRecordingCameraIds').mockReturnValue([2]);
+
+        const corrected = recordingService.reconcileRecordingStatusColumn();
+
+        expect(corrected).toBe(2);
+        const demoted = executeMock.mock.calls
+            .filter(([sql]) => /UPDATE cameras SET recording_status = 'stopped' WHERE id = \?/.test(sql))
+            .map(([, params]) => params[0]);
+        expect(demoted).toEqual([1, 3]); // camera 2 (live) is left alone
+    });
+
     it('delegates segment recovery through the recovery queue facade', async () => {
         const recoveryModule = await import('../services/recordingRecoveryService.js');
         const recoverSpy = vi.spyOn(recoveryModule.default, 'enqueueRecovery')

@@ -44,6 +44,9 @@ function emptyHealth(nowMs) {
         // suspendOffline() re-arms it; handleCameraBecameOnline() consumes it. Starts armed so a
         // camera whose state is rebuilt (boot, adoption) still gets its one fast retry.
         offlineResetPending: true,
+        // Segment count captured at the last (re)start. Recovery from a freeze is confirmed only
+        // once the live count exceeds this — see tick(). null until the first markStarted.
+        segmentBaseline: null,
     };
 }
 
@@ -57,6 +60,13 @@ export function createRecordingHealthMonitor({
     tickIntervalMs = RECORDING_HEALTH_TICK_INTERVAL_MS,
     logger = console,
     now = () => Date.now(),
+    // How many finalized segments a camera has. Recovery from a freeze is confirmed by this
+    // increasing since (re)start — a completed segment is real proof of recording, unlike stderr
+    // bytes, which a frozen stream still produces. Injectable so the monitor stays unit-testable.
+    countSegments = (cameraId) => {
+        const row = queryOne('SELECT COUNT(*) AS n FROM recording_segments WHERE camera_id = ?', [cameraId]);
+        return row?.n ?? 0;
+    },
 } = {}) {
     if (typeof startRecording !== 'function') {
         throw new Error('recordingHealthMonitor requires startRecording function');
@@ -115,6 +125,9 @@ export function createRecordingHealthMonitor({
         const state = ensureState(cameraId);
         state.lastDataTime = nowMs;
         state.inFlightAction = false;
+        // Snapshot the segment count now so tick() can confirm recovery by a COMPLETED segment
+        // appearing after this (re)start, rather than by stderr bytes a frozen stream also emits.
+        state.segmentBaseline = api.countSegments(cameraId);
         return state;
     }
 
@@ -244,18 +257,28 @@ export function createRecordingHealthMonitor({
                 : RECORDING_HEALTH_TIMEOUT_INTERNAL_MS;
             const timeSinceData = nowMs - state.lastDataTime;
             if (timeSinceData <= timeout) {
-                // Data is flowing. Confirm recovery only after the stream has stayed
-                // healthy for a sustained window since the last restart — a freshly
-                // spawned process that has not proven itself must not clear the breaker.
-                // `suspendedReason` is checked too, not just the counter. markRecovered is the ONLY
-                // writer that clears suspendedReason, so gating solely on the counter meant a
-                // camera that came back from an outage (count reset to 0 above, reason still
-                // 'camera_offline') could record healthily for hours while every status read still
-                // reported it suspended — and the moment it stopped for any benign reason it was
-                // shown as 'suspended_offline'. Data has flowed for the confirm window here, which
-                // is exactly what "recovered" means.
-                if ((state.consecutiveFailureCount > 0 || state.suspendedReason)
-                    && (nowMs - (state.lastRestartAt || 0)) >= RECORDING_RECOVERY_CONFIRM_MS) {
+                // Data is flowing. But "data" here is only that the stderr tailer saw bytes, and a
+                // frozen stream still spews error chatter — so time-alone is not proof of recovery.
+                const confirmWindowPassed = (nowMs - (state.lastRestartAt || 0)) >= RECORDING_RECOVERY_CONFIRM_MS;
+
+                if (state.consecutiveFailureCount > 0) {
+                    // A camera carrying failures must prove recovery with a COMPLETED segment, not
+                    // stderr bytes. The old time-only reset zeroed the breaker every ~45s — shorter
+                    // than the 600s a segment takes — so a stream that streamed briefly then re-froze
+                    // never reached the suspend threshold. Production symptom: camera 37 restarting
+                    // every 45-75s forever, each logged a success, while producing nothing. A new
+                    // segment since (re)start is the real signal that it can actually record.
+                    if (confirmWindowPassed
+                        && state.segmentBaseline != null
+                        && api.countSegments(cameraId) > state.segmentBaseline) {
+                        api.markRecovered(cameraId, nowMs);
+                    }
+                } else if (state.suspendedReason && confirmWindowPassed) {
+                    // Count is already 0 (e.g. cleared on an offline→online transition, which resets
+                    // the counter but leaves suspendedReason set). No breaker to protect here, so
+                    // clearing the lingering reason once data flows is pure status honesty — markRecovered
+                    // is the only writer that clears suspendedReason, and without this a camera that
+                    // recovered from an outage reads as 'suspended_offline' until it next stops.
                     api.markRecovered(cameraId, nowMs);
                 }
                 continue;
@@ -277,9 +300,12 @@ export function createRecordingHealthMonitor({
             state.restartCount += 1;
             api.markFailure(cameraId, 'stream_frozen', nowMs);
             const failed = streamHealthMap.get(cameraId);
-            if (failed) {
-                // No-media backoff is bounded low so a recovered camera resumes
-                // recording within ~1 min, instead of backing off to the 5-min cap.
+            if (failed && failed.consecutiveFailureCount < RECORDING_FAILURE_SUSPEND_THRESHOLD) {
+                // A brief blip retries briskly: bound the no-media backoff low so a camera that
+                // recovers on its own resumes within ~1 min instead of the 5-min cap. But once the
+                // breaker has tripped (count reached the suspend threshold — a persistently dead
+                // source), stop clamping and let the exponential backoff stand, so a dead upstream is
+                // polled at the 5-min cap rather than hammered every 60s (prod: 1,889 restarts/24h).
                 failed.cooldownUntil = Math.min(
                     failed.cooldownUntil,
                     nowMs + RECORDING_NO_MEDIA_MAX_COOLDOWN_MS
@@ -341,6 +367,7 @@ export function createRecordingHealthMonitor({
         stop,
         getSnapshot,
         computeCooldownMs,
+        countSegments,
     });
     return api;
 }

@@ -141,7 +141,11 @@ export function useRecordingDashboardData() {
     useAdminReconnectRefresh(() => fetchData({ mode: 'resume' }));
 
     const summary = useMemo(() => {
-        const recordingCount = recordings.filter((item) => item.runtime_status?.isRecording || item.recording_status === 'recording').length;
+        // Count only recorders the worker ACTUALLY has running (runtime_status, from
+        // recording_process_state). The old `|| recording_status === 'recording'` fallback revived
+        // the stale DB column and re-inflated the number the backend had already computed honestly
+        // (production: 32 shown vs 22 real). recording_status is intent, not proof of a live process.
+        const recordingCount = recordings.filter((item) => item.runtime_status?.isRecording).length;
         const totalSegments = recordings.reduce((total, item) => total + (item.storage?.segmentCount || item.segment_count || 0), 0);
         const totalSize = recordings.reduce((total, item) => total + (item.storage?.totalSize || item.total_size || 0), 0);
 
