@@ -40,7 +40,11 @@ const { default: recordingScheduler } = await import('./services/recordingSchedu
 const { default: recordingHealthDashboardService } = await import('./services/recordingHealthDashboardService.js');
 const { startRecordingDomain, stopRecordingDomain } = await import('./services/recordingDomainBootstrap.js');
 const { default: workerState } = await import('./services/recordingWorkerStateRepository.js');
-const { closeDbConnections } = await import('./database/connectionPool.js');
+// connectionPool exports the pool teardown as `closeAll` (server.js imports it the same way).
+// Importing the wrong name left closeDbConnections undefined, so every recorder shutdown threw
+// "closeDbConnections is not a function" and skipped the WAL checkpoint (non-fatal — the WAL
+// recovers on next open — which is why it stayed hidden).
+const { closeAll: closeDbConnections } = await import('./database/connectionPool.js');
 
 recordingService.attachScheduler(recordingScheduler);
 
