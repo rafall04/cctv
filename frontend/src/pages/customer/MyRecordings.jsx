@@ -40,6 +40,23 @@ function formatUkuran(bytes) {
     return mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${Math.round(mb)} MB`;
 }
 
+/*
+ * A saved file lands in a folder full of other downloads, so `20260812_124003.mp4` is useless the
+ * moment it leaves this page. Camera name + timestamp survives that trip. Non-alphanumerics are
+ * stripped rather than escaped: this string becomes a filename on the visitor's own machine.
+ */
+function namaUnduhan(camera, segment) {
+    const slug = String(camera?.name || 'kamera')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 40) || 'kamera';
+    const waktu = String(segment?.start_time || segment?.created_at || '')
+        .replace(/[^0-9]/g, '')
+        .slice(0, 14);
+    return waktu ? `${slug}-${waktu}.mp4` : `${slug}.mp4`;
+}
+
 export default function MyRecordings() {
     const [cameras, setCameras] = useState([]);
     const [aktif, setAktif] = useState(null);
@@ -170,6 +187,9 @@ export default function MyRecordings() {
         );
     }
 
+    // `aktif` holds the camera id, not the row — the download filename needs the name.
+    const kameraAktif = cameras.find((c) => c.id === aktif) || null;
+
     return (
         <div className="flex flex-col gap-4">
             <header className="flex flex-col gap-1">
@@ -287,11 +307,11 @@ export default function MyRecordings() {
                 </div>
                 <ul className="divide-y divide-edge">
                     {segments.map((s) => (
-                        <li key={s.id ?? s.filename}>
+                        <li key={s.id ?? s.filename} className="flex items-center gap-1 pr-2 transition-colors hover:bg-surface-sunken">
                             <button
                                 type="button"
                                 onClick={() => setDiputar(s)}
-                                className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-surface-sunken"
+                                className="flex min-w-0 flex-1 items-center justify-between gap-3 px-4 py-3 text-left"
                             >
                                 <span className="min-w-0">
                                     <span className="block truncate text-sm text-content">
@@ -306,6 +326,19 @@ export default function MyRecordings() {
                                 </span>
                                 <span className="shrink-0 text-xs font-medium text-primary">Putar</span>
                             </button>
+                            {/*
+                              * Same URL the player uses — the owner scope already authorises it, so
+                              * this needs no new endpoint. It exists because "you can watch it" and
+                              * "you can keep a copy" are different promises, and the second is the
+                              * one a customer needs when handing footage to somebody else.
+                              */}
+                            <a
+                                href={getSegmentStreamUrl(aktif, s.filename, SCOPE, s)}
+                                download={namaUnduhan(kameraAktif, s)}
+                                className="shrink-0 rounded-control border border-edge px-2.5 py-1.5 text-xs font-medium text-content-muted transition-colors hover:border-edge-strong hover:bg-surface-raised hover:text-content"
+                            >
+                                Unduh
+                            </a>
                         </li>
                     ))}
                 </ul>

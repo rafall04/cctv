@@ -121,4 +121,31 @@ describe('MyRecordings', () => {
         await waitFor(() => expect(screen.getByText('1 potongan')).toBeTruthy());
         expect(screen.getByText('149 MB')).toBeTruthy();
     });
+
+    /*
+     * Watching and keeping are different promises. The owner scope already authorises the bytes, so
+     * this is only an affordance — but without it the sales page has to say "ask our team", which is
+     * a worse product than the one that already exists.
+     */
+    it('offers every segment for download, not just playback', async () => {
+        renderPage();
+
+        await waitFor(() => expect(screen.getByText('1 potongan')).toBeTruthy());
+        const unduh = screen.getByRole('link', { name: 'Unduh' });
+        expect(unduh.getAttribute('href')).toBe('blob:stream');
+    });
+
+    /*
+     * `20260806_200002.mp4` is meaningless once it sits in a folder with the customer's other
+     * downloads, and this file is often on its way to somebody else — an insurer, or the police.
+     */
+    it('names the saved file after the camera and the moment, not the internal filename', async () => {
+        renderPage();
+
+        await waitFor(() => expect(screen.getByText('1 potongan')).toBeTruthy());
+        const nama = screen.getByRole('link', { name: 'Unduh' }).getAttribute('download');
+        expect(nama).toMatch(/^cctv-toko-\d{8}/);
+        expect(nama).toMatch(/\.mp4$/);
+        expect(nama).not.toBe(SEGMENT.filename);
+    });
 });
