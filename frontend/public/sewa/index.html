@@ -316,7 +316,9 @@
   <path d="M1128 282 v-16 m-6 6 l6 -7 l6 7" fill="none" stroke="var(--archive)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
   <text x="1170" y="264" font-size="19" font-weight="700" fill="var(--ink)">Penyimpanan</text>
   <text x="1170" y="286" font-size="19" font-weight="700" fill="var(--ink)">Cloud</text>
-  <text x="1100" y="322" class="mono" font-size="13" fill="var(--ink-2)">arsip rekaman jangka panjang</text>
+  <!-- "jangka panjang" quietly promised a duration nobody agreed to. The diagram's point is that a
+       copy lives off the server; how long it is kept belongs in the contract, not in a picture. -->
+  <text x="1100" y="322" class="mono" font-size="13" fill="var(--ink-2)">salinan arsip di luar lokasi</text>
   <text x="1100" y="342" class="mono" font-size="13" fill="var(--ink-2)">273,6 GB naik / 24 jam</text>
 
   <!-- ===================== USERS ===================== -->
@@ -403,7 +405,8 @@
           <li class="y"><b>Rekaman tidak lewat internet</b> — kamera dan server berada di satu
               jaringan, jadi gangguan ISP tidak memutus rekaman</li>
           <li class="y">Bisa diputar ulang sendiri kapan saja, langsung dari halaman Anda</li>
-          <li class="y">Arsip naik otomatis ke cloud, tidak dibatasi kapasitas disk lokal</li>
+          <li class="y">Arsip naik otomatis ke cloud, jadi tidak semata bergantung pada disk lokal —
+              berapa lama tersimpan kami sepakati tertulis, bukan tanpa batas</li>
           <li class="y">Kamera terkurung di VLAN — tidak terjangkau dari internet</li>
           <li class="y">Mutu rekaman = mutu asli kamera; tidak dikompres ulang demi menghemat jalur</li>
           <li class="y">Bisa ditayangkan untuk publik bila memang untuk warga</li>
@@ -427,7 +430,9 @@
         <ul class="feat">
           <li class="y">Langsung tonton dari HP lewat browser, tanpa aplikasi</li>
           <li class="y"><b>Rekaman tersedia sebagai tambahan</b> — yang terbaru ada di server, selebihnya
-              langsung disalin ke arsip cloud, jadi kedalamannya tidak dibatasi disk kami</li>
+              disalin ke arsip cloud. Itu memperpanjang jangkauannya melewati disk server, tapi
+              <b>bukan berarti tanpa batas</b> — lama simpannya kami sepakati tertulis di depan,
+              dan arsip hanya berisi sejak layanan Anda mulai berjalan</li>
           <li class="y">Halaman pribadi — kamera Anda tidak muncul di halaman publik</li>
           <li class="y">Bayar di muka, dipotong harian; berhenti kapan saja</li>
           <li class="y">Masa coba gratis <span class="masa-coba">3 hari, 1 kamera</span>, sekali per akun</li>
@@ -680,8 +685,10 @@
       <p class="eyebrow">Kalau membangun sendiri</p>
       <h2>Spesifikasi server — berapa kamera butuh apa</h2>
       <p class="lede" style="font-size:16.5px">
-        Angka di bawah diukur dari sistem yang sedang berjalan, bukan perkiraan di atas kertas.
-        Satu hal yang paling sering salah dibelanjakan orang:
+        Angka di bawah adalah <b style="color:var(--ink);font-weight:650">ancar-ancar dari pemasangan
+        yang sudah berjalan</b>, bukan jaminan — kebutuhan sebenarnya bergantung pada kamera yang
+        Anda pakai, dan kami pastikan bersama saat survei. Satu hal yang paling sering salah
+        dibelanjakan orang:
         <b style="color:var(--ink);font-weight:650">yang lebih dulu habis adalah disk, bukan prosesor</b>.
         Perekaman hanya menyalin aliran video apa adanya tanpa mengolah ulang, jadi 25 perekam
         sekaligus cuma memakai sekitar seperdelapan inti prosesor.
@@ -693,21 +700,21 @@
     <p class="hint" style="padding-left:0">← Geser tabel untuk melihat kolom disk →</p>
     <div class="table-wrap">
       <table>
-        <caption>Untuk tonton langsung dan rekam — disk dihitung dari pengukuran, prosesor sengaja dilebihkan (penjelasannya di bawah)</caption>
+        <caption>Untuk tonton langsung dan rekam. Semua angka di sini perkiraan: disk sangat bergantung pada kamera yang Anda pakai, dan kolom prosesor sengaja dilebihkan. Penjelasan keduanya ada di bawah tabel.</caption>
         <thead>
           <tr>
             <th>Jumlah kamera</th>
             <th class="num">Prosesor</th>
             <th class="num">Memori</th>
-            <th class="num">Disk · simpan 24 jam</th>
-            <th class="num">Disk · simpan 3 hari</th>
+            <th class="num">Perkiraan disk · 24 jam</th>
+            <th class="num">Perkiraan disk · 3 hari</th>
           </tr>
         </thead>
         <tbody>
-          <tr><td>Sampai 8 kamera</td><td class="num">2 vCPU</td><td class="num">4 GB</td><td class="num">66 GB</td><td class="num">199 GB</td></tr>
-          <tr><td>Sampai 16 kamera</td><td class="num">2 vCPU</td><td class="num">4 GB</td><td class="num">133 GB</td><td class="num">397 GB</td></tr>
-          <tr><td>Sampai 32 kamera</td><td class="num">4 vCPU</td><td class="num">8 GB</td><td class="num">265 GB</td><td class="num">795 GB</td></tr>
-          <tr><td>Sampai 64 kamera</td><td class="num">8 vCPU</td><td class="num">16 GB</td><td class="num">530 GB</td><td class="num">1,6 TB</td></tr>
+          <tr><td>Sampai 8 kamera</td><td class="num">2 vCPU</td><td class="num">4 GB</td><td class="num">±200 – 300 GB</td><td class="num">±0,5 – 0,9 TB</td></tr>
+          <tr><td>Sampai 16 kamera</td><td class="num">2 vCPU</td><td class="num">4 GB</td><td class="num">±350 – 600 GB</td><td class="num">±1 – 2 TB</td></tr>
+          <tr><td>Sampai 32 kamera</td><td class="num">4 vCPU</td><td class="num">8 GB</td><td class="num">±0,7 – 1,2 TB</td><td class="num">±2 – 4 TB</td></tr>
+          <tr><td>Sampai 64 kamera</td><td class="num">8 vCPU</td><td class="num">16 GB</td><td class="num">±1,5 – 2,5 TB</td><td class="num">±4 – 7,5 TB</td></tr>
         </tbody>
       </table>
     </div>
@@ -733,17 +740,34 @@
         gambar kecil kamera, memeriksa kesehatan kamera, dan mengemas ulang aliran dari kamera milik
         Anda sendiri. Bagian terakhir itu belum kami ukur pada jumlah besar, jadi kami memilih
         melebihkan — server yang kelonggaran jauh lebih murah daripada server yang tersendat.</span></div>
-      <div class="ff"><span class="ff-k">Cara menghitung disk sendiri</span><span class="ff-v">Jumlah
-        kamera × jam simpan × 0,3 GB, lalu tambah 15% cadangan. Angka 0,3 GB per kamera per jam itu
-        hasil ukur; kamera dengan bitrate tinggi butuh lebih banyak.</span></div>
-      <div class="ff"><span class="ff-k">Jaringan</span><span class="ff-v">±0,7 Mbps per kamera untuk
-        masuk ke server, dan sebesar itu juga per penonton untuk tiap kamera yang sedang dibuka.
-        Kestabilan sambungan lebih menentukan daripada besar angkanya.</span></div>
+      <div class="ff"><span class="ff-k">Kenapa disknya rentang, bukan satu angka</span><span class="ff-v">Karena
+        yang menentukan bukan jumlah kameranya, melainkan seberapa banyak data yang dihasilkan tiap
+        kamera — dan itu berbeda-beda jauh. Yang menaikkannya: <b>makin besar megapixel, makin besar
+        penyimpanannya</b> — kamera 4 MP jauh lebih boros daripada 2 MP, dan 8 MP lebih boros lagi.
+        Lalu codec (H.264 hampir dua kali H.265), frame rate yang lebih tinggi, pemandangan yang
+        ramai, dan rekaman malam hari — bintik pada gambar malam mahal untuk dimampatkan. Dua kamera
+        yang dari luar terlihat sama bisa berbeda dua kali lipat.</span></div>
+      <div class="ff"><span class="ff-k">Anggap angka di tabel sebagai ancar-ancar</span><span class="ff-v">Itu
+        perkiraan kasar dari pemasangan yang sudah berjalan, bukan jaminan, dan kamera Anda bisa
+        jatuh di luar rentangnya. Untuk aman, <b>siapkan 1,5–2× dari angka tabel</b>. Disk kebesaran
+        cuma membuang sedikit uang; disk kekecilan membuat sistem mulai menghapus rekaman lama Anda
+        sendiri.</span></div>
+      <div class="ff"><span class="ff-k">Cara memastikannya</span><span class="ff-v">Pasang satu
+        kamera dengan pengaturan yang akan dipakai, rekam satu jam, lalu lihat ukuran berkasnya —
+        tinggal dikalikan jumlah kamera dan jam simpan. Satu pengukuran nyata mengalahkan tabel mana
+        pun, dan kami bantu melakukannya saat survei sebelum Anda membeli disk.</span></div>
+      <div class="ff"><span class="ff-k">Jaringan</span><span class="ff-v">Kamera ke server berjalan
+        di jaringan lokal Anda, bukan lewat internet — jalur itu harus sanggup menampung bitrate
+        semua kamera sekaligus (16 kamera H.264 ≈ 50 Mbps), dan kabel jaringan biasa sudah lebih
+        dari cukup untuk itu. Yang memakai internet hanya penonton dari luar dan unggahan arsip,
+        dan besarnya mengikuti berapa orang menonton bersamaan — bukan berapa kamera terpasang.
+        Kestabilan lebih menentukan daripada besar angkanya.</span></div>
       <div class="ff"><span class="ff-k">Sisakan ruang kosong</span><span class="ff-v">Biarkan
         minimal 15% disk kosong. Saat sisa disk menipis, sistem mulai menghapus rekaman paling lama
         untuk mengambil ruang — itu pengaman, tapi lebih baik tidak pernah terpakai.</span></div>
       <div class="ff"><span class="ff-k">Yang sering kelebihan dibeli</span><span class="ff-v">Prosesor
-        kelas atas dan memori besar. Aplikasinya sendiri berjalan di bawah 700 MB; memori berlebih
+        kelas atas dan memori besar. Aplikasinya sendiri berjalan di bawah 700 MB pada sistem kami;
+        memori berlebih
         hanya jadi cache disk, dan manfaatnya berhenti bertambah jauh sebelum angka besar. Uangnya
         jauh lebih berguna di disk yang lebih besar dan sambungan yang lebih stabil — itu dua hal
         yang benar-benar habis lebih dulu.</span></div>

@@ -1,8 +1,9 @@
 # Rekomendasi Spesifikasi Server
 
 Patokan untuk menentukan server sebelum memasang sistem: berapa kamera butuh berapa CPU, RAM, dan
-disk. **Semua angka dasar di dokumen ini diukur langsung dari server produksi**, bukan diperkirakan
-— sumber pengukurannya ada di bagian [Dari mana angkanya](#dari-mana-angkanya).
+disk. Angkanya berasal dari pengukuran, bukan perkiraan — tapi **baca dulu dari pengukuran yang
+mana**, karena tiap angka punya cakupan berbeda dan dua di antaranya sempat salah besar. Rinciannya
+di [Dari mana angkanya](#dari-mana-angkanya).
 
 > Satu hal yang paling sering salah diperkirakan orang: **CPU hampir tidak pernah jadi batasnya.**
 > Perekaman berjalan dengan *stream copy* (menyalin paket video apa adanya, tanpa transcode), jadi
@@ -42,22 +43,41 @@ penulisan rekaman tidak tersendat.
 
 ## Menghitung disk
 
+> ⚠️ **Angka disk di dokumen ini pernah salah 2,5–5× ke arah yang berbahaya, dan dikoreksi
+> 2026-08-12.** Versi lama memakai `0,3 GB/kamera/jam` yang diukur dari **feed HLS publik yang sudah
+> diturunkan mutunya** (±0,7 Mbps) — bukan kamera 1080p sungguhan. Kamera nyata jauh lebih boros.
+> Salah ke arah ini fatal: disk kekecilan → penuh → pengaman darurat mulai **menghapus rekaman**.
+> Kalau menemukan `0,3 GB` di materi lain, itu sisa versi lama.
+
 Rumusnya:
 
 ```
-GB = jumlah_kamera × jam_retensi × 0,3 GB × 1,15
+GB = jumlah_kamera × jam_retensi × GB_per_jam × 1,15
+GB_per_jam       = bitrate_Mbps × 0,44
 ```
 
-`0,3 GB` adalah pemakaian per kamera per jam hasil pengukuran. `1,15` adalah margin untuk masa
-tenggang penghapusan (file baru benar-benar dihapus pada retensi + grace, di mana
-grace = maksimum antara 10 menit dan 10% retensi) ditambah cadangan.
+`1,15` adalah margin untuk masa tenggang penghapusan (file benar-benar dihapus pada retensi + grace,
+di mana grace = maksimum antara 10 menit dan 10% retensi) ditambah cadangan.
 
-| Kamera | Retensi 4 jam | 24 jam | 72 jam (3 hari) | 7 hari |
+**Yang menentukan ukuran file adalah bitrate, bukan resolusi dan bukan jumlah kamera.** Dua kamera
+1080p yang dari luar terlihat sama bisa berbeda hampir dua kali lipat hanya karena codec-nya.
+Patokan dari instalasi berkamera sungguhan:
+
+| Codec | Per 10 menit | Per kamera per jam | Setara bitrate |
+|---|---|---|---|
+| H.265 | 130–150 MB | **±0,8 GB** | ±1,9 Mbps |
+| H.264 | 230–250 MB | **±1,4 GB** | ±3,2 Mbps |
+| Feed HLS publik (diturunkan mutunya) | ±58 MB | ±0,34 GB | ±0,8 Mbps |
+
+Batas bawah tabel di bawah = H.265, batas atas = H.264. Baris `4 jam` ada karena itu retensi yang
+dipakai produksi sekarang.
+
+| Kamera | 4 jam | 24 jam | 3 hari | 7 hari |
 |---|---|---|---|---|
-| 8 | 11 GB | 66 GB | 199 GB | 464 GB |
-| 16 | 22 GB | 133 GB | 397 GB | 928 GB |
-| 32 | 44 GB | 265 GB | 795 GB | 1,9 TB |
-| 64 | 88 GB | 530 GB | 1,6 TB | 3,7 TB |
+| 8 | 29 – 52 GB | 180 – 310 GB | 530 – 930 GB | 1,2 – 2,2 TB |
+| 16 | 59 – 103 GB | 350 – 620 GB | 1,1 – 1,9 TB | 2,5 – 4,3 TB |
+| 32 | 118 – 206 GB | 710 GB – 1,2 TB | 2,1 – 3,7 TB | 4,9 – 8,7 TB |
+| 64 | 235 – 412 GB | 1,4 – 2,5 TB | 4,2 – 7,4 TB | 9,9 – 17,3 TB |
 
 Tambahkan kapasitas OS, database, dan log di atas angka itu — 20 GB sudah cukup lapang.
 
@@ -65,17 +85,26 @@ Tambahkan kapasitas OS, database, dan log di atas angka itu — 20 GB sudah cuku
 ambang batas, ia mulai **menghapus rekaman** untuk mengambil ruang. Di produksi ambangnya diset
 8 GB dengan target bebas 12 GB. Sisakan minimal 15% kapasitas kosong.
 
-### Kalau bitrate kamera berbeda
+### Yang membuat angkanya membengkak
 
-`0,3 GB/kamera/jam` setara sekitar **0,7 Mbps**. Itu angka untuk kamera dengan bitrate wajar
-(720p–1080p, H.264, dari feed HLS). Untuk kamera bitrate tinggi — 4 Mbps ke atas — kalikan:
+Semua faktor di bawah menaikkan bitrate, dan bitrate-lah yang menentukan ukuran file. Tidak satu pun
+punya pengali pasti — sebutkan sebagai arah, jangan sebagai rumus:
 
-```
-GB per kamera per jam = bitrate_Mbps × 0,44
-```
+- **Resolusi / megapixel.** Kamera 4 MP menyimpan jauh lebih banyak daripada 2 MP pada pengaturan
+  mutu yang sama; 8 MP lebih besar lagi. Ini faktor terbesar setelah codec.
+- **Codec.** H.264 hampir dua kali H.265 untuk gambar yang setara.
+- **Frame rate.** 25 fps terhadap 15 fps menambah ukuran secara nyata.
+- **Keramaian pemandangan.** Bitrate kamera umumnya variabel: jalan ramai menghasilkan file jauh
+  lebih besar daripada gudang yang sepi — dari kamera yang sama persis.
+- **Malam hari / mode inframerah.** Bintik-bintik (noise) pada gambar malam sangat mahal untuk
+  dimampatkan. Banyak instalasi memakai lebih banyak ruang di malam hari daripada siang.
 
-Yang menentukan ukuran file adalah **bitrate**, bukan resolusi. Pengukuran di produksi menunjukkan
-720p, 480p, dan 360p menghasilkan ukuran yang praktis sama karena bitrate-nya memang disetel sama.
+**Aturan aman: kalikan hasil hitungan dengan 1,5–2×.** Disk yang kebesaran hanya membuang sedikit
+uang; disk yang kekecilan membuat pengaman darurat menghapus rekaman pelanggan.
+
+**Sebelum membeli disk, ukur sendiri.** Cara paling jujur: pasang satu kamera dengan pengaturan
+yang akan dipakai, rekam satu jam, lalu lihat ukuran berkasnya. Satu pengukuran nyata mengalahkan
+seluruh tabel di atas.
 
 ---
 
