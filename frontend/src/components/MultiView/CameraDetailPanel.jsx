@@ -11,6 +11,7 @@ import { buildAreaPath } from '../../utils/publicGrowthShare';
 import { formatCompactCount } from '../common/CameraViewerStatsBadges.jsx';
 import CameraReactionBar from './CameraReactionBar.jsx';
 import CameraReportForm from './CameraReportForm.jsx';
+import CameraVehicleCountPanel from './CameraVehicleCountPanel.jsx';
 import SupportInlineNote from './SupportInlineNote.jsx';
 
 function metric(camera, key) {
@@ -93,6 +94,12 @@ export default function CameraDetailPanel({
                 </div>
             </div>
 
+            {/*
+              * Hitung kendaraan otomatis: pertama setelah baris identitas, karena INILAH isi yang
+              * membuat orang berhenti di kamera ini — dan hanya kamera yang benar-benar dipasangi
+              * penghitung yang merendernya, sisanya null (tidak ada kotak kosong di 35 kamera lain).
+              */}
+            <CameraVehicleCountPanel cameraId={camera?.id} />
             {/*
               * Its own row rather than joined to the action buttons above: on a phone that row is
               * already three items wide, and a five-item wrap would push the video further down the

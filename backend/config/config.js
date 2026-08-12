@@ -191,6 +191,20 @@ export const config = {
     statePublishIntervalMs: parseInt(process.env.RECORDING_STATE_PUBLISH_INTERVAL_MS || '15000', 10),
   },
 
+  // Automatic vehicle counting (YOLO) for ONE showcase camera.
+  //
+  // The counter is a separate process that writes a small JSON file; the API only reads it.
+  // Deliberately opt-in and empty by default: with no statsPath the endpoint reports
+  // "not configured" and the public panel renders nothing, so every other deployment is
+  // untouched. Set both vars in backend/.env on the box that runs the counter.
+  vehicleCount: {
+    cameraId: parseInt(process.env.VEHICLE_COUNT_CAMERA_ID || '0', 10),
+    statsPath: process.env.VEHICLE_COUNT_STATS_PATH || '',
+    // Beyond this age the numbers are shown as stopped, never as live. A stalled counter
+    // that keeps displaying its last total would be lying to the public.
+    staleAfterMs: parseInt(process.env.VEHICLE_COUNT_STALE_AFTER_MS || '120000', 10),
+  },
+
   telegram: {
     botToken: process.env.TELEGRAM_BOT_TOKEN || '',
     monitoringChatId: process.env.TELEGRAM_MONITORING_CHAT_ID || process.env.TELEGRAM_CHAT_ID || '',
