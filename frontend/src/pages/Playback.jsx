@@ -36,6 +36,7 @@ import PlaybackUsageGuide from '../components/playback/PlaybackUsageGuide';
 import PlaybackTokenAccess from '../components/playback/PlaybackTokenAccess.jsx';
 import PlaybackOptions from '../components/playback/PlaybackOptions.jsx';
 import LandingMobileDock from '../components/landing/LandingMobileDock.jsx';
+import PromoBanner from '../components/promo/PromoBanner.jsx';
 import { useAdminReconnectRefresh } from '../hooks/admin/useAdminReconnectRefresh';
 import { buildWhatsappLink } from '../utils/whatsappLink.js';
 import { usePlaybackMediaSource } from '../hooks/playback/usePlaybackMediaSource.js';
@@ -1127,6 +1128,8 @@ function Playback({
                         minHeightClassName="min-h-[120px]"
                     />
                 )}
+
+                {!isAdminPlayback && <PromoBanner placement="playback" cameraId={selectedCameraId} className="mt-4" />}
 
                 <PlaybackOptions playbackPolicy={playbackPolicy} showPublicNotice={!isAdminPlayback} autoPlayEnabled={autoPlayEnabled} onAutoPlayToggle={handleAutoPlayToggle} />
                 {!isAdminPlayback && (

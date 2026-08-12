@@ -9,6 +9,7 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import CameraThumbnail from '../components/CameraThumbnail';
+import PromoBanner from '../components/promo/PromoBanner.jsx';
 import { resolvePublicPopupCamera } from '../services/publicCameraResolver';
 import publicGrowthService from '../services/publicGrowthService';
 import { buildAreaShareText, sharePublicText } from '../utils/publicGrowthShare';
@@ -521,6 +522,10 @@ export default function AreaPublicPage() {
                     </>
                 )}
             </section>
+
+            {/* House promo for this area. Sits outside the camera grid section so an
+                empty or errored grid still shows it. */}
+            <PromoBanner placement="area" areaId={area?.id} className="mx-auto w-full max-w-2xl px-4 pb-8" />
 
             {selectedCamera && (
                 <Suspense fallback={null}>

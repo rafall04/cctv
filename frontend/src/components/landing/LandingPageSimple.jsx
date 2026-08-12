@@ -11,6 +11,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useBranding } from '../../contexts/BrandingContext';
 import { useCameras } from '../../contexts/CameraContext';
 import InlineAdSlot from '../ads/InlineAdSlot';
+import PromoBanner from '../promo/PromoBanner.jsx';
 import { isAdsMobileViewport, shouldRenderAdSlot } from '../ads/adsConfig';
 import { shouldDisableAnimations } from '../../utils/animationControl';
 import { setLitePreference } from '../../utils/publicExperienceMode';
@@ -364,6 +365,10 @@ export default function LandingPageSimple({
                     <CamerasMountSkeleton />
                 ))}
             </main>
+
+            {/* Simple mode still gets the house promo: it is one lazy image, not a
+                heavy effect, and this is the front page for low-end devices too. */}
+            <PromoBanner placement="landing" className="mx-auto mt-4 w-full max-w-2xl px-4" />
 
             {showFooterBanner && (
                 <DeferUntilVisible minHeight={120}>

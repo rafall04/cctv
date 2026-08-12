@@ -654,20 +654,30 @@ describe('LandingPage connectivity recovery', () => {
 
     it('tidak auto-preload map dari intersection observer pada device low-end', async () => {
         cameraContextState.deviceTier = 'low';
-        let observedCallback;
+        /*
+         * Assert on the OUTCOME (the map is never preloaded), not on "nothing
+         * observes anything". Other components on this page legitimately use an
+         * IntersectionObserver to defer their own work — the promo banner defers
+         * its fetch that way — so a blanket `observe` assertion would fail for
+         * reasons unrelated to map preloading, and capturing a single callback
+         * could silently end up holding someone else's.
+         *
+         * Firing EVERY registered callback is strictly stronger than the previous
+         * single-callback version: whichever observer belongs to the map preloader,
+         * it gets triggered here.
+         */
+        const callbacks = [];
         const observe = vi.fn();
         const disconnect = vi.fn();
         vi.stubGlobal('IntersectionObserver', vi.fn((callback) => {
-            observedCallback = callback;
+            callbacks.push(callback);
             return { observe, disconnect };
         }));
 
         renderWithRouter(<LandingPage />, { initialEntries: ['/?mode=full&view=grid'] });
 
-        expect(observe).not.toHaveBeenCalled();
-
-        if (observedCallback) {
-            observedCallback([{ isIntersecting: true, intersectionRatio: 1 }]);
+        for (const callback of callbacks) {
+            callback([{ isIntersecting: true, intersectionRatio: 1 }]);
         }
 
         expect(preloadLandingMapView).not.toHaveBeenCalled();

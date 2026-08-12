@@ -13,6 +13,37 @@ import { logSecurityEvent, SECURITY_EVENTS } from '../services/securityAuditLogg
 // Maximum request body size (1MB)
 const MAX_BODY_SIZE = 1 * 1024 * 1024; // 1MB in bytes
 
+/*
+ * Narrow exception to MAX_BODY_SIZE: admin image upload.
+ *
+ * The promo-banner poster arrives base64-encoded in a JSON body, so a 5MB image
+ * is ~6.7MB on the wire and the blanket 1MB cap would reject it. The allowance is
+ * deliberately keyed to one exact method+path rather than a prefix or a header,
+ * so nothing else inherits it.
+ *
+ * This hook runs BEFORE route auth, so an UNAUTHENTICATED caller can still push
+ * this many bytes at that one URL before being rejected with 401. The exposure is
+ * bounded by the global rate limiter's public tier; keep the ceiling small and do
+ * not add routes here casually. The matching per-route `bodyLimit` in
+ * routes/promoBannerRoutes.js must stay in agreement with this number.
+ */
+const MAX_UPLOAD_BODY_SIZE = 8 * 1024 * 1024; // 8MB in bytes
+const LARGE_BODY_ROUTES = [
+    { method: 'POST', pattern: /^\/api\/promo-banners\/\d+\/image\/?(\?|$)/ },
+];
+
+/**
+ * Resolve the body-size ceiling for one request.
+ * @param {object} request - Fastify request
+ * @returns {number} maximum allowed content-length in bytes
+ */
+export function resolveBodySizeLimit(request) {
+    const url = request?.url || '';
+    const method = (request?.method || '').toUpperCase();
+    const allowed = LARGE_BODY_ROUTES.some((route) => route.method === method && route.pattern.test(url));
+    return allowed ? MAX_UPLOAD_BODY_SIZE : MAX_BODY_SIZE;
+}
+
 // Allowed content types for requests with body
 const ALLOWED_CONTENT_TYPES = [
     'application/json',
@@ -161,19 +192,20 @@ async function inputSanitizerPlugin(fastify, _options) {
     // Add body size limit hook
     fastify.addHook('onRequest', async (request, reply) => {
         const contentLength = parseInt(request.headers['content-length'] || '0', 10);
-        
-        if (contentLength > MAX_BODY_SIZE) {
+        const maxSize = resolveBodySizeLimit(request);
+
+        if (contentLength > maxSize) {
             logSecurityEvent(SECURITY_EVENTS.VALIDATION_FAILURE, {
                 reason: 'Request body too large',
                 contentLength,
-                maxSize: MAX_BODY_SIZE,
+                maxSize,
                 endpoint: request.url,
                 method: request.method
             }, request);
-            
+
             return reply.code(413).send({
                 success: false,
-                message: 'Request body too large. Maximum size is 1MB.'
+                message: `Request body too large. Maximum size is ${Math.round(maxSize / (1024 * 1024))}MB.`
             });
         }
     });
@@ -230,5 +262,7 @@ export const inputSanitizerMiddleware = fp(inputSanitizerPlugin, {
 // Export constants for testing
 export const INPUT_SANITIZER_CONFIG = {
     MAX_BODY_SIZE,
+    MAX_UPLOAD_BODY_SIZE,
+    LARGE_BODY_ROUTES,
     ALLOWED_CONTENT_TYPES
 };

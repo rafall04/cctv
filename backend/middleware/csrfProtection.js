@@ -54,6 +54,18 @@ export const CSRF_SKIP_ENDPOINTS = [
 ];
 
 /**
+ * Endpoints that skip CSRF validation but must NOT be matched by prefix.
+ *
+ * `/api/promo-banners/` also hosts admin create/update/delete; skipping the whole
+ * prefix would strip CSRF from those. Only the anonymous click counter is exempt,
+ * matched as a whole path so no admin route can ever fall through it. The worst a
+ * forged request achieves is inflating one promo's click count.
+ */
+export const CSRF_SKIP_PATTERNS = [
+    /^\/api\/promo-banners\/\d+\/click\/?(\?|$)/
+];
+
+/**
  * Generate a cryptographically secure CSRF token
  * @returns {string} 64-character hex string (32 bytes)
  */
@@ -102,7 +114,10 @@ export function isStateChangingMethod(method) {
  */
 export function shouldSkipCsrf(url) {
     if (!url) return false;
-    return CSRF_SKIP_ENDPOINTS.some(endpoint => url.startsWith(endpoint));
+    if (CSRF_SKIP_ENDPOINTS.some(endpoint => url.startsWith(endpoint))) {
+        return true;
+    }
+    return CSRF_SKIP_PATTERNS.some(pattern => pattern.test(url));
 }
 
 /**

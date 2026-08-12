@@ -23,6 +23,7 @@ import LandingHero from '../components/landing/LandingHero';
 import LandingFooter from '../components/landing/LandingFooter';
 import LandingCamerasSection from '../components/landing/LandingCamerasSection';
 import LandingPublicTopStack from '../components/landing/LandingPublicTopStack';
+import PromoBanner from '../components/promo/PromoBanner.jsx';
 import LandingDiscoveryStrip from '../components/landing/LandingDiscoveryStrip';
 import LandingQuickAccessStrip from '../components/landing/LandingQuickAccessStrip';
 import LandingMobileDock from '../components/landing/LandingMobileDock';
@@ -323,6 +324,11 @@ function LandingPageContent({ onRefreshPauseChange }) {
                             />
                         </DeferUntilVisible>
                     )}
+
+                    {/* House promo. Deliberately NOT gated on the ads config — this is
+                        the operator's own advertising and must keep showing when the
+                        third-party network is switched off. */}
+                    <PromoBanner placement="landing" className="mx-auto mt-6 w-full max-w-2xl px-4" />
 
                     {saweriaEnabled && saweriaLeaderboardLink && (
                         <Suspense fallback={<DeferredSurfaceFallback className="mx-auto mt-6 min-h-[140px] max-w-7xl" />}>
