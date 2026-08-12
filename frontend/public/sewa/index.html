@@ -192,6 +192,7 @@
     /* Room for the bar so the last line of the page is never trapped underneath it. */
     body{padding-bottom:86px}
   }
+  .card-title{padding:16px 22px 0;font-size:16px;font-weight:700;color:var(--ink);letter-spacing:-.012em}
   .card{background:var(--surface);border:1px solid var(--edge);border-radius:8px;box-shadow:var(--e1)}
 
   /* ---------- dua jalur, dibuat kelihatan ----------
@@ -445,7 +446,7 @@
           <li class="y">Bisa diputar ulang sendiri kapan saja, langsung dari halaman Anda</li>
           <li class="y"><b>Arsip cloud tanpa biaya tambahan</b> — rekaman naik otomatis, jadi tidak
               semata bergantung pada disk lokal. Sudah termasuk, tidak ada tagihan penyimpanan
-              terpisah; berapa lama tersimpan kami sepakati tertulis di depan.</li>
+              terpisah. Untuk lama simpannya, hubungi admin.</li>
           <li class="y">Kamera terkurung di VLAN — tidak terjangkau dari internet</li>
           <li class="y">Mutu rekaman = mutu asli kamera; tidak dikompres ulang demi menghemat jalur</li>
           <li class="y">Bisa ditayangkan untuk publik bila memang untuk warga</li>
@@ -470,7 +471,7 @@
           <li class="y">Langsung tonton dari HP lewat browser, tanpa aplikasi</li>
           <li class="y"><b>Rekaman tersedia sebagai tambahan</b> — yang terbaru ada di server, selebihnya
               disalin ke arsip cloud. Itu memperpanjang jangkauannya melewati disk server, tapi
-              <b>bukan berarti tanpa batas</b> — lama simpannya kami sepakati tertulis di depan,
+              <b>bukan berarti tanpa batas</b> — untuk lama simpannya hubungi admin,
               dan arsip hanya berisi sejak layanan Anda mulai berjalan</li>
           <li class="y">Halaman pribadi — kamera Anda tidak muncul di halaman publik</li>
           <li class="y">Bayar di muka, dipotong harian; berhenti kapan saja</li>
@@ -569,7 +570,7 @@
 
   <!-- ============ TOPOLOGI SAAT SEWA ============ -->
   <div class="actions">
-    <a class="btn btn-ghost" href="./perbandingan.png?v=5a703d8b" download="perbandingan-cctv.png">
+    <a class="btn btn-ghost" href="./perbandingan.png?v=65dea741" download="perbandingan-cctv.png">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/>
@@ -802,6 +803,25 @@
       <div class="meta">
         <span>Contoh pemasangan tingkat desa &middot; <b>3 Agustus 2026</b></span>
       </div>
+
+    <div class="card">
+      <p class="card-title">Yang Anda dapat dengan memasang sendiri</p>
+      <ul class="feat">
+        <li class="y"><b>Arsip cloud tanpa biaya tambahan</b> — rekaman naik otomatis ke luar lokasi,
+            sudah termasuk. Tidak ada tagihan penyimpanan terpisah — untuk lama simpannya,
+            hubungi admin.</li>
+        <li class="y"><b>Rekaman tidak lewat internet</b> — kamera dan server berada di satu jaringan,
+            jadi gangguan ISP tidak memutus rekaman.</li>
+        <li class="y"><b>Jumlah kamera tidak dibatasi paket</b> — menambah kamera tidak menaikkan
+            tarif bulanan.</li>
+        <li class="y"><b>Mutu rekaman sama dengan aslinya</b> — tidak dikompres ulang demi menghemat
+            jalur internet.</li>
+        <li class="y"><b>Kamera terkurung di VLAN</b> — tidak terjangkau dari internet, dan alamat
+            RTSP-nya tidak pernah keluar dari server.</li>
+        <li class="y"><b>Pemasangan sampai jalan, gratis dari kami</b> — kami yang memasang dan
+            menyetel sampai sistemnya benar-benar berjalan di tempat Anda.</li>
+      </ul>
+    </div>
     </div>
 
 
@@ -989,7 +1009,7 @@
   </div>
 
   <div class="actions">
-    <a class="btn" href="./topologi.png?v=00d6d727" download="topologi-jaringan-cctv.png">
+    <a class="btn" href="./topologi.png?v=73e58e34" download="topologi-jaringan-cctv.png">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/>
