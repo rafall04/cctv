@@ -36,13 +36,21 @@ export default async function promoMediaRoutes(fastify, options) {
         prefix: PREFIX,
         decorateReply: false,
         /*
+         * Cache headers come from the plugin's own options, NOT a `setHeaders`
+         * callback. @fastify/static invokes that callback as
+         * `setHeaders(reply, path, stat)` — a Fastify Reply, which has `.header()`
+         * and no `.setHeader()`. Calling the Node API on it throws inside the send
+         * pump, and because that happens after the route matched, the request never
+         * gets a response at all: every poster request HUNG (curl reported no
+         * status) instead of failing loudly. Shipped once; do not reintroduce.
+         *
          * Safe to cache forever: a replaced poster is written under a NEW random base
          * name and the old files are unlinked, so a cached URL can never go stale in
          * place — the trap that bit meta-config.js when an unhashed filename was
          * served `immutable`.
          */
-        setHeaders: (res) => {
-            res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-        },
+        cacheControl: true,
+        maxAge: 31536000000,
+        immutable: true,
     });
 }
