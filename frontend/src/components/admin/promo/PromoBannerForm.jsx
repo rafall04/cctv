@@ -6,7 +6,7 @@
  * SideEffects: Reads a local file into base64 and POSTs it to the image endpoint.
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { uploadPromoBannerImage } from '../../../services/promoBannerService';
 import { useNotification } from '../../../contexts/NotificationContext';
 
@@ -120,14 +120,46 @@ function TargetPicker({ label, options, selected, onChange, searchable }) {
     );
 }
 
-export default function PromoBannerForm({ promo, areas, cameras, onSubmit, onCancel, saving }) {
+export default function PromoBannerForm({ promo, areas, cameras, onSubmit, onCancel, onUploaded, saving }) {
     const [form, setForm] = useState(EMPTY);
     const [uploading, setUploading] = useState(false);
     const [uploadInfo, setUploadInfo] = useState(null);
+    /*
+     * A brand-new promo has no id yet, and the image endpoint needs one. Rather than
+     * dead-ending the file picker until after a save, the chosen file is held here
+     * with a local preview and uploaded automatically once the promo exists.
+     */
+    const [pendingFile, setPendingFile] = useState(null);
+    const [pendingPreview, setPendingPreview] = useState(null);
     const fileInputRef = useRef(null);
+    // Mirrors pendingPreview so unmount cleanup can revoke without a state update.
+    const pendingPreviewRef = useRef(null);
     const { showNotification } = useNotification();
 
+    // An object URL holds its blob until revoked.
+    const replacePendingPreview = useCallback((url) => {
+        if (pendingPreviewRef.current) {
+            URL.revokeObjectURL(pendingPreviewRef.current);
+        }
+        pendingPreviewRef.current = url;
+        setPendingPreview(url);
+    }, []);
+
+    useEffect(() => () => {
+        if (pendingPreviewRef.current) {
+            URL.revokeObjectURL(pendingPreviewRef.current);
+            pendingPreviewRef.current = null;
+        }
+    }, []);
+
+    /*
+     * Switching to a different promo drops any draft poster, so it can never be
+     * attached to the wrong banner. The save path is unaffected: handleSubmit holds
+     * the file in its own closure, so clearing state here does not cancel the upload.
+     */
     useEffect(() => {
+        setPendingFile(null);
+        replacePendingPreview(null);
         if (!promo) {
             setForm(EMPTY);
             setUploadInfo(null);
@@ -144,7 +176,7 @@ export default function PromoBannerForm({ promo, areas, cameras, onSubmit, onCan
             camera_ids: promo.camera_ids || [],
         });
         setUploadInfo(null);
-    }, [promo]);
+    }, [promo, replacePendingPreview]);
 
     const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
 
@@ -154,28 +186,52 @@ export default function PromoBannerForm({ promo, areas, cameras, onSubmit, onCan
             : [...form.placements, key]);
     };
 
+    // Clearing the input matters: without it, re-picking the SAME file fires no
+    // change event, so a rejected file cannot be retried after fixing nothing.
+    const resetFileInput = () => {
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
+    };
+
+    const rejectionReason = (file) => {
+        if (!ACCEPTED_TYPES.includes(file.type)) {
+            return { title: 'Format tidak didukung', message: 'Gunakan PNG, JPG, atau WebP.' };
+        }
+        if (file.size > MAX_UPLOAD_BYTES) {
+            return {
+                title: 'Gambar terlalu besar',
+                message: `Maksimal ${Math.round(MAX_UPLOAD_BYTES / (1024 * 1024))}MB, berkas ini ${(file.size / (1024 * 1024)).toFixed(1)}MB.`,
+            };
+        }
+        return null;
+    };
+
     const handleFile = async (event) => {
         const file = event.target.files?.[0];
         if (!file) {
             return;
         }
-        if (!promo?.id) {
-            showNotification({ type: 'warning', title: 'Simpan dulu', message: 'Simpan promo terlebih dahulu, baru unggah gambar.' });
-            return;
-        }
-        if (!ACCEPTED_TYPES.includes(file.type)) {
-            showNotification({ type: 'error', title: 'Format tidak didukung', message: 'Gunakan PNG, JPG, atau WebP.' });
-            return;
-        }
-        if (file.size > MAX_UPLOAD_BYTES) {
-            showNotification({
-                type: 'error',
-                title: 'Gambar terlalu besar',
-                message: `Maksimal ${Math.round(MAX_UPLOAD_BYTES / (1024 * 1024))}MB, berkas ini ${(file.size / (1024 * 1024)).toFixed(1)}MB.`,
-            });
+
+        const rejection = rejectionReason(file);
+        if (rejection) {
+            showNotification({ type: 'error', ...rejection });
+            resetFileInput();
             return;
         }
 
+        if (!promo?.id) {
+            // Nothing to attach it to yet — hold it and preview locally.
+            // handleSubmit uploads it as soon as the promo has an id.
+            setPendingFile(file);
+            replacePendingPreview(URL.createObjectURL(file));
+            return;
+        }
+
+        await uploadFile(promo.id, file);
+    };
+
+    const uploadFile = async (promoId, file) => {
         setUploading(true);
         try {
             const base64 = await new Promise((resolve, reject) => {
@@ -185,37 +241,66 @@ export default function PromoBannerForm({ promo, areas, cameras, onSubmit, onCan
                 reader.readAsDataURL(file);
             });
 
-            const result = await uploadPromoBannerImage(promo.id, base64);
+            const result = await uploadPromoBannerImage(promoId, base64);
             if (!result.success) {
                 showNotification({ type: 'error', title: 'Gagal mengunggah', message: result.message });
-                return;
+                return false;
             }
 
             const image = result.data?.image;
             setUploadInfo({ ...image, sourceName: file.name });
+            setPendingFile(null);
+            replacePendingPreview(null);
             showNotification({
                 type: 'success',
                 title: 'Gambar diunggah',
                 message: `Dikonversi ke WebP: ${(file.size / 1024).toFixed(0)}KB → ${(image.bytes / 1024).toFixed(0)}KB.`,
             });
+            // The list row still shows "Tanpa gambar" until the parent refetches.
+            onUploaded?.();
+            return true;
         } catch (error) {
             showNotification({ type: 'error', title: 'Gagal mengunggah', message: error.message });
+            return false;
         } finally {
             setUploading(false);
-            if (fileInputRef.current) {
-                fileInputRef.current.value = '';
-            }
+            resetFileInput();
         }
     };
 
-    const handleSubmit = (event) => {
+    const handleSubmit = async (event) => {
         event.preventDefault();
-        onSubmit({
+
+        /*
+         * A banner targeted at "area" or "camera" with nothing selected matches
+         * nothing and silently never appears. Better to say so than to let the
+         * operator believe it is live.
+         */
+        if (form.placements.length === 0) {
+            showNotification({ type: 'warning', title: 'Lokasi tampil kosong', message: 'Centang minimal satu lokasi tampil.' });
+            return;
+        }
+        if (form.target_mode === 'area' && form.area_ids.length === 0) {
+            showNotification({ type: 'warning', title: 'Area belum dipilih', message: 'Pilih minimal satu area, atau ubah ke "Semua kamera".' });
+            return;
+        }
+        if (form.target_mode === 'camera' && form.camera_ids.length === 0) {
+            showNotification({ type: 'warning', title: 'Kamera belum dipilih', message: 'Pilih minimal satu kamera, atau ubah ke "Semua kamera".' });
+            return;
+        }
+
+        const saved = await onSubmit({
             ...form,
             priority: Number.parseInt(form.priority, 10) || 100,
             start_date: form.start_date || null,
             end_date: form.end_date || null,
         });
+
+        // Now that the promo has an id, flush the poster the operator picked
+        // while it was still a draft.
+        if (saved?.id && pendingFile) {
+            await uploadFile(saved.id, pendingFile);
+        }
     };
 
     const areaOptions = useMemo(() => areas.map((area) => ({ id: area.id, label: area.name })), [areas]);
@@ -224,7 +309,10 @@ export default function PromoBannerForm({ promo, areas, cameras, onSubmit, onCan
         [cameras]
     );
 
-    const currentImageBase = uploadInfo?.imageBase || promo?.image_base;
+    // A locally-picked file wins over what is stored, so the operator sees the
+    // poster they just chose rather than the one it is about to replace.
+    const storedImageBase = uploadInfo?.imageBase || promo?.image_base;
+    const previewSrc = pendingPreview || (storedImageBase ? `/api/promo-media/${storedImageBase}-640.webp` : null);
 
     return (
         <form onSubmit={handleSubmit} className="space-y-5">
@@ -243,9 +331,9 @@ export default function PromoBannerForm({ promo, areas, cameras, onSubmit, onCan
             <div className="rounded-card border border-edge bg-surface-sunken p-3">
                 <span className="mb-2 block text-sm font-medium text-content">Gambar poster</span>
 
-                {currentImageBase ? (
+                {previewSrc ? (
                     <img
-                        src={`/api/promo-media/${currentImageBase}-640.webp`}
+                        src={previewSrc}
                         alt="Pratinjau poster promo"
                         className="mb-3 h-auto w-full max-w-sm rounded-card border border-edge"
                     />
@@ -258,15 +346,18 @@ export default function PromoBannerForm({ promo, areas, cameras, onSubmit, onCan
                     type="file"
                     accept={ACCEPTED_TYPES.join(',')}
                     onChange={handleFile}
-                    disabled={uploading || !promo?.id}
+                    disabled={uploading}
                     aria-label="Pilih gambar poster"
                     className="block w-full text-sm text-content-muted file:mr-3 file:rounded-control file:border file:border-edge file:bg-surface file:px-3 file:py-1.5 file:text-sm file:text-content"
                 />
                 <p className="mt-2 text-xs text-content-subtle">
-                    {promo?.id
-                        ? `PNG/JPG/WebP, maksimal ${Math.round(MAX_UPLOAD_BYTES / (1024 * 1024))}MB. Otomatis dikecilkan jadi WebP 1200px + 640px.`
-                        : 'Simpan promo dulu, lalu unggah gambarnya.'}
+                    PNG/JPG/WebP, maksimal {Math.round(MAX_UPLOAD_BYTES / (1024 * 1024))}MB. Otomatis dikecilkan jadi WebP 1200px + 640px.
                 </p>
+                {pendingFile && (
+                    <p className="mt-1 text-xs text-content-muted">
+                        <strong>{pendingFile.name}</strong> akan diunggah otomatis begitu promo disimpan.
+                    </p>
+                )}
                 {uploading && <p className="mt-2 text-xs text-content-muted">Mengunggah dan mengonversi…</p>}
                 {uploadInfo && (
                     <p className="mt-2 font-mono text-xs tabular-nums text-content-muted">

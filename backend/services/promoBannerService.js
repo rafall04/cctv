@@ -162,6 +162,28 @@ const ADMIN_SELECT = `
     FROM promo_banners p
 `;
 
+/**
+ * Why the server decides this and not the admin UI: the schedule window is
+ * evaluated against the configured LOCAL date (WIB), and a browser computing
+ * "today" from UTC disagrees for the first 7 hours of every local day. The panel
+ * would then label an already-expired banner "Tayang". One source of truth.
+ */
+export function resolveScheduleState(promo, today = getLocalDate()) {
+    if (!promo.active) {
+        return 'inactive';
+    }
+    if (!promo.image_base) {
+        return 'no_image';
+    }
+    if (promo.start_date && promo.start_date > today) {
+        return 'not_started';
+    }
+    if (promo.end_date && promo.end_date < today) {
+        return 'expired';
+    }
+    return 'live';
+}
+
 function attachTargets(promo) {
     if (!promo) {
         return null;
@@ -170,11 +192,14 @@ function attachTargets(promo) {
         'SELECT target_type, target_id FROM promo_banner_targets WHERE promo_id = ? ORDER BY target_id',
         [promo.id]
     );
+    const scheduleState = resolveScheduleState(promo);
     return {
         ...promo,
         placements: parsePlacements(promo.placements),
         area_ids: targets.filter((t) => t.target_type === 'area').map((t) => t.target_id),
         camera_ids: targets.filter((t) => t.target_type === 'camera').map((t) => t.target_id),
+        schedule_state: scheduleState,
+        is_live: scheduleState === 'live' ? 1 : 0,
     };
 }
 

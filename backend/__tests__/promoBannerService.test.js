@@ -298,6 +298,48 @@ describe('targeting writes', () => {
     });
 });
 
+describe('schedule state is decided server-side', () => {
+    /*
+     * The admin panel used to recompute this from the browser clock in UTC while
+     * the resolver used the app's LOCAL date, so for the first 7 hours of every
+     * WIB day an already-expired banner was still labelled "Tayang".
+     */
+    it.each([
+        ['live', {}],
+        ['inactive', { active: false }],
+        ['not_started', { start_date: '2026-09-01' }],
+        ['expired', { end_date: '2026-08-11' }],
+    ])('reports %s', (expected, overrides) => {
+        makeBanner(overrides);
+        const [row] = listPromoBanners();
+        expect(row.schedule_state).toBe(expected);
+        expect(row.is_live).toBe(expected === 'live' ? 1 : 0);
+    });
+
+    it('reports no_image for a banner that has never had a poster', () => {
+        makeBanner({ image_base: null });
+        const [row] = listPromoBanners();
+        expect(row.schedule_state).toBe('no_image');
+        expect(row.is_live).toBe(0);
+    });
+
+    it('agrees with what the public resolver actually serves', () => {
+        // The chip and the visitor must never disagree.
+        for (const overrides of [{}, { active: false }, { start_date: '2026-09-01' }, { end_date: '2026-08-11' }, { image_base: null }]) {
+            resetSchema();
+            makeBanner(overrides);
+            const [row] = listPromoBanners();
+            const served = resolvePromoBannerForContext({ cameraId: 11, placement: 'popup' }) !== null;
+            expect(Boolean(row.is_live), JSON.stringify(overrides)).toBe(served);
+        }
+    });
+
+    it('treats the last day of the window as still live', () => {
+        makeBanner({ start_date: '2026-08-12', end_date: '2026-08-12' });
+        expect(listPromoBanners()[0].schedule_state).toBe('live');
+    });
+});
+
 describe('stats', () => {
     it('accumulates impressions and clicks into one row per day', () => {
         const promo = makeBanner();

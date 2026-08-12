@@ -46,16 +46,24 @@ function Chip({ children, tone = 'neutral' }) {
     );
 }
 
+const STATE_LABELS = {
+    inactive: 'Nonaktif',
+    no_image: 'Tanpa gambar',
+    not_started: 'Belum mulai',
+    expired: 'Kedaluwarsa',
+};
+
 function PromoRow({ promo, areaNameById, onEdit, onDelete }) {
     /*
-     * "Aktif" here is the operator's switch. A banner can be switched on and still
+     * "Aktif" is only the operator's switch. A banner can be switched on and still
      * not be showing — no image yet, or outside its schedule — so those states are
-     * called out separately rather than hidden behind one green chip.
+     * named separately rather than hidden behind one green chip.
+     *
+     * The state comes from the SERVER, which evaluates the schedule in the app's
+     * local timezone. Recomputing it here from the browser clock disagreed with the
+     * backend for the first 7 hours of every WIB day.
      */
-    const today = new Date().toISOString().slice(0, 10);
-    const notStarted = promo.start_date && promo.start_date > today;
-    const expired = promo.end_date && promo.end_date < today;
-    const live = Boolean(promo.active) && Boolean(promo.image_base) && !notStarted && !expired;
+    const live = Boolean(promo.is_live);
 
     const targetSummary = promo.target_mode === 'area'
         ? (promo.area_ids || []).map((id) => areaNameById.get(id) || `#${id}`).join(', ') || 'belum dipilih'
@@ -83,7 +91,7 @@ function PromoRow({ promo, areaNameById, onEdit, onDelete }) {
                         <h3 className="min-w-0 truncate text-base font-semibold text-content">{promo.title}</h3>
                         {live
                             ? <Chip tone="live">Tayang</Chip>
-                            : <Chip tone="idle">{!promo.active ? 'Nonaktif' : !promo.image_base ? 'Tanpa gambar' : notStarted ? 'Belum mulai' : 'Kedaluwarsa'}</Chip>}
+                            : <Chip tone="idle">{STATE_LABELS[promo.schedule_state] || 'Tidak tayang'}</Chip>}
                     </div>
 
                     <p className="mt-1 text-sm text-content-muted">
@@ -152,10 +160,20 @@ export default function PromoBannerManagement() {
 
         const load = async () => {
             setLoading(true);
+            /*
+             * Each request is caught individually. cameraService.getAllCameras THROWS
+             * on failure instead of returning { success: false }, so a bare Promise.all
+             * would reject and leave the whole page stuck on "Memuat…" — including the
+             * promo list, which does not depend on cameras at all.
+             */
+            const settle = (promise) => promise.then(
+                (value) => value,
+                (error) => ({ success: false, message: error?.message || 'Gagal memuat' })
+            );
             const [promoResult, areaResult, cameraResult] = await Promise.all([
-                getAllPromoBanners(),
-                areaService.getAllAreas(),
-                cameraService.getAllCameras(),
+                settle(getAllPromoBanners()),
+                settle(areaService.getAllAreas()),
+                settle(cameraService.getAllCameras()),
             ]);
             if (cancelled) {
                 return;
@@ -192,19 +210,20 @@ export default function PromoBannerManagement() {
 
         if (!result.success) {
             showNotification({ type: 'error', title: 'Gagal menyimpan', message: result.message });
-            return;
+            return null;
         }
 
         showNotification({
             type: 'success',
             title: editing?.id ? 'Promo diperbarui' : 'Promo dibuat',
-            message: editing?.id ? '' : 'Sekarang unggah gambar posternya.',
         });
 
         await loadPromos();
-        // Stay on the new banner so the operator can upload its poster right away —
-        // the image endpoint needs an id, so a fresh banner has no image yet.
+        // Stay on the saved banner so the operator keeps editing it — and so the form
+        // can attach a poster that was picked before this promo had an id.
         setEditing(result.data || null);
+        // Returned so the form knows the new id and can flush a pending upload.
+        return result.data || null;
     };
 
     const handleDelete = async () => {
@@ -257,6 +276,7 @@ export default function PromoBannerManagement() {
                         cameras={cameras}
                         saving={saving}
                         onSubmit={handleSubmit}
+                        onUploaded={loadPromos}
                         onCancel={() => setEditing(null)}
                     />
                 </section>
