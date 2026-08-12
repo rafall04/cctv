@@ -471,7 +471,7 @@ const start = async () => {
         }
 
         console.log('');
-        console.log('🚀 RAF NET CCTV Backend Server Started');
+        console.log('🚀 RAF CCTV Backend Server Started');
         console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         console.log(`📡 Server: http://${config.server.host}:${config.server.port}`);
         console.log(`🔧 Environment: ${config.server.env}`);

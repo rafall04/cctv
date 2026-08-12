@@ -224,7 +224,7 @@ export default function MyAccount() {
                     )}
                 </dl>
                 <p className="mt-4 text-xs text-content-muted">
-                    Ingin berhenti berlangganan atau menghapus akun? Hubungi admin RAF NET — langganan &amp; sisa saldo perlu diproses dulu.
+                    Ingin berhenti berlangganan atau menghapus akun? Hubungi admin RAF CCTV — langganan &amp; sisa saldo perlu diproses dulu.
                 </p>
             </div>
         </div>

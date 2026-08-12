@@ -275,7 +275,7 @@ class PaymentService {
             // NOT help, so don't suggest it; point the customer to admin instead.
             const flagged = /suspicious|buyer|fraud|blacklist|blocked/i.test(gatewayMsg);
             const err = new Error(flagged
-                ? 'Pembayaran untuk akun ini sedang ditolak oleh gateway. Coba lagi nanti, atau hubungi admin RAF NET untuk memverifikasi akun Anda.'
+                ? 'Pembayaran untuk akun ini sedang ditolak oleh gateway. Coba lagi nanti, atau hubungi admin RAF CCTV untuk memverifikasi akun Anda.'
                 : 'Pembayaran gagal dibuat di gateway. Coba sebentar lagi, atau pilih metode pembayaran lain.');
             err.statusCode = 400;
             err.expose = true; // friendly message goes to the customer, not a generic error

@@ -74,7 +74,7 @@ export async function takeSnapshot(videoElement, options = {}) {
                             await navigator.share({
                                 files: [file],
                                 title: `Snapshot - ${cameraName}`,
-                                text: `Snapshot dari ${branding.company_name || 'RAF NET'} CCTV`
+                                text: `Snapshot dari ${branding.company_name || 'RAF CCTV'} CCTV`
                             });
                             resolve({
                                 success: true,
@@ -178,7 +178,7 @@ function addWatermark(ctx, canvas, options) {
     ctx.fillText(branding.logo_text || 'R', logoX, logoY);
 
     // Company name or custom text
-    const displayText = watermarkText || branding.company_name || 'RAF NET';
+    const displayText = watermarkText || branding.company_name || 'RAF CCTV';
     ctx.font = `bold ${fontSize}px Arial`;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';

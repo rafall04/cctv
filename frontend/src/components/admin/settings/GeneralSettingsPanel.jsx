@@ -296,7 +296,7 @@ export default function GeneralSettingsPanel() {
                             value={settings.event_banner_text}
                             onChange={handleChange}
                             rows={3}
-                            placeholder="Sambut momen spesial bersama RAF NET CCTV publik."
+                            placeholder="Sambut momen spesial bersama RAF CCTV publik."
                             className="w-full resize-none rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-content transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                         />
                     </Field>

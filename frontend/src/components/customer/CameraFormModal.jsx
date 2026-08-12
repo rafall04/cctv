@@ -132,7 +132,7 @@ export default function CameraFormModal({ camera = null, areas = [], onClose, on
                         <span className="text-sm text-content-muted">
                             Tampilkan di hub publik
                             <span className="mt-0.5 block text-xs text-content-muted">
-                                Kamera muncul di peta &amp; daftar publik RAF NET — hanya selama saldo aktif. Bisa diubah kapan saja.
+                                Kamera muncul di peta &amp; daftar publik RAF CCTV — hanya selama saldo aktif. Bisa diubah kapan saja.
                             </span>
                         </span>
                     </label>
@@ -142,7 +142,7 @@ export default function CameraFormModal({ camera = null, areas = [], onClose, on
                         </label>
                         <input id="cam-rtsp" name="private_rtsp_url" value={form.private_rtsp_url} onChange={handleChange} maxLength={500} className={inputClass} placeholder="rtsp://user:pass@ip-kamera:554/stream" />
                         <p className="mt-1 text-xs text-content-muted">
-                            Dari aplikasi kamera/NVR Anda. Pastikan kamera bisa diakses dari jaringan RAF NET.
+                            Dari aplikasi kamera/NVR Anda. Pastikan kamera bisa diakses dari jaringan RAF CCTV.
                         </p>
                         <details className="mt-2 rounded-xl border border-edge bg-surface-sunken p-3 text-xs">
                             <summary className="cursor-pointer font-medium text-primary">Tidak tahu URL RTSP? Klik di sini</summary>
@@ -153,7 +153,7 @@ export default function CameraFormModal({ camera = null, areas = [], onClose, on
                                     <li><b>Dahua/Imou:</b> <code>rtsp://user:pass@IP:554/cam/realmonitor?channel=1&amp;subtype=0</code></li>
                                     <li><b>EZVIZ/V380/lainnya:</b> cek menu aplikasi → Pengaturan → RTSP/ONVIF.</li>
                                 </ul>
-                                <p><b>IP kamera</b> = alamat lokal kamera di jaringan Anda (mis. 192.168.1.10). <b>user/password</b> = login kamera. Tidak yakin? Hubungi admin RAF NET — kami bantu setel.</p>
+                                <p><b>IP kamera</b> = alamat lokal kamera di jaringan Anda (mis. 192.168.1.10). <b>user/password</b> = login kamera. Tidak yakin? Hubungi admin RAF CCTV — kami bantu setel.</p>
                             </div>
                         </details>
                     </div>

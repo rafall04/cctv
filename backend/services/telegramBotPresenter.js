@@ -123,7 +123,7 @@ function btn(text, action, ...params) {
 
 export function buildHelpMessage({ authorized, chatId, writeEnabled = {} } = {}) {
     const lines = [
-        '<b>🤖 RAF NET — Bot Pengelola Pelanggan</b>',
+        '<b>🤖 RAF CCTV — Bot Pengelola Pelanggan</b>',
         '',
         authorized
             ? 'Chat ini <b>diizinkan</b> mengelola pelanggan. Perintah tersedia:'
@@ -320,7 +320,7 @@ export function buildCustomersPage({ customers, page, pageCount, total, query })
 export function buildStatsMessage(stats) {
     return {
         text: [
-            '📊 <b>Ringkasan RAF NET</b>',
+            '📊 <b>Ringkasan RAF CCTV</b>',
             '━━━━━━━━━━━━━━━━━━━━',
             '<b>Pelanggan</b>',
             `• Total: ${stats.customersTotal}`,

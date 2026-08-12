@@ -94,7 +94,7 @@ export function usePlaybackShareAndSnapshot({
             ctx.font = `bold ${fontSize}px Arial`;
             ctx.textAlign = 'left';
             ctx.textBaseline = 'middle';
-            ctx.fillText(branding?.company_name || 'RAF NET', logoX + logoSize / 2 + padding / 2, logoY - fontSize / 3);
+            ctx.fillText(branding?.company_name || 'RAF CCTV', logoX + logoSize / 2 + padding / 2, logoY - fontSize / 3);
 
             ctx.font = `${fontSize * 0.7}px Arial`;
             ctx.fillStyle = '#94a3b8';

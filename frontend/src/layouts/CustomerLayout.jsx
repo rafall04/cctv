@@ -65,7 +65,7 @@ export default function CustomerLayout({ children }) {
                 <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
                     <div className="min-w-0">
                         <h1 className="truncate text-lg font-bold text-content">
-                            {branding?.company_name || 'RAF NET CCTV'}
+                            {branding?.company_name || 'RAF CCTV'}
                         </h1>
                         <p className="truncate text-xs text-content-muted">
                             Portal Pelanggan{user?.username ? ` — ${user.username}` : ''}

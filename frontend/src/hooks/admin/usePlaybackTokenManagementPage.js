@@ -13,7 +13,7 @@ import { useConfirm } from '../../contexts/ConfirmContext';
 import { useNotification } from '../../contexts/NotificationContext';
 import { TIMESTAMP_STORAGE, useTimezone } from '../../contexts/TimezoneContext';
 
-export const DEFAULT_PLAYBACK_TOKEN_TEMPLATE = `Halo, berikut token akses playback CCTV RAF NET.
+export const DEFAULT_PLAYBACK_TOKEN_TEMPLATE = `Halo, berikut token akses playback RAF CCTV.
 
 Kode Akses: {{token}}
 Link: {{playback_url}}

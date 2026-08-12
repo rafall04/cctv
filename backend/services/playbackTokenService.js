@@ -15,7 +15,7 @@ import { normalizeCameraIds, parseCameraIdsJson, parseAreaIdsJson, resolveAreaId
 export const PLAYBACK_TOKEN_COOKIE = 'raf_playback_token';
 export const PLAYBACK_TOKEN_SESSION_COOKIE = 'raf_playback_session';
 
-const DEFAULT_SHARE_TEMPLATE = `Halo, berikut token akses playback CCTV RAF NET.
+const DEFAULT_SHARE_TEMPLATE = `Halo, berikut token akses playback RAF CCTV.
 
 Kode Akses: {{token}}
 Link: {{playback_url}}

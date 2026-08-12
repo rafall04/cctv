@@ -75,7 +75,7 @@ export default function MyCameras() {
         const makePublic = !camera.is_public;
         if (makePublic && !(await confirm({
             title: 'Tampilkan di hub publik?',
-            message: `"${camera.name}" akan tampil di peta & daftar publik RAF NET — siapa pun bisa menontonnya selama saldo aktif.`,
+            message: `"${camera.name}" akan tampil di peta & daftar publik RAF CCTV — siapa pun bisa menontonnya selama saldo aktif.`,
             confirmLabel: 'Tampilkan',
         }))) {
             return;

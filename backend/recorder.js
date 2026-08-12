@@ -125,7 +125,7 @@ async function drainReconcileRequests() {
 
 async function start() {
     console.log('');
-    console.log('🎥 RAF NET CCTV Recording Worker');
+    console.log('🎥 RAF CCTV Recording Worker');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log(`   pid: ${process.pid}`);
     console.log(`   reconcile requests : every ${RECONCILE_REQUEST_INTERVAL_MS}ms`);
