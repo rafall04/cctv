@@ -35,7 +35,7 @@ function StripMenit({ baris }) {
                 {baris.map((b) => (
                     <div
                         key={b.menit}
-                        className="min-w-0 flex-1 rounded-t-sm bg-content-subtle/40"
+                        className="min-w-0 flex-1 rounded-t-sm bg-content-subtle/70"
                         style={{ height: `${Math.max(6, Math.round((b.total / puncak) * 100))}%` }}
                     />
                 ))}
@@ -116,52 +116,57 @@ export default function CameraVehicleCountPanel({ cameraId }) {
                 )}
             </div>
 
-            <div className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                <span className="text-2xl font-semibold tabular-nums text-content">
-                    {angka(data.total)}
-                </span>
-                <span className="min-w-0 text-xs text-content-muted">
-                    kendaraan melintas garis hitung{data.mulaiTeks ? ` sejak ${data.mulaiTeks}` : ''}
-                </span>
-            </div>
+            {/* Lebar dibatasi: popup ini selebar layar di desktop, dan tanpa pagar ini
+                empat kartu jenis kendaraan melar ~300px masing-masing sementara angka arah
+                terlempar ke tepi kanan — datanya benar tapi terbaca berantakan. */}
+            <div className="mt-2 max-w-2xl">
+                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                    <span className="text-2xl font-semibold tabular-nums text-content">
+                        {angka(data.total)}
+                    </span>
+                    <span className="min-w-0 text-xs text-content-muted">
+                        kendaraan melintas garis hitung{data.mulaiTeks ? ` sejak ${data.mulaiTeks}` : ''}
+                    </span>
+                </div>
 
-            <dl className="mt-3 grid grid-cols-4 gap-2">
-                {JENIS.map(({ key, label }) => (
-                    <div
-                        key={key}
-                        className="min-w-0 rounded-control border border-edge bg-surface-sunken px-2 py-1.5"
-                    >
-                        <dt className="truncate text-xs text-content-muted">{label}</dt>
-                        <dd className="text-base font-semibold tabular-nums text-content">
-                            {angka(data.perJenis?.[key])}
-                        </dd>
-                    </div>
-                ))}
-            </dl>
-
-            {Array.isArray(data.perArah) && data.perArah.length > 0 && (
-                <ul className="mt-2 flex flex-col gap-1">
-                    {data.perArah.map((arah) => (
-                        <li
-                            key={arah.label}
-                            className="flex min-w-0 items-center justify-between gap-2 text-xs"
+                <dl className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    {JENIS.map(({ key, label }) => (
+                        <div
+                            key={key}
+                            className="min-w-0 rounded-control border border-edge bg-surface-sunken px-2 py-1.5"
                         >
-                            <span className="min-w-0 truncate text-content-muted">{arah.label}</span>
-                            <span className="shrink-0 tabular-nums font-medium text-content">
-                                {angka(arah.total)}
-                            </span>
-                        </li>
+                            <dt className="truncate text-xs text-content-muted">{label}</dt>
+                            <dd className="text-base font-semibold tabular-nums text-content">
+                                {angka(data.perJenis?.[key])}
+                            </dd>
+                        </div>
                     ))}
-                </ul>
-            )}
+                </dl>
 
-            {perMenit.length >= 3 && <StripMenit baris={perMenit} />}
+                {Array.isArray(data.perArah) && data.perArah.length > 0 && (
+                    <ul className="mt-2 flex flex-col gap-1">
+                        {data.perArah.map((arah) => (
+                            <li
+                                key={arah.label}
+                                className="flex min-w-0 items-center justify-between gap-2 text-xs"
+                            >
+                                <span className="min-w-0 truncate text-content-muted">{arah.label}</span>
+                                <span className="shrink-0 tabular-nums font-medium text-content">
+                                    {angka(arah.total)}
+                                </span>
+                            </li>
+                        ))}
+                    </ul>
+                )}
 
-            <p className="mt-3 text-xs text-content-subtle">
-                {berhenti
-                    ? 'Angka di atas adalah hasil terakhir sebelum penghitungan berhenti, bukan jumlah saat ini.'
-                    : 'Dihitung otomatis dari video langsung kamera ini, satu kali per kendaraan saat melewati garis hitung.'}
-            </p>
+                {perMenit.length >= 3 && <StripMenit baris={perMenit} />}
+
+                <p className="mt-3 text-xs text-content-subtle">
+                    {berhenti
+                        ? 'Angka di atas adalah hasil terakhir sebelum penghitungan berhenti, bukan jumlah saat ini.'
+                        : 'Dihitung otomatis dari video langsung kamera ini, satu kali per kendaraan saat melewati garis hitung.'}
+                </p>
+            </div>
         </div>
     );
 }
