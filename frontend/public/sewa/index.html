@@ -85,7 +85,8 @@
   @media (min-width:430px){ .pagenav a{padding:7px 14px;font-size:13.5px} }
   .pagenav a:hover{background:var(--surface);color:var(--ink)}
   /* Anchor jumps must not tuck a heading under the sticky bar. */
-  section[id]{scroll-margin-top:56px}
+  section[id]{scroll-margin-top:16px}
+  @media (min-width:720px){ section[id]{scroll-margin-top:64px} }
   .pagenav a{transition:background-color .18s ease, border-color .18s ease, color .18s ease}
   /* "You are here". Without it the bar is a list of jumps that never acknowledges where the
      reader already is — the navigation rule this page was failing. */
@@ -146,6 +147,39 @@
   .pagenav{border:1px solid var(--edge);border-radius:999px;background:var(--surface);
            box-shadow:var(--e1);padding:6px;border-bottom:1px solid var(--edge)}
   @media (min-width:430px){ .pagenav{padding:7px} }
+
+  /* ---------- navigasi ----------
+     Dua bentuk, bukan satu bentuk yang dipaksa muat. Di HP bar duduk di bawah: selalu di tempat
+     yang sama sejak detik pertama, dan di jangkauan jempol. Sebelumnya ia muncul di tengah halaman
+     lalu melompat ke atas saat digulir, yang terasa seperti sesuatu yang lepas.
+     Di layar besar tidak ada jangkauan jempol, jadi pola atas yang konvensional justru yang benar. */
+  .pagenav svg{display:none}
+
+  @media (max-width:719px){
+    .pagenav{
+      /* insets, NEVER width:100vw — elemen fixed lolos dari overflow-x:clip milik root, dan 100vw
+         ikut menghitung lebar yang justru sedang dibuatnya. */
+      position:fixed; left:0; right:0; bottom:0; top:auto; z-index:40;
+      display:grid; grid-template-columns:repeat(4,1fr); gap:4px;
+      border:0; border-top:1px solid var(--edge); border-radius:0; overflow:visible;
+      background:var(--surface); box-shadow:0 -2px 14px rgba(0,0,0,.16);
+      padding:7px 8px calc(7px + env(safe-area-inset-bottom,0px));
+    }
+    .pagenav a{
+      display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;
+      padding:6px 2px; min-height:46px; border:0; background:transparent; border-radius:9px;
+      font-size:10.5px; font-weight:600; letter-spacing:.01em; line-height:1.15; text-align:center;
+    }
+    .pagenav a svg{display:block; width:20px; height:20px}
+    .pagenav a span{display:block; overflow:hidden; text-overflow:ellipsis; max-width:100%}
+    .pagenav a.kini{background:var(--accent-soft); color:var(--accent); border:0}
+    /* The sign-up chip stays the one filled thing, but as a tinted cell rather than a solid block —
+       a solid slab in a bottom bar reads as a stuck state, not as an action. */
+    .pagenav a.nav-cta{background:transparent; color:var(--accent); border:0}
+    .pagenav a.nav-cta svg{stroke-width:2.2}
+    /* Room for the bar so the last line of the page is never trapped underneath it. */
+    body{padding-bottom:86px}
+  }
   .card{background:var(--surface);border:1px solid var(--edge);border-radius:8px;box-shadow:var(--e1)}
 
   /* ---------- dua jalur, dibuat kelihatan ----------
@@ -363,21 +397,11 @@
     </div>
   </header>
 
-  <div>
-    <div class="bukti">
-      <div><b>12 hari</b><span>arsip tersimpan</span></div>
-      <div><b>49.709</b><span>potongan terarsip</span></div>
-      <div><b>0</b><span>unggahan gagal</span></div>
-    </div>
-    <p class="bukti-cap">Angka dari sistem kami yang sedang berjalan, per 12 Agustus 2026 &mdash; bukan
-      jumlah pelanggan, melainkan bukti bahwa mesinnya memang jalan tiap hari.</p>
-  </div>
-
   <nav class="pagenav" aria-label="Bagian halaman">
-    <a href="#pilihan">Bandingkan</a>
-    <a href="#topologi-sewa">Sewa</a>
-    <a href="#mandiri">Pasang sendiri</a>
-    <a href="#daftar" class="nav-cta">Daftar</a>
+    <a href="#pilihan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="7" height="16" rx="1.6"/><rect x="14" y="4" width="7" height="16" rx="1.6"/></svg><span>Bandingkan</span></a>
+    <a href="#topologi-sewa"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.5 19a4.5 4.5 0 0 0 .4-9 6 6 0 0 0-11.5 1.5A3.5 3.5 0 0 0 7 19z"/></svg><span>Sewa</span></a>
+    <a href="#mandiri"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/></svg><span>Pasang sendiri</span></a>
+    <a href="#daftar" class="nav-cta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg><span>Daftar</span></a>
   </nav>
 
   <!-- ============ PILIHAN PEMAKAIAN ============ -->
