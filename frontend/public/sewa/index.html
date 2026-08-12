@@ -95,6 +95,57 @@
   .pagenav a.nav-cta:hover{color:var(--paper);filter:brightness(1.08)}
   @media (prefers-reduced-motion: reduce){ *,*::before,*::after{transition-duration:.01ms !important;
     animation-duration:.01ms !important;scroll-behavior:auto !important} }
+
+  /* ---------- identitas ----------
+     Halaman ini tidak punya merek sama sekali di layar pertama: tanpa nama, tanpa tanda, tanpa
+     jalan kembali ke situs utamanya. Itu yang membuatnya terbaca sebagai dokumen lepas, bukan
+     halaman milik sebuah usaha. */
+  .brand{display:flex;align-items:center;justify-content:space-between;gap:12px;
+         padding-bottom:var(--s3);border-bottom:1px solid var(--edge-soft)}
+  .brand-id{display:flex;align-items:center;gap:10px;min-width:0}
+  .brand-mark{flex:none;width:26px;height:26px;border-radius:7px;background:var(--accent);
+              display:grid;place-items:center}
+  .brand-mark svg{display:block}
+  .brand-name{font-weight:700;font-size:15px;letter-spacing:.02em;color:var(--ink);
+              white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .brand-back{flex:none;font-size:13px;color:var(--ink-2);text-decoration:none;white-space:nowrap}
+  .brand-back:hover{color:var(--accent)}
+
+  /* ---------- hero ----------
+     Dua kolom begitu ada ruang: teks memikul pesan, gambar memikul perhatian. Di bawah 860px ia
+     kembali menumpuk, gambar di bawah teks supaya kalimat pertama tetap yang pertama dibaca. */
+  .hero-grid{display:grid;grid-template-columns:1fr;gap:var(--s4);align-items:center}
+  /* The text moved into a nested column, which left it outside header's own gap — the headline and
+     the paragraph under it were touching. Rhythm belongs to whichever box actually holds the text. */
+  .hero-grid > div{display:flex;flex-direction:column;gap:var(--s2)}
+  @media (min-width:860px){ .hero-grid{grid-template-columns:1.05fr .95fr;gap:var(--s5)} }
+  .hero-art{width:100%;max-width:420px;height:auto;justify-self:center}
+  @media (min-width:860px){ .hero-art{max-width:none} }
+
+  /* ---------- bukti ----------
+     Angka operasional, bukan jumlah pelanggan. Bertanggal karena ia potret, bukan nilai hidup. */
+  .bukti{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:var(--edge);
+         border:1px solid var(--edge);border-radius:8px;overflow:hidden;box-shadow:var(--e1)}
+  .bukti div{background:var(--surface);padding:14px 12px;display:flex;flex-direction:column;gap:3px}
+  .bukti b{font-size:clamp(17px,4.4vw,22px);font-weight:700;color:var(--ink);
+           font-variant-numeric:tabular-nums;letter-spacing:-.02em;line-height:1.1}
+  .bukti span{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+              color:var(--ink-3);line-height:1.35}
+  .bukti-cap{font-size:12.5px;color:var(--ink-3);margin-top:9px}
+
+  /* ---------- kepala bagian bernomor ----------
+     Nomor memberi halaman panjang sebuah rangka. Tanpanya setiap judul terlihat sama pentingnya. */
+  .sec-no{display:inline-flex;align-items:center;gap:9px;font-family:var(--mono);font-size:11px;
+          letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3)}
+  .sec-no b{display:grid;place-items:center;width:22px;height:22px;border-radius:6px;
+            background:var(--accent-soft);color:var(--accent);font-size:11px;font-weight:700}
+
+  /* ---------- bar navigasi ----------
+     Diberi permukaan sendiri supaya terbaca sebagai alat, bukan sebagai chip yang mengambang di
+     antara dua garis rambut. */
+  .pagenav{border:1px solid var(--edge);border-radius:999px;background:var(--surface);
+           box-shadow:var(--e1);padding:6px;border-bottom:1px solid var(--edge)}
+  @media (min-width:430px){ .pagenav{padding:7px} }
   .card{background:var(--surface);border:1px solid var(--edge);border-radius:8px;box-shadow:var(--e1)}
 
   /* ---------- dua jalur, dibuat kelihatan ----------
@@ -235,7 +286,22 @@
 <body>
 <div class="wrap">
 
+  <div class="brand">
+    <div class="brand-id">
+      <span class="brand-mark" aria-hidden="true">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.1"
+             stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 8h13v7H3z"/><path d="M16 10.5l5-2.5v9l-5-2.5"/><circle cx="6.5" cy="17.5" r="1.5"/>
+        </svg>
+      </span>
+      <span class="brand-name">RAF NET &middot; Sistem CCTV</span>
+    </div>
+    <a class="brand-back" href="/">Ke beranda</a>
+  </div>
+
   <header>
+    <div class="hero-grid">
+    <div>
     <p class="eyebrow">Dua cara memakainya</p>
     <h1>Sewa dari kami, atau pasang sistemnya di tempat Anda</h1>
     <p class="lede">
@@ -252,7 +318,60 @@
       <a class="btn" href="#topologi-sewa">Saya mau menyewa</a>
       <a class="btn btn-ghost" href="#mandiri">Saya mau pasang sendiri</a>
     </div>
+    </div>
+      <svg class="hero-art" viewBox="0 0 420 250" role="img"
+           aria-label="Kamera di lokasi Anda mengirim ke satu server, server menyiarkan ke ponsel dan menyalin ke arsip">
+        <defs>
+          <marker id="h-ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M0 0 L10 5 L0 10 z" fill="var(--ink-3)"/>
+          </marker>
+        </defs>
+        <rect x="1" y="1" width="418" height="248" rx="12" fill="var(--surface-2)" stroke="var(--edge-soft)"/>
+
+        <rect x="26" y="40" width="118" height="78" rx="9" fill="var(--rtsp-soft)" stroke="var(--rtsp-edge)"/>
+        <g stroke="var(--rtsp)" stroke-width="2.1" fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M60 68h30v17H60z"/><path d="M90 73l12-6v22l-12-6"/>
+        </g>
+        <circle cx="65" cy="90" r="2.2" fill="var(--rtsp)"/>
+        <text x="85" y="108" text-anchor="middle" font-size="11.5" fill="var(--ink-2)" font-family="var(--sans)">Kamera Anda</text>
+
+        <rect x="151" y="95" width="118" height="60" rx="9" fill="var(--surface)" stroke="var(--accent)" stroke-width="1.6"/>
+        <g stroke="var(--accent)" stroke-width="2.1" fill="none" stroke-linecap="round">
+          <path d="M196 116h28M196 124h28M196 132h16"/>
+        </g>
+        <text x="210" y="147" text-anchor="middle" font-size="11.5" fill="var(--ink-2)" font-family="var(--sans)">Satu server</text>
+
+        <rect x="276" y="40" width="118" height="78" rx="9" fill="var(--surface)" stroke="var(--edge)"/>
+        <rect x="322" y="60" width="26" height="40" rx="4" fill="none" stroke="var(--accent)" stroke-width="2"/>
+        <path d="M331 95h8" stroke="var(--accent)" stroke-width="2" stroke-linecap="round"/>
+        <text x="335" y="112" text-anchor="middle" font-size="11.5" fill="var(--ink-2)" font-family="var(--sans)">Layar Anda</text>
+
+        <rect x="276" y="168" width="118" height="58" rx="9" fill="var(--archive-soft)" stroke="var(--archive)" stroke-opacity=".5"/>
+        <g stroke="var(--archive)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M323 196a9 9 0 0 1 1.5-17.6 12 12 0 0 1 22 4A9.5 9.5 0 0 1 345 196z"/>
+          <path d="M335 191v-9M331 186l4-4 4 4"/>
+        </g>
+        <text x="335" y="218" text-anchor="middle" font-size="11.5" fill="var(--ink-2)" font-family="var(--sans)">Arsip</text>
+
+        <g stroke="var(--ink-3)" stroke-width="1.7" fill="none" marker-end="url(#h-ar)" stroke-linecap="round">
+          <path d="M144 84h44v6"/>
+          <path d="M269 118h6V90"/>
+          <path d="M269 132h6v32"/>
+        </g>
+        <text x="196" y="70" font-size="10" font-family="var(--mono)" fill="var(--ink-3)">RTSP</text>
+      </svg>
+    </div>
   </header>
+
+  <div>
+    <div class="bukti">
+      <div><b>12 hari</b><span>arsip tersimpan</span></div>
+      <div><b>49.709</b><span>potongan terarsip</span></div>
+      <div><b>0</b><span>unggahan gagal</span></div>
+    </div>
+    <p class="bukti-cap">Angka dari sistem kami yang sedang berjalan, per 12 Agustus 2026 &mdash; bukan
+      jumlah pelanggan, melainkan bukti bahwa mesinnya memang jalan tiap hari.</p>
+  </div>
 
   <nav class="pagenav" aria-label="Bagian halaman">
     <a href="#pilihan">Bandingkan</a>
@@ -264,7 +383,7 @@
   <!-- ============ PILIHAN PEMAKAIAN ============ -->
   <section id="pilihan">
     <div class="sec-head">
-      <p class="eyebrow">Bandingkan dulu</p>
+      <p class="sec-no"><b>01</b>Bandingkan</p>
       <h2>Punya server sendiri, atau cukup sewa ke kami</h2>
       <p class="lede" style="font-size:16.5px">
         Tidak semua tempat butuh server sendiri, dan tidak semua tempat cocok menyewa.
@@ -413,7 +532,7 @@
 
   <!-- ============ TOPOLOGI SAAT SEWA ============ -->
   <div class="actions">
-    <a class="btn btn-ghost" href="./perbandingan.png?v=90a890c8" download="perbandingan-cctv.png">
+    <a class="btn btn-ghost" href="./perbandingan.png?v=5a703d8b" download="perbandingan-cctv.png">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/>
@@ -425,6 +544,7 @@
 
   <section id="topologi-sewa" class="track track-sewa">
     <div class="sec-head">
+      <p class="sec-no"><b>02</b>Jalur sewa</p>
       <span class="track-tag tag-sewa">Jalur sewa</span>
       <h2>Bentuknya berbeda — dan ada satu syarat yang tidak bisa ditawar</h2>
       <p class="lede" style="font-size:16.5px">
@@ -576,7 +696,7 @@
   <!-- ============ CARA MENDAFTAR ============ -->
   <section id="daftar" class="track track-sewa">
     <div class="sec-head">
-      <p class="eyebrow">Kalau sudah cocok</p>
+      <p class="sec-no"><b>03</b>Cara mendaftar</p>
       <h2>Cara mendaftar — enam langkah</h2>
       <p class="lede" style="font-size:16.5px">
         Pendaftaran bisa Anda lakukan sendiri lewat halaman kami. Tidak perlu memasang aplikasi
@@ -634,6 +754,7 @@
 
   <section id="mandiri" class="track track-mandiri">
     <div class="sec-head">
+      <p class="sec-no"><b>04</b>Jalur pasang sendiri</p>
       <span class="track-tag tag-mandiri">Jalur pasang sendiri</span>
       <h2>Bentuk lengkapnya — dari kamera sampai layar warga</h2>
       <p class="lede" style="font-size:16.5px">
@@ -831,7 +952,7 @@
   </div>
 
   <div class="actions">
-    <a class="btn" href="./topologi.png?v=a5a69017" download="topologi-jaringan-cctv.png">
+    <a class="btn" href="./topologi.png?v=00d6d727" download="topologi-jaringan-cctv.png">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/>
@@ -845,7 +966,7 @@
 
   <section id="spek" class="track track-mandiri">
     <div class="sec-head">
-      <p class="eyebrow">Kalau membangun sendiri</p>
+      <p class="sec-no"><b>05</b>Spesifikasi server</p>
       <h2>Spesifikasi server — berapa kamera butuh apa</h2>
       <p class="lede" style="font-size:16.5px">
         Angka di bawah adalah <b style="color:var(--ink);font-weight:650">ancar-ancar dari pemasangan
