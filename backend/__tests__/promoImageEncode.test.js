@@ -25,7 +25,6 @@ import {
 
 const execFileAsync = promisify(execFile);
 
-let hasFfmpeg = false;
 let sourcePng = null;
 const created = [];
 
@@ -38,8 +37,16 @@ async function ffmpegAvailable() {
     }
 }
 
+/*
+ * Detected with TOP-LEVEL await, not in beforeAll. `describe.skipIf` is evaluated
+ * while the module is being collected — before any hook runs — so a flag set in
+ * beforeAll is still false at that point and the whole suite skips EVERYWHERE,
+ * including on machines that do have ffmpeg. That is worse than no test: it looks
+ * like coverage while proving nothing. (Caught exactly that way on the box.)
+ */
+const hasFfmpeg = await ffmpegAvailable();
+
 beforeAll(async () => {
-    hasFfmpeg = await ffmpegAvailable();
     if (!hasFfmpeg) {
         return;
     }
