@@ -187,6 +187,28 @@ describe('targeting validation', () => {
         expect(onSubmit).not.toHaveBeenCalled();
     });
 
+    it('warns that an area-targeted banner cannot appear on the landing page', async () => {
+        // Hit in production: all four placements were ticked with area targeting, and
+        // the landing page silently showed nothing because it has no area context.
+        renderForm({ promo: { ...SAVED_PROMO, target_mode: 'area', placements: ['popup', 'landing'], area_ids: [2] } });
+
+        expect(await screen.findByText(/tidak akan tampil di sana/i)).not.toBeNull();
+    });
+
+    it('does not warn when the banner targets every camera', async () => {
+        renderForm({ promo: { ...SAVED_PROMO, target_mode: 'all', placements: ['popup', 'landing'] } });
+
+        await waitFor(() => expect(screen.getByLabelText('Pilih gambar poster')).not.toBeNull());
+        expect(screen.queryByText(/tidak akan tampil di sana/i)).toBeNull();
+    });
+
+    it('does not warn when the landing placement is not selected', async () => {
+        renderForm({ promo: { ...SAVED_PROMO, target_mode: 'area', placements: ['popup'], area_ids: [2] } });
+
+        await waitFor(() => expect(screen.getByLabelText('Pilih gambar poster')).not.toBeNull());
+        expect(screen.queryByText(/tidak akan tampil di sana/i)).toBeNull();
+    });
+
     it('saves area targeting once an area is ticked', async () => {
         const onSubmit = vi.fn().mockResolvedValue(SAVED_PROMO);
         renderForm({ promo: null, onSubmit });

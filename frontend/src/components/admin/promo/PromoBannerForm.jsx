@@ -379,6 +379,21 @@ export default function PromoBannerForm({ promo, areas, cameras, onSubmit, onCan
             {/* ----------------------------------------------------- placements */}
             <fieldset className="rounded-card border border-edge bg-surface-sunken p-3">
                 <legend className="px-1 text-sm font-medium text-content">Lokasi tampil</legend>
+
+                {/*
+                 * The landing page is not about any one camera, so there is no area to
+                 * match against. An area/camera-targeted banner therefore never appears
+                 * there. Saying so beats letting the operator tick the box and wonder
+                 * why the poster never shows up.
+                 */}
+                {form.placements.includes('landing') && form.target_mode !== 'all' && (
+                    <p className="mb-3 rounded-control border border-status-warn/30 bg-status-warn/10 px-3 py-2 text-xs text-status-warn">
+                        Halaman depan tidak terikat satu kamera, jadi promo dengan target{' '}
+                        {form.target_mode === 'area' ? 'area' : 'kamera'} tertentu <strong>tidak akan tampil di sana</strong>.
+                        Pilih target &quot;Semua kamera&quot; kalau memang ingin tampil di halaman depan.
+                    </p>
+                )}
+
                 <div className="grid gap-2 sm:grid-cols-2">
                     {PLACEMENT_OPTIONS.map((option) => (
                         <label key={option.key} className="flex cursor-pointer items-start gap-2 rounded-control p-2 text-sm hover:bg-surface-raised">
