@@ -352,7 +352,10 @@ export default function LoginPage() {
                 type="button"
                 onClick={toggleTheme}
                 aria-label={isDark ? 'Aktifkan light mode' : 'Aktifkan dark mode'}
-                className="fixed top-4 right-4 p-3 rounded-xl bg-white/80 backdrop-blur-sm shadow-lg border border-gray-200/50 text-content-muted hover:bg-surface transition-all z-50"
+                /* bg-white/80 with no dark pair left a white blob floating over the dark login
+                   screen. Semantic surfaces follow the theme by definition — that is the whole
+                   reason the tokens exist. */
+                className="fixed top-4 right-4 z-50 rounded-xl border border-edge bg-surface/85 p-3 text-content-muted shadow-e2 backdrop-blur-sm transition-colors hover:bg-surface-raised hover:text-content"
             >
                 {isDark ? <Icons.Sun /> : <Icons.Moon />}
             </button>

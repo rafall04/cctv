@@ -104,14 +104,14 @@ export default function RegisterPage() {
     const plan = info?.default_plan;
 
     return (
-        <div className="flex min-h-screen items-center justify-center bg-gray-100 px-4 py-8">
+        <div className="flex min-h-screen items-center justify-center bg-surface-sunken px-4 py-8">
             <div className="w-full max-w-md">
-                <div className="rounded-2xl border border-edge bg-white p-6 shadow-xl">
+                <div className="rounded-2xl border border-edge bg-surface p-6 shadow-e2">
                     <h1 className="text-xl font-bold text-content">Daftar Sewa CCTV</h1>
 
                     {submitted ? (
                         <div className="mt-4 space-y-3 text-center">
-                            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-2xl dark:bg-emerald-900/40">⏳</div>
+                            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-edge bg-surface-sunken text-2xl">⏳</div>
                             <h2 className="font-semibold text-content">Pendaftaran terkirim!</h2>
                             <p className="text-sm text-content-muted">
                                 Akun Anda <b>menunggu persetujuan admin</b>. Anda akan bisa login setelah disetujui
@@ -143,18 +143,18 @@ export default function RegisterPage() {
                             </Link>
                         </div>
                     ) : infoLoading ? (
-                        <p className="mt-4 text-sm text-gray-500">Memuat…</p>
+                        <p className="mt-4 text-sm text-content-muted">Memuat…</p>
                     ) : !info?.enabled ? (
-                        <div className="mt-4 rounded-xl bg-amber-50 p-4 text-sm text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
+                        <div className="mt-4 rounded-xl border border-status-warn/40 bg-surface-sunken p-4 text-sm text-content">
                             Pendaftaran mandiri sedang ditutup. Silakan hubungi admin untuk berlangganan.
                         </div>
                     ) : (
                         <>
-                            <div className="mt-3 rounded-xl bg-primary-100 p-3 text-xs text-primary dark:bg-sky-900/30 text-primary">
+                            <div className="mt-3 rounded-xl border border-edge bg-surface-sunken p-3 text-xs text-content-muted">
                                 ℹ️ Pendaftaran perlu <b>persetujuan admin</b> sebelum bisa login.
                             </div>
                             {plan && (
-                                <div className="mt-3 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200">
+                                <div className="mt-3 rounded-xl border border-status-live/40 bg-surface-sunken p-3 text-sm text-content">
                                     {plan.is_trial ? (
                                         <>🎁 Akun baru langsung dapat <b>{plan.name}</b> — gratis {plan.trial_days} hari, hingga {plan.max_cameras} kamera.</>
                                     ) : (
@@ -179,7 +179,7 @@ export default function RegisterPage() {
                                     <label htmlFor="reg-password" className="mb-1.5 block text-sm font-medium text-content-muted">Password</label>
                                     <input id="reg-password" name="password" type="password" autoComplete="new-password" value={form.password} onChange={handleChange} required minLength={12} className={inputClass} placeholder="Minimal 12 karakter" />
                                     {pwdRequirements.length > 0 && (
-                                        <ul className="mt-1.5 space-y-0.5 text-xs text-gray-500">
+                                        <ul className="mt-1.5 space-y-0.5 text-xs text-content-subtle">
                                             {pwdRequirements.map((r) => (<li key={r}>• {r}</li>))}
                                         </ul>
                                     )}
@@ -190,7 +190,7 @@ export default function RegisterPage() {
                                 </div>
 
                                 {error && (
-                                    <div role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-300">
+                                    <div role="alert" className="rounded-xl border border-status-fault/50 bg-surface-sunken p-3 text-sm text-status-fault">
                                         {error}
                                         {errorList.length > 0 && (
                                             <ul className="mt-1 list-inside list-disc text-xs">
