@@ -63,12 +63,21 @@ test.beforeEach(async ({ page, context }) => {
         }
         return route.continue();
     });
-    await page.emulateMedia({ reducedMotion: 'reduce' });
+    /*
+     * Both dark switches, not just one. The app reads a `dark` class; /sewa/ is standalone HTML
+     * that only honours prefers-color-scheme. Emulating the class alone audited /sewa/ in its LIGHT
+     * theme while the test name promised dark — which is how its light palette shipped with
+     * sub-4.5:1 body text nobody had measured.
+     */
+    await page.emulateMedia({ reducedMotion: 'reduce', colorScheme: 'dark' });
 });
 
 /* [path, minimum text nodes expected] — the floor guards against a page that failed to render at
  * all, which would otherwise let the audit pass by measuring nothing. */
-const PAGES = [['/', 6], ['/?mode=full', 6], ['/login', 4], ['/playback', 2]];
+/* /sewa/ carries its own stylesheet rather than the app's tokens, so nothing the app-wide dark
+ * palette guarantees applies to it. Trailing slash on purpose — it is static HTML in public/sewa/,
+ * and only the directory form resolves to it under `vite preview`. */
+const PAGES = [['/', 6], ['/?mode=full', 6], ['/login', 4], ['/playback', 2], ['/sewa/', 20]];
 
 const AUDIT = () => {
     const rgb = (s) => (s.match(/[\d.]+/g) || []).map(Number);

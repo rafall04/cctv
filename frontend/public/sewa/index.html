@@ -11,7 +11,11 @@
   :root{
     --paper:#EDF1F0; --surface:#FFFFFF; --surface-2:#F4F8F7;
     --edge:#D2DCDA; --edge-soft:#E3EAE9;
-    --ink:#0B181A; --ink-2:#47605E; --ink-3:#6B8380;
+    /* --ink-3 was #6B8380, which measures 4.05:1 on white and as low as 3.36:1 on the tinted
+       table rows — under the 4.5 WCAG AA asks for. It carries table headers, captions and the
+       key/value labels, so the faintest text on the page was also some of the most load-bearing.
+       #586D6A clears 4.5 against every surface this page actually puts it on. */
+    --ink:#0B181A; --ink-2:#47605E; --ink-3:#586D6A;
     --accent:#0B6F78; --accent-soft:#DCEDEE;
     --rtsp:#A2481F; --rtsp-soft:#F6E7DF; --rtsp-edge:#E4C9BA;
     --archive:#4B5896; --archive-soft:#E4E6F4;
@@ -24,7 +28,9 @@
     :root{
       --paper:#08100F; --surface:#0F1A1C; --surface-2:#142225;
       --edge:#24373A; --edge-soft:#1B2B2E;
-      --ink:#E7EFED; --ink-2:#9DB3B0; --ink-3:#7B918E;
+      /* #7B918E measured 4.37:1 against the highlighted "tonton + rekam" column — the darkest
+         surface it lands on, and the one carrying the number people compare prices with. */
+      --ink:#E7EFED; --ink-2:#9DB3B0; --ink-3:#819794;
       --accent:#4FC3C9; --accent-soft:#0E2D31;
       --rtsp:#E28A58; --rtsp-soft:#2E1D14; --rtsp-edge:#4A2E1F;
       --archive:#98A2E2; --archive-soft:#1A1E38;
@@ -60,9 +66,13 @@
            padding:9px 0;background:var(--paper);border-bottom:1px solid var(--edge)}
   /* Tuned so all four labels fit at 360px without scrolling. The strip still scrolls if a font
      scale pushes them out, but a half-cut word at rest reads as a bug rather than an affordance. */
-  .pagenav a{flex:none;padding:7px 9px;border-radius:3px;font-size:13px;font-weight:600;
-             color:var(--ink-2);text-decoration:none;white-space:nowrap}
-  @media (min-width:420px){ .pagenav a{padding:7px 13px;font-size:13.5px} }
+  /* Chips, not bare text. On a dark screen four unstyled links floating between two hairlines read
+     as stray text rather than as a control — the thing that made this bar look unfinished. */
+  .pagenav a{flex:none;padding:6px 10px;border-radius:999px;font-size:12.5px;font-weight:600;
+             color:var(--ink-2);text-decoration:none;white-space:nowrap;
+             background:var(--surface);border:1px solid var(--edge)}
+  .pagenav a:hover{border-color:var(--accent);color:var(--accent)}
+  @media (min-width:430px){ .pagenav a{padding:7px 14px;font-size:13.5px} }
   .pagenav a:hover{background:var(--surface);color:var(--ink)}
   /* Anchor jumps must not tuck a heading under the sticky bar. */
   section[id]{scroll-margin-top:56px}
@@ -78,6 +88,11 @@
   .scroll svg .sans,.scroll svg .sans text{font-family:var(--sans)}
 
   .actions{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+  /* Two buttons of different widths stacked on a phone read as an accident, not a choice. A grid
+     makes them deliberate: equal halves where they fit, equal full-width rows where they don't. */
+  .hero-actions{display:grid;grid-template-columns:1fr;gap:10px;margin-top:8px}
+  .hero-actions .btn{justify-content:center;padding:13px 18px}
+  @media (min-width:520px){ .hero-actions{grid-template-columns:repeat(2,minmax(0,1fr));max-width:540px} }
   .btn{display:inline-flex;align-items:center;gap:9px;padding:11px 18px;border-radius:4px;
        background:var(--accent);color:var(--paper);text-decoration:none;font-size:15px;font-weight:600}
   .btn:hover{filter:brightness(1.08)}
@@ -188,17 +203,18 @@
     <p class="eyebrow">Dua cara memakainya</p>
     <h1>Sewa dari kami, atau pasang sistemnya di tempat Anda</h1>
     <p class="lede">
-      Keduanya menonton langsung dan merekam. Yang membedakan adalah di mana servernya berdiri, apa
-      yang terjadi saat internet sedang terganggu, dan berapa yang keluar di awal. Pilih jalur Anda,
-      atau bandingkan dulu di bawah.
+      Keduanya menonton langsung dan merekam. Bedanya di mana servernya berdiri, dan berapa yang
+      keluar di awal.
     </p>
-    <div class="actions">
+    <!--
+      The dated meta block used to sit here, between the primary action and the nav — provenance
+      competing with the thing the page wants people to press. One of its two lines was also wrong:
+      it stamped the price list "4 Agustus 2026" when those figures are now read live from the panel
+      on every visit. The remaining line describes the diagram, so it moved next to the diagram.
+    -->
+    <div class="hero-actions">
       <a class="btn" href="#topologi-sewa">Saya mau menyewa</a>
       <a class="btn btn-ghost" href="#mandiri">Saya mau pasang sendiri</a>
-    </div>
-    <div class="meta">
-      <span>Contoh pemasangan tingkat desa &middot; <b>3 Agustus 2026</b></span>
-      <span>Harga paket sewa &middot; <b>4 Agustus 2026</b></span>
     </div>
   </header>
 
@@ -361,7 +377,7 @@
 
   <!-- ============ TOPOLOGI SAAT SEWA ============ -->
   <div class="actions">
-    <a class="btn btn-ghost" href="./perbandingan.png?v=9962350c" download="perbandingan-cctv.png">
+    <a class="btn btn-ghost" href="./perbandingan.png?v=bb3a7253" download="perbandingan-cctv.png">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/>
@@ -589,6 +605,9 @@
         internet. Yang keluar hanya video siap-tonton dan salinan rekaman ke arsip. Inilah bentuk
         yang dimaksud kolom &ldquo;Server di lokasi Anda&rdquo; di perbandingan tadi.
       </p>
+      <div class="meta">
+        <span>Contoh pemasangan tingkat desa &middot; <b>3 Agustus 2026</b></span>
+      </div>
     </div>
 
 
@@ -776,7 +795,7 @@
   </div>
 
   <div class="actions">
-    <a class="btn" href="./topologi.png?v=1d3527b5" download="topologi-jaringan-cctv.png">
+    <a class="btn" href="./topologi.png?v=0f7c4575" download="topologi-jaringan-cctv.png">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/>
