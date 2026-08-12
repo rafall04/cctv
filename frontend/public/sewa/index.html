@@ -21,6 +21,12 @@
     --archive:#4B5896; --archive-soft:#E4E6F4;
     --ok:#2C7A58; --ok-soft:#DCEFE5; --warn:#8A6415; --warn-soft:#F7EDD4;
     --grid:#0B181A0D;
+    /* Elevation. The page was flat surfaces on flat paper with 1px borders and nothing else, which
+       is what made it read as an unstyled document rather than a designed one. */
+    --e1:0 1px 2px rgba(11,24,26,.06), 0 2px 8px rgba(11,24,26,.05);
+    --e2:0 2px 4px rgba(11,24,26,.07), 0 8px 24px rgba(11,24,26,.07);
+    /* One spacing scale instead of ad-hoc clamps, so vertical rhythm is a decision, not an accident. */
+    --s1:8px; --s2:12px; --s3:18px; --s4:26px; --s5:40px; --s6:64px;
     --sans:"Segoe UI",-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif;
     --mono:ui-monospace,"Cascadia Mono",Consolas,"Segoe UI Mono",Menlo,monospace;
   }
@@ -36,6 +42,10 @@
       --archive:#98A2E2; --archive-soft:#1A1E38;
       --ok:#5FCB99; --ok-soft:#122C22; --warn:#D9AC4E; --warn-soft:#2E2510;
       --grid:#E7EFED12;
+      /* Shadows barely read on a near-black page — depth there comes from the surface step and the
+         edge, so these stay faint and do the remaining work without turning into grey smudges. */
+      --e1:0 1px 2px rgba(0,0,0,.4);
+      --e2:0 2px 6px rgba(0,0,0,.45), 0 10px 28px rgba(0,0,0,.35);
     }
   }
   *{margin:0;padding:0;box-sizing:border-box}
@@ -76,7 +86,30 @@
   .pagenav a:hover{background:var(--surface);color:var(--ink)}
   /* Anchor jumps must not tuck a heading under the sticky bar. */
   section[id]{scroll-margin-top:56px}
-  .card{background:var(--surface);border:1px solid var(--edge);border-radius:4px}
+  .pagenav a{transition:background-color .18s ease, border-color .18s ease, color .18s ease}
+  /* "You are here". Without it the bar is a list of jumps that never acknowledges where the
+     reader already is — the navigation rule this page was failing. */
+  .pagenav a.kini{color:var(--accent);border-color:var(--accent);background:var(--accent-soft)}
+  /* Declared last so it outranks .kini: the sign-up chip should never change colour underfoot. */
+  .pagenav a.nav-cta{background:var(--accent);border-color:var(--accent);color:var(--paper)}
+  .pagenav a.nav-cta:hover{color:var(--paper);filter:brightness(1.08)}
+  @media (prefers-reduced-motion: reduce){ *,*::before,*::after{transition-duration:.01ms !important;
+    animation-duration:.01ms !important;scroll-behavior:auto !important} }
+  .card{background:var(--surface);border:1px solid var(--edge);border-radius:8px;box-shadow:var(--e1)}
+
+  /* ---------- dua jalur, dibuat kelihatan ----------
+     Urutannya sudah mengelompokkan sewa dan pasang-sendiri, tapi pengelompokan yang hanya ada di
+     urutan tidak terlihat oleh orang yang sedang menggulir. Satu pita warna di tepi kiri membuat
+     wilayahnya terbaca tanpa perlu membaca judulnya, dan tanpa membungkus ulang DOM-nya. */
+  .track{border-left:3px solid var(--edge);padding-left:clamp(13px,3vw,20px)}
+  .track-sewa{border-left-color:var(--accent)}
+  .track-mandiri{border-left-color:var(--rtsp)}
+  .track-tag{display:inline-flex;align-items:center;gap:7px;align-self:flex-start;
+             padding:5px 11px;border-radius:999px;font-family:var(--mono);font-size:10.5px;
+             letter-spacing:.14em;text-transform:uppercase;font-weight:600}
+  .track-tag::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+  .tag-sewa{color:var(--accent);background:var(--accent-soft)}
+  .tag-mandiri{color:var(--rtsp);background:var(--rtsp-soft)}
   .hint{display:none;padding:12px 16px 0;font-family:var(--mono);font-size:11px;
         letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
   @media (max-width:960px){.hint{display:block}}
@@ -103,10 +136,13 @@
   /* ---------- pilihan pemakaian ---------- */
   section{display:flex;flex-direction:column;gap:22px}
   .sec-head{display:flex;flex-direction:column;gap:9px}
+  /* Sections need more air between them than their own parts need inside them; a uniform gap is
+     what made every block feel equally important. */
+  .wrap > section{margin-top:var(--s3)}
   h2{font-size:clamp(20px,3vw,27px);line-height:1.18;letter-spacing:-.018em;font-weight:700;text-wrap:balance}
 
   .opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
-  .opt{background:var(--surface);border:1px solid var(--edge);border-radius:4px;
+  .opt{background:var(--surface);border:1px solid var(--edge);border-radius:8px;box-shadow:var(--e1);
        display:flex;flex-direction:column;overflow:hidden}
   .opt-a{border-top:3px solid var(--accent)}
   .opt-b{border-top:3px solid var(--archive)}
@@ -135,7 +171,7 @@
   .ff-v{font-size:14.5px;line-height:1.45;color:var(--ink-2)}
 
   /* ---------- tabel paket ---------- */
-  .table-wrap{overflow-x:auto;contain:paint;border:1px solid var(--edge);border-radius:4px;background:var(--surface)}
+  .table-wrap{overflow-x:auto;contain:paint;border:1px solid var(--edge);border-radius:8px;background:var(--surface);box-shadow:var(--e1)}
   table{border-collapse:collapse;width:100%;min-width:520px}
   caption{text-align:left;padding:16px 18px 0;font-size:13px;color:var(--ink-3)}
   th,td{text-align:left;padding:11px 18px;font-size:14.5px;border-bottom:1px solid var(--edge-soft)}
@@ -146,7 +182,7 @@
   .dim{color:var(--ink-3)}
 
   /* ---------- mana yang cocok ---------- */
-  .pick{display:flex;flex-direction:column;gap:1px;background:var(--edge);
+  .pick{display:flex;flex-direction:column;gap:1px;background:var(--edge);box-shadow:var(--e1);
         border:1px solid var(--edge);border-radius:4px;overflow:hidden}
   .pick-row{background:var(--surface);padding:15px 20px;display:flex;flex-wrap:wrap;gap:8px 16px;
             align-items:center;justify-content:space-between}
@@ -156,7 +192,7 @@
   .pick-a-b{color:var(--archive);background:var(--archive-soft)}
 
   /* ---------- syarat wajib ---------- */
-  .req{border:1px solid var(--rtsp-edge);background:var(--rtsp-soft);border-radius:4px;
+  .req{border:1px solid var(--rtsp-edge);background:var(--rtsp-soft);border-radius:8px;box-shadow:var(--e1);
        padding:18px 20px;display:flex;flex-direction:column;gap:12px}
   .req h3{font-size:17px;font-weight:700;color:var(--ink);letter-spacing:-.01em}
   .req p{font-size:14.8px;line-height:1.55;color:var(--ink-2);max-width:70ch}
@@ -172,7 +208,7 @@
      cells hanging in the second row. 320 gives three, so the grid closes as 3 + 3. */
   .steps{list-style:none;counter-reset:s;display:grid;
          grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:1px;background:var(--edge);
-         border:1px solid var(--edge);border-radius:4px;overflow:hidden}
+         border:1px solid var(--edge);border-radius:8px;overflow:hidden;box-shadow:var(--e1)}
   .steps li{counter-increment:s;background:var(--surface);padding:18px 20px 20px;
             display:flex;flex-direction:column;gap:7px}
   .steps li::before{content:counter(s);font-family:var(--mono);font-size:12px;font-weight:700;
@@ -222,7 +258,7 @@
     <a href="#pilihan">Bandingkan</a>
     <a href="#topologi-sewa">Sewa</a>
     <a href="#mandiri">Pasang sendiri</a>
-    <a href="#daftar">Daftar</a>
+    <a href="#daftar" class="nav-cta">Daftar</a>
   </nav>
 
   <!-- ============ PILIHAN PEMAKAIAN ============ -->
@@ -377,7 +413,7 @@
 
   <!-- ============ TOPOLOGI SAAT SEWA ============ -->
   <div class="actions">
-    <a class="btn btn-ghost" href="./perbandingan.png?v=bb3a7253" download="perbandingan-cctv.png">
+    <a class="btn btn-ghost" href="./perbandingan.png?v=90a890c8" download="perbandingan-cctv.png">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/>
@@ -387,9 +423,9 @@
     <span class="note">Untuk dikirim lewat WhatsApp tanpa harus membuka tautan.</span>
   </div>
 
-  <section id="topologi-sewa">
+  <section id="topologi-sewa" class="track track-sewa">
     <div class="sec-head">
-      <p class="eyebrow">Kalau Anda menyewa</p>
+      <span class="track-tag tag-sewa">Jalur sewa</span>
       <h2>Bentuknya berbeda — dan ada satu syarat yang tidak bisa ditawar</h2>
       <p class="lede" style="font-size:16.5px">
         Tanpa server di lokasi Anda, kamera harus bisa kami jangkau dari luar. Artinya arah
@@ -538,7 +574,7 @@
   </section>
 
   <!-- ============ CARA MENDAFTAR ============ -->
-  <section id="daftar">
+  <section id="daftar" class="track track-sewa">
     <div class="sec-head">
       <p class="eyebrow">Kalau sudah cocok</p>
       <h2>Cara mendaftar — enam langkah</h2>
@@ -596,9 +632,9 @@
     </div>
   </section>
 
-  <section id="mandiri">
+  <section id="mandiri" class="track track-mandiri">
     <div class="sec-head">
-      <p class="eyebrow">Kalau membangun sendiri</p>
+      <span class="track-tag tag-mandiri">Jalur pasang sendiri</span>
       <h2>Bentuk lengkapnya — dari kamera sampai layar warga</h2>
       <p class="lede" style="font-size:16.5px">
         Server berdiri di lokasi Anda, kamera terkurung di jaringan tertutup tanpa jalan keluar ke
@@ -795,7 +831,7 @@
   </div>
 
   <div class="actions">
-    <a class="btn" href="./topologi.png?v=0f7c4575" download="topologi-jaringan-cctv.png">
+    <a class="btn" href="./topologi.png?v=a5a69017" download="topologi-jaringan-cctv.png">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/>
@@ -807,7 +843,7 @@
 
   </section>
 
-  <section id="spek">
+  <section id="spek" class="track track-mandiri">
     <div class="sec-head">
       <p class="eyebrow">Kalau membangun sendiri</p>
       <h2>Spesifikasi server — berapa kamera butuh apa</h2>
@@ -1000,6 +1036,32 @@
         .catch(function () { /* offline, dibuka sebagai berkas, atau backend sedang sibuk — biarkan tabel bawaan */ })
         .then(function () { clearTimeout(jam); });
 }());
+</script>
+
+<script>
+/*
+ * Highlights whichever section the reader is actually in. Progressive on purpose: with JavaScript
+ * off the bar is still four working anchors, it just stops following along. IntersectionObserver
+ * rather than a scroll handler so it costs nothing per frame, and the top margin matches the
+ * sticky bar's own height so a section is not "current" while hidden behind it.
+ */
+(function () {
+    var tautan = [].slice.call(document.querySelectorAll('.pagenav a[href^="#"]'));
+    if (!tautan.length || !('IntersectionObserver' in window)) return;
+    var peta = {}, bagian = [];
+    tautan.forEach(function (a) {
+        var el = document.getElementById(a.getAttribute('href').slice(1));
+        if (el) { peta[el.id] = a; bagian.push(el); }
+    });
+    var terlihat = {};
+    var obs = new IntersectionObserver(function (entri) {
+        entri.forEach(function (e) { terlihat[e.target.id] = e.isIntersecting; });
+        var aktif = null;
+        bagian.forEach(function (s) { if (terlihat[s.id] && aktif === null) aktif = s.id; });
+        tautan.forEach(function (a) { a.classList.toggle('kini', aktif !== null && peta[aktif] === a); });
+    }, { rootMargin: '-56px 0px -68% 0px' });
+    bagian.forEach(function (s) { obs.observe(s); });
+})();
 </script>
 </body>
 </html>
