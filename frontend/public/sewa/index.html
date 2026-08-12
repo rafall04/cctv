@@ -715,7 +715,7 @@
     <p class="hint" style="padding-left:0">← Geser tabel untuk melihat seluruh kolom →</p>
     <div class="table-wrap">
       <table>
-        <caption>Bila deteksi gerakan diaktifkan — tambahan di atas tabel pertama, dihitung per kamera yang dipantau, bukan per total kamera terpasang</caption>
+        <caption>Bila deteksi gerakan diaktifkan — perkiraan tambahan di atas tabel pertama, dihitung per kamera yang dipantau, bukan per total kamera terpasang</caption>
         <thead>
           <tr>
             <th>Kamera yang dipantau</th>
@@ -732,18 +732,24 @@
       </table>
     </div>
 
+    <!-- No runtime, model, or chip vendor named here on purpose: the buyer does not need it, and
+         printing it hands a competitor the parts list. Equally deliberate — this block no longer
+         tells anyone NOT to buy an accelerator. That was an absolute we cannot back with a single
+         measurement, and it would strand a customer who later wants more cameras or faster alerts. -->
     <div class="req">
-      <h3>Tiga hal yang harus diluruskan soal deteksi gerakan</h3>
+      <h3>Yang perlu diketahui soal deteksi gerakan</h3>
       <ul>
-        <li class="y"><b>Ini beban prosesor, bukan kartu grafis.</b> Deteksi berjalan lewat OpenVINO
-            di prosesor Intel. Kartu grafis NVIDIA tidak otomatis terpakai — jangan membelinya
-            untuk keperluan ini.</li>
-        <li class="y"><b>Bebannya tumbuh per kamera yang dipantau.</b> Sepuluh kamera terpasang
-            dengan dua yang dipantau hanya menanggung beban dua kamera, bukan sepuluh.</li>
-        <li class="n"><b>Angka tambahan di tabel kedua belum kami ukur di lapangan.</b> Berbeda
-            dengan tabel pertama yang berasal dari pengukuran, angka ini turunan dari ukuran model
-            yang dipakai. Pakai untuk menyusun anggaran awal, jangan untuk mengunci jumlah kamera —
-            kami ukur bersama di perangkat Anda sebelum menyepakati angkanya.</li>
+        <li class="y"><b>Bebannya dihitung per kamera yang dipantau.</b> Sepuluh kamera terpasang
+            dengan dua yang dipantau hanya menanggung beban dua kamera, bukan sepuluh — jadi fitur
+            ini bisa dinyalakan bertahap, tidak harus sekaligus.</li>
+        <li class="y"><b>Untuk beberapa kamera, prosesor server biasa sudah cukup.</b> Bila kamera
+            yang dipantau banyak, atau Anda ingin pemberitahuannya lebih cepat, perangkat pemercepat
+            khusus akan sangat membantu. Mana yang Anda perlukan kami tentukan saat survei — sesuai
+            jumlah kamera dan seberapa cepat Anda ingin tahu.</li>
+        <li class="n"><b>Angka di tabel kedua masih perkiraan, belum hasil ukur.</b> Berbeda dengan
+            tabel pertama yang seluruhnya berasal dari pengukuran. Pakai untuk menyusun anggaran
+            awal, jangan untuk mengunci jumlah kamera — kami ukur bersama di perangkat Anda sebelum
+            menyepakati angkanya.</li>
       </ul>
     </div>
 
@@ -757,10 +763,10 @@
       <div class="ff"><span class="ff-k">Sisakan ruang kosong</span><span class="ff-v">Biarkan
         minimal 15% disk kosong. Saat sisa disk menipis, sistem mulai menghapus rekaman paling lama
         untuk mengambil ruang — itu pengaman, tapi lebih baik tidak pernah terpakai.</span></div>
-      <div class="ff"><span class="ff-k">Yang tidak perlu dibeli</span><span class="ff-v">Kartu grafis
-        khusus; prosesor banyak inti bila tidak memakai deteksi; dan memori besar — aplikasinya
-        sendiri berjalan di bawah 700 MB, sisanya hanya jadi cache disk. Uangnya lebih berguna di
-        disk yang lebih besar dan sambungan yang lebih stabil.</span></div>
+      <div class="ff"><span class="ff-k">Yang sering kelebihan dibeli</span><span class="ff-v">Prosesor
+        banyak inti bila tidak memakai deteksi, dan memori besar — aplikasinya sendiri berjalan di
+        bawah 700 MB, sisanya hanya jadi cache disk. Untuk perekaman murni, uangnya jauh lebih
+        berguna di disk yang lebih besar dan sambungan yang lebih stabil.</span></div>
     </div>
   </section>
 

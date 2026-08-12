@@ -89,8 +89,13 @@ container Docker per kamera, memuat model YOLO11-nano pada resolusi 320 piksel l
 
 Dua hal yang perlu diluruskan sebelum belanja perangkat:
 
-1. **Ini beban CPU, bukan GPU.** OpenVINO berjalan di prosesor Intel (dan iGPU Intel bila ada).
-   Tidak perlu kartu grafis khusus, dan kartu NVIDIA tidak otomatis terpakai.
+1. **Sebagaimana dikonfigurasi sekarang, ini beban CPU — bukan GPU.** OpenVINO berjalan di prosesor
+   Intel (dan iGPU Intel bila ada), jadi kartu NVIDIA yang dipasang begitu saja **tidak** akan
+   terpakai. Itu fakta tentang konfigurasi saat ini, **bukan** anjuran untuk tidak pernah memakai
+   akselerator: untuk kamera yang dipantau banyak atau deteksi yang harus cepat, perangkat
+   pemercepat adalah jawaban yang benar — tapi menuju ke sana berarti mengganti runtime inferensinya,
+   bukan sekadar menancapkan kartu. Jangan menyarankan pelanggan membeli GPU sebelum perubahan itu
+   dikerjakan, dan jangan pula menyarankan mereka tidak akan pernah membutuhkannya.
 2. **Beban tumbuh per kamera yang dipantau**, bukan per total kamera. Sepuluh kamera terpasang
    dengan dua yang dipantau hanya membayar dua.
 
@@ -153,8 +158,9 @@ kamera yang benar-benar akan merekam.
 
 ## Yang tidak perlu dibeli
 
-- **Kartu grafis khusus** — perekaman tidak memakainya sama sekali, dan detektor memakai OpenVINO
-  di CPU/iGPU Intel.
+- **Kartu grafis khusus, bila hanya merekam** — perekaman tidak memakainya sama sekali, dan detektor
+  seperti dikonfigurasi sekarang juga tidak. Untuk deteksi berskala besar itu cerita lain; lihat
+  catatan di bagian deteksi gerakan sebelum menyimpulkan.
 - **CPU banyak core untuk perekaman saja** — 16 perekam serentak = 1% dari 16 core. Kalau tidak
   memakai deteksi gerakan, core tambahan hanya menganggur.
 - **RAM besar** — aplikasinya di bawah 700 MB. RAM di atas itu berguna sebagai cache disk, dan
