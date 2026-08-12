@@ -20,6 +20,8 @@ this file stays thin on purpose.
 - **[docs/billing-rental.md](docs/billing-rental.md)** — subscriber rental + prepaid billing + payment
   gateways + plans + registration approval + playback scope. Read when touching billing/customer cameras.
 - **[README.md](README.md)** — deployment, env-var setup, operational runbook (PM2 / Nginx / MediaMTX).
+- **[docs/spek-server.md](docs/spek-server.md)** — server sizing guide for buyers/operators: how many
+  cameras need how much CPU, RAM, disk, and bandwidth. All baseline figures measured on production.
 - **[SECURITY.md](SECURITY.md)** — security policy & posture.
 - **[INSTALLATION_SECURITY.md](INSTALLATION_SECURITY.md)** — installer hardening (interactive install, generated secrets).
 - **[MIGRATION_GUIDE.md](MIGRATION_GUIDE.md)** — running DB migrations safely on existing data. Read before

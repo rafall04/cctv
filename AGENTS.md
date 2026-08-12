@@ -16,6 +16,7 @@ Read the matching guide **only when your task touches that area** — don't load
 | React components, hooks, playback/landing view modes, frontend perf | [docs/frontend-guide.md](docs/frontend-guide.md) |
 | Billing, subscriber/customer cameras, payment gateways, plans, registration, playback scope | [docs/billing-rental.md](docs/billing-rental.md) |
 | Deployment / env-var setup / PM2 / Nginx / MediaMTX | [README.md](README.md) |
+| Server sizing: cameras → CPU / RAM / disk / bandwidth | [docs/spek-server.md](docs/spek-server.md) |
 | Security policy & posture | [SECURITY.md](SECURITY.md) |
 | Running DB migrations on a populated DB | [MIGRATION_GUIDE.md](MIGRATION_GUIDE.md) |
 
