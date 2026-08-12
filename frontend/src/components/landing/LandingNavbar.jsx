@@ -91,6 +91,15 @@ export default function Navbar({ branding, layoutMode, onLayoutToggle }) {
                     </div>
 
                     <div className="flex items-center gap-2">
+                        {/* The sales page is useless if nothing points at it. Kept to one short word
+                            and flex-none so Android font-scaling cannot widen this row past the
+                            viewport — the failure mode the mobile-viewport rules were written for. */}
+                        <Link
+                            to="/sewa"
+                            className="flex-none rounded-control border border-edge bg-surface px-2.5 py-2 text-xs font-medium text-content transition-colors hover:border-edge-strong hover:bg-surface-raised"
+                        >
+                            Sewa
+                        </Link>
                         <LayoutModeToggle
                             layoutMode={layoutMode}
                             onChange={handleLayoutChange}

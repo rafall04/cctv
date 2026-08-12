@@ -20,6 +20,7 @@ const PAGES = [
     ['landing playback view', '/?view=playback&mode=full', {}],
     ['public playback', '/playback', {}],
     ['login', '/login', {}],
+    ['sewa (sales page)', '/sewa', {}],
 ];
 
 /*
@@ -47,7 +48,20 @@ const AREAS = [
     { id: 2, name: 'KEC BOJONEGORO DAN SEKITARNYA', slug: 'kec-bojonegoro', camera_count: 4, total_views: 500 },
 ];
 
+/*
+ * Four plans with a deliberately long name on the last one. Same reasoning as CAMERAS above: an
+ * empty price list makes /sewa render its "cannot load" card instead of the four-across grid, so the
+ * layout that can actually overflow would never be measured.
+ */
+const PLANS = [
+    { key: 'trial', name: 'Trial Gratis', description: 'Coba gratis sebelum berlangganan', price_per_camera: 0, recording_price_per_camera: 0, recording_retention_days: 0, max_cameras: 1, is_trial: true, trial_days: 3 },
+    { key: 'basic', name: 'Basic', description: '1 kamera, cocok untuk rumah', price_per_camera: 15000, recording_price_per_camera: 10000, recording_retention_days: 0, max_cameras: 1, is_trial: false, trial_days: null },
+    { key: 'hemat', name: 'Hemat', description: 'Sampai 3 kamera, lebih murah per kamera', price_per_camera: 12000, recording_price_per_camera: 8000, recording_retention_days: 0, max_cameras: 3, is_trial: false, trial_days: null },
+    { key: 'bisnis', name: 'BISNIS DENGAN NAMA PAKET YANG SENGAJA DIBUAT PANJANG', description: 'Sampai 10 kamera, harga terbaik per kamera', price_per_camera: 10000, recording_price_per_camera: 5000, recording_retention_days: 30, max_cameras: 10, is_trial: false, trial_days: null },
+];
+
 const API_FIXTURES = [
+    [/\/api\/public\/billing\/plans/, PLANS],
     [/\/api\/public\/discovery/, { live_now: CAMERAS, top_cameras: CAMERAS, popular_areas: AREAS, new_cameras: CAMERAS }],
     [/\/api\/cameras\/active/, CAMERAS],
     [/\/api\/cameras\/public/, CAMERAS],

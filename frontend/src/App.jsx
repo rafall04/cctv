@@ -63,6 +63,7 @@ const MyAccount = lazyWithRetry(() => import('./pages/customer/MyAccount'), 'my-
 const MyPanduan = lazyWithRetry(() => import('./pages/customer/MyPanduan'), 'my-panduan');
 const MyRecordings = lazyWithRetry(() => import('./pages/customer/MyRecordings'), 'my-recordings');
 const RegisterPage = lazyWithRetry(() => import('./pages/RegisterPage'), 'register-page');
+const SewaPage = lazyWithRetry(() => import('./pages/SewaPage'), 'sewa-page');
 // Playback (recordingService + full playback component/hook tree, ~72 KB raw) is lazy so it stays OUT
 // of the eager App chunk that every public-landing visit downloads + parses. Both the public /playback
 // and admin /admin/playback routes already render it inside <Suspense>, and LandingCamerasSection also
@@ -140,6 +141,9 @@ function App() {
                 <Route path="/admin/login" element={<LoginPage />} />
                 <Route path="/daftar" element={
                     <PublicPageRoute><RegisterPage /></PublicPageRoute>
+                } />
+                <Route path="/sewa" element={
+                    <PublicPageRoute><SewaPage /></PublicPageRoute>
                 } />
 
                 {/* Customer portal (role: customer) */}
