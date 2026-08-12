@@ -33,7 +33,10 @@
     }
   }
   *{margin:0;padding:0;box-sizing:border-box}
-  html{-webkit-text-size-adjust:100%}
+  /* clip, never hidden — hidden would make <html> a scroll container and kill position:sticky.
+     Body alone is not enough: a wide strip's content reaches the DOCUMENT's scrollable rect even
+     when every ancestor clips it, and mobile browsers fit initial zoom to that width. */
+  html{-webkit-text-size-adjust:100%; overflow-x:clip}
   body{
     background:var(--paper); color:var(--ink); font-family:var(--sans);
     font-size:16px; line-height:1.6; overflow-x:clip;
@@ -53,7 +56,8 @@
   .hint{display:none;padding:12px 16px 0;font-family:var(--mono);font-size:11px;
         letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
   @media (max-width:960px){.hint{display:block}}
-  .scroll{overflow-x:auto;padding:10px}
+  /* contain:paint keeps the 940px-wide diagram from widening the document. It still scrolls. */
+  .scroll{overflow-x:auto;padding:10px;contain:paint}
   .scroll svg{display:block;min-width:940px;width:100%;height:auto}
   .scroll svg text{font-family:var(--sans)}
   .scroll svg .mono,.scroll svg .mono text{font-family:var(--mono);font-variant-numeric:tabular-nums}
@@ -102,7 +106,7 @@
   .ff-v{font-size:14.5px;line-height:1.45;color:var(--ink-2)}
 
   /* ---------- tabel paket ---------- */
-  .table-wrap{overflow-x:auto;border:1px solid var(--edge);border-radius:4px;background:var(--surface)}
+  .table-wrap{overflow-x:auto;contain:paint;border:1px solid var(--edge);border-radius:4px;background:var(--surface)}
   table{border-collapse:collapse;width:100%;min-width:520px}
   caption{text-align:left;padding:16px 18px 0;font-size:13px;color:var(--ink-3)}
   th,td{text-align:left;padding:11px 18px;font-size:14.5px;border-bottom:1px solid var(--edge-soft)}
@@ -176,7 +180,7 @@
       <a href="#topologi-sewa" style="color:var(--accent)">ada diagramnya sendiri di bawah</a>.
     </p>
     <div class="meta">
-      <span>Contoh terpasang: Desa Dander &amp; Tanjungharjo &middot; <b>3 Agustus 2026</b></span>
+      <span>Contoh pemasangan tingkat desa &middot; <b>3 Agustus 2026</b></span>
       <span>Harga paket sewa &middot; <b>4 Agustus 2026</b></span>
     </div>
   </header>
@@ -212,7 +216,9 @@
 
   <!-- ===================== TITLE ===================== -->
   <text x="60" y="52" class="mono" font-size="13" letter-spacing="3" fill="var(--accent)">TOPOLOGI JARINGAN</text>
-  <text x="60" y="88" font-size="31" font-weight="700" letter-spacing="-.6" fill="var(--ink)">CCTV Desa Dander &amp; Tanjungharjo</text>
+  <!-- Deliberately unnamed. This diagram is public; naming the site would hand anyone the
+       location whose network is drawn below it. The layout is the point, not whose it is. -->
+  <text x="60" y="88" font-size="31" font-weight="700" letter-spacing="-.6" fill="var(--ink)">CCTV Desa — contoh pemasangan</text>
   <text x="1340" y="52" class="mono" font-size="13" letter-spacing="1.6" text-anchor="end" fill="var(--ink-3)">3 AGUSTUS 2026</text>
   <text x="1340" y="86" class="mono" font-size="15" text-anchor="end" fill="var(--ink-2)">11 kamera · 3 VLAN · 1 server</text>
   <line x1="60" y1="112" x2="1340" y2="112" stroke="var(--edge)"/>
@@ -222,7 +228,10 @@
   <rect x="130" y="140" width="240" height="150" rx="4" fill="var(--rtsp-soft)" stroke="var(--rtsp-edge)"/>
   <text x="250" y="167" class="mono" font-size="13" letter-spacing="1.4" text-anchor="middle" fill="var(--rtsp)">VLAN KAMERA 1</text>
   <use href="#cam" x="231" y="188"/>
-  <text x="250" y="245" class="mono" font-size="15" text-anchor="middle" fill="var(--ink)">192.168.12.x</text>
+  <!-- Never print the real subnets. Someone already inside the network would otherwise be handed
+       the exact ranges to probe, and the diagram's point — each VLAN is its own isolated subnet —
+       survives placeholders perfectly well. -->
+  <text x="250" y="245" class="mono" font-size="15" text-anchor="middle" fill="var(--ink)">subnet A</text>
   <text x="250" y="270" font-size="15" text-anchor="middle" fill="var(--ink-2)">1 kamera</text>
 
   <!-- group B -->
@@ -231,7 +240,7 @@
   <use href="#cam" x="481" y="188"/>
   <use href="#cam" x="541" y="188"/>
   <use href="#cam" x="601" y="188"/>
-  <text x="560" y="245" class="mono" font-size="15" text-anchor="middle" fill="var(--ink)">192.168.13.x</text>
+  <text x="560" y="245" class="mono" font-size="15" text-anchor="middle" fill="var(--ink)">subnet B</text>
   <text x="560" y="270" font-size="15" text-anchor="middle" fill="var(--ink-2)">7 kamera</text>
 
   <!-- group C -->
@@ -240,7 +249,7 @@
   <use href="#cam" x="791" y="188"/>
   <use href="#cam" x="851" y="188"/>
   <use href="#cam" x="911" y="188"/>
-  <text x="870" y="245" class="mono" font-size="15" text-anchor="middle" fill="var(--ink)">192.168.14.x</text>
+  <text x="870" y="245" class="mono" font-size="15" text-anchor="middle" fill="var(--ink)">subnet C</text>
   <text x="870" y="270" font-size="15" text-anchor="middle" fill="var(--ink-2)">3 kamera</text>
 
   <!-- ===================== LINKS: cameras -> mikrotik ===================== -->
@@ -403,7 +412,7 @@
         <div class="opt-foot">
           <div class="ff"><span class="ff-k">Biaya</span><span class="ff-v">Investasi perangkat di awal, lalu listrik &amp; internet jalan</span></div>
           <div class="ff"><span class="ff-k">Anda siapkan</span><span class="ff-v">Tempat server, listrik, koneksi internet dengan upload stabil</span></div>
-          <div class="ff"><span class="ff-k">Sudah berjalan</span><span class="ff-v">Desa Dander &amp; Tanjungharjo — 11 kamera, 1 server, 273,6 GB terarsip per hari</span></div>
+          <div class="ff"><span class="ff-k">Sudah berjalan</span><span class="ff-v">Satu pemasangan desa — 11 kamera, 1 server, 273,6 GB terarsip per hari</span></div>
         </div>
       </article>
 
@@ -738,7 +747,7 @@
   <footer>
     <p>
       Dua sumber angka, supaya jelas: jumlah kamera, segmen VLAN, dan volume arsip pada diagram
-      pertama dibaca dari instalasi Desa Dander &amp; Tanjungharjo per 3 Agustus 2026. Tabel harga
+      pertama dibaca dari satu instalasi tingkat desa per 3 Agustus 2026. Tabel harga
       paket <b>dibaca langsung dari sistem yang menagih setiap kali halaman ini dibuka</b> — jadi
       yang Anda lihat adalah tarif yang berlaku saat itu juga, bukan salinan yang bisa basi.
       Bila halaman dibuka tanpa internet, yang tampil adalah tarif per 4 Agustus 2026.

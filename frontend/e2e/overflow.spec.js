@@ -20,7 +20,10 @@ const PAGES = [
     ['landing playback view', '/?view=playback&mode=full', {}],
     ['public playback', '/playback', {}],
     ['login', '/login', {}],
-    ['sewa (sales page)', '/sewa', {}],
+    /* Trailing slash on purpose. /sewa is static HTML in frontend/public/sewa/, and only the
+       directory form resolves to it under `vite preview`; without the slash the dev server falls
+       through to the SPA and this would silently test the wrong page. */
+    ['sewa (sales page)', '/sewa/', {}],
 ];
 
 /*
@@ -49,9 +52,9 @@ const AREAS = [
 ];
 
 /*
- * Four plans with a deliberately long name on the last one. Same reasoning as CAMERAS above: an
- * empty price list makes /sewa render its "cannot load" card instead of the four-across grid, so the
- * layout that can actually overflow would never be measured.
+ * The /sewa page reads its price table from this endpoint at runtime. Same reasoning as CAMERAS
+ * above: served an empty list it renders an empty table, and the wide multi-column price grid —
+ * the part of that page most likely to overflow a phone — would never be measured at all.
  */
 const PLANS = [
     { key: 'trial', name: 'Trial Gratis', description: 'Coba gratis sebelum berlangganan', price_per_camera: 0, recording_price_per_camera: 0, recording_retention_days: 0, max_cameras: 1, is_trial: true, trial_days: 3 },
