@@ -6,8 +6,17 @@ disk. **Semua angka dasar di dokumen ini diukur langsung dari server produksi**,
 
 > Satu hal yang paling sering salah diperkirakan orang: **CPU hampir tidak pernah jadi batasnya.**
 > Perekaman berjalan dengan *stream copy* (menyalin paket video apa adanya, tanpa transcode), jadi
-> 16 perekam serentak hanya membebani prosesor sekitar 1%. Yang benar-benar habis lebih dulu adalah
-> **disk**, lalu **bandwidth**. Belanjakan anggaran ke sana.
+> 25 perekam serentak hanya menghabiskan **12,6% dari satu inti** — 0,8% dari kapasitas mesin
+> 16-inti. Yang benar-benar habis lebih dulu adalah **disk**, lalu **bandwidth**. Belanjakan
+> anggaran ke sana.
+
+⚠️ **Kolom vCPU di tabel di bawah adalah ruang lega, bukan kebutuhan terukur.** Dari angka di atas,
+64 kamera hanya butuh ±0,3 inti untuk merekam — jauh di bawah 8 vCPU yang direkomendasikan. Selisih
+itu disediakan untuk melayani penonton, membuat thumbnail, health-check, dan **mengemas ulang RTSP
+lewat MediaMTX**. Bagian terakhir itu **belum pernah terukur**: pada 12 Agustus 2026 MediaMTX di
+produksi melaporkan `itemCount: 0` — nol path aktif, karena seluruh 36 kamera di sana adalah HLS
+eksternal, bukan RTSP milik sendiri. Padahal RTSP justru jalur yang dipakai pembeli yang memasang
+kamera sendiri. Jangan menurunkan angka vCPU di tabel sebelum jalur itu diukur pada skala nyata.
 
 ---
 
@@ -143,7 +152,9 @@ Diukur langsung di server produksi pada **12 Agustus 2026**:
 | Rekaman 4 jam terakhir | 676 segmen = **37,96 GB** |
 | Rata-rata satu segmen | ±58 MB (segmen 10 menit) |
 | Total rekaman di disk | 42 GB (pada retensi 4 jam) |
-| Detektor gerakan aktif | **0 container** |
+| Total CPU seluruh ffmpeg | **12,6% dari satu inti** (25 proses) |
+| Path aktif MediaMTX | **0** — jalur RTSP tidak teruji sama sekali |
+| Detektor gerakan aktif | **0 container**, dan perangkatnya belum terpasang |
 
 Turunannya: 7,00 GB ÷ 24 kamera = **0,29 GB per kamera per jam**; dari jendela 4 jam keluar angka
 0,34. Dibulatkan jadi **0,3 GB** untuk perhitungan. Angka itu cocok silang dengan trafik jaringan

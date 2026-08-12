@@ -693,7 +693,7 @@
     <p class="hint" style="padding-left:0">← Geser tabel untuk melihat kolom disk →</p>
     <div class="table-wrap">
       <table>
-        <caption>Tanpa deteksi gerakan — hanya tonton langsung dan rekam</caption>
+        <caption>Untuk tonton langsung dan rekam — disk dihitung dari pengukuran, prosesor sengaja dilebihkan (penjelasannya di bawah)</caption>
         <thead>
           <tr>
             <th>Jumlah kamera</th>
@@ -712,48 +712,27 @@
       </table>
     </div>
 
-    <p class="hint" style="padding-left:0">← Geser tabel untuk melihat seluruh kolom →</p>
-    <div class="table-wrap">
-      <table>
-        <caption>Bila deteksi gerakan diaktifkan — perkiraan tambahan di atas tabel pertama, dihitung per kamera yang dipantau, bukan per total kamera terpasang</caption>
-        <thead>
-          <tr>
-            <th>Kamera yang dipantau</th>
-            <th class="num">Tambahan prosesor</th>
-            <th class="num">Tambahan memori</th>
-            <th class="num">Tambahan disk</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr><td>2 kamera</td><td class="num">+1 vCPU</td><td class="num">+1 GB</td><td class="num dim">tidak ada</td></tr>
-          <tr><td>4 kamera</td><td class="num">+2 vCPU</td><td class="num">+2 GB</td><td class="num dim">tidak ada</td></tr>
-          <tr><td>8 kamera</td><td class="num">+4 vCPU</td><td class="num">+4 GB</td><td class="num dim">tidak ada</td></tr>
-        </tbody>
-      </table>
-    </div>
-
-    <!-- No runtime, model, or chip vendor named here on purpose: the buyer does not need it, and
-         printing it hands a competitor the parts list. Equally deliberate — this block no longer
-         tells anyone NOT to buy an accelerator. That was an absolute we cannot back with a single
-         measurement, and it would strand a customer who later wants more cameras or faster alerts. -->
+    <!-- The spec table for motion detection was removed rather than softened. It listed vCPU figures
+         for something that has never run on any machine we operate, and a spec table is read as
+         "available" no matter what the footnote says — a customer could buy hardware against it. -->
     <div class="req">
-      <h3>Yang perlu diketahui soal deteksi gerakan</h3>
-      <ul>
-        <li class="y"><b>Bebannya dihitung per kamera yang dipantau.</b> Sepuluh kamera terpasang
-            dengan dua yang dipantau hanya menanggung beban dua kamera, bukan sepuluh — jadi fitur
-            ini bisa dinyalakan bertahap, tidak harus sekaligus.</li>
-        <li class="y"><b>Untuk beberapa kamera, prosesor server biasa sudah cukup.</b> Bila kamera
-            yang dipantau banyak, atau Anda ingin pemberitahuannya lebih cepat, perangkat pemercepat
-            khusus akan sangat membantu. Mana yang Anda perlukan kami tentukan saat survei — sesuai
-            jumlah kamera dan seberapa cepat Anda ingin tahu.</li>
-        <li class="n"><b>Angka di tabel kedua masih perkiraan, belum hasil ukur.</b> Berbeda dengan
-            tabel pertama yang seluruhnya berasal dari pengukuran. Pakai untuk menyusun anggaran
-            awal, jangan untuk mengunci jumlah kamera — kami ukur bersama di perangkat Anda sebelum
-            menyepakati angkanya.</li>
-      </ul>
+      <h3>Deteksi gerakan — segera hadir</h3>
+      <p>Fitur ini sedang kami siapkan dan <b>belum bisa dipesan</b>. Kami sengaja tidak memasang
+         tabel spesifikasinya di sini: belum ada angka hasil ukur yang bisa kami pertanggungjawabkan,
+         dan spesifikasi karangan hanya akan membuat Anda membeli perangkat yang belum tentu tepat.</p>
+      <p>Yang sudah pasti soal bentuknya nanti: bebannya dihitung per kamera yang dipantau, bukan per
+         kamera yang terpasang — jadi bisa dinyalakan bertahap, tidak harus sekaligus. Begitu
+         pengukurannya selesai, angkanya kami umumkan di halaman ini.</p>
     </div>
 
     <div class="card" style="padding:18px 22px 20px;display:flex;flex-direction:column;gap:14px">
+      <div class="ff"><span class="ff-k">Kenapa kolom prosesornya terlihat berlebih</span><span class="ff-v">Karena
+        memang dilebihkan, dan itu disengaja. Perekaman sendiri hampir tidak memakai prosesor — 25
+        perekam yang berjalan bersamaan di sistem kami total hanya menghabiskan sekitar seperdelapan
+        inti. Angka di kolom itu adalah ruang lega untuk pekerjaan lain: melayani penonton, membuat
+        gambar kecil kamera, memeriksa kesehatan kamera, dan mengemas ulang aliran dari kamera milik
+        Anda sendiri. Bagian terakhir itu belum kami ukur pada jumlah besar, jadi kami memilih
+        melebihkan — server yang kelonggaran jauh lebih murah daripada server yang tersendat.</span></div>
       <div class="ff"><span class="ff-k">Cara menghitung disk sendiri</span><span class="ff-v">Jumlah
         kamera × jam simpan × 0,3 GB, lalu tambah 15% cadangan. Angka 0,3 GB per kamera per jam itu
         hasil ukur; kamera dengan bitrate tinggi butuh lebih banyak.</span></div>
@@ -764,9 +743,10 @@
         minimal 15% disk kosong. Saat sisa disk menipis, sistem mulai menghapus rekaman paling lama
         untuk mengambil ruang — itu pengaman, tapi lebih baik tidak pernah terpakai.</span></div>
       <div class="ff"><span class="ff-k">Yang sering kelebihan dibeli</span><span class="ff-v">Prosesor
-        banyak inti bila tidak memakai deteksi, dan memori besar — aplikasinya sendiri berjalan di
-        bawah 700 MB, sisanya hanya jadi cache disk. Untuk perekaman murni, uangnya jauh lebih
-        berguna di disk yang lebih besar dan sambungan yang lebih stabil.</span></div>
+        kelas atas dan memori besar. Aplikasinya sendiri berjalan di bawah 700 MB; memori berlebih
+        hanya jadi cache disk, dan manfaatnya berhenti bertambah jauh sebelum angka besar. Uangnya
+        jauh lebih berguna di disk yang lebih besar dan sambungan yang lebih stabil — itu dua hal
+        yang benar-benar habis lebih dulu.</span></div>
     </div>
   </section>
 
