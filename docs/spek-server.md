@@ -96,11 +96,15 @@ Dua hal yang perlu diluruskan sebelum belanja perangkat:
 
 **Angka perencanaan sementara: siapkan 1 core per 2 kamera yang dipantau, di luar tabel di atas.**
 
-> Angka itu **belum diukur di lapangan** — saat dokumen ini ditulis, tidak ada satu pun container
-> detektor yang berjalan di server produksi, jadi tidak ada data nyata untuk dikutip. Perlakukan
-> sebagai perkiraan kasar untuk anggaran awal, bukan jaminan. Sebelum menjanjikan jumlah kamera
-> tertentu ke pelanggan, **nyalakan satu detektor dan ukur sendiri** pemakaian CPU-nya di perangkat
-> yang bersangkutan.
+> Angka itu **belum diukur di lapangan**, dan tidak bisa diukur dulu: per 12 Agustus 2026 detektornya
+> **belum terpasang sama sekali** di server produksi — tidak ada image `motion-ai`, tidak ada
+> direktori `/opt/yolo-poc`, tidak ada berkas model, dan tidak pernah ada container detektor yang
+> berjalan. Kodenya ada di backend (`services/rondaDetectorService.js`), perangkat pendukungnya
+> belum. Jadi angka di atas adalah turunan dari ukuran model, bukan hasil pengukuran.
+>
+> Perlakukan sebagai perkiraan kasar untuk anggaran awal, bukan jaminan. Sebelum menjanjikan jumlah
+> kamera tertentu ke pelanggan, **pasang detektornya, nyalakan satu, lalu ukur sendiri** pemakaian
+> CPU-nya di perangkat yang bersangkutan.
 
 ---
 
