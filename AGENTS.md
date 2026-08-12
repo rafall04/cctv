@@ -61,7 +61,12 @@ small on purpose so they stay loaded every session — the *how* behind them is 
 - **Money is INTEGER rupiah, never float.**
 - **`customer` role is denied-by-default** on every auth-required endpoint except the whitelist in
   `middleware/customerAccessPolicy.js` (`/api/auth/*`, `/api/users/profile*`, `/api/customer/*`).
-- **Subscriber product is live-only** — no public playback, no playback-token access, recordings stay staff-only.
+- **Subscriber footage is private, not staff-only.** It never appears on a public surface — the
+  archive gate refuses any camera that is not `community` (`publicArchiveAccessService.js`). But the
+  **owner** replays their own rental camera in full, archive included, via `?scope=owner` →
+  `owner_full`, and may mint share links for it; both rules live in `rentalPlaybackAccessPolicy.js`
+  and both require an active subscription. Don't build a second owner-access path — that policy file
+  is it.
 - **Production DB safety** — never mutate the prod DB to "verify"; never `INSERT OR REPLACE` ad-hoc
   rows; always back up `data/cctv.db` first. Full rationale in [Database](#database) below (real incident).
 - **Parameterized SQL only** — `?` placeholders, never string-interpolate user/values into SQL.
