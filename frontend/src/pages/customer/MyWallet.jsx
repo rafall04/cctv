@@ -229,7 +229,7 @@ function TopupPanel({ onCompleted, resumable = [] }) {
                                 <div ref={qrBoxRef} className="hidden" aria-hidden="true">
                                     <QRCodeCanvas value={pending.qris.qr_string} size={640} level="M" marginSize={4} />
                                 </div>
-                                <div className="rounded-lg bg-white p-3">
+                                <div className="rounded-lg border border-edge bg-surface p-3">
                                     <QRCodeCanvas value={pending.qris.qr_string} size={232} level="M" marginSize={2} />
                                 </div>
                                 <div className="flex w-full flex-wrap items-center justify-center gap-2">

@@ -15,7 +15,7 @@ import { Alert } from '../../ui/Alert';
 
 function FeatureItem({ title, description, enabled }) {
     return (
-        <div className={`flex items-start gap-3 p-3 rounded-xl ${enabled ? 'bg-surface-sunken' : 'bg-gray-50/50 opacity-60'}`}>
+        <div className={`flex items-start gap-3 p-3 rounded-xl ${enabled ? 'bg-surface-sunken' : 'bg-surface-sunken opacity-60'}`}>
             <div className={`mt-1 h-2.5 w-2.5 rounded-full ${enabled ? 'bg-emerald-500' : 'bg-gray-400'}`}></div>
             <div>
                 <div className="flex items-center gap-2">

@@ -63,7 +63,7 @@ function SegmentRow({ row, win, highlighted, showCamera, onPlay }) {
         <li
             id={`seg-${row.segmentId}`}
             className={`flex items-center gap-3 rounded-card border p-3 transition-colors ${
-                highlighted ? 'border-primary bg-primary-100' : 'border-edge bg-surface'
+                highlighted ? 'border-primary bg-primary/10' : 'border-edge bg-surface'
             }`}
         >
             {/*

@@ -464,3 +464,55 @@ describe('guardrail: governance docs reference no deleted files (doc-lint)', () 
         expect(broken, `\nGovernance docs point at files that no longer exist (fix the doc in the same PR):\n  ${broken.join('\n  ')}\n`).toEqual([]);
     });
 });
+
+/*
+ * A light background with no dark counterpart is invisible in review and catastrophic in use.
+ *
+ * /daftar shipped with `bg-white` on its card and no dark pair. Every notice inside it DID carry a
+ * dark variant, so each one looked handled — but a 30%-opacity dark tint composited over white
+ * turns pale, and pale text on pale ground is unreadable. The registration page, the end of the
+ * whole sales funnel, was illegible on any dark-mode phone and nothing failed.
+ *
+ * Two exclusions keep this honest rather than noisy:
+ *  - a dark pair may be `dark:bg-`, `dark:hover:bg-`, `dark:focus:bg-` … all count;
+ *  - a white scrim under 50% opacity sits on video or a coloured button, where white is correct in
+ *    both themes. Those are not defects.
+ *
+ * The 21 that remain are deliberate: white knobs on toggle switches, play buttons over video
+ * thumbnails, and one white panel behind a payment QR code (a QR must be light to scan). Ratcheted
+ * rather than zeroed — the number may fall, never rise.
+ */
+describe('guardrail: a light surface always declares its dark counterpart', () => {
+    const FRONTEND_SRC = path.resolve(BACKEND_ROOT, '..', 'frontend', 'src');
+    const SISA = 21;
+
+    const TERANG = /\bbg-(white|gray-(50|100|200|300)|slate-(50|100|200)|zinc-(50|100|200)|neutral-(50|100|200)|emerald-(50|100)|green-(50|100)|red-(50|100)|amber-(50|100)|yellow-(50|100)|sky-(50|100)|blue-(50|100)|indigo-(50|100)|violet-(50|100)|purple-(50|100)|rose-(50|100)|orange-(50|100)|teal-(50|100)|cyan-(50|100)|primary-(50|100))(\/\d{1,3})?\b/g;
+    const PASANGAN = /dark:(?:[a-z-]+:)*bg-/;
+    const ATTR = /className\s*=\s*(?:"([^"]*)"|'([^']*)'|\{`([^`]*)`\}|\{"([^"]*)"\}|\{'([^']*)'\})/g;
+    const opaque = (c) => { const m = /\/(\d{1,3})$/.exec(c); return !m || Number(m[1]) >= 50; };
+
+    it(`does not grow past the ${SISA} deliberate exceptions`, () => {
+        if (!fs.existsSync(FRONTEND_SRC)) return; // backend-only checkout
+        const offenders = [];
+        for (const file of walk(FRONTEND_SRC, ['.jsx', '.js'])) {
+            if (/\.test\.|\.spec\./.test(file)) continue;
+            const src = read(file);
+            let m;
+            while ((m = ATTR.exec(src)) !== null) {
+                const cls = m[1] ?? m[2] ?? m[3] ?? m[4] ?? m[5] ?? '';
+                const hits = (cls.match(TERANG) || []).filter(opaque);
+                if (!hits.length || PASANGAN.test(cls)) continue;
+                const line = src.slice(0, m.index).split('\n').length;
+                offenders.push(`${path.relative(FRONTEND_SRC, file).split(path.sep).join('/')}:${line} — ${hits.join(' ')}`);
+            }
+        }
+        expect(
+            offenders.length,
+            `\nLight surfaces without a dark counterpart: ${offenders.length} (allowed ${SISA}).\n`
+            + `Use the semantic tokens (bg-surface / bg-surface-sunken / bg-primary/10) — they follow the\n`
+            + `theme by definition. If a case is genuinely theme-independent (a switch knob, something\n`
+            + `over video, a QR backdrop), say so in a comment and lower SISA when the count drops.\n\n  `
+            + offenders.join('\n  ') + '\n',
+        ).toBeLessThanOrEqual(SISA);
+    });
+});

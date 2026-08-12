@@ -489,7 +489,7 @@ export default function ImportExport() {
                             {importMode === 'upload_json' ? (
                                 <div>
                                     <label htmlFor="import-json-file" className="block text-sm font-medium text-content-muted mb-1">Upload JSON</label>
-                                    <input id="import-json-file" type="file" accept=".json" onChange={handleFileUpload} ref={fileInputRef} className="w-full text-sm text-content-muted file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100" />
+                                    <input id="import-json-file" type="file" accept=".json" onChange={handleFileUpload} ref={fileInputRef} className="w-full text-sm text-content-muted file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" />
                                     {rawPayload.length > 0 && <p className="mt-3 text-sm text-green-600 dark:text-green-400 font-medium">Loaded {rawPayload.length} rows from {rawFileName || 'JSON'}.</p>}
                                 </div>
                             ) : (

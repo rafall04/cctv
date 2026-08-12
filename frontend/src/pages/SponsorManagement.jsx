@@ -726,7 +726,7 @@ function SponsorManagement() {
                                         value={cameraSearch}
                                         onChange={(e) => setCameraSearch(e.target.value)}
                                         placeholder="Cari kamera"
-                                        className="bg-white border border-edge-strong rounded-lg px-3 py-1.5 text-sm text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary md:w-60"
+                                        className="bg-surface border border-edge-strong rounded-lg px-3 py-1.5 text-sm text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary md:w-60"
                                     />
                                 </div>
                                 {overCameraLimit && (

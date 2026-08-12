@@ -38,7 +38,7 @@ export default function AreaFormModal({
                 role="dialog"
                 aria-modal="true"
                 aria-label={editingArea ? 'Edit Area' : 'Tambah Area'}
-                className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-edge max-h-[90vh] overflow-y-auto"
+                className="bg-surface w-full max-w-lg rounded-2xl shadow-2xl border border-edge max-h-[90vh] overflow-y-auto"
             >
                 <div className="p-6 border-b border-edge flex justify-between items-center sticky top-0 bg-surface">
                     <div>

@@ -132,7 +132,7 @@ export function RondaZoneEditor({ name, refreshKey, roi, ignore, onChange }) {
                         aria-pressed={mode === m.id}
                         className={`rounded-control border px-2.5 py-1 text-[11px] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 ${
                             mode === m.id
-                                ? 'border-primary-500 bg-primary-100 text-content'
+                                ? 'border-primary bg-primary/10 text-content'
                                 : 'border-edge text-content-muted hover:border-edge-strong'
                         }`}
                     >
