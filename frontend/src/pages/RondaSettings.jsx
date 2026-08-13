@@ -221,8 +221,9 @@ export function RondaSettings() {
                     <button
                         type="button"
                         onClick={() => setAdding((v) => !v)}
-                        className="rounded-control bg-primary-500 px-4 py-2 text-sm font-semibold text-white
-                                   focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                        className="min-h-[44px] rounded-control bg-primary-500 px-4 py-2 text-sm font-semibold
+                                   text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500
+                                   sm:min-h-0"
                     >
                         {adding ? 'Batal' : '+ Tambah Kamera'}
                     </button>
@@ -491,7 +492,7 @@ export function RondaSettings() {
                                             <label className={labelClass} htmlFor={`ign-${cam.name}`}>
                                                 Zona abaikan — jam/watermark/jalan tetangga
                                             </label>
-                                            <textarea id={`ign-${cam.name}`} rows="2" className={`${inputClass} font-mono text-xs`}
+                                            <textarea id={`ign-${cam.name}`} rows="2" className={`${inputClass} font-mono text-base sm:text-xs`}
                                                 value={draft.ignore}
                                                 onChange={(e) => setField(cam.name, 'ignore', e.target.value)} />
                                             <p className={hintClass}>
@@ -502,7 +503,7 @@ export function RondaSettings() {
                                             <label className={labelClass} htmlFor={`roi-${cam.name}`}>
                                                 Area pantau — kosongkan berarti seluruh gambar
                                             </label>
-                                            <textarea id={`roi-${cam.name}`} rows="2" className={`${inputClass} font-mono text-xs`}
+                                            <textarea id={`roi-${cam.name}`} rows="2" className={`${inputClass} font-mono text-base sm:text-xs`}
                                                 value={draft.roi}
                                                 onChange={(e) => setField(cam.name, 'roi', e.target.value)} />
                                             <p className={hintClass}>

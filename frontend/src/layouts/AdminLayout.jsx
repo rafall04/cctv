@@ -172,7 +172,7 @@ export default function AdminLayout({ children }) {
                             onChange={(e) => setNavQuery(e.target.value)}
                             placeholder="Cari menu…"
                             aria-label="Cari menu admin"
-                            className="w-full min-h-11 rounded-control border border-edge bg-surface-sunken pl-10 pr-3 text-sm text-content placeholder:text-content-subtle transition-colors hover:border-edge-strong focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
+                            className="w-full min-h-11 rounded-control border border-edge bg-surface-sunken pl-10 pr-3 text-base sm:text-sm text-content placeholder:text-content-subtle transition-colors hover:border-edge-strong focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                         />
                     </div>
                 </div>
