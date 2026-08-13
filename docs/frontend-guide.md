@@ -175,6 +175,10 @@ Tokens are defined in `frontend/src/index.css` (light + dark values) and mapped 
 - `iframe/embed/object/canvas` are clamped to `max-width: 100%` in `index.css` (Tailwind preflight only covers img/video; third-party ad iframes walk through that gap). Keep the clamp.
 - Flex rows of controls must be able to shrink: `min-w-0` on items + `truncate` on labels, or Android font-scaling (1.3×+) widens the row past the viewport (`LandingViewModeSwitch` is the reference).
 - Floating map chrome: solid `bg-surface` panels (no translucency over imagery), and no hover-lift transforms on controls that sit over a draggable map.
+- **Form controls need `text-base sm:text-sm`, never bare `text-sm`.** Safari iOS zooms the whole page in whenever a focused `input`/`select`/`textarea` has a font under 16px, and the user must pinch back out after every field. Admin pages are edited from a phone in the field, so this is not hypothetical: the counting and ronda settings pages had 13 and 18 such controls before 2026-08-13.
+- **Touch targets ≥40px high on narrow screens** — `min-h-[40px] sm:min-h-0` so desktop density is unaffected. Icon-sized 26–30px buttons are unreliable for a thumb; the ronda draw-mode switch and the counting-line delete buttons were both below it.
+- **Hit-testing for drag handles is done in screen pixels, not fractions of the frame.** A radius expressed as a proportion becomes an ellipse the moment the box is not square — `0.03` on a 300×169 preview is 9px across but 5px tall. Convert with the element's `getBoundingClientRect()` (`CountingLineEditor` is the reference).
+- **Don't draw round handles as SVG `<circle>` inside a `preserveAspectRatio="none"` viewBox** — non-uniform scaling turns them into ovals and shrinks them on phones. Position an HTML element with percentage `left`/`top` and a fixed pixel size instead.
 
 **Error Boundaries:**
 - Wrap components with ErrorBoundary for graceful error handling
