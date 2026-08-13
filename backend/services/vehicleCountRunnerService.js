@@ -38,10 +38,22 @@ async function systemctl(args) {
     }
 }
 
+/**
+ * `start`, BUKAN `restart` — dan ini bukan detail sepele.
+ *
+ * systemd `restart` juga membunuh proses yang sedang sehat, jadi setiap kali admin menyimpan
+ * setelan, penghitung akan dimulai ulang dan stream beranotasi mati beberapa detik: penonton
+ * di halaman publik melihat kotak dan garisnya lenyap. Terbukti saat verifikasi 2026-08-13,
+ * PID berubah setiap penyimpanan.
+ *
+ * `start` bersifat idempoten: proses yang sudah jalan dibiarkan, dan perubahan setelan diambil
+ * sendiri oleh penghitung yang memantau berkas config-nya. Yang dinyalakan hanya yang memang
+ * sedang mati. Proses yang MENGGANTUNG bukan urusan sini — itu tugas timer pengawas.
+ */
 export async function nyalakan(cameraId) {
     const unit = unitUntuk(cameraId);
     if (!unit) return false;
-    return systemctl(['restart', unit]);
+    return systemctl(['start', unit]);
 }
 
 export async function matikan(cameraId) {
