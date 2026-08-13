@@ -202,7 +202,7 @@ export default function VehicleCountSettings() {
                                 <button
                                     type="button"
                                     onClick={() => bukaKamera(c.camera_id)}
-                                    className={`flex w-full items-center justify-between gap-2 rounded-control px-2 py-2 text-left text-sm transition-colors hover:bg-surface-raised ${dipilih === c.camera_id ? 'bg-surface-raised' : ''}`}
+                                    className={`flex min-h-[44px] w-full items-center justify-between gap-2 rounded-control px-2 py-2 text-left text-sm transition-colors hover:bg-surface-raised sm:min-h-0 ${dipilih === c.camera_id ? 'bg-surface-raised' : ''}`}
                                 >
                                     <span className="flex min-w-0 items-center gap-2">
                                         <span className={`h-2 w-2 shrink-0 rounded-full ${c.berjalan ? 'bg-status-live' : 'bg-status-idle'}`} />

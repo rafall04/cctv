@@ -130,7 +130,9 @@ export function RondaZoneEditor({ name, refreshKey, roi, ignore, onChange }) {
                         type="button"
                         onClick={() => setMode(m.id)}
                         aria-pressed={mode === m.id}
-                        className={`rounded-control border px-2.5 py-1 text-[11px] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 ${
+                        /* min-h 40px di layar sempit: ini sakelar mode gambar, kendali paling
+                           sering ditekan di halaman ini, dan sebelumnya hanya setinggi 27px. */
+                        className={`min-h-[40px] rounded-control border px-3 py-1 text-[11px] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 sm:min-h-0 sm:px-2.5 ${
                             mode === m.id
                                 ? 'border-primary bg-primary/10 text-content'
                                 : 'border-edge text-content-muted hover:border-edge-strong'
@@ -141,15 +143,15 @@ export function RondaZoneEditor({ name, refreshKey, roi, ignore, onChange }) {
                 ))}
                 {mode === 'roi' && roi.length > 0 && (
                     <button type="button" onClick={() => onChange({ roi: [], ignore })}
-                        className="rounded-control border border-edge px-2.5 py-1 text-[11px] text-status-fault
-                                   focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
+                        className="min-h-[40px] rounded-control border border-edge px-3 py-1 text-[11px] text-status-fault
+                                   focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 sm:min-h-0 sm:px-2.5">
                         Bersihkan ({roi.length} titik)
                     </button>
                 )}
                 {mode === 'ignore' && ignore.length > 0 && (
                     <button type="button" onClick={() => onChange({ roi, ignore: [] })}
-                        className="rounded-control border border-edge px-2.5 py-1 text-[11px] text-status-fault
-                                   focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
+                        className="min-h-[40px] rounded-control border border-edge px-3 py-1 text-[11px] text-status-fault
+                                   focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 sm:min-h-0 sm:px-2.5">
                         Bersihkan ({ignore.length} zona)
                     </button>
                 )}
