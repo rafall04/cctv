@@ -67,9 +67,13 @@ function readJson(file) {
 
 // Never let secrets reach the browser: the Telegram bot token is shared infrastructure, and the
 // stream key is effectively the camera's private address (the same leak that was closed on the
-// public landing payload). The UI needs neither to do its job.
+// public landing payload). `source_url` is the strictest of the three — for an internal camera it
+// is literally the RTSP URL, which must never reach the frontend under any circumstance. The UI
+// needs none of them to do its job; `source_type` alone is enough to explain the camera.
 function redact(config) {
-    const { bot_token: _token, stream_key: _key, ...safe } = config || {};
+    const {
+        bot_token: _token, stream_key: _key, source_url: _sumber, ...safe
+    } = config || {};
     return safe;
 }
 
@@ -86,9 +90,16 @@ function statusOf(cfg) {
             ageSeconds: Math.round(ageMs / 100) / 10,
             eventsToday: st.events_today ?? null,
             lastSeen: st.ts ?? null,
+            // Detektor bisa hidup tapi tidak mendapat gambar sama sekali. Dibedakan supaya
+            // panel tidak menampilkan lampu hijau untuk kamera yang sebenarnya buta.
+            sourceOk: st.sumber_terbaca !== false,
+            reconnects: st.sambung_ulang ?? null,
         };
     } catch {
-        return { online: false, ageSeconds: null, eventsToday: null, lastSeen: null };
+        return {
+            online: false, ageSeconds: null, eventsToday: null, lastSeen: null,
+            sourceOk: null, reconnects: null,
+        };
     }
 }
 

@@ -330,17 +330,24 @@ export function RondaSettings() {
             {cameras.map((cam) => {
                 const draft = drafts[cam.name] || draftFrom(cam.config);
                 const online = cam.status?.online;
+                // Detektor yang hidup tetapi tidak mendapat gambar bukan "aktif" dan bukan pula
+                // "mati" — menyamakannya dengan salah satu dari keduanya menyembunyikan justru
+                // kegagalan yang paling sering: alamat sumber yang tidak bisa dibuka.
+                const butaSumber = online && cam.status?.sourceOk === false;
+                const warnaTitik = butaSumber ? 'bg-status-warn' : (online ? 'bg-status-live' : 'bg-status-fault');
                 return (
                     <section key={cam.name} className="rounded-card border border-edge bg-surface-raised p-4 shadow-e1">
                         <div className="flex flex-wrap items-center gap-2">
                             <span
-                                className={`h-2.5 w-2.5 flex-none rounded-full ${online ? 'bg-status-live' : 'bg-status-fault'}`}
+                                className={`h-2.5 w-2.5 flex-none rounded-full ${warnaTitik}`}
                                 aria-hidden="true"
                             />
                             <h2 className="font-semibold text-content">{cam.config?.label || cam.name}</h2>
                             <span className="text-xs tabular-nums text-content-subtle">
                                 {cam.config?.area ? `${cam.config.area} · ` : ''}
-                                {online ? `aktif · ${cam.status.eventsToday ?? 0} kejadian hari ini` : 'tidak aktif'}
+                                {butaSumber
+                                    ? `berjalan, tetapi gambar kamera tidak terbaca — ${cam.status.reconnects ?? 0}× menyambung ulang`
+                                    : (online ? `aktif · ${cam.status.eventsToday ?? 0} kejadian hari ini` : 'tidak aktif')}
                             </span>
                             <span className="ml-auto flex gap-2">
                                 <button

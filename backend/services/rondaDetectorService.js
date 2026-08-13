@@ -16,6 +16,7 @@ import { promisify } from 'util';
 import fs from 'fs';
 import path from 'path';
 import { query, queryOne } from '../database/connectionPool.js';
+import { getCameraDeliveryProfile, getPrimaryExternalStreamUrl } from '../utils/cameraDelivery.js';
 import rondaConfigService from './rondaConfigService.js';
 
 const run = promisify(execFile);
@@ -48,6 +49,49 @@ async function docker(args) {
         const detail = (error.stderr || error.message || '').split('\n')[0];
         throw fail(`Perintah docker gagal: ${detail}`, 500);
     }
+}
+
+const KOLOM_SUMBER = `c.id, c.name, c.stream_key, c.stream_source, c.delivery_type,
+    c.private_rtsp_url, c.external_hls_url, c.external_stream_url,
+    c.external_embed_url, c.external_snapshot_url`;
+
+/**
+ * URL video yang benar-benar bisa dibaca detektor untuk sebuah kamera.
+ *
+ * Dulu ini selalu `rtsp://127.0.0.1:8554/<stream_key>`, seolah setiap kamera diterbitkan lewat
+ * MediaMTX. Di produksi asumsi itu salah: MediaMTX berjalan dengan NOL path karena hampir semua
+ * kamera di sana berjenis HLS eksternal (milik pemda). Akibatnya detektor apa pun yang
+ * ditambahkan dari panel akan menyambung ulang selamanya ke alamat 404 — hidup, tapi buta.
+ * Terbukti langsung saat uji pemasangan: `method DESCRIBE failed: 404 (Not Found)`, delapan kali
+ * sambung ulang dalam 45 detik.
+ *
+ * Sumbernya kini diputuskan dengan pengelompokan yang sama seperti bagian sistem lain
+ * (`utils/cameraDelivery.js`), jadi tidak ada aturan tandingan yang harus ikut dirawat.
+ */
+function sumberKamera(camera) {
+    const profil = getCameraDeliveryProfile(camera);
+
+    if (profil.hasInternalRtsp) {
+        if (!KEY_RE.test(String(camera.stream_key || ''))) {
+            return { url: null, jenis: 'internal_hls', alasan: 'Kamera ini belum punya stream key yang valid' };
+        }
+        return { url: `${RTSP_BASE}/${camera.stream_key}`, jenis: 'internal_hls' };
+    }
+
+    if (profil.effectiveDeliveryType === 'external_hls') {
+        const url = getPrimaryExternalStreamUrl(camera);
+        if (url) return { url, jenis: 'external_hls' };
+    }
+
+    // Sisanya (embed, mjpeg, jsmpeg, websocket, external_unresolved) memang tidak menyediakan
+    // aliran video yang bisa dibuka ffmpeg/opencv. Menolak di sini jauh lebih baik daripada
+    // membiarkan operator menambah kamera yang tak akan pernah melihat apa pun.
+    return {
+        url: null,
+        jenis: profil.classification,
+        alasan: `Jenis siaran "${profil.classification}" belum bisa dipantau ronda — `
+            + 'yang didukung baru kamera RTSP internal dan HLS eksternal',
+    };
 }
 
 function slugFor(cameraName, taken) {
@@ -160,13 +204,17 @@ class RondaDetectorService {
             rondaConfigService.listRaw().map((c) => String(c.config?.stream_key || '')).filter(Boolean),
         );
         const rows = query(
-            `SELECT c.id, c.name, c.stream_key, a.name AS area
+            `SELECT ${KOLOM_SUMBER}, a.name AS area
              FROM cameras c LEFT JOIN areas a ON a.id = c.area_id
              WHERE c.stream_key IS NOT NULL AND c.stream_key != '' AND c.camera_class = 'community'
              ORDER BY c.name`,
         );
+        // Kamera yang sumbernya tidak bisa dibaca tidak ditawarkan sama sekali: menawarkannya
+        // hanya memindahkan kegagalan ke tempat yang lebih membingungkan — kamera yang sudah
+        // terlanjur ditambahkan, diam, dan tampak seperti detektor rusak.
         return rows
             .filter((r) => !monitored.has(String(r.stream_key)))
+            .filter((r) => Boolean(sumberKamera(r).url))
             .map((r) => ({ id: r.id, name: r.name, area: r.area || '', stream_key: r.stream_key }));
     }
 
@@ -177,7 +225,9 @@ class RondaDetectorService {
             'run', '-d', '--name', name, '--restart', 'unless-stopped', '--network', 'host',
             '--cpus', String(cfg.cpus || 2), '--memory', `${cfg.memory_mb || 2048}m`,
             ...env('TZ', 'Asia/Jakarta'),
-            ...env('RTSP_URL', `${RTSP_BASE}/${cfg.stream_key}`),
+            // `source_url` diisi saat kamera dibuat; cadangan lama dipertahankan supaya config
+            // yang ditulis sebelum resolusi sumber ada tetap bisa dinyalakan ulang.
+            ...env('RTSP_URL', cfg.source_url || `${RTSP_BASE}/${cfg.stream_key}`),
             ...env('CAM_LABEL', cfg.label || name),
             ...env('AREA_LABEL', cfg.area || '-'),
             ...env('OUT_DIR', cfg.out_dir),
@@ -215,9 +265,12 @@ class RondaDetectorService {
 
     async createDetector(input) {
         const { camera_id: cameraId, area, chat_id: chatId } = input || {};
-        const row = query('SELECT id, name, stream_key FROM cameras WHERE id = ?', [cameraId])[0];
+        const row = query(`SELECT ${KOLOM_SUMBER} FROM cameras c WHERE c.id = ?`, [cameraId])[0];
         if (!row) throw fail('Kamera tidak ditemukan', 404);
         if (!KEY_RE.test(String(row.stream_key || ''))) throw fail('Kamera ini belum punya stream key yang valid', 400);
+
+        const sumber = sumberKamera(row);
+        if (!sumber.url) throw fail(sumber.alasan || 'Sumber kamera ini tidak bisa dipantau', 400);
 
         const taken = new Set(rondaConfigService.listNames());
         const name = assertName(slugFor(row.name, taken));
@@ -226,6 +279,8 @@ class RondaDetectorService {
             label: input.label?.trim() || row.name,
             area: String(area || '').trim(),
             stream_key: row.stream_key,
+            source_url: sumber.url,
+            source_type: sumber.jenis,
             camera_id: row.id,
             out_dir: `/work/live/${name}`,
             enabled: true,
@@ -270,7 +325,7 @@ class RondaDetectorService {
      * Telegram credentials.
      */
     async #healConfig(name, config) {
-        if (config.stream_key && config.bot_token) return config;
+        if (config.stream_key && config.bot_token && config.source_url) return config;
         let env = [];
         try {
             env = JSON.parse(await docker(['inspect', '-f', '{{json .Config.Env}}', name]) || '[]');
@@ -282,14 +337,27 @@ class RondaDetectorService {
             return hit ? hit.slice(key.length + 1) : '';
         };
         const healed = { ...config };
+        const rtsp = pick('RTSP_URL');
         if (!healed.stream_key) {
-            const rtsp = pick('RTSP_URL');
             const key = rtsp.split('/').pop() || '';
             if (KEY_RE.test(key)) healed.stream_key = key;
         }
+        /*
+         * Sumber dipulihkan dari DB lebih dulu, bukan dari env container: kamera eksternal bisa
+         * berganti URL, dan container lama menyimpan alamat yang sudah basi. Env hanya dipakai
+         * kalau kameranya sudah tidak ada lagi di database.
+         */
+        if (!healed.source_url) {
+            const baris = healed.camera_id
+                ? query(`SELECT ${KOLOM_SUMBER} FROM cameras c WHERE c.id = ?`, [healed.camera_id])[0]
+                : null;
+            const dariDb = baris ? sumberKamera(baris) : { url: null };
+            healed.source_url = dariDb.url || rtsp || '';
+            if (dariDb.jenis) healed.source_type = dariDb.jenis;
+        }
         if (!healed.bot_token) healed.bot_token = pick('TELEGRAM_BOT_TOKEN') || resolveBotToken();
         if (!healed.out_dir) healed.out_dir = pick('OUT_DIR') || `/work/live/${name}`;
-        if (!healed.stream_key) {
+        if (!healed.stream_key || !healed.source_url) {
             throw fail('Sumber kamera tidak diketahui, jadi belum bisa dinyalakan ulang dari sini', 400);
         }
         rondaConfigService.writeRaw(name, healed);

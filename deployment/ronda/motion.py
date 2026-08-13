@@ -557,6 +557,25 @@ def main():
 
         bingkai, stempel = sumber.terbaru()
         if bingkai is None:
+            # Sumber belum terbaca (alamat salah, kamera mati, kredensial berubah). Status TETAP
+            # ditulis supaya panel bisa membedakan "detektor mati" dari "detektor hidup tapi tidak
+            # dapat gambar" — tanpa ini, URL yang salah hanya tampak sebagai titik abu-abu tanpa
+            # keterangan, dan itulah yang terjadi saat uji pemasangan pertama.
+            if time.time() - tulis_terakhir >= 2.0:
+                tulis_terakhir = time.time()
+                try:
+                    tulis_atomik(berkas_status, json.dumps({
+                        "ts": datetime.now().isoformat(timespec="seconds"),
+                        "events_today": event_hari_ini,
+                        "enabled": setelan.aktif,
+                        "label": setelan["label"],
+                        "area": setelan["area"],
+                        "sumber_terbaca": False,
+                        "sambung_ulang": sumber.sambung_ulang,
+                        "setelan_dimuat_ulang": setelan.muat_ulang,
+                    }, ensure_ascii=False).encode("utf-8"))
+                except OSError:
+                    pass
             time.sleep(0.5)
             continue
 
@@ -690,6 +709,7 @@ def main():
                     "label": setelan["label"],
                     "area": setelan["area"],
                     "fps": fps,
+                    "sumber_terbaca": True,
                     "umur_frame_detik": round(max(0.0, sekarang - stempel), 1),
                     "sambung_ulang": sumber.sambung_ulang,
                     "setelan_dimuat_ulang": setelan.muat_ulang,
