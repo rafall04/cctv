@@ -7,7 +7,7 @@ bisa menjalankan sesuatu.
 | Berkas | Isi |
 |---|---|
 | `motion.py` | Detektor: baca RTSP → MOG2 → konfirmasi YOLO (OpenVINO) → Telegram. Satu proses per kamera. |
-| `Dockerfile` | Image `motion-ai:latest` (~400 MB, tanpa torch). |
+| `Dockerfile` | Image `motion-ai:latest` — 1,4 GB di disk, tanpa torch. |
 | `ekspor-model.sh` | Ekspor `yolo11n` → `yolo11n320_openvino_model`, sekali saja. |
 | `pasang.sh` | Menjalankan ketiganya. Idempoten. **Tidak** menyalakan detektor. |
 
@@ -27,10 +27,15 @@ Tanpa token, detektor berjalan dan merekam kejadian tetapi tidak bisa mengirim p
 
 ## Biaya CPU — baca sebelum menambah kamera
 
-Tiap detektor dibatasi 2 core (`--cpus 2`). Server produksi punya 16 core yang sudah dipakai
-puluhan proses ffmpeg dan satu penghitung kendaraan. **Nyalakan satu kamera dulu, ukur, baru
-tambah** — angka "1 core per 2 kamera" di [docs/spek-server.md](../../docs/spek-server.md) adalah
-turunan dari ukuran model, bukan hasil pengukuran di perangkat ini.
+Tiap detektor dibatasi 2 core (`--cpus 2`), tetapi yang benar-benar terpakai jauh lebih kecil.
+Terukur di produksi 13 Agustus 2026 pada kamera jembatan Sosrodilogo, siang hari lalu lintas
+ramai: **27,7% dari satu core dan 162 MiB RAM** (`proc_w=960`, `target_fps=5`, `imgsz=320`, dan
+`GATE_COOLDOWN=5` — dua kali lebih sering dari bawaannya, jadi angka ini konservatif).
+
+Yang belum terukur: malam hari (derau sensor menaikkan luas gerak, jadi YOLO lebih sering
+terpicu) dan hujan. Perencanaan sekarang **1 core per 3 kamera** —
+lihat [docs/spek-server.md](../../docs/spek-server.md). Tetap **nyalakan satu kamera dulu,
+ukur, baru tambah** sebelum menjanjikan jumlah kamera ke pelanggan.
 
 ## Kontrak yang menghubungkan tiga berkas
 
@@ -54,9 +59,11 @@ Yang ditulis detektor ke `OUT_DIR`, dan siapa yang membacanya:
 
 ## Catatan teknis
 
-- **OpenVINO langsung, bukan ultralytics.** Menghemat ~2 GB per image dan impor torch di tiap
-  container. Harganya: letterbox dan NMS ditulis tangan di `motion.py` — periksa bagian itu lebih
-  dulu kalau modelnya diganti.
+- **OpenVINO langsung, bukan ultralytics.** Tidak ada impor torch di tiap container, dan image
+  berhenti di 1,4 GB. Harganya: letterbox dan NMS ditulis tangan di `motion.py` — periksa bagian
+  itu lebih dulu kalau modelnya diganti. (Catatan ukuran: `docker image inspect .Size` melaporkan
+  364 MB untuk image ini, tetapi pemakaian disk sebenarnya 1,4 GB menurut `docker system df -v`.
+  Pakai yang kedua saat menghitung kapasitas disk.)
 - **Gerak dulu, YOLO belakangan.** YOLO hanya dipanggil setelah gerakan bertahan `CONFIRM` detik,
   dan paling cepat tiap `GATE_COOLDOWN` detik. Menjalankannya tiap frame akan menabrak ffmpeg.
 - **Bayangan dibuang.** MOG2 menandai bayangan dengan nilai 127; ambang 200 menyingkirkannya,

@@ -31,7 +31,9 @@ fi
 
 echo
 echo "==> Selesai. Tidak ada detektor yang dijalankan."
-docker image inspect "$IMAGE" -f '    image   : {{.Id}} ({{.Size}} byte)'
+# Ukuran diambil dari `docker images`, bukan `inspect .Size`: yang kedua melaporkan angka
+# terkompresi (364 MB) sementara yang terpakai di disk 1,4 GB — beda hampir empat kali.
+echo "    image   : $(docker images "$IMAGE" --format '{{.ID}}, {{.Size}} di disk')"
 echo "    model   : $KERJA/$MODEL"
 echo "    config  : $KERJA/config (berisi $(ls -1 "$KERJA/config" 2>/dev/null | wc -l) berkas)"
 echo "    detektor: $(docker ps -a --filter 'name=motion-' --format '{{.Names}}' | wc -l) container"

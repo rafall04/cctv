@@ -13,9 +13,10 @@ rondaDetectorService.js, dan semua kunci config yang dibaca ulang saat berjalan 
 EDITABLE di rondaConfigService.js. Menambah setelan berarti menyentuh ketiga berkas itu; kalau
 tidak, panel akan tampak menyimpan padahal detektor tidak pernah membacanya.
 
-Kenapa openvino langsung, bukan ultralytics: image jadi ~400 MB, bukan ~2,5 GB, dan tiap
-container tidak perlu mengimpor torch hanya untuk satu model nano. Konsekuensinya letterbox dan
-NMS ditulis sendiri di sini — itu bagian yang paling perlu dijaga saat mengganti model.
+Kenapa openvino langsung, bukan ultralytics: tidak ada container yang perlu mengimpor torch
+hanya untuk satu model nano, dan image tetap 1,4 GB (terukur di produksi 13 Agustus 2026).
+Konsekuensinya letterbox dan NMS ditulis sendiri di sini — itu bagian yang paling perlu dijaga
+saat mengganti model.
 
 Deteksi gerak DULU, YOLO belakangan: menjalankan YOLO tiap frame akan memakan CPU yang di server
 ini sudah dipakai puluhan ffmpeg. MOG2 murah; YOLO hanya dipanggil saat ada gerakan yang sudah

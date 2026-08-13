@@ -1,8 +1,9 @@
 # Image runtime detektor Ronda Digital ("motion-ai:latest").
 #
-# Sengaja TIDAK memuat torch/ultralytics: inferensi memakai OpenVINO langsung, jadi image
-# tinggal ~400 MB alih-alih ~2,5 GB dan tiap container tidak menghabiskan detik-detik awal
-# untuk mengimpor torch. Model .pt diekspor ke format OpenVINO SEKALI di luar image
+# Sengaja TIDAK memuat torch/ultralytics: inferensi memakai OpenVINO langsung, jadi tidak ada
+# container yang menghabiskan detik-detik awal untuk mengimpor torch. Terukur di produksi
+# 13 Agustus 2026: 1,4 GB di disk (`docker system df -v`; angka `inspect .Size` 364 MB itu
+# ukuran terkompresi, bukan pemakaian disk). Model .pt diekspor ke format OpenVINO SEKALI di luar image
 # (lihat ekspor-model.sh) lalu dipasang lewat volume, bukan ikut dibangun ke dalam image.
 #
 # motion.py juga tidak disalin ke dalam image — ia ikut volume /work, supaya memperbaiki
