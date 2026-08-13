@@ -102,6 +102,32 @@ describe('CameraReactionBar', () => {
         expect(container.innerHTML).toBe('');
     });
 
+    /*
+     * Emoji tidak mewarisi warna tombol: fon sistem menggambarnya dengan warnanya sendiri, jadi
+     * saat tombol berpindah ke keadaan terpilih jempolnya tetap kuning dan setengah sinyal
+     * keadaan itu hilang. Ikon SVG memakai currentColor. Tes ini menjaga keduanya.
+     */
+    it('memakai ikon SVG, bukan emoji, dan ikonnya mewarisi warna tombol', async () => {
+        render(<CameraReactionBar cameraId={7} />);
+        const bagus = await screen.findByRole('button', { name: 'Kamera ini bagus' });
+        const bermasalah = screen.getByRole('button', { name: 'Kamera ini bermasalah' });
+
+        for (const tombol of [bagus, bermasalah]) {
+            const svg = tombol.querySelector('svg');
+            expect(svg).not.toBeNull();
+            expect(svg.getAttribute('stroke')).toBe('currentColor');
+            expect(svg.getAttribute('aria-hidden')).toBe('true');
+        }
+        // Tidak ada emoji yang tersisa di dalam tombol.
+        const emoji = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u;
+        expect(emoji.test(bagus.textContent)).toBe(false);
+        expect(emoji.test(bermasalah.textContent)).toBe(false);
+
+        // Yang ke bawah adalah yang ke atas diputar; tanpa itu keduanya tampak sama.
+        expect(bermasalah.querySelector('svg').getAttribute('class')).toContain('rotate-180');
+        expect(bagus.querySelector('svg').getAttribute('class')).not.toContain('rotate-180');
+    });
+
     it('re-reads when the popup moves to another camera', async () => {
         const { rerender } = render(<CameraReactionBar cameraId={7} />);
         await screen.findByTestId('camera-reaction-bar');
