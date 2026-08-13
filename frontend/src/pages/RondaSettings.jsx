@@ -30,14 +30,21 @@ const CLASS_PRESETS = [
     { label: 'Orang + kendaraan', value: 'person,bicycle,car,motorcycle,bus,truck' },
 ];
 
+/*
+ * `text-base sm:text-sm`: di bawah 16 px, Safari iOS memperbesar halaman saat input disentuh dan
+ * pengguna harus mencubit untuk kembali. Halaman ronda justru paling sering dibuka dari HP —
+ * orang mengubah jam siaga atau kepekaan saat sedang di luar, bukan di depan laptop.
+ */
 const inputClass =
-    'w-full bg-surface-sunken border border-edge rounded-control px-3 py-2 text-content text-sm ' +
+    'w-full bg-surface-sunken border border-edge rounded-control px-3 py-2 text-content text-base sm:text-sm ' +
     'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus:border-edge-strong';
 const labelClass = 'block text-xs font-medium text-content-muted mb-1.5';
 const hintClass = 'mt-1 text-[11px] text-content-subtle';
+// min-h 40 px hanya di layar sempit: tombol-tombol ini sebelumnya setinggi 27-30 px, di bawah
+// ukuran sasaran sentuh yang bisa ditekan dengan yakin sambil berdiri.
 const btnGhost =
-    'rounded-control border border-edge px-3 py-1.5 text-xs text-content-muted hover:border-edge-strong ' +
-    'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:opacity-50';
+    'min-h-[40px] sm:min-h-0 rounded-control border border-edge px-3 py-1.5 text-xs text-content-muted ' +
+    'hover:border-edge-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:opacity-50';
 
 function draftFrom(config) {
     return {
@@ -391,7 +398,7 @@ export function RondaSettings() {
                                         type="checkbox"
                                         checked={draft.enabled}
                                         onChange={(e) => setField(cam.name, 'enabled', e.target.checked)}
-                                        className="h-4 w-4 rounded border-edge accent-[var(--primary-color)]"
+                                        className="h-5 w-5 rounded border-edge accent-[var(--primary-color)] sm:h-4 sm:w-4"
                                     />
                                     Kirim peringatan ke Telegram
                                 </label>
@@ -414,8 +421,9 @@ export function RondaSettings() {
                                                     key={p.label}
                                                     type="button"
                                                     onClick={() => setField(cam.name, 'alert_hours', p.value)}
-                                                    className="rounded-control border border-edge px-2 py-1 text-[11px] text-content-muted
-                                                               hover:border-edge-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                                                    className="min-h-[40px] rounded-control border border-edge px-3 py-1 text-[11px]
+                                                               text-content-muted hover:border-edge-strong focus:outline-none
+                                                               focus-visible:ring-2 focus-visible:ring-primary-500 sm:min-h-0 sm:px-2"
                                                 >
                                                     {p.label}
                                                 </button>

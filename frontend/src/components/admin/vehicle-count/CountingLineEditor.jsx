@@ -13,7 +13,15 @@
 
 import { useCallback, useRef, useState } from 'react';
 
-const HIT = 0.03;        // sedekat apa sentuhan harus mengenai ujung garis untuk menggesernya
+/*
+ * Jangkauan sentuh dihitung dalam PIKSEL LAYAR, bukan proporsi bingkai.
+ *
+ * Sebelumnya 0,03 proporsi: pada gambar selebar 300 px di HP itu berarti 9 px mendatar tetapi
+ * hanya 5 px menegak (tingginya 169 px), jadi sasarannya lonjong dan jauh lebih kecil dari
+ * ujung jari. 28 px adalah lingkaran yang sama besar ke segala arah, seukuran anjuran sasaran
+ * sentuh, dan tetap wajar dengan tetikus di layar lebar.
+ */
+const HIT_PX = 28;
 const MIN_PANJANG = 0.05; // ruas lebih pendek dari ini tidak akan pernah dilintasi dengan andal
 
 function jepit01(n) {
@@ -39,11 +47,15 @@ export default function CountingLineEditor({ previewUrl, garis = [], onChange, a
 
     /** Ujung garis mana yang tersentuh? Mengembalikan {i, ujung} atau null. */
     const cariUjung = useCallback((p) => {
+        const r = kotakRef.current?.getBoundingClientRect();
+        if (!r?.width || !r?.height) return null;
         for (let i = 0; i < garis.length; i += 1) {
             for (const ujung of ['a', 'b']) {
                 const t = garis[i]?.[ujung];
                 if (!t) continue;
-                if (Math.hypot(t[0] - p.x, t[1] - p.y) <= HIT) return { i, ujung };
+                const dx = (t[0] - p.x) * r.width;      // jarak dinilai di layar, bukan di ruang
+                const dy = (t[1] - p.y) * r.height;     // proporsi, supaya bulat ke segala arah
+                if (Math.hypot(dx, dy) <= HIT_PX) return { i, ujung };
             }
         }
         return null;
@@ -133,14 +145,11 @@ export default function CountingLineEditor({ previewUrl, garis = [], onChange, a
                     </defs>
 
                     {garis.map((g, i) => (
-                        <g key={i}>
-                            <line
-                                x1={g.a[0]} y1={g.a[1]} x2={g.b[0]} y2={g.b[1]}
-                                stroke="#facc15" strokeWidth="3" vectorEffect="non-scaling-stroke"
-                            />
-                            <circle cx={g.a[0]} cy={g.a[1]} r="0.014" fill="#facc15" />
-                            <circle cx={g.b[0]} cy={g.b[1]} r="0.014" fill="#facc15" />
-                        </g>
+                        <line
+                            key={i}
+                            x1={g.a[0]} y1={g.a[1]} x2={g.b[0]} y2={g.b[1]}
+                            stroke="#facc15" strokeWidth="3" vectorEffect="non-scaling-stroke"
+                        />
                     ))}
 
                     {/* Panah arah A + lawannya, digambar dari tengah garis pertama supaya
@@ -165,6 +174,21 @@ export default function CountingLineEditor({ previewUrl, garis = [], onChange, a
                         );
                     })()}
                 </svg>
+
+                {/*
+                  * Pegangan ujung digambar sebagai elemen HTML, bukan <circle> SVG: viewBox 0-1
+                  * diregangkan ke 16:9 dengan preserveAspectRatio="none", jadi lingkaran SVG
+                  * keluar sebagai lonjong dan ikut mengecil di layar HP. Ini bulat, ukurannya
+                  * tetap dalam piksel, dan sama besar dengan jangkauan sentuh di atas.
+                  */}
+                {garis.flatMap((g, i) => ['a', 'b'].map((ujung) => (
+                    <span
+                        key={`${i}-${ujung}`}
+                        className="pointer-events-none absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2
+                                   rounded-full border-2 border-surface bg-[#facc15] shadow-e1"
+                        style={{ left: `${g[ujung][0] * 100}%`, top: `${g[ujung][1] * 100}%` }}
+                    />
+                )))}
 
                 {arahArus && garis[0] && (
                     <div className="pointer-events-none absolute bottom-2 left-2 flex flex-col gap-1 rounded-control bg-surface-overlay/80 px-2 py-1.5 text-xs">
@@ -194,7 +218,9 @@ export default function CountingLineEditor({ previewUrl, garis = [], onChange, a
                             <button
                                 type="button"
                                 onClick={() => hapus(i)}
-                                className="shrink-0 rounded-control border border-edge px-2 py-1 text-content transition-colors hover:border-edge-strong hover:bg-surface-raised"
+                                className="min-h-[40px] shrink-0 rounded-control border border-edge px-3 py-1
+                                           text-content transition-colors hover:border-edge-strong
+                                           hover:bg-surface-raised sm:min-h-0 sm:px-2"
                             >
                                 Hapus
                             </button>

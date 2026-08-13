@@ -16,8 +16,13 @@ import { useNotification } from '../contexts/NotificationContext';
 import vehicleCountAdminService from '../services/vehicleCountAdminService';
 import CountingLineEditor from '../components/admin/vehicle-count/CountingLineEditor.jsx';
 
-const KELAS_INPUT = 'w-full rounded-control border border-edge bg-surface px-3 py-2 text-sm text-content transition-colors focus:border-edge-strong focus:outline-none';
-const KELAS_TOMBOL = 'rounded-control border border-edge px-3 py-2 text-sm font-medium text-content transition-colors hover:border-edge-strong hover:bg-surface-raised';
+/*
+ * `text-base sm:text-sm`, bukan `text-sm` saja: Safari iOS memperbesar seluruh halaman begitu
+ * jari menyentuh input yang fontnya di bawah 16 px, dan pengguna harus mencubit untuk kembali.
+ * Di layar lebar ukurannya kembali 14 px. Halaman ini memang dipakai dari HP di lapangan.
+ */
+const KELAS_INPUT = 'w-full rounded-control border border-edge bg-surface px-3 py-2 text-base sm:text-sm text-content transition-colors focus:border-edge-strong focus:outline-none';
+const KELAS_TOMBOL = 'min-h-[44px] rounded-control border border-edge px-3 py-2 text-sm font-medium text-content transition-colors hover:border-edge-strong hover:bg-surface-raised sm:min-h-0';
 
 /* Jumlah kamera yang realistis berjalan bersamaan di satu server 16 core. */
 const BATAS_WAJAR = 3;
@@ -26,6 +31,15 @@ const MODEL_PILIHAN = [
     { value: 'kamera15-v1.pt', label: 'Khusus kamera ini (hasil latihan) — paling cepat & tepat' },
     { value: 'yolo11m.pt', label: 'yolo11m (umum, COCO)' },
     { value: 'yolo11s.pt', label: 'yolo11s (umum, lebih ringan)' },
+];
+
+// Delapan arah baku menutup hampir semua jalan; sudut miring tetap bisa diketik persis di
+// bawahnya. Sumbu Y menunjuk ke BAWAH pada gambar, jadi "utara" bernilai negatif.
+const ARAH_CEPAT = [
+    { label: 'Timur', panah: '→', nilai: [1, 0] },
+    { label: 'Barat', panah: '←', nilai: [-1, 0] },
+    { label: 'Utara', panah: '↑', nilai: [0, -1] },
+    { label: 'Selatan', panah: '↓', nilai: [0, 1] },
 ];
 
 function Baris({ label, anak, keterangan }) {
@@ -245,6 +259,7 @@ export default function VehicleCountSettings() {
                                 type="checkbox"
                                 checked={Boolean(draft.aktif)}
                                 onChange={(e) => ubah('aktif', e.target.checked)}
+                                className="h-5 w-5 rounded border-edge accent-[var(--primary-color)] sm:h-4 sm:w-4"
                             />
                             Nyalakan penghitungan
                         </label>
@@ -341,27 +356,71 @@ export default function VehicleCountSettings() {
                                 />
                             )}
                         />
-                        <Baris
-                            label="Arah arus X"
-                            keterangan="Menentukan perlintasan masuk arah A atau B. Panah hijau di gambar menunjukkan arah A."
-                            anak={(
-                                <input
-                                    type="number" step="0.1" className={KELAS_INPUT}
-                                    value={draft.arah_arus?.[0] ?? 1}
-                                    onChange={(e) => ubah('arah_arus', [Number(e.target.value), draft.arah_arus?.[1] ?? 0])}
-                                />
-                            )}
-                        />
-                        <Baris
-                            label="Arah arus Y"
-                            anak={(
-                                <input
-                                    type="number" step="0.1" className={KELAS_INPUT}
-                                    value={draft.arah_arus?.[1] ?? 0}
-                                    onChange={(e) => ubah('arah_arus', [draft.arah_arus?.[0] ?? 1, Number(e.target.value)])}
-                                />
-                            )}
-                        />
+                        <div className="sm:col-span-2">
+                            <Baris
+                                label="Arah A menghadap ke mana"
+                                keterangan="Menentukan perlintasan masuk arah A atau B. Panah hijau di gambar menunjukkan arah A."
+                                anak={(
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {ARAH_CEPAT.map((a) => {
+                                            const [x, y] = draft.arah_arus || [1, 0];
+                                            // Sudut antara arah tersimpan dan preset; di bawah ~22°
+                                            // dianggap preset itulah yang sedang dipakai.
+                                            const pjg = Math.hypot(x, y) || 1;
+                                            const terpilih = (x * a.nilai[0] + y * a.nilai[1]) / pjg > 0.92;
+                                            return (
+                                                <button
+                                                    key={a.label}
+                                                    type="button"
+                                                    onClick={() => ubah('arah_arus', a.nilai)}
+                                                    className={`min-h-[44px] flex-1 rounded-control border px-2 py-2 text-xs
+                                                                transition-colors sm:min-h-0 ${terpilih
+                                                            ? 'border-primary-500 bg-primary-500/10 text-content'
+                                                            : 'border-edge text-content-muted hover:border-edge-strong'}`}
+                                                >
+                                                    <span aria-hidden="true" className="mr-1">{a.panah}</span>
+                                                    {a.label}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            />
+                            {/*
+                              * Tombol arah TIDAK menggantikan angka persisnya, hanya menyembunyikannya.
+                              * Perempatan Sosrodilogo memakai 0,90 / -0,44 — sekitar 26°, tidak jatuh
+                              * pada satu pun dari delapan arah baku. Menghapus isian ini akan membuat
+                              * sudut yang sudah disetel tidak bisa dikembalikan dari panel.
+                              */}
+                            <details className="mt-2">
+                                <summary className="cursor-pointer text-xs text-content-muted">
+                                    Sudut persis: {(draft.arah_arus?.[0] ?? 1).toFixed(2)},{' '}
+                                    {(draft.arah_arus?.[1] ?? 0).toFixed(2)}
+                                </summary>
+                                <div className="mt-2 grid gap-3 sm:grid-cols-2">
+                                    <Baris
+                                        label="Arah arus X"
+                                        anak={(
+                                            <input
+                                                type="number" step="0.01" className={KELAS_INPUT}
+                                                value={draft.arah_arus?.[0] ?? 1}
+                                                onChange={(e) => ubah('arah_arus', [Number(e.target.value), draft.arah_arus?.[1] ?? 0])}
+                                            />
+                                        )}
+                                    />
+                                    <Baris
+                                        label="Arah arus Y"
+                                        anak={(
+                                            <input
+                                                type="number" step="0.01" className={KELAS_INPUT}
+                                                value={draft.arah_arus?.[1] ?? 0}
+                                                onChange={(e) => ubah('arah_arus', [draft.arah_arus?.[0] ?? 1, Number(e.target.value)])}
+                                            />
+                                        )}
+                                    />
+                                </div>
+                            </details>
+                        </div>
                         <Baris
                             label="Model"
                             anak={(
