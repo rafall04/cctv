@@ -16,6 +16,7 @@ import { useNotification } from '../contexts/NotificationContext';
 import { useConfirm } from '../contexts/ConfirmContext';
 import rondaAdminService from '../services/rondaAdminService';
 import RondaZoneEditor from '../components/admin/ronda/RondaZoneEditor';
+import PanduanPanel from '../components/admin/PanduanPanel';
 import { TableSkeleton } from '../components/ui/Skeleton';
 
 const HOUR_PRESETS = [
@@ -23,6 +24,53 @@ const HOUR_PRESETS = [
     { label: '22:00–05:00', value: '22:00-05:00' },
     { label: '23:00–04:30', value: '23:00-04:30' },
     { label: '24 jam', value: '' },
+];
+
+/*
+ * Ditulis dari kegagalan yang benar-benar terjadi saat memasang detektor pertama, bukan dari
+ * daftar istilah: sumber yang tidak terbaca, peringatan yang terlalu sering, dan lampu status
+ * yang disalahartikan sebagai "rusak".
+ */
+const PANDUAN = [
+    {
+        tanya: 'Bagaimana ronda ini bekerja?',
+        jawab: 'Dua tahap. Pertama gerakan dideteksi dengan cara murah — itu berjalan terus. '
+            + 'Baru kalau gerakannya bertahan beberapa detik, YOLO dipanggil untuk memastikan '
+            + 'itu benar orang atau kendaraan, bukan daun atau bayangan. Peringatan Telegram '
+            + 'hanya dikirim setelah tahap kedua lolos.',
+    },
+    {
+        tanya: 'Area pantau dan zona abaikan',
+        jawab: 'Tekan salah satu tombol mode di atas gambar, lalu ketuk gambarnya. "Area pantau" '
+            + '(kuning) membatasi tempat yang diperiksa — dikosongkan berarti seluruh layar. '
+            + '"Zona abaikan" (merah) mematikan bagian tertentu: jam di pojok, tulisan berjalan, '
+            + 'atau jalan raya yang ramai sepanjang malam.',
+    },
+    {
+        tanya: 'Arti warna lampu di sebelah nama kamera',
+        jawab: 'Hijau = berjalan dan melihat gambar. Kuning = prosesnya hidup tetapi gambar '
+            + 'kameranya tidak terbaca — biasanya alamat sumber berubah atau kameranya mati; '
+            + 'jumlah percobaan sambung ulang ikut ditampilkan. Merah = detektornya tidak jalan.',
+    },
+    {
+        tanya: 'Peringatannya terlalu sering',
+        jawab: 'Berurutan, dari yang paling tidak berisiko: naikkan "Ukuran gerakan minimum", '
+            + 'tambahkan zona abaikan di bagian yang selalu bergerak, persempit area pantau, '
+            + 'baru terakhir naikkan jeda. Menaikkan jeda lebih dulu hanya menyembunyikan '
+            + 'gejalanya — kejadiannya tetap terdeteksi, Anda saja yang tidak diberi tahu.',
+    },
+    {
+        tanya: 'Tidak ada peringatan sama sekali',
+        jawab: 'Periksa berurutan: lampu kamera hijau atau tidak, tanda centang "aktif" menyala, '
+            + 'ID grup Telegram terisi, dan jam ronda memang sedang berlaku. Di luar jam ronda '
+            + 'peringatan tetap dikirim, hanya jauh lebih jarang — itu jeda yang kedua.',
+    },
+    {
+        tanya: 'Mana yang berlaku langsung, mana yang perlu nyalakan ulang?',
+        jawab: 'Jam, jeda, grup Telegram, kepekaan, zona, dan nama berlaku sekitar 15 detik tanpa '
+            + 'memutus apa pun. Resolusi olah, FPS, batas bingkai, dan retensi baru berlaku '
+            + 'setelah "Nyalakan ulang" — pesan setelah menyimpan akan menyebutkannya.',
+    },
 ];
 
 const CLASS_PRESETS = [
@@ -229,6 +277,14 @@ export function RondaSettings() {
                     </button>
                 )}
             </header>
+
+            <PanduanPanel
+                judul="Panduan singkat"
+                bagian={PANDUAN}
+                catatan="Satu detektor terukur memakai sekitar 28% dari satu core dan 162 MB RAM
+                         di server ini (siang, lalu lintas ramai). Malam hari belum terukur —
+                         nyalakan satu kamera dulu dan lihat bebannya sebelum menambah."
+            />
 
             {!available && (
                 <div className="rounded-card border border-status-warn/30 bg-status-warn/10 p-4 text-sm">

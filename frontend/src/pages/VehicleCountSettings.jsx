@@ -15,6 +15,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNotification } from '../contexts/NotificationContext';
 import vehicleCountAdminService from '../services/vehicleCountAdminService';
 import CountingLineEditor from '../components/admin/vehicle-count/CountingLineEditor.jsx';
+import PanduanPanel from '../components/admin/PanduanPanel.jsx';
 
 /*
  * `text-base sm:text-sm`, bukan `text-sm` saja: Safari iOS memperbesar seluruh halaman begitu
@@ -37,6 +38,63 @@ const MODEL_PILIHAN = [
     { value: 'kamera15-v1.pt', label: 'Khusus kamera ini v1 — versi sebelumnya' },
     { value: 'yolo11m.pt', label: 'yolo11m (umum, COCO)' },
     { value: 'yolo11s.pt', label: 'yolo11s (umum, lebih ringan)' },
+];
+
+/*
+ * Isi panduan ditulis dari hal-hal yang benar-benar salah dipahami saat menyetel kamera pertama,
+ * bukan dari daftar istilah. Setiap angka di sini terukur di kamera jembatan Sosrodilogo.
+ */
+const PANDUAN = [
+    {
+        tanya: 'Bagaimana kendaraan dihitung?',
+        jawab: 'Saat melewati garis kuning. Satu kendaraan dihitung SEKALI, pada garis pertama '
+            + 'yang ia lintasi — jadi menambah garis memperluas cakupan tanpa membuat hitungan '
+            + 'ganda. Di kamera ini satu garis hanya menangkap 57% lalu lintas; tiga garis 87%.',
+    },
+    {
+        tanya: 'Menggambar garis dari HP',
+        jawab: 'Tarik jari di atas gambar untuk membuat garis baru. Untuk menggeser, tarik '
+            + 'bulatan kuning di ujungnya. Ruas yang terlalu pendek dibuang sendiri karena tidak '
+            + 'akan pernah dilintasi dengan andal. Tekan "Simpan setelan" setelah selesai.',
+    },
+    {
+        tanya: 'Arah A dan arah B itu apa?',
+        jawab: 'Panah hijau di gambar adalah arah A; garis putus-putus biru arah sebaliknya (B). '
+            + 'Nama yang Anda isi itulah yang muncul di halaman publik, jadi tulis nama tempat '
+            + 'yang dikenal orang — "Menuju jembatan", bukan "kiri".',
+    },
+    {
+        tanya: 'Ambang deteksi vs ambang tampil kotak',
+        jawab: 'Sengaja dipisah. Melacak butuh peka (0,1) supaya motor kecil di kejauhan tidak '
+            + 'lolos; menampilkan kotak butuh rapi (0,35) supaya tayangan publik tidak penuh '
+            + 'kotak ragu-ragu. Menaikkan ambang deteksi akan mengurangi hitungan, bukan '
+            + 'sekadar merapikan tampilan.',
+    },
+    {
+        tanya: 'Ukuran olah (imgsz) — apakah makin besar makin bagus?',
+        jawab: 'Tidak. Pada kamera CCTV yang gambarnya sudah lunak, 384–512 terukur mengalahkan '
+            + '640: memperbesar hanya memperbesar derau, sambil memakan CPU jauh lebih banyak '
+            + 'dan membuat penghitung tertinggal dari siaran.',
+    },
+    {
+        tanya: 'Angkanya terlihat aneh, apa yang saya cek?',
+        jawab: 'Baris kecil di bawah ringkasan: kalau "frame terakhir" lebih dari beberapa detik, '
+            + 'masalahnya di siaran kamera, bukan di penghitungan. Kalau fps turun jauh di bawah '
+            + '8, turunkan FPS olah atau imgsz. Kalau satu arah nyaris nol, kemungkinan besar '
+            + 'panah arahnya terbalik.',
+    },
+    {
+        tanya: 'Apakah menyimpan memutus tayangan publik?',
+        jawab: 'Tidak. Penghitung membaca setelan baru sambil terus berjalan — prosesnya tidak '
+            + 'dimulai ulang dan hitungannya tidak ter-reset. Termasuk saat mengganti model.',
+    },
+    {
+        tanya: 'Model mana yang dipilih?',
+        jawab: 'v2 (dianjurkan) — dilatih dari kamera ini sendiri. Dibanding v1, ia tidak lagi '
+            + 'memecah satu truk besar menjadi beberapa kotak, dan komposisi hitungannya lebih '
+            + 'dekat ke hitungan manual. v1 dibiarkan di daftar supaya Anda bisa kembali dari '
+            + 'halaman ini kalau hasilnya ternyata tidak sesuai.',
+    },
 ];
 
 // Delapan arah baku menutup hampir semua jalan; sudut miring tetap bisa diketik persis di
@@ -185,6 +243,13 @@ export default function VehicleCountSettings() {
                     langsung di atas gambar kamera.
                 </p>
             </header>
+
+            <PanduanPanel
+                judul="Panduan singkat"
+                bagian={PANDUAN}
+                catatan="Tiap penghitung memakai 4–6 dari 16 core di server ini. Satu kamera aman;
+                         sebelum menyalakan yang ketiga, lihat dulu beban servernya."
+            />
 
             {jumlahAktif >= BATAS_WAJAR && (
                 <div className="rounded-card border border-status-warn/30 bg-status-warn/10 px-3 py-2 text-xs text-status-warn">
