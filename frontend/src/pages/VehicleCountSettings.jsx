@@ -29,13 +29,19 @@ const KELAS_TOMBOL = 'min-h-[44px] rounded-control border border-edge px-3 py-2 
 const BATAS_WAJAR = 3;
 
 /*
- * v1 sengaja DIPERTAHANKAN di daftar meski v2 lebih baik: mengganti model adalah satu-satunya
- * perubahan di halaman ini yang akibatnya tidak langsung terlihat, jadi jalan pulangnya harus
- * ada di panel — bukan lewat SSH.
+ * v2 SENGAJA tidak dianjurkan meski angka validasinya lebih tinggi (mAP50-95 0,629 vs 0,602).
+ * Set latihannya menyisihkan 443 bingkai gelap, jadi ia praktis hanya belajar siang hari, dan
+ * begitu senja ia menandai motor sebagai mobil — terlihat langsung oleh pemilik pada 13 Agustus
+ * 2026, beberapa jam setelah dipasang. Pada 60 bingkai senja: v2 menemukan 56 mobil ketika
+ * wasit yolo11x hanya menemukan 31; v1 menemukan 28.
+ *
+ * Pelajarannya, dan alasan catatan ini ada: mAP pada set validasi yang dibangun dari data siang
+ * tidak mengatakan apa pun tentang malam. Jangan naikkan v2 menjadi anjuran sebelum ia dilatih
+ * ulang dengan bingkai gelap dan diuji SETELAH matahari terbenam.
  */
 const MODEL_PILIHAN = [
-    { value: 'kamera15-v2.pt', label: 'Khusus kamera ini v2 (hasil latihan) — dianjurkan' },
-    { value: 'kamera15-v1.pt', label: 'Khusus kamera ini v1 — versi sebelumnya' },
+    { value: 'kamera15-v1.pt', label: 'Khusus kamera ini v1 — dianjurkan (siang & malam)' },
+    { value: 'kamera15-v2.pt', label: 'v2 — lebih rapi siang, tetapi salah kelas saat malam' },
     { value: 'yolo11m.pt', label: 'yolo11m (umum, COCO)' },
     { value: 'yolo11s.pt', label: 'yolo11s (umum, lebih ringan)' },
 ];
@@ -90,10 +96,17 @@ const PANDUAN = [
     },
     {
         tanya: 'Model mana yang dipilih?',
-        jawab: 'v2 (dianjurkan) — dilatih dari kamera ini sendiri. Dibanding v1, ia tidak lagi '
-            + 'memecah satu truk besar menjadi beberapa kotak, dan komposisi hitungannya lebih '
-            + 'dekat ke hitungan manual. v1 dibiarkan di daftar supaya Anda bisa kembali dari '
-            + 'halaman ini kalau hasilnya ternyata tidak sesuai.',
+        jawab: 'v1 — dianjurkan, dan itu yang sedang dipakai. v2 memang lebih rapi pada siang '
+            + 'hari (tidak memecah satu truk menjadi beberapa kotak), tetapi set latihannya '
+            + 'menyisihkan bingkai gelap, sehingga setelah senja ia menandai motor sebagai '
+            + 'mobil. Pilih v2 hanya kalau kamera Anda selalu terang.',
+    },
+    {
+        tanya: 'Kenapa angka bagus belum tentu hasilnya bagus?',
+        jawab: 'Karena set uji bisa tidak mewakili keadaan sebenarnya. v2 menang di semua angka '
+            + 'validasi tetapi gagal setelah gelap, sebab bingkai malam memang tidak ikut '
+            + 'dilatihkan. Kalau Anda mengganti model, lihat sendiri hasilnya di jam tersibuk '
+            + 'DAN setelah matahari terbenam sebelum menganggapnya lebih baik.',
     },
 ];
 
