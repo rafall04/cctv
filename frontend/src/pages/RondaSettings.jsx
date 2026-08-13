@@ -96,6 +96,7 @@ export function RondaSettings() {
     const [cameras, setCameras] = useState([]);
     const [availableCams, setAvailableCams] = useState([]);
     const [available, setAvailable] = useState(true);
+    const [kesiapan, setKesiapan] = useState(null);
     const [loading, setLoading] = useState(true);
     const [drafts, setDrafts] = useState({});
     const [busy, setBusy] = useState(null);
@@ -111,6 +112,7 @@ export function RondaSettings() {
             ]);
             const cams = list?.data?.cameras ?? [];
             setAvailable(list?.data?.available !== false);
+            setKesiapan(list?.data?.kesiapan ?? null);
             setCameras(cams);
             setAvailableCams(avail?.data ?? []);
             setDrafts((prev) => {
@@ -221,8 +223,22 @@ export function RondaSettings() {
             </header>
 
             {!available && (
-                <div className="rounded-card border border-edge bg-surface-raised p-4 text-sm text-content-muted">
-                    Layanan deteksi tidak terpasang di server ini, jadi tidak ada kamera yang bisa diatur.
+                <div className="rounded-card border border-status-warn/30 bg-status-warn/10 p-4 text-sm">
+                    <p className="font-medium text-status-warn">
+                        Layanan deteksi belum terpasang di server ini, jadi kamera belum bisa ditambahkan.
+                    </p>
+                    {kesiapan?.kurang?.length > 0 && (
+                        <>
+                            <p className="mt-2 text-content-muted">Yang belum tersedia:</p>
+                            <ul className="mt-1 list-disc space-y-0.5 pl-5 text-content-muted">
+                                {kesiapan.kurang.map((k) => <li key={k}>{k}</li>)}
+                            </ul>
+                        </>
+                    )}
+                    <p className="mt-2 text-content-subtle">
+                        Setelan tiap kamera yang sudah ada tetap bisa diubah dari halaman ini; yang
+                        terhalang hanya menambah kamera baru dan menyalakan ulang detektor.
+                    </p>
                 </div>
             )}
 

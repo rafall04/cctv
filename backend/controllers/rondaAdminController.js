@@ -22,10 +22,12 @@ export async function listRondaCameras(request, reply) {
     try {
         const cameras = rondaConfigService.listCameras();
         // `available: false` lets the UI explain the detectors aren't installed on this host
-        // instead of showing an empty list that looks like a bug.
+        // instead of showing an empty list that looks like a bug. `kesiapan` goes further and
+        // names each missing piece, so the operator isn't left guessing what to install.
+        const kesiapan = await rondaDetectorService.kesiapan();
         return reply.send({
             success: true,
-            data: { available: rondaConfigService.isAvailable(), cameras },
+            data: { available: kesiapan.siap, kesiapan, cameras },
         });
     } catch (error) {
         return sendError(reply, error, 'List ronda cameras error');

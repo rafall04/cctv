@@ -86,6 +86,15 @@ export default function VehicleCountSettings() {
         }
     }, [showNotification, muatRingkasan]);
 
+    /* Kamera pertama yang sudah diatur langsung dibuka. Tanpa ini halaman terbuka kosong dan
+       angka yang sebenarnya SUDAH ada terbaca sebagai "datanya tidak muncul" — nyatanya cuma
+       belum diklik. Mengutamakan yang sedang berjalan supaya yang terbuka adalah yang hidup. */
+    useEffect(() => {
+        if (dipilih || memuat || terpasang.length === 0) return;
+        const utama = terpasang.find((c) => c.berjalan) || terpasang[0];
+        bukaKamera(utama.camera_id);
+    }, [dipilih, memuat, terpasang, bukaKamera]);
+
     /* Ringkasan disegarkan berkala supaya admin melihat angkanya benar-benar bertambah —
        itu satu-satunya bukti yang berarti bahwa penghitungnya bekerja. */
     useEffect(() => {
@@ -307,6 +316,7 @@ export default function VehicleCountSettings() {
                         previewUrl={`/api/thumbnails/${dipilih}.jpg`}
                         garis={draft.garis || []}
                         arahArus={draft.arah_arus}
+                        namaArah={draft.nama_arah}
                         onChange={(g) => ubah('garis', g)}
                     />
 

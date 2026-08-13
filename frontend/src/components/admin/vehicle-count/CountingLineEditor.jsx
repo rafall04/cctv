@@ -24,7 +24,7 @@ function bulat3(n) {
     return Math.round(n * 1000) / 1000;
 }
 
-export default function CountingLineEditor({ previewUrl, garis = [], onChange, arahArus }) {
+export default function CountingLineEditor({ previewUrl, garis = [], onChange, arahArus, namaArah = {} }) {
     const [seret, setSeret] = useState(null);
     const kotakRef = useRef(null);
 
@@ -117,27 +117,65 @@ export default function CountingLineEditor({ previewUrl, garis = [], onChange, a
                     </div>
                 )}
 
+                {/*
+                  * strokeWidth di sini dalam PIKSEL LAYAR, bukan satuan viewBox, karena
+                  * vectorEffect="non-scaling-stroke". Nilai lama 0.006 berarti garis setebal
+                  * 0,006 piksel — tak terlihat sama sekali, sehingga yang tampak hanya titik
+                  * ujungnya (r memakai satuan viewBox yang ikut diskalakan). Itulah keluhan
+                  * "kok cuma titik kuning".
+                  */}
                 <svg viewBox="0 0 1 1" preserveAspectRatio="none" className="pointer-events-none absolute inset-0 h-full w-full">
+                    <defs>
+                        <marker id="panah-arah" viewBox="0 0 10 10" refX="8" refY="5"
+                            markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+                            <path d="M 0 0 L 10 5 L 0 10 z" fill="#4ade80" />
+                        </marker>
+                    </defs>
+
                     {garis.map((g, i) => (
                         <g key={i}>
                             <line
                                 x1={g.a[0]} y1={g.a[1]} x2={g.b[0]} y2={g.b[1]}
-                                stroke="#facc15" strokeWidth="0.006" vectorEffect="non-scaling-stroke"
+                                stroke="#facc15" strokeWidth="3" vectorEffect="non-scaling-stroke"
                             />
-                            <circle cx={g.a[0]} cy={g.a[1]} r="0.012" fill="#facc15" />
-                            <circle cx={g.b[0]} cy={g.b[1]} r="0.012" fill="#facc15" />
+                            <circle cx={g.a[0]} cy={g.a[1]} r="0.014" fill="#facc15" />
+                            <circle cx={g.b[0]} cy={g.b[1]} r="0.014" fill="#facc15" />
                         </g>
                     ))}
-                    {arahArus && garis[0] && (
-                        <line
-                            x1={(garis[0].a[0] + garis[0].b[0]) / 2}
-                            y1={(garis[0].a[1] + garis[0].b[1]) / 2}
-                            x2={(garis[0].a[0] + garis[0].b[0]) / 2 + arahArus[0] * 0.12}
-                            y2={(garis[0].a[1] + garis[0].b[1]) / 2 + arahArus[1] * 0.12}
-                            stroke="#4ade80" strokeWidth="0.006" vectorEffect="non-scaling-stroke"
-                        />
-                    )}
+
+                    {/* Panah arah A + lawannya, digambar dari tengah garis pertama supaya
+                        "mana arah A, mana arah B" terjawab di gambar, bukan hanya di formulir. */}
+                    {arahArus && garis[0] && (() => {
+                        const cx = (garis[0].a[0] + garis[0].b[0]) / 2;
+                        const cy = (garis[0].a[1] + garis[0].b[1]) / 2;
+                        const [ux, uy] = arahArus;
+                        return (
+                            <g>
+                                <line
+                                    x1={cx} y1={cy} x2={cx + ux * 0.16} y2={cy + uy * 0.16}
+                                    stroke="#4ade80" strokeWidth="3" vectorEffect="non-scaling-stroke"
+                                    markerEnd="url(#panah-arah)"
+                                />
+                                <line
+                                    x1={cx} y1={cy} x2={cx - ux * 0.10} y2={cy - uy * 0.10}
+                                    stroke="#38bdf8" strokeWidth="3" vectorEffect="non-scaling-stroke"
+                                    strokeDasharray="4 3"
+                                />
+                            </g>
+                        );
+                    })()}
                 </svg>
+
+                {arahArus && garis[0] && (
+                    <div className="pointer-events-none absolute bottom-2 left-2 flex flex-col gap-1 rounded-control bg-surface-overlay/80 px-2 py-1.5 text-xs">
+                        <span className="flex items-center gap-1.5 text-content">
+                            <span className="inline-block h-0.5 w-4 bg-[#4ade80]" /> {namaArah.plus || 'Arah A'}
+                        </span>
+                        <span className="flex items-center gap-1.5 text-content">
+                            <span className="inline-block h-0.5 w-4 bg-[#38bdf8]" /> {namaArah.minus || 'Arah B'}
+                        </span>
+                    </div>
+                )}
             </div>
 
             <p className="text-xs text-content-muted">

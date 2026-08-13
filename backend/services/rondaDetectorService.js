@@ -80,7 +80,70 @@ function resolveBotToken() {
     return '';
 }
 
+/*
+ * Kesiapan dijawab dari cache pendek: pemeriksaannya memanggil `docker image inspect`, dan
+ * halaman daftar dimuat ulang tiap kali admin membuka tab. Tanpa cache, satu halaman admin
+ * bisa memicu belasan proses docker di server yang beban CPU-nya sudah tinggi.
+ */
+const KESIAPAN_TTL = 30000;
+let kesiapanCache = { pada: 0, hasil: null };
+
 class RondaDetectorService {
+    async #imageAda() {
+        try {
+            return Boolean(await docker(['image', 'inspect', IMAGE, '-f', '{{.Id}}']));
+        } catch {
+            return false;
+        }
+    }
+
+    /**
+     * Apa saja yang belum ada supaya "Tambah Kamera" benar-benar bisa jalan.
+     *
+     * Ini ada karena kegagalannya dulu menyesatkan: tanpa runtime detektor, tombol tambah
+     * berhenti di pesan "Token bot Telegram belum tersetel" — seolah tinggal mengisi token,
+     * padahal image docker dan modelnya pun tidak ada di mesin ini. Operator berhak tahu
+     * daftar persisnya, bukan menebak dari satu pesan galat.
+     */
+    async kesiapan() {
+        const sekarang = Date.now();
+        if (kesiapanCache.hasil && sekarang - kesiapanCache.pada < KESIAPAN_TTL) {
+            return kesiapanCache.hasil;
+        }
+
+        const rincian = {
+            docker: false,
+            image: false,
+            work_dir: fs.existsSync(WORK_DIR),
+            model: fs.existsSync(path.join(WORK_DIR, String(MODEL).replace(/^\/work\//, ''))),
+            config_dir: rondaConfigService.isAvailable(),
+            telegram_token: Boolean(resolveBotToken()),
+        };
+        try {
+            await run('docker', ['version', '-f', '{{.Server.Version}}'], { timeout: 10000 });
+            rincian.docker = true;
+        } catch {
+            rincian.docker = false;
+        }
+        if (rincian.docker) rincian.image = await this.#imageAda();
+
+        const label = {
+            docker: 'Docker aktif di server',
+            image: `Image docker ${IMAGE}`,
+            work_dir: `Folder kerja ${WORK_DIR}`,
+            model: `Model deteksi ${MODEL}`,
+            config_dir: `Folder setelan ${CONFIG_DIR}`,
+            telegram_token: 'Token bot Telegram (Pengaturan Telegram)',
+        };
+        const hasil = {
+            siap: Object.values(rincian).every(Boolean),
+            kurang: Object.entries(rincian).filter(([, ada]) => !ada).map(([k]) => label[k]),
+            rincian,
+        };
+        kesiapanCache = { pada: sekarang, hasil };
+        return hasil;
+    }
+
     /** Community cameras that have a stream key and no detector yet. */
     listAvailableCameras() {
         const monitored = new Set(
