@@ -150,7 +150,15 @@ describe('vehicleCountService', () => {
             ...STATS,
             riwayat: [
                 { t: '2026-08-13T05:00:00Z', total: 100, jenis: { motor: 60, mobil: 30, truk: 8, bus: 2 } },
-                { t: '2026-08-13T05:00:10Z', total: 140, jenis: { motor: 90, mobil: 40, truk: 8, bus: 2 } },
+                {
+                    t: '2026-08-13T05:00:10Z',
+                    total: 140,
+                    jenis: { motor: 90, mobil: 40, truk: 8, bus: 2 },
+                    arah: {
+                        'Menuju barat (jembatan)': 80,
+                        'Menuju timur (belakang kamera)': 60,
+                    },
+                },
                 { t: '2026-08-13T05:00:20Z', total: 180, jenis: { motor: 120, mobil: 50, truk: 8, bus: 2 } },
             ],
         };
@@ -163,6 +171,18 @@ describe('vehicleCountService', () => {
             expect(d.selarasVideo).toBe(true);
             expect(d.total).toBe(140);                    // cuplikan 05:00:10, bukan 05:00:20
             expect(d.perJenis.motor).toBe(90);
+        });
+
+        it('menggeser baris arah ke detik yang SAMA supaya jumlahnya tidak bertentangan', async () => {
+            readFileSyncMock.mockReturnValue(JSON.stringify(DENGAN_RIWAYAT));
+            const { getPublicVehicleCount } = await muat();
+            const d = getPublicVehicleCount(15, { pada: '2026-08-13T05:00:13Z' });
+
+            const jumlahArah = d.perArah.reduce((s, a) => s + a.total, 0);
+            const jumlahJenis = Object.values(d.perJenis).reduce((s, n) => s + n, 0);
+            expect(jumlahArah).toBe(140);
+            expect(jumlahJenis).toBe(140);
+            expect(jumlahArah).toBe(jumlahJenis);
         });
 
         it('kembali ke angka terkini bila detiknya di luar jangkauan riwayat', async () => {

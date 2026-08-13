@@ -201,11 +201,16 @@ export function getPublicVehicleCount(cameraId, { pada = '' } = {}) {
         // yang membuat panel ini dapat dipercaya, bukan sekadar dipamerkan.
         total10m: toInt(data?.total_10_menit),
         perJenis10m: ringkasJenis(data?.per_jenis_10_menit),
+        // Baris arah ikut digeser ke detik yang sama. Kalau hanya kartu jenis yang digeser,
+        // kartu berjumlah 102 sementara baris arah berjumlah 105 — dua angka benar yang
+        // terbaca sebagai saling bertentangan.
         perArah: Object.entries(arah)
             .map(([label, nilai]) => ({
                 label,
                 perJenis: ringkasJenis(nilai),
-                total: JENIS.reduce((sum, jenis) => sum + toInt(nilai?.[jenis]), 0),
+                total: cuplikan && cuplikan.arah && label in cuplikan.arah
+                    ? toInt(cuplikan.arah[label])
+                    : JENIS.reduce((sum, jenis) => sum + toInt(nilai?.[jenis]), 0),
             }))
             .sort((a, b) => b.total - a.total),
         perMenit: Array.isArray(data?.per_menit)
