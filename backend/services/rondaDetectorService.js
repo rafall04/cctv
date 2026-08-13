@@ -133,11 +133,21 @@ class RondaDetectorService {
             work_dir: `Folder kerja ${WORK_DIR}`,
             model: `Model deteksi ${MODEL}`,
             config_dir: `Folder setelan ${CONFIG_DIR}`,
-            telegram_token: 'Token bot Telegram (Pengaturan Telegram)',
         };
+        /*
+         * Token Telegram sengaja DILUAR penentu `siap`. Ia bukan bagian yang dipasang, melainkan
+         * setelan yang hanya boleh diisi manusia — dan kalau ia ikut mengunci `siap`, tombol
+         * "Tambah Kamera" tetap tersembunyi setelah runtime terpasang, sehingga operator tidak
+         * punya jalan untuk maju. Kekurangannya tetap dilaporkan, hanya lewat jalur berbeda.
+         */
         const hasil = {
-            siap: Object.values(rincian).every(Boolean),
-            kurang: Object.entries(rincian).filter(([, ada]) => !ada).map(([k]) => label[k]),
+            siap: Object.entries(rincian)
+                .filter(([k]) => k !== 'telegram_token')
+                .every(([, ada]) => ada),
+            kurang: Object.entries(label).filter(([k]) => !rincian[k]).map(([, teks]) => teks),
+            perlu_disetel: rincian.telegram_token
+                ? []
+                : ['Token bot Telegram — isi di Pengaturan Telegram sebelum menambah kamera'],
             rincian,
         };
         kesiapanCache = { pada: sekarang, hasil };

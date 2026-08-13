@@ -242,6 +242,15 @@ export function RondaSettings() {
                 </div>
             )}
 
+            {available && kesiapan?.perlu_disetel?.length > 0 && (
+                <div className="rounded-card border border-edge bg-surface-raised p-4 text-sm text-content-muted">
+                    Detektornya sudah terpasang, tetapi masih ada yang perlu diisi:
+                    <ul className="mt-1 list-disc space-y-0.5 pl-5">
+                        {kesiapan.perlu_disetel.map((k) => <li key={k}>{k}</li>)}
+                    </ul>
+                </div>
+            )}
+
             {adding && (
                 <section className="rounded-card border border-edge bg-surface-raised p-4 shadow-e1">
                     <h2 className="font-semibold text-content">Tambah Kamera ke Pemantauan</h2>

@@ -68,12 +68,13 @@ describe('rondaDetectorService.kesiapan', () => {
         const hasil = await svc.kesiapan();
 
         expect(hasil.siap).toBe(false);
-        expect(hasil.kurang.length).toBeGreaterThanOrEqual(5);
         const gabung = hasil.kurang.join(' | ');
+        expect(hasil.kurang).toHaveLength(5);
         expect(gabung).toMatch(/Docker/i);
         expect(gabung).toMatch(/image/i);
         expect(gabung).toMatch(/Model/i);
-        expect(gabung).toMatch(/Telegram/i);
+        expect(gabung).toMatch(/Folder setelan/i);
+        expect(hasil.perlu_disetel.join(' ')).toMatch(/Telegram/i);
     });
 
     it('image tidak diperiksa saat docker sendiri mati — perintahnya pasti gagal', async () => {
@@ -100,6 +101,27 @@ describe('rondaDetectorService.kesiapan', () => {
 
         expect(hasil.siap).toBe(true);
         expect(hasil.kurang).toEqual([]);
+        expect(hasil.perlu_disetel).toEqual([]);
+    });
+
+    /*
+     * Kalau token ikut mengunci `siap`, tombol "Tambah Kamera" tetap tersembunyi walau runtime
+     * sudah terpasang — operator terkurung tanpa jalan maju. Token dilaporkan, tapi lewat
+     * jalur terpisah.
+     */
+    it('runtime lengkap tanpa token tetap dinyatakan siap, tokennya dilaporkan terpisah', async () => {
+        adaBerkas.mockReturnValue(true);
+        execFileMock.mockReturnValue('sha256:abc');
+        const konfig = (await import('../services/rondaConfigService.js')).default;
+        konfig.isAvailable.mockReturnValue(true);
+        konfig.anyBotToken.mockReturnValue('');
+
+        const svc = await muat();
+        const hasil = await svc.kesiapan();
+
+        expect(hasil.siap).toBe(true);
+        expect(hasil.kurang).toEqual([]);
+        expect(hasil.perlu_disetel.join(' ')).toMatch(/Telegram/i);
     });
 
     it('hasilnya di-cache — halaman admin tidak boleh memicu docker berkali-kali', async () => {
