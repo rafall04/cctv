@@ -27,8 +27,14 @@ const KELAS_TOMBOL = 'min-h-[44px] rounded-control border border-edge px-3 py-2 
 /* Jumlah kamera yang realistis berjalan bersamaan di satu server 16 core. */
 const BATAS_WAJAR = 3;
 
+/*
+ * v1 sengaja DIPERTAHANKAN di daftar meski v2 lebih baik: mengganti model adalah satu-satunya
+ * perubahan di halaman ini yang akibatnya tidak langsung terlihat, jadi jalan pulangnya harus
+ * ada di panel — bukan lewat SSH.
+ */
 const MODEL_PILIHAN = [
-    { value: 'kamera15-v1.pt', label: 'Khusus kamera ini (hasil latihan) — paling cepat & tepat' },
+    { value: 'kamera15-v2.pt', label: 'Khusus kamera ini v2 (hasil latihan) — dianjurkan' },
+    { value: 'kamera15-v1.pt', label: 'Khusus kamera ini v1 — versi sebelumnya' },
     { value: 'yolo11m.pt', label: 'yolo11m (umum, COCO)' },
     { value: 'yolo11s.pt', label: 'yolo11s (umum, lebih ringan)' },
 ];
