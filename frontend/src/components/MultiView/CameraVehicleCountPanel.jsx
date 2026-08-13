@@ -26,6 +26,36 @@ function angka(n) {
     return Number(n || 0).toLocaleString('id-ID');
 }
 
+/**
+ * Jam nyata dari frame yang SEDANG TAMPIL di layar penonton.
+ *
+ * Pemutar live selalu tertinggal beberapa detik di belakang tepi siaran karena buffer, dan
+ * jaraknya berbeda-beda tiap penonton (jaringan, perangkat). Jadi angka "detik ini" akan
+ * selalu lebih maju daripada gambar yang dilihat — itulah sebab panel terasa tidak sinkron.
+ *
+ * `buffered.end − currentTime` adalah jarak penonton ke tepi siaran, terbaca langsung dari
+ * elemen <video> tanpa perlu menyentuh pemutarnya. Dikurangkan dari jam tepi siaran, hasilnya
+ * jam frame yang sedang tampil.
+ */
+function jamFrameTampil(tepiSiaran) {
+    if (!tepiSiaran) return '';
+    const video = document.querySelector('[role="dialog"] video') || document.querySelector('video');
+    if (!video) return '';
+    let tepiBuffer = 0;
+    try {
+        if (video.buffered && video.buffered.length) {
+            tepiBuffer = video.buffered.end(video.buffered.length - 1);
+        }
+    } catch {
+        return '';
+    }
+    const tertinggal = tepiBuffer - video.currentTime;
+    if (!Number.isFinite(tertinggal) || tertinggal < 0) return '';
+    const ms = Date.parse(tepiSiaran);
+    if (Number.isNaN(ms)) return '';
+    return new Date(ms - tertinggal * 1000).toISOString();
+}
+
 /* Strip menit terakhir. Sengaja tanpa sumbu dan tanpa warna: ini konteks bentuk arus,
    bukan grafik yang harus dibaca nilainya satu per satu. */
 function StripMenit({ baris }) {
@@ -65,11 +95,17 @@ export default function CameraVehicleCountPanel({ cameraId }) {
             return undefined;
         }
         let cancelled = false;
+        let tepiSiaran = '';
 
         const muat = async () => {
             try {
-                const hasil = await vehicleCountService.getForCamera(cameraId);
+                // Panggilan pertama belum tahu jam tepi siaran, jadi mengambil angka terkini;
+                // panggilan berikutnya sudah bisa meminta angka pada detik yang ditonton.
+                const hasil = await vehicleCountService.getForCamera(
+                    cameraId, jamFrameTampil(tepiSiaran),
+                );
                 if (cancelled || !mountedRef.current) return;
+                tepiSiaran = hasil?.data?.tepiSiaran || '';
                 setData(hasil?.data?.tersedia ? hasil.data : null);
             } catch {
                 // Kamera tanpa penghitung menjawab 404. Panel ini memang harus diam,
@@ -178,7 +214,9 @@ export default function CameraVehicleCountPanel({ cameraId }) {
                 <p className="mt-3 text-xs text-content-subtle">
                     {berhenti
                         ? 'Angka di atas adalah hasil terakhir sebelum penghitungan berhenti, bukan jumlah saat ini.'
-                        : 'Dihitung otomatis dari video langsung kamera ini, satu kali per kendaraan saat melewati garis hitung.'}
+                        : data.selarasVideo
+                            ? 'Angka diselaraskan dengan detik yang sedang Anda tonton, sehingga cocok dengan yang tergambar di video.'
+                            : 'Dihitung otomatis dari video langsung kamera ini, satu kali per kendaraan saat melewati garis hitung.'}
                 </p>
             </div>
         </div>

@@ -10,7 +10,11 @@ import { getPublicVehicleCount } from '../services/vehicleCountService.js';
 
 export async function getVehicleCount(request, reply) {
     try {
-        const data = getPublicVehicleCount(request.params.cameraId);
+        // `pada` = jam frame yang sedang ditonton (dihitung frontend dari tepi siaran dikurangi
+        // jarak penonton ke tepi). Kosong = pakai angka terkini.
+        const data = getPublicVehicleCount(request.params.cameraId, {
+            pada: String(request.query?.pada || '').slice(0, 40),
+        });
         return reply.send({ success: true, data });
     } catch (error) {
         const statusCode = error.statusCode || 500;

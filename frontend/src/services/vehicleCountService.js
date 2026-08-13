@@ -14,10 +14,15 @@ const publicRequestConfig = {
 };
 
 export const vehicleCountService = {
-    async getForCamera(cameraId) {
+    /**
+     * @param {string} pada  Jam frame yang sedang ditonton (ISO). Diisi supaya angka yang
+     *                       dikembalikan SAMA dengan yang tergambar di frame itu, bukan
+     *                       angka detik ini yang selalu lebih maju daripada video.
+     */
+    async getForCamera(cameraId, pada = '') {
         const response = await apiClient.get(
             `/api/public/vehicle-count/${encodeURIComponent(cameraId)}`,
-            publicRequestConfig
+            pada ? { ...publicRequestConfig, params: { pada } } : publicRequestConfig
         );
         return response.data;
     },

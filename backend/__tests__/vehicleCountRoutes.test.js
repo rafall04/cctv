@@ -42,7 +42,7 @@ describe('vehicleCountRoutes', () => {
 
         expect(response.statusCode).toBe(200);
         expect(response.json()).toMatchObject({ success: true, data: { cameraId: 15, total: 1284 } });
-        expect(getPublicVehicleCountMock).toHaveBeenCalledWith('15');
+        expect(getPublicVehicleCountMock).toHaveBeenCalledWith('15', { pada: '' });
         await fastify.close();
     });
 
@@ -67,6 +67,20 @@ describe('vehicleCountRoutes', () => {
 
         expect(response.statusCode).toBe(404);
         expect(response.json()).toMatchObject({ success: false, message: 'Kamera tidak ditemukan' });
+        await fastify.close();
+    });
+
+    it('meneruskan detik yang ditonton supaya angkanya bisa diselaraskan ke video', async () => {
+        getPublicVehicleCountMock.mockReturnValue({ cameraId: 15, tersedia: true, total: 140 });
+        const fastify = await buatServer();
+
+        const response = await fastify.inject({
+            method: 'GET',
+            url: '/api/public/vehicle-count/15?pada=2026-08-13T05:00:13Z',
+        });
+
+        expect(response.statusCode).toBe(200);
+        expect(getPublicVehicleCountMock).toHaveBeenCalledWith('15', { pada: '2026-08-13T05:00:13Z' });
         await fastify.close();
     });
 

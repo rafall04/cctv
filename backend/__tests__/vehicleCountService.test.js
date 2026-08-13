@@ -140,6 +140,50 @@ describe('vehicleCountService', () => {
         expect(again.getPublicVehicleCount(15).tersedia).toBe(false);
     });
 
+    /*
+     * Penonton melihat frame beberapa detik lebih lama daripada "sekarang" karena buffer
+     * pemutar. Kalau panel memakai angka detik ini, ia selalu lebih maju daripada yang
+     * tergambar di video — itulah keluhan "data bawah tidak sinkron dengan live".
+     */
+    describe('penyelarasan dengan detik yang ditonton', () => {
+        const DENGAN_RIWAYAT = {
+            ...STATS,
+            riwayat: [
+                { t: '2026-08-13T05:00:00Z', total: 100, jenis: { motor: 60, mobil: 30, truk: 8, bus: 2 } },
+                { t: '2026-08-13T05:00:10Z', total: 140, jenis: { motor: 90, mobil: 40, truk: 8, bus: 2 } },
+                { t: '2026-08-13T05:00:20Z', total: 180, jenis: { motor: 120, mobil: 50, truk: 8, bus: 2 } },
+            ],
+        };
+
+        it('mengembalikan angka pada detik yang diminta, bukan yang terkini', async () => {
+            readFileSyncMock.mockReturnValue(JSON.stringify(DENGAN_RIWAYAT));
+            const { getPublicVehicleCount } = await muat();
+            const d = getPublicVehicleCount(15, { pada: '2026-08-13T05:00:13Z' });
+
+            expect(d.selarasVideo).toBe(true);
+            expect(d.total).toBe(140);                    // cuplikan 05:00:10, bukan 05:00:20
+            expect(d.perJenis.motor).toBe(90);
+        });
+
+        it('kembali ke angka terkini bila detiknya di luar jangkauan riwayat', async () => {
+            readFileSyncMock.mockReturnValue(JSON.stringify(DENGAN_RIWAYAT));
+            const { getPublicVehicleCount } = await muat();
+            const d = getPublicVehicleCount(15, { pada: '2020-01-01T00:00:00Z' });
+
+            expect(d.selarasVideo).toBe(false);
+            expect(d.total).toBe(1284);
+        });
+
+        it('tidak mengubah apa pun bila penonton tidak menyebutkan detiknya', async () => {
+            readFileSyncMock.mockReturnValue(JSON.stringify(DENGAN_RIWAYAT));
+            const { getPublicVehicleCount } = await muat();
+            const d = getPublicVehicleCount(15);
+
+            expect(d.selarasVideo).toBe(false);
+            expect(d.total).toBe(1284);
+        });
+    });
+
     it('identifies only the configured camera', async () => {
         const { isVehicleCountCamera } = await muat();
         expect(isVehicleCountCamera(15)).toBe(true);

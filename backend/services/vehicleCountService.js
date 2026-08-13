@@ -79,6 +79,54 @@ function requireCommunityCamera(cameraId) {
     return camera;
 }
 
+/**
+ * Jam nyata dari TEPI SIARAN — segmen terbaru yang ada di playlist.
+ *
+ * Dipakai frontend untuk menghitung frame yang sedang ditonton berasal dari detik keberapa:
+ * `ditonton = tepiSiaran − (buffered.end − currentTime)`. Tanpa ini panel hanya bisa
+ * menampilkan angka "sekarang", yang selalu beberapa detik lebih maju daripada gambar yang
+ * dilihat orang — sumber keluhan "data bawah tidak sinkron dengan live".
+ *
+ * Dibaca dari `#EXT-X-PROGRAM-DATE-TIME` + durasi segmen sesudahnya, jadi angkanya berasal
+ * dari playlist yang sama yang diputar pemutar, bukan dari tebakan tetap.
+ */
+function bacaTepiSiaran(hlsDir) {
+    try {
+        const teks = fs.readFileSync(path.join(hlsDir, 'live.m3u8'), 'utf8');
+        const baris = teks.split('\n');
+        let mulai = null;
+        let durasi = 0;
+        for (const b of baris) {
+            const pdt = b.match(/^#EXT-X-PROGRAM-DATE-TIME:(.+)$/);
+            if (pdt) {
+                mulai = Date.parse(pdt[1].trim());
+                durasi = 0;
+                continue;
+            }
+            const inf = b.match(/^#EXTINF:([\d.]+)/);
+            if (inf && mulai !== null) durasi += parseFloat(inf[1]) || 0;
+        }
+        if (mulai === null || Number.isNaN(mulai)) return null;
+        return new Date(mulai + durasi * 1000).toISOString();
+    } catch {
+        return null;
+    }
+}
+
+/** Cuplikan riwayat pada atau tepat sebelum `pada`; null bila di luar jangkauan riwayat. */
+function cuplikanPada(riwayat, pada) {
+    if (!Array.isArray(riwayat) || !riwayat.length) return null;
+    const target = Date.parse(pada);
+    if (Number.isNaN(target)) return null;
+    let hasil = null;
+    for (const r of riwayat) {
+        const t = Date.parse(r?.t);
+        if (Number.isNaN(t) || t > target) continue;
+        if (!hasil || t > Date.parse(hasil.t)) hasil = r;
+    }
+    return hasil;
+}
+
 function bacaBerkasStatistik(statsPath) {
     let raw;
     let mtimeMs;
@@ -105,7 +153,7 @@ function bacaBerkasStatistik(statsPath) {
  * jumlah frame): itu jargon operasional yang tidak boleh bocor ke permukaan publik.
  * Yang dikirim hanya angka yang bisa dipertanggungjawabkan ke pengunjung.
  */
-export function getPublicVehicleCount(cameraId) {
+export function getPublicVehicleCount(cameraId, { pada = '' } = {}) {
     const id = toInt(cameraId);
     if (!id) {
         const err = new Error('Kamera tidak ditemukan');
@@ -127,6 +175,11 @@ export function getPublicVehicleCount(cameraId) {
     const umurMs = Math.max(0, Date.now() - mtimeMs);
     const arah = data?.arah && typeof data.arah === 'object' ? data.arah : {};
 
+    // Angka pada DETIK YANG SEDANG DITONTON, bila penonton menyebutkannya. Yang bergeser
+    // hanya total & rincian jenis; sisanya (per arah, per menit, kejadian) tetap terkini
+    // karena bukan angka yang dicocokkan orang ke gambar.
+    const cuplikan = pada ? cuplikanPada(data?.riwayat, pada) : null;
+
     return {
         cameraId: id,
         namaKamera: camera.name,
@@ -137,8 +190,12 @@ export function getPublicVehicleCount(cameraId) {
         umurDetik: Math.round(umurMs / 1000),
         diperbaruiPada: new Date(mtimeMs).toISOString(),
         mulaiTeks: typeof data?.mulai === 'string' ? data.mulai : '',
-        total: toInt(data?.total),
-        perJenis: ringkasJenis(data?.total_jenis),
+        // Jam tepi siaran: bahan hitung frontend untuk tahu frame yang tampil dari detik mana.
+        tepiSiaran: bacaTepiSiaran((config.vehicleCount || {}).hlsDir || ''),
+        // true = angka di bawah ini sudah digeser ke detik yang ditonton, bukan detik ini
+        selarasVideo: Boolean(cuplikan),
+        total: toInt(cuplikan ? cuplikan.total : data?.total),
+        perJenis: ringkasJenis(cuplikan ? cuplikan.jenis : data?.total_jenis),
         // Total sesi bisa berumur belasan jam, jadi pengunjung tidak punya cara memeriksanya.
         // Angka 10 menit terakhir bisa dicocokkan sendiri sambil menonton videonya — itulah
         // yang membuat panel ini dapat dipercaya, bukan sekadar dipamerkan.
