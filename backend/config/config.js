@@ -198,6 +198,12 @@ export const config = {
   // "not configured" and the public panel renders nothing, so every other deployment is
   // untouched. Set both vars in backend/.env on the box that runs the counter.
   vehicleCount: {
+    // Direktori config per kamera (cam<ID>.json). Ini yang membuat penghitungan bisa
+    // dinyalakan dari panel admin di kamera mana pun, bukan dipatok satu kamera lewat env.
+    // Kosong = fitur belum disiapkan di server ini.
+    configDir: process.env.VEHICLE_COUNT_CONFIG_DIR || '',
+    // Dipertahankan untuk pemasangan lama yang masih memakai satu kamera lewat env; kalau
+    // configDir terisi, daftar kamera datang dari berkas config dan nilai ini tidak dipakai.
     cameraId: parseInt(process.env.VEHICLE_COUNT_CAMERA_ID || '0', 10),
     statsPath: process.env.VEHICLE_COUNT_STATS_PATH || '',
     // Beyond this age the numbers are shown as stopped, never as live. A stalled counter
@@ -208,10 +214,12 @@ export const config = {
     // the public player at it is what makes "what you watch" and "what is counted" the same
     // picture instead of two feeds a few seconds apart.
     //
-    // hlsDir is the directory the counter writes; hlsPath is how the browser reaches it.
-    // Empty = feature off, public player keeps the untouched camera feed.
+    // Per kamera: hlsDir/<id>/live.m3u8 di disk, hlsPath/<id>/live.m3u8 di browser.
+    // Kosong = fitur mati, pemutar publik memakai umpan kamera apa adanya.
     hlsDir: process.env.VEHICLE_COUNT_HLS_DIR || '',
     hlsPath: process.env.VEHICLE_COUNT_HLS_PATH || '',
+    // Tempat tiap penghitung menulis statistiknya: stateDir/cam<id>.json
+    stateDir: process.env.VEHICLE_COUNT_STATE_DIR || '',
     // Much tighter than staleAfterMs on purpose: stale NUMBERS can be labelled "stopped" and
     // stay useful, but a stale PLAYLIST is a dead video player on a public page. Past this
     // age the original camera feed is served again.

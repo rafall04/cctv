@@ -18,6 +18,7 @@ import {
     updateCameraReport,
 } from '../controllers/adminCameraFeedbackController.js';
 import { authMiddleware, requireAdmin } from '../middleware/authMiddleware.js';
+import vehicleCountAdminRoutes from './vehicleCountAdminRoutes.js';
 import { createApiKeySchema, apiKeyIdParamSchema } from '../middleware/schemaValidators.js';
 import mediaMtxService from '../services/mediaMtxService.js';
 
@@ -425,4 +426,9 @@ export default async function adminRoutes(fastify, options) {
         onRequest: [authMiddleware, requireAdmin],
         handler: getBackupPreview,
     });
+
+    // Setelan penghitungan kendaraan per kamera -> /api/admin/vehicle-count/*
+    // Didaftarkan bersarang di sini, bukan di server.js: berkas itu berada tepat di pagar
+    // ukuran 800 baris, dan menambah dua baris di sana menjatuhkan gate untuk semua orang.
+    await fastify.register(vehicleCountAdminRoutes, { prefix: '/vehicle-count' });
 }

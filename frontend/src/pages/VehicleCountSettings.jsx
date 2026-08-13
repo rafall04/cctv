@@ -1,0 +1,353 @@
+/*
+ * Purpose: Admin page to turn vehicle counting on for any camera and tune it — separate page from Ronda Digital.
+ * Caller: App.jsx admin routes.
+ * Deps: vehicleCountAdminService, CountingLineEditor, NotificationContext.
+ * MainFuncs: VehicleCountSettings.
+ * SideEffects: reads/writes counting config through the admin API.
+ *
+ * Penghitungan memakai 4-6 dari 16 core per kamera, jadi halaman ini menyebutkan batas itu
+ * di depan: menyalakannya di sepuluh kamera bukan hanya lambat, tetapi akan menjatuhkan
+ * layanan yang sedang dipakai orang.
+ */
+
+import { useCallback, useEffect, useMemo, useState } from 'react';
+
+import { useNotification } from '../contexts/NotificationContext';
+import vehicleCountAdminService from '../services/vehicleCountAdminService';
+import CountingLineEditor from '../components/admin/vehicle-count/CountingLineEditor.jsx';
+
+const KELAS_INPUT = 'w-full rounded-control border border-edge bg-surface px-3 py-2 text-sm text-content transition-colors focus:border-edge-strong focus:outline-none';
+const KELAS_TOMBOL = 'rounded-control border border-edge px-3 py-2 text-sm font-medium text-content transition-colors hover:border-edge-strong hover:bg-surface-raised';
+
+/* Jumlah kamera yang realistis berjalan bersamaan di satu server 16 core. */
+const BATAS_WAJAR = 3;
+
+const MODEL_PILIHAN = [
+    { value: 'kamera15-v1.pt', label: 'Khusus kamera ini (hasil latihan) — paling cepat & tepat' },
+    { value: 'yolo11m.pt', label: 'yolo11m (umum, COCO)' },
+    { value: 'yolo11s.pt', label: 'yolo11s (umum, lebih ringan)' },
+];
+
+function Baris({ label, anak, keterangan }) {
+    return (
+        <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-content-muted">{label}</span>
+            {anak}
+            {keterangan && <span className="text-xs text-content-subtle">{keterangan}</span>}
+        </label>
+    );
+}
+
+export default function VehicleCountSettings() {
+    const { showNotification } = useNotification();
+    const [terpasang, setTerpasang] = useState([]);
+    const [tersedia, setTersedia] = useState([]);
+    const [dipilih, setDipilih] = useState(null);
+    const [draft, setDraft] = useState(null);
+    const [memuat, setMemuat] = useState(true);
+    const [menyimpan, setMenyimpan] = useState(false);
+    const [kameraBaru, setKameraBaru] = useState('');
+
+    const muatDaftar = useCallback(async () => {
+        try {
+            const [a, b] = await Promise.all([
+                vehicleCountAdminService.listCameras(),
+                vehicleCountAdminService.listAvailable(),
+            ]);
+            setTerpasang(a?.data || []);
+            setTersedia(b?.data || []);
+        } catch {
+            showNotification('Gagal memuat daftar penghitungan', 'error');
+        } finally {
+            setMemuat(false);
+        }
+    }, [showNotification]);
+
+    useEffect(() => { muatDaftar(); }, [muatDaftar]);
+
+    const bukaKamera = useCallback(async (cameraId) => {
+        try {
+            const hasil = await vehicleCountAdminService.getCamera(cameraId);
+            setDipilih(cameraId);
+            setDraft(hasil?.data || null);
+        } catch {
+            showNotification('Gagal memuat setelan kamera', 'error');
+        }
+    }, [showNotification]);
+
+    const ubah = (kunci, nilai) => setDraft((s) => ({ ...s, [kunci]: nilai }));
+
+    const simpan = async () => {
+        if (!draft) return;
+        setMenyimpan(true);
+        try {
+            // Disusun EKSPLISIT, bukan menyalin seluruh draft: daftar ini harus cocok persis
+            // dengan skema rute. Field yang tidak terdaftar di sana akan DIHAPUS diam-diam oleh
+            // Fastify dan panel terlihat "tidak menyimpan" tanpa pesan galat apa pun.
+            const kirim = {
+                aktif: Boolean(draft.aktif),
+                label: draft.label || '',
+                garis: draft.garis || [],
+                arah_arus: draft.arah_arus || [1, 0],
+                nama_arah: draft.nama_arah || {},
+                model: draft.model,
+                imgsz: draft.imgsz,
+                conf: draft.conf,
+                conf_gambar: draft.conf_gambar,
+                fps: draft.fps,
+                min_gerak: draft.min_gerak,
+                min_umur: draft.min_umur,
+            };
+            const hasil = await vehicleCountAdminService.saveCamera(dipilih, kirim);
+            setDraft((s) => ({ ...s, ...(hasil?.data || {}) }));
+            showNotification(hasil?.message || 'Setelan tersimpan', 'success');
+            muatDaftar();
+        } catch (error) {
+            showNotification(
+                error?.response?.data?.message || 'Gagal menyimpan setelan', 'error',
+            );
+        } finally {
+            setMenyimpan(false);
+        }
+    };
+
+    const hapus = async () => {
+        if (!dipilih) return;
+        try {
+            await vehicleCountAdminService.removeCamera(dipilih);
+            setDipilih(null);
+            setDraft(null);
+            showNotification('Setelan dihapus', 'success');
+            muatDaftar();
+        } catch {
+            showNotification('Gagal menghapus setelan', 'error');
+        }
+    };
+
+    const jumlahAktif = useMemo(
+        () => terpasang.filter((c) => c.aktif).length, [terpasang],
+    );
+
+    return (
+        <div className="flex flex-col gap-4">
+            <header className="flex flex-col gap-1">
+                <h1 className="text-xl font-semibold text-content">Hitung Kendaraan</h1>
+                <p className="text-sm text-content-muted">
+                    Nyalakan penghitungan otomatis di kamera mana pun, lalu gambar garis hitungnya
+                    langsung di atas gambar kamera.
+                </p>
+            </header>
+
+            {jumlahAktif >= BATAS_WAJAR && (
+                <div className="rounded-card border border-status-warn/30 bg-status-warn/10 px-3 py-2 text-xs text-status-warn">
+                    {jumlahAktif} kamera menyala. Tiap penghitung memakai 4–6 dari 16 core, jadi
+                    menambah lagi berisiko menekan layanan CCTV yang sedang dipakai pengunjung.
+                </div>
+            )}
+
+            <section className="rounded-card border border-edge bg-surface p-3">
+                <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-content-subtle">
+                    Kamera yang sudah diatur
+                </h2>
+                {memuat ? (
+                    <p className="text-sm text-content-muted">Memuat…</p>
+                ) : terpasang.length === 0 ? (
+                    <p className="text-sm text-content-muted">Belum ada. Tambahkan di bawah.</p>
+                ) : (
+                    <ul className="flex flex-col gap-1">
+                        {terpasang.map((c) => (
+                            <li key={c.camera_id}>
+                                <button
+                                    type="button"
+                                    onClick={() => bukaKamera(c.camera_id)}
+                                    className={`flex w-full items-center justify-between gap-2 rounded-control px-2 py-2 text-left text-sm transition-colors hover:bg-surface-raised ${dipilih === c.camera_id ? 'bg-surface-raised' : ''}`}
+                                >
+                                    <span className="flex min-w-0 items-center gap-2">
+                                        <span className={`h-2 w-2 shrink-0 rounded-full ${c.berjalan ? 'bg-status-live' : 'bg-status-idle'}`} />
+                                        <span className="truncate text-content">{c.nama_kamera || `Kamera ${c.camera_id}`}</span>
+                                    </span>
+                                    <span className="shrink-0 text-xs text-content-muted">
+                                        {c.aktif ? (c.berjalan ? 'menghitung' : 'aktif, belum jalan') : 'mati'}
+                                        {' · '}{(c.garis || []).length} garis
+                                    </span>
+                                </button>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+
+                <div className="mt-3 flex flex-col gap-2 border-t border-edge pt-3 sm:flex-row sm:items-end">
+                    <div className="min-w-0 flex-1">
+                        <Baris
+                            label="Tambah kamera"
+                            anak={(
+                                <select
+                                    className={KELAS_INPUT}
+                                    value={kameraBaru}
+                                    onChange={(e) => setKameraBaru(e.target.value)}
+                                >
+                                    <option value="">Pilih kamera…</option>
+                                    {tersedia.filter((c) => !c.sudah_diatur).map((c) => (
+                                        <option key={c.id} value={c.id}>{c.name}</option>
+                                    ))}
+                                </select>
+                            )}
+                            keterangan="Hanya kamera community yang aktif — kamera lain tidak pernah tampil di halaman publik."
+                        />
+                    </div>
+                    <button
+                        type="button"
+                        className={KELAS_TOMBOL}
+                        disabled={!kameraBaru}
+                        onClick={() => { bukaKamera(Number(kameraBaru)); setKameraBaru(''); }}
+                    >
+                        Atur
+                    </button>
+                </div>
+            </section>
+
+            {draft && (
+                <section className="flex flex-col gap-3 rounded-card border border-edge bg-surface p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <h2 className="text-base font-semibold text-content">
+                            {draft.label || `Kamera ${dipilih}`}
+                        </h2>
+                        <label className="flex items-center gap-2 text-sm text-content">
+                            <input
+                                type="checkbox"
+                                checked={Boolean(draft.aktif)}
+                                onChange={(e) => ubah('aktif', e.target.checked)}
+                            />
+                            Nyalakan penghitungan
+                        </label>
+                    </div>
+
+                    <CountingLineEditor
+                        previewUrl={`/api/thumbnails/${dipilih}.jpg`}
+                        garis={draft.garis || []}
+                        arahArus={draft.arah_arus}
+                        onChange={(g) => ubah('garis', g)}
+                    />
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                        <Baris
+                            label="Nama arah A (searah panah hijau)"
+                            anak={(
+                                <input
+                                    className={KELAS_INPUT}
+                                    value={draft.nama_arah?.plus || ''}
+                                    onChange={(e) => ubah('nama_arah', { ...draft.nama_arah, plus: e.target.value })}
+                                />
+                            )}
+                        />
+                        <Baris
+                            label="Nama arah B (berlawanan)"
+                            anak={(
+                                <input
+                                    className={KELAS_INPUT}
+                                    value={draft.nama_arah?.minus || ''}
+                                    onChange={(e) => ubah('nama_arah', { ...draft.nama_arah, minus: e.target.value })}
+                                />
+                            )}
+                        />
+                        <Baris
+                            label="Arah arus X"
+                            keterangan="Menentukan perlintasan masuk arah A atau B. Panah hijau di gambar menunjukkan arah A."
+                            anak={(
+                                <input
+                                    type="number" step="0.1" className={KELAS_INPUT}
+                                    value={draft.arah_arus?.[0] ?? 1}
+                                    onChange={(e) => ubah('arah_arus', [Number(e.target.value), draft.arah_arus?.[1] ?? 0])}
+                                />
+                            )}
+                        />
+                        <Baris
+                            label="Arah arus Y"
+                            anak={(
+                                <input
+                                    type="number" step="0.1" className={KELAS_INPUT}
+                                    value={draft.arah_arus?.[1] ?? 0}
+                                    onChange={(e) => ubah('arah_arus', [draft.arah_arus?.[0] ?? 1, Number(e.target.value)])}
+                                />
+                            )}
+                        />
+                        <Baris
+                            label="Model"
+                            anak={(
+                                <select className={KELAS_INPUT} value={draft.model || ''}
+                                    onChange={(e) => ubah('model', e.target.value)}>
+                                    {MODEL_PILIHAN.map((m) => (
+                                        <option key={m.value} value={m.value}>{m.label}</option>
+                                    ))}
+                                </select>
+                            )}
+                        />
+                        <Baris
+                            label="Ukuran olah (imgsz)"
+                            keterangan="Lebih besar TIDAK selalu lebih baik: pada kamera CCTV, 384–512 terukur mengalahkan 640."
+                            anak={(
+                                <input type="number" step="32" min="256" max="960" className={KELAS_INPUT}
+                                    value={draft.imgsz ?? 448}
+                                    onChange={(e) => ubah('imgsz', Number(e.target.value))} />
+                            )}
+                        />
+                        <Baris
+                            label="Ambang deteksi"
+                            keterangan="Rendah = lebih peka melacak kendaraan kecil seperti motor."
+                            anak={(
+                                <input type="number" step="0.01" min="0.02" max="0.9" className={KELAS_INPUT}
+                                    value={draft.conf ?? 0.1}
+                                    onChange={(e) => ubah('conf', Number(e.target.value))} />
+                            )}
+                        />
+                        <Baris
+                            label="Ambang tampil kotak"
+                            keterangan="Dipisah dari ambang deteksi: melacak butuh peka, menampilkan butuh rapi."
+                            anak={(
+                                <input type="number" step="0.05" min="0.05" max="0.95" className={KELAS_INPUT}
+                                    value={draft.conf_gambar ?? 0.35}
+                                    onChange={(e) => ubah('conf_gambar', Number(e.target.value))} />
+                            )}
+                        />
+                        <Baris
+                            label="FPS olah"
+                            keterangan="Terlalu tinggi membuat penghitung tertinggal dari siaran."
+                            anak={(
+                                <input type="number" min="1" max="15" className={KELAS_INPUT}
+                                    value={draft.fps ?? 8}
+                                    onChange={(e) => ubah('fps', Number(e.target.value))} />
+                            )}
+                        />
+                        <Baris
+                            label="Gerak minimum (px)"
+                            keterangan="Perpindahan bersih sebelum boleh dihitung — menyaring deteksi diam yang bergetar."
+                            anak={(
+                                <input type="number" min="5" max="400" className={KELAS_INPUT}
+                                    value={draft.min_gerak ?? 45}
+                                    onChange={(e) => ubah('min_gerak', Number(e.target.value))} />
+                            )}
+                        />
+                    </div>
+
+                    <div className="flex flex-wrap gap-2 border-t border-edge pt-3">
+                        <button type="button" className={KELAS_TOMBOL} onClick={simpan} disabled={menyimpan}>
+                            {menyimpan ? 'Menyimpan…' : 'Simpan setelan'}
+                        </button>
+                        <button type="button" className={KELAS_TOMBOL} onClick={hapus}>
+                            Hapus dari daftar
+                        </button>
+                        <button type="button" className={KELAS_TOMBOL}
+                            onClick={() => { setDipilih(null); setDraft(null); }}>
+                            Tutup
+                        </button>
+                    </div>
+
+                    <p className="text-xs text-content-subtle">
+                        Perubahan dibaca penghitung tanpa perlu memulai ulang, jadi video di halaman
+                        publik tidak terputus saat Anda menyimpan.
+                    </p>
+                </section>
+            )}
+        </div>
+    );
+}

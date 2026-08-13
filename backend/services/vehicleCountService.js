@@ -11,6 +11,7 @@ import path from 'path';
 
 import config from '../config/config.js';
 import { queryOne } from '../database/connectionPool.js';
+import { kameraAktif } from './vehicleCountConfigService.js';
 
 const JENIS = ['motor', 'mobil', 'truk', 'bus'];
 
@@ -32,9 +33,40 @@ function ringkasJenis(source) {
  * Apakah kamera ini yang dipasangi penghitung? Dipakai frontend agar panel hanya muncul
  * di kamera yang benar-benar punya data — bukan di semua kamera.
  */
+/**
+ * Kamera ini sedang dihitung?
+ *
+ * Sumbernya berkas config per kamera, bukan satu id yang dipatok di env — itulah yang membuat
+ * penghitungan bisa dinyalakan dari panel admin di kamera mana pun. Nilai env lama masih
+ * dihormati agar pemasangan yang belum dipindahkan tidak mendadak kehilangan panelnya.
+ */
 export function isVehicleCountCamera(cameraId) {
-    const configured = (config.vehicleCount || {}).cameraId;
-    return Boolean(configured) && Number(cameraId) === configured;
+    const vc = config.vehicleCount || {};
+    if (vc.configDir) return kameraAktif(cameraId);
+    return Boolean(vc.cameraId) && Number(cameraId) === vc.cameraId;
+}
+
+/** Jalur berkas statistik milik kamera ini (per kamera bila stateDir dipakai). */
+function jalurStatistik(cameraId) {
+    const vc = config.vehicleCount || {};
+    if (vc.stateDir) return path.join(vc.stateDir, `cam${Number(cameraId)}.json`);
+    return vc.statsPath || '';
+}
+
+/** Direktori HLS beranotasi milik kamera ini. */
+function dirHls(cameraId) {
+    const vc = config.vehicleCount || {};
+    if (!vc.hlsDir) return '';
+    return vc.stateDir ? path.join(vc.hlsDir, String(Number(cameraId))) : vc.hlsDir;
+}
+
+/** Jalur publik playlist beranotasi milik kamera ini. */
+function jalurHls(cameraId) {
+    const vc = config.vehicleCount || {};
+    if (!vc.hlsPath) return '';
+    return vc.stateDir
+        ? `${vc.hlsPath.replace(/\/live\.m3u8$/, '')}/${Number(cameraId)}/live.m3u8`
+        : vc.hlsPath;
 }
 
 /**
@@ -51,12 +83,14 @@ export function getAnnotatedStreamPath(cameraId) {
     // Sengaja bertahan terhadap config yang tidak lengkap: fungsi ini dipanggil dari jalur
     // stream PUBLIK, jadi bagian config yang hilang harus berarti "fitur mati", bukan
     // melempar galat dan merobohkan pemutaran semua kamera.
-    const { hlsDir, hlsPath, hlsStaleMs } = config.vehicleCount || {};
-    if (!hlsDir || !hlsPath || !isVehicleCountCamera(cameraId)) return null;
+    const { hlsStaleMs } = config.vehicleCount || {};
+    const dir = dirHls(cameraId);
+    const jalur = jalurHls(cameraId);
+    if (!dir || !jalur || !isVehicleCountCamera(cameraId)) return null;
     try {
-        const { mtimeMs } = fs.statSync(path.join(hlsDir, 'live.m3u8'));
+        const { mtimeMs } = fs.statSync(path.join(dir, 'live.m3u8'));
         if (Date.now() - mtimeMs > hlsStaleMs) return null;
-        return hlsPath;
+        return jalur;
     } catch {
         return null;
     }
@@ -161,7 +195,8 @@ export function getPublicVehicleCount(cameraId, { pada = '' } = {}) {
         throw err;
     }
 
-    const { statsPath, staleAfterMs } = config.vehicleCount || {};
+    const { staleAfterMs } = config.vehicleCount || {};
+    const statsPath = jalurStatistik(id);
     if (!statsPath || !isVehicleCountCamera(id)) {
         // Fitur mati untuk kamera ini. Bukan error — panel publik cukup tidak muncul.
         return { cameraId: id, tersedia: false };
@@ -191,7 +226,7 @@ export function getPublicVehicleCount(cameraId, { pada = '' } = {}) {
         diperbaruiPada: new Date(mtimeMs).toISOString(),
         mulaiTeks: typeof data?.mulai === 'string' ? data.mulai : '',
         // Jam tepi siaran: bahan hitung frontend untuk tahu frame yang tampil dari detik mana.
-        tepiSiaran: bacaTepiSiaran((config.vehicleCount || {}).hlsDir || ''),
+        tepiSiaran: bacaTepiSiaran(dirHls(id)),
         // true = angka di bawah ini sudah digeser ke detik yang ditonton, bukan detik ini
         selarasVideo: Boolean(cuplikan),
         total: toInt(cuplikan ? cuplikan.total : data?.total),

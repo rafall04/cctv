@@ -53,6 +53,7 @@ const AreaPublicPage = lazyWithRetry(() => import('./pages/AreaPublicPage'), 'ar
 const BillingManagement = lazyWithRetry(() => import('./pages/BillingManagement'), 'billing-management');
 const VoucherManagement = lazyWithRetry(() => import('./pages/VoucherManagement'), 'voucher-management');
 const RondaSettings = lazyWithRetry(() => import('./pages/RondaSettings'), 'ronda-settings');
+const VehicleCountSettings = lazyWithRetry(() => import('./pages/VehicleCountSettings'), 'vehicle-count-settings');
 const TelegramArchiveSettings = lazyWithRetry(() => import('./pages/TelegramArchiveSettings'), 'telegram-archive-settings');
 const TelegramArchiveLibrary = lazyWithRetry(() => import('./pages/TelegramArchiveLibrary'), 'telegram-archive-library');
 const CustomerCameraIPs = lazyWithRetry(() => import('./pages/CustomerCameraIPs'), 'customer-camera-ips');
@@ -399,6 +400,17 @@ function App() {
                     element={
                         <AdminPageRoute adminOnly>
                             <RondaSettings />
+                        </AdminPageRoute>
+                    }
+                />
+                {/* Halaman TERPISAH dari Ronda Digital: keduanya memakai deteksi, tetapi yang
+                    disetel berbeda jauh — ronda mengurus zona gerakan dan jam jaga, ini
+                    mengurus garis hitung dan arah arus. */}
+                <Route
+                    path="/admin/hitung-kendaraan"
+                    element={
+                        <AdminPageRoute adminOnly>
+                            <VehicleCountSettings />
                         </AdminPageRoute>
                     }
                 />
