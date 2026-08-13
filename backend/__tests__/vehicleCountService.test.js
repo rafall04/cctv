@@ -28,6 +28,9 @@ vi.mock('../config/config.js', () => ({
             cameraId: 15,
             statsPath: '/opt/yolo-demo/web/stats.json',
             staleAfterMs: 120000,
+            hlsDir: '/opt/yolo-demo/web/hls',
+            hlsPath: '/hitung-hls/live.m3u8',
+            hlsStaleMs: 30000,
         },
     },
 }));
@@ -142,5 +145,38 @@ describe('vehicleCountService', () => {
         expect(isVehicleCountCamera(15)).toBe(true);
         expect(isVehicleCountCamera('15')).toBe(true);
         expect(isVehicleCountCamera(16)).toBe(false);
+    });
+
+    /*
+     * The annotated stream is what makes "what you watch" and "what is counted" the same
+     * picture. But a public page must never be left with a dead player, so a playlist that
+     * stopped updating has to fall back to the untouched camera feed — that is the case
+     * these tests exist for.
+     */
+    describe('getAnnotatedStreamPath', () => {
+        it('serves the annotated playlist while the counter is writing it', async () => {
+            statSyncMock.mockReturnValue({ mtimeMs: Date.now() - 3000 });
+            const { getAnnotatedStreamPath } = await muat();
+            expect(getAnnotatedStreamPath(15)).toBe('/hitung-hls/live.m3u8');
+        });
+
+        it('falls back to the original feed once the playlist goes stale', async () => {
+            statSyncMock.mockReturnValue({ mtimeMs: Date.now() - 60000 });
+            const { getAnnotatedStreamPath } = await muat();
+            expect(getAnnotatedStreamPath(15)).toBeNull();
+        });
+
+        it('falls back when the playlist is missing entirely', async () => {
+            statSyncMock.mockImplementation(() => { throw new Error('ENOENT'); });
+            const { getAnnotatedStreamPath } = await muat();
+            expect(getAnnotatedStreamPath(15)).toBeNull();
+        });
+
+        it('never redirects any other camera to the annotated stream', async () => {
+            statSyncMock.mockReturnValue({ mtimeMs: Date.now() });
+            const { getAnnotatedStreamPath } = await muat();
+            expect(getAnnotatedStreamPath(16)).toBeNull();
+            expect(getAnnotatedStreamPath(1)).toBeNull();
+        });
     });
 });

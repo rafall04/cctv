@@ -7,6 +7,7 @@
  */
 
 import fs from 'fs';
+import path from 'path';
 
 import config from '../config/config.js';
 import { queryOne } from '../database/connectionPool.js';
@@ -32,8 +33,33 @@ function ringkasJenis(source) {
  * di kamera yang benar-benar punya data — bukan di semua kamera.
  */
 export function isVehicleCountCamera(cameraId) {
-    const configured = config.vehicleCount.cameraId;
+    const configured = (config.vehicleCount || {}).cameraId;
     return Boolean(configured) && Number(cameraId) === configured;
+}
+
+/**
+ * Jalur HLS BERANOTASI (kotak, label, garis hitung) untuk kamera pameran — atau null.
+ *
+ * Dipakai read-model stream supaya pengunjung menonton GAMBAR YANG SAMA dengan yang
+ * dihitung, bukan dua umpan yang berselisih beberapa detik.
+ *
+ * Null dikembalikan begitu playlist berhenti diperbarui, dan itu disengaja: angka basi masih
+ * berguna kalau ditandai "berhenti", tapi playlist basi berarti pemutar video MATI di halaman
+ * publik. Jadi ambangnya jauh lebih ketat, dan pemanggilnya kembali ke umpan kamera asli.
+ */
+export function getAnnotatedStreamPath(cameraId) {
+    // Sengaja bertahan terhadap config yang tidak lengkap: fungsi ini dipanggil dari jalur
+    // stream PUBLIK, jadi bagian config yang hilang harus berarti "fitur mati", bukan
+    // melempar galat dan merobohkan pemutaran semua kamera.
+    const { hlsDir, hlsPath, hlsStaleMs } = config.vehicleCount || {};
+    if (!hlsDir || !hlsPath || !isVehicleCountCamera(cameraId)) return null;
+    try {
+        const { mtimeMs } = fs.statSync(path.join(hlsDir, 'live.m3u8'));
+        if (Date.now() - mtimeMs > hlsStaleMs) return null;
+        return hlsPath;
+    } catch {
+        return null;
+    }
 }
 
 function requireCommunityCamera(cameraId) {
@@ -87,7 +113,7 @@ export function getPublicVehicleCount(cameraId) {
         throw err;
     }
 
-    const { statsPath, staleAfterMs } = config.vehicleCount;
+    const { statsPath, staleAfterMs } = config.vehicleCount || {};
     if (!statsPath || !isVehicleCountCamera(id)) {
         // Fitur mati untuk kamera ini. Bukan error — panel publik cukup tidak muncul.
         return { cameraId: id, tersedia: false };
@@ -134,4 +160,4 @@ export function getPublicVehicleCount(cameraId) {
     };
 }
 
-export default { getPublicVehicleCount, isVehicleCountCamera };
+export default { getPublicVehicleCount, isVehicleCountCamera, getAnnotatedStreamPath };

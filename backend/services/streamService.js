@@ -14,6 +14,7 @@ import cameraHealthService from './cameraHealthService.js';
 import cameraViewStatsService from './cameraViewStatsService.js';
 import { getAccessInfo, canViewLive } from './cameraAccessService.js';
 import voucherService from './voucherService.js';
+import { getAnnotatedStreamPath } from './vehicleCountService.js';
 import { PUBLIC_LIVE_SQL } from '../utils/cameraVisibility.js';
 import {
     getEffectiveDeliveryType,
@@ -112,6 +113,17 @@ class StreamService {
             } else {
                 streams = { ...streams, webrtc: null };
             }
+        }
+
+        // Kamera pameran hitung kendaraan: sajikan umpan BERANOTASI (kotak, label, garis
+        // hitung) sebagai stream publiknya, supaya yang DITONTON pengunjung persis gambar
+        // yang DIHITUNG — bukan dua umpan yang berselisih beberapa detik.
+        // Dijaga dua hal: kamera ber-gate voucher tidak pernah disentuh (URL-nya harus tetap
+        // lewat jalur bergerbang), dan begitu playlist beranotasi basi, fungsi ini memberi
+        // null sehingga umpan kamera asli dipakai lagi. Penghitung tumbang != video mati.
+        if (!voucherGated) {
+            const beranotasi = getAnnotatedStreamPath(camera.id);
+            if (beranotasi) streams = { ...streams, hls: beranotasi };
         }
 
         return {

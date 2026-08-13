@@ -203,6 +203,19 @@ export const config = {
     // Beyond this age the numbers are shown as stopped, never as live. A stalled counter
     // that keeps displaying its last total would be lying to the public.
     staleAfterMs: parseInt(process.env.VEHICLE_COUNT_STALE_AFTER_MS || '120000', 10),
+
+    // The counter also emits an ANNOTATED HLS stream (boxes, labels, counting line). Pointing
+    // the public player at it is what makes "what you watch" and "what is counted" the same
+    // picture instead of two feeds a few seconds apart.
+    //
+    // hlsDir is the directory the counter writes; hlsPath is how the browser reaches it.
+    // Empty = feature off, public player keeps the untouched camera feed.
+    hlsDir: process.env.VEHICLE_COUNT_HLS_DIR || '',
+    hlsPath: process.env.VEHICLE_COUNT_HLS_PATH || '',
+    // Much tighter than staleAfterMs on purpose: stale NUMBERS can be labelled "stopped" and
+    // stay useful, but a stale PLAYLIST is a dead video player on a public page. Past this
+    // age the original camera feed is served again.
+    hlsStaleMs: parseInt(process.env.VEHICLE_COUNT_HLS_STALE_MS || '30000', 10),
   },
 
   telegram: {
