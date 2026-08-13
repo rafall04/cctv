@@ -10,9 +10,10 @@ import { useEffect, useRef, useState } from 'react';
 
 import { vehicleCountService } from '../../services/vehicleCountService';
 
-/* Diperbarui tiap 15 detik: penghitung menulis tiap detik, tapi angka publik yang
-   berkedip terus justru sulit dibaca — dan endpoint-nya sendiri di-cache 5 detik. */
-const REFRESH_MS = 15000;
+/* Diperbarui tiap 4 detik. Orang menilai panel ini dengan cara mencocokkannya ke kendaraan
+   yang sedang lewat di video, jadi jeda 15 detik (nilai lama) membuatnya terasa mati.
+   Endpoint-nya di-cache 2 detik di backend, jadi polling ini tidak menambah beban nyata. */
+const REFRESH_MS = 4000;
 
 const JENIS = [
     { key: 'motor', label: 'Motor' },
@@ -120,16 +121,29 @@ export default function CameraVehicleCountPanel({ cameraId }) {
                 empat kartu jenis kendaraan melar ~300px masing-masing sementara angka arah
                 terlempar ke tepi kanan — datanya benar tapi terbaca berantakan. */}
             <div className="mt-2 max-w-2xl">
+                {/* Dua angka, dan yang bisa DIPERIKSA ditaruh lebih dulu: pengunjung bisa
+                    mencocokkan angka 10 menit terakhir dengan kendaraan yang barusan lewat,
+                    sedangkan total sesi berumur belasan jam dan harus dipercaya begitu saja. */}
                 <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                     <span className="text-2xl font-semibold tabular-nums text-content">
-                        {angka(data.total)}
+                        {angka(data.total10m)}
                     </span>
                     <span className="min-w-0 text-xs text-content-muted">
-                        kendaraan melintas garis hitung{data.mulaiTeks ? ` sejak ${data.mulaiTeks}` : ''}
+                        kendaraan dalam 10 menit terakhir
                     </span>
                 </div>
+                <p className="mt-0.5 text-xs text-content-subtle">
+                    <span className="tabular-nums">{angka(data.total)}</span> total
+                    {data.mulaiTeks ? ` sejak ${data.mulaiTeks}` : ''}
+                </p>
 
-                <dl className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {/* Ditandai jelas: kartu di bawah ini rincian TOTAL SESI, bukan 10 menit di
+                    atasnya. Dua angka berbeda cakupan tanpa keterangan akan terbaca
+                    sebagai saling bertentangan. */}
+                <p className="mt-3 text-xs font-medium uppercase tracking-wide text-content-subtle">
+                    Rincian sejak mulai
+                </p>
+                <dl className="mt-1.5 grid grid-cols-2 gap-2 sm:grid-cols-4">
                     {JENIS.map(({ key, label }) => (
                         <div
                             key={key}

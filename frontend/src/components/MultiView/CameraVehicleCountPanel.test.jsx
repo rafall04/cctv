@@ -28,6 +28,8 @@ const DATA = {
     umurDetik: 3,
     mulaiTeks: '2026-08-12 20:57:33 WIB',
     total: 1284,
+    total10m: 37,
+    perJenis10m: { motor: 24, mobil: 11, truk: 2, bus: 0 },
     perJenis: { motor: 812, mobil: 390, truk: 68, bus: 14 },
     perArah: [
         { label: 'Menuju timur (belakang kamera)', total: 658, perJenis: {} },
@@ -56,11 +58,29 @@ describe('CameraVehicleCountPanel', () => {
         expect(screen.getByText('658')).toBeTruthy();
     });
 
+    /*
+     * The headline has to be the number a visitor can actually check. A session total that
+     * has been accumulating for half a day can only be taken on faith; the last ten minutes
+     * can be compared against the vehicles they just watched go past.
+     */
+    it('leads with the ten-minute figure a visitor can verify against the video', async () => {
+        render(<CameraVehicleCountPanel cameraId={15} />);
+
+        expect(await screen.findByText('37')).toBeTruthy();
+        expect(screen.getByText(/kendaraan dalam 10 menit terakhir/i)).toBeTruthy();
+    });
+
+    it('marks the per-type cards as the session breakdown, not the ten-minute one', async () => {
+        render(<CameraVehicleCountPanel cameraId={15} />);
+
+        expect(await screen.findByText(/Rincian sejak mulai/i)).toBeTruthy();
+        expect(screen.getByText(/total sejak/i)).toBeTruthy();
+    });
+
     it('says what the number counts instead of showing a bare total', async () => {
         render(<CameraVehicleCountPanel cameraId={15} />);
 
-        expect(await screen.findByText(/kendaraan melintas garis hitung/i)).toBeTruthy();
-        expect(screen.getByText(/satu kali per kendaraan/i)).toBeTruthy();
+        expect(await screen.findByText(/satu kali per kendaraan/i)).toBeTruthy();
     });
 
     it('renders nothing for a camera without counting', async () => {

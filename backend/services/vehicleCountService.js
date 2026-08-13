@@ -113,6 +113,11 @@ export function getPublicVehicleCount(cameraId) {
         mulaiTeks: typeof data?.mulai === 'string' ? data.mulai : '',
         total: toInt(data?.total),
         perJenis: ringkasJenis(data?.total_jenis),
+        // Total sesi bisa berumur belasan jam, jadi pengunjung tidak punya cara memeriksanya.
+        // Angka 10 menit terakhir bisa dicocokkan sendiri sambil menonton videonya — itulah
+        // yang membuat panel ini dapat dipercaya, bukan sekadar dipamerkan.
+        total10m: toInt(data?.total_10_menit),
+        perJenis10m: ringkasJenis(data?.per_jenis_10_menit),
         perArah: Object.entries(arah)
             .map(([label, nilai]) => ({
                 label,

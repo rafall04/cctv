@@ -34,6 +34,8 @@ vi.mock('../config/config.js', () => ({
 
 const STATS = {
     total: 1284,
+    total_10_menit: 37,
+    per_jenis_10_menit: { motor: 24, mobil: 11, truk: 2, bus: 0 },
     total_jenis: { motor: 812, mobil: 390, truk: 68, bus: 14 },
     arah: {
         'Menuju barat (jembatan)': { motor: 400, mobil: 190, truk: 30, bus: 6 },
@@ -74,6 +76,9 @@ describe('vehicleCountService', () => {
         expect(data.berhenti).toBe(false);
         expect(data.total).toBe(1284);
         expect(data.perJenis).toEqual({ motor: 812, mobil: 390, truk: 68, bus: 14 });
+        // Angka yang bisa diperiksa pengunjung sambil menonton, bukan hanya total sesi.
+        expect(data.total10m).toBe(37);
+        expect(data.perJenis10m).toEqual({ motor: 24, mobil: 11, truk: 2, bus: 0 });
         expect(data.perArah[0]).toMatchObject({ label: 'Menuju timur (belakang kamera)', total: 658 });
         expect(data.perMenit).toEqual([
             { menit: '07:01', total: 22 },
