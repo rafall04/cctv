@@ -17,6 +17,7 @@ import {
     daftarConfig,
     hapusConfig,
     simpanConfig,
+    tanpaSumber,
 } from '../services/vehicleCountConfigService.js';
 
 function sendError(reply, error, label) {
@@ -57,8 +58,9 @@ export async function listCountCameras(request, reply) {
         const byId = new Map(rows.map((r) => [r.id, r]));
         return reply.send({
             success: true,
+            // tanpaSumber: alamat upstream kamera tidak pernah ikut ke browser
             data: configs.map((c) => ({
-                ...c,
+                ...tanpaSumber(c),
                 nama_kamera: byId.get(Number(c.camera_id))?.name || c.label || '',
                 ...statusJalan(c.camera_id),
             })),
@@ -99,7 +101,7 @@ export async function getCountCamera(request, reply) {
         // sesuatu untuk diisi, dan "belum ada" bukan kesalahan.
         return reply.send({
             success: true,
-            data: { ...(tersimpan || bentukBawaan(id)), ...statusJalan(id) },
+            data: { ...tanpaSumber(tersimpan || bentukBawaan(id)), ...statusJalan(id) },
         });
     } catch (error) {
         return sendError(reply, error, 'Get vehicle-count camera error');
@@ -109,7 +111,11 @@ export async function getCountCamera(request, reply) {
 export async function saveCountCamera(request, reply) {
     try {
         const data = simpanConfig(request.params.cameraId, request.body || {});
-        return reply.send({ success: true, message: 'Setelan penghitungan tersimpan', data });
+        return reply.send({
+            success: true,
+            message: 'Setelan penghitungan tersimpan',
+            data: tanpaSumber(data),
+        });
     } catch (error) {
         return sendError(reply, error, 'Save vehicle-count camera error');
     }

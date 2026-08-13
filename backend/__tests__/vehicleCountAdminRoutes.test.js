@@ -26,6 +26,12 @@ vi.mock('../services/vehicleCountConfigService.js', () => ({
     simpanConfig: simpanMock,
     hapusConfig: hapusMock,
     bentukBawaan: (id) => ({ camera_id: id, aktif: false, garis: [] }),
+    tanpaSumber: (isi) => {
+        if (!isi) return isi;
+        const { sumber, ...sisa } = isi;
+        void sumber;
+        return sisa;
+    },
 }));
 vi.mock('../database/connectionPool.js', () => ({ query: queryMock, queryOne: vi.fn() }));
 vi.mock('../config/config.js', () => ({ default: { vehicleCount: { stateDir: '' } } }));
@@ -49,6 +55,20 @@ describe('vehicleCountAdminRoutes', () => {
         [daftarMock, bacaMock, simpanMock, hapusMock, queryMock].forEach((m) => m.mockReset());
         daftarMock.mockReturnValue([]);
         queryMock.mockReturnValue([]);
+    });
+
+    it('tidak pernah membocorkan alamat sumber kamera ke browser', async () => {
+        daftarMock.mockReturnValue([
+            { camera_id: 15, aktif: true, garis: [{}], sumber: 'https://contoh.go.id/rahasia.m3u8' },
+        ]);
+        queryMock.mockReturnValue([{ id: 15, name: 'SOSRODILOGO' }]);
+        const f = await buatServer();
+
+        const r = await f.inject({ method: 'GET', url: '/api/admin/vehicle-count/cameras' });
+
+        expect(r.body).not.toMatch(/contoh\.go\.id/);
+        expect(r.json().data[0]).not.toHaveProperty('sumber');
+        await f.close();
     });
 
     it('menyajikan daftar kamera yang diatur', async () => {

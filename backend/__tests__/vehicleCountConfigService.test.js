@@ -41,7 +41,14 @@ describe('vehicleCountConfigService', () => {
         vi.resetModules();
         Object.values(fsMock).forEach((f) => f.mockReset());
         queryOneMock.mockReset();
-        queryOneMock.mockReturnValue({ id: 15, name: 'SOSRODILOGO', camera_class: 'community', enabled: 1 });
+        queryOneMock.mockReturnValue({
+            id: 15,
+            name: 'SOSRODILOGO',
+            camera_class: 'community',
+            enabled: 1,
+            delivery_type: 'external_hls',
+            external_stream_url: 'https://contoh.go.id/live/rahasia.m3u8',
+        });
     });
 
     function tersimpan() {
@@ -102,6 +109,35 @@ describe('vehicleCountConfigService', () => {
         simpanConfig(15, { garis: GARIS_SAH, arah_arus: [30, -40] });
         const [x, y] = tersimpan().arah_arus;
         expect(Math.hypot(x, y)).toBeCloseTo(1, 3);
+    });
+
+    /*
+     * Penghitung tidak bisa memakai /api/stream/:id — begitu kamera dihitung, endpoint itu
+     * mengembalikan jalur BERANOTASI dan penghitung akan memakan keluarannya sendiri. Jadi
+     * alamat asli ditulis ke berkas config, TAPI tidak boleh ikut keluar lewat API admin.
+     */
+    it('menulis alamat sumber ke berkas config untuk dipakai penghitung', async () => {
+        const { simpanConfig } = await muat();
+        simpanConfig(15, { garis: GARIS_SAH });
+        expect(tersimpan().sumber).toBe('https://contoh.go.id/live/rahasia.m3u8');
+    });
+
+    it('menyaring alamat sumber dari bentuk yang boleh keluar lewat API', async () => {
+        const { simpanConfig, tanpaSumber } = await muat();
+        const isi = simpanConfig(15, { garis: GARIS_SAH });
+
+        expect(isi.sumber).toBeTruthy();
+        expect(tanpaSumber(isi)).not.toHaveProperty('sumber');
+        expect(JSON.stringify(tanpaSumber(isi))).not.toMatch(/contoh\.go\.id/);
+    });
+
+    it('menolak kamera tanpa sumber yang bisa dihitung', async () => {
+        queryOneMock.mockReturnValue({
+            id: 20, name: 'TANPA SUMBER', camera_class: 'community', enabled: 1,
+            delivery_type: 'external_embed',
+        });
+        const { simpanConfig } = await muat();
+        expect(() => simpanConfig(20, { garis: GARIS_SAH })).toThrowError(/sumber stream/i);
     });
 
     it('menolak kamera yang tidak ada', async () => {

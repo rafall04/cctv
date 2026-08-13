@@ -129,11 +129,37 @@ function bersihkan(masuk, cameraId, nama) {
 
 function kamera(cameraId) {
     const row = queryOne(
-        `SELECT id, name, camera_class, enabled FROM cameras WHERE id = ?`,
+        `SELECT id, name, camera_class, enabled, delivery_type,
+                external_stream_url, external_hls_url, stream_key
+           FROM cameras WHERE id = ?`,
         [Number(cameraId)]
     );
     if (!row) throw gagal('Kamera tidak ditemukan', 404);
     return row;
+}
+
+/**
+ * URL sumber ASLI kamera untuk proses penghitung.
+ *
+ * Tidak bisa memakai /api/stream/:id: begitu sebuah kamera dihitung, endpoint itu justru
+ * mengembalikan jalur BERANOTASI — penghitung akan memakan keluarannya sendiri. Jadi alamat
+ * aslinya disimpan di berkas config, dan disaring dari jawaban API (lihat `tanpaSumber`)
+ * supaya alamat upstream tidak pernah ikut terkirim ke browser.
+ */
+function sumberKamera(cam) {
+    if (cam.delivery_type === 'external_hls') {
+        return cam.external_stream_url || cam.external_hls_url || '';
+    }
+    if (cam.stream_key) return `http://127.0.0.1:8888/${cam.stream_key}/index.m3u8`;
+    return '';
+}
+
+/** Bentuk config tanpa alamat upstream — inilah yang boleh keluar lewat API admin. */
+export function tanpaSumber(isi) {
+    if (!isi) return isi;
+    const { sumber, ...sisa } = isi;
+    void sumber;
+    return sisa;
 }
 
 export function bacaConfig(cameraId) {
@@ -171,7 +197,9 @@ export function simpanConfig(cameraId, masuk) {
     const dir = direktori();
     if (!dir) throw gagal('Penghitungan kendaraan belum disiapkan di server ini', 503);
     const cam = kamera(cameraId);
-    const isi = bersihkan(masuk, cam.id, masuk?.label || cam.name);
+    const sumber = sumberKamera(cam);
+    if (!sumber) throw gagal('Kamera ini tidak punya sumber stream yang bisa dihitung', 400);
+    const isi = { ...bersihkan(masuk, cam.id, masuk?.label || cam.name), sumber };
 
     // Menyalakan tanpa garis hanya akan menghasilkan penghitung yang berjalan tanpa pernah
     // menghitung apa pun - ditolak di sini supaya kekeliruannya terlihat saat menyimpan.
