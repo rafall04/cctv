@@ -629,7 +629,15 @@ def main():
             gerak_sejak = None
             event_terbuka = False
 
-        cukup_lama = gerak_sejak is not None and sekarang - gerak_sejak >= CONFIRM_SEC
+        # `kotak_gerak` HARUS ikut diperiksa, bukan hanya `gerak_sejak`: selama jeda DEBOUNCE
+        # gerak_sejak masih terisi walau bingkai saat ini tidak punya kotak sama sekali, dan
+        # union bbox di bawah lalu memanggil min() atas urutan kosong. Itu menghentikan seluruh
+        # container — terbukti pada uji kedua, setelah 13 detik berjalan normal.
+        cukup_lama = (
+            bool(kotak_gerak)
+            and gerak_sejak is not None
+            and sekarang - gerak_sejak >= CONFIRM_SEC
+        )
         boleh_gate = sekarang - gate_terakhir >= GATE_COOLDOWN
         if cukup_lama and not event_terbuka and boleh_gate and setelan.aktif:
             gate_terakhir = sekarang
@@ -643,9 +651,16 @@ def main():
             ax2, ay2 = min(lebar, x2 + pad_x), min(tinggi, y2 + pad_y)
             potongan = kerja[ay1:ay2, ax1:ax2]
 
-            temuan = pengonfirmasi.deteksi(
-                potongan, float(setelan["confirm_conf"] or 0.15), setelan.kelas_dikonfirmasi,
-            )
+            # Jalur inferensi adalah satu-satunya bagian yang memanggil pustaka luar dan
+            # aritmetika array di dalam loop. Satu bingkai yang bentuknya tak terduga tidak
+            # boleh mematikan pemantauan semalaman — dilewati saja, lalu dicatat.
+            try:
+                temuan = pengonfirmasi.deteksi(
+                    potongan, float(setelan["confirm_conf"] or 0.15), setelan.kelas_dikonfirmasi,
+                )
+            except Exception as e:                         # noqa: BLE001
+                log("konfirmasi gagal, bingkai dilewati:", e)
+                temuan = []
             deteksi_terakhir = [(n, s, (x + ax1, y + ay1, xx + ax1, yy + ay1))
                                 for n, s, (x, y, xx, yy) in temuan]
 
