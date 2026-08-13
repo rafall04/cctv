@@ -139,11 +139,17 @@ Dua hal yang perlu diluruskan sebelum belanja perangkat:
 
 **Angka perencanaan sementara: siapkan 1 core per 2 kamera yang dipantau, di luar tabel di atas.**
 
-> Angka itu **belum diukur di lapangan**, dan tidak bisa diukur dulu: per 12 Agustus 2026 detektornya
-> **belum terpasang sama sekali** di server produksi — tidak ada image `motion-ai`, tidak ada
-> direktori `/opt/yolo-poc`, tidak ada berkas model, dan tidak pernah ada container detektor yang
-> berjalan. Kodenya ada di backend (`services/rondaDetectorService.js`), perangkat pendukungnya
-> belum. Jadi angka di atas adalah turunan dari ukuran model, bukan hasil pengukuran.
+> Angka itu **belum diukur di lapangan**, dan tidak bisa diukur dulu: diperiksa ulang 13 Agustus 2026
+> dan detektornya masih **belum terpasang sama sekali** di server produksi — tidak ada image
+> `motion-ai`, tidak ada direktori `/opt/yolo-poc`, tidak ada berkas model, dan tidak pernah ada
+> container detektor yang berjalan. Pencarian menyeluruh di seluruh disk produksi maupun di host
+> Proxmox tidak menemukan satu pun `motion.py`. Kodenya ada di backend
+> (`services/rondaDetectorService.js`), perangkat pendukungnya belum. Jadi angka di atas adalah
+> turunan dari ukuran model, bukan hasil pengukuran.
+>
+> Halaman **Ronda Digital** kini melaporkan sendiri bagian mana yang belum ada
+> (`rondaDetectorService.kesiapan()`), jadi keadaan ini terbaca dari panel tanpa perlu masuk ke
+> server — sebelumnya satu-satunya petunjuk adalah pesan galat soal token Telegram, yang menyesatkan.
 >
 > Perlakukan sebagai perkiraan kasar untuk anggaran awal, bukan jaminan. Sebelum menjanjikan jumlah
 > kamera tertentu ke pelanggan, **pasang detektornya, nyalakan satu, lalu ukur sendiri** pemakaian
