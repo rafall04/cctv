@@ -8,6 +8,7 @@
 
 import {
     getCountCamera,
+    getCountSummary,
     listAvailableCameras,
     listCountCameras,
     removeCountCamera,
@@ -70,6 +71,9 @@ export default async function vehicleCountAdminRoutes(fastify) {
     fastify.get('/cameras', { onRequest: guard }, listCountCameras);
     fastify.get('/available', { onRequest: guard }, listAvailableCameras);
     fastify.get('/cameras/:cameraId', { onRequest: guard, schema: idParam }, getCountCamera);
+    fastify.get('/cameras/:cameraId/ringkasan', {
+        onRequest: guard, schema: idParam,
+    }, getCountSummary);
     fastify.put('/cameras/:cameraId', {
         onRequest: guard,
         schema: { ...idParam, ...bodySchema },

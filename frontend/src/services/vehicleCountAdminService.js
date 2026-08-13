@@ -26,6 +26,12 @@ export const vehicleCountAdminService = {
         return data;
     },
 
+    /** Ringkasan hitungan + kesehatan proses; null bila kamera itu belum pernah jalan. */
+    async getSummary(cameraId) {
+        const { data } = await apiClient.get(`${BASE}/cameras/${cameraId}/ringkasan`);
+        return data;
+    },
+
     async saveCamera(cameraId, payload) {
         const { data } = await apiClient.put(`${BASE}/cameras/${cameraId}`, payload);
         return data;

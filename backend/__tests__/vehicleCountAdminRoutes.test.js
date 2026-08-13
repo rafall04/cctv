@@ -12,12 +12,16 @@
 import Fastify from 'fastify';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { daftarMock, bacaMock, simpanMock, hapusMock, queryMock } = vi.hoisted(() => ({
+const {
+    daftarMock, bacaMock, simpanMock, hapusMock, queryMock, nyalakanMock, matikanMock,
+} = vi.hoisted(() => ({
     daftarMock: vi.fn(),
     bacaMock: vi.fn(),
     simpanMock: vi.fn(),
     hapusMock: vi.fn(),
     queryMock: vi.fn(),
+    nyalakanMock: vi.fn(),
+    matikanMock: vi.fn(),
 }));
 
 vi.mock('../services/vehicleCountConfigService.js', () => ({
@@ -34,6 +38,10 @@ vi.mock('../services/vehicleCountConfigService.js', () => ({
     },
 }));
 vi.mock('../database/connectionPool.js', () => ({ query: queryMock, queryOne: vi.fn() }));
+vi.mock('../services/vehicleCountRunnerService.js', () => ({
+    nyalakan: nyalakanMock,
+    matikan: matikanMock,
+}));
 vi.mock('../config/config.js', () => ({ default: { vehicleCount: { stateDir: '' } } }));
 
 // auth diloloskan: yang diuji di sini bentuk rute + skema, bukan ulang menguji middleware
@@ -52,9 +60,46 @@ async function buatServer() {
 describe('vehicleCountAdminRoutes', () => {
     beforeEach(() => {
         vi.resetModules();
-        [daftarMock, bacaMock, simpanMock, hapusMock, queryMock].forEach((m) => m.mockReset());
+        [daftarMock, bacaMock, simpanMock, hapusMock, queryMock, nyalakanMock, matikanMock]
+            .forEach((m) => m.mockReset());
         daftarMock.mockReturnValue([]);
         queryMock.mockReturnValue([]);
+        nyalakanMock.mockResolvedValue(true);
+        matikanMock.mockResolvedValue(true);
+    });
+
+    it('menyalakan prosesnya saat disimpan aktif, dan mematikannya saat dimatikan', async () => {
+        simpanMock.mockReturnValue({ camera_id: 15, aktif: true });
+        let f = await buatServer();
+        await f.inject({
+            method: 'PUT', url: '/api/admin/vehicle-count/cameras/15',
+            payload: { aktif: true, garis: [] },
+        });
+        expect(nyalakanMock).toHaveBeenCalledWith(15);
+        await f.close();
+
+        simpanMock.mockReturnValue({ camera_id: 15, aktif: false });
+        f = await buatServer();
+        await f.inject({
+            method: 'PUT', url: '/api/admin/vehicle-count/cameras/15',
+            payload: { aktif: false, garis: [] },
+        });
+        expect(matikanMock).toHaveBeenCalledWith(15);
+        await f.close();
+    });
+
+    it('tetap menyimpan walau proses gagal dinyalakan — garis yang baru digambar tidak boleh hilang', async () => {
+        simpanMock.mockReturnValue({ camera_id: 15, aktif: true });
+        nyalakanMock.mockResolvedValue(false);
+        const f = await buatServer();
+
+        const r = await f.inject({
+            method: 'PUT', url: '/api/admin/vehicle-count/cameras/15',
+            payload: { aktif: true, garis: [] },
+        });
+
+        expect(r.statusCode).toBe(200);
+        await f.close();
     });
 
     it('tidak pernah membocorkan alamat sumber kamera ke browser', async () => {

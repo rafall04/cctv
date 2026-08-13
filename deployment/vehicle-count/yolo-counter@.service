@@ -1,0 +1,31 @@
+# Penghitung kendaraan, satu unit per kamera: `systemctl start yolo-counter@15`.
+#
+# Restart=on-failure, BUKAN always: mematikan penghitungan dari panel admin membuat prosesnya
+# keluar dengan status 0, dan `always` akan menghidupkannya kembali terus-menerus melawan
+# keinginan admin. Kegagalan sungguhan tetap dihidupkan ulang.
+#
+# CATATAN PENTING: Restart= tidak menolong proses yang MENGGANTUNG, hanya yang MATI. Penghitung
+# pernah diam 5,5 jam sementara systemd melaporkan `active`. Karena itu ada dua pengawas lain:
+# pengawas di dalam proses (livesrc.PengawasKemajuan) dan timer yolo-counter-watchdog yang
+# menilai KEMAJUAN dari umur berkas statistik.
+[Unit]
+Description=Penghitung kendaraan YOLO - kamera %i
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/yolo-demo
+Environment=VEHICLE_COUNT_CONFIG_DIR=/opt/yolo-demo/config
+Environment=VEHICLE_COUNT_STATE_DIR=/opt/yolo-demo/state
+Environment=VEHICLE_COUNT_HLS_DIR=/opt/yolo-demo/web/hls
+ExecStart=/opt/yolo-demo/venv/bin/python /opt/yolo-demo/counter.py %i
+Restart=on-failure
+RestartSec=5
+StandardOutput=append:/opt/yolo-demo/logs/counter-%i.log
+StandardError=append:/opt/yolo-demo/logs/counter-%i.log
+# Sengaja mengalah terhadap backend CCTV yang sedang melayani pengunjung.
+CPUWeight=40
+Nice=5
+
+[Install]
+WantedBy=multi-user.target

@@ -19,6 +19,7 @@ import {
     simpanConfig,
     tanpaSumber,
 } from '../services/vehicleCountConfigService.js';
+import { matikan, nyalakan } from '../services/vehicleCountRunnerService.js';
 
 function sendError(reply, error, label) {
     const code = error.statusCode || 500;
@@ -111,6 +112,10 @@ export async function getCountCamera(request, reply) {
 export async function saveCountCamera(request, reply) {
     try {
         const data = simpanConfig(request.params.cameraId, request.body || {});
+        // Menyalakan/mematikan prosesnya menyusul penyimpanan, bukan mendahuluinya: setelan
+        // yang sah harus sudah tersimpan sebelum ada yang mencoba menjalankannya.
+        if (data.aktif) await nyalakan(data.camera_id);
+        else await matikan(data.camera_id);
         return reply.send({
             success: true,
             message: 'Setelan penghitungan tersimpan',
@@ -123,6 +128,7 @@ export async function saveCountCamera(request, reply) {
 
 export async function removeCountCamera(request, reply) {
     try {
+        await matikan(request.params.cameraId);
         const ok = hapusConfig(request.params.cameraId);
         return reply.send({
             success: true,
@@ -130,5 +136,35 @@ export async function removeCountCamera(request, reply) {
         });
     } catch (error) {
         return sendError(reply, error, 'Remove vehicle-count camera error');
+    }
+}
+
+/**
+ * Ringkasan hitungan untuk panel admin.
+ *
+ * Sengaja LEBIH banyak daripada panel publik: di sini angka operasional (fps, frame yang
+ * dijatuhkan, sambung ulang, berapa kali setelan dimuat ulang) justru yang menjawab
+ * "apakah ini sehat" — sedangkan di halaman publik semua itu hanyalah jargon.
+ */
+export async function getCountSummary(request, reply) {
+    try {
+        const id = Number(request.params.cameraId);
+        const { stateDir } = config.vehicleCount || {};
+        if (!stateDir) return reply.send({ success: true, data: null });
+        let isi;
+        try {
+            isi = JSON.parse(fs.readFileSync(path.join(stateDir, `cam${id}.json`), 'utf8'));
+        } catch {
+            // Belum pernah jalan, atau baru dimatikan. Bukan galat — panel menampilkan
+            // "belum ada data" dan itu memang keadaannya.
+            return reply.send({ success: true, data: null });
+        }
+        // riwayat per detik hanya berguna untuk menyelaraskan panel publik ke video;
+        // di ringkasan admin ia hanya memperbesar respons tanpa menambah arti.
+        const { riwayat, ...ringkas } = isi;
+        void riwayat;
+        return reply.send({ success: true, data: { ...ringkas, ...statusJalan(id) } });
+    } catch (error) {
+        return sendError(reply, error, 'Get vehicle-count summary error');
     }
 }

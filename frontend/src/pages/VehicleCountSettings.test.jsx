@@ -23,6 +23,7 @@ vi.mock('../services/vehicleCountAdminService', () => ({
         getCamera: vi.fn(),
         saveCamera: vi.fn(),
         removeCamera: vi.fn(),
+        getSummary: vi.fn(),
     },
 }));
 
@@ -59,6 +60,17 @@ beforeEach(() => {
     vehicleCountAdminService.listAvailable.mockResolvedValue({ data: [] });
     vehicleCountAdminService.getCamera.mockResolvedValue({ data: CONFIG });
     vehicleCountAdminService.saveCamera.mockResolvedValue({ data: CONFIG, message: 'ok' });
+    vehicleCountAdminService.getSummary.mockResolvedValue({
+        data: {
+            total: 2254, total_10_menit: 374,
+            total_jenis: { motor: 1280, mobil: 521, truk: 443, bus: 10 },
+            arah: { 'Ke barat': { motor: 700 }, 'Ke timur': { motor: 580 } },
+            fps: 10.3, frame_diproses: 12000, umur_frame_terakhir_detik: 0.9,
+            frame_dijatuhkan_sumber: 52, sambung_ulang: 0, setelan_dimuat_ulang: 2,
+            jumlah_garis: 3, model: 'kamera15-v1.pt imgsz=448',
+            diperbarui: '2026-08-13 13:40:00 WIB', mulai: '2026-08-13 10:46:38 WIB',
+        },
+    });
 });
 
 describe('VehicleCountSettings', () => {
@@ -85,6 +97,32 @@ describe('VehicleCountSettings', () => {
         expect(payload).not.toHaveProperty('berjalan');
         expect(payload).not.toHaveProperty('camera_id');
         expect(payload).not.toHaveProperty('diperbarui');
+    });
+
+    /*
+     * Data hitungan harus ikut terangkum di panel admin: yang pertama ingin diketahui admin
+     * setelah membuka kamera adalah apakah ini benar-benar menghitung dan berapa — bukan
+     * formulir setelannya.
+     */
+    it('merangkum data hitungan beserta angka kesehatan prosesnya', async () => {
+        render(<VehicleCountSettings />);
+        fireEvent.click(await screen.findByText('SOSRODILOGO'));
+
+        expect(await screen.findByText('374')).toBeTruthy();               // 10 menit terakhir
+        // angka & keterangannya berada di elemen terpisah, jadi dicocokkan masing-masing
+        expect(screen.getByText('2.254')).toBeTruthy();                    // total sesi
+        expect(screen.getByText(/total sejak/)).toBeTruthy();
+        expect(screen.getByText('1.280')).toBeTruthy();                    // motor
+        expect(screen.getByText(/10.3 fps/)).toBeTruthy();                 // angka operasional
+        expect(screen.getByText(/setelan dimuat ulang 2×/)).toBeTruthy();
+    });
+
+    it('mengatakan apa adanya saat kamera belum pernah menghitung', async () => {
+        vehicleCountAdminService.getSummary.mockResolvedValue({ data: null });
+        render(<VehicleCountSettings />);
+        fireEvent.click(await screen.findByText('SOSRODILOGO'));
+
+        expect(await screen.findByText(/Belum ada data hitungan/i)).toBeTruthy();
     });
 
     it('menyampaikan alasan penolakan server apa adanya', async () => {

@@ -47,6 +47,7 @@ export default function VehicleCountSettings() {
     const [memuat, setMemuat] = useState(true);
     const [menyimpan, setMenyimpan] = useState(false);
     const [kameraBaru, setKameraBaru] = useState('');
+    const [ringkasan, setRingkasan] = useState(null);
 
     const muatDaftar = useCallback(async () => {
         try {
@@ -65,15 +66,33 @@ export default function VehicleCountSettings() {
 
     useEffect(() => { muatDaftar(); }, [muatDaftar]);
 
+    const muatRingkasan = useCallback(async (cameraId) => {
+        try {
+            const hasil = await vehicleCountAdminService.getSummary(cameraId);
+            setRingkasan(hasil?.data || null);
+        } catch {
+            setRingkasan(null);
+        }
+    }, []);
+
     const bukaKamera = useCallback(async (cameraId) => {
         try {
             const hasil = await vehicleCountAdminService.getCamera(cameraId);
             setDipilih(cameraId);
             setDraft(hasil?.data || null);
+            muatRingkasan(cameraId);
         } catch {
             showNotification('Gagal memuat setelan kamera', 'error');
         }
-    }, [showNotification]);
+    }, [showNotification, muatRingkasan]);
+
+    /* Ringkasan disegarkan berkala supaya admin melihat angkanya benar-benar bertambah —
+       itu satu-satunya bukti yang berarti bahwa penghitungnya bekerja. */
+    useEffect(() => {
+        if (!dipilih) return undefined;
+        const t = setInterval(() => muatRingkasan(dipilih), 5000);
+        return () => clearInterval(t);
+    }, [dipilih, muatRingkasan]);
 
     const ubah = (kunci, nilai) => setDraft((s) => ({ ...s, [kunci]: nilai }));
 
@@ -221,6 +240,68 @@ export default function VehicleCountSettings() {
                             Nyalakan penghitungan
                         </label>
                     </div>
+
+                    {/* Data hitungan ditaruh DI ATAS editor: yang pertama ingin diketahui admin
+                        setelah membuka kamera adalah "apakah ini menghitung dan berapa",
+                        bukan formulir setelannya. */}
+                    {ringkasan ? (
+                        <div className="rounded-card border border-edge bg-surface-sunken p-3">
+                            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                                <span className="text-2xl font-semibold tabular-nums text-content">
+                                    {Number(ringkasan.total_10_menit || 0).toLocaleString('id-ID')}
+                                </span>
+                                <span className="text-xs text-content-muted">
+                                    kendaraan dalam 10 menit terakhir
+                                </span>
+                                <span className="ml-auto text-xs text-content-subtle">
+                                    {ringkasan.diperbarui}
+                                </span>
+                            </div>
+                            <p className="mt-0.5 text-xs text-content-subtle">
+                                <span className="tabular-nums">
+                                    {Number(ringkasan.total || 0).toLocaleString('id-ID')}
+                                </span> total sejak {ringkasan.mulai}
+                            </p>
+
+                            <dl className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                                {['motor', 'mobil', 'truk', 'bus'].map((k) => (
+                                    <div key={k} className="min-w-0 rounded-control border border-edge bg-surface px-2 py-1.5">
+                                        <dt className="truncate text-xs capitalize text-content-muted">{k}</dt>
+                                        <dd className="text-base font-semibold tabular-nums text-content">
+                                            {Number(ringkasan.total_jenis?.[k] || 0).toLocaleString('id-ID')}
+                                        </dd>
+                                    </div>
+                                ))}
+                            </dl>
+
+                            <ul className="mt-2 flex flex-col gap-1">
+                                {Object.entries(ringkasan.arah || {}).map(([nama, per]) => (
+                                    <li key={nama} className="flex items-center justify-between gap-2 text-xs">
+                                        <span className="min-w-0 truncate text-content-muted">{nama}</span>
+                                        <span className="shrink-0 font-medium tabular-nums text-content">
+                                            {Object.values(per).reduce((a, b) => a + b, 0).toLocaleString('id-ID')}
+                                        </span>
+                                    </li>
+                                ))}
+                            </ul>
+
+                            {/* Angka operasional: inilah yang menjawab "sehat atau tidak", dan
+                                sengaja hanya ada di sini — di halaman publik semuanya jargon. */}
+                            <p className="mt-2 border-t border-edge pt-2 text-xs text-content-subtle">
+                                {ringkasan.fps} fps · {Number(ringkasan.frame_diproses || 0).toLocaleString('id-ID')} frame ·
+                                {' '}frame terakhir {ringkasan.umur_frame_terakhir_detik}s lalu ·
+                                {' '}dijatuhkan {ringkasan.frame_dijatuhkan_sumber} ·
+                                {' '}sambung ulang {ringkasan.sambung_ulang} ·
+                                {' '}setelan dimuat ulang {ringkasan.setelan_dimuat_ulang ?? 0}× ·
+                                {' '}{ringkasan.jumlah_garis} garis · {ringkasan.model}
+                            </p>
+                        </div>
+                    ) : (
+                        <p className="rounded-card border border-edge bg-surface-sunken px-3 py-2 text-xs text-content-muted">
+                            Belum ada data hitungan untuk kamera ini. Gambar garis, nyalakan, lalu
+                            angkanya akan muncul di sini dalam beberapa detik.
+                        </p>
+                    )}
 
                     <CountingLineEditor
                         previewUrl={`/api/thumbnails/${dipilih}.jpg`}

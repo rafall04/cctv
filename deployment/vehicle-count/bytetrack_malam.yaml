@@ -1,0 +1,9 @@
+# ByteTrack disetel untuk CCTV malam: motor terdeteksi pada confidence 0.15-0.40,
+# sedangkan default ultralytics (new_track_thresh 0.25) membuangnya sebelum jadi trek.
+tracker_type: bytetrack
+track_high_thresh: 0.20
+track_low_thresh: 0.04
+new_track_thresh: 0.12
+track_buffer: 45
+match_thresh: 0.85
+fuse_score: False
