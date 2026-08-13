@@ -40,8 +40,9 @@ const BATAS_WAJAR = 3;
  * ulang dengan bingkai gelap dan diuji SETELAH matahari terbenam.
  */
 const MODEL_PILIHAN = [
-    { value: 'kamera15-v1.pt', label: 'Khusus kamera ini v1 — dianjurkan (siang & malam)' },
-    { value: 'kamera15-v2.pt', label: 'v2 — lebih rapi siang, tetapi salah kelas saat malam' },
+    { value: 'bojonegoro-v3.pt', label: 'Bojonegoro v3 — dianjurkan, 12 kamera siang & malam' },
+    { value: 'kamera15-v1.pt', label: 'Kamera 15 v1 — hanya dilatih di satu kamera' },
+    { value: 'kamera15-v2.pt', label: 'v2 — salah kelas saat malam, jangan dipakai' },
     { value: 'yolo11m.pt', label: 'yolo11m (umum, COCO)' },
     { value: 'yolo11s.pt', label: 'yolo11s (umum, lebih ringan)' },
 ];
@@ -96,10 +97,10 @@ const PANDUAN = [
     },
     {
         tanya: 'Model mana yang dipilih?',
-        jawab: 'v1 — dianjurkan, dan itu yang sedang dipakai. v2 memang lebih rapi pada siang '
-            + 'hari (tidak memecah satu truk menjadi beberapa kotak), tetapi set latihannya '
-            + 'menyisihkan bingkai gelap, sehingga setelah senja ia menandai motor sebagai '
-            + 'mobil. Pilih v2 hanya kalau kamera Anda selalu terang.',
+        jawab: 'Bojonegoro v3 — dianjurkan. Dilatih dari 12 kamera Bojonegoro sekaligus, siang '
+            + 'sampai malam, jadi ia tidak hanya cocok untuk satu simpang. Diuji terpisah per '
+            + 'kondisi: malam 0,47 berbanding 0,23 milik v1. v1 hanya melihat satu kamera, dan '
+            + 'di kamera lain ia bisa mengarang truk di jalan kosong. v2 jangan dipakai.',
     },
     {
         tanya: 'Kenapa angka bagus belum tentu hasilnya bagus?',
