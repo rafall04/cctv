@@ -137,19 +137,28 @@ Dua hal yang perlu diluruskan sebelum belanja perangkat:
 2. **Beban tumbuh per kamera yang dipantau**, bukan per total kamera. Sepuluh kamera terpasang
    dengan dua yang dipantau hanya membayar dua.
 
-**Angka perencanaan sementara: siapkan 1 core per 2 kamera yang dipantau, di luar tabel di atas.**
+**Angka perencanaan: siapkan 1 core per 3 kamera yang dipantau, di luar tabel di atas.**
 
-> Angka itu **belum diukur di lapangan**, dan tidak bisa diukur dulu: diperiksa ulang 13 Agustus 2026
-> dan detektornya masih **belum terpasang sama sekali** di server produksi — tidak ada image
-> `motion-ai`, tidak ada direktori `/opt/yolo-poc`, tidak ada berkas model, dan tidak pernah ada
-> container detektor yang berjalan. Pencarian menyeluruh di seluruh disk produksi maupun di host
-> Proxmox tidak menemukan satu pun `motion.py`. Kodenya ada di backend
-> (`services/rondaDetectorService.js`), perangkat pendukungnya belum. Jadi angka di atas adalah
-> turunan dari ukuran model, bukan hasil pengukuran.
+> **Diukur di produksi 13 Agustus 2026** (bukan lagi turunan ukuran model). Runtime detektornya
+> dipasang hari itu — sebelumnya tidak pernah ada di server mana pun, termasuk host Proxmox.
+> Satu detektor pada kamera jembatan Sosrodilogo, siang hari dengan lalu lintas ramai:
 >
-> Halaman **Ronda Digital** kini melaporkan sendiri bagian mana yang belum ada
-> (`rondaDetectorService.kesiapan()`), jadi keadaan ini terbaca dari panel tanpa perlu masuk ke
-> server — sebelumnya satu-satunya petunjuk adalah pesan galat soal token Telegram, yang menyesatkan.
+> | | |
+> |---|---|
+> | CPU | **27,7% dari satu core** (batas container 2 core, jadi terpakai ~14% dari jatahnya) |
+> | RAM | **162 MiB** dari batas 2 GiB |
+> | Setelan | `proc_w=960`, `target_fps=5`, `imgsz=320`, `GATE_COOLDOWN=5` |
+> | Hasil | 5 kejadian dalam 3 menit (motor, bus, mobil, truk, orang), tanpa restart |
+>
+> Pengukuran ini **konservatif**: `GATE_COOLDOWN` diisi 5 detik, sedangkan bawaannya 10 — artinya
+> YOLO dipanggil dua kali lebih sering daripada pemasangan normal. Yang belum terukur: malam hari
+> (derau sensor menaikkan luas gerak, jadi YOLO lebih sering terpicu) dan hujan. Tetap **nyalakan
+> satu, ukur, baru tambah** sebelum menjanjikan jumlah kamera ke pelanggan.
+>
+> Halaman **Ronda Digital** melaporkan sendiri bagian mana yang belum terpasang
+> (`rondaDetectorService.kesiapan()`), jadi keadaan pemasangan terbaca dari panel tanpa perlu masuk
+> ke server — sebelumnya satu-satunya petunjuk adalah pesan galat soal token Telegram, yang
+> menyesatkan karena menyiratkan tinggal mengisi token.
 >
 > Perlakukan sebagai perkiraan kasar untuk anggaran awal, bukan jaminan. Sebelum menjanjikan jumlah
 > kamera tertentu ke pelanggan, **pasang detektornya, nyalakan satu, lalu ukur sendiri** pemakaian
