@@ -29,20 +29,27 @@ const KELAS_TOMBOL = 'min-h-[44px] rounded-control border border-edge px-3 py-2 
 const BATAS_WAJAR = 3;
 
 /*
- * v2 SENGAJA tidak dianjurkan meski angka validasinya lebih tinggi (mAP50-95 0,629 vs 0,602).
- * Set latihannya menyisihkan 443 bingkai gelap, jadi ia praktis hanya belajar siang hari, dan
- * begitu senja ia menandai motor sebagai mobil — terlihat langsung oleh pemilik pada 13 Agustus
- * 2026, beberapa jam setelah dipasang. Pada 60 bingkai senja: v2 menemukan 56 mobil ketika
- * wasit yolo11x hanya menemukan 31; v1 menemukan 28.
+ * Dua model ditandai "jangan dipakai", dan keduanya sempat MENANG di angka lebih dulu. Daftar
+ * ini menyimpan sebabnya supaya tidak ada yang menaikkannya lagi hanya karena mAP-nya tinggi.
  *
- * Pelajarannya, dan alasan catatan ini ada: mAP pada set validasi yang dibangun dari data siang
- * tidak mengatakan apa pun tentang malam. Jangan naikkan v2 menjadi anjuran sebelum ia dilatih
- * ulang dengan bingkai gelap dan diuji SETELAH matahari terbenam.
+ * v2 — menyisihkan 443 bingkai gelap dari latihan DAN validasi, jadi mAP 0,629 miliknya tidak
+ * pernah mengukur malam. Setelah senja ia menandai motor sebagai mobil; pemilik yang menemukan,
+ * beberapa jam setelah dipasang.
+ *
+ * v3 — sudah dilatih dengan bingkai malam dan menang di setiap kondisi, tetapi mewarisi
+ * kekeliruan gurunya: yolo11x memakai kelas COCO dan tidak mengenal truk kargo Indonesia, jadi
+ * bak tinggi yang disorot lampu dilabeli "bus". Di lapangan ia melaporkan 41% bus pada pukul
+ * satu pagi. Dua puluh empat potongan diperiksa satu per satu: semuanya truk.
+ *
+ * Aturan yang lahir dari keduanya: sebuah model hanya boleh naik setelah diuji pada kondisi
+ * yang akan benar-benar ia hadapi, DAN komposisi keluarannya dilihat sebagai gambar — bukan
+ * hanya sebagai angka.
  */
 const MODEL_PILIHAN = [
-    { value: 'bojonegoro-v3.pt', label: 'Bojonegoro v3 — dianjurkan, 12 kamera siang & malam' },
+    { value: 'bojonegoro-v4.pt', label: 'Bojonegoro v4 — dianjurkan, 12 kamera siang & malam' },
     { value: 'kamera15-v1.pt', label: 'Kamera 15 v1 — hanya dilatih di satu kamera' },
-    { value: 'kamera15-v2.pt', label: 'v2 — salah kelas saat malam, jangan dipakai' },
+    { value: 'bojonegoro-v3.pt', label: 'v3 — truk malam dilaporkan bus, jangan dipakai' },
+    { value: 'kamera15-v2.pt', label: 'v2 — motor malam dilaporkan mobil, jangan dipakai' },
     { value: 'yolo11m.pt', label: 'yolo11m (umum, COCO)' },
     { value: 'yolo11s.pt', label: 'yolo11s (umum, lebih ringan)' },
 ];
@@ -97,10 +104,10 @@ const PANDUAN = [
     },
     {
         tanya: 'Model mana yang dipilih?',
-        jawab: 'Bojonegoro v3 — dianjurkan. Dilatih dari 12 kamera Bojonegoro sekaligus, siang '
-            + 'sampai malam, jadi ia tidak hanya cocok untuk satu simpang. Diuji terpisah per '
-            + 'kondisi: malam 0,47 berbanding 0,23 milik v1. v1 hanya melihat satu kamera, dan '
-            + 'di kamera lain ia bisa mengarang truk di jalan kosong. v2 jangan dipakai.',
+        jawab: 'Bojonegoro v4 — dianjurkan. Dilatih dari 12 kamera Bojonegoro sekaligus, siang '
+            + 'sampai malam. Diuji terpisah per kondisi: malam 0,53 berbanding 0,27 milik v1. '
+            + 'Catatan jujur: bus malam dicatat sebagai truk, karena truk kargo berbak tinggi '
+            + 'dan bus nyaris tak terbedakan dalam gelap — dan bus di sini hanya ~3% kendaraan.',
     },
     {
         tanya: 'Kenapa angka bagus belum tentu hasilnya bagus?',
