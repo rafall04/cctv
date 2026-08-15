@@ -13,6 +13,7 @@ import { useNotification } from '../../contexts/NotificationContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { useFormValidation } from '../useFormValidation';
 import { useAdminReconnectRefresh } from './useAdminReconnectRefresh';
+import { useCameraClassControl } from './useCameraClassControl';
 import { REQUEST_POLICY } from '../../services/requestPolicy';
 import {
     buildCameraPayload,
@@ -427,6 +428,15 @@ export function useCameraManagementPage() {
         }
     }, [showError]);
 
+    /*
+     * Reload in the BACKGROUND: a class change rewrites camera_class/owner_user_id, and the card
+     * badge must follow, but blanking the grid to a spinner for a one-field change would be a
+     * bigger interruption than the change itself.
+     */
+    const cameraClassControl = useCameraClassControl({
+        onChanged: useCallback(() => loadCameras({ mode: 'background' }), [loadCameras]),
+    });
+
     const getFieldError = useCallback((fieldName) => {
         return touched[fieldName] ? formErrors[fieldName] : '';
     }, [formErrors, touched]);
@@ -510,6 +520,7 @@ export function useCameraManagementPage() {
         getFieldError,
         setModalError,
         setFilters,
+        ...cameraClassControl,
     };
 }
 

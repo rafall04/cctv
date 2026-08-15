@@ -6,6 +6,7 @@ MainFuncs: CameraManagement.
 SideEffects: Delegates camera mutations and stream refresh actions through the page hook.
 */
 
+import CameraClassModal from '../components/admin/cameras/CameraClassModal';
 import CameraFormModal from '../components/admin/cameras/CameraFormModal';
 import CameraGrid from '../components/admin/cameras/CameraGrid';
 import CameraManagementHeader from '../components/admin/cameras/CameraManagementHeader';
@@ -62,6 +63,14 @@ export default function CameraManagement() {
         getFieldError,
         setModalError,
         setFilters,
+        classCamera,
+        classUsers,
+        classError,
+        isSavingClass,
+        openClassModal,
+        closeClassModal,
+        saveCameraClass,
+        setClassError,
     } = useCameraManagementPage();
 
     return (
@@ -195,6 +204,7 @@ export default function CameraManagement() {
                     onToggleEnabled={toggleEnabled}
                     onToggleMaintenance={toggleMaintenance}
                     onRefreshStream={refreshCameraStream}
+                    onChangeClass={openClassModal}
                 />
             )}
 
@@ -213,6 +223,16 @@ export default function CameraManagement() {
                 onBlur={handleBlur}
                 setFieldValue={setFieldValue}
                 setModalError={setModalError}
+            />
+
+            <CameraClassModal
+                camera={classCamera}
+                users={classUsers}
+                error={classError}
+                isSaving={isSavingClass}
+                onClose={closeClassModal}
+                onSubmit={saveCameraClass}
+                onDismissError={() => setClassError('')}
             />
         </div>
     );

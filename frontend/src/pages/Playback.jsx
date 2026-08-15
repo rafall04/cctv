@@ -24,6 +24,7 @@ import { isAdsMobileViewport, shouldRenderAdSlot } from '../components/ads/adsCo
 import { getStreamCapabilities } from '../utils/cameraDelivery.js';
 import { toggleElementFullscreen } from '../utils/fullscreen.js';
 import { isAdminPlaybackScope, PLAYBACK_ACCESS_SCOPES, resolveViewerTrackingScope } from '../utils/playbackAccessPolicy.js';
+import { resolveTokenScopedCameras } from '../utils/playbackTokenCameras.js';
 
 import PlaybackHeader from '../components/playback/PlaybackHeader';
 import PlaybackVideo from '../components/playback/PlaybackVideo';
@@ -151,7 +152,9 @@ function Playback({
         const targetCameraId = Number.isInteger(defaultCameraId) && defaultCameraId > 0
             ? defaultCameraId
             : allowedIds[0];
-        const targetCamera = playbackCameras.find((camera) => camera.id === targetCameraId);
+        // A just-activated token may name a camera no public list carries, and says so a render early.
+        const targetCamera = playbackCameras.find((camera) => camera.id === targetCameraId)
+            || (tokenData.allowed_cameras || []).find((camera) => camera.id === targetCameraId);
 
         if (!targetCamera) {
             updatePlaybackSearchParams({
@@ -190,6 +193,7 @@ function Playback({
         setTokenInput,
         tokenStatus,
         allowedCameraIds,
+        allowedCameras,
         tokenMessage,
         isTokenBusy,
         activateToken,
@@ -237,22 +241,23 @@ function Playback({
     const autoPlayEnabledRef = useRef(autoPlayEnabled);
     const selectedCameraIdRef = useRef(selectedCameraId);
 
-    const visiblePlaybackCameras = useMemo(() => {
-        if (isAdminPlayback || tokenStatus?.scope_type !== 'selected' || !Array.isArray(allowedCameraIds)) {
-            return playbackCameras;
-        }
-
-        const allowedIds = new Set(allowedCameraIds);
-        return playbackCameras.filter((camera) => allowedIds.has(camera.id));
-    }, [allowedCameraIds, isAdminPlayback, playbackCameras, tokenStatus]);
+    /* The page's ONE camera list — public cameras plus any the token covers that the public list, by
+       invariant, cannot hold. Every selection effect below reads THIS, or a share-linked private
+       camera is evicted the instant it is chosen. See utils/playbackTokenCameras.js. */
+    const visiblePlaybackCameras = useMemo(() => resolveTokenScopedCameras({
+        cameras: playbackCameras,
+        tokenCameras: isAdminPlayback ? null : allowedCameras,
+        allowedCameraIds,
+        scopeType: tokenStatus?.scope_type,
+    }), [allowedCameraIds, allowedCameras, isAdminPlayback, playbackCameras, tokenStatus]);
     const selectedCamera = useMemo(() => {
         if (!selectedCameraId) {
             return null;
         }
 
-        return playbackCameras.find((camera) => camera.id === selectedCameraId)
+        return visiblePlaybackCameras.find((camera) => camera.id === selectedCameraId)
             || (propSelectedCamera?.id === selectedCameraId && getStreamCapabilities(propSelectedCamera).playback ? propSelectedCamera : null);
-    }, [playbackCameras, propSelectedCamera, selectedCameraId]);
+    }, [propSelectedCamera, selectedCameraId, visiblePlaybackCameras]);
     const isMobileAdsViewport = isAdsMobileViewport();
     const showPlaybackNative = shouldRenderAdSlot(adsConfig, 'playbackNative', isMobileAdsViewport);
     const showPlaybackPopunder = shouldRenderAdSlot(adsConfig, 'playbackPopunder', isMobileAdsViewport);
@@ -322,12 +327,12 @@ function Playback({
     }, [selectedCameraId]);
 
     useEffect(() => {
-        if (selectedCameraId && playbackCameras.some((camera) => camera.id === selectedCameraId)) {
+        if (selectedCameraId && visiblePlaybackCameras.some((camera) => camera.id === selectedCameraId)) {
             return;
         }
 
-        setSelectedCameraId(playbackCameras[0]?.id ?? null);
-    }, [playbackCameras, selectedCameraId]);
+        setSelectedCameraId(visiblePlaybackCameras[0]?.id ?? null);
+    }, [selectedCameraId, visiblePlaybackCameras]);
 
     useEffect(() => {
         if (isAdminPlayback || tokenStatus?.scope_type !== 'selected' || !Array.isArray(allowedCameraIds)) {
@@ -339,7 +344,7 @@ function Playback({
             return;
         }
 
-        const firstAllowedCamera = playbackCameras.find((camera) => allowedIds.has(camera.id));
+        const firstAllowedCamera = visiblePlaybackCameras.find((camera) => allowedIds.has(camera.id));
         if (firstAllowedCamera) {
             setSelectedCameraId(firstAllowedCamera.id);
             updatePlaybackSearchParams({
@@ -348,7 +353,7 @@ function Playback({
                 stripRawToken: true,
             });
         }
-    }, [allowedCameraIds, isAdminPlayback, playbackCameras, selectedCameraId, tokenStatus, updatePlaybackSearchParams]);
+    }, [allowedCameraIds, isAdminPlayback, selectedCameraId, tokenStatus, updatePlaybackSearchParams, visiblePlaybackCameras]);
 
     useEffect(() => {
         if (!showPlaybackPopunder) {

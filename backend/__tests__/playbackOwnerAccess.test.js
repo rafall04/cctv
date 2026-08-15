@@ -157,6 +157,19 @@ describe('tautan yang diterbitkan pemilik untuk kameranya sendiri', () => {
             .toBe('public_denied');
     });
 
+    it('kamera owner_private terbuka lewat tautan terbitan PEMILIKNYA', () => {
+        // Jalur yang dipakai operator untuk kamera pribadinya sendiri: scope=owner menolak
+        // owner_private (uji di atas), jadi tautan terbitan pemilik inilah satu-satunya cara
+        // keluarga menonton tanpa akun staff. billing_status null = tidak ada yang perlu dibayar.
+        validateForCameraMock.mockReturnValue(token({ created_by: 1 }));
+        const privat = {
+            ...KAMERA_SEWA, camera_class: 'owner_private', owner_user_id: 1, billing_status: null,
+        };
+
+        expect(service.resolvePlaybackAccess(privat, minta(null, undefined)).accessMode)
+            .toBe('token_full');
+    });
+
     it('langganan ditangguhkan → tautan ikut mati', () => {
         validateForCameraMock.mockReturnValue(token());
         const ditangguhkan = { ...KAMERA_SEWA, billing_status: 'suspended' };

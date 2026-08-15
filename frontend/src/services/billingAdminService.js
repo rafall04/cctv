@@ -1,6 +1,6 @@
 /*
  * Purpose: Admin billing API client — customers, subscriptions, payments, manual top-up.
- * Caller: pages/BillingManagement.jsx.
+ * Caller: pages/BillingManagement.jsx, hooks/admin/useCameraClassControl.js (setCameraClass).
  * Deps: shared apiClient (cookies + CSRF + retry).
  * MainFuncs: customers/subscriptions/payments CRUD-ish helpers.
  * SideEffects: HTTP requests only.

@@ -11,6 +11,7 @@ import playbackTokenService, {
     PLAYBACK_TOKEN_SESSION_COOKIE,
 } from '../services/playbackTokenService.js';
 import { deletePlaybackToken } from '../services/playbackTokenDeletionService.js';
+import { listTokenPlayableCameras } from '../services/playbackTokenCameraCatalog.js';
 import { findLiveSession } from '../services/playbackSessionReuseService.js';
 import { parseUtcSql } from '../services/timeService.js';
 import { isHttpsRequest } from '../utils/authCookieOptions.js';
@@ -37,6 +38,20 @@ function resolveCookieMaxAge(tokenData) {
         ? Math.floor((expiresAt.getTime() - Date.now()) / 1000)
         : 60;
     return Math.max(60, Math.min(remainingSeconds, 30 * 24 * 60 * 60));
+}
+
+/*
+ * The viewer builds its camera picker from the PUBLIC camera list, which by invariant holds
+ * community cameras only. Attaching the token's OWN camera set is what makes an owner-issued share
+ * link render at all: without it the picker filters down to nothing and a perfectly valid link
+ * looks broken. Cheap enough to repeat on the 30s heartbeat — one indexed read over a handful of
+ * ids, and only for 'selected' tokens (every other scope returns [] without touching the DB).
+ */
+function withPlayableCameras(tokenData) {
+    if (!tokenData) {
+        return tokenData;
+    }
+    return { ...tokenData, allowed_cameras: listTokenPlayableCameras(tokenData) };
 }
 
 // In-memory per-IP throttle for failed public activation attempts. Cheap
@@ -290,7 +305,12 @@ export async function activatePlaybackToken(request, reply) {
             getPlaybackTokenCookieOptions(request, session.timeout_seconds)
         );
 
-        return reply.send({ success: true, message: 'Token playback aktif', data, session });
+        return reply.send({
+            success: true,
+            message: 'Token playback aktif',
+            data: withPlayableCameras(data),
+            session,
+        });
     } catch (error) {
         logControllerError('Activate playback token', error);
         return reply.code(error.statusCode || 500).send({
@@ -337,7 +357,7 @@ export async function heartbeatPlaybackToken(request, reply) {
             );
         }
 
-        return reply.send({ success: true, data, session });
+        return reply.send({ success: true, data: withPlayableCameras(data), session });
     } catch (error) {
         logControllerError('Heartbeat playback token', error);
         return reply.code(error.statusCode || 500).send({

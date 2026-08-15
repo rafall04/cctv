@@ -224,6 +224,13 @@ export function usePlaybackTokenAccess({
         setTokenInput,
         tokenStatus,
         allowedCameraIds: tokenStatus?.allowed_camera_ids || null,
+        /*
+         * The server's own description of what this token covers. Needed because a token may grant
+         * a camera that is on NO public list (an owner's private camera), which the page cannot
+         * learn about any other way. Both sources of tokenStatus — a fresh activation and the
+         * cookie hydration above — carry it, so a returning visitor is not a second-class case.
+         */
+        allowedCameras: tokenStatus?.allowed_cameras || null,
         cameraRules: tokenStatus?.camera_rules || [],
         defaultCameraId: tokenStatus?.default_camera_id || null,
         tokenMessage,

@@ -23,6 +23,7 @@ export default function CameraGrid({
     onToggleEnabled,
     onToggleMaintenance,
     onRefreshStream,
+    onChangeClass,
 }) {
     const [page, setPage] = useState(1);
     const totalPages = Math.max(1, Math.ceil(cameras.length / PAGE_SIZE));
@@ -54,6 +55,7 @@ export default function CameraGrid({
                         onToggleEnabled={onToggleEnabled}
                         onToggleMaintenance={onToggleMaintenance}
                         onRefreshStream={onRefreshStream}
+                        onChangeClass={onChangeClass}
                     />
                 ))}
             </div>

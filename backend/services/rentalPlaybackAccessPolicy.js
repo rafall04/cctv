@@ -1,9 +1,9 @@
 /**
- * Purpose: Decide who may replay a RENTED camera's recordings — the one deliberate opening in the
- *          "subscriber product is live-only" rule.
- * Caller: recordingPlaybackService.resolvePlaybackAccess.
+ * Purpose: Decide who may replay a NON-COMMUNITY camera's recordings — the one deliberate opening in
+ *          the "private footage never reaches the public" rule.
+ * Caller: recordingPlaybackService.resolvePlaybackAccess, playbackTokenCameraCatalog.
  * Deps: playbackTokenService.
- * MainFuncs: resolveOwnerScopeAccess, resolveOwnerIssuedTokenAccess.
+ * MainFuncs: isOwnerIssuedTokenCamera, resolveOwnerScopeAccess, resolveOwnerIssuedTokenAccess.
  * SideEffects: Token validation touches usage counters (delegated to playbackTokenService).
  *
  * WHY THIS IS ITS OWN FILE
@@ -37,6 +37,26 @@ function unauthorized() {
 const masihDibayar = (camera) => !camera.billing_status || camera.billing_status === 'active';
 
 /**
+ * "Did the person who owns THIS camera mint THIS token?" — the single condition that lets a share
+ * link reach non-community footage. Exported because the camera CATALOG the viewer page renders
+ * must answer the very same question: a picker that lists a camera the segment gate then refuses
+ * is worse than one that never listed it, and two copies of this rule would drift apart.
+ *
+ * scope_type 'selected' only. Not 'all', not 'area' — a broad token must never widen into private
+ * footage just because the issuer happens to own one of the cameras it covers.
+ */
+export function isOwnerIssuedTokenCamera(camera, token) {
+    return !!token
+        && !!camera
+        && token.scope_type === 'selected'
+        && camera.owner_user_id != null
+        && Number(token.created_by) === Number(camera.owner_user_id)
+        // The gate below refuses a lapsed rental, so a predicate that stopped short of the billing
+        // check would have the catalog advertising cameras the segment request then denies.
+        && masihDibayar(camera);
+}
+
+/**
  * `?scope=owner` — the signed-in owner replaying their own rental camera.
  * Throws 401 rather than falling back to a preview: a wrong answer here must be loud, and a
  * silent downgrade would let a probe distinguish "not yours" from "nothing there".
@@ -68,11 +88,12 @@ export function resolveOwnerScopeAccess(camera, request) {
  * A share link the camera's OWNER minted for THIS camera — the customer handing footage to their
  * staff or to the police without routing it through us.
  *
- * Three conditions, all required:
- *  - scope_type 'selected'. Not 'all', not 'area'. (There is no 'camera' scope in this system;
- *    assuming that name would have made this branch dead code that never matched.)
- *  - the issuer owns THIS camera. Not "is a customer", not "is an admin".
- *  - the rental is still paid up, exactly as for live.
+ * Also the path an operator's own `owner_private` camera takes: the admin who owns it mints a
+ * 'selected' link for the family, and it lands here. Nothing about this branch is rental-specific
+ * beyond the billing check, which a class with no billing_status passes by definition.
+ *
+ * One condition, isOwnerIssuedTokenCamera: the issuer owns THIS camera, via a 'selected' token, and
+ * the rental is still paid up exactly as for live. (No billing_status = nothing to owe.)
  *
  * Expiry, revocation, session caps and the usage audit are already enforced inside
  * validateRequestForCamera and are deliberately not duplicated here.
@@ -90,12 +111,7 @@ export function resolveOwnerIssuedTokenAccess(camera, request, options, onRefusa
         return null;
     }
 
-    const diterbitkanPemilik = token
-        && token.scope_type === 'selected'
-        && camera.owner_user_id != null
-        && Number(token.created_by) === Number(camera.owner_user_id);
-
-    if (!diterbitkanPemilik || !masihDibayar(camera)) {
+    if (!isOwnerIssuedTokenCamera(camera, token)) {
         return null;
     }
 
