@@ -43,6 +43,33 @@ const ERROR_VARIANTS = {
     },
 };
 
+/*
+ * Does this hls.js error mean "this device cannot decode this stream"?
+ *
+ * Exported separately because the answer must be acted on BEFORE the caller's usual `if (!fatal)
+ * return` guard. Measured against production: hls.js asks the decoder itself
+ * (`video/mp4;codecs=hvc1.1.6.L150.0` -> false), drops the level, and reports it NON-FATALLY —
+ * then never emits MANIFEST_PARSED and keeps the session alive with nothing to play. Treating a
+ * codec refusal as ignorable because it is not flagged fatal is what left the player showing
+ * "Memuat stream" indefinitely.
+ *
+ * bufferAddCodecError / bufferIncompatibleCodecsError are the same verdict arriving later, when the
+ * manifest looked fine but addSourceBuffer refused the codec.
+ */
+export const isCodecFailure = (hlsError) => {
+    if (!hlsError) return false;
+    const reason = (hlsError.reason || '').toLowerCase();
+    const details = hlsError.details || '';
+    return details === 'manifestIncompatibleCodecsError'
+        || details === 'bufferAddCodecError'
+        || details === 'bufferIncompatibleCodecsError'
+        || details === 'fragParsingError'
+        || details === 'bufferAppendError'
+        || reason.includes('codec')
+        || reason.includes('hevc')
+        || reason.includes('h265');
+};
+
 export const getPublicPopupErrorType = ({ hlsError, streamSource }) => {
     if (!hlsError) return 'unknown';
 
@@ -50,27 +77,7 @@ export const getPublicPopupErrorType = ({ hlsError, streamSource }) => {
         return 'cors';
     }
 
-    const reason = (hlsError.reason || '').toLowerCase();
-    const details = hlsError.details || '';
-
-    /*
-     * bufferAddCodecError / bufferIncompatibleCodecsError are what hls.js reports when the manifest
-     * looked fine but addSourceBuffer refused the codec — the exact shape an H.265 stream takes on a
-     * device without an HEVC decoder. They were missing here, so that case fell through to the
-     * generic media/unknown buckets and the reader was told the CCTV was unreachable.
-     */
-    if (
-        details === 'manifestIncompatibleCodecsError' ||
-        details === 'bufferAddCodecError' ||
-        details === 'bufferIncompatibleCodecsError' ||
-        details === 'fragParsingError' ||
-        details === 'bufferAppendError' ||
-        reason.includes('codec') ||
-        reason.includes('hevc') ||
-        reason.includes('h265')
-    ) {
-        return 'codec';
-    }
+    if (isCodecFailure(hlsError)) return 'codec';
 
     if (hlsError.type === 'networkError') return 'network';
     if (hlsError.type === 'mediaError') return 'media';

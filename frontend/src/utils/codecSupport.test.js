@@ -11,7 +11,7 @@
  * Refusing to play on a maybe would break devices that are perfectly capable.
  */
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { hasPlayableVideoLevel, isCodecStringPlayable, isHevcPlayable, getCodecWarning } from './codecSupport';
+import { isCodecStringPlayable, isHevcPlayable, getCodecWarning } from './codecSupport';
 
 const H265 = 'hvc1.1.6.L150.0';
 const H264 = 'avc1.640028';
@@ -59,50 +59,6 @@ describe('isHevcPlayable', () => {
     it('false kalau keduanya ditolak', () => {
         noHevc();
         expect(isHevcPlayable()).toBe(false);
-    });
-});
-
-describe('hasPlayableVideoLevel — gerbang pra-putar', () => {
-    it('memblokir manifest yang SEMUA levelnya H.265 di perangkat tanpa HEVC', () => {
-        noHevc();
-        expect(hasPlayableVideoLevel([{ videoCodec: H265 }])).toBe(false);
-    });
-
-    it('meloloskan kalau ada SATU level yang bisa diputar', () => {
-        noHevc();
-        expect(hasPlayableVideoLevel([{ videoCodec: H265 }, { videoCodec: H264 }])).toBe(true);
-    });
-
-    it('meloloskan H.265 di perangkat yang memang mendukungnya', () => {
-        allCodecs();
-        expect(hasPlayableVideoLevel([{ videoCodec: H265 }])).toBe(true);
-    });
-
-    describe('tidak pernah memblokir saat ragu', () => {
-        it('daftar level kosong atau bukan array', () => {
-            noHevc();
-            expect(hasPlayableVideoLevel([])).toBe(true);
-            expect(hasPlayableVideoLevel(undefined)).toBe(true);
-            expect(hasPlayableVideoLevel(null)).toBe(true);
-        });
-
-        it('level tanpa deklarasi codec', () => {
-            // Manifest tanpa atribut CODECS tidak bisa dinilai — jangan menghalangi.
-            noHevc();
-            expect(hasPlayableVideoLevel([{}])).toBe(true);
-            expect(hasPlayableVideoLevel([{ videoCodec: '' }])).toBe(true);
-        });
-
-        it('media stack tidak bisa ditanya sama sekali', () => {
-            vi.stubGlobal('MediaSource', undefined);
-            vi.stubGlobal('ManagedMediaSource', undefined);
-            expect(hasPlayableVideoLevel([{ videoCodec: H265 }])).toBe(true);
-        });
-    });
-
-    it('membaca codecSet kalau videoCodec tidak ada', () => {
-        noHevc();
-        expect(hasPlayableVideoLevel([{ codecSet: H265 }])).toBe(false);
     });
 });
 

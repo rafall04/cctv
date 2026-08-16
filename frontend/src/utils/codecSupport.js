@@ -46,32 +46,6 @@ export const isHevcPlayable = () => {
 };
 
 /**
- * Does at least ONE level of a parsed HLS manifest carry a codec this device can decode?
- *
- * Used as a pre-flight gate before playback: hls.js happily keeps downloading fragments it cannot
- * decode, so without this the player waits on a first frame that will never arrive. Returns true
- * when the answer is unknown or the manifest declares no codecs — refusing to play on a maybe
- * would break devices that are perfectly capable.
- *
- * @param {Array<{videoCodec?: string, codecSet?: string, attrs?: object}>} levels hls.js `hls.levels`
- * @returns {boolean}
- */
-export const hasPlayableVideoLevel = (levels) => {
-    if (!Array.isArray(levels) || levels.length === 0) return true;
-
-    let sawAnswerableLevel = false;
-    for (const level of levels) {
-        const codec = level?.videoCodec || level?.codecSet || '';
-        if (!codec) return true; // undeclared codec — cannot judge, so do not block
-        const playable = isCodecStringPlayable(`video/mp4;codecs="${codec}"`);
-        if (playable === null) return true; // cannot ask — do not block
-        sawAnswerableLevel = true;
-        if (playable) return true;
-    }
-    return !sawAnswerableLevel;
-};
-
-/**
  * Detect browser type and codec support
  * @returns {Object} Browser codec support information
  */

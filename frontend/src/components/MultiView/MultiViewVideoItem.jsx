@@ -17,6 +17,7 @@ import { shouldDisableAnimations } from '../../utils/animationControl';
 import { LoadingStage, getStageMessage, createStreamError } from '../../utils/streamLoaderTypes';
 import { createFallbackHandler } from '../../utils/fallbackHandler';
 import { getHLSConfig } from '../../utils/hlsConfig';
+import { isCodecFailure } from '../../utils/publicPopupState.js';
 import { shouldUseQueuedInit, getGlobalStreamInitQueue } from '../../utils/streamInitQueue';
 import { viewerService } from '../../services/viewerService';
 import { takeSnapshot as takeSnapshotUtil } from '../../utils/snapshotHelper';
@@ -499,9 +500,17 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
 
                 hls.on(Hls.Events.ERROR, (_, d) => {
                     if (cancelled || isLive) return; // Don't handle errors if already playing
-
-                    // For non-fatal errors, just continue
-                    if (!d.fatal) return;
+                    // BEFORE the fatal guard, and matching every codec detail rather than one:
+                    // hls.js reports a codec refusal NON-fatally, drops the level, and then never
+                    // emits MANIFEST_PARSED, so this tile would load forever. Same bug as VideoPopup.
+                    if (isCodecFailure(d)) {
+                        clearStreamTimeout();
+                        setStatus('error'); setErrorType('codec'); setLoadingStage(LoadingStage.ERROR);
+                        onError?.(camera.id, new Error('Codec tidak didukung browser'));
+                        hls.destroy();
+                        return;
+                    }
+                    if (!d.fatal) return; // non-fatal: keep going
 
                     const isInternalManifestWarmup404 =
                         camera.stream_source !== 'external' &&
@@ -530,15 +539,6 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
 
                     // Clear loading timeout
                     clearStreamTimeout();
-
-                    // Check for codec incompatibility - NOT recoverable
-                    if (d.details === 'manifestIncompatibleCodecsError') {
-                        console.error('Browser tidak support codec H.265/HEVC. Ubah setting kamera ke H.264.');
-                        setStatus('error');
-                        setLoadingStage(LoadingStage.ERROR);
-                        onError?.(camera.id, new Error('Codec tidak didukung browser'));
-                        return;
-                    }
 
                     const errorType = d.type === Hls.ErrorTypes.NETWORK_ERROR ? 'network' :
                         d.type === Hls.ErrorTypes.MEDIA_ERROR ? 'media' : 'unknown';

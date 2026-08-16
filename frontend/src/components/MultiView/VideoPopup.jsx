@@ -45,12 +45,12 @@ import {
 import {
     getPublicPopupErrorType,
     getPublicPopupInitialStatus,
+    isCodecFailure,
     getPublicPopupOverlayState,
     getPublicPopupStatusDisplay,
     isPublicPopupPlaybackLocked,
     shouldShowPublicPopupRetry,
 } from '../../utils/publicPopupState.js';
-import { hasPlayableVideoLevel } from '../../utils/codecSupport';
 import {
     getEffectiveDeliveryType,
     getPopupEmbedUrl,
@@ -553,7 +553,6 @@ function VideoPopup({
             reportRuntimeSuccess('external_hls_runtime_playing');
         };
 
-        // Permanent by nature: never retried, never waited on. Rationale: utils/codecSupport.js.
         const failWithCodec = () => { clearStreamTimeout(); setStatus('error'); setErrorType('codec'); setLoadingStage(LoadingStage.ERROR); };
 
         // Fallback poll: some browsers never fire 'playing' reliably.
@@ -647,7 +646,6 @@ function VideoPopup({
 
             hls.on(HlsClass.Events.MANIFEST_PARSED, () => {
                 if (isStaleStreamRun() || isLive) return; // Skip if already live
-                if (!hasPlayableVideoLevel(hls.levels)) { failWithCodec(); hls.destroy(); return; }
                 // Update to buffering stage
                 setLoadingStage(LoadingStage.BUFFERING);
                 updateStreamStage(LoadingStage.BUFFERING);
@@ -679,7 +677,9 @@ function VideoPopup({
 
             hls.on(HlsClass.Events.ERROR, (_, d) => {
                 if (isStaleStreamRun() || isLive) return; // Don't handle errors if already playing
-
+                // BEFORE the fatal guard: hls.js reports a codec refusal non-fatally, drops the
+                // level, then never emits MANIFEST_PARSED. Ignoring it left the UI loading forever.
+                if (isCodecFailure(d)) { failWithCodec(); hls.destroy(); return; }
                 // For non-fatal errors, just continue
                 if (!d.fatal) return;
 
@@ -758,7 +758,6 @@ function VideoPopup({
                     }
                 }
 
-                if (detectedErrorType === 'codec') { failWithCodec(); return; }
                 // Try auto-retry with FallbackHandler
                 if (fallbackHandlerRef.current) {
                     const streamError = createStreamError({
