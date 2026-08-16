@@ -3,8 +3,11 @@
 #          via a self-hosted local Bot API server (2000 MB limit, not the cloud 50 MB),
 #          routed per-camera / per-area so one group never mixes sources.
 # Caller:  systemd unit tg-archive.service (long-running loop).
-# Deps:    stdlib + requests. Reads the app DB READ-ONLY; own state in state.db.
-# SideEffects: network upload to Telegram; writes only to its own state.db.
+# Deps:    stdlib + requests. Reads recording segments from the app DB; own state in state.db.
+# SideEffects: network upload to Telegram; writes state.db, and MIRRORS each outcome into the app
+#          DB table telegram_archive_uploads so the admin archive page reads its own data instead
+#          of opening this sidecar's state.db across processes. The mirror is best-effort: it can
+#          never fail an upload (see mirror_to_app_db).
 
 import os
 import re
@@ -28,6 +31,23 @@ def env(name, default=None, required=False):
     return val
 
 
+def parse_cutoff(raw):
+    """
+    ARCHIVE_MIN_RECORDED_AT -> aware datetime, or None when unset.
+
+    Exits rather than silently ignoring a malformed value: a cutoff that quietly
+    does nothing would let exactly the flood it was set to stop back through.
+    """
+    raw = (raw or '').strip()
+    if not raw:
+        return None
+    try:
+        parsed = datetime.fromisoformat(raw.replace('Z', '+00:00'))
+    except ValueError:
+        sys.exit('FATAL: ARCHIVE_MIN_RECORDED_AT=%r is not ISO-8601 (e.g. 2026-07-27T22:00:00Z)' % raw)
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+
 class Config:
     def __init__(self):
         self.api_base = env('TG_API_BASE', 'http://127.0.0.1:8092').rstrip('/')
@@ -48,6 +68,39 @@ class Config:
         self.timeout = int(env('REQUEST_TIMEOUT_SEC', '1800'))
         self.backfill = env('BACKFILL', '0') == '1'
         self.stability_sec = int(env('STABILITY_SEC', '3'))
+        # Stale-salvage filter. A recording incident leaves thousands of corrupt
+        # partials behind; the recovery pipeline rescues a few seconds out of each,
+        # registers them as segments, and they land here HOURS later — burying the
+        # archive group under 6-60 second clips that arrive after newer footage.
+        #
+        # Duration alone is NOT a safe test: measured over 390 real uploads, 24 of
+        # them were legitimately short (a flaky camera reconnecting) and those are
+        # exactly the clips an operator wants. What separates them is AGE, not length
+        # — every legitimate short segment reached here within 0.07-0.60h of being
+        # recorded, while salvage fragments are many hours old.
+        #
+        # So both conditions must hold before we skip. Set MIN_DURATION_SEC=0 to
+        # disable the filter entirely.
+        self.min_duration_sec = int(env('MIN_DURATION_SEC', '120'))
+        self.stale_hours = float(env('STALE_HOURS', '2'))
+        # Ceiling on how late a segment may arrive and still be archived, whatever
+        # its length. The archive's value is chronological order; a clip landing
+        # hours after it was recorded breaks that permanently. Doubles as the
+        # tolerance for an uploader outage — set it above the longest downtime you
+        # would still want backfilled. 0 disables.
+        self.max_late_hours = float(env('MAX_LATE_HOURS', '12'))
+        # Hard cutoff: never archive anything recorded before this instant.
+        # Surgical tool for excluding a known-bad window (e.g. a recording incident)
+        # without loosening the tolerance rules. Empty = no cutoff.
+        self.min_recorded_at = parse_cutoff(env('ARCHIVE_MIN_RECORDED_AT', ''))
+        # Stall alerting. This uploader had NONE: an archive that stopped was completely silent,
+        # and the operator found out when they went looking for footage that was never sent.
+        # 20 minutes is twice the segment length, so a segment still being written cannot trip it.
+        self.stall_alert_min = float(env('STALL_ALERT_MIN', '20'))
+        # Empty = journald only (always written). Set to an ops chat id to get the alert pushed.
+        # Deliberately NOT one of the archive groups: a stall notice does not belong in the
+        # footage feed people scroll.
+        self.alert_chat_id = env('TG_ALERT_CHAT_ID', '') or None
         self.dry_run = env('DRY_RUN', '0') == '1'
         # Set to 0 only if some OTHER process ever needs to consume this bot's updates —
         # Telegram allows a single getUpdates consumer per token (a second one gets 409).
@@ -391,6 +444,87 @@ def call(cfg, state, method, payload, log):
     return False, None, '%s %s' % (resp.status_code, desc)
 
 
+def is_permanent_failure(err):
+    """
+    True when repeating this exact request can never help.
+
+    Plain HTTP semantics do the classifying. 4xx means the request itself is wrong — the bot was
+    removed from the group, the chat is gone, the file is over the limit — and no amount of
+    retrying fixes that, so those segments are recorded and stepped over. 5xx means the far side
+    failed, which is the definition of "try again". 429 is a rate limit, the most retryable answer
+    there is.
+
+    Anything unrecognised — a timeout string, a proxy's HTML error page, an empty error — counts as
+    RETRYABLE on purpose. Being wrong in that direction costs a bounded stall that raises an alert;
+    being wrong in the other direction costs footage missing from the archive forever, silently.
+    """
+    if not err:
+        return False
+    code = str(err).split(' ', 1)[0]
+    if not code.isdigit():
+        return False
+    status = int(code)
+    return 400 <= status < 500 and status != 429
+
+
+def send_alert(cfg, text, log):
+    """
+    Best effort BY DEFINITION: the usual reason to alert is that Telegram cannot be reached, so
+    this is the call most likely to fail too. Every alert is therefore written to the log first,
+    and recovery is announced separately — the recovery message is the one that always arrives.
+
+    Deliberately not routed through call(): that carries the 30-minute upload timeout and sleeps
+    on 429, either of which would freeze the main loop on a message nobody is waiting for.
+    """
+    if not cfg.alert_chat_id:
+        return
+    try:
+        requests.post(cfg.api('sendMessage'),
+                      data={'chat_id': cfg.alert_chat_id, 'text': text},
+                      timeout=15)
+    except requests.RequestException as exc:
+        log.warning('alert not delivered: %s', exc)
+
+
+def note_stall(cfg, stall, seg, pending, log):
+    """
+    Track the head-of-queue segment we are stuck on, and say so ONCE.
+
+    One line per change of state, never one per poll: a stalled archive polls every 60s and an
+    alert per poll would bury the one line that mattered — the mistake this project has already
+    paid for once in its backend logs.
+    """
+    now = time.time()
+    if not stall or stall['seg_id'] != seg['id']:
+        return {'seg_id': seg['id'], 'since': now, 'alerted': False}
+    if stall['alerted']:
+        return stall
+
+    stuck_min = (now - stall['since']) / 60.0
+    if stuck_min < cfg.stall_alert_min:
+        return stall
+
+    log.error('ARCHIVE STALLED %.0f min on seg %s cam%s — %d segment(s) waiting behind it',
+              stuck_min, seg['id'], seg['camera_id'], pending)
+    send_alert(cfg,
+               'Arsip Telegram tertahan %.0f menit di segmen %s (cam%s). %d segmen menunggu di '
+               'belakangnya. Rekaman tetap aman di disk dan antrean lanjut sendiri begitu koneksi '
+               'pulih.' % (stuck_min, seg['id'], seg['camera_id'], pending), log)
+    stall['alerted'] = True
+    return stall
+
+
+def clear_stall(cfg, stall, log):
+    """Announce recovery only if a stall was announced, so a quiet blip stays quiet."""
+    if not stall:
+        return None
+    if stall['alerted']:
+        stuck_min = (time.time() - stall['since']) / 60.0
+        log.info('archive recovered after %.0f min stalled', stuck_min)
+        send_alert(cfg, 'Arsip Telegram jalan lagi setelah tertahan %.0f menit.' % stuck_min, log)
+    return None
+
+
 def send_document(cfg, state, chat_id, seg, caption, log):
     """In --local mode the Bot API server reads the file straight off disk, so we
     pass a reference instead of a multipart copy of ~200 MB.
@@ -418,14 +552,55 @@ def copy_to(cfg, state, chat_id, from_chat_id, message_id, log):
     }, log)
 
 
-def record(state, seg, status, detail=None, targets=None):
+def record(state, seg, status, detail=None, targets=None, cfg=None, log=None):
+    payload = json.dumps(targets) if targets else None
     state.execute(
         'INSERT OR REPLACE INTO uploaded'
         '(segment_id,camera_id,filename,file_size,status,detail,targets,uploaded_at) '
         "VALUES(?,?,?,?,?,?,?,datetime('now'))",
         (seg['id'], seg['camera_id'], seg['filename'], seg['file_size'],
-         status, detail, json.dumps(targets) if targets else None))
+         status, detail, payload))
     state.commit()
+    if cfg is not None:
+        mirror_to_app_db(cfg, seg, status, detail, targets, payload, log)
+
+
+def mirror_to_app_db(cfg, seg, status, detail, targets, payload, log=None):
+    """Mirror the outcome into the APPLICATION database.
+
+    The uploader stays a separate process on purpose (see sidecar/.module_map.md), but its data
+    should not be foreign: the admin archive page reads telegram_archive_uploads with an ordinary
+    query and can join it against cameras/areas, instead of the backend opening this sidecar's
+    state.db read-only across processes while it is mid-WAL-write.
+
+    Deliberately a MIRROR, not a move: state.db stays the uploader's own source of truth, so a
+    write failure here can never cost an upload or cause one to be retried. Rows are tiny and rare
+    (~15/hour), so the extra connection costs nothing.
+    """
+    # NOTE: `seg` is a sqlite3.Row — it indexes like a dict but has NO .get(). Its SELECT always
+    # includes start_time, so ['start_time'] is safe. `targets` entries ARE plain dicts.
+    file_id = None
+    if targets:
+        file_id = (targets[0] or {}).get('fileId')
+    conn = None
+    try:
+        conn = sqlite3.connect(cfg.app_db, timeout=30)
+        conn.execute('PRAGMA busy_timeout=5000')
+        conn.execute(
+            'INSERT OR REPLACE INTO telegram_archive_uploads'
+            '(segment_id,camera_id,filename,file_size,status,detail,targets,file_id,'
+            ' recorded_at,recorded_until,duration_seconds,uploaded_at) '
+            "VALUES(?,?,?,?,?,?,?,?,?,?,?,datetime('now'))",
+            (seg['id'], seg['camera_id'], seg['filename'], seg['file_size'],
+             status, detail, payload, file_id,
+             seg['start_time'], seg['end_time'], seg['duration']))
+        conn.commit()
+    except Exception as exc:  # noqa: BLE001 - never let bookkeeping break an upload
+        if log:
+            log.warning('mirror to app db failed for seg %s: %s', seg['id'], exc)
+    finally:
+        if conn is not None:
+            conn.close()
 
 
 def pace(cfg, size_bytes, elapsed, log):
@@ -448,6 +623,73 @@ def pace(cfg, size_bytes, elapsed, log):
 
 # -------------------------------------------------------------------------- main
 
+def parse_recorded_at(seg):
+    """recording_segments.start_time is ISO-8601 UTC. None when unparseable."""
+    try:
+        return datetime.fromisoformat(str(seg['start_time']).replace('Z', '+00:00'))
+    except (ValueError, AttributeError, TypeError):
+        return None
+
+
+def skip_reason(seg, cfg, now=None):
+    """
+    Why this segment should NOT be archived, or None to archive it.
+
+    THE ARCHIVE IS A LIVE MIRROR, NOT A BACKFILL TOOL. Its value comes from the
+    group reading in recording order. A clip that lands hours after it was recorded
+    breaks that ordering permanently, and no amount of correct content makes up for
+    an archive you can no longer scroll chronologically.
+
+    That matters because of how recovery works: after a recording incident the
+    pipeline rescues fragments out of corrupt partials and registers them as NEW
+    segments — new ids, old recording times — so they upload after newer footage.
+    Measured after the 2026-07-27 incident: 161 short fragments plus 25 mid-length
+    ones, with 1749 partials still queued to produce more.
+
+    Three rules, cheapest first. All are opt-out.
+    """
+    now = now or datetime.now(timezone.utc)
+    recorded = parse_recorded_at(seg)
+
+    # 1. Hard cutoff. Excludes a known-bad window outright, without touching the
+    #    tolerance rules below. This is the surgical tool for "we had an incident on
+    #    date X, never archive anything from before it".
+    if cfg.min_recorded_at and recorded and recorded < cfg.min_recorded_at:
+        return ('before_cutoff',
+                'recorded %s, before ARCHIVE_MIN_RECORDED_AT=%s'
+                % (seg['start_time'], cfg.min_recorded_at.isoformat()))
+
+    if recorded is None:
+        # Cannot prove anything about an unparseable timestamp — archive it.
+        return None
+
+    age_hours = (now - recorded).total_seconds() / 3600.0
+
+    # 2. Too late to be worth ordering. Catches salvage of ANY length, which rule 3
+    #    misses — the incident produced 25 clips of 2-9 minutes that passed a
+    #    length-based test and still arrived out of order.
+    #    Set generously: it doubles as the tolerance for an uploader outage, since
+    #    anything recorded while the uploader was down ages exactly the same way.
+    if cfg.max_late_hours > 0 and age_hours > cfg.max_late_hours:
+        return ('too_late',
+                'recorded %s (%.1fh ago) — older than MAX_LATE_HOURS=%s'
+                % (seg['start_time'], age_hours, cfg.max_late_hours))
+
+    # 3. Short AND stale. Catches salvage early, before rule 2's generous window is
+    #    reached. Both conditions are required: measured across 390 real uploads, 24
+    #    were legitimately short (a flaky camera reconnecting) and every one reached
+    #    the uploader within 0.07-0.60h, so age separates them cleanly while length
+    #    alone would have discarded real footage.
+    duration = seg['duration']
+    if (cfg.min_duration_sec > 0 and duration is not None
+            and duration < cfg.min_duration_sec and age_hours > cfg.stale_hours):
+        return ('stale_salvage',
+                '%ss clip recorded %s (%.1fh ago) — below MIN_DURATION_SEC=%s and older than STALE_HOURS=%s'
+                % (duration, seg['start_time'], age_hours, cfg.min_duration_sec, cfg.stale_hours))
+
+    return None
+
+
 def process_one(cfg, state, router, seg, cam_meta, log):
     """Returns True when the watermark may advance past this segment."""
     cam = cam_meta.get(seg['camera_id']) or {
@@ -455,12 +697,21 @@ def process_one(cfg, state, router, seg, cam_meta, log):
 
     targets = router.targets(seg['camera_id'], cam['area_id'])
     if not targets:
-        record(state, seg, 'no_route', 'no group configured for this camera/area')
+        record(state, seg, 'no_route', 'no group configured for this camera/area', cfg=cfg, log=log)
+        return True
+
+    # Checked before touching the disk: this is the cheap way out of a salvage flood.
+    skip = skip_reason(seg, cfg)
+    if skip:
+        status, detail = skip
+        record(state, seg, status, detail, cfg=cfg, log=log)
+        log.info('seg %s cam%s %s: %s (%ss), not archiving',
+                 seg['id'], seg['camera_id'], seg['filename'], status, seg['duration'])
         return True
 
     path = seg['file_path']
     if not os.path.isfile(path):
-        record(state, seg, 'missing', 'file gone (retention cleanup?)')
+        record(state, seg, 'missing', 'file gone (retention cleanup?)', cfg=cfg, log=log)
         log.info('seg %s cam%s: file gone, skipping', seg['id'], seg['camera_id'])
         return True
 
@@ -470,7 +721,7 @@ def process_one(cfg, state, router, seg, cam_meta, log):
         return False
 
     if size > cfg.max_file_mb * 1048576:
-        record(state, seg, 'too_big', '%d bytes > MAX_FILE_MB' % size)
+        record(state, seg, 'too_big', '%d bytes > MAX_FILE_MB' % size, cfg=cfg, log=log)
         log.warning('seg %s cam%s: %.1f MB exceeds limit, skipping',
                     seg['id'], seg['camera_id'], size / 1048576.0)
         return True
@@ -482,7 +733,7 @@ def process_one(cfg, state, router, seg, cam_meta, log):
         log.info('[dry-run] seg %s %s (%s, %.1f MB) -> %s',
                  seg['id'], seg['filename'], cam['name'], size / 1048576.0,
                  ', '.join('%s(%s)' % (t['label'], t['chatId']) for t in targets))
-        record(state, seg, 'dry_run', None, targets)
+        record(state, seg, 'dry_run', None, targets, cfg=cfg, log=log)
         return True
 
     err = None
@@ -494,8 +745,15 @@ def process_one(cfg, state, router, seg, cam_meta, log):
             log.info('seg %s cam%s %s -> %s (%.1f MB in %.0fs, %.1f Mbps)',
                      seg['id'], seg['camera_id'], seg['filename'], primary['label'],
                      size / 1048576.0, elapsed, size * 8 / elapsed / 1e6)
+            # file_id is what the web archive needs: Bot API cannot fetch a file from a
+            # message_id — getFile takes a file_id, and it arrives right here in the same
+            # sendDocument response. Copies into extra groups reuse this same stored file,
+            # so ONE file_id per segment is enough however many groups it landed in.
+            document = result.get('document') or {}
             sent = [{'chatId': primary['chatId'], 'label': primary['label'],
-                     'messageId': result.get('message_id')}]
+                     'messageId': result.get('message_id'),
+                     'fileId': document.get('file_id'),
+                     'fileUniqueId': document.get('file_unique_id')}]
 
             # extra groups: copy, never re-upload
             for extra in targets[1:]:
@@ -507,7 +765,7 @@ def process_one(cfg, state, router, seg, cam_meta, log):
                 else:
                     log.warning('seg %s copy to %s failed: %s', seg['id'], extra['label'], err2)
 
-            record(state, seg, 'ok', None, sent)
+            record(state, seg, 'ok', None, sent, cfg=cfg, log=log)
             pace(cfg, size, elapsed, log)
             return True
 
@@ -516,10 +774,30 @@ def process_one(cfg, state, router, seg, cam_meta, log):
         if attempt < cfg.max_attempts:
             time.sleep(min(30 * attempt, 180))
 
-    # Give up on this one rather than wedging the queue behind it forever.
-    record(state, seg, 'failed', err, targets)
-    log.error('seg %s cam%s permanently failed, advancing past it', seg['id'], seg['camera_id'])
-    return True
+    # WHY THIS BRANCHES INSTEAD OF ALWAYS ADVANCING
+    # --------------------------------------------
+    # Advancing past every failure treated "the world is broken" exactly like "this segment is
+    # broken". During an ISP outage that skipped EVERY camera's segments — roughly one per three
+    # minutes of retries, permanently and silently, because nothing ever revisits a `failed` row
+    # and the files are gone to retention long before anyone looks.
+    #
+    # So permanent failures still step aside (a bot removed from a group must not wedge the
+    # queue), and everything else holds position, which is the behaviour the "still growing"
+    # path has always had: stop, keep order, retry next poll.
+    #
+    # Holding is bounded WITHOUT inventing a constant. skip_reason runs on every poll and its
+    # rule 2 retires anything older than MAX_LATE_HOURS, so a segment that can never be sent
+    # ages out on its own and the queue moves on. That ceiling already exists to protect
+    # chronological order, and its own comment already called it "the tolerance for an uploader
+    # outage" — this is the code finally taking it at its word.
+    if is_permanent_failure(err):
+        record(state, seg, 'failed', err, targets, cfg=cfg, log=log)
+        log.error('seg %s cam%s permanently failed, advancing past it', seg['id'], seg['camera_id'])
+        return True
+
+    log.warning('seg %s cam%s not sent (%s) — holding the queue in order, will retry',
+                seg['id'], seg['camera_id'], err)
+    return False
 
 
 def run(cfg, log):
@@ -538,8 +816,11 @@ def run(cfg, log):
 
     cam_meta = load_camera_meta(app_db)
     refreshed = time.time()
-    log.info('started: watermark=%s routes=%d cap=%.0f Mbps',
-             watermark, len(router.routes), cfg.max_mbps)
+    # Which segment the queue is currently held on, and whether we have said so out loud.
+    stall = None
+    log.info('started: watermark=%s routes=%d cap=%.0f Mbps stall_alert=%.0f min%s',
+             watermark, len(router.routes), cfg.max_mbps, cfg.stall_alert_min,
+             '' if cfg.alert_chat_id else ' (log only — TG_ALERT_CHAT_ID unset)')
 
     if cfg.discover_chats:
         threading.Thread(target=discovery_loop, args=(cfg, log),
@@ -559,7 +840,11 @@ def run(cfg, log):
 
             for seg in rows:
                 if not process_one(cfg, state, router, seg, cam_meta, log):
+                    # Held on purpose. Track how long, so a queue that stops moving says so
+                    # instead of going quiet — see note_stall.
+                    stall = note_stall(cfg, stall, seg, len(rows), log)
                     break   # not ready yet — stop, keep order, retry next poll
+                stall = clear_stall(cfg, stall, log)
                 watermark = seg['id']
                 meta_set(state, 'last_segment_id', watermark)
         except sqlite3.Error as exc:
