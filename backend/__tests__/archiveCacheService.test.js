@@ -25,6 +25,9 @@ async function loadCache(maxBytes, extra = {}) {
     process.env.TG_ARCHIVE_CACHE_WRITE_GRACE_MS = String(extra.writeGrace ?? 0);
     process.env.TG_ARCHIVE_CACHE_MIN_AGE_MS = String(extra.minAge ?? 0);
     process.env.TG_ARCHIVE_CACHE_TTL_MS = String(extra.ttl ?? 24 * 60 * 60_000);
+    // 0 disables the disk floor, which is what every pre-existing test wants: they are about the
+    // SIZE cap, and a real temp dir on a healthy disk would otherwise always pass the floor anyway.
+    process.env.TG_ARCHIVE_CACHE_MIN_FREE_BYTES = String(extra.minFree ?? 0);
     return import('../services/archiveCacheService.js');
 }
 
@@ -49,6 +52,8 @@ afterEach(() => {
     delete process.env.TG_ARCHIVE_CACHE_WRITE_GRACE_MS;
     delete process.env.TG_ARCHIVE_CACHE_MIN_AGE_MS;
     delete process.env.TG_ARCHIVE_CACHE_TTL_MS;
+    delete process.env.TG_ARCHIVE_CACHE_MIN_FREE_BYTES;
+    vi.restoreAllMocks();
 });
 
 describe('archive cache module surface', () => {
@@ -174,5 +179,102 @@ describe('archive cache eviction', () => {
         cache = await loadCache(10_000);
         write('a.mp4', 400, 999_999);
         expect(cache.makeRoom(400)).toMatchObject({ deleted: 0, freed: 0 });
+    });
+});
+
+/*
+ * The disk is a SEPARATE question from the cache.
+ *
+ * The size cap alone let a cache sitting far under its limit hand a download to a filesystem
+ * something else had filled — on the production box that "something else" is 37 GB of docker whose
+ * build cache has filled root before. What breaks then is not playback but every SQLite write on a
+ * shared machine, with the archive as trigger rather than cause.
+ *
+ * `free` is faked rather than measured: a test cannot fill a real disk, and the whole point is the
+ * case where the cache is small and the DISK is not.
+ */
+describe('disk floor, not just the cache cap', () => {
+    const GB = 1024 * 1024 * 1024;
+
+    /*
+     * The free-space reader is INJECTED rather than mocked. Spying on the module's exported
+     * freeBytes does not intercept makeRoom's own call to it — an ESM binding resolves internally,
+     * not through the namespace object — so such a spy silently does nothing and the test passes
+     * for the wrong reason. Passing the dependency in states it plainly instead.
+     */
+    const disk = (bytes) => ({ free: () => bytes });
+
+    /** Free space that RISES as the cache shrinks, the way a real disk behaves. */
+    function diskThatRecovers(base) {
+        const dirBytes = () => fs.readdirSync(dir)
+            .reduce((sum, name) => sum + fs.statSync(path.join(dir, name)).size, 0);
+        const start = dirBytes();
+        return { free: () => base + (start - dirBytes()) };
+    }
+
+    it('refuses when the disk is low even though the cache is nearly empty', async () => {
+        cache = await loadCache(10 * GB, { minFree: 5 * GB });
+        write('tiny.mp4', 400, 999_999);
+
+        expect(() => cache.makeRoom(200 * 1024 * 1024, disk(300 * 1024 * 1024)))
+            .toThrowError(/di bawah batas aman/i);
+    });
+
+    it('names the DISK as the reason, not the cache — they need different fixes', async () => {
+        cache = await loadCache(10 * GB, { minFree: 5 * GB });
+
+        try {
+            cache.makeRoom(1000, disk(100 * 1024 * 1024));
+            throw new Error('seharusnya menolak');
+        } catch (err) {
+            expect(err.statusCode).toBe(507);
+            expect(err.message).toMatch(/BUKAN cache arsip yang penuh/i);
+        }
+    });
+
+    it('evicts harder before giving up, dropping MIN_AGE but never the write grace', async () => {
+        cache = await loadCache(10 * GB, { minFree: 1500, minAge: 60_000, writeGrace: 60_000 });
+        const settled = write('settled.mp4', 1000, 120_000);   // past the write grace
+        const arriving = write('arriving.mp4', 1000, 0);        // still being downloaded
+
+        expect(() => cache.makeRoom(0, diskThatRecovers(1000))).not.toThrow();
+
+        expect(fs.existsSync(settled), 'yang sudah tenang boleh digusur').toBe(false);
+        expect(fs.existsSync(arriving), 'yang masih diunduh TIDAK boleh disentuh').toBe(true);
+    });
+
+    it('never evicts a pinned file to satisfy the disk floor', async () => {
+        // Menghapus berkas yang sedang distream mengubah masalah disk jadi playback rusak.
+        cache = await loadCache(10 * GB, { minFree: 5 * GB, writeGrace: 0, minAge: 0 });
+        const watching = write('watching.mp4', 1000, 999_999);
+        cache.pin(watching);
+
+        expect(() => cache.makeRoom(1000, disk(1 * GB))).toThrow();
+        expect(fs.existsSync(watching)).toBe(true);
+    });
+
+    it('skips the check entirely when free space cannot be determined', async () => {
+        // statfs yang gagal harus berarti "lewati", bukan "anggap penuh" — kalau tidak, setiap
+        // pemutaran jadi 507 di filesystem yang tidak biasa.
+        cache = await loadCache(10 * GB, { minFree: 5 * GB });
+
+        expect(() => cache.makeRoom(1000, disk(null))).not.toThrow();
+    });
+
+    it('freeBytes membaca disk sungguhan dan masuk akal', async () => {
+        // Seam-nya boleh disuntik, tapi implementasi bawaannya harus benar-benar bekerja.
+        cache = await loadCache(10 * GB);
+        const free = cache.freeBytes();
+
+        expect(typeof free === 'number' || free === null).toBe(true);
+        if (typeof free === 'number') expect(free).toBeGreaterThan(0);
+    });
+
+    it('stats reports the disk beside the cap so an operator sees which limit is close', async () => {
+        cache = await loadCache(10 * GB, { minFree: 5 * GB });
+        const s = cache.stats();
+
+        expect(s.minFree).toBe(5 * GB);
+        expect(typeof s.free === 'number' || s.free === null).toBe(true);
     });
 });
