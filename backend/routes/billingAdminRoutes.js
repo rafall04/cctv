@@ -14,6 +14,7 @@ import {
     assignSubscription,
     updateSubscription,
     setCameraClass,
+    unpublishCamera,
     listPayments,
     markPaymentPaid,
     runCharges,
@@ -136,6 +137,17 @@ export default async function billingAdminRoutes(fastify) {
             },
         },
     }, setCameraClass);
+
+    /*
+     * Take a RENTED camera off the public hub. One direction, and no body — there is deliberately
+     * no admin-side "publish": exposing a customer's camera is their consent to give, and they
+     * already hold that switch in their own portal. A boolean body would have made the other
+     * direction one typo away. Rationale in subscriberCameraPublishService.
+     */
+    fastify.post('/cameras/:id/unpublish', {
+        onRequest: guard,
+        schema: idParamSchema,
+    }, unpublishCamera);
 
     // Subscriber camera host/IP list for ISP-broadband routing (host/IP only, no RTSP creds).
     fastify.get('/camera-ips', { onRequest: guard }, listCustomerCameraIps);

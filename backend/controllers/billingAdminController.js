@@ -4,7 +4,8 @@
  * Caller: billingAdminRoutes (/api/admin/billing/*, requireAdmin).
  * Deps: connectionPool, billingService, walletService, paymentService.
  * MainFuncs: listCustomers, manualTopup, listSubscriptions, assignSubscription,
- *            updateSubscription, setCameraClass, listPayments, markPaymentPaid, runCharges.
+ *            updateSubscription, setCameraClass, unpublishCamera, listPayments, markPaymentPaid,
+ *            runCharges.
  * SideEffects: Mutates billing tables via services; audit-logged inside the services.
  */
 
@@ -15,6 +16,7 @@ import walletService from '../services/walletService.js';
 import paymentService from '../services/paymentService.js';
 import paymentSettingsService from '../services/paymentSettingsService.js';
 import customerCameraIpService from '../services/customerCameraIpService.js';
+import { unpublishSubscriberCamera } from '../services/subscriberCameraPublishService.js';
 import promoService from '../services/promoService.js';
 import { logAdminAction } from '../services/securityAuditLogger.js';
 
@@ -295,6 +297,21 @@ export async function updateSubscription(request, reply) {
         return reply.send({ success: true, message: 'Langganan diperbarui', data: subscription });
     } catch (error) {
         return handleError(reply, error, 'Update subscription error:');
+    }
+}
+
+export async function unpublishCamera(request, reply) {
+    try {
+        const camera = unpublishSubscriberCamera(request.params.id, request);
+        return reply.send({
+            success: true,
+            message: camera.already_private
+                ? 'Kamera sewa ini memang sudah tidak tampil di hub publik'
+                : 'Kamera sewa disembunyikan dari hub publik',
+            data: camera,
+        });
+    } catch (error) {
+        return handleError(reply, error, 'Unpublish camera error:');
     }
 }
 

@@ -45,6 +45,16 @@ export const billingAdminService = {
         return response.data;
     },
 
+    /*
+     * Rented cameras only, and one direction only: an operator may take a customer's camera OFF
+     * the public hub (moderation), never put one on it. There is no publish counterpart here
+     * because there is none on the server either — see subscriberCameraPublishService.js.
+     */
+    async unpublishCamera(cameraId) {
+        const response = await apiClient.post(`/api/admin/billing/cameras/${cameraId}/unpublish`);
+        return response.data;
+    },
+
     async getPayments(limit = 100) {
         const response = await apiClient.get('/api/admin/billing/payments', { params: { limit } });
         return response.data;

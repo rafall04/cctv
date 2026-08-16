@@ -362,6 +362,10 @@ class BillingService {
              WHERE id = ?`,
             [camera_class, ownerId, cameraId]
         );
+        // Both caches. The list cache alone made a camera vanish from public PAGES instantly while
+        // the live stream stayed openable to anyone holding the URL for up to the access cache's
+        // 30s TTL — the wrong half to leave running when an operator has just said "make it private".
+        invalidateCameraAccessCache(cameraId);
         cameraService.invalidateCameraCache();
 
         if (request) {

@@ -1,14 +1,21 @@
 /*
- * Purpose: Dialog for switching one camera between the public community class and the operator's
- *          own private class, and for naming the user who owns it when it is private.
+ * Purpose: One dialog for "who can see this camera", adapting to what the camera actually is:
+ *          a class switch for community/owner_private, a publish switch for a rented camera.
  * Caller: CameraManagement page.
  * Deps: useFocusTrap, Alert, CAMERA_CLASS_OPTIONS from useCameraClassControl.
  *
- * The copy here carries real weight: this is the control that decides whether a camera is visible
- * to the whole internet or to nobody but its owner, and it is a one-click change with no undo
- * prompt anywhere else in the page. Each option states what actually happens rather than naming the
- * enum value, and the private option says plainly what still keeps working (recording, admin
- * playback) so nobody avoids it thinking it turns the camera off.
+ * WHY A RENTED CAMERA GETS A DIFFERENT — AND ONE-WAY — CONTROL
+ * Its CLASS is not the operator's to set: it is `subscriber` because a subscription exists, and
+ * the backend refuses to change it. Its VISIBILITY is the operator's to REMOVE but not to grant.
+ * Publishing someone else's camera to the internet is their consent to give, and they already hold
+ * that switch in their own portal; taking a camera down is moderation and has no privacy downside.
+ * So this side of the dialog offers one button, and the copy says plainly why the other is absent
+ * rather than leaving the operator to wonder whether it is broken. Full rationale lives in
+ * backend/services/subscriberCameraPublishService.js.
+ *
+ * The copy carries weight: this decides whether a camera is visible to the whole internet or to
+ * nobody. Each option states what happens rather than naming the enum, and the private->public
+ * warning exists because that transition does something the button does not look like it does.
  */
 
 import { useEffect, useRef, useState } from 'react';
@@ -28,6 +35,7 @@ export default function CameraClassModal({
     const dialogRef = useRef(null);
     const [cameraClass, setCameraClass] = useState('community');
     const [ownerUserId, setOwnerUserId] = useState('');
+    const [isPublic, setIsPublic] = useState(false);
 
     useFocusTrap(dialogRef, { active: Boolean(camera), onEscape: onClose });
 
@@ -41,6 +49,7 @@ export default function CameraClassModal({
         }
         setCameraClass(camera?.camera_class === 'owner_private' ? 'owner_private' : 'community');
         setOwnerUserId(camera?.owner_user_id ? String(camera.owner_user_id) : '');
+        setIsPublic(camera?.is_public === 1 || camera?.is_public === true);
         // eslint-disable-next-line react-hooks/exhaustive-deps -- seed on open, not on every refresh
     }, [cameraId]);
 
@@ -48,17 +57,21 @@ export default function CameraClassModal({
         return null;
     }
 
-    /*
-     * A rented camera's class is downstream of its subscription, so the backend refuses to set it
-     * here. Showing a disabled form with a reason beats a form that submits and 400s.
-     */
     const isSubscriber = camera.camera_class === 'subscriber';
-    const needsOwner = cameraClass === 'owner_private';
-    const submitDisabled = isSaving || isSubscriber || (needsOwner && !ownerUserId);
+    const needsOwner = !isSubscriber && cameraClass === 'owner_private';
+    /* The transition that does more than it looks like it does — see the warning below. */
+    const isOpeningUp = camera.camera_class === 'owner_private' && cameraClass === 'community';
+    const isSuspended = camera.billing_status === 'suspended';
+    /* A rented camera offers exactly one action, and only while there is something to undo. */
+    const submitDisabled = isSaving
+        || (needsOwner && !ownerUserId)
+        || (isSubscriber && !isPublic);
 
     const handleSubmit = (event) => {
         event.preventDefault();
-        onSubmit({ cameraClass, ownerUserId });
+        onSubmit(isSubscriber
+            ? { mode: 'unpublish' }
+            : { mode: 'class', cameraClass, ownerUserId });
     };
 
     return (
@@ -67,12 +80,14 @@ export default function CameraClassModal({
                 ref={dialogRef}
                 role="dialog"
                 aria-modal="true"
-                aria-label="Ubah kelas kamera"
+                aria-label="Atur visibilitas kamera"
                 className="bg-surface w-full max-w-lg rounded-2xl shadow-2xl border border-edge my-auto max-h-[90vh] flex flex-col"
             >
                 <div className="p-4 sm:p-6 border-b border-edge flex justify-between items-center shrink-0">
                     <div>
-                        <h3 className="text-lg font-bold text-content">Kelas kamera</h3>
+                        <h3 className="text-lg font-bold text-content">
+                            {isSubscriber ? 'Visibilitas kamera sewa' : 'Kelas kamera'}
+                        </h3>
                         <p className="text-sm text-content-muted">{camera.name}</p>
                     </div>
                     <button
@@ -94,10 +109,36 @@ export default function CameraClassModal({
                     )}
 
                     {isSubscriber ? (
-                        <Alert
-                            type="warning"
-                            message="Kamera ini kamera sewaan pelanggan. Kelasnya mengikuti langganannya — batalkan langganan di halaman Billing dulu kalau memang mau diubah."
-                        />
+                        <>
+                            <div className="rounded-xl border border-edge-strong bg-surface p-3">
+                                <p className="text-sm font-medium text-content">
+                                    Status sekarang: {isPublic ? 'tampil di hub publik' : 'tidak tampil di hub publik'}
+                                    {isPublic && isSuspended ? ' (tertahan — langganan ditangguhkan)' : ''}
+                                </p>
+                                <p className="text-xs text-content-muted mt-1">
+                                    Milik pelanggan {camera.owner_username ? `“${camera.owner_username}”` : `#${camera.owner_user_id}`}.
+                                    Rekamannya tidak pernah publik apa pun statusnya — kamera sewa memang live-only untuk umum.
+                                </p>
+                            </div>
+
+                            {/*
+                              * Satu arah, disengaja. Mempublikasikan kamera pelanggan adalah
+                              * persetujuan yang milik dia, dan sakelarnya sudah ada di portalnya.
+                              * Alasan lengkapnya di subscriberCameraPublishService.js.
+                              */}
+                            {isPublic ? (
+                                <Alert
+                                    type="warning"
+                                    message="Menyembunyikan kamera ini menurunkannya dari hub publik seketika. Pemiliknya bisa menampilkannya lagi kapan saja dari portalnya sendiri — ini tuas moderasi, bukan kunci."
+                                />
+                            ) : (
+                                <p className="rounded-xl border border-edge-strong bg-surface-sunken px-3 py-2 text-xs text-content-muted">
+                                    Hanya pelanggan pemiliknya yang bisa menampilkan kamera ini ke publik, dari portalnya
+                                    sendiri. Anda sengaja tidak diberi tombol itu: memajang kamera milik orang lain ke
+                                    internet adalah persetujuan yang bukan milik operator.
+                                </p>
+                            )}
+                        </>
                     ) : (
                         <fieldset className="space-y-2" disabled={isSaving}>
                             <legend className="text-sm font-semibold text-content mb-1">Kelas</legend>
@@ -127,7 +168,22 @@ export default function CameraClassModal({
                         </fieldset>
                     )}
 
-                    {!isSubscriber && needsOwner && (
+                    {isOpeningUp && (
+                        /*
+                         * Every access gate reads camera_class as it is NOW, not as it was when the
+                         * footage was recorded — true for local recordings and for the Telegram
+                         * archive alike. So this switch is retroactive, which is the one thing the
+                         * button does not look like it does. No hour count is shown on purpose: the
+                         * camera row here comes from the LIST projection, which does not carry
+                         * recording_duration_hours, and a fabricated number is worse than none.
+                         */
+                        <Alert
+                            type="warning"
+                            message="Ini juga membuka SELURUH riwayat rekaman kamera ini, bukan cuma siarannya — termasuk yang direkam selagi kamera masih privat, dan termasuk salinannya di arsip Telegram. Kalau live-nya saja yang mau publik, setel dulu Mode Playback Publik = Admin only di form kamera."
+                        />
+                    )}
+
+                    {needsOwner && (
                         <div>
                             <label htmlFor="camera-class-owner" className="block text-sm font-semibold text-content mb-1">
                                 Pemilik kamera
@@ -154,7 +210,7 @@ export default function CameraClassModal({
                         </div>
                     )}
 
-                    {!isSubscriber && needsOwner && (
+                    {needsOwner && (
                         <p className="rounded-xl border border-edge-strong bg-surface-sunken px-3 py-2 text-xs text-content-muted">
                             Rekaman tetap berjalan seperti biasa, dan admin tetap bisa memutar ulang lewat
                             /admin/playback. Yang hilang hanya kehadirannya di permukaan publik.
@@ -175,7 +231,9 @@ export default function CameraClassModal({
                             className="flex-[2] px-4 py-2.5 bg-gradient-to-r from-primary to-primary-600 text-white font-medium rounded-xl shadow-lg shadow-primary/30 hover:from-primary-600 hover:to-blue-700 disabled:opacity-50 transition-all text-sm"
                             disabled={submitDisabled}
                         >
-                            {isSaving ? 'Menyimpan…' : 'Simpan kelas'}
+                            {isSaving
+                                ? 'Menyimpan…'
+                                : (isSubscriber ? 'Sembunyikan dari hub publik' : 'Simpan')}
                         </button>
                     </div>
                 </form>

@@ -13,9 +13,11 @@
  * product had no way to reach. This hook is that missing call, kept out of useCameraManagementPage
  * because it owns a different endpoint family (billing admin) and its own async user list.
  *
- * SUBSCRIBER IS DELIBERATELY NOT OFFERED. The backend refuses it — subscriber class is a
- * consequence of an active subscription, and letting an admin set it here would create a rental
+ * SUBSCRIBER IS DELIBERATELY NOT OFFERED AS A CLASS. The backend refuses it — subscriber class is
+ * a consequence of an active subscription, and letting an admin set it here would create a rental
  * camera with no subscription behind it, which the billing engine has no way to charge or suspend.
+ * A rented camera's public visibility can be REMOVED by the operator (moderation) but never
+ * granted — that is the `unpublish` mode below, and its one-way shape is deliberate.
  */
 
 import { useCallback, useRef, useState } from 'react';
@@ -75,33 +77,57 @@ export function useCameraClassControl({ onChanged } = {}) {
         setClassError('');
     }, []);
 
-    const saveCameraClass = useCallback(async ({ cameraClass, ownerUserId }) => {
+    /**
+     * Two endpoints behind one dialog, because they answer the same operator question.
+     * `mode: 'unpublish'` is the rented-camera path — one direction only, and there is deliberately
+     * no publish counterpart (rationale: backend/services/subscriberCameraPublishService.js).
+     * `mode: 'class'` is everything else.
+     *
+     * The unpublish toast repeats what the SERVER said rather than composing its own sentence:
+     * only the server knows whether the camera was actually taken down or was already private.
+     */
+    const saveCameraClass = useCallback(async ({ mode, cameraClass, ownerUserId }) => {
         if (!classCamera) {
             return;
         }
 
+        const unpublishing = mode === 'unpublish';
+        const failureTitle = unpublishing ? 'Gagal menyembunyikan kamera' : 'Gagal mengubah kelas kamera';
+
         setIsSavingClass(true);
         setClassError('');
         try {
-            // owner_user_id is required by the backend for owner_private and meaningless for
-            // community, where it is cleared along with any billing state.
-            const payload = cameraClass === 'owner_private'
-                ? { camera_class: cameraClass, owner_user_id: Number(ownerUserId) }
-                : { camera_class: cameraClass };
-            const result = await billingAdminService.setCameraClass(classCamera.id, payload);
+            let result;
+            if (unpublishing) {
+                result = await billingAdminService.unpublishCamera(classCamera.id);
+            } else {
+                // owner_user_id is required by the backend for owner_private and meaningless for
+                // community, where it is cleared along with any billing state.
+                result = await billingAdminService.setCameraClass(
+                    classCamera.id,
+                    cameraClass === 'owner_private'
+                        ? { camera_class: cameraClass, owner_user_id: Number(ownerUserId) }
+                        : { camera_class: cameraClass }
+                );
+            }
 
             if (!result?.success) {
-                setClassError(result?.message || 'Gagal mengubah kelas kamera');
+                setClassError(result?.message || failureTitle);
                 return;
             }
 
-            success('Kelas kamera diperbarui', `${classCamera.name} sekarang ${cameraClass === 'owner_private' ? 'privat (tidak tampil di publik)' : 'kamera komunitas'}.`);
+            success(
+                unpublishing ? 'Visibilitas diperbarui' : 'Kelas kamera diperbarui',
+                unpublishing
+                    ? `${classCamera.name}: ${result.message}`
+                    : `${classCamera.name} sekarang ${cameraClass === 'owner_private' ? 'privat (tidak tampil di publik)' : 'kamera komunitas'}.`
+            );
             setClassCamera(null);
             await onChanged?.();
         } catch (error) {
-            const message = error.response?.data?.message || 'Gagal mengubah kelas kamera';
+            const message = error.response?.data?.message || failureTitle;
             setClassError(message);
-            showError('Gagal mengubah kelas kamera', message);
+            showError(failureTitle, message);
         } finally {
             setIsSavingClass(false);
         }
