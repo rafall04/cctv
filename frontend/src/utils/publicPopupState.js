@@ -53,8 +53,16 @@ export const getPublicPopupErrorType = ({ hlsError, streamSource }) => {
     const reason = (hlsError.reason || '').toLowerCase();
     const details = hlsError.details || '';
 
+    /*
+     * bufferAddCodecError / bufferIncompatibleCodecsError are what hls.js reports when the manifest
+     * looked fine but addSourceBuffer refused the codec — the exact shape an H.265 stream takes on a
+     * device without an HEVC decoder. They were missing here, so that case fell through to the
+     * generic media/unknown buckets and the reader was told the CCTV was unreachable.
+     */
     if (
         details === 'manifestIncompatibleCodecsError' ||
+        details === 'bufferAddCodecError' ||
+        details === 'bufferIncompatibleCodecsError' ||
         details === 'fragParsingError' ||
         details === 'bufferAppendError' ||
         reason.includes('codec') ||

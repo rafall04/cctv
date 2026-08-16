@@ -50,6 +50,7 @@ import {
     isPublicPopupPlaybackLocked,
     shouldShowPublicPopupRetry,
 } from '../../utils/publicPopupState.js';
+import { hasPlayableVideoLevel } from '../../utils/codecSupport';
 import {
     getEffectiveDeliveryType,
     getPopupEmbedUrl,
@@ -552,8 +553,10 @@ function VideoPopup({
             reportRuntimeSuccess('external_hls_runtime_playing');
         };
 
-        // Fallback: Check video state periodically
-        // Some browsers don't fire 'playing' event reliably
+        // Permanent by nature: never retried, never waited on. Rationale: utils/codecSupport.js.
+        const failWithCodec = () => { clearStreamTimeout(); setStatus('error'); setErrorType('codec'); setLoadingStage(LoadingStage.ERROR); };
+
+        // Fallback poll: some browsers never fire 'playing' reliably.
         const startPlaybackCheck = () => {
             playbackCheckInterval = setInterval(() => {
                 if (isStaleStreamRun() || isLive) {
@@ -619,7 +622,7 @@ function VideoPopup({
         };
 
         const initHls = async () => {
-            HlsClass = await preloadHls();
+            // initializePlayback already awaited preloadHls and assigned HlsClass.
             if (isStaleStreamRun() || !HlsClass) return;
 
             const deviceTier = detectDeviceTier();
@@ -636,15 +639,15 @@ function VideoPopup({
             setTimeout(() => {
                 if (!isStaleStreamRun() && hlsRef.current) {
                     hls.attachMedia(video);
-                    startPlaybackCheck();
                 }
             }, 50);
 
-            // Start playback check early - don't wait for events that may not fire
+            // ONCE — a second call inside the attachMedia timeout above leaked the first interval.
             startPlaybackCheck();
 
             hls.on(HlsClass.Events.MANIFEST_PARSED, () => {
                 if (isStaleStreamRun() || isLive) return; // Skip if already live
+                if (!hasPlayableVideoLevel(hls.levels)) { failWithCodec(); hls.destroy(); return; }
                 // Update to buffering stage
                 setLoadingStage(LoadingStage.BUFFERING);
                 updateStreamStage(LoadingStage.BUFFERING);
@@ -755,6 +758,7 @@ function VideoPopup({
                     }
                 }
 
+                if (detectedErrorType === 'codec') { failWithCodec(); return; }
                 // Try auto-retry with FallbackHandler
                 if (fallbackHandlerRef.current) {
                     const streamError = createStreamError({
@@ -768,6 +772,8 @@ function VideoPopup({
                     const result = fallbackHandlerRef.current.handleError(streamError, () => {
                         if (!isStaleStreamRun() && hls) {
                             setLoadingStage(LoadingStage.CONNECTING);
+                            // Re-arm the net the handler above disarmed, or a stalled retry never ends.
+                            startTimeout(LoadingStage.CONNECTING);
                             hls.destroy();
                             const newHlsConfig = getHLSConfig(deviceTier, {
                                 isMobile: false,

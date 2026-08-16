@@ -5,6 +5,72 @@
  * H.265 (HEVC) support varies by browser and device hardware.
  */
 
+/*
+ * A codec string the browser can be asked about directly. HEVC support is a HARDWARE question on
+ * every desktop and Android device, so the User-Agent cannot answer it — Chrome on one phone plays
+ * this and on the next phone does not. `MediaSource.isTypeSupported` asks the decoder itself.
+ *
+ * hvc1 is what MediaMTX advertises in production (`CODECS="hvc1.1.6.L150.0"`); hev1 is the other
+ * legal fourcc for the same codec and some builds accept only one of the two, so a level is
+ * playable if EITHER answers yes.
+ */
+const HEVC_PROBES = ['video/mp4;codecs="hvc1.1.6.L93.B0"', 'video/mp4;codecs="hev1.1.6.L93.B0"'];
+
+/**
+ * Ask the media stack whether it can decode a codec string, rather than guessing from the UA.
+ *
+ * @param {string} codecString full MIME+codecs string, e.g. 'video/mp4;codecs="hvc1.1.6.L150.0"'
+ * @returns {boolean|null} null when the question cannot be asked (no MSE, e.g. SSR or old iOS)
+ */
+export const isCodecStringPlayable = (codecString) => {
+    if (!codecString) return null;
+    const MS = typeof window !== 'undefined'
+        ? (window.ManagedMediaSource || window.MediaSource)
+        : null;
+    if (!MS || typeof MS.isTypeSupported !== 'function') return null;
+    try {
+        return MS.isTypeSupported(codecString);
+    } catch {
+        return null;
+    }
+};
+
+/**
+ * Can this device decode H.265/HEVC at all?
+ * @returns {boolean|null} null when undeterminable — callers must treat that as "do not block".
+ */
+export const isHevcPlayable = () => {
+    const answers = HEVC_PROBES.map(isCodecStringPlayable);
+    if (answers.every((a) => a === null)) return null;
+    return answers.some((a) => a === true);
+};
+
+/**
+ * Does at least ONE level of a parsed HLS manifest carry a codec this device can decode?
+ *
+ * Used as a pre-flight gate before playback: hls.js happily keeps downloading fragments it cannot
+ * decode, so without this the player waits on a first frame that will never arrive. Returns true
+ * when the answer is unknown or the manifest declares no codecs — refusing to play on a maybe
+ * would break devices that are perfectly capable.
+ *
+ * @param {Array<{videoCodec?: string, codecSet?: string, attrs?: object}>} levels hls.js `hls.levels`
+ * @returns {boolean}
+ */
+export const hasPlayableVideoLevel = (levels) => {
+    if (!Array.isArray(levels) || levels.length === 0) return true;
+
+    let sawAnswerableLevel = false;
+    for (const level of levels) {
+        const codec = level?.videoCodec || level?.codecSet || '';
+        if (!codec) return true; // undeclared codec — cannot judge, so do not block
+        const playable = isCodecStringPlayable(`video/mp4;codecs="${codec}"`);
+        if (playable === null) return true; // cannot ask — do not block
+        sawAnswerableLevel = true;
+        if (playable) return true;
+    }
+    return !sawAnswerableLevel;
+};
+
 /**
  * Detect browser type and codec support
  * @returns {Object} Browser codec support information
@@ -25,11 +91,16 @@ export const detectBrowserCodecSupport = () => {
     else if (isFirefox) browserName = 'Firefox';
     else if (isEdge) browserName = 'Edge';
     
-    // H.265 support detection
-    // Safari: Full native support
-    // Chrome/Edge: Depends on hardware decoder (not guaranteed)
-    // Firefox: No support
-    const h265Support = isSafari ? 'full' : (isChrome || isEdge) ? 'partial' : 'none';
+    /*
+     * ASK, then fall back to guessing. The UA-only version answered "partial" for every Chrome on
+     * earth, which is why the landing card could only ever say "tergantung hardware device" — a
+     * shrug, on a question the browser answers definitively. Only when the media stack cannot be
+     * queried at all (no MSE) do we drop back to the old heuristic.
+     */
+    const measured = isHevcPlayable();
+    const h265Support = measured === null
+        ? (isSafari ? 'full' : (isChrome || isEdge) ? 'partial' : 'none')
+        : (measured ? 'full' : 'none');
     
     return {
         h264: true,        // All modern browsers support H.264

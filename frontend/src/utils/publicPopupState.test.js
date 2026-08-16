@@ -27,6 +27,22 @@ describe('publicPopupState', () => {
             streamSource: 'mediamtx',
         })).toBe('codec');
 
+        /*
+         * The buffer-level codec refusals. These are what hls.js reports when the manifest looked
+         * fine but addSourceBuffer rejected the codec — the exact shape an H.265 stream takes on a
+         * phone with no HEVC decoder. Missing from the list, they fell through to the generic
+         * buckets and the viewer was told the CCTV was unreachable.
+         */
+        expect(getPublicPopupErrorType({
+            hlsError: { type: 'mediaError', details: 'bufferAddCodecError' },
+            streamSource: 'mediamtx',
+        })).toBe('codec');
+
+        expect(getPublicPopupErrorType({
+            hlsError: { type: 'mediaError', details: 'bufferIncompatibleCodecsError' },
+            streamSource: 'mediamtx',
+        })).toBe('codec');
+
         expect(getPublicPopupErrorType({
             hlsError: { type: 'networkError', details: 'manifestLoadError' },
             streamSource: 'mediamtx',
