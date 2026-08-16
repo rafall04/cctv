@@ -53,8 +53,48 @@ export function formatBytes(bytes) {
     return mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${Math.round(mb)} MB`;
 }
 
-export function scopeSummary(route) {
-    if (route.scope === 'camera') return `Kamera ${route.cameraId}`;
-    if (route.scope === 'area') return `Area ${route.areaId}`;
-    return 'Semua kamera';
+/**
+ * What a route actually points at, in words an operator can act on.
+ *
+ * This used to answer `Kamera 1443`, which is not an answer: the page exists to show which CCTV
+ * goes to which Telegram group, and a bare id makes that unknowable without opening another tab.
+ * Worse, the row's headline is the route LABEL — free text that can say anything — so a route
+ * carrying a private camera into a group named after a different one looked perfectly normal.
+ * The camera name is the fact; the label is only what someone typed.
+ *
+ * The overview endpoint already ships `cameras` (id, name, areaId, areaName) and `areas` in the
+ * very same payload, so this costs no extra request.
+ *
+ * @param {{scope: string, cameraId?: number, areaId?: number}} route
+ * @param {{cameras?: Array, areas?: Array}} [lookup]
+ * @returns {{name: string, id: string|null, detail: string|null, missing: boolean}}
+ */
+export function resolveRouteTarget(route, { cameras = [], areas = [] } = {}) {
+    const same = (a, b) => Number(a) === Number(b);
+
+    if (route.scope === 'camera') {
+        const camera = cameras.find((item) => same(item.id, route.cameraId));
+        if (!camera) {
+            // A route aimed at a deleted camera archives nothing, forever, without complaining.
+            // That is a real fault, so it reads like one instead of hiding as a plain id.
+            return { name: `Kamera #${route.cameraId} sudah tidak ada`, id: null, detail: null, missing: true };
+        }
+        return {
+            name: camera.name,
+            id: `#${camera.id}`,
+            detail: camera.areaName || 'Tanpa area',
+            missing: false,
+        };
+    }
+
+    if (route.scope === 'area') {
+        const area = areas.find((item) => same(item.id, route.areaId));
+        if (!area) {
+            return { name: `Area #${route.areaId} sudah tidak ada`, id: null, detail: null, missing: true };
+        }
+        const count = cameras.filter((item) => same(item.areaId, route.areaId)).length;
+        return { name: `Area ${area.name}`, id: null, detail: `${count} kamera perekam`, missing: false };
+    }
+
+    return { name: 'Semua kamera', id: null, detail: `${cameras.length} kamera perekam`, missing: false };
 }

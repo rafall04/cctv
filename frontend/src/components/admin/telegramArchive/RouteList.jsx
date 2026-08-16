@@ -7,11 +7,16 @@
  * Mobile stacks the label above its actions. The previous single-row flex let three buttons win the
  * width and squeezed every label down to "Arsip Se…", which made the list useless on a phone —
  * labels now wrap instead of truncating.
+ *
+ * The second line names the actual CAMERA, not just its id. The headline is the route label, which
+ * is free text and can say anything: a route sending a private camera to a group named after a
+ * different one used to look entirely ordinary here. The facts sit on one wrapping flex row so a
+ * narrow screen moves the chat id to its own line instead of truncating or breaking the number.
  */
 
-import { btnDanger, btnGhost, card, cardHead, cardTitle, scopeSummary } from './archiveUi';
+import { btnDanger, btnGhost, card, cardHead, cardTitle, resolveRouteTarget } from './archiveUi';
 
-export function RouteList({ routes, busyId, onToggle, onEdit, onDelete }) {
+export function RouteList({ routes, cameras = [], areas = [], busyId, onToggle, onEdit, onDelete }) {
     return (
         <section className={card}>
             <div className={cardHead}>
@@ -29,6 +34,7 @@ export function RouteList({ routes, busyId, onToggle, onEdit, onDelete }) {
                 <ul className="divide-y divide-edge">
                     {routes.map((route) => {
                         const off = route.enabled === false;
+                        const target = resolveRouteTarget(route, { cameras, areas });
                         return (
                             <li key={route.id} className="px-4 py-4 sm:px-5">
                                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
@@ -48,9 +54,29 @@ export function RouteList({ routes, busyId, onToggle, onEdit, onDelete }) {
                                                     </span>
                                                 )}
                                             </p>
-                                            <p className="mt-1 break-words text-xs text-content-muted">
-                                                {scopeSummary(route)}
-                                                <span className="mx-1.5 text-content-subtle">→</span>
+                                            <p className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-content-muted">
+                                                {/* min-w-0: a flex item defaults to min-width:auto and would refuse to
+                                                    shrink below its longest word, so break-words alone still overflows
+                                                    a 320px screen on a long camera name. */}
+                                                <span
+                                                    className={`min-w-0 break-words font-medium ${
+                                                        target.missing ? 'text-status-fault' : 'text-content'
+                                                    }`}
+                                                >
+                                                    {target.name}
+                                                </span>
+                                                {target.id && (
+                                                    <span className="font-mono tabular-nums text-content-subtle">
+                                                        {target.id}
+                                                    </span>
+                                                )}
+                                                {target.detail && (
+                                                    <>
+                                                        <span className="text-content-subtle" aria-hidden="true">·</span>
+                                                        <span className="break-words">{target.detail}</span>
+                                                    </>
+                                                )}
+                                                <span className="text-content-subtle" aria-hidden="true">→</span>
                                                 <span className="font-mono tabular-nums">{route.chatId}</span>
                                             </p>
                                         </div>

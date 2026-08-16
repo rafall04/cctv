@@ -256,6 +256,8 @@ export function TelegramArchiveSettings() {
 
             <RouteList
                 routes={routes}
+                cameras={cameras}
+                areas={areas}
                 busyId={busyId}
                 onToggle={handleToggle}
                 onEdit={handleEdit}
