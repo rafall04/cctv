@@ -11,6 +11,7 @@ import { useEffect, useRef, useState } from 'react';
 import streamService from '../../services/streamService';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { getSecureStreamUrl, buildSecureStreamUrl, clearTokenCache } from '../../services/streamTokenService';
+import { isCodecFailure } from '../../utils/publicPopupState.js';
 
 export default function CustomerLivePlayer({ camera, onClose }) {
     const dialogRef = useRef(null);
@@ -64,7 +65,24 @@ export default function CustomerLivePlayer({ camera, onClose }) {
                         }
                     });
                     hls.on(Hls.Events.ERROR, (_event, data) => {
-                        if (cancelled || !data.fatal) return;
+                        if (cancelled) return;
+                        /*
+                         * BEFORE the fatal guard. hls.js reports a codec refusal NON-fatally, drops
+                         * the level, then never emits MANIFEST_PARSED — so this player would sit on
+                         * its loading state forever, and whatever error eventually surfaced would
+                         * blame the stream ("Stream terputus") for the device's missing decoder.
+                         * Same defect as VideoPopup and MultiViewVideoItem; same single predicate.
+                         */
+                        if (isCodecFailure(data)) {
+                            setState({
+                                status: 'error',
+                                message: 'Perangkat ini tidak bisa memutar codec H.265/HEVC kamera tersebut. Coba buka di Safari, atau minta admin mengubah kamera ke H.264.',
+                            });
+                            hls.destroy();
+                            hlsRef.current = null;
+                            return;
+                        }
+                        if (!data.fatal) return;
                         const httpCode = data.response?.code;
                         if (httpCode === 402) {
                             setState({ status: 'suspended', message: 'Saldo habis — kamera ditangguhkan.' });
