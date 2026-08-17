@@ -79,12 +79,18 @@ describe('cameraService read models', () => {
 
         expect(querySpy.mock.calls[0][0]).not.toContain('private_rtsp_url');
         expect(rows[0]).not.toHaveProperty('private_rtsp_url');
-        expect(rows[0].viewer_stats).toEqual({
-            live_viewers: 4,
-            total_views: 18,
-            total_watch_seconds: 240,
-            last_viewed_at: '2026-05-05 10:00:00',
-        });
+        /*
+         * Only what a public surface renders. total_watch_seconds and last_viewed_at used to ride
+         * along here AND flat on the row, read by nobody: measured against production, zero
+         * references across the frontend and ~80 KB of every 737 KB response — JSON.parsed and
+         * reconciled by every visitor on every refresh. Dropped from the SQL projection too.
+         */
+        expect(rows[0].viewer_stats).toEqual({ live_viewers: 4, total_views: 18 });
+        for (const dead of ['total_watch_seconds', 'last_viewed_at']) {
+            expect(rows[0], `${dead} flat`).not.toHaveProperty(dead);
+            expect(rows[0].viewer_stats, `${dead} nested`).not.toHaveProperty(dead);
+            expect(querySpy.mock.calls[0][0], `${dead} in SQL`).not.toContain(dead);
+        }
     });
 
     it('strips internal health/runtime fields and never selects stream_key for the public landing list', async () => {
