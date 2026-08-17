@@ -170,6 +170,27 @@ only when recording code actually changed — a UI or route deploy leaves it unt
 PM2 otherwise walks the process tree by PPID and kills the detached recorders on every
 restart, which silently undoes the whole mechanism.
 
+##### Recording audio
+
+Recordings carry the camera microphone when the camera has one, and stay video-only when
+it does not — FFmpeg decides per camera at start time via `-map 0:a?`, so nothing has to
+be configured per camera and a camera that gains or loses a mic corrects itself on the
+next recorder restart. The track is transcoded to AAC 32 kbps because CCTV microphones
+speak G.711, which the MP4 container cannot hold at all (stream-copying it does not lose
+the audio — it stops the recorder).
+
+Cost, measured on production: **+0.46% of one core** and **+14.4 MB per camera-hour**.
+
+To turn it off fleet-wide without a deploy:
+
+```bash
+echo "RECORDING_AUDIO=off" >> backend/.env
+pm2 restart deployment/ecosystem.config.cjs --only rafnet-cctv-recorder --update-env
+```
+
+Any other value (or none) means audio is recorded. The switch only affects recorders
+started after the restart; already-running FFmpeg processes keep their original arguments.
+
 #### 6. Configure Nginx
 
 ```bash

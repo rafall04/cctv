@@ -2,7 +2,8 @@
 // Caller: recordingService.startRecording.
 // Deps: fs.mkdirSync, recording segment file policy, process time policy, internal RTSP transport policy,
 //        camera delivery utilities. Pure beyond mkdirSync side effect.
-// MainFuncs: prepareRecordingStart, getRecordingSourceConfig, buildRecordingFfmpegArgs, maskRecordingSourceForLog.
+// MainFuncs: prepareRecordingStart, getRecordingSourceConfig, buildRecordingFfmpegArgs,
+//        maskRecordingSourceForLog, isRecordingAudioEnabled.
 // SideEffects: Creates the camera + pending recording directories (idempotent mkdirSync recursive).
 
 import { mkdirSync } from 'fs';
@@ -22,6 +23,52 @@ import { RECORDING_RTSP_SOCKET_TIMEOUT_MICROS } from './recordingIntervalsPolicy
 import { getFfmpegLogPath } from './recordingFfmpegLog.js';
 
 const EXTERNAL_RECORDING_PROTOCOL_WHITELIST = 'file,http,https,tcp,tls,crypto';
+
+// Record the microphone when the camera has one, stay video-only when it does not —
+// decided by FFmpeg per camera at start time, NOT by a database column.
+//
+// The `?` in `-map 0:a?` is the whole adaptation mechanism: it makes the audio stream
+// OPTIONAL. Without it, a camera with no microphone dies instantly with
+// "Stream map '0:a' matches no streams" — verified on the production binary against a
+// real audio-less camera (exit 1 in 2s). With it, the same camera records video-only
+// and exits 0, while its neighbour on the same server records both.
+//
+// Why no `has_audio` column: `cameras.video_codec` is the cautionary tale. It is set by
+// hand, and on production it claims h264 for cameras 1 and 2 while ffprobe reads hevc on
+// both. A hand-maintained capability column goes stale; `-map 0:a?` re-decides on every
+// recorder start, so a camera that gains or loses a mic corrects itself.
+//
+// Why transcode instead of `-c:a copy`: every microphone on this deployment speaks G.711
+// (`pcm_alaw`/`pcm_mulaw`, 8 kHz mono, 64 kbps), and G.711 HAS NO TAG IN THE MP4
+// CONTAINER. Stream-copying it does not degrade — it kills the recorder before the first
+// segment exists. Measured on the prod binary (ffmpeg 4.2.7) against cameras 1 and 1435:
+//
+//   -c:a copy  -> "Could not find tag for codec pcm_alaw in stream #1, codec not
+//                  currently supported in container" / "Could not write header"
+//                  -> exit 1, 0 bytes on disk, in ~1.2s
+//   -c:a aac   -> exit 0, aac LC 8000 Hz mono, segments play
+//
+// Nine of the twelve recording cameras carry G.711, so `-c:a copy` would have stopped
+// nine recorders at once. It also passes the whole test suite, which is exactly why the
+// reasoning lives here.
+//
+// 32k, not 64k: FFmpeg's native AAC encoder is bounded by the 8 kHz mono source. Asking
+// for 64k yielded 40.7 kbps of actual output; 32k yielded 32.05 kbps. The extra request
+// buys nothing. Measured cost per camera, 120s wall on prod camera 9:
+//   video-only 4.06s CPU -> with audio 4.61s CPU  (+0.46% of one core)
+//   audio track 244,550 B / 60s = 32.6 kbps ~ 350 MB/camera/day
+// On-disk impact is bounded by the ~5h retention window (<1 GB); the long-term cost lands
+// on the Telegram archive, which copies segments byte-for-byte with no transcode.
+const RECORDING_AUDIO_MAP_ARGS = ['-map', '0:a?'];
+const RECORDING_AUDIO_CODEC_ARGS = ['-c:a', 'aac', '-b:a', '32k'];
+
+// Escape hatch. A wrong argument here does not degrade one camera, it stops EVERY
+// recorder on the next restart, and this file's history is a list of exactly that kind of
+// incident. `RECORDING_AUDIO=off` restores the previous video-only behaviour without a
+// deploy. Read lazily so the knob is honoured per call rather than frozen at import.
+export function isRecordingAudioEnabled() {
+    return String(process.env.RECORDING_AUDIO || '').trim().toLowerCase() !== 'off';
+}
 
 export function maskRecordingSourceForLog(sourceUrl) {
     if (!sourceUrl) return '';
@@ -157,12 +204,15 @@ export function buildRecordingFfmpegArgs({ cameraDir, outputPattern, inputUrl, s
             socketTimeoutMicros: RECORDING_RTSP_SOCKET_TIMEOUT_MICROS,
         });
 
+    const withAudio = isRecordingAudioEnabled();
+
     return [
         ...RECORDING_LOG_ARGS,
         ...inputArgs,
         '-map', '0:v',
+        ...(withAudio ? RECORDING_AUDIO_MAP_ARGS : []),
         '-c:v', 'copy',
-        '-an',
+        ...(withAudio ? RECORDING_AUDIO_CODEC_ARGS : ['-an']),
         '-f', 'segment',
         '-segment_time', '600',
         '-segment_format', 'mp4',

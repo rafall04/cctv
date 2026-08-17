@@ -59,6 +59,17 @@ export function classifyRecordingExit({
     if (streamSource === 'external' && (output.includes('invalid data found') || output.includes('failed to open segment') || output.includes('error when loading first segment'))) {
         return 'unsupported_playlist';
     }
+    // A track the MP4 container cannot hold. This MUST be tested before 'invalid argument'
+    // below, because FFmpeg reports the same failure twice and the second line wins the
+    // naive match: "Could not find tag for codec pcm_alaw in stream #1, codec not currently
+    // supported in container" is followed by "Could not write header for output file #0
+    // (incorrect codec parameters ?): Invalid argument". Classified by that tail, a camera
+    // whose microphone speaks an unmuxable codec would be reported as `invalid_source` —
+    // sending the operator to check the RTSP URL, which is fine. The source is reachable;
+    // the codec is the problem, and it is fixed by transcoding, not by editing the camera.
+    if (output.includes('codec not currently supported in container') || output.includes('could not find tag for codec')) {
+        return 'unsupported_track_codec';
+    }
     if (output.includes('invalid argument') || output.includes('protocol not found') || output.includes('no such file or directory')) {
         return 'invalid_source';
     }

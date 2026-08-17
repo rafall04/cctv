@@ -50,6 +50,36 @@ describe('recordingFailureClassifier', () => {
         })).toBe('unsupported_playlist');
     });
 
+    /*
+     * FFmpeg reports an unmuxable track TWICE, and the tail is what a naive matcher sees:
+     * "...codec not currently supported in container" is followed by "Could not write
+     * header for output file #0 (incorrect codec parameters ?): Invalid argument". Matched
+     * on the tail this reads as `invalid_source` and sends the operator to check an RTSP
+     * URL that is perfectly fine. Both lines here verbatim from the production binary.
+     */
+    it('names an unmuxable track codec instead of blaming the source', () => {
+        expect(classifyRecordingExit({
+            ffmpegOutput: [
+                '[mp4 @ 0x55b83ecf7000] Could not find tag for codec pcm_alaw in stream #1, codec not currently supported in container',
+                'Could not write header for output file #0 (incorrect codec parameters ?): Invalid argument',
+            ].join('\n'),
+            exitCode: 1,
+            exitSignal: null,
+            streamSource: 'internal',
+            stopReason: null,
+        })).toBe('unsupported_track_codec');
+    });
+
+    it('still blames the source for a plain Invalid argument exit', () => {
+        expect(classifyRecordingExit({
+            ffmpegOutput: 'rtsp://cam/stream: Invalid argument',
+            exitCode: 1,
+            exitSignal: null,
+            streamSource: 'internal',
+            stopReason: null,
+        })).toBe('invalid_source');
+    });
+
     it('falls back to ffmpeg_failed for unknown non-zero exits', () => {
         expect(classifyRecordingExit({
             ffmpegOutput: 'muxer failed unexpectedly',

@@ -7,8 +7,8 @@
  * MainFuncs: PlaybackVideo render states.
  * SideEffects: None; renders into jsdom only.
  */
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import PlaybackVideo from './PlaybackVideo';
 
 vi.mock('../CodecBadge', () => ({
@@ -75,5 +75,155 @@ describe('PlaybackVideo waiting state', () => {
 
         expect(screen.queryByTestId('playback-loading-state')).toBeNull();
         expect(screen.queryByTestId('playback-empty-state')).toBeNull();
+    });
+});
+
+/*
+ * Recordings used to have no audio track at all, and this player hardcoded `muted` to make
+ * autoplay work. The recorder now maps the camera microphone, so a literal would mean we
+ * record sound that no viewer can ever reach. Muted stays the DEFAULT — the autoplay policy
+ * demands it and this player advances segments on its own — but it has to be the viewer's
+ * to change, and the change has to survive the next segment.
+ */
+describe('PlaybackVideo audio', () => {
+    const playingSegment = { id: 1, filename: 'a.mp4' };
+    const renderPlaying = (overrides = {}) => {
+        const videoRef = { current: null };
+        const view = render(
+            <PlaybackVideo {...baseProps} videoRef={videoRef} selectedSegment={playingSegment} {...overrides} />
+        );
+        return { videoRef, ...view };
+    };
+
+    beforeEach(() => {
+        localStorage.clear();
+    });
+
+    it('starts muted and offers a way out', () => {
+        const { videoRef } = renderPlaying();
+
+        expect(videoRef.current.muted).toBe(true);
+        expect(screen.getByTestId('playback-unmute')).toBeTruthy();
+    });
+
+    it('unmutes the element on tap, drops the prompt, and remembers the choice', () => {
+        const { videoRef } = renderPlaying();
+
+        fireEvent.click(screen.getByTestId('playback-unmute'));
+
+        expect(videoRef.current.muted).toBe(false);
+        expect(screen.queryByTestId('playback-unmute')).toBeNull();
+        // Remembered, so the next segment does not silently re-mute the viewer.
+        expect(localStorage.getItem('recording-audio-muted')).toBe('0');
+    });
+
+    it('honours a remembered unmuted preference on a fresh mount', () => {
+        localStorage.setItem('recording-audio-muted', '0');
+
+        const { videoRef } = renderPlaying();
+
+        expect(videoRef.current.muted).toBe(false);
+        expect(screen.queryByTestId('playback-unmute')).toBeNull();
+    });
+
+    it('follows the NATIVE mute control instead of fighting it', async () => {
+        const { videoRef } = renderPlaying();
+
+        // What the browser's own volume button does: change the element, tell nobody.
+        // Assigning `muted` makes jsdom queue its OWN volumechange asynchronously, so the
+        // await is what lets that second event land inside act instead of after the test.
+        await act(async () => {
+            videoRef.current.muted = false;
+            fireEvent.volumeChange(videoRef.current);
+        });
+
+        expect(screen.queryByTestId('playback-unmute')).toBeNull();
+        expect(localStorage.getItem('recording-audio-muted')).toBe('0');
+    });
+
+    it('stays quiet when there is nothing playing or the video failed', () => {
+        render(<PlaybackVideo {...baseProps} videoRef={{ current: null }} selectedSegment={null} />);
+        expect(screen.queryByTestId('playback-unmute')).toBeNull();
+
+        render(
+            <PlaybackVideo
+                {...baseProps}
+                videoRef={{ current: null }}
+                selectedSegment={playingSegment}
+                videoError="boom"
+            />
+        );
+        expect(screen.queryByTestId('playback-unmute')).toBeNull();
+    });
+});
+
+/*
+ * Three of the twelve recording cameras genuinely have no microphone. Where the browser can
+ * say so, do not advertise sound that does not exist — but only where it can SAY so. An
+ * inconclusive probe must keep the control, or Chrome (which reports nothing useful about a
+ * muted element) would hide it on every camera.
+ */
+describe('PlaybackVideo audio honesty', () => {
+    const proto = window.HTMLMediaElement.prototype;
+
+    // jsdom never loads media, so readyState stays at HAVE_NOTHING and mozHasAudio does not
+    // exist. Both have to be planted to simulate an element that has actually parsed its
+    // metadata — which is the only state in which "no audio" is a trustworthy answer.
+    //
+    // Restore by DESCRIPTOR, not by `delete`: readyState is a native jsdom accessor, and
+    // deleting it leaves every later test in this file looking at an element with no
+    // readyState at all — which silently flips the very behaviour being asserted.
+    const original = {};
+    const simulateLoaded = (hasAudio) => {
+        for (const prop of ['readyState', 'mozHasAudio']) {
+            if (!(prop in original)) {
+                original[prop] = Object.getOwnPropertyDescriptor(proto, prop) ?? null;
+            }
+        }
+        Object.defineProperty(proto, 'readyState', { configurable: true, value: 1 });
+        Object.defineProperty(proto, 'mozHasAudio', { configurable: true, value: hasAudio });
+    };
+
+    afterEach(() => {
+        for (const [prop, descriptor] of Object.entries(original)) {
+            if (descriptor) {
+                Object.defineProperty(proto, prop, descriptor);
+            } else {
+                delete proto[prop];
+            }
+        }
+        localStorage.clear();
+    });
+
+    it('hides the prompt when a LOADED element positively reports no audio track', () => {
+        simulateLoaded(false);
+
+        render(
+            <PlaybackVideo {...baseProps} videoRef={{ current: null }} selectedSegment={{ id: 1, filename: 'a.mp4' }} />
+        );
+
+        expect(screen.queryByTestId('playback-unmute')).toBeNull();
+    });
+
+    it('keeps the prompt when the browser reports an audio track', () => {
+        simulateLoaded(true);
+
+        render(
+            <PlaybackVideo {...baseProps} videoRef={{ current: null }} selectedSegment={{ id: 1, filename: 'a.mp4' }} />
+        );
+
+        expect(screen.getByTestId('playback-unmute')).toBeTruthy();
+    });
+
+    /*
+     * The default jsdom element: nothing loaded, no vendor property, empty track list. That is
+     * exactly what Chrome looks like on a muted player, and it must keep the control.
+     */
+    it('keeps the prompt when the browser cannot say either way', () => {
+        render(
+            <PlaybackVideo {...baseProps} videoRef={{ current: null }} selectedSegment={{ id: 1, filename: 'a.mp4' }} />
+        );
+
+        expect(screen.getByTestId('playback-unmute')).toBeTruthy();
     });
 });

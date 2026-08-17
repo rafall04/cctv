@@ -6,10 +6,12 @@ mana**, karena tiap angka punya cakupan berbeda dan dua di antaranya sempat sala
 di [Dari mana angkanya](#dari-mana-angkanya).
 
 > Satu hal yang paling sering salah diperkirakan orang: **CPU hampir tidak pernah jadi batasnya.**
-> Perekaman berjalan dengan *stream copy* (menyalin paket video apa adanya, tanpa transcode), jadi
-> 25 perekam serentak hanya menghabiskan **12,6% dari satu inti** — 0,8% dari kapasitas mesin
-> 16-inti. Yang benar-benar habis lebih dulu adalah **disk**, lalu **bandwidth**. Belanjakan
-> anggaran ke sana.
+> Perekaman menyalin paket **video** apa adanya (*stream copy*, tanpa transcode), jadi 25 perekam
+> serentak hanya menghabiskan **12,6% dari satu inti** — 0,8% dari kapasitas mesin 16-inti. Audio
+> memang ditranskode (G.711 → AAC, lihat catatan audio di bagian disk), tapi itu hanya menambah
+> **+0,46% dari satu inti per kamera** — terukur di produksi, 4,06 → 4,61 detik CPU untuk 120 detik
+> rekaman. Yang benar-benar habis lebih dulu tetap **disk**, lalu **bandwidth**. Belanjakan anggaran
+> ke sana.
 
 ⚠️ **Kolom vCPU di tabel di bawah adalah ruang lega, bukan kebutuhan terukur.** Dari angka di atas,
 64 kamera hanya butuh ±0,3 inti untuk merekam — jauh di bawah 8 vCPU yang direkomendasikan. Selisih
@@ -68,6 +70,14 @@ Patokan dari instalasi berkamera sungguhan:
 | H.265 | 130–150 MB | **±0,8 GB** | ±1,9 Mbps |
 | H.264 | 230–250 MB | **±1,4 GB** | ±3,2 Mbps |
 | Feed HLS publik (diturunkan mutunya) | ±58 MB | ±0,34 GB | ±0,8 Mbps |
+
+**Tambahan audio (hanya untuk kamera yang punya mikrofon).** Perekam memetakan trek audio kamera
+bila ada, dan mentranskodenya ke AAC 32 kbps — mikrofon CCTV berbicara G.711 yang tidak bisa masuk
+kontainer MP4 apa adanya. Biayanya **+14,4 MB per kamera per jam (±0,014 GB)**, terukur di produksi:
+244.550 byte untuk 60 detik. Relatif terhadap tabel di atas itu +1,8% pada H.265, +1,0% pada H.264,
+dan **+4,2% pada feed HLS publik** yang bitrate videonya paling rendah. Di produksi 9 dari 12 kamera
+perekam punya mikrofon, jadi dampak nyatanya di bawah angka itu. Untuk mematikannya sepenuhnya,
+setel `RECORDING_AUDIO=off` di `backend/.env` lalu restart perekam.
 
 Batas bawah tabel di bawah = H.265, batas atas = H.264. Baris `4 jam` ada karena itu retensi yang
 dipakai produksi sekarang.

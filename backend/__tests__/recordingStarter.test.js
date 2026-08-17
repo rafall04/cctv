@@ -226,6 +226,134 @@ describe('recordingStarter.buildRecordingFfmpegArgs', () => {
         expect(args).toContain('-protocol_whitelist');
         expect(args.indexOf('-i')).toBeLessThan(args.indexOf('-c:v'));
     });
+
+    /*
+     * REGRESSION: recordings were silent even though 9 of 12 cameras in Dander and
+     * Tanjungharjo publish a live microphone — `-an` threw the track away at the source.
+     *
+     * The two assertions below are the ones that matter, and neither is cosmetic:
+     *
+     * 1. The `?` on `-map 0:a?`. Without it a camera that has no microphone fails at
+     *    startup with "Stream map '0:a' matches no streams" — verified on the prod binary
+     *    against camera 7 (exit 1 in 2s) versus the optional form (exit 0, video-only
+     *    output). This one character is what makes the feature adapt per device, so it is
+     *    asserted as an exact string and not via toContain('-map').
+     *
+     * 2. `-c:a` must never be `copy`. Every mic on this deployment speaks G.711, which the
+     *    MP4 container cannot tag: stream-copy exits 1 with 0 bytes written, taking the
+     *    whole recorder down rather than just the audio. Verified on prod ffmpeg 4.2.7.
+     *    A `-c:a copy` patch passes every other test in this suite, which is precisely why
+     *    this assertion exists.
+     */
+    it('REGRESSION: records optional audio, transcoded — never stream-copied', async () => {
+        const { buildRecordingFfmpegArgs } = await import('../services/recordingStarter.js');
+        const args = buildRecordingFfmpegArgs({
+            cameraDir: '/recordings/camera1',
+            outputPattern: '/recordings/camera1/pending/%Y%m%d_%H%M%S.mp4.partial',
+            inputUrl: 'rtsp://cam/stream',
+            streamSource: 'internal',
+            rtspTransport: 'tcp',
+        });
+
+        // Audio is mapped OPTIONALLY. The trailing '?' is load-bearing.
+        const audioMap = args.indexOf('0:a?');
+        expect(audioMap).toBeGreaterThan(-1);
+        expect(args[audioMap - 1]).toBe('-map');
+        expect(args).not.toContain('0:a');
+
+        // Video still maps and still stream-copies: audio must not cost a video re-encode.
+        const videoMap = args.indexOf('0:v');
+        expect(args[videoMap - 1]).toBe('-map');
+        const vcodec = args.indexOf('-c:v');
+        expect(args[vcodec + 1]).toBe('copy');
+
+        // Audio is transcoded to AAC at 32k. 64k is not an upgrade here — the 8 kHz mono
+        // source caps FFmpeg's native encoder at ~40 kbps of real output.
+        const acodec = args.indexOf('-c:a');
+        expect(acodec).toBeGreaterThan(-1);
+        expect(args[acodec + 1]).toBe('aac');
+        expect(args[acodec + 1]).not.toBe('copy');
+        const abitrate = args.indexOf('-b:a');
+        expect(abitrate).toBeGreaterThan(-1);
+        expect(args[abitrate + 1]).toBe('32k');
+
+        // '-an' would silence the track again; the two must never coexist.
+        expect(args).not.toContain('-an');
+
+        // Output options belong after the input, and the pattern stays last.
+        expect(args.indexOf('-i')).toBeLessThan(audioMap);
+        expect(args[args.length - 1]).toBe('/recordings/camera1/pending/%Y%m%d_%H%M%S.mp4.partial');
+    });
+
+    it('maps audio on external HLS recordings too, not just RTSP', async () => {
+        const { buildRecordingFfmpegArgs } = await import('../services/recordingStarter.js');
+        const args = buildRecordingFfmpegArgs({
+            cameraDir: '/recordings/camera1',
+            outputPattern: '/r/c1/%Y.mp4',
+            inputUrl: 'https://example.com/live.m3u8',
+            streamSource: 'external',
+        });
+
+        expect(args).toContain('0:a?');
+        expect(args).not.toContain('-an');
+        expect(args.indexOf('-i')).toBeLessThan(args.indexOf('0:a?'));
+    });
+
+    /*
+     * A wrong argument here stops EVERY recorder at once, so audio has to be revertible
+     * without a deploy. RECORDING_AUDIO=off must restore the byte-for-byte previous
+     * behaviour, not merely "something close to it".
+     */
+    it('RECORDING_AUDIO=off falls back to the previous video-only args', async () => {
+        const previous = process.env.RECORDING_AUDIO;
+        process.env.RECORDING_AUDIO = 'off';
+        try {
+            const { buildRecordingFfmpegArgs } = await import('../services/recordingStarter.js');
+            const args = buildRecordingFfmpegArgs({
+                cameraDir: '/recordings/camera1',
+                outputPattern: '/r/c1/%Y.mp4',
+                inputUrl: 'rtsp://cam/stream',
+                streamSource: 'internal',
+                rtspTransport: 'tcp',
+            });
+
+            expect(args).toContain('-an');
+            expect(args).not.toContain('-c:a');
+            expect(args).not.toContain('-b:a');
+            expect(args).not.toContain('0:a?');
+            // The video half is untouched by the knob.
+            expect(args[args.indexOf('-c:v') + 1]).toBe('copy');
+            expect(args[args.indexOf('0:v') - 1]).toBe('-map');
+        } finally {
+            if (previous === undefined) {
+                delete process.env.RECORDING_AUDIO;
+            } else {
+                process.env.RECORDING_AUDIO = previous;
+            }
+        }
+    });
+
+    it('treats any value other than "off" as audio enabled', async () => {
+        const previous = process.env.RECORDING_AUDIO;
+        try {
+            const { isRecordingAudioEnabled } = await import('../services/recordingStarter.js');
+
+            delete process.env.RECORDING_AUDIO;
+            expect(isRecordingAudioEnabled()).toBe(true);
+
+            process.env.RECORDING_AUDIO = 'on';
+            expect(isRecordingAudioEnabled()).toBe(true);
+
+            process.env.RECORDING_AUDIO = '  OFF  ';
+            expect(isRecordingAudioEnabled()).toBe(false);
+        } finally {
+            if (previous === undefined) {
+                delete process.env.RECORDING_AUDIO;
+            } else {
+                process.env.RECORDING_AUDIO = previous;
+            }
+        }
+    });
 });
 
 describe('recordingStarter.prepareRecordingStart', () => {

@@ -37,5 +37,15 @@ export function parseRecordingStderrLine(output = '') {
         return { kind: 'error', logLine: trimmed };
     }
 
+    // FFmpeg's verdict on a track the container cannot hold — "Could not find tag for
+    // codec pcm_alaw in stream #1, codec not currently supported in container" — contains
+    // none of the words above, so the generic rule drops it as 'other' and the one line
+    // that explains WHY the recorder died never reaches the log. It is emitted once, at
+    // startup, immediately before the process exits: a genuine error, and not a repeating
+    // one, so it belongs on stderr under the logging policy.
+    if (text.includes('codec not currently supported in container') || text.includes('Could not find tag for codec')) {
+        return { kind: 'error', logLine: trimmed };
+    }
+
     return { kind: 'other' };
 }

@@ -31,6 +31,17 @@ describe('parseRecordingStderrLine', () => {
         expect(parseRecordingStderrLine('Closing input stream after error').kind).not.toBe('error');
     });
 
+    /*
+     * FFmpeg's verdict on a track the container cannot hold carries none of the words the
+     * generic rule looks for ('error' / 'Error' / 'failed'), so it used to be dropped as
+     * 'other' — losing the only line that says WHY the recorder died. Text is the real
+     * message from the production binary (ffmpeg 4.2.7) fed a G.711 camera into MP4.
+     */
+    it('surfaces an unmuxable-codec line that carries none of the usual error words', () => {
+        const line = '[mp4 @ 0x55b83ecf7000] Could not find tag for codec pcm_alaw in stream #1, codec not currently supported in container';
+        expect(parseRecordingStderrLine(line)).toMatchObject({ kind: 'error', logLine: line });
+    });
+
     it('treats unrecognized lines as other', () => {
         expect(parseRecordingStderrLine('frame=  100 fps= 25').kind).toBe('other');
         expect(parseRecordingStderrLine('').kind).toBe('other');

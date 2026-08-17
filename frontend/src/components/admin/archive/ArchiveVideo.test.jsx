@@ -11,7 +11,7 @@
  * pillarbox on the 704x576 cameras — on a phone, most of the picture.
  */
 
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ArchiveVideo from './ArchiveVideo';
 
@@ -80,6 +80,61 @@ describe('ArchiveVideo aspect ratio', () => {
 
         expect(video.hasAttribute('playsinline')).toBe(true);
         expect(video.className).toContain('object-contain');
+    });
+});
+
+/*
+ * This element autoplays and, until recordings started carrying the camera microphone, it did
+ * so UNMUTED — which browsers only permit while there is nothing to hear. Give it a real audio
+ * track and the autoplay policy blocks it, once per segment, because `key={segmentId}` remounts
+ * the element on every clip. Nothing in this suite would have caught that.
+ */
+describe('ArchiveVideo audio', () => {
+    beforeEach(() => {
+        localStorage.clear();
+    });
+
+    it('autoplays muted by default, which is what keeps autoplay allowed', () => {
+        const { container } = render(<ArchiveVideo src="/s/1" segmentId={1} />);
+        const video = videoEl(container);
+
+        expect(video.autoplay).toBe(true);
+        expect(video.muted).toBe(true);
+    });
+
+    it('honours a remembered unmuted preference instead of re-muting every segment', () => {
+        localStorage.setItem('recording-audio-muted', '0');
+
+        const { container } = render(<ArchiveVideo src="/s/1" segmentId={1} />);
+
+        expect(videoEl(container).muted).toBe(false);
+    });
+
+    it('remembers what the native mute control was told', async () => {
+        const { container } = render(<ArchiveVideo src="/s/1" segmentId={1} />);
+        const video = videoEl(container);
+
+        // Assigning `muted` makes jsdom queue its own volumechange asynchronously; the await
+        // lets that land inside act rather than after the test has finished.
+        await act(async () => {
+            video.muted = false;
+            fireEvent.volumeChange(video);
+        });
+
+        expect(localStorage.getItem('recording-audio-muted')).toBe('0');
+    });
+
+    it('asks to play explicitly and survives a refusal instead of throwing', () => {
+        const play = vi.fn().mockRejectedValue(new DOMException('blocked', 'NotAllowedError'));
+        const { container } = render(<ArchiveVideo src="/s/1" segmentId={1} />);
+        const video = videoEl(container);
+        video.play = play;
+
+        // An unhandled rejection here is the failure mode: a blocked autoplay must degrade to
+        // a paused player with visible controls, not to a console error.
+        expect(() => fireEvent.canPlay(video)).not.toThrow();
+        expect(play).toHaveBeenCalled();
+        expect(video.hasAttribute('controls')).toBe(true);
     });
 });
 

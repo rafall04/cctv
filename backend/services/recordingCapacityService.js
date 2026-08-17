@@ -26,10 +26,20 @@ import { RECORDING_EMERGENCY_DISK_THRESHOLD_BYTES } from './recordingIntervalsPo
 const BYTES_PER_GB = 1024 * 1024 * 1024;
 
 /**
- * Fallback rate: 0.43 GB per camera-hour, measured on production 2026-07-31 across 30 concurrent
- * external-HLS recorders. Used only until this installation has produced enough of its own data.
+ * Fallback rate, used only until this installation has produced enough of its own data —
+ * measureRate() below replaces it with the truth as soon as there is a real sample.
+ *
+ * Video: 0.43 GB per camera-hour, measured on production 2026-07-31 across 30 concurrent
+ * external-HLS recorders, back when recordings were video-only.
+ *
+ * Audio: the recorder now maps the camera microphone when there is one (recordingStarter.js).
+ * AAC at 32 kbps is 14.4 MB per camera-hour. It is added for EVERY camera even though only
+ * some have a microphone — 9 of 12 on production, 3 with none — because this figure sizes a
+ * disk budget, and over-reserving by 3% is the harmless direction to be wrong in.
  */
-const DEFAULT_BYTES_PER_CAMERA_HOUR = 0.43 * BYTES_PER_GB;
+const DEFAULT_VIDEO_BYTES_PER_CAMERA_HOUR = 0.43 * BYTES_PER_GB;
+const DEFAULT_AUDIO_BYTES_PER_CAMERA_HOUR = 0.0141 * BYTES_PER_GB;
+const DEFAULT_BYTES_PER_CAMERA_HOUR = DEFAULT_VIDEO_BYTES_PER_CAMERA_HOUR + DEFAULT_AUDIO_BYTES_PER_CAMERA_HOUR;
 
 /** Below this much recorded time a camera's rate is noise, not a measurement. */
 const MIN_SAMPLE_HOURS = 0.5;

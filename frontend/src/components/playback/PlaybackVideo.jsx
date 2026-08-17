@@ -5,7 +5,13 @@
  * MainFuncs: PlaybackVideo component.
  * SideEffects: Invokes handler props for speed, snapshot, fullscreen, retry, and notification close.
  */
+import { useEffect, useState } from 'react';
 import CodecBadge from '../CodecBadge';
+import {
+    detectHasAudioTrack,
+    readRecordingMutePreference,
+    writeRecordingMutePreference,
+} from '../../utils/recordingAudio';
 
 export default function PlaybackVideo({
     videoRef,
@@ -32,6 +38,93 @@ export default function PlaybackVideo({
     formatTimestamp,
     crossOriginMode = 'anonymous',
 }) {
+    /*
+     * `muted` used to be a hardcoded attribute here (added to make autoplay work, back when
+     * recordings had no audio track to lose). Now that the recorder maps the camera
+     * microphone, a literal would mean we record sound nobody can ever hear.
+     *
+     * Default is still muted, because that is what the browser autoplay policy requires and
+     * this player advances through segments on its own. What changes is that the viewer's
+     * choice is remembered — through segment changes and across visits — instead of being
+     * re-imposed on every render.
+     */
+    const [isMuted, setIsMuted] = useState(readRecordingMutePreference);
+    // null = we could not tell. Never rendered as "no audio": see detectHasAudioTrack.
+    const [hasAudioTrack, setHasAudioTrack] = useState(null);
+
+    useEffect(() => {
+        const video = videoRef?.current;
+        if (!video) return undefined;
+
+        video.muted = isMuted;
+
+        // The native <video controls> mute button changes the element directly, without
+        // telling React. Listen for it so our state and the remembered preference follow
+        // the viewer rather than fighting them.
+        //
+        // The equality guard drops the echo of the line above: assigning `muted` fires
+        // volumechange too, and without this every mute toggle costs a second render for an
+        // event that carries no news.
+        const syncFromElement = () => {
+            if (video.muted === isMuted) return;
+            setIsMuted(video.muted);
+            writeRecordingMutePreference(video.muted);
+        };
+
+        video.addEventListener('volumechange', syncFromElement);
+        return () => video.removeEventListener('volumechange', syncFromElement);
+    }, [isMuted, videoRef]);
+
+    // Keyed on the filename, not the segment object: a new object identity on every parent
+    // render would tear these listeners down and rebuild them four times a second.
+    const segmentKey = selectedSegment?.filename ?? null;
+
+    useEffect(() => {
+        const video = videoRef?.current;
+        if (!video) return undefined;
+
+        setHasAudioTrack(null);
+        let settled = false;
+
+        // Probed on more than one event because the browsers disagree about when the answer
+        // exists: track lists are there at metadata, while a decoded-byte counter is still
+        // zero then and only becomes meaningful once playback has run. DETACHES as soon as
+        // one of them answers — this page already carries a timeupdate listener at 4 Hz and
+        // does not need a second one running for the whole segment.
+        const probe = () => {
+            if (settled) return;
+            const answer = detectHasAudioTrack(video);
+            if (answer === null) return;
+            settled = true;
+            setHasAudioTrack(answer);
+            video.removeEventListener('loadedmetadata', probe);
+            video.removeEventListener('timeupdate', probe);
+        };
+
+        video.addEventListener('loadedmetadata', probe);
+        video.addEventListener('timeupdate', probe);
+        probe();
+
+        return () => {
+            video.removeEventListener('loadedmetadata', probe);
+            video.removeEventListener('timeupdate', probe);
+        };
+    }, [videoRef, segmentKey]);
+
+    const unmute = () => {
+        const video = videoRef?.current;
+        if (video) {
+            video.muted = false;
+        }
+        setIsMuted(false);
+        writeRecordingMutePreference(false);
+    };
+
+    // Offer the prompt unless we positively know there is nothing to hear. Cameras 7, 8 and
+    // the private camera really do have no microphone, so hiding it there is honest; hiding
+    // it on an inconclusive probe would not be.
+    const showUnmutePrompt = isMuted && hasAudioTrack !== false && Boolean(selectedSegment) && !videoError;
+
     const getErrorInfo = () => {
         const errors = {
             codec: { 
@@ -165,7 +258,6 @@ export default function PlaybackVideo({
                     playsInline
                     preload="auto"
                     crossOrigin={crossOriginMode}
-                    muted
                 />
                 
                 {/*
@@ -248,6 +340,29 @@ export default function PlaybackVideo({
                     </div>
                 )}
                 
+                {/*
+                  * Chrome sitting on top of video uses dark glass, not theme surfaces —
+                  * the frame behind it is not a theme-controlled background.
+                  */}
+                {showUnmutePrompt && (
+                    <button
+                        type="button"
+                        onClick={unmute}
+                        data-testid="playback-unmute"
+                        aria-label="Nyalakan suara rekaman"
+                        title="Nyalakan suara rekaman"
+                        className="absolute top-2 left-2 sm:top-4 sm:left-4 z-30 inline-flex min-h-11 max-w-[55%] items-center gap-2 rounded-lg bg-black/70 px-3 py-2 text-xs font-medium text-white shadow-lg transition-all hover:bg-black/90 hover:scale-105 sm:text-sm"
+                    >
+                        <svg className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM12.293 7.293a1 1 0 011.414 0L15 8.586l1.293-1.293a1 1 0 111.414 1.414L16.414 10l1.293 1.293a1 1 0 01-1.414 1.414L15 11.414l-1.293 1.293a1 1 0 01-1.414-1.414L13.586 10l-1.293-1.293a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                        {/* Speed buttons own the opposite corner; the long label would collide
+                            with them on a phone, so it only unfolds where there is room. */}
+                        <span className="truncate sm:hidden">Suara</span>
+                        <span className="hidden truncate sm:inline">Suara mati — ketuk untuk menyalakan</span>
+                    </button>
+                )}
+
                 <div className="flex absolute top-2 sm:top-4 right-2 sm:right-4 gap-1 sm:gap-2 z-30">
                     {[0.5, 1, 1.5, 2].map(speed => (
                         <button

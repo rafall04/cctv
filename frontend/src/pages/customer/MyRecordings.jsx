@@ -24,6 +24,7 @@ import { getSegments, getSegmentStreamUrl } from '../../services/recordingServic
 import PlaybackCoverageStrip from '../../components/playback/PlaybackCoverageStrip';
 import PlaybackRangePicker from '../../components/playback/PlaybackRangePicker';
 import { rollingRange } from '../../utils/playbackDayRange';
+import { readRecordingMutePreference, writeRecordingMutePreference } from '../../utils/recordingAudio';
 
 const SCOPE = 'owner_full';
 
@@ -69,6 +70,11 @@ export default function MyRecordings() {
     const [pesan, setPesan] = useState(null);
     const [tautan, setTautan] = useState([]);
     const [sibukTautan, setSibukTautan] = useState(false);
+    // Rekaman kini membawa mikrofon kamera. `autoPlay` pada elemen ber-audio justru
+    // DIBLOKIR kebijakan browser, dan `key={diputar.filename}` me-remount pemutar tiap klik
+    // — jadi default tanpa mute berarti satu blokiran per segmen. Mulai dari preferensi yang
+    // diingat (bisu kecuali diminta lain), lalu ikuti kontrol native.
+    const [bisu, setBisu] = useState(readRecordingMutePreference);
 
     useEffect(() => {
         customerService.getMyCameras()
@@ -223,6 +229,22 @@ export default function MyRecordings() {
                         src={getSegmentStreamUrl(aktif, diputar.filename, SCOPE, diputar)}
                         controls
                         autoPlay
+                        muted={bisu}
+                        playsInline
+                        // Penjaga kesetaraan membuang gema React menulis `muted` kembali ke
+                        // elemen — itu juga memicu volumechange, dan tanpa ini tiap ganti
+                        // bisu memakan satu render tambahan tanpa kabar baru.
+                        onVolumeChange={(e) => {
+                            const m = e.currentTarget.muted;
+                            if (m === bisu) return;
+                            setBisu(m);
+                            writeRecordingMutePreference(m);
+                        }}
+                        // `autoPlay` sendirian tak memberi cara mengamati penolakan. Meminta
+                        // secara eksplisit membuat preferensi tanpa-bisu turun jadi pemutar
+                        // ter-pause dengan kontrol terlihat, bukan klip yang diam tak jalan.
+                        // `?.catch?.` karena play() tak dijamin mengembalikan Promise.
+                        onCanPlay={(e) => e.currentTarget.play?.()?.catch?.(() => {})}
                         className="max-h-[60vh] w-full"
                     />
                     <p className="bg-surface px-4 py-2 text-xs text-content-muted">

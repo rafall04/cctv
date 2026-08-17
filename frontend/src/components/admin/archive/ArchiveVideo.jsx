@@ -19,6 +19,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { IconButton } from '../../ui/Button';
+import { readRecordingMutePreference, writeRecordingMutePreference } from '../../../utils/recordingAudio';
 
 // Only used for the instant between opening and the first metadata event. 16:9 is the widest shape
 // in the fleet, so the box can only ever shrink to fit — it never has to grow and shove the
@@ -41,6 +42,12 @@ export default function ArchiveVideo({ src, segmentId, onFullscreenChange }) {
     const wrapperRef = useRef(null);
     const [ratio, setRatio] = useState(FALLBACK_RATIO);
     const [isFullscreen, setIsFullscreen] = useState(false);
+    // Recordings now carry the camera microphone, and `autoPlay` on an element with a real
+    // audio track is exactly what the browser autoplay policy blocks. `key={segmentId}`
+    // remounts this element on every clip, so an unmuted default would mean a fresh block
+    // per segment. Start from the remembered preference (muted unless asked otherwise) and
+    // keep it in step with the native control below.
+    const [isMuted, setIsMuted] = useState(readRecordingMutePreference);
 
     // Reset per segment: without this, switching clips keeps the previous camera's ratio until the
     // new metadata lands, which is a visible wrong-shaped flash between two different cameras.
@@ -53,6 +60,27 @@ export default function ArchiveVideo({ src, segmentId, onFullscreenChange }) {
         if (videoWidth > 0 && videoHeight > 0) {
             setRatio(videoWidth / videoHeight);
         }
+    }, []);
+
+    // The guard drops the echo of React writing `muted` back onto the element, which fires
+    // volumechange as well and otherwise costs a render per toggle for no news.
+    const handleVolumeChange = useCallback((event) => {
+        const muted = event.currentTarget.muted;
+        if (muted === isMuted) return;
+        setIsMuted(muted);
+        writeRecordingMutePreference(muted);
+    }, [isMuted]);
+
+    // `autoPlay` alone gives no way to observe a refusal. Asking explicitly means an unmuted
+    // preference degrades to a paused player with visible controls — the operator presses
+    // play — rather than to a clip that silently never starts.
+    const handleCanPlay = useCallback((event) => {
+        // `?.catch?.` and not `.catch(...)`: play() is only guaranteed to return a promise in
+        // modern browsers, and jsdom's returns nothing at all — a bare .catch() there turns a
+        // best-effort nudge into a TypeError thrown out of an event handler.
+        event.currentTarget.play?.()?.catch?.(() => {
+            // Blocked by the autoplay policy. Controls are rendered; nothing else to do.
+        });
     }, []);
 
     // Fullscreen can also be left with Escape or the browser's own control, so the button's label
@@ -94,9 +122,12 @@ export default function ArchiveVideo({ src, segmentId, onFullscreenChange }) {
                     src={src}
                     controls
                     autoPlay
+                    muted={isMuted}
                     playsInline
                     preload="metadata"
                     onLoadedMetadata={handleMetadata}
+                    onVolumeChange={handleVolumeChange}
+                    onCanPlay={handleCanPlay}
                     // object-contain is the browser default for video, but stating it means a later
                     // `object-cover` elsewhere cannot silently crop evidence footage.
                     className="h-full w-full object-contain"

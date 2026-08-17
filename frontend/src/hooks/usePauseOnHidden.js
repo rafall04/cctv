@@ -5,9 +5,14 @@ import { useEffect } from 'react';
  * visible again.
  *
  * Why: a backgrounded tab keeps decoding and (for HLS) buffering live video for nothing — wasting
- * the viewer's bandwidth, CPU and battery. CCTV streams are always muted, so there is no audio to
- * lose by pausing. On resume the component's existing live-edge snap (and HLS.js live recovery)
- * pulls playback back to the live edge.
+ * the viewer's bandwidth, CPU and battery. The LIVE players this hook serves are muted, so there is
+ * no audio to lose by pausing. On resume the component's existing live-edge snap (and HLS.js live
+ * recovery) pulls playback back to the live edge.
+ *
+ * Scope note: "muted" is a property of the live players (VideoPopup, MultiViewVideoItem), not of the
+ * medium. RECORDINGS now carry the camera microphone, and their players let the viewer unmute — so
+ * do not reuse this hook on a recording player without first deciding what silently pausing audio
+ * mid-sentence should do.
  *
  * Safety: we only auto-resume a stream that WE paused (one that was playing when the tab hid), so a
  * manual user pause is never overridden. No-op when the ref holds no <video> (e.g. MJPEG/embed tiles).

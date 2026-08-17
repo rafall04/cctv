@@ -113,7 +113,9 @@ describe('measured rate', () => {
         const result = await capacityService.getCapacity();
 
         expect(result.rate.source).toBe('default');
-        expect(result.rate.bytesPerCameraHour).toBeCloseTo(0.43 * GB, -6);
+        // 0.43 GB of video measured on production + 0.0141 GB for the AAC track the recorder
+        // now maps when the camera has a microphone. See recordingCapacityService.
+        expect(result.rate.bytesPerCameraHour).toBeCloseTo(0.4441 * GB, -6);
     });
 });
 
