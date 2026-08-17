@@ -54,7 +54,27 @@ const ERROR_VARIANTS = {
  * "Memuat stream" indefinitely.
  *
  * bufferAddCodecError / bufferIncompatibleCodecsError are the same verdict arriving later, when the
- * manifest looked fine but addSourceBuffer refused the codec.
+ * manifest looked fine but addSourceBuffer refused the codec. `bufferAddCodecError` is the
+ * non-fatal one that motivated hoisting this check at all (hls.js 1.6.15 dist:20213-20216).
+ *
+ * WHAT IS DELIBERATELY *NOT* HERE, AND WHY (regression, 2026-08-17)
+ * ----------------------------------------------------------------
+ * `fragParsingError` and `bufferAppendError` were briefly on this list. They are NOT codec
+ * verdicts, and because this predicate runs ABOVE the fatal guard and its callers answer with
+ * `hls.destroy()`, including them killed healthy streams on their first hiccup — a stream that
+ * had played fine for months went black. Read from the hls.js 1.6.15 source we ship:
+ *
+ *   - `fragParsingError` is emitted NON-FATALLY at dist:10800 with reason
+ *     "Found no media in msn <n>" — a momentarily empty segment, not a decoder refusal.
+ *   - `bufferAppendError` (dist:19759) is what hls.js itself prepares to RECOVER from: its
+ *     own handler returns early on fatal, then resets level selection specifically "so that a
+ *     new selection can be made after calling recoverMediaError" (dist:4262-4270).
+ *   - hls.js only reads either as codec evidence when bound to a source buffer or an AUDIO
+ *     fragment (dist:5236, 5242) — a condition this predicate never checked.
+ *
+ * Left off the list, both fall through to the caller's normal fatal-gated path: non-fatal ones
+ * are ignored so hls.js can recover exactly as it did before, and a genuinely fatal one still
+ * surfaces an error. The H.265 fix is untouched — its verdict arrives as `bufferAddCodecError`.
  */
 export const isCodecFailure = (hlsError) => {
     if (!hlsError) return false;
@@ -63,8 +83,6 @@ export const isCodecFailure = (hlsError) => {
     return details === 'manifestIncompatibleCodecsError'
         || details === 'bufferAddCodecError'
         || details === 'bufferIncompatibleCodecsError'
-        || details === 'fragParsingError'
-        || details === 'bufferAppendError'
         || reason.includes('codec')
         || reason.includes('hevc')
         || reason.includes('h265');
