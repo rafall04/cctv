@@ -23,7 +23,7 @@
 // (see recordingHealthMonitor), so they must NOT be suppressed with -nostats. They
 // do mean the file grows steadily, hence the self-truncation below.
 
-import { createReadStream, existsSync, mkdirSync, openSync, statSync, truncateSync } from 'fs';
+import { closeSync, createReadStream, existsSync, mkdirSync, openSync, readSync, statSync, truncateSync } from 'fs';
 import { dirname, join } from 'path';
 import { RECORDINGS_BASE_PATH } from './recordingPaths.js';
 
@@ -58,6 +58,42 @@ export function openFfmpegLog(logPath) {
  * Returns { stop() }. Never throws: a missing/unreadable log degrades to "no data
  * yet" so a log problem can never take down a recording.
  */
+/**
+ * Read the last `maxBytes` of a camera's FFmpeg log, synchronously, right now.
+ *
+ * The tailer polls once a second, and FFmpeg's stderr is BLOCK-buffered when it points at a
+ * file rather than a terminal — so the lines that explain a failure are still sitting in
+ * FFmpeg's own stdio buffer and only reach the disk when the process exits. A recorder that
+ * dies quickly therefore closes with an EMPTY captured tail, and every such failure classifies
+ * as the generic `ffmpeg_failed` no matter what FFmpeg actually said.
+ *
+ * Measured on production: camera 1169 exits in 8s with "Too many packets buffered for output
+ * stream 0:0." plainly written in its ffmpeg.log, while the recorder logged
+ * "Last FFmpeg output:" followed by nothing. This is the read that closes that gap — called at
+ * close time, after FFmpeg has flushed, before the exit is classified.
+ *
+ * Never throws: a missing or unreadable log must not turn a recorder crash into a second one.
+ */
+export function readFfmpegLogTail({ logPath, maxBytes = 8192 } = {}) {
+    if (!logPath) return '';
+    try {
+        const { size } = statSync(logPath);
+        if (!size) return '';
+        const start = Math.max(0, size - maxBytes);
+        const fd = openSync(logPath, 'r');
+        try {
+            const length = size - start;
+            const buffer = Buffer.alloc(length);
+            readSync(fd, buffer, 0, length, start);
+            return buffer.toString('utf8');
+        } finally {
+            closeSync(fd);
+        }
+    } catch {
+        return '';
+    }
+}
+
 export function createLogTailer({
     logPath,
     onData,

@@ -9,7 +9,7 @@ import { spawn } from 'child_process';
 import { RecordingRuntimeState } from './recordingRuntimeState.js';
 import { classifyRecordingExit } from './recordingFailureClassifier.js';
 import { RECORDING_PROCESS_GRACEFUL_STOP_MS } from './recordingIntervalsPolicy.js';
-import { createLogTailer, openFfmpegLog } from './recordingFfmpegLog.js';
+import { createLogTailer, openFfmpegLog, readFfmpegLogTail } from './recordingFfmpegLog.js';
 
 // How often an ADOPTED recorder is checked for liveness. We are not its parent, so
 // there is no 'close' event to wait on — kill(pid, 0) is the only signal available.
@@ -29,6 +29,7 @@ export class RecordingProcessManager {
         this.closeWaiters = new Map();
         this.callbacks = new Map();
         this.tailers = new Map();
+        this.logPaths = new Map();
         this.livenessTimers = new Map();
     }
 
@@ -123,6 +124,7 @@ export class RecordingProcessManager {
 
     startTailer(cameraId, logPath, { fromEnd }) {
         this.stopTailer(cameraId);
+        this.logPaths.set(cameraId, logPath);
         const tailer = createLogTailer({
             logPath,
             fromEnd,
@@ -134,6 +136,22 @@ export class RecordingProcessManager {
     stopTailer(cameraId) {
         this.tailers.get(cameraId)?.stop();
         this.tailers.delete(cameraId);
+    }
+
+    /**
+     * What FFmpeg said, for classification — the polled buffer PLUS a fresh read of the log.
+     *
+     * The second half is not belt-and-braces. FFmpeg's stderr is block-buffered into a file, so
+     * a recorder that dies quickly flushes its last words only as it exits, after the tailer's
+     * final 1s poll. Production camera 1169 closed with an empty buffer eight seconds running,
+     * while "Too many packets buffered for output stream 0:0." sat plainly in its ffmpeg.log —
+     * so every fast failure classified as the generic `ffmpeg_failed` and the recorder could
+     * never learn anything from it.
+     */
+    getOutputForClassification(cameraId) {
+        const buffered = this.getOutput(cameraId);
+        const flushed = readFfmpegLogTail({ logPath: this.logPaths.get(cameraId) });
+        return flushed ? `${buffered}\n${flushed}` : buffered;
     }
 
     startLivenessPoll(cameraId, pid) {
@@ -360,7 +378,7 @@ export class RecordingProcessManager {
         }
 
         const reason = classifyRecordingExit({
-            ffmpegOutput: this.getOutput(cameraId),
+            ffmpegOutput: this.getOutputForClassification(cameraId),
             exitCode,
             exitSignal,
             streamSource: record.streamSource,
@@ -392,6 +410,8 @@ export class RecordingProcessManager {
         this.outputBuffers.delete(cameraId);
         this.callbacks.delete(cameraId);
         this.stopTailer(cameraId);
+        // After classification, never before: getOutputForClassification reads through it.
+        this.logPaths.delete(cameraId);
         this.stopLivenessPoll(cameraId);
         this.state.remove(cameraId);
 

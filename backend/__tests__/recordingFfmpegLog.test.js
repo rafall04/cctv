@@ -147,3 +147,48 @@ describe('createLogTailer', () => {
         tailer.stop();
     });
 });
+
+/*
+ * REGRESSION (production, 2026-08-17): FFmpeg's stderr is BLOCK-buffered when it points at a
+ * file rather than a terminal, so a recorder that dies quickly flushes its last words only as
+ * it exits — after the tailer's final 1s poll. Camera 1169 closed with an empty captured tail
+ * while "Too many packets buffered for output stream 0:0." sat plainly in its ffmpeg.log, so
+ * the exit classified as the generic `ffmpeg_failed` and the recorder could learn nothing from
+ * it. This read is what closes that window at close time.
+ */
+describe('readFfmpegLogTail', () => {
+    it('returns the tail of a log the tailer never got to poll', async () => {
+        const { readFfmpegLogTail } = await import('../services/recordingFfmpegLog.js');
+        const logPath = join(tmpdir(), `ffmpeg-tail-${process.pid}.log`);
+        writeFileSync(logPath, 'frame= 1\nToo many packets buffered for output stream 0:0.\n');
+
+        try {
+            expect(readFfmpegLogTail({ logPath })).toContain('Too many packets buffered');
+        } finally {
+            rmSync(logPath, { force: true });
+        }
+    });
+
+    it('returns only the LAST maxBytes, so a 8 MB log cannot be pulled into memory', async () => {
+        const { readFfmpegLogTail } = await import('../services/recordingFfmpegLog.js');
+        const logPath = join(tmpdir(), `ffmpeg-tail-big-${process.pid}.log`);
+        writeFileSync(logPath, `${'x'.repeat(5000)}TAIL_MARKER`);
+
+        try {
+            const tail = readFfmpegLogTail({ logPath, maxBytes: 64 });
+            expect(tail).toContain('TAIL_MARKER');
+            expect(tail.length).toBeLessThanOrEqual(64);
+        } finally {
+            rmSync(logPath, { force: true });
+        }
+    });
+
+    /* A crashed recorder must never be turned into a second crash by its own diagnostics. */
+    it('answers empty instead of throwing when there is no log to read', async () => {
+        const { readFfmpegLogTail } = await import('../services/recordingFfmpegLog.js');
+
+        expect(readFfmpegLogTail({ logPath: join(tmpdir(), 'tidak-ada-berkas-ini.log') })).toBe('');
+        expect(readFfmpegLogTail({})).toBe('');
+        expect(readFfmpegLogTail()).toBe('');
+    });
+});
