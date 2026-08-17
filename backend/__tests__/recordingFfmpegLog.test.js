@@ -192,3 +192,50 @@ describe('readFfmpegLogTail', () => {
         expect(readFfmpegLogTail()).toBe('');
     });
 });
+
+/*
+ * REGRESSION (production, 2026-08-17): the log is append-only and outlives every recorder that
+ * writes to it, so an unbounded tail reports the PREVIOUS process's crash as this one's. Camera
+ * 1169 failed with "method SETUP failed: 500" — a refused connection — and the tail still
+ * carried an earlier "Too many packets buffered", classifying it as a stalled audio track and
+ * pointing the self-repair at the wrong problem entirely.
+ */
+describe('readFfmpegLogTail respects where this process started writing', () => {
+    it('never reads backwards into the previous recorder output', async () => {
+        const { readFfmpegLogTail, currentLogSize } = await import('../services/recordingFfmpegLog.js');
+        const logPath = join(tmpdir(), `ffmpeg-offset-${process.pid}.log`);
+        writeFileSync(logPath, 'Too many packets buffered for output stream 0:0.\n');
+        const offset = currentLogSize(logPath);
+        appendFileSync(logPath, 'method SETUP failed: 500 Internal Server Error\n');
+
+        try {
+            const scoped = readFfmpegLogTail({ logPath, fromOffset: offset });
+            expect(scoped).toContain('SETUP failed');
+            expect(scoped).not.toContain('Too many packets');
+
+            // Without the bound, the old line comes back — this is the bug, pinned.
+            expect(readFfmpegLogTail({ logPath })).toContain('Too many packets');
+        } finally {
+            rmSync(logPath, { force: true });
+        }
+    });
+
+    it('answers empty when this process wrote nothing at all', async () => {
+        const { readFfmpegLogTail, currentLogSize } = await import('../services/recordingFfmpegLog.js');
+        const logPath = join(tmpdir(), `ffmpeg-offset-empty-${process.pid}.log`);
+        writeFileSync(logPath, 'riwayat lama\n');
+
+        try {
+            expect(readFfmpegLogTail({ logPath, fromOffset: currentLogSize(logPath) })).toBe('');
+        } finally {
+            rmSync(logPath, { force: true });
+        }
+    });
+
+    it('currentLogSize answers 0 for a log that does not exist yet', async () => {
+        const { currentLogSize } = await import('../services/recordingFfmpegLog.js');
+
+        expect(currentLogSize(join(tmpdir(), 'belum-ada.log'))).toBe(0);
+        expect(currentLogSize(null)).toBe(0);
+    });
+});

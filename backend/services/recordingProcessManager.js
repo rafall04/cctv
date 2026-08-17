@@ -9,7 +9,7 @@ import { spawn } from 'child_process';
 import { RecordingRuntimeState } from './recordingRuntimeState.js';
 import { classifyRecordingExit } from './recordingFailureClassifier.js';
 import { RECORDING_PROCESS_GRACEFUL_STOP_MS } from './recordingIntervalsPolicy.js';
-import { createLogTailer, openFfmpegLog, readFfmpegLogTail } from './recordingFfmpegLog.js';
+import { createLogTailer, currentLogSize, openFfmpegLog, readFfmpegLogTail } from './recordingFfmpegLog.js';
 
 // How often an ADOPTED recorder is checked for liveness. We are not its parent, so
 // there is no 'close' event to wait on — kill(pid, 0) is the only signal available.
@@ -30,6 +30,7 @@ export class RecordingProcessManager {
         this.callbacks = new Map();
         this.tailers = new Map();
         this.logPaths = new Map();
+        this.logStartOffsets = new Map();
         this.livenessTimers = new Map();
     }
 
@@ -125,6 +126,10 @@ export class RecordingProcessManager {
     startTailer(cameraId, logPath, { fromEnd }) {
         this.stopTailer(cameraId);
         this.logPaths.set(cameraId, logPath);
+        // Where this recorder's output begins. The log is append-only and outlives every
+        // process that writes to it, so classification must not be allowed to read backwards
+        // into the previous recorder's dying words.
+        this.logStartOffsets.set(cameraId, currentLogSize(logPath));
         const tailer = createLogTailer({
             logPath,
             fromEnd,
@@ -150,7 +155,10 @@ export class RecordingProcessManager {
      */
     getOutputForClassification(cameraId) {
         const buffered = this.getOutput(cameraId);
-        const flushed = readFfmpegLogTail({ logPath: this.logPaths.get(cameraId) });
+        const flushed = readFfmpegLogTail({
+            logPath: this.logPaths.get(cameraId),
+            fromOffset: this.logStartOffsets.get(cameraId) ?? 0,
+        });
         return flushed ? `${buffered}\n${flushed}` : buffered;
     }
 
@@ -412,6 +420,7 @@ export class RecordingProcessManager {
         this.stopTailer(cameraId);
         // After classification, never before: getOutputForClassification reads through it.
         this.logPaths.delete(cameraId);
+        this.logStartOffsets.delete(cameraId);
         this.stopLivenessPoll(cameraId);
         this.state.remove(cameraId);
 

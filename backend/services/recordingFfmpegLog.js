@@ -58,6 +58,16 @@ export function openFfmpegLog(logPath) {
  * Returns { stop() }. Never throws: a missing/unreadable log degrades to "no data
  * yet" so a log problem can never take down a recording.
  */
+/** Current size of a log, or 0 if it does not exist yet. Never throws. */
+export function currentLogSize(logPath) {
+    if (!logPath) return 0;
+    try {
+        return statSync(logPath).size;
+    } catch {
+        return 0;
+    }
+}
+
 /**
  * Read the last `maxBytes` of a camera's FFmpeg log, synchronously, right now.
  *
@@ -74,12 +84,19 @@ export function openFfmpegLog(logPath) {
  *
  * Never throws: a missing or unreadable log must not turn a recorder crash into a second one.
  */
-export function readFfmpegLogTail({ logPath, maxBytes = 8192 } = {}) {
+export function readFfmpegLogTail({ logPath, maxBytes = 8192, fromOffset = 0 } = {}) {
     if (!logPath) return '';
     try {
         const { size } = statSync(logPath);
         if (!size) return '';
-        const start = Math.max(0, size - maxBytes);
+        // `fromOffset` is where THIS process began writing. The log is append-only and shared by
+        // every recorder this camera has ever had, so an unbounded tail happily reports the
+        // previous process's crash as this one's. Production made that concrete: camera 1169
+        // failed with "method SETUP failed: 500", and the tail still carried the earlier
+        // "Too many packets buffered" — classifying a refused connection as a stalled audio
+        // track, which is the wrong repair entirely.
+        const start = Math.max(fromOffset, size - maxBytes);
+        if (start >= size) return '';
         const fd = openSync(logPath, 'r');
         try {
             const length = size - start;
