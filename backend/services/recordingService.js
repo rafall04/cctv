@@ -30,6 +30,7 @@ import {
     prepareRecordingStart,
 } from './recordingStarter.js';
 import { parseRecordingStderrLine } from './recordingStderrParser.js';
+import { isAudioFaultReason, markRecordingAudioUnusable } from './recordingAudioFallback.js';
 import { redactUrlCredentials } from '../utils/logRedaction.js';
 import {
     RECORDING_LIFECYCLE_RECONCILE_INTERVAL_MS,
@@ -341,6 +342,18 @@ class RecordingService {
         // single largest source of the plaintext passwords found in the production
         // recorder log, so it gets redacted like every other FFmpeg line.
         console.error(`Last FFmpeg output:\n${redactUrlCredentials(recordingProcessManager.getOutput(cameraId).slice(-1000))}`);
+        // The one failure the recorder can repair by itself: the camera advertised an audio
+        // track it never actually delivers, so FFmpeg buffered video waiting to interleave and
+        // gave up. Retrying identically would fail identically. Marking it makes the NEXT start
+        // video-only — and this line is the only announcement, because the mark is per process
+        // and the retry is silent from then on.
+        if (isAudioFaultReason(result.reason) && markRecordingAudioUnusable(cameraId)) {
+            console.error(
+                `[Recording] Camera ${cameraId} advertises audio it cannot deliver (${result.reason}); `
+                + 'recording it video-only until this recorder restarts.'
+            );
+        }
+
         this.markRecordingFailure(cameraId, result.reason);
         this.logRestart(cameraId, 'process_crashed', false);
 

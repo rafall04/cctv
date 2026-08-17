@@ -70,6 +70,22 @@ describe('recordingFailureClassifier', () => {
         })).toBe('unsupported_track_codec');
     });
 
+    /*
+     * REGRESSION (production, 2026-08-17): camera 1169 declares pcm_alaw in its SDP and never
+     * sends an audio packet. FFmpeg buffers video waiting to interleave, overruns the muxing
+     * queue and exits 1 in 8s with nothing written. Naming it apart from `ffmpeg_failed` is
+     * what lets the recorder repair itself — see recordingAudioFallback.js.
+     */
+    it('names a stalled audio track so the recorder can drop it and retry', () => {
+        expect(classifyRecordingExit({
+            ffmpegOutput: 'Too many packets buffered for output stream 0:0.',
+            exitCode: 1,
+            exitSignal: null,
+            streamSource: 'internal',
+            stopReason: null,
+        })).toBe('audio_stream_stalled');
+    });
+
     it('still blames the source for a plain Invalid argument exit', () => {
         expect(classifyRecordingExit({
             ffmpegOutput: 'rtsp://cam/stream: Invalid argument',

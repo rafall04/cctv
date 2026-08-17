@@ -21,6 +21,7 @@ import {
 } from './recordingSegmentFilePolicy.js';
 import { RECORDING_RTSP_SOCKET_TIMEOUT_MICROS } from './recordingIntervalsPolicy.js';
 import { getFfmpegLogPath } from './recordingFfmpegLog.js';
+import { shouldSkipRecordingAudio } from './recordingAudioFallback.js';
 
 const EXTERNAL_RECORDING_PROTOCOL_WHITELIST = 'file,http,https,tcp,tls,crypto';
 
@@ -192,7 +193,16 @@ const EXTERNAL_RECONNECT_ARGS = [
     '-reconnect_delay_max', '30',
 ];
 
-export function buildRecordingFfmpegArgs({ cameraDir, outputPattern, inputUrl, streamSource, rtspTransport = 'tcp' }) {
+export function buildRecordingFfmpegArgs({
+    cameraDir,
+    outputPattern,
+    inputUrl,
+    streamSource,
+    rtspTransport = 'tcp',
+    // null = decide from the global knob. A caller passes false for a camera that has already
+    // proven its advertised audio cannot be recorded (recordingAudioFallback.js).
+    withAudio = null,
+}) {
     const resolvedOutputPattern = outputPattern || join(cameraDir, '%Y%m%d_%H%M%S.mp4');
     const inputArgs = streamSource === 'external'
         ? [
@@ -204,15 +214,15 @@ export function buildRecordingFfmpegArgs({ cameraDir, outputPattern, inputUrl, s
             socketTimeoutMicros: RECORDING_RTSP_SOCKET_TIMEOUT_MICROS,
         });
 
-    const withAudio = isRecordingAudioEnabled();
+    const audioEnabled = withAudio === null ? isRecordingAudioEnabled() : Boolean(withAudio);
 
     return [
         ...RECORDING_LOG_ARGS,
         ...inputArgs,
         '-map', '0:v',
-        ...(withAudio ? RECORDING_AUDIO_MAP_ARGS : []),
+        ...(audioEnabled ? RECORDING_AUDIO_MAP_ARGS : []),
         '-c:v', 'copy',
-        ...(withAudio ? RECORDING_AUDIO_CODEC_ARGS : ['-an']),
+        ...(audioEnabled ? RECORDING_AUDIO_CODEC_ARGS : ['-an']),
         '-f', 'segment',
         '-segment_time', '600',
         '-segment_format', 'mp4',
@@ -266,12 +276,18 @@ export function prepareRecordingStart({ camera, recordingsBasePath }) {
     mkdirSync(cameraDir, { recursive: true });
     mkdirSync(pendingDir, { recursive: true });
 
+    // A camera that already proved its advertised audio cannot be recorded is spawned
+    // video-only, so it does not die the same way every retry. `-map 0:a?` handles cameras
+    // with NO audio; this handles the ones that claim audio and never send it.
+    const withAudio = shouldSkipRecordingAudio(camera.id) ? false : null;
+
     const ffmpegArgs = buildRecordingFfmpegArgs({
         cameraDir,
         outputPattern: getPendingRecordingPattern(recordingsBasePath, camera.id),
         inputUrl: sourceConfig.inputUrl,
         streamSource: sourceConfig.streamSource,
         rtspTransport: sourceConfig.rtspTransport,
+        withAudio,
     });
 
     const recordingTimezone = getRecordingProcessTimezone();

@@ -59,6 +59,15 @@ export function classifyRecordingExit({
     if (streamSource === 'external' && (output.includes('invalid data found') || output.includes('failed to open segment') || output.includes('error when loading first segment'))) {
         return 'unsupported_playlist';
     }
+    // An audio track that is ADVERTISED but never delivered. FFmpeg holds video packets in the
+    // muxing queue waiting for audio to interleave against, overruns it, and exits — having
+    // written nothing. Camera 1169 on production does exactly this: ffprobe reads `pcm_alaw` in
+    // its SDP, no audio RTP packet ever arrives over its mandatory UDP transport, and the
+    // recorder dies in 8 seconds. Classified apart from `ffmpeg_failed` because it is the one
+    // failure the recorder can actually repair by itself — see recordingAudioFallback.js.
+    if (output.includes('too many packets buffered')) {
+        return 'audio_stream_stalled';
+    }
     // A track the MP4 container cannot hold. This MUST be tested before 'invalid argument'
     // below, because FFmpeg reports the same failure twice and the second line wins the
     // naive match: "Could not find tag for codec pcm_alaw in stream #1, codec not currently
