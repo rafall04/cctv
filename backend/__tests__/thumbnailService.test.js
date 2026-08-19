@@ -761,3 +761,41 @@ describe('kamera external_flv bisa menghasilkan thumbnail sungguhan', () => {
         expect(divonisTakDidukung).toEqual([]);
     });
 });
+
+/*
+ * AGENTS.md menyebut kasus ini gamblang: "A third-party camera being down ... none of these are
+ * application errors." stderr adalah satu-satunya alat triase operator — 9% isinya kegagalan
+ * thumbnail, dan 123 dari 176 kamera penyumbangnya milik pihak ketiga yang tak bisa kita perbaiki.
+ * Kamera MILIK SENDIRI beda: satu baris keras di kegagalan pertama berguna, ada yang bisa ditengok.
+ */
+describe('penentuan stderr untuk kegagalan thumbnail', () => {
+    const eksternal = { id: 721, stream_source: 'external', delivery_type: 'external_flv' };
+    const internal = { id: 5, stream_source: 'internal', delivery_type: 'internal_hls' };
+
+    it('kamera pihak ketiga yang mati TIDAK pernah masuk stderr', async () => {
+        const { default: thumbnailService } = await import('../services/thumbnailService.js');
+
+        expect(thumbnailService.shouldReportThumbnailFailureLoudly(eksternal, {
+            isConfigFact: false, failures: 1,
+        })).toBe(false);
+    });
+
+    it('kamera milik sendiri keras SEKALI, lalu diam pada pengulangan', async () => {
+        const { default: thumbnailService } = await import('../services/thumbnailService.js');
+
+        expect(thumbnailService.shouldReportThumbnailFailureLoudly(internal, {
+            isConfigFact: false, failures: 1,
+        })).toBe(true);
+        expect(thumbnailService.shouldReportThumbnailFailureLoudly(internal, {
+            isConfigFact: false, failures: 2,
+        })).toBe(false);
+    });
+
+    it('fakta konfigurasi tak pernah keras, bahkan untuk kamera sendiri', async () => {
+        const { default: thumbnailService } = await import('../services/thumbnailService.js');
+
+        expect(thumbnailService.shouldReportThumbnailFailureLoudly(internal, {
+            isConfigFact: true, failures: 1,
+        })).toBe(false);
+    });
+});

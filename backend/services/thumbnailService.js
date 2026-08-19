@@ -165,6 +165,24 @@ class ThumbnailService {
         return failures;
     }
 
+    /*
+     * Which stream does this failure belong on? stderr is the only triage tool an operator has, so
+     * it has to mean something. A third-party camera being down is NOT an application error —
+     * AGENTS.md names this exact case. We do not own that upstream, cannot fix it, and no operator
+     * action follows; 123 of the 176 cameras filling stderr here were external. Our OWN hardware
+     * failing to yield a frame is different: worth one loud line the first time, because someone
+     * can actually go and look at it. Repeats stay quiet either way — log the transition, not the
+     * steady state — and clearThumbnailFailure() resets that, so a camera that recovers and breaks
+     * again is loud again.
+     */
+    shouldReportThumbnailFailureLoudly(camera, { isConfigFact = false, failures = 1 } = {}) {
+        if (isConfigFact || failures > 1) {
+            return false;
+        }
+
+        return getEffectiveDeliveryType(camera) === 'internal_hls';
+    }
+
     clearThumbnailFailure(cameraId) {
         this.failureBackoff.delete(cameraId);
     }
@@ -487,22 +505,14 @@ class ThumbnailService {
                     } catch (error) {
                         failed += 1;
                         const failures = this.registerThumbnailFailure(camera.id);
-                        /*
-                         * Two separate reasons this used to flood stderr (2,532/day, ~20 per camera):
-                         *
-                         * 1. `unsupported_delivery_type` (and the missing-source variants) is not a
-                         *    failure at all — it states that this camera's delivery type cannot
-                         *    produce a thumbnail. That is a fixed fact about its configuration, not
-                         *    an event, so it never belongs on stderr.
-                         * 2. A camera that keeps timing out re-reports the SAME failure every sweep.
-                         *    Per the logging policy in AGENTS.md we announce the transition and stay
-                         *    quiet about the steady state: first failure is loud, repeats go to
-                         *    stdout. clearThumbnailFailure() resets this, so a camera that recovers
-                         *    and breaks again is loud again.
-                         */
+                        // Which stream this belongs on is a rule, not a one-off — see
+                        // shouldReportThumbnailFailureLoudly for why.
                         const message = this.sanitizeErrorMessage(error.message);
                         const isConfigFact = /unsupported_delivery_type|missing_external_snapshot_source|missing_mjpeg_thumbnail_source/i.test(message || '');
-                        const emit = (isConfigFact || failures > 1) ? console.log : console.error;
+                        const emit = this.shouldReportThumbnailFailureLoudly(camera, {
+                            isConfigFact,
+                            failures,
+                        }) ? console.error : console.log;
                         emit(`[Thumbnail] Camera ${camera.id} (${camera.name}) failed:`, message);
                     }
                 }
