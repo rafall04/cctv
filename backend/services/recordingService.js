@@ -104,6 +104,7 @@ class RecordingService {
             // Adopted recorders must land in exactly the same callback wiring as
             // ones we spawned ourselves, or freshness/segment events would silently
             // stop flowing for them.
+            markStarted: (cameraId) => this.markRecordingStarted(cameraId),
             buildCallbacks: (cameraId, camera) => ({
                 onStderr: (output) => this.handleRecordingStderr(cameraId, output),
                 onError: (error) => {

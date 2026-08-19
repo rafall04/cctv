@@ -89,7 +89,20 @@ export function createRecordingLifecycleReconciler({
     }
 
     async function reconcileAll(reason = 'periodic_safety_net', now = Date.now()) {
-        const cameras = query(`${CAMERA_SELECT} WHERE enabled = 1 AND enable_recording = 1 ORDER BY id ASC`);
+        // Cameras that SHOULD be recording, plus any that currently ARE. The second half matters:
+        // adoption deliberately takes back every recorder whose camera row still exists and leaves
+        // the stop decision to this sweep — but a filter on enabled/enable_recording means a
+        // recorder for a camera someone disabled is never looked at again, so it records on
+        // forever and is re-adopted on every boot. decideRecordingLifecycleAction already returns
+        // stop_disabled for exactly this; it simply was never asked.
+        const activeIds = recordingProcessManager.getActiveCameraIds?.() ?? [];
+        const extra = activeIds.length
+            ? ` OR id IN (${activeIds.map(() => '?').join(', ')})`
+            : '';
+        const cameras = query(
+            `${CAMERA_SELECT} WHERE ((enabled = 1 AND enable_recording = 1)${extra}) ORDER BY id ASC`,
+            activeIds,
+        );
         const results = [];
         for (const camera of cameras) {
             results.push(await reconcileCameraSnapshot(camera, reason, now));

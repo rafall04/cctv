@@ -106,3 +106,48 @@ describe('recordingFailureClassifier', () => {
         })).toBe('ffmpeg_failed');
     });
 });
+
+/*
+ * REGRESSION (2026-08-19 audit T4): the intentional/restart sets listed reasons nothing produces
+ * ('camera_disabled', 'process_shutdown') while the reasons real callers pass fell through to
+ * `ffmpeg_failed`. Every deliberate stop was then logged as a crash AND counted as a failure — and
+ * a freeze-restart counted twice (monitor tick + the close it caused), so the circuit breaker
+ * suspended a camera in half the intended number of failures.
+ */
+describe('penghentian yang DISENGAJA tidak boleh divonis crash', () => {
+    const closedByUs = (stopReason) => classifyRecordingExit({
+        ffmpegOutput: '', exitCode: 255, exitSignal: null, streamSource: 'internal', stopReason,
+    });
+
+    it('mengenali alasan stop yang benar-benar dikirim pemanggil', () => {
+        expect(closedByUs('admin_stop')).toBe('intentional_stop');
+        expect(closedByUs('camera_or_recording_disabled')).toBe('intentional_stop');
+        expect(closedByUs('delivery_not_recordable')).toBe('intentional_stop');
+        expect(closedByUs('camera_offline')).toBe('intentional_stop');
+        expect(closedByUs('manual_stop')).toBe('intentional_stop');
+    });
+
+    it('mengenali restart, termasuk yang dari freeze detector dan ganti sumber', () => {
+        expect(closedByUs('stream_frozen')).toBe('restart_requested');
+        expect(closedByUs('camera_source_updated')).toBe('restart_requested');
+    });
+
+    /*
+     * restartRecording menempelkan '_restart' pada alasan apa pun yang diterimanya, jadi
+     * 'api_restart' menjadi 'api_restart_restart'. Mencocokkan akhirannya berarti alasan restart
+     * baru apa pun ikut tertangkap tanpa ada yang perlu ingat menambahkannya ke daftar.
+     */
+    it('menangkap akhiran _restart yang dibuat restartRecording', () => {
+        expect(closedByUs('api_restart_restart')).toBe('restart_requested');
+        expect(closedByUs('camera_source_updated_restart')).toBe('restart_requested');
+        expect(closedByUs('alasan_baru_yang_belum_ada_restart')).toBe('restart_requested');
+    });
+
+    it('crash sungguhan TETAP dilaporkan sebagai kegagalan', () => {
+        expect(closedByUs(null)).toBe('ffmpeg_failed');
+        expect(closedByUs('process_crashed')).toBe('ffmpeg_failed');
+        expect(classifyRecordingExit({
+            ffmpegOutput: 'Server returned 404 Not Found', exitCode: 1, stopReason: null,
+        })).toBe('upstream_unreachable');
+    });
+});

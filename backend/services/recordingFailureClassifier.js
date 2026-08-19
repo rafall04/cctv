@@ -4,10 +4,29 @@
 // MainFuncs: classifyRecordingExit.
 // SideEffects: None.
 
+/*
+ * Reasons that mean WE stopped this recorder on purpose.
+ *
+ * The set has to match what the producers actually send, and for a long time it did not: it listed
+ * 'camera_disabled' and 'process_shutdown', which nothing in the codebase ever emits, while the
+ * real reasons — the ones the lifecycle policy, the freeze detector and the admin endpoint pass
+ * in — fell through to `ffmpeg_failed`. The fallout was not cosmetic:
+ *
+ *   * every deliberate stop was logged to stderr as a crash and written to restart_logs as
+ *     'process_crashed' — exactly the noise the logging policy exists to prevent;
+ *   * a freeze-restart counted the failure TWICE (once in the monitor's tick, again on the close
+ *     it had just caused), so the circuit breaker suspended a camera in half the intended number
+ *     of failures.
+ *
+ * The `signaled` escape hatch below does not rescue these: SIGINT makes ffmpeg exit 255 with no
+ * exitSignal, and `-loglevel error` suppresses the "received signal" line it would otherwise print.
+ */
 const INTENTIONAL_STOP_REASONS = new Set([
     'manual_stop',
-    'camera_disabled',
+    'admin_stop',
     'camera_offline',
+    'camera_or_recording_disabled',
+    'delivery_not_recordable',
 ]);
 
 const SHUTDOWN_REASONS = new Set([
@@ -17,8 +36,10 @@ const SHUTDOWN_REASONS = new Set([
 
 const RESTART_REASONS = new Set([
     'stream_frozen_restart',
+    'stream_frozen',
     'health_restart',
     'manual_restart',
+    'camera_source_updated',
 ]);
 
 export function classifyRecordingExit({
@@ -32,7 +53,10 @@ export function classifyRecordingExit({
         return 'intentional_shutdown';
     }
 
-    if (RESTART_REASONS.has(stopReason)) {
+    // restartRecording appends '_restart' to whatever reason it was given, so 'api_restart'
+    // becomes 'api_restart_restart'. Matching the suffix covers every future restart reason
+    // without anyone having to remember to add it here.
+    if (RESTART_REASONS.has(stopReason) || String(stopReason || '').endsWith('_restart')) {
         return 'restart_requested';
     }
 

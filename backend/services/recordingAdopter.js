@@ -38,6 +38,10 @@ export function createRecordingAdopter({
     recordingsBasePath = RECORDINGS_BASE_PATH,
     logger = console,
     buildCallbacks = () => ({}),
+    // Seeds the freeze detector for a recorder we did not spawn. Without it an adopted recorder
+    // is ABSENT from the monitor's map until its first close, so the 30s no-data check — the
+    // whole reason the monitor exists — never runs for the recorders that survive a restart.
+    markStarted = () => {},
 } = {}) {
     if (!processManager) {
         throw new Error('recordingAdopter requires a processManager');
@@ -89,6 +93,7 @@ export function createRecordingAdopter({
 
                 if (result?.success) {
                     seenCameras.add(cameraId);
+                    markStarted(cameraId);
                     adopted.push({ cameraId, pid });
                 } else {
                     logger.warn?.(`[Recording] Could not adopt camera ${cameraId} pid ${pid}: ${result?.message}`);

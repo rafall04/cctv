@@ -37,10 +37,21 @@ export function isWorkerMode() {
     return config.recording?.workerEnabled === true;
 }
 
+/*
+ * The queue write is the whole request in worker mode — if it fails, nothing will ever happen.
+ * requestReconcile swallows its own errors and answers false, and every caller here used to
+ * discard that and reply success anyway, so a failed enqueue looked identical to a done job.
+ */
+function queued(ok, message) {
+    return ok
+        ? { success: true, queued: true, message }
+        : { success: false, queued: false, message: 'Could not queue the request for the recording worker' };
+}
+
 export async function reconcile(cameraId, reason = 'api_request') {
     if (isWorkerMode()) {
-        workerState.requestReconcile(cameraId, reason);
-        return { success: true, queued: true, reason };
+        const ok = workerState.requestReconcile(cameraId, reason);
+        return { ...queued(ok, 'Reconcile requested'), reason };
     }
     const service = await getRecordingService();
     return service.reconcileRecordingLifecycle(cameraId, reason);
@@ -58,8 +69,7 @@ export async function reconcileAll(reason = 'api_request') {
 
 export async function start(cameraId, reason = 'api_start') {
     if (isWorkerMode()) {
-        workerState.requestReconcile(cameraId, reason, 'start');
-        return { success: true, queued: true, message: 'Recording start requested' };
+        return queued(workerState.requestReconcile(cameraId, reason, 'start'), 'Recording start requested');
     }
     const service = await getRecordingService();
     return service.startRecording(cameraId);
@@ -67,8 +77,7 @@ export async function start(cameraId, reason = 'api_start') {
 
 export async function stop(cameraId, options = {}) {
     if (isWorkerMode()) {
-        workerState.requestReconcile(cameraId, options.reason || 'api_stop', 'stop');
-        return { success: true, queued: true, message: 'Recording stop requested' };
+        return queued(workerState.requestReconcile(cameraId, options.reason || 'api_stop', 'stop'), 'Recording stop requested');
     }
     const service = await getRecordingService();
     return service.stopRecording(cameraId, options);
@@ -76,8 +85,7 @@ export async function stop(cameraId, options = {}) {
 
 export async function restart(cameraId, reason = 'api_restart') {
     if (isWorkerMode()) {
-        workerState.requestReconcile(cameraId, reason, 'restart');
-        return { success: true, queued: true, message: 'Recording restart requested' };
+        return queued(workerState.requestReconcile(cameraId, reason, 'restart'), 'Recording restart requested');
     }
     const service = await getRecordingService();
     return service.restartRecording(cameraId, reason);
