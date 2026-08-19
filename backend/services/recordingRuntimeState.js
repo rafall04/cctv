@@ -13,7 +13,7 @@ export class RecordingRuntimeState {
 
     // `pid` is passed explicitly for ADOPTED recorders: we hold no child handle for
     // a process we did not spawn, so the pid is the only handle that exists.
-    setActive(cameraId, { process, pid = null, streamSource, startedAt = new Date(), camera = null }) {
+    setActive(cameraId, { process, pid = null, streamSource, startedAt = new Date(), camera = null, withAudio = null }) {
         const record = {
             cameraId,
             process,

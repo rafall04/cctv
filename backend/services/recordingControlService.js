@@ -58,7 +58,7 @@ export async function reconcileAll(reason = 'api_request') {
 
 export async function start(cameraId, reason = 'api_start') {
     if (isWorkerMode()) {
-        workerState.requestReconcile(cameraId, reason);
+        workerState.requestReconcile(cameraId, reason, 'start');
         return { success: true, queued: true, message: 'Recording start requested' };
     }
     const service = await getRecordingService();
@@ -67,7 +67,7 @@ export async function start(cameraId, reason = 'api_start') {
 
 export async function stop(cameraId, options = {}) {
     if (isWorkerMode()) {
-        workerState.requestReconcile(cameraId, options.reason || 'api_stop');
+        workerState.requestReconcile(cameraId, options.reason || 'api_stop', 'stop');
         return { success: true, queued: true, message: 'Recording stop requested' };
     }
     const service = await getRecordingService();
@@ -76,7 +76,7 @@ export async function stop(cameraId, options = {}) {
 
 export async function restart(cameraId, reason = 'api_restart') {
     if (isWorkerMode()) {
-        workerState.requestReconcile(cameraId, reason);
+        workerState.requestReconcile(cameraId, reason, 'restart');
         return { success: true, queued: true, message: 'Recording restart requested' };
     }
     const service = await getRecordingService();

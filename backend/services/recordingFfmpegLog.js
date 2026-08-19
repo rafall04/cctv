@@ -114,6 +114,7 @@ export function readFfmpegLogTail({ logPath, maxBytes = 8192, fromOffset = 0 } =
 export function createLogTailer({
     logPath,
     onData,
+    onTruncate,
     fromEnd = false,
     maxBytes = FFMPEG_LOG_MAX_BYTES,
     intervalMs = FFMPEG_LOG_POLL_INTERVAL_MS,
@@ -192,6 +193,11 @@ export function createLogTailer({
                 try {
                     truncateSync(logPath, 0);
                     offset = 0;
+                    // Anyone holding a byte offset into this file is now pointing past its end.
+                    // The exit classifier does exactly that (readFfmpegLogTail's fromOffset), and a
+                    // stale offset makes it read nothing at all — the same blindness the offset was
+                    // added to prevent, just arriving by a different door.
+                    onTruncate?.();
                 } catch (error) {
                     logger.warn?.(`[FfmpegLog] Could not truncate ${logPath}: ${error.message}`);
                 }

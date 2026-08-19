@@ -147,3 +147,41 @@ describe('recordingStarter honours the fallback', () => {
         expect(args).not.toContain('0:a?');
     });
 });
+
+/*
+ * REGRESSION (2026-08-19 audit T6): the fallback was armed by the exit REASON alone, without ever
+ * asking whether the run that died had mapped audio at all. "Too many packets buffered" is also
+ * what a stalled VIDEO queue reports, and with `RECORDING_AUDIO=off` every run is video-only — so
+ * a camera could be marked audio-unusable over a failure its audio had no part in, and then be
+ * recorded without sound for the rest of the process's life.
+ */
+describe('penanda audio hanya berlaku untuk run yang memang memetakan audio', () => {
+    const audioFault = { cameraId: 42, reason: 'audio_stream_stalled' };
+
+    /** Mirror of the guard in recordingService.handleRecordingClosed. */
+    const wouldMark = (result) =>
+        result.withAudio !== false && isAudioFaultReason(result.reason);
+
+    it('menandai run yang memetakan audio', () => {
+        expect(wouldMark({ ...audioFault, withAudio: true })).toBe(true);
+    });
+
+    it('TIDAK menandai run video-saja meski alasannya terdengar seperti audio', () => {
+        expect(wouldMark({ ...audioFault, withAudio: false })).toBe(false);
+    });
+
+    /*
+     * Perekam ADOPSI tak pernah kita lihat argumennya, jadi jawabannya null. Menolak belajar dari
+     * mereka akan membuat justru kamera yang selamat melewati restart tak pernah bisa diperbaiki.
+     */
+    it('tetap menandai perekam adopsi yang argumennya tak diketahui', () => {
+        expect(wouldMark({ ...audioFault, withAudio: null })).toBe(true);
+        expect(wouldMark({ ...audioFault })).toBe(true);
+    });
+
+    it('alasan non-audio tak pernah menandai apa pun, withAudio apa pun', () => {
+        for (const withAudio of [true, false, null]) {
+            expect(wouldMark({ cameraId: 42, reason: 'upstream_unreachable', withAudio })).toBe(false);
+        }
+    });
+});

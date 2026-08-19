@@ -114,11 +114,23 @@ async function drainReconcileRequests() {
         return;
     }
 
-    for (const { cameraId, reason } of requests) {
+    for (const { cameraId, reason, action = 'reconcile' } of requests) {
         try {
-            await recordingService.reconcileRecordingLifecycle(cameraId, reason);
+            // An imperative is honoured as an imperative. Routing stop/restart through reconcile
+            // meant the desired-state decision answered `noop_recording` for a camera that was
+            // already running — so the admin stop button did nothing at all, and a changed RTSP
+            // URL kept being recorded from the OLD source, both while replying success.
+            if (action === 'stop') {
+                await recordingService.stopRecording(cameraId, { reason });
+            } else if (action === 'restart') {
+                await recordingService.restartRecording(cameraId, reason);
+            } else if (action === 'start') {
+                await recordingService.startRecording(cameraId);
+            } else {
+                await recordingService.reconcileRecordingLifecycle(cameraId, reason);
+            }
         } catch (error) {
-            console.error(`[Recorder] Reconcile failed for camera ${cameraId} (${reason}):`, error?.message || error);
+            console.error(`[Recorder] ${action} failed for camera ${cameraId} (${reason}):`, error?.message || error);
         }
     }
 }

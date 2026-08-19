@@ -347,7 +347,11 @@ class RecordingService {
         // gave up. Retrying identically would fail identically. Marking it makes the NEXT start
         // video-only — and this line is the only announcement, because the mark is per process
         // and the retry is silent from then on.
-        if (isAudioFaultReason(result.reason) && markRecordingAudioUnusable(cameraId)) {
+        // `withAudio === false` is proof this run mapped no audio, so an audio verdict cannot be
+        // about our mapping — "Too many packets buffered" is also what a stalled VIDEO queue says.
+        // `null` (an adopted recorder, whose arguments we never saw) stays eligible: refusing to
+        // learn from those would leave the very cameras that survive restarts unrepairable.
+        if (result.withAudio !== false && isAudioFaultReason(result.reason) && markRecordingAudioUnusable(cameraId)) {
             console.error(
                 `[Recording] Camera ${cameraId} advertises audio it cannot deliver (${result.reason}); `
                 + 'recording it video-only until this recorder restarts.'

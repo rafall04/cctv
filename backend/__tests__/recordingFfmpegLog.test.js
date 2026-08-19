@@ -239,3 +239,54 @@ describe('readFfmpegLogTail respects where this process started writing', () => 
         expect(currentLogSize(null)).toBe(0);
     });
 });
+
+/*
+ * REGRESSION (2026-08-19 audit T5): the tailer truncates the log itself once it passes 8 MB, but
+ * anyone else holding a byte offset into that file is then pointing past its end. The exit
+ * classifier does exactly that, and a stale offset made readFfmpegLogTail return nothing at all —
+ * re-creating the very blindness the offset was introduced to prevent, arriving by another door.
+ */
+describe('createLogTailer memberi tahu pemegang offset saat log dipangkas', () => {
+    it('memanggil onTruncate sesudah memangkas log yang melewati batas', async () => {
+        const { createLogTailer } = await import('../services/recordingFfmpegLog.js');
+        const logPath = join(tmpdir(), `ffmpeg-trunc-${process.pid}.log`);
+        writeFileSync(logPath, 'x'.repeat(400));
+        let truncated = 0;
+
+        const tailer = createLogTailer({
+            logPath, maxBytes: 100, intervalMs: 20,
+            onData: () => {},
+            onTruncate: () => { truncated += 1; },
+        });
+
+        try {
+            await new Promise((r) => setTimeout(r, 200));
+            expect(truncated).toBeGreaterThan(0);
+            expect(statSync(logPath).size).toBe(0);
+        } finally {
+            tailer.stop();
+            rmSync(logPath, { force: true });
+        }
+    }, 4000);
+
+    it('tidak memanggil onTruncate untuk log yang masih di bawah batas', async () => {
+        const { createLogTailer } = await import('../services/recordingFfmpegLog.js');
+        const logPath = join(tmpdir(), `ffmpeg-notrunc-${process.pid}.log`);
+        writeFileSync(logPath, 'kecil saja\n');
+        let truncated = 0;
+
+        const tailer = createLogTailer({
+            logPath, maxBytes: 1_000_000, intervalMs: 20,
+            onData: () => {},
+            onTruncate: () => { truncated += 1; },
+        });
+
+        try {
+            await new Promise((r) => setTimeout(r, 150));
+            expect(truncated).toBe(0);
+        } finally {
+            tailer.stop();
+            rmSync(logPath, { force: true });
+        }
+    }, 4000);
+});

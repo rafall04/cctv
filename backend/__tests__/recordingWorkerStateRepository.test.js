@@ -106,14 +106,15 @@ describe('reconcile request queue', () => {
     it('claims requests, deletes them, and COALESCES per camera', () => {
         // Ten edits to one camera still only need one reconcile.
         queryMock.mockReturnValue([
-            { id: 1, camera_id: 7, reason: 'settings_changed' },
-            { id: 2, camera_id: 7, reason: 'source_changed' },
-            { id: 3, camera_id: 9, reason: 'health_transition_offline' },
+            { id: 1, camera_id: 7, reason: 'settings_changed', action: 'reconcile' },
+            { id: 2, camera_id: 7, reason: 'source_changed', action: 'reconcile' },
+            { id: 3, camera_id: 9, reason: 'health_transition_offline', action: 'reconcile' },
         ]);
 
+        // Plain reconciles still coalesce first-wins; only an imperative overrides one.
         expect(repo.takeReconcileRequests()).toEqual([
-            { cameraId: 7, reason: 'settings_changed' },
-            { cameraId: 9, reason: 'health_transition_offline' },
+            { cameraId: 7, reason: 'settings_changed', action: 'reconcile' },
+            { cameraId: 9, reason: 'health_transition_offline', action: 'reconcile' },
         ]);
 
         const [deleteSql, deleteParams] = executeMock.mock.calls[0];

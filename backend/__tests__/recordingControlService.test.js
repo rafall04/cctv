@@ -100,8 +100,11 @@ describe('recordingControlService — worker mode', () => {
         expect(reconcileLifecycleMock).not.toHaveBeenCalled();
 
         expect(requestReconcileMock).toHaveBeenCalledTimes(4);
-        expect(requestReconcileMock).toHaveBeenCalledWith(7, 'camera_created');
-        expect(requestReconcileMock).toHaveBeenCalledWith(7, 'camera_source_updated');
+        // Each imperative carries its own action: routing them all as 'reconcile' is what let the
+        // worker answer noop_recording and silently drop an admin stop or a source-change restart.
+        expect(requestReconcileMock).toHaveBeenCalledWith(7, 'camera_created', 'start');
+        expect(requestReconcileMock).toHaveBeenCalledWith(7, 'camera_source_updated', 'stop');
+        expect(requestReconcileMock).toHaveBeenCalledWith(7, 'src_changed', 'restart');
         expect(requestReconcileMock).toHaveBeenCalledWith(7, 'settings_changed');
     });
 

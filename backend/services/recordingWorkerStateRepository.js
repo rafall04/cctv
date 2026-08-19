@@ -132,11 +132,21 @@ export function readHealthSnapshot(nowMs = Date.now()) {
  * reconcileRecordingLifecycle() — without it, an admin toggle would sit until the
  * recorder's periodic sweep came round.
  */
-export function requestReconcile(cameraId, reason = 'api_request') {
+/**
+ * Actions the worker can be asked to perform, weakest first.
+ *
+ * 'reconcile' means "make the world match the database" and is a DESIRED-STATE decision. The
+ * others are imperatives — they must happen even when desired state says nothing needs to change,
+ * which is exactly the case that used to swallow them.
+ */
+export const RECONCILE_ACTIONS = ['reconcile', 'start', 'restart', 'stop'];
+
+export function requestReconcile(cameraId, reason = 'api_request', action = 'reconcile') {
+    const safeAction = RECONCILE_ACTIONS.includes(action) ? action : 'reconcile';
     return safe(() => {
         execute(
-            'INSERT INTO recording_reconcile_requests (camera_id, reason, requested_at) VALUES (?, ?, ?)',
-            [cameraId, reason, nowIso()]
+            'INSERT INTO recording_reconcile_requests (camera_id, reason, requested_at, action) VALUES (?, ?, ?, ?)',
+            [cameraId, reason, nowIso(), safeAction]
         );
         return true;
     }, false);
@@ -149,7 +159,7 @@ export function requestReconcile(cameraId, reason = 'api_request') {
 export function takeReconcileRequests(limit = 200) {
     return safe(() => {
         const rows = query(
-            'SELECT id, camera_id, reason FROM recording_reconcile_requests ORDER BY id LIMIT ?',
+            "SELECT id, camera_id, reason, COALESCE(action, 'reconcile') AS action FROM recording_reconcile_requests ORDER BY id LIMIT ?",
             [limit]
         );
         if (rows.length === 0) {
@@ -162,11 +172,19 @@ export function takeReconcileRequests(limit = 200) {
             ids
         );
 
+        // Coalescing keeps ONE entry per camera, and which one it keeps matters. First-wins used
+        // to be fine when every row said the same thing; now an imperative must never be swallowed
+        // by a routine reconcile that happened to be queued after it. So an imperative always beats
+        // a plain reconcile, and among imperatives the most recent wins — that is the operator's
+        // latest intent.
         const byCamera = new Map();
         for (const row of rows) {
-            if (!byCamera.has(row.camera_id)) {
-                byCamera.set(row.camera_id, { cameraId: row.camera_id, reason: row.reason });
+            const previous = byCamera.get(row.camera_id);
+            const isImperative = row.action !== 'reconcile';
+            if (previous && !isImperative) {
+                continue;
             }
+            byCamera.set(row.camera_id, { cameraId: row.camera_id, reason: row.reason, action: row.action });
         }
         return [...byCamera.values()];
     }, []);

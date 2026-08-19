@@ -35,6 +35,7 @@ export class RecordingProcessManager {
     }
 
     async start(cameraId, { ffmpegArgs, camera, streamSource, spawnOptions, stderrLogPath, onStdout, onStderr, onClose, onError }) {
+        const withAudio = Array.isArray(ffmpegArgs) && ffmpegArgs.includes('0:a?');
         if (this.state.has(cameraId)) {
             return { success: false, message: 'Already recording' };
         }
@@ -56,7 +57,7 @@ export class RecordingProcessManager {
         }
 
         const child = spawn(this.binary, ffmpegArgs, effectiveSpawnOptions);
-        this.state.setActive(cameraId, { process: child, camera, streamSource });
+        this.state.setActive(cameraId, { process: child, camera, streamSource, withAudio });
         this.outputBuffers.set(cameraId, []);
         this.callbacks.set(cameraId, { onStdout, onStderr, onClose, onError });
 
@@ -66,7 +67,10 @@ export class RecordingProcessManager {
             try { closeSync(logFd); } catch { /* already closed */ }
             // Don't hold the event loop open for a process that is meant to outlive us.
             child.unref?.();
-            this.startTailer(cameraId, stderrLogPath, { fromEnd: false });
+            // fromEnd, not 0: the log is append-only and shared with every recorder this camera
+            // has ever had. Starting at 0 replayed the whole history into the classification ring
+            // and re-fired old segment-completed events on every single respawn.
+            this.startTailer(cameraId, stderrLogPath, { fromEnd: true });
         } else {
             child.stdout?.on('data', (data) => {
                 this.state.updateLastDataAt(cameraId);
@@ -134,6 +138,7 @@ export class RecordingProcessManager {
             logPath,
             fromEnd,
             onData: (output) => this.feedOutput(cameraId, output),
+            onTruncate: () => this.logStartOffsets.set(cameraId, 0),
         });
         this.tailers.set(cameraId, tailer);
     }
@@ -400,6 +405,7 @@ export class RecordingProcessManager {
         const result = {
             cameraId,
             reason,
+            withAudio: record.withAudio ?? null,
             exitCode,
             exitSignal,
             forcedKill: record.forcedKill,
