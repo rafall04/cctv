@@ -191,6 +191,26 @@ pm2 restart deployment/ecosystem.config.cjs --only rafnet-cctv-recorder --update
 Any other value (or none) means audio is recorded. The switch only affects recorders
 started after the restart; already-running FFmpeg processes keep their original arguments.
 
+##### Ingest circuit breaker
+
+MediaMTX retries a static source forever, with no backoff and no knob to change it. On the
+cheap RTSP firmware in this fleet every attempt leaves a dead session behind, so a camera
+that goes down is kept down by our own reconnects — the retry meant to restore the stream
+is what prevents it. A camera offline for more than 30 minutes is therefore demoted to
+`sourceOnDemand`: MediaMTX stops dialling it and only tries when a viewer actually asks.
+
+Nothing in the database changes, and recovery needs no operator. Health still probes the
+camera directly, so the first success lifts the demotion on its own.
+
+Parking requires a RECENT health check, which is the safety property that matters: if the
+health sweep itself stops working, every camera fails that test and nothing is parked. To
+disable the mechanism entirely:
+
+```bash
+echo "MEDIAMTX_PARK_DEAD_INGEST=off" >> backend/.env
+pm2 restart deployment/ecosystem.config.cjs --only rafnet-cctv-backend --update-env
+```
+
 #### 6. Configure Nginx
 
 ```bash

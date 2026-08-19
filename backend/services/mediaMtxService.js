@@ -9,7 +9,7 @@ SideEffects: Reads camera/area DB rows and creates, patches, refreshes, or delet
 import axios from 'axios';
 import { config } from '../config/config.js';
 import { query, queryOne } from '../database/connectionPool.js';
-import { resolveInternalIngestPolicy } from '../utils/internalIngestPolicy.js';
+import { resolveInternalIngestPolicy, shouldParkInternalIngest, isIngestParkEnabled } from '../utils/internalIngestPolicy.js';
 import { resolveInternalRtspTransport, toMediaMtxSourceProtocol } from '../utils/internalRtspTransportPolicy.js';
 
 // Centralized Axios instance for MediaMTX API to avoid repetition and enforce standard timeouts
@@ -101,10 +101,15 @@ class MediaMtxService {
     buildInternalPathConfig(camera) {
         const resolvedPolicy = resolveInternalIngestPolicy(camera, camera._areaPolicy || null);
         const resolvedTransport = resolveInternalRtspTransport(camera, camera._areaPolicy || null);
+        // A chronically dead camera is parked on-demand no matter what the operator asked for:
+        // always_on means MediaMTX dials forever, and on this firmware that is what keeps a wedged
+        // camera wedged. Operator intent is untouched in the DB — this is a temporary demotion that
+        // lifts itself the moment the camera answers again. See shouldParkInternalIngest.
+        const parked = shouldParkInternalIngest(camera);
         return {
             source: camera.rtsp_url,
             rtspTransport: toMediaMtxSourceProtocol(resolvedTransport),
-            sourceOnDemand: resolvedPolicy.mode !== 'always_on',
+            sourceOnDemand: parked || resolvedPolicy.mode !== 'always_on',
             sourceOnDemandStartTimeout: '10s',
             sourceOnDemandCloseAfter: `${resolvedPolicy.closeAfterSeconds || 30}s`,
         };
@@ -231,6 +236,15 @@ class MediaMtxService {
         // Initial health check after 5 seconds
         setTimeout(() => this.healthCheck(), 5000);
 
+        // Park/unpark chronically dead ingests. Separate from healthCheck on purpose: that one
+        // only re-syncs when a path is MISSING, so a config-only change like this would never be
+        // applied by it. Two minutes is far below the 30-minute park threshold, so the decision is
+        // never the slow part.
+        this.parkReconcileInterval = setInterval(() => {
+            this.reconcileParkedIngest().catch((error) =>
+                console.error('[MediaMTX] Ingest park reconcile failed:', error.message));
+        }, 120000);
+
         console.log('[MediaMTX] Auto-sync enabled (health check every 30s)');
     }
 
@@ -242,6 +256,53 @@ class MediaMtxService {
             clearInterval(this.healthCheckInterval);
             this.healthCheckInterval = null;
         }
+        if (this.parkReconcileInterval) {
+            clearInterval(this.parkReconcileInterval);
+            this.parkReconcileInterval = null;
+        }
+    }
+
+    /**
+     * Apply the ingest circuit breaker to the cameras whose parked state actually changed.
+     *
+     * Only changed cameras are touched: updateCameraPath costs two API round-trips per camera and
+     * this fleet is ~750 paths, so re-checking every path every cycle would be its own kind of
+     * hammering. `parkedPaths` starts empty after a restart, which correctly re-applies the park to
+     * cameras that are still dead — a one-off burst bounded by how many are actually down.
+     */
+    async reconcileParkedIngest(now = Date.now()) {
+        if (!isIngestParkEnabled()) {
+            return { checked: 0, changed: 0, skipped: 'disabled' };
+        }
+        if (!this.parkedPaths) {
+            this.parkedPaths = new Set();
+        }
+
+        const cameras = this.getDatabaseCameras();
+        let changed = 0;
+
+        for (const camera of cameras) {
+            const shouldPark = shouldParkInternalIngest(camera, now);
+            if (shouldPark === this.parkedPaths.has(camera.path_name)) {
+                continue;
+            }
+
+            const result = await this.updateCameraPath(camera.path_name, camera.rtsp_url, camera);
+            if (!result?.success) {
+                continue;
+            }
+
+            if (shouldPark) {
+                this.parkedPaths.add(camera.path_name);
+            } else {
+                this.parkedPaths.delete(camera.path_name);
+            }
+            changed += 1;
+            // A transition worth one line: it changes how hard we knock on a camera.
+            console.log(`[MediaMTX] Camera ${camera.id} ingest ${shouldPark ? 'PARKED (dead too long; on-demand only)' : 'UNPARKED (source answering again)'}`);
+        }
+
+        return { checked: cameras.length, changed };
     }
 
     /**
@@ -361,6 +422,9 @@ class MediaMtxService {
                     cameras.source_profile,
                     cameras.description,
                     cameras.enable_recording,
+                    cameras.is_online,
+                    crs.last_online_at,
+                    crs.last_health_check_at,
                     CASE
                         WHEN areas.internal_ingest_policy_default IN ('default', 'always_on', 'on_demand')
                             THEN areas.internal_ingest_policy_default
@@ -375,6 +439,7 @@ class MediaMtxService {
                     COALESCE(cameras.stream_key, 'camera' || cameras.id) as path_name
                 FROM cameras
                 LEFT JOIN areas ON areas.id = cameras.area_id
+                LEFT JOIN camera_runtime_state crs ON crs.camera_id = cameras.id
                 WHERE cameras.enabled = 1 AND (cameras.stream_source = 'internal' OR cameras.stream_source IS NULL)
             `);
             return cameras.map((camera) => ({
