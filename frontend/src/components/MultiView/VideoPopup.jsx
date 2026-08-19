@@ -43,7 +43,7 @@ import {
     normalizePublicPopupAspectRatio,
 } from '../../utils/publicPopupLayout.js';
 import {
-    getPublicPopupErrorType,
+    classifyHlsError,
     getPublicPopupInitialStatus,
     isCodecFailure,
     getPublicPopupOverlayState,
@@ -685,15 +685,8 @@ function VideoPopup({
 
                 // Clear loading timeout
                 clearStreamTimeout();
-                const detectedErrorType = getPublicPopupErrorType({
-                    hlsError: {
-                        ...d,
-                        type: d.type === HlsClass.ErrorTypes.NETWORK_ERROR
-                            ? 'networkError'
-                            : d.type === HlsClass.ErrorTypes.MEDIA_ERROR
-                                ? 'mediaError'
-                                : 'unknownError',
-                    },
+                const detectedErrorType = classifyHlsError(d, {
+                    HlsErrorTypes: HlsClass.ErrorTypes,
                     streamSource: camera.stream_source,
                 });
 
@@ -789,13 +782,21 @@ function VideoPopup({
                                 requestVideoPlay(video);
                             });
 
+                            // The retry instance kept three defects the primary handler had already
+                            // fixed: no isCodecFailure (a NON-fatal codec refusal was dropped, so
+                            // the viewer got "Loading Timeout" instead of the codec message), a
+                            // STALE errorType from the error that triggered the retry, and no
+                            // clearStreamTimeout — which overwrote even a correct verdict.
                             newHls.on(HlsClass.Events.ERROR, (_, d2) => {
                                 if (isStaleStreamRun()) return;
-                                if (d2.fatal) {
-                                    setStatus('error');
-                                    setErrorType(detectedErrorType);
-                                    setLoadingStage(LoadingStage.ERROR);
-                                }
+                                if (isCodecFailure(d2)) { failWithCodec(); newHls.destroy(); return; }
+                                if (!d2.fatal) return;
+                                clearStreamTimeout(); setStatus('error');
+                                setErrorType(classifyHlsError(d2, {
+                                    HlsErrorTypes: HlsClass.ErrorTypes,
+                                    streamSource: camera.stream_source,
+                                }));
+                                setLoadingStage(LoadingStage.ERROR);
                             });
                         }
                     });

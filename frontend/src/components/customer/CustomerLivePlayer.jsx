@@ -12,12 +12,14 @@ import streamService from '../../services/streamService';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { getSecureStreamUrl, buildSecureStreamUrl, clearTokenCache } from '../../services/streamTokenService';
 import { isCodecFailure } from '../../utils/publicPopupState.js';
+import { canPlayNativeHls, startNativeHlsPlayback } from '../../utils/nativeHlsPlayback.js';
 
 export default function CustomerLivePlayer({ camera, onClose }) {
     const dialogRef = useRef(null);
     useFocusTrap(dialogRef, { onEscape: onClose });
     const videoRef = useRef(null);
     const hlsRef = useRef(null);
+    const nativeStopRef = useRef(null);
     const [state, setState] = useState({ status: 'loading', message: '' });
 
     useEffect(() => {
@@ -95,21 +97,25 @@ export default function CustomerLivePlayer({ camera, onClose }) {
                         hls.destroy();
                         hlsRef.current = null;
                     });
-                } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                } else if (canPlayNativeHls(video)) {
                     // Safari/iOS native HLS — the rewritten playlist keeps the token
                     // flowing to child playlists and segments.
-                    video.src = securedUrl;
+                    //
+                    // hls.js is not involved here, so `isCodecFailure` above can never run: this
+                    // branch has to read the verdict off the element itself. Without that it
+                    // reported every failure as "Stream tidak dapat diputar" — blaming the stream
+                    // for a decoder the renter's own phone is missing.
                     video.addEventListener('loadedmetadata', () => {
-                        if (!cancelled) {
-                            setState({ status: 'playing', message: '' });
-                            video.play().catch(() => {});
-                        }
+                        if (!cancelled) setState({ status: 'playing', message: '' });
                     }, { once: true });
-                    video.addEventListener('error', () => {
-                        if (!cancelled) {
-                            setState({ status: 'error', message: 'Stream tidak dapat diputar di perangkat ini.' });
-                        }
-                    }, { once: true });
+                    nativeStopRef.current = startNativeHlsPlayback(video, securedUrl, {
+                        isStale: () => cancelled,
+                        onCodecFailure: () => setState({
+                            status: 'error',
+                            message: 'Perangkat ini tidak bisa memutar codec H.265/HEVC kamera tersebut. Coba buka di Safari, atau minta admin mengubah kamera ke H.264.',
+                        }),
+                        onError: () => setState({ status: 'error', message: 'Stream tidak dapat diputar di perangkat ini.' }),
+                    });
                 } else {
                     setState({ status: 'error', message: 'Browser tidak mendukung pemutaran HLS.' });
                 }
@@ -129,6 +135,8 @@ export default function CustomerLivePlayer({ camera, onClose }) {
         start();
         return () => {
             cancelled = true;
+            nativeStopRef.current?.();
+            nativeStopRef.current = null;
             if (hlsRef.current) {
                 hlsRef.current.destroy();
                 hlsRef.current = null;

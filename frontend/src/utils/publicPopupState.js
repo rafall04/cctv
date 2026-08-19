@@ -218,3 +218,23 @@ export const getPublicPopupOverlayState = ({ status, loadingStage, errorType }) 
         canRetry: false,
     };
 };
+
+/**
+ * Classify an hls.js error into a popup error type, translating hls.js's own ErrorTypes enum.
+ *
+ * Extracted because both hls.js instances in VideoPopup need it — the primary one and the one the
+ * fallback retry builds. The retry copy did not exist, so it reused the error type computed for a
+ * DIFFERENT (earlier) error and reported, say, a network failure as "Error Media". Having one
+ * function means a new player cannot accidentally ship a third dialect of this mapping.
+ *
+ * `HlsErrorTypes` is passed in rather than imported: hls.js is lazy-loaded in every caller, and
+ * importing it here would drag the whole library into the initial bundle.
+ */
+export const classifyHlsError = (hlsError, { HlsErrorTypes, streamSource } = {}) => {
+    const type = hlsError?.type === HlsErrorTypes?.NETWORK_ERROR
+        ? 'networkError'
+        : hlsError?.type === HlsErrorTypes?.MEDIA_ERROR
+            ? 'mediaError'
+            : 'unknownError';
+    return getPublicPopupErrorType({ hlsError: { ...hlsError, type }, streamSource });
+};

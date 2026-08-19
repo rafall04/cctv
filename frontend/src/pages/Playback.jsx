@@ -23,6 +23,7 @@ import InlineAdSlot from '../components/ads/InlineAdSlot';
 import { isAdsMobileViewport, shouldRenderAdSlot } from '../components/ads/adsConfig.js';
 import { getStreamCapabilities } from '../utils/cameraDelivery.js';
 import { toggleElementFullscreen } from '../utils/fullscreen.js';
+import { classifyPlaybackMediaError } from '../utils/playbackMediaError.js';
 import { isAdminPlaybackScope, PLAYBACK_ACCESS_SCOPES, resolveViewerTrackingScope } from '../utils/playbackAccessPolicy.js';
 import { resolveTokenScopedCameras } from '../utils/playbackTokenCameras.js';
 
@@ -775,15 +776,12 @@ function Playback({
         };
 
         const handleSourceError = () => {
-            if (isStale()) {
-                return;
-            }
+            if (isStale()) return;
 
             const mediaError = video.error;
-            const errorCode = mediaError?.code;
 
             clearBufferingState();
-            setErrorType(errorCode === 2 ? 'network' : null);
+            setErrorType(classifyPlaybackMediaError(mediaError));
             setVideoError(mediaError?.message || 'Gagal memuat video playback');
         };
 

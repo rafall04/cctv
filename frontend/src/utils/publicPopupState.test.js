@@ -4,6 +4,7 @@ import {
     getPublicPopupInitialStatus,
     getPublicPopupOverlayState,
     getPublicPopupStatusDisplay,
+    classifyHlsError,
     isCodecFailure,
     isPublicPopupPlaybackLocked,
     shouldShowPublicPopupRetry,
@@ -131,5 +132,39 @@ describe('isCodecFailure memisahkan vonis codec dari error yang bisa pulih', () 
         expect(isCodecFailure(undefined)).toBe(false);
         expect(isCodecFailure({})).toBe(false);
         expect(isCodecFailure({ details: 'fragLoadError', fatal: true })).toBe(false);
+    });
+});
+
+/*
+ * REGRESSION: VideoPopup builds a SECOND hls.js instance in its fallback retry, and that handler
+ * kept reusing the error type computed for the error that TRIGGERED the retry — so a network
+ * failure on the retry could be reported as "Error Media". One shared classifier is what stops a
+ * third dialect of this mapping from appearing the next time a player is added.
+ */
+describe('classifyHlsError menerjemahkan enum hls.js jadi tipe error popup', () => {
+    const HlsErrorTypes = { NETWORK_ERROR: 'networkError', MEDIA_ERROR: 'mediaError' };
+
+    it('menerjemahkan tipe jaringan dan media', () => {
+        expect(classifyHlsError({ type: 'networkError', details: 'fragLoadError' }, { HlsErrorTypes }))
+            .toBe('network');
+        expect(classifyHlsError({ type: 'mediaError', details: 'bufferStalledError' }, { HlsErrorTypes }))
+            .toBe('media');
+    });
+
+    it('vonis codec tetap menang atas tipe apa pun', () => {
+        expect(classifyHlsError({ type: 'mediaError', details: 'bufferAddCodecError' }, { HlsErrorTypes }))
+            .toBe('codec');
+    });
+
+    it('stream eksternal yang gagal jaringan dilaporkan sebagai kendala penyedia', () => {
+        expect(classifyHlsError(
+            { type: 'networkError', details: 'manifestLoadError' },
+            { HlsErrorTypes, streamSource: 'external' },
+        )).toBe('cors');
+    });
+
+    it('tipe yang tak dikenal jatuh ke unknown, bukan melempar', () => {
+        expect(classifyHlsError({ type: 'otherError', details: 'x' }, { HlsErrorTypes })).toBe('unknown');
+        expect(classifyHlsError(null, { HlsErrorTypes })).toBe('unknown');
     });
 });

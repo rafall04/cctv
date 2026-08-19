@@ -18,6 +18,8 @@ import { LoadingStage, getStageMessage, createStreamError } from '../../utils/st
 import { createFallbackHandler } from '../../utils/fallbackHandler';
 import { getHLSConfig } from '../../utils/hlsConfig';
 import { isCodecFailure } from '../../utils/publicPopupState.js';
+import { canPlayNativeHls, startNativeHlsPlayback } from '../../utils/nativeHlsPlayback.js';
+import { startLivePictureWatch } from '../../utils/livePictureWatch.js';
 import { shouldUseQueuedInit, getGlobalStreamInitQueue } from '../../utils/streamInitQueue';
 import { viewerService } from '../../services/viewerService';
 import { takeSnapshot as takeSnapshotUtil } from '../../utils/snapshotHelper';
@@ -365,18 +367,16 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
         abortControllerRef.current = new AbortController();
         setStatus(availabilityState === 'degraded' ? 'degraded' : 'connecting');
         setLoadingStage(LoadingStage.CONNECTING);
-        let playbackCheckInterval = null;
+        let stopWatch = null; let stopNative = null;
+        const stopPictureWatch = () => { stopWatch?.(); stopWatch = null; };
 
         // Only change to 'live' once video starts playing - don't revert on buffering
         const handlePlaying = () => {
             if (cancelled || isLive) return; // Skip if already live
             isLive = true; // Set flag to prevent future setState
-            clearInterval(playbackCheckInterval);
-            playbackCheckInterval = null;
             setStatus('live');
             setLoadingStage(LoadingStage.PLAYING);
-            // Clear timeout on success
-            clearStreamTimeout();
+            clearStreamTimeout(); // Clear timeout on success
             if (fallbackHandlerRef.current) {
                 fallbackHandlerRef.current.reset();
             }
@@ -384,32 +384,30 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
             startViewerSessionAfterPlayback();
         };
 
-        // Fallback: Check video state periodically
+        const failWithCodec = () => {
+            stopPictureWatch(); clearStreamTimeout();
+            setStatus('error'); setErrorType('codec'); setLoadingStage(LoadingStage.ERROR);
+            onError?.(camera.id, new Error('Codec tidak didukung browser')); // parent isolation tracking
+        };
+
+        // "Live" used to mean bytes were accepted — which a device that cannot DECODE them
+        // satisfies perfectly. Going live also clears the timeout while every error handler below
+        // opens with `|| isLive`, so that wrong verdict was permanent: a black tile marked LIVE.
+        // The shared watch demands a picture, and keeps watching after the verdict.
         const startPlaybackCheck = () => {
-            playbackCheckInterval = setInterval(() => {
-                if (cancelled || isLive) {
-                    clearInterval(playbackCheckInterval);
-                    playbackCheckInterval = null;
-                    return;
-                }
-                if (video.readyState >= 3 && video.buffered.length > 0) {
-                    if (!video.paused || video.currentTime > 0) {
-                        handlePlaying();
-                    } else {
-                        video.play().catch(() => { });
-                    }
-                }
-            }, 500);
+            stopWatch = startLivePictureWatch(video, {
+                isStale: () => cancelled,
+                onPicture: handlePlaying,
+                onNoPicture: failWithCodec,
+                requestPlay: (el) => el.play().catch(() => { }),
+            });
         };
 
         const handleError = () => {
             if (cancelled || isLive) return; // Don't show error if already playing
-            clearInterval(playbackCheckInterval);
-            playbackCheckInterval = null;
-            setStatus('error');
-            setLoadingStage(LoadingStage.ERROR);
-            // Notify parent of error for isolation tracking
-            onError?.(camera.id, new Error('Video playback error'));
+            stopPictureWatch();
+            setStatus('error'); setLoadingStage(LoadingStage.ERROR);
+            onError?.(camera.id, new Error('Video playback error')); // parent isolation tracking
         };
 
         // Live-edge sync: if the player ever gets more than
@@ -607,9 +605,11 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                         onError?.(camera.id, new Error(`HLS fatal error: ${d.type}`));
                     }
                 });
-            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-                video.src = effectiveUrl;
-                video.addEventListener('loadedmetadata', () => video.play().catch(() => { }));
+            } else if (canPlayNativeHls(video)) {
+                // hls.js never runs here, so isCodecFailure cannot either — the verdict lives on
+                // the element instead. See nativeHlsPlayback for what this branch used to swallow.
+                stopNative = startNativeHlsPlayback(video, effectiveUrl, { isStale: () => cancelled, onCodecFailure: failWithCodec, onError: handleError });
+                startPlaybackCheck();
             }
         };
 
@@ -647,7 +647,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
         // Cleanup function - ensures proper resource release
         return () => {
             cancelled = true;
-            clearInterval(playbackCheckInterval);
+            stopPictureWatch(); stopNative?.();
             if (initTimeout) clearTimeout(initTimeout);
             video.removeEventListener('playing', handlePlaying);
             video.removeEventListener('error', handleError);
