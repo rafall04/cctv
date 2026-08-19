@@ -150,6 +150,39 @@ function buildRtspRequest({ method, uri, cseq, authorization = null }) {
     return `${lines.join('\r\n')}\r\n\r\n`;
 }
 
+/*
+ * End a probe connection with RST, not FIN.
+ *
+ * `socket.destroy()` sends FIN — a half-close that politely waits for the peer to close its own
+ * side. Well-behaved servers do. The cheap RTSP cameras on this deployment (firmware
+ * `RtpRtspFlyer`, realm "turing") never do: every probe we ended left the camera holding a
+ * CLOSE_WAIT socket forever, our side stacking up as FIN-WAIT-2. Those dead entries fill the
+ * camera's small session table, and a full table makes the firmware answer 401 to CREDENTIALS
+ * THAT ARE CORRECT — so health reads it as auth failure, marks the camera offline, and retries
+ * harder, which adds more zombies. Measured 2026-08-19 on cameras 7 and 8 (192.168.14.3/.4):
+ * blocking all traffic for 8 minutes let the firmware reap its sessions and camera 7 answered
+ * a clean DESCRIBE immediately afterwards.
+ *
+ * RST tears the connection down on BOTH sides at once, so the camera reclaims the slot the moment
+ * we are done with it. We are always finished with the socket when this is called — the response
+ * is parsed or the attempt has failed — so there is no unread data to lose.
+ *
+ * Falls back to destroy() where resetAndDestroy is unavailable (Node < 18.3): worse for this
+ * firmware, but never worse than the behaviour it replaces.
+ */
+function endProbeSocket(socket) {
+    try {
+        if (typeof socket.resetAndDestroy === 'function') {
+            socket.resetAndDestroy();
+            return;
+        }
+    } catch {
+        // resetAndDestroy throws if the socket never reached a connected state; destroy() below
+        // still cleans it up, and the probe result is already decided either way.
+    }
+    socket.destroy();
+}
+
 function sendRtspRequest({ host, port, request, timeoutMs = 4000 }) {
     return new Promise((resolve) => {
         const socket = new net.Socket();
@@ -161,7 +194,7 @@ function sendRtspRequest({ host, port, request, timeoutMs = 4000 }) {
                 return;
             }
             settled = true;
-            socket.destroy();
+            endProbeSocket(socket);
             resolve(result);
         };
 
@@ -232,7 +265,7 @@ function runRtspChallengeResponseSession({ host, port, firstRequest, buildSecond
         const settle = (result) => {
             if (settled) return;
             settled = true;
-            socket.destroy();
+            endProbeSocket(socket);
             resolve(result);
         };
 

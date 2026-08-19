@@ -324,6 +324,10 @@ export class RecordingProcessManager {
             stopReason: record.stopReason,
             forcedKill: record.forcedKill,
             adopted: !!record.adopted,
+            // Last time FFmpeg wrote anything (the `-stats` heartbeat ticks sub-second while it is
+            // pulling). Exposed so the lifecycle policy can tell a recorder that is still being fed
+            // by the camera from one that has stalled — see recordingLifecyclePolicy.
+            lastDataAt: record.lastDataAt ?? null,
         };
     }
 

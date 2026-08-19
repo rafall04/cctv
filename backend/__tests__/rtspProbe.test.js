@@ -114,3 +114,46 @@ describe('guardProbeSettlement — the fleet-level armour', () => {
             .rejects.toThrow('asli');
     });
 });
+
+/*
+ * REGRESSION (production, 2026-08-19): probes ended their sockets with destroy() — a FIN. The
+ * `RtpRtspFlyer` cameras on this deployment never close their own side, so every probe left the
+ * camera holding a CLOSE_WAIT socket forever. Those fill the firmware's small session table, and a
+ * full table answers 401 to CORRECT credentials — which health reads as auth failure, marks the
+ * camera offline, and retries harder, adding more zombies. Cameras 7 and 8 were wedged this way
+ * for two days; eight minutes of total silence let camera 7 reap its sessions and answer normally.
+ *
+ * RST tears both sides down at once, so the slot is reclaimed the moment the probe is finished.
+ */
+describe('probe melepaskan slot sesi kamera, bukan meninggalkan zombie', () => {
+    it('mengakhiri koneksi dengan RST sehingga sisi kamera ikut runtuh', async () => {
+        const seen = [];
+        const port = await listen((socket) => {
+            socket.on('error', (e) => seen.push(e.code));
+            socket.on('close', (hadError) => seen.push(hadError ? 'close_with_error' : 'close_clean'));
+            socket.on('data', () => socket.write('RTSP/1.0 200 OK\r\nCSeq: 1\r\n\r\n'));
+        });
+
+        await sendRtspRequest({
+            host: '127.0.0.1', port, request: 'DESCRIBE rtsp://x RTSP/1.0\r\nCSeq: 1\r\n\r\n', timeoutMs: 2000,
+        });
+        await new Promise((r) => setTimeout(r, 250));
+
+        // RST surfaces on the peer as ECONNRESET; a FIN would have left it half-open with the
+        // server never seeing an error at all.
+        expect(seen).toContain('ECONNRESET');
+    }, 5000);
+
+    it('tetap menyerahkan hasil probe yang benar meski koneksi diputus paksa', async () => {
+        const port = await listen((socket) => {
+            socket.on('error', () => {});
+            socket.on('data', () => socket.write('RTSP/1.0 200 OK\r\nCSeq: 1\r\nContent-Length: 0\r\n\r\n'));
+        });
+
+        const result = await sendRtspRequest({
+            host: '127.0.0.1', port, request: 'DESCRIBE rtsp://x RTSP/1.0\r\nCSeq: 1\r\n\r\n', timeoutMs: 2000,
+        });
+
+        expect(result.statusCode).toBe(200);
+    }, 5000);
+});
