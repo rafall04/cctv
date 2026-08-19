@@ -54,6 +54,10 @@ class MediaMtxService {
         this.healthCheckInterval = null;
         this.consecutiveFailures = 0;
         this.maxConsecutiveFailures = 3;
+        // Which paths are currently demoted to on-demand because their camera is chronically dead.
+        // Built here rather than lazily because buildInternalPathConfig reads it on every path
+        // build, including ones that happen before the first park reconcile.
+        this.parkedPaths = new Set();
     }
 
     static isRealViewer(reader, debug = false) {
@@ -105,7 +109,9 @@ class MediaMtxService {
         // always_on means MediaMTX dials forever, and on this firmware that is what keeps a wedged
         // camera wedged. Operator intent is untouched in the DB — this is a temporary demotion that
         // lifts itself the moment the camera answers again. See shouldParkInternalIngest.
-        const parked = shouldParkInternalIngest(camera);
+        const parked = shouldParkInternalIngest(camera, Date.now(), {
+            currentlyParked: this.parkedPaths?.has(camera.path_name) ?? false,
+        });
         return {
             source: camera.rtsp_url,
             rtspTransport: toMediaMtxSourceProtocol(resolvedTransport),
@@ -282,7 +288,9 @@ class MediaMtxService {
         let changed = 0;
 
         for (const camera of cameras) {
-            const shouldPark = shouldParkInternalIngest(camera, now);
+            const shouldPark = shouldParkInternalIngest(camera, now, {
+                currentlyParked: this.parkedPaths.has(camera.path_name),
+            });
             if (shouldPark === this.parkedPaths.has(camera.path_name)) {
                 continue;
             }

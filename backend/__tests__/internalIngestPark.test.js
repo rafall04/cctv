@@ -79,10 +79,43 @@ describe('shouldParkInternalIngest', () => {
         expect(shouldParkInternalIngest({ ...deadCamera, is_online: undefined }, NOW)).toBe(false);
     });
 
+    /*
+     * REGRESSION (produksi, 2026-08-19): keluar-parkir dulu memakai syarat yang sama dengan
+     * masuk-parkir, jadi kamera yang health check-nya melewati jendela kesegaran MEMBATALKAN
+     * parkirnya sendiri — MediaMTX memalu lagi, cek berikutnya mendarat, ia parkir lagi.
+     * 493 parkir / 464 unpark dalam satu sore, masing-masing dua round-trip API: mekanisme yang
+     * dibangun untuk menghentikan churn justru memproduksinya sendiri.
+     */
+    it('kamera yang SUDAH diparkir tetap diparkir walau health check-nya jadi basi', () => {
+        const basi = { ...deadCamera, last_health_check_at: iso(INGEST_PARK_HEALTH_FRESH_MS + 60_000) };
+
+        expect(shouldParkInternalIngest(basi, NOW, { currentlyParked: false })).toBe(false);
+        expect(shouldParkInternalIngest(basi, NOW, { currentlyParked: true })).toBe(true);
+    });
+
+    it('hanya BUKTI HIDUP yang melepaskan parkir', () => {
+        expect(shouldParkInternalIngest(
+            { ...deadCamera, is_online: 1 }, NOW, { currentlyParked: true },
+        )).toBe(false);
+    });
+
+    it('status tak-diketahui bukan bukti apa pun — parkir dipertahankan apa adanya', () => {
+        for (const unknown of [null, undefined]) {
+            expect(shouldParkInternalIngest({ ...deadCamera, is_online: unknown }, NOW, { currentlyParked: true })).toBe(true);
+            expect(shouldParkInternalIngest({ ...deadCamera, is_online: unknown }, NOW, { currentlyParked: false })).toBe(false);
+        }
+    });
+
+    it('jendela kesegaran harus di ATAS cadence health paling lambat (10 mnt)', () => {
+        expect(INGEST_PARK_HEALTH_FRESH_MS).toBeGreaterThan(10 * 60 * 1000);
+    });
+
     it('tombol mati fleet-wide mematikan seluruh mekanisme', () => {
         process.env.MEDIAMTX_PARK_DEAD_INGEST = 'off';
         expect(isIngestParkEnabled()).toBe(false);
         expect(shouldParkInternalIngest(deadCamera, NOW)).toBe(false);
+        // Termasuk melepaskan yang sedang terparkir — tombol mati berarti mati.
+        expect(shouldParkInternalIngest(deadCamera, NOW, { currentlyParked: true })).toBe(false);
 
         process.env.MEDIAMTX_PARK_DEAD_INGEST = 'on';
         expect(isIngestParkEnabled()).toBe(true);

@@ -123,7 +123,11 @@ export {
  * problem, not a wedge, and is left alone so a newly added camera is never quietly demoted.
  */
 export const INGEST_PARK_AFTER_MS = 30 * 60 * 1000;
-export const INGEST_PARK_HEALTH_FRESH_MS = 10 * 60 * 1000;
+// Comfortably above the SLOWEST health cadence (passive-only cameras are re-probed every 10 min).
+// Set near that cadence, this window is crossed and re-crossed by ordinary jitter, and each
+// crossing used to flip the park — 493 parks against 464 unparks in one afternoon on production,
+// churn produced by the very mechanism meant to stop churn.
+export const INGEST_PARK_HEALTH_FRESH_MS = 30 * 60 * 1000;
 
 /** `MEDIAMTX_PARK_DEAD_INGEST=off` disables parking entirely, without a deploy. */
 export function isIngestParkEnabled() {
@@ -136,15 +140,34 @@ function toMillis(value) {
     return Number.isFinite(parsed) ? parsed : null;
 }
 
+/*
+ * ENTERING and LEAVING the park are deliberately asymmetric.
+ *
+ * Parking needs full confidence, because it changes how MediaMTX treats a camera. UNparking needs
+ * PROOF OF LIFE — `is_online === 1` — and nothing else. Making the exit depend on the same
+ * timestamp conditions as the entry is what made this oscillate in production: a camera whose
+ * health check drifted past the freshness window unparked itself, MediaMTX resumed hammering, the
+ * next check landed and it parked again. 493 parks / 464 unparks in an afternoon, each one two API
+ * round-trips — the mechanism built to stop churn generating its own.
+ *
+ * With the exit gated on recovery instead, a parked camera simply stays parked until it answers.
+ * That is also the honest reading: a stale health check is not evidence the camera came back.
+ */
 export function shouldParkInternalIngest(camera = {}, now = Date.now(), {
     parkAfterMs = INGEST_PARK_AFTER_MS,
     healthFreshMs = INGEST_PARK_HEALTH_FRESH_MS,
+    currentlyParked = false,
 } = {}) {
     if (!isIngestParkEnabled()) return false;
+
     // Explicit about absence: `Number(null)` is 0, so a plain numeric compare would read a camera
-    // whose state is simply unknown as confirmed-dead and park it. Unknown must never park.
+    // whose state is simply unknown as confirmed-dead. Unknown never parks a fresh camera, and
+    // never releases a parked one either — it is not evidence in either direction.
     const isOnline = camera.is_online;
-    if (isOnline === null || isOnline === undefined || Number(isOnline) !== 0) return false;
+    if (isOnline === null || isOnline === undefined) return currentlyParked;
+    if (Number(isOnline) !== 0) return false;
+
+    if (currentlyParked) return true;
 
     const lastOnlineAt = toMillis(camera.last_online_at);
     if (lastOnlineAt === null || (now - lastOnlineAt) < parkAfterMs) return false;
