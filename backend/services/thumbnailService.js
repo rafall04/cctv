@@ -293,6 +293,30 @@ class ThumbnailService {
             return [{ type: 'placeholder', reason: 'missing_mjpeg_thumbnail_source' }];
         }
 
+        /*
+         * HTTP-FLV. These used to fall through to `unsupported_delivery_type`, a verdict meaning
+         * "this camera can never have a thumbnail" — and it was simply wrong: FFmpeg reads HTTP-FLV
+         * natively, and on production it pulls a valid 320x180 frame from these very sources. So 91
+         * cameras were retried forever, failed instantly every sweep, and each wrote a log line for
+         * a failure that could never resolve (301 lines, 8% of stdout).
+         *
+         * They now take the MJPEG route: an explicit snapshot URL wins, otherwise grab a frame from
+         * the stream itself. This upstream is third-party and flaky — about one attempt in three
+         * fails — but that is an ordinary transient failure, which the failure backoff already
+         * handles, and unlike the old verdict it can succeed on the next try.
+         */
+        if (deliveryType === 'external_flv') {
+            if (externalSnapshotUrl) {
+                return [{ type: 'external_snapshot', sourceUrl: externalSnapshotUrl, externalTlsMode }];
+            }
+
+            if (externalStreamUrl.startsWith('http://') || externalStreamUrl.startsWith('https://')) {
+                return [{ type: 'external_flv', sourceUrl: externalStreamUrl, externalTlsMode }];
+            }
+
+            return [{ type: 'placeholder', reason: 'missing_external_snapshot_source' }];
+        }
+
         if (deliveryType === 'external_embed' || deliveryType === 'external_jsmpeg' || deliveryType === 'external_custom_ws') {
             if (externalSnapshotUrl) {
                 return [{ type: 'external_snapshot', sourceUrl: externalSnapshotUrl, externalTlsMode }];

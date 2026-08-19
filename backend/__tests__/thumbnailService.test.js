@@ -699,3 +699,65 @@ describe('sapuan thumbnail otomatis tidak mengetuk kamera yang sedang mati', () 
         expect(thumbnailService.shouldSkipCamera(offlineInternal).skipped).toBe(false);
     });
 });
+
+/*
+ * REGRESSION (produksi, 2026-08-20): 91 kamera `external_flv` tidak punya cabang sama sekali di
+ * resolver, jadi jatuh ke `unsupported_delivery_type` — vonis "kamera ini tidak akan pernah bisa
+ * punya thumbnail". Vonis itu KELIRU: FFmpeg membaca HTTP-FLV secara asli dan di produksi berhasil
+ * menarik frame 320x180 yang sah dari sumber yang sama. Akibatnya mereka dicoba selamanya, gagal
+ * seketika tiap sapuan, dan menulis 301 baris log (8% stdout) untuk kegagalan yang tak bisa selesai.
+ */
+describe('kamera external_flv bisa menghasilkan thumbnail sungguhan', () => {
+    const flvCam = {
+        id: 721, enabled: 1, status: 'active', is_online: 1, runtime_is_online: 1,
+        stream_source: 'external', delivery_type: 'external_flv',
+        external_stream_url: 'https://surakarta.atcsindonesia.info:8086/camera/BalaiKota.flv',
+    };
+
+    it('mengambil frame dari stream FLV-nya sendiri, bukan memvonis tak didukung', async () => {
+        const { default: thumbnailService } = await import('../services/thumbnailService.js');
+
+        expect(thumbnailService.resolveCameraThumbnailStrategy(flvCam)).toEqual({
+            type: 'external_flv',
+            sourceUrl: flvCam.external_stream_url,
+            externalTlsMode: expect.anything(),
+        });
+    });
+
+    it('mendahulukan URL snapshot eksplisit kalau adminnya menyetel satu', async () => {
+        const { default: thumbnailService } = await import('../services/thumbnailService.js');
+
+        expect(thumbnailService.resolveCameraThumbnailStrategy({
+            ...flvCam, external_snapshot_url: 'https://example.test/snap.jpg',
+        }).type).toBe('external_snapshot');
+    });
+
+    /* Tanpa sumber apa pun ia dapat placeholder — bukan lemparan yang dicatat tiap siklus. */
+    it('tanpa sumber sama sekali jatuh ke placeholder, bukan unavailable', async () => {
+        const { default: thumbnailService } = await import('../services/thumbnailService.js');
+
+        const strategy = thumbnailService.resolveCameraThumbnailStrategy({
+            ...flvCam, external_stream_url: null,
+        });
+        expect(strategy.type).toBe('placeholder');
+    });
+
+    /*
+     * Dengan external_flv punya cabang, KETUJUH jenis pengantaran kini terlayani — dan karena
+     * getEffectiveDeliveryType selalu menormalkan ke salah satunya, vonis `unsupported_delivery_type`
+     * jadi tak terjangkau. Tes ini mengunci sifat itu: siapa pun yang menambah jenis pengantaran baru
+     * tanpa cabang di resolver langsung gagal di sini, bukan diam-diam menghukum kamera dengan vonis
+     * "tidak akan pernah bisa" seperti yang menimpa 91 kamera FLV.
+     */
+    it('setiap jenis pengantaran punya cabang — tak ada lagi vonis tak-didukung', async () => {
+        const { default: thumbnailService } = await import('../services/thumbnailService.js');
+        const { DELIVERY_TYPES } = await import('../utils/cameraDelivery.js');
+
+        const divonisTakDidukung = DELIVERY_TYPES.filter((jenis) => (
+            thumbnailService.resolveCameraThumbnailStrategy({ ...flvCam, delivery_type: jenis })
+                ?.reason === 'unsupported_delivery_type'
+        ));
+
+        expect(divonisTakDidukung).toEqual([]);
+    });
+});
