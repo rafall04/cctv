@@ -187,6 +187,20 @@ function sendRtspRequest({ host, port, request, timeoutMs = 4000 }) {
             settle({ errorCode: error?.code || 'request_error' });
         });
 
+        // A camera that ACCEPTS the connection and then closes it cleanly — FIN, no data,
+        // no RST — emits none of the events above: 'data' never sees the header terminator,
+        // a clean FIN is not an 'error', and a closed socket's inactivity timer is cleared,
+        // so 'timeout' can never fire either. Without this handler the promise loses its
+        // resolver forever, and because the health sweep awaits every probe through
+        // Promise.allSettled, ONE such camera froze health monitoring for the entire fleet:
+        // 447 sweep completions on 2026-08-17, zero ever after, no error logged. The session
+        // variant below already carried this exact listener (and documents the same FIN
+        // behaviour on these cameras); this primitive — the fresh-socket digest fallback —
+        // was the one place it was missing.
+        socket.on('close', () => {
+            settle({ errorCode: 'connection_closed_without_response' });
+        });
+
         socket.connect(port, host);
     });
 }
@@ -544,4 +558,6 @@ async function probeRtspSource(rtspUrl, timeoutMs = 4000) {
     };
 }
 
-export { probeRtspSource };
+// sendRtspRequest is exported for its regression test only: the accept-then-FIN hang above
+// cannot be reproduced through probeRtspSource without scripting a full digest handshake.
+export { probeRtspSource, sendRtspRequest };

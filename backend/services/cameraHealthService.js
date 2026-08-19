@@ -36,7 +36,7 @@ import {
     buildInternalIngestPolicySummary,
     isStrictOnDemandSourceProfile,
 } from '../utils/internalIngestPolicy.js';
-import { resolveExternalHealthMode as resolveExternalHealthModePolicy } from './cameraHealthPolicy.js';
+import { resolveExternalHealthMode as resolveExternalHealthModePolicy, guardProbeSettlement } from './cameraHealthPolicy.js';
 import {
     normalizeMonitoringOnline,
     shouldUseStrictInternalMonitoring,
@@ -514,7 +514,7 @@ async function batchProbe(cameras, probeFn) {
     await Promise.all([...domainGroups.entries()].map(async ([domain, group]) => {
         for (let i = 0; i < group.length; i += BATCH_CONCURRENCY_PER_DOMAIN) {
             const batch = group.slice(i, i + BATCH_CONCURRENCY_PER_DOMAIN);
-            const batchResults = await Promise.allSettled(batch.map(probeFn));
+            const batchResults = await Promise.allSettled(batch.map((camera) => guardProbeSettlement(probeFn(camera)))); // one never-settling probe must cost one camera, never the fleet — see cameraHealthPolicy
             allResults.push(...batchResults.map((r, idx) => ({
                 result: r,
                 camera: batch[idx]
@@ -2516,7 +2516,7 @@ class CameraHealthService {
             for (const probe of probeResults.filter(p => p.result.status === 'fulfilled')) {
                 const streamResult = probe.result.value;
                 // One camera must never cost the sweep: a throw here used to leave every other camera unchecked this tick.
-                const monitoring = await this.evaluateCameraMonitoringStatus(streamResult.camera, activePaths, streamResult)
+                const monitoring = await guardProbeSettlement(this.evaluateCameraMonitoringStatus(streamResult.camera, activePaths, streamResult))
                     .catch((error) => { console.error(`[CameraHealth] Camera ${streamResult.camera.id} monitoring failed:`, error.message); return null; });
                 if (!monitoring) continue;
                 const finalResult = {
