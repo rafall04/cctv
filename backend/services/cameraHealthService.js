@@ -2242,7 +2242,7 @@ class CameraHealthService {
         }
 
         if (strictRtspHealth) {
-            const rtspResult = await this.probeInternalRtspSource(camera.private_rtsp_url);
+            const rtspResult = await this.getOrProbeInternalRtsp(camera); // cache: one DESCRIBE per tick, not two
             return {
                 online: rtspResult.online,
                 reason: rtspResult.reason,
@@ -2397,7 +2397,7 @@ class CameraHealthService {
             if (attempt > 0) {
                 await new Promise(r => setTimeout(r, 3000));
             }
-            
+            this.internalRtspProbeCache.delete(camera.id); // bustCache only cleared the EXTERNAL key
             const rawResult = await this.evaluateCameraRaw(camera, activePaths, {
                 timeoutMs: Math.max(20000, Date.now() - this.lastCheck || 20000), // Extended timeout
                 bustCache: true

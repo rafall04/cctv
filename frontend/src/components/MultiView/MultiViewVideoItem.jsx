@@ -1084,6 +1084,8 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                         <p className="text-white text-xs font-medium mb-1">Timeout</p>
                         <p className="text-gray-400 text-[10px] mb-3">Loading terlalu lama</p>
                         <div className="flex items-center justify-center gap-2">
+                            {/* Codec is not retryable — same rule VideoPopup applies via canRetry:false. */}
+                            {errorType !== 'codec' && (
                             <button
                                 onClick={handleRetry}
                                 aria-label="Coba sambungkan ulang stream"
@@ -1092,6 +1094,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                                 <Icons.Reset />
                                 Coba Lagi
                             </button>
+                            )}
                             <button
                                 onClick={handleClose}
                                 aria-label="Tutup tile kamera"
@@ -1123,12 +1126,8 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                         {errorType === 'codec' ? (
                             <>
                                 <p className="text-yellow-400 text-xs font-medium mb-1">Codec Tidak Didukung</p>
-                                <p className="text-gray-400 text-[10px] mb-2 leading-relaxed">
-                                    Browser Anda tidak mendukung codec H.265/HEVC. Gunakan Safari untuk hasil terbaik.
-                                </p>
-                                <div className="text-[9px] text-gray-500 mb-3">
-                                    Atau hubungi admin untuk mengubah codec kamera ke H.264
-                                </div>
+                                <p className="text-gray-400 text-[10px] mb-2 leading-relaxed">Browser Anda tidak mendukung codec H.265/HEVC. Gunakan Safari untuk hasil terbaik.</p>
+                                <div className="text-[9px] text-gray-500 mb-3">Atau hubungi admin untuk mengubah codec kamera ke H.264</div>
                             </>
                         ) : (
                             <>

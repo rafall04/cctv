@@ -652,3 +652,50 @@ describe('thumbnailService external thumbnails', () => {
         expect(execFileMock.mock.calls[0][1]).toContain('http://localhost:8888/local-stale/index.m3u8');
     });
 });
+
+/*
+ * REGRESSION (2026-08-19 audit): the offline guard exempted INTERNAL cameras entirely, so the
+ * unattended 5-minute sweep kept retrying cameras that were down — and its fallback grabs the
+ * frame over RTSP straight from the device. On the cheap firmware in this fleet every attempt
+ * leaves a dead session behind, which is what keeps a wedged camera wedged.
+ *
+ * The exemption is right for an EXPLICIT refresh (is_online can be stale, and an operator asked
+ * on purpose) and wrong for the sweep. Both halves are pinned here so a later tidy-up cannot
+ * collapse them back into one rule.
+ */
+describe('sapuan thumbnail otomatis tidak mengetuk kamera yang sedang mati', () => {
+    const offlineInternal = {
+        id: 34, enabled: 1, status: 'active', is_online: 0, runtime_is_online: 0,
+        stream_source: 'internal', delivery_type: 'internal_hls',
+        private_rtsp_url: 'rtsp://user:pass@10.0.0.9:554/stream1',
+    };
+
+    it('melewati kamera internal yang offline di jalur latar belakang', async () => {
+        const { default: thumbnailService } = await import('../services/thumbnailService.js');
+
+        expect(thumbnailService.isBackgroundThumbnailAllowed(offlineInternal)).toBe(false);
+    });
+
+    it('juga melewati kamera EKSTERNAL yang offline — aturannya sama di sapuan', async () => {
+        const { default: thumbnailService } = await import('../services/thumbnailService.js');
+
+        expect(thumbnailService.isBackgroundThumbnailAllowed({
+            ...offlineInternal, delivery_type: 'external_hls', external_hls_url: 'https://x/y.m3u8',
+        })).toBe(false);
+    });
+
+    it('kamera internal yang ONLINE tetap disapu seperti biasa', async () => {
+        const { default: thumbnailService } = await import('../services/thumbnailService.js');
+
+        expect(thumbnailService.isBackgroundThumbnailAllowed({
+            ...offlineInternal, is_online: 1, runtime_is_online: 1,
+        })).toBe(true);
+    });
+
+    /* Jalur eksplisit tetap boleh mencoba — itu yang dikunci tes "legacy is_online is 0" di atas. */
+    it('refresh EKSPLISIT kamera internal offline tetap tidak dilewati', async () => {
+        const { default: thumbnailService } = await import('../services/thumbnailService.js');
+
+        expect(thumbnailService.shouldSkipCamera(offlineInternal).skipped).toBe(false);
+    });
+});

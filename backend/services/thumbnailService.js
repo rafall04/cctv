@@ -170,6 +170,18 @@ class ThumbnailService {
     }
 
     isBackgroundThumbnailAllowed(camera) {
+        /*
+         * The unattended 5-minute sweep does NOT get the explicit-refresh exemption for internal
+         * cameras. Its fallback grabs the frame over RTSP straight from the device, and on the
+         * cheap firmware in this fleet every attempt leaves a dead session behind — which is
+         * precisely what keeps a wedged camera wedged (same reason rtspProbe now closes with RST
+         * and MediaMTX parks dead ingests). A camera that is down has nothing to snapshot anyway,
+         * so the sweep gains nothing by knocking; an operator pressing refresh still can.
+         */
+        if (camera?.is_online === 0 || camera?.runtime_is_online === 0) {
+            return false;
+        }
+
         return !this.shouldSkipCamera({
             ...camera,
             _skipStrictOnDemandIdleThumbnail: false,
@@ -309,6 +321,9 @@ class ThumbnailService {
         const isInternal = deliveryType === 'internal_hls';
         const runtimeOnline = camera.runtime_is_online;
 
+        // Internal cameras are exempt HERE on purpose: an explicit refresh must still try, because
+        // is_online can be stale and an operator asked for this one deliberately. The BACKGROUND
+        // sweep applies the stricter rule — see isBackgroundThumbnailAllowed.
         if (!isInternal && (camera.is_online === 0 || runtimeOnline === 0)) {
             return { skipped: true, reason: 'camera_offline' };
         }
