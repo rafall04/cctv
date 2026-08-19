@@ -23,10 +23,30 @@
 // merely contains an "@" (…/photos/me@2x.png) has a "/" before it and is skipped.
 const URL_USERINFO_RE = /([a-z][a-z0-9+.\-]*:\/\/)([^/?#\s@]+)@/gi;
 
+// Matches a secret carried in a query string: `token=…`, `password=…`, and friends.
+//
+// Userinfo is no longer how third parties hand out access — a bearer token in the URL is, and
+// FFmpeg echoes the whole command line on failure. Production was writing complete ZoneMinder
+// JWTs into pm2 logs (which are archived and world-readable) every time a Jombang camera failed
+// to yield a thumbnail. Those tokens expire in two hours, which limits the damage but does not
+// make them safe to publish.
+//
+// The NAME is kept and only the value replaced, so the log still says a token was involved — that
+// is the diagnosable part. The value class is the URL-safe token alphabet, not "anything up to a
+// delimiter": FFmpeg formats failures as `URL: message`, and a greedier class swallowed that colon
+// along with the start of the message.
+//
+// `session` is deliberately NOT on the list. An existing test asserts a `?session=` URL is
+// credential-free, and there is no production evidence of one leaking — the JWTs that did leak came
+// through `token=`. Add it if evidence turns up, but do not overrule that test on a hunch.
+// `monitor=168` and friends are untouched either way: only the listed names match.
+const URL_QUERY_SECRET_RE = /([?&](?:access_token|api_key|apikey|auth|authorization|key|passwd|password|pwd|secret|sig|signature|token)=)([A-Za-z0-9._~%+/=-]+)/gi;
+
 /**
- * Replace `scheme://user:pass@` with `scheme://****:****@` everywhere in `value`.
+ * Strip credentials out of `value`: `scheme://user:pass@` becomes `scheme://****:****@`, and a
+ * secret carried in a query string keeps its name but loses its value (`token=****`).
  *
- * Deliberately narrow: only the userinfo is removed, so hostnames, ports, paths
+ * Deliberately narrow: only the secret itself is removed, so hostnames, ports, paths
  * and error text all survive intact. Those are what make a recording failure
  * diagnosable, and over-redacting them would just trade one operational problem
  * for another.
@@ -35,7 +55,9 @@ export function redactUrlCredentials(value) {
     if (typeof value !== 'string' || value === '') {
         return value;
     }
-    return value.replace(URL_USERINFO_RE, '$1****:****@');
+    return value
+        .replace(URL_USERINFO_RE, '$1****:****@')
+        .replace(URL_QUERY_SECRET_RE, '$1****');
 }
 
 export default { redactUrlCredentials };

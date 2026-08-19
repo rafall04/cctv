@@ -58,3 +58,40 @@ describe('redactUrlCredentials', () => {
         expect(redactUrlCredentials(42)).toBe(42);
     });
 });
+
+/*
+ * REGRESSION (produksi, 2026-08-20): userinfo bukan lagi cara pihak ketiga membagi akses — token
+ * bearer di URL yang dipakai sekarang, dan FFmpeg menggemakan seluruh baris perintahnya saat gagal.
+ * Produksi menulis JWT ZoneMinder UTUH ke log pm2 (yang diarsipkan) tiap kali kamera Jombang gagal
+ * menghasilkan thumbnail. Token itu kedaluwarsa 2 jam — itu membatasi kerusakannya, bukan membuatnya
+ * aman diterbitkan.
+ */
+describe('rahasia di query string', () => {
+    it('menyamarkan token tapi membiarkan sisa barisnya utuh', () => {
+        const line = 'https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=168&token=eyJhbGciOiJIUzI1NiJ9.abc.def -vframes 1 -q:v 8';
+
+        expect(redactUrlCredentials(line)).toBe(
+            'https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=168&token=**** -vframes 1 -q:v 8'
+        );
+    });
+
+    it('menyamarkan nama-nama rahasia yang lain, dan hanya nilainya', () => {
+        expect(redactUrlCredentials('https://x/y?password=s3cr3t&next=ok')).toBe('https://x/y?password=****&next=ok');
+        expect(redactUrlCredentials('https://x/y?api_key=AKIA123&z=1')).toBe('https://x/y?api_key=****&z=1');
+        expect(redactUrlCredentials('https://x/y?SIGNATURE=abc')).toBe('https://x/y?SIGNATURE=****');
+    });
+
+    /*
+     * Nama parameter yang tidak berbahaya HARUS lolos — itulah bagian yang membuat kegagalan bisa
+     * didiagnosis, dan menyamarkan berlebihan cuma menukar satu masalah operasional dengan yang lain.
+     */
+    it('tidak menyentuh parameter biasa', () => {
+        expect(redactUrlCredentials('https://x/y?monitor=122&scale=320')).toBe('https://x/y?monitor=122&scale=320');
+        expect(redactUrlCredentials('https://x/photos/me@2x.png?monitor=1')).toBe('https://x/photos/me@2x.png?monitor=1');
+    });
+
+    it('kedua aturan berlaku pada baris yang sama', () => {
+        expect(redactUrlCredentials('rtsp://admin:hunter2@10.0.0.4:554/s?token=abc: timed out'))
+            .toBe('rtsp://****:****@10.0.0.4:554/s?token=****: timed out');
+    });
+});

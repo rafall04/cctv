@@ -15,6 +15,7 @@ import { dirname } from 'path';
 import { query, execute } from '../database/connectionPool.js';
 import { config } from '../config/config.js';
 import { getEffectiveDeliveryType, getPrimaryExternalStreamUrl } from '../utils/cameraDelivery.js';
+import { redactUrlCredentials } from '../utils/logRedaction.js';
 import { resolveInternalIngestPolicy } from '../utils/internalIngestPolicy.js';
 import { buildFfmpegRtspInputArgs, resolveInternalRtspTransport } from '../utils/internalRtspTransportPolicy.js';
 import { normalizeThumbnailStrategy } from '../utils/thumbnailStrategyPolicy.js';
@@ -121,8 +122,15 @@ class ThumbnailService {
         return next;
     }
 
+    /*
+     * Delegates to the shared redactor instead of carrying a second copy of the rule. The local
+     * copy only stripped `user:pass@`, so a third party that hands out access as a query-string
+     * token — which is how they mostly do it now — sailed straight into the log. FFmpeg echoes
+     * its whole command line on failure, so production was writing complete ZoneMinder JWTs into
+     * pm2 logs every time a Jombang camera failed to yield a frame.
+     */
     sanitizeErrorMessage(message = '') {
-        return String(message).replace(/\b(rtsp|https?):\/\/([^:\s/@]+):([^@\s/]+)@/gi, '$1://****:****@');
+        return redactUrlCredentials(String(message));
     }
 
     getThumbnailAgeMs(camera) {
