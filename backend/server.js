@@ -69,7 +69,7 @@ import hlsProxyRoutes from './routes/hlsProxyRoutes.js';
 import externalStreamProxyRoutes from './routes/externalStreamProxyRoutes.js';
 import sponsorRoutes from './routes/sponsorRoutes.js';
 import sponsorPackageRoutes from './routes/sponsorPackageRoutes.js';
-import promoBannerRoutes from './routes/promoBannerRoutes.js';
+import commerceRoutes from './routes/commerceRoutes.js';
 import saweriaRoutes from './routes/saweriaRoutes.js';
 import voucherRoutes from './routes/voucherRoutes.js';
 import voucherWebhookRoutes from './routes/voucherWebhookRoutes.js';
@@ -401,7 +401,7 @@ await fastify.register(playbackViewerRoutes, { prefix: '/api/playback-viewer' })
 await fastify.register(hlsProxyRoutes, { prefix: '/hls' });
 await fastify.register(sponsorRoutes, { prefix: '/api/sponsors' });
 await fastify.register(sponsorPackageRoutes, { prefix: '/api/sponsor-packages' });
-await fastify.register(promoBannerRoutes);
+await fastify.register(commerceRoutes);
 await fastify.register(saweriaRoutes, { prefix: '/api/saweria' });
 await fastify.register(voucherRoutes, { prefix: '/api/voucher' });
 await fastify.register(voucherWebhookRoutes, { prefix: '/api/voucher/webhook' });

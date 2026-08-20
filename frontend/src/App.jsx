@@ -47,6 +47,7 @@ const UnifiedSettings = lazyWithRetry(() => import('./pages/UnifiedSettings'), '
 const Dashboard = lazyWithRetry(() => import('./pages/Dashboard'), 'dashboard');
 const SponsorManagement = lazyWithRetry(() => import('./pages/SponsorManagement'), 'sponsor-management');
 const PromoBannerManagement = lazyWithRetry(() => import('./pages/PromoBannerManagement'), 'promo-banner-management');
+const AffiliateManagement = lazyWithRetry(() => import('./pages/AffiliateManagement'), 'affiliate-management');
 const AdsManagement = lazyWithRetry(() => import('./pages/AdsManagement'), 'ads-management');
 const RecordingDashboard = lazyWithRetry(() => import('./pages/RecordingDashboard'), 'recording-dashboard');
 const AreaPublicPage = lazyWithRetry(() => import('./pages/AreaPublicPage'), 'area-public-page');
@@ -360,6 +361,14 @@ function App() {
                     element={
                         <AdminPageRoute adminOnly>
                             <PromoBannerManagement />
+                        </AdminPageRoute>
+                    }
+                />
+                <Route
+                    path="/admin/affiliate"
+                    element={
+                        <AdminPageRoute adminOnly>
+                            <AffiliateManagement />
                         </AdminPageRoute>
                     }
                 />

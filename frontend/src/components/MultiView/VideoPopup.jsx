@@ -34,7 +34,7 @@ import InlineAdSlot from '../ads/InlineAdSlot.jsx';
 import CameraDetailPanel from './CameraDetailPanel.jsx';
 import RelatedCamerasStrip from './RelatedCamerasStrip.jsx';
 import SponsorBadge from '../SponsorBadge.jsx';
-import PromoBanner from '../promo/PromoBanner.jsx';
+import UnderVideoCommerceSlot from '../commerce/UnderVideoCommerceSlot.jsx';
 import { isAdsMobileViewport, shouldRenderAdSlot } from '../ads/adsConfig.js';
 import {
     getPublicPopupBodyStyle,
@@ -1551,7 +1551,7 @@ function VideoPopup({
                     video + controls own the first screen. */}
                 {!isFullscreen && (
                     <>
-                        <PromoBanner placement="popup" cameraId={camera?.id} className="border-t border-edge bg-surface px-3 py-3" />
+                        <UnderVideoCommerceSlot cameraId={camera?.id} />
                         <CameraDetailPanel
                             camera={camera}
                             isFavorite={Boolean(isFavorite?.(camera.id))}
