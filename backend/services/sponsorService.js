@@ -27,6 +27,31 @@ const PACKAGE_ORDER_SQL = `
     s.created_at DESC
 `;
 
+/*
+ * PUBLIC projection. `SPONSOR_SELECT_WITH_PACKAGE` above is `SELECT s.*`, which is right for the
+ * admin list and wrong for anonymous visitors: the sponsors table also holds `price` (the
+ * sponsorship rate we charged), `contact_name`, `contact_email`, `contact_phone` (a third party's
+ * PII) and `notes` (free-form internal remarks).
+ *
+ * The codebase already knew those five columns were sensitive — sponsorRoutes.js gates the admin
+ * list behind requireAdmin with a comment naming price, contact_email and contact_phone as things
+ * 'a viewer-role user must not see'. And two lines later it registered the PUBLIC route running
+ * the same star-select, publishing to the whole internet what the gate withheld from a logged-in
+ * viewer. Sharing one SELECT constant between an admin reader and a public one is what made that
+ * possible, so the public path gets its own.
+ *
+ * The columns are exactly what the landing SponsorStrip renders. Anything more has to be added
+ * here deliberately, which is the point.
+ */
+const PUBLIC_SPONSOR_SELECT = `
+    SELECT s.id, s.name, s.logo, s.url, s.package,
+        sp.name AS package_name,
+        sp.color AS package_color,
+        sp.sort_order AS package_sort_order
+    FROM sponsors s
+    LEFT JOIN sponsor_packages sp ON sp.key = s.package
+`;
+
 /**
  * Get all sponsors
  */
@@ -35,11 +60,13 @@ export function getAllSponsors() {
 }
 
 /**
- * Get active sponsors only
+ * Sponsors currently on display. This feeds an UNAUTHENTICATED route (GET /api/sponsors/active,
+ * called by the landing SponsorStrip on every visit), so it reads through PUBLIC_SPONSOR_SELECT
+ * and never the admin star-select. See the WHY on that constant.
  */
 export function getActiveSponsors() {
     return query(`
-        ${SPONSOR_SELECT_WITH_PACKAGE}
+        ${PUBLIC_SPONSOR_SELECT}
         WHERE s.active = 1
         AND (s.end_date IS NULL OR s.end_date >= DATE('now'))
         ORDER BY ${PACKAGE_ORDER_SQL}
@@ -301,14 +328,33 @@ export function removeSponsorFromCamera(cameraId) {
     `, [cameraId]);
 }
 
-/**
- * Get cameras with sponsors
+/*
+ * Cameras carrying a sponsor, for PUBLIC display.
+ *
+ * This used to be `SELECT * FROM cameras WHERE sponsor_name IS NOT NULL AND enabled = 1`, sent
+ * straight to an unauthenticated caller by the controller with no projection in between. Two
+ * Critical Invariants went out with it the moment any camera was given a sponsor:
+ *
+ *   * `private_rtsp_url` — 'Never expose RTSP URLs to the frontend'. `SELECT *` does not read
+ *     the invariant; it reads the schema, and the schema has that column.
+ *   * `camera_class` was never filtered, so an `owner_private` or `subscriber` camera given a
+ *     sponsor would have appeared on a public surface, with its stream_key.
+ *
+ * The route comment above it asserted the opposite — 'they cannot leak admin-only metadata,
+ * they filter to enabled cameras only'. Enabled was never the dangerous axis. A safety claim in
+ * a comment stops the next reader from checking, which is how this survived.
+ *
+ * So: an explicit column list, not a star, and the community filter every public query owes.
+ * The columns are exactly what SponsorBadge renders plus the identity needed to place it —
+ * anything a future caller wants beyond this has to be added deliberately, one field at a time.
  */
 export function getCamerasWithSponsors() {
     return query(`
-        SELECT * FROM cameras
+        SELECT id, name, area_id, sponsor_name, sponsor_logo, sponsor_url, sponsor_package
+        FROM cameras
         WHERE sponsor_name IS NOT NULL
-        AND enabled = 1
+          AND enabled = 1
+          AND camera_class = 'community'
         ORDER BY
             CASE sponsor_package
                 WHEN 'gold' THEN 1

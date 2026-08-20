@@ -35,8 +35,14 @@ export default async function promoBannerRoutes(fastify, options) {
     /*
      * Public reads. Only the fields the poster itself needs are returned
      * (title, alt text, image base, CTA) — never scheduling, targeting, contact
-     * numbers, or stats. The resolver also refuses to echo any camera field, so
-     * this endpoint cannot be used to enumerate cameras.
+     * numbers, or stats.
+     *
+     * On cameras: the resolver looks a camera up to find its area, and the name it reads DOES
+     * reach the caller — buildWhatsAppUrl substitutes `{kamera}` into the public cta_url. What
+     * makes that safe is not this endpoint's shape but the `camera_class = 'community'` filter on
+     * that lookup, whose names are already public on the landing page. A non-community id finds
+     * nothing and is therefore indistinguishable from an id that does not exist. If you touch
+     * that query, that property is what you must preserve.
      */
     fastify.get(`${BASE}/public`, getPublicPromoBanner);
     fastify.post(`${BASE}/:id/click`, trackPromoBannerClick);

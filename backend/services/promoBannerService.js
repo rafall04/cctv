@@ -105,10 +105,27 @@ export function resolvePromoBannerForContext({ cameraId = null, areaId = null, p
     let areaName = null;
 
     if (cameraId) {
-        // Only the area link is read here; no camera field is ever echoed back to
-        // the caller, so this cannot become a probe for which cameras exist.
+        /*
+         * COMMUNITY ONLY — and this filter is the whole defence, so do not "simplify" it away.
+         *
+         * The comment that used to sit here claimed "no camera field is ever echoed back to the
+         * caller, so this cannot become a probe for which cameras exist". It was false. The name
+         * read below is substituted into the WhatsApp `?text=` by buildWhatsAppUrl and shipped as
+         * the public `cta_url`, on an unauthenticated route. With a WhatsApp number set and
+         * `{kamera}` in the template, anyone could have walked the id space and harvested the
+         * names of `owner_private` and `subscriber` cameras — people's homes and paying
+         * customers' premises — from a promo endpoint.
+         *
+         * It never fired in production only because the live banner has no WhatsApp number, which
+         * is a configuration accident, not a control. The filter is the control: a non-community
+         * id now finds nothing, so it resolves exactly like an id that does not exist, and
+         * `{kamera}` falls back to '-'. Community camera names are already public on the landing
+         * page, so nothing legitimate is lost.
+         */
         const camera = queryOne(
-            'SELECT c.id, c.name, c.area_id, a.name AS area_name FROM cameras c LEFT JOIN areas a ON a.id = c.area_id WHERE c.id = ?',
+            `SELECT c.id, c.name, c.area_id, a.name AS area_name
+             FROM cameras c LEFT JOIN areas a ON a.id = c.area_id
+             WHERE c.id = ? AND c.camera_class = 'community'`,
             [cameraId]
         );
         if (camera) {

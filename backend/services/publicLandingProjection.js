@@ -109,3 +109,48 @@ export function stripInternalLandingFields(camera) {
     }
     return stripProxiedOriginUrls(publicCamera);
 }
+
+/*
+ * Ingest and routing policy. Distinct from the health fields above because it answers a different
+ * question — not "is this camera up" but "how does this backend TALK to it": whether the stream is
+ * held open or dialled on demand and for how long, which RTSP transport is used, and which source
+ * profile applies. None of it is a credential. All of it is a description of how the streaming tier
+ * behaves, which is reconnaissance, and it was being handed to anonymous callers for free.
+ *
+ * `GET /api/stream/` shipped every one of these on every call. That endpoint had been hardened
+ * once, carefully — private_rtsp_url and stream_key are destructured off with a comment explaining
+ * why — and the fields below simply were not part of that day's question. That is the pattern this
+ * whole sweep kept finding: the fix goes into the field someone was thinking about, and the rest of
+ * the row rides along.
+ *
+ * Verified before removing: zero references in non-admin frontend code for any of them.
+ */
+export const PUBLIC_STREAM_INTERNAL_FIELDS = [
+    'source_profile',
+    'internal_ingest_policy_override',
+    'internal_on_demand_close_after_seconds_override',
+    'internal_on_demand_close_after_seconds',
+    'area_internal_ingest_policy_default',
+    'internal_rtsp_transport_override',
+    'area_internal_rtsp_transport_default',
+    'last_online_check',
+];
+
+/**
+ * Public projection for the stream endpoints: everything the landing strip removes, plus the
+ * ingest/routing policy above.
+ *
+ * @param {object} camera enriched camera row
+ * @returns {object} shallow copy safe for an unauthenticated response
+ */
+export function stripInternalStreamFields(camera) {
+    const publicCamera = stripInternalLandingFields(camera);
+    if (!publicCamera || typeof publicCamera !== 'object') {
+        return publicCamera;
+    }
+
+    for (const field of PUBLIC_STREAM_INTERNAL_FIELDS) {
+        delete publicCamera[field];
+    }
+    return publicCamera;
+}

@@ -26,9 +26,19 @@ import {
 } from '../middleware/schemaValidators.js';
 
 export default async function sponsorRoutes(fastify, options) {
-    // Public routes — read-only. getActiveSponsors and getCamerasWithSponsors
-    // both filter to enabled cameras only, so they cannot leak admin-only
-    // metadata. Pricing and contact details only live on the admin endpoints.
+    // Public routes — read-only, unauthenticated.
+    //
+    // This comment used to read "both filter to enabled cameras only, so they cannot leak
+    // admin-only metadata". That was false and it was load-bearing: `enabled` was never the
+    // dangerous axis, and behind it getCamerasWithSponsors ran `SELECT * FROM cameras` with no
+    // camera_class filter — so the first camera given a sponsor would have published its
+    // private_rtsp_url and stream_key here, and a sponsored owner_private camera would have
+    // appeared on a public surface outright. The query now names its columns and filters to
+    // community; see the WHY in sponsorService.getCamerasWithSponsors.
+    //
+    // The rule for anything added below this line: a public handler owes an explicit column
+    // list and the community filter. Do not restate that it is safe — make it safe, and let the
+    // query say so.
     fastify.get('/active', getActiveSponsors);
     fastify.get('/cameras', getCamerasWithSponsors);
 

@@ -954,6 +954,7 @@ class CameraService {
         return this.getCameraDetailById(id);
     }
 
+    // Strips internal monitoring state like the landing list does: ?view=map was publishing it.
     getPublicMapCameraList() {
         cameraRuntimeStateService.seedMissingRows();
         const key = cacheKey(CacheNamespace.CAMERAS, 'public-map-camera-list');
@@ -964,7 +965,7 @@ class CameraService {
             LEFT JOIN camera_runtime_state crs ON crs.camera_id = c.id
             WHERE c.enabled = 1 AND ${PUBLIC_LIVE_SQL}
             ORDER BY c.is_tunnel ASC, c.id ASC
-        `)).map((camera) => cameraHealthService.enrichCameraAvailability(camera)), CAMERA_READ_MODEL_TTL_MS);
+        `)).map((camera) => cameraHealthService.enrichCameraAvailability(camera)).map(stripInternalLandingFields), CAMERA_READ_MODEL_TTL_MS);
     }
 
     getPublicLandingCameraList() {

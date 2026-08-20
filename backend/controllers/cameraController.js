@@ -34,11 +34,31 @@ export async function getActiveCameras(request, reply) {
     }
 }
 
-// Get single camera by ID (admin only)
+// Get one camera in full. Requires a login; credentials are stripped for non-admins (see below).
 export async function getCameraById(request, reply) {
     try {
         const { id } = request.params;
         const camera = cameraService.getCameraDetailById(id);
+
+        /*
+         * `getCameraDetailById` is a `SELECT c.*`, so the row carries private_rtsp_url — which
+         * embeds the camera's username:password — and stream_key. This route requires a login but
+         * NOT requireAdmin (the comment above claiming 'admin only' was describing an intention,
+         * not the route), and `viewer` is a real staff role: cameraAccessService.STAFF_ROLES is
+         * {admin, viewer}, and the Camera Management page is reachable by both. So every viewer
+         * account could read every camera's RTSP credentials — against the Critical Invariant that
+         * RTSP URLs never reach the frontend at all.
+         *
+         * Gating the route would have been wrong: viewers are meant to open that page. What they
+         * are not meant to do is EDIT — PUT /:id does carry requireAdmin — so the credentials are
+         * only ever needed by an admin filling the edit form. Non-admins get the same record
+         * without them.
+         */
+        if (camera && request.user?.role !== 'admin') {
+            delete camera.private_rtsp_url;
+            delete camera.stream_key;
+        }
+
         return reply.send({ success: true, data: camera });
     } catch (error) {
         console.error('Get camera by ID error:', error);

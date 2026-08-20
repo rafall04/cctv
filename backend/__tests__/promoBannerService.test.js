@@ -55,7 +55,9 @@ function resetSchema() {
         DROP TABLE IF EXISTS areas;
 
         CREATE TABLE areas (id INTEGER PRIMARY KEY, name TEXT);
-        CREATE TABLE cameras (id INTEGER PRIMARY KEY, name TEXT, area_id INTEGER);
+        -- camera_class is part of the real schema and it is the axis this endpoint is gated on.
+        -- The fixture omitted it, which is precisely why a missing class filter could not be seen here.
+        CREATE TABLE cameras (id INTEGER PRIMARY KEY, name TEXT, area_id INTEGER, camera_class TEXT);
 
         CREATE TABLE promo_banners (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -95,10 +97,12 @@ function resetSchema() {
         );
 
         INSERT INTO areas (id, name) VALUES (2, 'DANDER'), (3, 'TANJUNGHARJO'), (9, 'SURABAYA');
-        INSERT INTO cameras (id, name, area_id) VALUES
-            (11, 'CCTV LAPANGAN DANDER', 2),
-            (12, 'CCTV BALAI TANJUNGHARJO', 3),
-            (99, 'CCTV SURABAYA', 9);
+        INSERT INTO cameras (id, name, area_id, camera_class) VALUES
+            (11, 'CCTV LAPANGAN DANDER', 2, 'community'),
+            (12, 'CCTV BALAI TANJUNGHARJO', 3, 'community'),
+            (99, 'CCTV SURABAYA', 9, 'community'),
+            (77, 'Rumah Pak Budi', 2, 'owner_private'),
+            (78, 'Gudang Pelanggan', 3, 'subscriber');
     `);
 }
 
@@ -369,5 +373,67 @@ describe('stats', () => {
     it('ignores a non-integer id', () => {
         expect(recordClick(null)).toBe(false);
         expect(recordImpression('1; DROP TABLE promo_banners')).toBe(false);
+    });
+});
+
+/*
+ * REGRESSION (audit 2026-08-20): this endpoint is public and unauthenticated, and its camera
+ * lookup had NO camera_class filter. The name it read is substituted into the WhatsApp `?text=`
+ * by buildWhatsAppUrl and shipped as the public `cta_url` — so with a WhatsApp number configured
+ * and `{kamera}` in the template, anyone could walk the id space and harvest the names of
+ * owner_private and subscriber cameras: people's homes, and paying customers' premises.
+ *
+ * It never fired in production only because the live banner happens to have no WhatsApp number.
+ * That is a configuration accident, not a control, so these tests pin the control instead.
+ *
+ * The code carried a comment asserting the opposite ("no camera field is ever echoed back ...
+ * cannot become a probe for which cameras exist"). Assertions belong in tests, where they get
+ * checked; in a comment they only stop the next reader from looking.
+ */
+describe('kamera non-community tidak boleh bocor lewat promo publik', () => {
+    beforeEach(() => {
+        resetSchema();
+        const promo = createPromoBanner({
+            title: 'Pemasangan CCTV',
+            whatsapp_number: '081234567890',
+            whatsapp_message: 'Halo, saya tanya soal {kamera} di {area}.',
+            target_mode: 'all',
+            placements: ['popup'],
+            active: 1,
+        });
+        db.prepare('UPDATE promo_banners SET image_base = ? WHERE id = ?').run('promo-x', promo.id);
+    });
+
+    it('tidak menyisipkan nama kamera PRIVAT ke cta_url publik', () => {
+        const resolved = resolvePromoBannerForContext({ placement: 'popup', cameraId: 77 });
+
+        expect(resolved).not.toBeNull();
+        expect(decodeURIComponent(resolved.cta_url)).not.toContain('Rumah Pak Budi');
+    });
+
+    it('tidak menyisipkan nama kamera SUBSCRIBER ke cta_url publik', () => {
+        const resolved = resolvePromoBannerForContext({ placement: 'popup', cameraId: 78 });
+
+        expect(decodeURIComponent(resolved.cta_url)).not.toContain('Gudang Pelanggan');
+    });
+
+    /*
+     * The point is not merely that the name is absent — it is that a private id must be
+     * INDISTINGUISHABLE from an id that was never issued. If a private camera still resolved its
+     * AREA, the difference in the response would answer "does camera 77 exist?" on its own.
+     */
+    it('kamera privat menjawab persis seperti id yang tidak ada', () => {
+        const priv = resolvePromoBannerForContext({ placement: 'popup', cameraId: 77 });
+        const ghost = resolvePromoBannerForContext({ placement: 'popup', cameraId: 424242 });
+
+        expect(priv).toEqual(ghost);
+    });
+
+    it('kamera community TETAP dapat namanya — fiturnya tidak dimatikan, hanya dibatasi', () => {
+        const resolved = resolvePromoBannerForContext({ placement: 'popup', cameraId: 11 });
+
+        const text = decodeURIComponent(resolved.cta_url);
+        expect(text).toContain('CCTV LAPANGAN DANDER');
+        expect(text).toContain('DANDER');
     });
 });

@@ -11,6 +11,7 @@ import { config } from '../config/config.js';
 import jwt from 'jsonwebtoken';
 import { sanitizeCameraThumbnailList } from './thumbnailPathService.js';
 import cameraHealthService from './cameraHealthService.js';
+import { stripInternalStreamFields } from './publicLandingProjection.js';
 import cameraViewStatsService from './cameraViewStatsService.js';
 import { getAccessInfo, canViewLive } from './cameraAccessService.js';
 import voucherService from './voucherService.js';
@@ -38,7 +39,10 @@ class StreamService {
         // the value, so this is mostly cosmetic — but it removes one extra
         // place where scrapers can pluck the path identifier without
         // parsing URLs. private_rtsp_url stays stripped as before.
-        const { private_rtsp_url, stream_key, ...publicAvailability } = availability;
+        // Those two were never the whole story: the projection also carries this backend's ingest
+        // and routing policy, which shipped on every anonymous call. See stripInternalStreamFields.
+        const { private_rtsp_url, stream_key, ...rest } = availability;
+        const publicAvailability = stripInternalStreamFields(rest);
 
         // For external_hls cameras with proxying enabled (the default), the
         // response's `streams.hls` is now an opaque /api/stream/:id/external.m3u8

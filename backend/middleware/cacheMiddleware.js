@@ -18,6 +18,7 @@
  */
 
 import cache, { CacheTTL } from '../services/cacheService.js';
+import { authMiddleware, requireAdmin } from './authMiddleware.js';
 
 /**
  * Generate cache key from request
@@ -130,46 +131,57 @@ export function getCacheStats() {
     return cache.stats();
 }
 
-/**
- * Fastify plugin to register cache management routes
+/*
+ * Cache management endpoints.
+ *
+ * These carried an `(admin only)` comment on every route and NOTHING enforced it. Anyone on the
+ * internet could read the cache telemetry and, worse, POST a pattern to flush the server-side
+ * response cache — which forces every cached public read model to be recomputed from SQLite on
+ * demand, on a box that is also running the recorders. That is an availability problem written as
+ * a comment.
+ *
+ * They were also unreachable at the documented paths. Fastify already applies the `prefix` from
+ * the register() options to this encapsulated instance, and the plugin then prepended it a second
+ * time — so the real paths were `/api/cache/api/cache/stats` and friends, while the
+ * `/api/cache/stats` that server.js prints on boot answered 404. Nothing in the repo calls either
+ * form, which is why a broken and open endpoint sat unnoticed: it was too broken to be used and
+ * not broken enough to be reported.
+ *
+ * Paths are relative now, so the register() prefix is applied exactly once.
+ *
  * @param {Object} fastify - Fastify instance
- * @param {Object} options - Plugin options
+ * @param {Object} options - Plugin options (prefix comes from register(), not from here)
  */
-export async function cachePlugin(fastify, options = {}) {
-    const { prefix = '/api/cache' } = options;
-    
-    // Get cache stats (admin only)
-    fastify.get(`${prefix}/stats`, async (_request, _reply) => {
-        return {
-            success: true,
-            data: getCacheStats(),
-        };
-    });
-    
-    // Invalidate cache by pattern (admin only)
-    fastify.post(`${prefix}/invalidate`, async (request, reply) => {
-        const { pattern } = request.body;
-        
+export async function cachePlugin(fastify) {
+    const adminOnly = { preHandler: [authMiddleware, requireAdmin] };
+
+    fastify.get('/stats', adminOnly, async () => ({
+        success: true,
+        data: getCacheStats(),
+    }));
+
+    fastify.post('/invalidate', adminOnly, async (request, reply) => {
+        const { pattern } = request.body || {};
+
         if (!pattern) {
             return reply.code(400).send({
                 success: false,
                 message: 'Pattern is required',
             });
         }
-        
+
         const count = invalidateCache(pattern);
-        
+
         return {
             success: true,
             message: `Invalidated ${count} cache entries`,
             count,
         };
     });
-    
-    // Clear all cache (admin only)
-    fastify.post(`${prefix}/clear`, async (_request, _reply) => {
+
+    fastify.post('/clear', adminOnly, async () => {
         clearCache();
-        
+
         return {
             success: true,
             message: 'Cache cleared',

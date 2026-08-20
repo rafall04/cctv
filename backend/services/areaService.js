@@ -12,6 +12,21 @@ import {
 import { normalizeInternalRtspTransport } from '../utils/internalRtspTransportPolicy.js';
 
 const CACHE_ALL_AREAS = cacheKey(CacheNamespace.AREAS, 'all');
+
+/*
+ * Columns the PUBLIC area list may carry. Named rather than starred so that adding a column to
+ * `areas` is not the same act as publishing it — see the WHY on getAllAreas.
+ */
+const PUBLIC_AREA_COLUMNS = [
+    'a.id', 'a.name', 'a.slug', 'a.description',
+    'a.rt', 'a.rw', 'a.kelurahan', 'a.kecamatan',
+    'a.latitude', 'a.longitude',
+    // Display defaults the public map and landing filters actually read.
+    'a.coverage_scope', 'a.viewport_zoom_override',
+    'a.show_on_grid_default', 'a.grid_default_camera_limit',
+    // Honest to publish: a visitor should know an area needs a voucher before clicking it.
+    'a.is_access_gated',
+].join(', ');
 const CACHE_AREA_FILTERS = cacheKey(CacheNamespace.AREAS, 'filters');
 const CACHE_AREA_SUMMARY = cacheKey(CacheNamespace.AREAS, 'summary');
 const CACHE_AREA_OVERVIEW = cacheKey(CacheNamespace.AREAS, 'overview');
@@ -203,18 +218,37 @@ class AreaService {
         console.log('[Cache] Area cache invalidated');
     }
 
+    /*
+     * The public variant was `SELECT a.*`, which published this fleet's OPERATING POLICY to every
+     * anonymous landing-page visitor: internal_ingest_policy_default and
+     * internal_on_demand_close_after_seconds (whether we hold a camera's stream open or dial it on
+     * demand, and for how long), internal_rtsp_transport_default (TCP vs UDP), and
+     * external_health_mode_override (how we probe). None of it is a credential; all of it is
+     * reconnaissance about how the streaming tier behaves, published for free.
+     *
+     * The irony is two lines down: the camera COUNT in this very query was deliberately scoped so
+     * that rented and private cameras never leak 'even as a count'. The thinking went into the
+     * subquery and stopped at the star above it — which is the same shape as every other leak found
+     * in this sweep. A star-select on a public path also means the NEXT column a migration adds
+     * ships publicly with no code change and no review.
+     *
+     * Everything the public UI genuinely uses stays: identity and address, map coordinates, the
+     * grid/zoom display defaults MapView and the landing filters read, and is_access_gated — a
+     * visitor is entitled to know an area needs a voucher before they click it.
+     */
     getAllAreas({ publicOnly = false } = {}) {
-        // Public variant counts only community cameras so rented/private cameras
-        // never leak (even as a count) into the landing-page area filter.
         const cacheKeyName = publicOnly ? `${CACHE_ALL_AREAS}:public` : CACHE_ALL_AREAS;
         const cached = cache.get(cacheKeyName);
         if (cached) {
             return { areas: cached, isCached: true };
         }
 
+        // Public variant counts only community cameras so rented/private cameras
+        // never leak (even as a count) into the landing-page area filter.
         const cameraCountFilter = publicOnly ? `AND ${PUBLIC_LIVE_SQL}` : '';
+        const areaColumns = publicOnly ? PUBLIC_AREA_COLUMNS : 'a.*';
         const areas = query(`
-            SELECT a.*,
+            SELECT ${areaColumns},
                    (SELECT COUNT(*) FROM cameras c WHERE c.area_id = a.id ${cameraCountFilter}) as camera_count
             FROM areas a
             ORDER BY a.kecamatan, a.kelurahan, a.rw, a.rt, a.name ASC
