@@ -108,7 +108,18 @@ describe('guardrail: data-safety patterns', () => {
         'database/migrations/zz_20260523_add_sponsor_packages_and_camera_limit.js',
     ]);
     it('no NEW money/price column declared REAL in migrations', () => {
-        const moneyReal = /\b(price|amount|default_price|harga|fee|saldo|balance|tarif|biaya)\w*\s+REAL\b/i;
+        /*
+         * `w*` on BOTH sides of the word list, not just after it. The old pattern anchored with
+         * `(price|...)`, and `` cannot match after an underscore — so every PREFIXED money
+         * column slipped straight through: `product_price_rupiah REAL`, `sponsor_price REAL`,
+         * `commission_amount REAL`, `total_biaya REAL` all passed a green suite. The guardrail
+         * only ever caught a column named exactly `price` or `default_price`, which is the one
+         * naming style nobody uses once a table has two money columns.
+         *
+         * Verified not to catch the legitimately-REAL neighbours: latitude, longitude,
+         * viewport_zoom_override, confidence, score, duration_seconds.
+         */
+        const moneyReal = /w*(price|amount|harga|fee|saldo|balance|tarif|biaya)w*s+REAL/i;
         const offenders = walk(path.join(BACKEND_ROOT, 'database', 'migrations'), ['.js'])
             .filter((f) => moneyReal.test(read(f)))
             .map(rel)

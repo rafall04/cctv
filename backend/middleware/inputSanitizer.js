@@ -14,22 +14,25 @@ import { logSecurityEvent, SECURITY_EVENTS } from '../services/securityAuditLogg
 const MAX_BODY_SIZE = 1 * 1024 * 1024; // 1MB in bytes
 
 /*
- * Narrow exception to MAX_BODY_SIZE: admin image upload.
+ * Narrow exception to MAX_BODY_SIZE: the two admin image uploads.
  *
- * The promo-banner poster arrives base64-encoded in a JSON body, so a 5MB image
- * is ~6.7MB on the wire and the blanket 1MB cap would reject it. The allowance is
- * deliberately keyed to one exact method+path rather than a prefix or a header,
- * so nothing else inherits it.
+ * A poster (promo banner) or a product photo (affiliate offer) arrives base64-encoded in a JSON
+ * body, so a 5MB image is ~6.7MB on the wire and the blanket 1MB cap would reject it. Each
+ * allowance is deliberately keyed to ONE exact method + WHOLE path — never a prefix, never a
+ * header. A prefix like /api/admin/affiliate/ would hand the 8MB ceiling to every admin affiliate
+ * route, including ones whose only job is a small JSON edit, and this hook runs BEFORE route auth,
+ * so widening it widens what an UNAUTHENTICATED caller may push before being rejected with 401.
+ * That exposure is bounded by the global rate limiter's public tier; keep the ceiling small and do
+ * not add routes here casually.
  *
- * This hook runs BEFORE route auth, so an UNAUTHENTICATED caller can still push
- * this many bytes at that one URL before being rejected with 401. The exposure is
- * bounded by the global rate limiter's public tier; keep the ceiling small and do
- * not add routes here casually. The matching per-route `bodyLimit` in
- * routes/promoBannerRoutes.js must stay in agreement with this number.
+ * The matching per-route `bodyLimit`s — routes/promoBannerRoutes.js and routes/affiliateRoutes.js,
+ * both `Math.ceil(MAX_PROMO_UPLOAD_BYTES * 1.4) + 4096` = 7344128 bytes — must stay in agreement
+ * with this number: below it, so the route rejects first and this hook is the outer backstop.
  */
 const MAX_UPLOAD_BODY_SIZE = 8 * 1024 * 1024; // 8MB in bytes
 const LARGE_BODY_ROUTES = [
     { method: 'POST', pattern: /^\/api\/promo-banners\/\d+\/image\/?(\?|$)/ },
+    { method: 'POST', pattern: /^\/api\/admin\/affiliate\/offers\/\d+\/image\/?(\?|$)/ },
 ];
 
 /**

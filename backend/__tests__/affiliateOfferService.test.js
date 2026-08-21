@@ -1,11 +1,12 @@
 /**
- * Purpose: Prove the affiliate feature's data rules - the six-key public payload (anti-leak),
+ * Purpose: Prove the affiliate feature's data rules - the thirteen-key public payload (anti-leak),
+ *          the three optional extras (WhatsApp / price / photo, each switched by PRESENCE alone),
  *          targeting precedence, the liveness re-check the /go redirect performs on every read,
  *          the guarded daily stat UPSERT, and the bounded count throttle.
  * Caller: Backend test gate (vitest, node env).
  * Deps: vitest, better-sqlite3 (in-memory, real schema), mocked connectionPool + pinned timeService.
  * MainFuncs: resolveOfferForContext / resolveOfferForRedirect / recordImpression / recordClick /
- *            partner + offer CRUD / getOfferStats / allowCount.
+ *            partner + offer CRUD / setOfferImage / getOfferStats / allowCount.
  * SideEffects: In-memory database only. Never touches backend/data/cctv.db.
  *
  * WHY A REAL SQLITE AND NOT A STUBBED query()
@@ -51,6 +52,7 @@ const YESTERDAY = '2026-08-11';
 const NEXT_MONTH = '2026-09-01';
 
 import affiliateOfferService, {
+    buildOfferWhatsAppUrl,
     buildPublicPayload,
     normalizeBillingMode,
     normalizePlacements,
@@ -61,8 +63,10 @@ import affiliateOfferService, {
     recordImpression,
     resolveOfferForContext,
     resolveOfferForRedirect,
+    setOfferImage,
     statColumnFor,
 } from '../services/affiliateOfferService.js';
+import { PUBLIC_PAYLOAD_KEYS } from '../services/affiliateOfferExtras.js';
 import {
     COUNT_WINDOW_MS,
     MAX_THROTTLE_KEYS,
@@ -72,7 +76,16 @@ import {
     throttleSize,
 } from '../utils/affiliateCountThrottle.js';
 
-/** The exact schema from database/migrations/zz_20260820_add_affiliate_offers.js. */
+/**
+ * The exact schema from database/migrations/zz_20260820_add_affiliate_offers.js, PLUS the columns
+ * zz_20260821_add_affiliate_offer_extras.js adds on top of it.
+ *
+ * The extras are spelled here exactly as that migration spells them - every one of them NULLABLE
+ * and, critically, `product_price_rupiah INTEGER` with NO DEFAULT. A `DEFAULT 0` here would make
+ * this fixture disagree with production about the one distinction the whole price feature rests
+ * on: NULL means "this offer advertises no price", 0 means "gratis". A fixture that cannot express
+ * the difference cannot fail when the code loses it.
+ */
 function resetSchema() {
     db.exec(`
         DROP TABLE IF EXISTS affiliate_offer_stats;
@@ -115,6 +128,13 @@ function resetSchema() {
             active INTEGER NOT NULL DEFAULT 1,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            whatsapp_number TEXT,
+            whatsapp_message TEXT,
+            product_price_rupiah INTEGER,
+            image_base TEXT,
+            image_width INTEGER,
+            image_height INTEGER,
+            image_bytes INTEGER,
             FOREIGN KEY (partner_id) REFERENCES affiliate_partners(id) ON DELETE CASCADE
         );
         CREATE TABLE affiliate_offer_targets (
@@ -132,6 +152,7 @@ function resetSchema() {
             impressions INTEGER NOT NULL DEFAULT 0,
             product_clicks INTEGER NOT NULL DEFAULT 0,
             store_clicks INTEGER NOT NULL DEFAULT 0,
+            whatsapp_clicks INTEGER NOT NULL DEFAULT 0,
             UNIQUE (offer_id, stat_date),
             FOREIGN KEY (offer_id) REFERENCES affiliate_offers(id) ON DELETE CASCADE
         );
@@ -192,25 +213,70 @@ describe('public payload - the anti-leak contract', () => {
      * filter, so a private or subscriber camera's name can reach an anonymous caller. A comment
      * enforces nothing. This test does.
      */
-    it('contains EXACTLY the six contracted keys and nothing else', () => {
+    it('contains EXACTLY the thirteen contracted keys and nothing else', () => {
         const partner = makePartner();
-        makeOffer(partner.id, { description: 'Garansi resmi 1 tahun' });
+        makeOffer(partner.id, {
+            description: 'Garansi resmi 1 tahun',
+            whatsapp_number: '081298765432',
+            product_price_rupiah: 149000,
+        });
 
         const payload = resolveOfferForContext({ placement: 'popup', cameraId: 11 });
 
+        // Spelled out literally, NOT compared against the module's own constant: a list imported
+        // from the code under test would agree with whatever that code decided to emit today.
         expect(Object.keys(payload).sort()).toEqual([
             'description',
             'id',
+            'image_base',
+            'image_height',
+            'image_width',
+            'price_rupiah',
             'product_href',
             'product_title',
+            'product_url',
             'store_href',
             'store_name',
+            'store_url',
+            'whatsapp_url',
         ]);
     });
 
-    it('never carries a camera name, an area name, the partner id, the price, the contact note or a raw partner URL', () => {
+    it('emits all thirteen keys, as nulls, when every optional extra is unset', () => {
+        // The shape is fixed so the frontend branches on a VALUE, never on `in`/undefined - a key
+        // that disappears when empty is a second way to say "absent" and the two eventually differ.
+        const partner = makePartner({ store_url: null });
+        makeOffer(partner.id, { description: null });
+
+        const payload = resolveOfferForContext({ placement: 'popup', cameraId: 11 });
+        expect(Object.keys(payload)).toHaveLength(13);
+        for (const key of ['description', 'store_url', 'store_href', 'whatsapp_url', 'price_rupiah',
+            'image_base', 'image_width', 'image_height']) {
+            expect(payload[key], key).toBeNull();
+        }
+    });
+
+    it('keeps the exported PUBLIC_PAYLOAD_KEYS honest about what is actually emitted', () => {
+        // The constant is what affiliateOfferExtras.js documents as the contract; the literal list
+        // above is the contract. This ties the two together, so a key added to one and not the
+        // other cannot pass unnoticed in either direction.
         const partner = makePartner();
-        makeOffer(partner.id, { description: 'Garansi resmi 1 tahun' });
+        makeOffer(partner.id);
+
+        const payload = resolveOfferForContext({ placement: 'popup', cameraId: 11 });
+        expect([...PUBLIC_PAYLOAD_KEYS].sort()).toEqual(Object.keys(payload).sort());
+        expect(PUBLIC_PAYLOAD_KEYS).toHaveLength(13);
+    });
+
+    it('never carries a camera name, an area name, the partner id, the FEE, the contact note or the schedule', () => {
+        const partner = makePartner();
+        makeOffer(partner.id, {
+            description: 'Garansi resmi 1 tahun',
+            whatsapp_number: '081298765432',
+            // Deliberately a DIFFERENT number from the partner's 250000 fee, so "the price leaked"
+            // and "the price is shown" cannot be confused for one another.
+            product_price_rupiah: 149000,
+        });
 
         const serialized = JSON.stringify(resolveOfferForContext({ placement: 'popup', cameraId: 11 }));
 
@@ -219,23 +285,35 @@ describe('public payload - the anti-leak contract', () => {
         expect(serialized).not.toContain('LAPANGAN');
         expect(serialized).not.toContain('DANDER');
         expect(serialized).not.toContain('RUMAH PAK RT');
-        // Commercial terms and the counterparty's contact details.
+        // affiliate_partners.price_rupiah is what the operator charges the SHOP. It is a different
+        // number from product_price_rupiah, which is what the visitor sees - and only one of them
+        // is public. The visitor's price IS here; the fee must not be.
+        expect(serialized).toContain('149000');
         expect(serialized).not.toContain('250000');
+        // The counterparty's private contact details, which live one JOIN away from this payload.
         expect(serialized).not.toContain('081234567890');
+        expect(serialized).not.toContain('Pak Budi');
         expect(serialized).not.toContain('partner_id');
-        // The schedule, the targeting and the active flags are internal bookkeeping.
-        for (const internal of ['billing_mode', 'start_date', 'end_date', 'active', 'target_mode', 'placements', 'priority']) {
+        // Internal bookkeeping: the schedule, the targeting, the flags, and the raw column names
+        // behind the three extras (the payload exposes whatsapp_url, never the number or template).
+        for (const internal of ['billing_mode', 'start_date', 'end_date', 'active', 'target_mode',
+            'placements', 'priority', 'contact_note', 'whatsapp_number', 'whatsapp_message',
+            'product_price_rupiah', 'image_bytes']) {
             expect(serialized, internal).not.toContain(internal);
         }
-        // The destination itself: the payload advertises our own redirector, never the shop URL.
-        expect(serialized).not.toContain('toko-sinar.example');
     });
 
-    it('advertises only the /go redirector, keyed p for product and s for store', () => {
-        const partner = makePartner();
-        const offer = makeOffer(partner.id);
+    it('advertises the REAL destination alongside the /go redirector, keyed p and s', () => {
+        // Phase 1 emitted only /go. That was reversed on purpose: a relative href is inside the
+        // PWA's "/" scope, so an installed PWA follows the 302 itself and strands the visitor on a
+        // stranger's shop inside our shell, with no address bar. An absolute https URL is out of
+        // scope and Android hands it to the browser. /go stays as the no-JS fallback and counter.
+        const partner = makePartner({ store_url: 'https://toko-sinar.example/etalase' });
+        const offer = makeOffer(partner.id, { product_url: 'https://toko-sinar.example/produk/9' });
 
         const payload = resolveOfferForContext({ placement: 'popup', cameraId: 11 });
+        expect(payload.product_url).toBe('https://toko-sinar.example/produk/9');
+        expect(payload.store_url).toBe('https://toko-sinar.example/etalase');
         expect(payload.product_href).toBe(`/api/public/affiliate/offers/${offer.id}/go?l=p`);
         expect(payload.store_href).toBe(`/api/public/affiliate/offers/${offer.id}/go?l=s`);
     });
@@ -245,27 +323,302 @@ describe('public payload - the anti-leak contract', () => {
         makeOffer(partner.id);
 
         const payload = resolveOfferForContext({ placement: 'popup', cameraId: 11 });
+        expect(payload.store_url).toBeNull();
         expect(payload.store_href).toBeNull();
-        // Still exactly six keys - the key is present and null, never dropped, so the frontend can
-        // branch on a value instead of on the shape.
-        expect(Object.keys(payload)).toHaveLength(6);
+        expect(Object.keys(payload)).toHaveLength(13);
     });
 
-    it('builds the same six keys directly from a row, with a missing description as null', () => {
+    it('emits null rather than a destination it cannot vouch for', () => {
+        // The URL is re-validated ON THE WAY OUT, not only on write: a row can predate the policy
+        // or be edited straight in sqlite3, and what leaves here becomes an href in a public page,
+        // where `javascript:` is worse than it is in a Location header.
+        const partner = makePartner();
+        const offer = makeOffer(partner.id);
+        db.prepare('UPDATE affiliate_offers SET product_url = ? WHERE id = ?')
+            .run('javascript:alert(1)', offer.id);
+        db.prepare('UPDATE affiliate_partners SET store_url = ? WHERE id = ?')
+            .run('http://toko-lama.example', partner.id);
+
+        const payload = resolveOfferForContext({ placement: 'popup', cameraId: 11 });
+        expect(payload.product_url).toBeNull();
+        expect(payload.store_url).toBeNull();
+        expect(JSON.stringify(payload)).not.toContain('javascript:');
+        // The /go href survives; it re-resolves and refuses on its own, and a dead redirector is a
+        // 404 rather than an anchor the browser will happily execute.
+        expect(payload.product_href).toBe(`/api/public/affiliate/offers/${offer.id}/go?l=p`);
+        expect(payload.store_href).toBeNull();
+    });
+
+    it('builds the same thirteen keys directly from a row, with a missing description as null', () => {
         expect(buildPublicPayload({
             id: 7,
             product_title: 'Kamera',
             description: '',
             store_name: 'Toko',
-            has_store_url: 0,
+            product_url: 'https://toko.example/p/7',
+            store_url: null,
+            whatsapp_number: null,
+            whatsapp_message: null,
+            product_price_rupiah: null,
+            image_base: null,
+            image_width: null,
+            image_height: null,
         })).toEqual({
             id: 7,
             product_title: 'Kamera',
             description: null,
             store_name: 'Toko',
+            product_url: 'https://toko.example/p/7',
+            store_url: null,
             product_href: '/api/public/affiliate/offers/7/go?l=p',
             store_href: null,
+            whatsapp_url: null,
+            price_rupiah: null,
+            image_base: null,
+            image_width: null,
+            image_height: null,
         });
+    });
+});
+
+describe('product price - NULL and 0 are different facts', () => {
+    /*
+     * The whole price feature rests on this distinction, and it is the kind that gets flattened by
+     * a helpful `?? 0` or a `DEFAULT 0` in a later migration:
+     *
+     *   NULL -> this offer does not advertise a price at all; the card shows no price row.
+     *   0    -> this offer costs nothing ("gratis"), and the card says so.
+     *
+     * Presence is the switch, so NULL is the OFF position - there is no show_price flag to consult
+     * instead. A code path that cannot tell the two apart silently prints "Rp0" on every offer
+     * whose price was never set, which is a lie about a partner's product on a public page.
+     */
+    it('stores NULL when no price is given, and reports it as null publicly', () => {
+        const partner = makePartner();
+        const offer = makeOffer(partner.id);
+
+        expect(db.prepare('SELECT product_price_rupiah AS p FROM affiliate_offers WHERE id = ?')
+            .get(offer.id).p).toBeNull();
+        expect(resolveOfferForContext({ placement: 'popup', cameraId: 11 }).price_rupiah).toBeNull();
+    });
+
+    it('stores 0 as 0 and reports it as 0, never as "no price"', () => {
+        const partner = makePartner();
+        const offer = makeOffer(partner.id, { product_price_rupiah: 0 });
+
+        expect(db.prepare('SELECT product_price_rupiah AS p FROM affiliate_offers WHERE id = ?')
+            .get(offer.id).p).toBe(0);
+        const price = resolveOfferForContext({ placement: 'popup', cameraId: 11 }).price_rupiah;
+        expect(price).toBe(0);
+        expect(price).not.toBeNull();
+    });
+
+    it('round-trips an ordinary integer price through create, read and the public payload', () => {
+        const partner = makePartner();
+        makeOffer(partner.id, { product_price_rupiah: 149000 });
+
+        expect(affiliateOfferService.listOffers()[0].product_price_rupiah).toBe(149000);
+        expect(resolveOfferForContext({ placement: 'popup', cameraId: 11 }).price_rupiah).toBe(149000);
+    });
+
+    it('clears a price back to NULL when the field is submitted empty', () => {
+        // Clearing is how the price is switched off, so '' MUST mean NULL and not 0 - and it must
+        // reach the column, not merely be ignored as "nothing sent".
+        const partner = makePartner();
+        const offer = makeOffer(partner.id, { product_price_rupiah: 149000 });
+
+        affiliateOfferService.updateOffer(offer.id, { product_price_rupiah: '' });
+
+        expect(db.prepare('SELECT product_price_rupiah AS p FROM affiliate_offers WHERE id = ?')
+            .get(offer.id).p).toBeNull();
+        expect(resolveOfferForContext({ placement: 'popup', cameraId: 11 }).price_rupiah).toBeNull();
+    });
+
+    it('refuses a float or a negative product price (money is INTEGER rupiah)', () => {
+        // The Critical Invariant. A float here would be rounded by whichever formatter reached it
+        // first and print a price nobody set.
+        const partner = makePartner();
+        expect(() => makeOffer(partner.id, { product_price_rupiah: 149000.5 })).toThrow(/bulat/i);
+        expect(() => makeOffer(partner.id, { product_price_rupiah: -1 })).toThrow(/bulat/i);
+        expect(() => makeOffer(partner.id, { product_price_rupiah: 'gratis' })).toThrow(/bulat/i);
+
+        // And a PUT must refuse exactly what a POST refuses; validating on create only is how a
+        // value the API rejects ends up in the table anyway.
+        const offer = makeOffer(partner.id);
+        expect(() => affiliateOfferService.updateOffer(offer.id, { product_price_rupiah: 1.5 })).toThrow(/bulat/i);
+        expect(() => affiliateOfferService.updateOffer(offer.id, { product_price_rupiah: -5 })).toThrow(/bulat/i);
+    });
+
+    it('ignores a price that is not an integer in the ROW, rather than printing it', () => {
+        // Defence on the read side too: a hand-edited or legacy row holding a float must show no
+        // price at all instead of a rounded one.
+        const partner = makePartner();
+        const offer = makeOffer(partner.id, { product_price_rupiah: 149000 });
+        db.prepare('UPDATE affiliate_offers SET product_price_rupiah = ? WHERE id = ?').run(1500.75, offer.id);
+
+        expect(resolveOfferForContext({ placement: 'popup', cameraId: 11 }).price_rupiah).toBeNull();
+    });
+});
+
+describe('WhatsApp CTA - presence is the switch, and {kamera} is not a placeholder', () => {
+    it('emits no whatsapp_url at all when the offer has no number', () => {
+        const partner = makePartner();
+        makeOffer(partner.id);
+
+        expect(resolveOfferForContext({ placement: 'popup', cameraId: 11 }).whatsapp_url).toBeNull();
+    });
+
+    it('appears the moment a number is filled and disappears when it is cleared', () => {
+        // This IS the switch. There is no show_whatsapp boolean to disagree with the number.
+        const partner = makePartner();
+        const offer = makeOffer(partner.id);
+
+        affiliateOfferService.updateOffer(offer.id, { whatsapp_number: '081298765432' });
+        expect(resolveOfferForContext({ placement: 'popup', cameraId: 11 }).whatsapp_url)
+            .toContain('https://wa.me/6281298765432?text=');
+
+        affiliateOfferService.updateOffer(offer.id, { whatsapp_number: '' });
+        expect(db.prepare('SELECT whatsapp_number AS n FROM affiliate_offers WHERE id = ?')
+            .get(offer.id).n).toBeNull();
+        expect(resolveOfferForContext({ placement: 'popup', cameraId: 11 }).whatsapp_url).toBeNull();
+    });
+
+    it('substitutes {barang} and {toko} with the offer and shop that already appear on the card', () => {
+        const partner = makePartner({ store_name: 'Toko Sinar' });
+        makeOffer(partner.id, {
+            product_title: 'Kamera Indoor 2MP',
+            whatsapp_number: '081298765432',
+            whatsapp_message: 'Halo {toko}, saya mau tanya {barang}',
+        });
+
+        const url = resolveOfferForContext({ placement: 'popup', cameraId: 11 }).whatsapp_url;
+        expect(decodeURIComponent(url.split('text=')[1]))
+            .toBe('Halo Toko Sinar, saya mau tanya Kamera Indoor 2MP');
+        // The text is percent-encoded, so a space never reaches the anchor raw.
+        expect(url).not.toContain(' ');
+    });
+
+    it('NEVER substitutes a camera name, however hard the template asks for one', () => {
+        /*
+         * THE LEAK THIS FEATURE MUST NOT REPEAT.
+         *
+         * promoBannerService.resolvePromoBannerForContext carries a comment claiming no camera
+         * field is echoed to the caller, then substitutes {kamera} into its public cta_url - on a
+         * query with no camera_class filter, so an owner_private or subscriber camera's name (i.e.
+         * someone's home) can reach an anonymous visitor.
+         *
+         * Here the resolver selects `area_id` and nothing else, so there is no name in scope to
+         * leak. This test asserts that from the outside: an operator who types {kamera} gets the
+         * literal text back, not the camera. Camera 11 is even a community camera - if the name of
+         * a PUBLIC camera cannot get in, a private one certainly cannot.
+         */
+        const partner = makePartner();
+        makeOffer(partner.id, {
+            whatsapp_number: '081298765432',
+            whatsapp_message: 'Halo, saya lihat di {kamera} soal {barang}',
+        });
+
+        const payload = resolveOfferForContext({ placement: 'popup', cameraId: 11 });
+        const serialized = JSON.stringify(payload);
+
+        expect(serialized).not.toContain('LAPANGAN');
+        expect(serialized).not.toContain('DANDER');
+        expect(decodeURIComponent(payload.whatsapp_url.split('text=')[1]))
+            .toBe('Halo, saya lihat di {kamera} soal Kamera Indoor 2MP');
+    });
+
+    it('falls back to a default opener when only the number is set', () => {
+        const partner = makePartner();
+        makeOffer(partner.id, { product_title: 'Kamera Indoor 2MP', whatsapp_number: '081298765432' });
+
+        const url = resolveOfferForContext({ placement: 'popup', cameraId: 11 }).whatsapp_url;
+        expect(decodeURIComponent(url.split('text=')[1])).toContain('Kamera Indoor 2MP');
+    });
+
+    it('normalises a local 08 number to the international form wa.me needs', () => {
+        expect(buildOfferWhatsAppUrl({ whatsapp_number: '0812-9876-5432', product_title: 'X' }))
+            .toContain('https://wa.me/6281298765432?');
+        expect(buildOfferWhatsAppUrl({ whatsapp_number: '6281298765432', product_title: 'X' }))
+            .toContain('https://wa.me/6281298765432?');
+        expect(buildOfferWhatsAppUrl({ whatsapp_number: '', product_title: 'X' })).toBeNull();
+        expect(buildOfferWhatsAppUrl({})).toBeNull();
+    });
+
+    it('refuses an implausible number on write instead of storing a dead link', () => {
+        // A wa.me link to a nonexistent number fails silently inside WhatsApp, where neither the
+        // operator nor we can see it. Refusing at the panel is the only place it is visible.
+        const partner = makePartner();
+        expect(() => makeOffer(partner.id, { whatsapp_number: '0812' })).toThrow(/WhatsApp/i);
+        expect(() => makeOffer(partner.id, { whatsapp_number: '0812345678901234567' })).toThrow(/WhatsApp/i);
+
+        const offer = makeOffer(partner.id);
+        expect(() => affiliateOfferService.updateOffer(offer.id, { whatsapp_number: '0812' })).toThrow(/WhatsApp/i);
+    });
+});
+
+describe('product photo - presence is the switch, and the base is allowlisted on the way out', () => {
+    const GOOD_BASE = 'aff-0123456789abcdef';
+
+    it('emits no image trio at all until a photo is attached', () => {
+        const partner = makePartner();
+        makeOffer(partner.id);
+
+        const payload = resolveOfferForContext({ placement: 'popup', cameraId: 11 });
+        expect(payload.image_base).toBeNull();
+        expect(payload.image_width).toBeNull();
+        expect(payload.image_height).toBeNull();
+    });
+
+    it('publishes the base and its dimensions once a photo is attached, and drops all three when cleared', () => {
+        const partner = makePartner();
+        const offer = makeOffer(partner.id);
+
+        setOfferImage(offer.id, { imageBase: GOOD_BASE, width: 320, height: 240, bytes: 8192 });
+        expect(resolveOfferForContext({ placement: 'popup', cameraId: 11 })).toMatchObject({
+            image_base: GOOD_BASE,
+            image_width: 320,
+            image_height: 240,
+        });
+
+        // Clearing image_base IS how "no photo" is expressed - there is no show_image flag.
+        affiliateOfferService.clearOfferImage(offer.id);
+        expect(resolveOfferForContext({ placement: 'popup', cameraId: 11 })).toMatchObject({
+            image_base: null,
+            image_width: null,
+            image_height: null,
+        });
+    });
+
+    it('refuses to publish a base that fails the affiliate filename allowlist', () => {
+        /*
+         * The frontend turns image_base into `/api/affiliate-media/<base>-320.webp`, so an
+         * unvalidated base is a path fragment we hand a browser. A doctored row must produce no
+         * image at all - and it must take the dimensions with it, because a width with no picture
+         * is worse than no picture.
+         */
+        const partner = makePartner();
+        const offer = makeOffer(partner.id);
+        setOfferImage(offer.id, { imageBase: GOOD_BASE, width: 320, height: 240, bytes: 8192 });
+
+        for (const hostile of ['../../etc/passwd', 'aff-../../etc/passwd', '/etc/passwd',
+            'aff-ABCDEF', 'aff-abc', 'promo-0123456789ab', '']) {
+            db.prepare('UPDATE affiliate_offers SET image_base = ? WHERE id = ?').run(hostile, offer.id);
+            const payload = resolveOfferForContext({ placement: 'popup', cameraId: 11 });
+            expect(payload.image_base, hostile).toBeNull();
+            expect(payload.image_width, hostile).toBeNull();
+            expect(payload.image_height, hostile).toBeNull();
+        }
+    });
+
+    it('keeps the byte count internal - it is operator bookkeeping, not visitor content', () => {
+        const partner = makePartner();
+        const offer = makeOffer(partner.id);
+        setOfferImage(offer.id, { imageBase: GOOD_BASE, width: 320, height: 240, bytes: 8192 });
+
+        expect(JSON.stringify(resolveOfferForContext({ placement: 'popup', cameraId: 11 })))
+            .not.toContain('8192');
+        // ...but the admin projection still has it, so this is about the PUBLIC payload only.
+        expect(affiliateOfferService.getOffer(offer.id).image_bytes).toBe(8192);
     });
 });
 
@@ -462,6 +815,26 @@ describe('resolveOfferForRedirect - liveness is re-checked on every read', () =>
         expect(resolveOfferForRedirect(offer.id, '')).toBeNull();
         expect(resolveOfferForRedirect('1; DROP TABLE affiliate_offers', 'p')).toBeNull();
     });
+
+    it('refuses l=w outright - a WhatsApp tap is countable, never navigable', () => {
+        /*
+         * `w` is a real link kind: it counts. What it must never have is a DESTINATION. Falling
+         * through to the product URL would file one intent as another AND land the visitor
+         * somewhere they did not tap; redirecting to wa.me instead would leave a stable, guessable
+         * URL on our domain that opens a chat with a partner's phone number - a free
+         * "our domain in front of your WhatsApp link" tool for anyone who finds it.
+         *
+         * Null here is what the controller turns into a 404 on the non-beacon path.
+         */
+        const partner = makePartner();
+        const offer = makeOffer(partner.id, { whatsapp_number: '081298765432' });
+
+        expect(resolveOfferForRedirect(offer.id, 'w')).toBeNull();
+        // ...while the very same offer still redirects for the two kinds that do have a target,
+        // so this is a rule about `w` and not a dead offer.
+        expect(resolveOfferForRedirect(offer.id, 'p')).not.toBeNull();
+        expect(resolveOfferForRedirect(offer.id, 's')).not.toBeNull();
+    });
 });
 
 describe('partnerScheduleState - one definition shared by resolve, redirect and the admin badge', () => {
@@ -505,6 +878,7 @@ describe('stat writes - the guarded daily UPSERT', () => {
         recordClick(offer.id, 'p');
         recordClick(offer.id, 's');
         recordClick(offer.id, 's');
+        recordClick(offer.id, 'w');
 
         const rows = statRows();
         expect(rows).toHaveLength(1);
@@ -514,6 +888,7 @@ describe('stat writes - the guarded daily UPSERT', () => {
             impressions: 2,
             product_clicks: 1,
             store_clicks: 2,
+            whatsapp_clicks: 1,
         });
     });
 
@@ -527,17 +902,37 @@ describe('stat writes - the guarded daily UPSERT', () => {
         expect(statRows()[0].stat_date).toBe(TODAY);
     });
 
-    it('increments the product column for l=p and the store column for l=s, never the other', () => {
+    it('sends p, s and w to three different columns and never to each other', () => {
+        /*
+         * A WhatsApp tap is a different intent from a product tap - starting a conversation, not
+         * browsing - and it is what a partner is invoiced against, so folding it into
+         * product_clicks would produce one number nobody can read. Three offers, one event each,
+         * so a mapping that collapsed two kinds into one column shows up as a column that moved
+         * on the wrong row rather than as a total that still happens to add up.
+         */
         const partner = makePartner();
         const a = makeOffer(partner.id, { product_title: 'A' });
         const b = makeOffer(partner.id, { product_title: 'B' });
+        const c = makeOffer(partner.id, { product_title: 'C', whatsapp_number: '081298765432' });
 
         recordClick(a.id, 'p');
         recordClick(b.id, 's');
+        recordClick(c.id, 'w');
 
         const byOffer = Object.fromEntries(statRows().map((r) => [r.offer_id, r]));
-        expect(byOffer[a.id]).toMatchObject({ product_clicks: 1, store_clicks: 0, impressions: 0 });
-        expect(byOffer[b.id]).toMatchObject({ product_clicks: 0, store_clicks: 1, impressions: 0 });
+        expect(byOffer[a.id]).toMatchObject({ product_clicks: 1, store_clicks: 0, whatsapp_clicks: 0, impressions: 0 });
+        expect(byOffer[b.id]).toMatchObject({ product_clicks: 0, store_clicks: 1, whatsapp_clicks: 0, impressions: 0 });
+        expect(byOffer[c.id]).toMatchObject({ product_clicks: 0, store_clicks: 0, whatsapp_clicks: 1, impressions: 0 });
+    });
+
+    it('cannot mint a phantom whatsapp row for an offer id that does not exist', () => {
+        // The WHERE EXISTS guard has to cover the NEW column too: the id arrives from a public URL
+        // and `w` is reachable by the same beacon a forged id can be aimed at.
+        const partner = makePartner();
+        makeOffer(partner.id);
+
+        expect(() => recordClick(999999, 'w')).not.toThrow();
+        expect(statRows()).toEqual([]);
     });
 
     it('cannot create a stat row for an offer id that does not exist', () => {
@@ -567,13 +962,14 @@ describe('stat writes - the guarded daily UPSERT', () => {
         expect(statRows()).toEqual([]);
     });
 
-    it('maps only p and s to a stat column and throws on anything else', () => {
+    it('maps only p, s and w to a stat column and throws on anything else', () => {
         // SQLite cannot parameterize an identifier, so this map is the only thing standing between
         // a query-string value and an interpolated column name.
         expect(statColumnFor('p')).toBe('product_clicks');
         expect(statColumnFor('s')).toBe('store_clicks');
+        expect(statColumnFor('w')).toBe('whatsapp_clicks');
 
-        for (const bogus of ['impressions', 'P', '', 'id', 'constructor', '__proto__', 'toString', 'store_clicks']) {
+        for (const bogus of ['impressions', 'P', 'W', '', 'id', 'constructor', '__proto__', 'toString', 'store_clicks', 'whatsapp_clicks']) {
             expect(() => statColumnFor(bogus), bogus).toThrow();
         }
         expect(() => statColumnFor(null)).toThrow();
@@ -593,8 +989,10 @@ describe('stat writes - the guarded daily UPSERT', () => {
         recordImpression(offer.id);
         recordClick(offer.id, 'p');
 
+        recordClick(offer.id, 'w');
+
         expect(affiliateOfferService.getOfferStats(offer.id, 30)).toEqual([
-            { stat_date: TODAY, impressions: 1, product_clicks: 1, store_clicks: 0 },
+            { stat_date: TODAY, impressions: 1, product_clicks: 1, store_clicks: 0, whatsapp_clicks: 1 },
         ]);
     });
 });

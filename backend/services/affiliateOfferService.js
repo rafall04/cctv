@@ -1,35 +1,37 @@
 /*
 Purpose: Own the affiliate feature's data rules — pick ONE partner offer for a viewing context,
-         resolve the /go redirect target, count impressions/clicks, and serve admin CRUD.
-Caller: affiliateController (public resolve + /go redirect, admin partner/offer CRUD + stats).
+         resolve the /go target, count impressions/clicks/WhatsApp taps, and serve admin CRUD.
+Caller: affiliateController (public resolve + /go redirect, admin partner/offer CRUD + stats + photo).
 Deps: database/connectionPool (query/queryOne/execute/transaction), services/timeService
-      (getLocalDate — WIB), utils/outboundUrlPolicy (https-only URL validation).
+      (getLocalDate — WIB), utils/outboundUrlPolicy (https-only URL validation),
+      services/affiliateOfferExtras (WhatsApp/price/photo rules + the public payload shape).
 MainFuncs: resolveOfferForContext, resolveOfferForRedirect, recordImpression, recordClick,
-           listPartners/getPartner/createPartner/updatePartner/deletePartner,
-           listOffers/getOffer/createOffer/updateOffer/deleteOffer/setOfferTargets, getOfferStats.
+           listPartners/getPartner/createPartner/updatePartner/deletePartner, listOffers/getOffer/
+           createOffer/updateOffer/deleteOffer/setOfferTargets/setOfferImage, getOfferStats.
 SideEffects: Reads/writes affiliate_partners, affiliate_offers, affiliate_offer_targets,
-             affiliate_offer_stats. Reads cameras.area_id (that column ONLY — see below).
+             affiliate_offer_stats; unlinks offer photos. Reads cameras.area_id (ONLY — see below).
 
 WHY THE PUBLIC PAYLOAD IS HAND-BUILT AND NEVER A SPREAD ROW
 -----------------------------------------------------------
-buildPublicPayload names all six keys literally. It must never become `{ ...row, href }`: the
-row it is handed is joined against affiliate_partners, so a spread would ship the partner's
-price, contact note, schedule and raw store URL to every anonymous visitor the moment someone
-adds a column. The resolve SELECT is a second, independent allow-list — it does not even read
-product_url, store_url, price_rupiah, contact_note or partner_id — so a leak needs two
-mistakes, not one.
+buildPublicPayload (services/affiliateOfferExtras.js) names all thirteen keys literally and must
+never become `{ ...row, href }`: the row it is handed is joined against affiliate_partners, so a
+spread would ship the partner's price, contact note, schedule and targeting to every anonymous
+visitor the moment someone adds a column. RESOLVE_SELECT below is a second, independent
+allow-list, so a leak needs two mistakes rather than one. Both destination URLs ARE public now —
+that file's header carries why phase 1 reversed, and why they are still re-validated on the way out.
 
-WHY THE CAMERA NAME IS DELIBERATELY NOT READ
---------------------------------------------
+WHY THE CAMERA NAME IS DELIBERATELY NOT READ (even now that a template exists)
+------------------------------------------------------------------------------
 The camera lookup selects `area_id` and nothing else. The neighbouring promo resolver
-(promoBannerService.resolvePromoBannerForContext) carries a comment claiming "no camera field
-is ever echoed back to the caller" while three lines later it keeps `camera.name` and
-substitutes it into the public `cta_url` — on a query with no camera_class filter, so a
-PRIVATE or SUBSCRIBER camera's name reaches an anonymous caller. That comment is false and
-this file must not inherit it. Affiliate offers have no template substitution at all, so
-there is no legitimate use for the name; not reading it is what makes the leak impossible
-rather than merely unintended. If someone later adds `{kamera}` templating here, they must
-also add the `camera_class = 'community'` gate — do not select the name "just in case".
+(promoBannerService.resolvePromoBannerForContext) carried a comment claiming "no camera field is
+ever echoed back to the caller" while three lines later it kept `camera.name` and substituted it
+into the public `cta_url` — on a query with no camera_class filter, so a PRIVATE or SUBSCRIBER
+camera's name reached an anonymous caller. That comment was false and this file must not inherit
+it. The WhatsApp template added here substitutes {barang} and {toko} — the offer's own product and
+shop, both already public on the card carrying the button — and NOTHING else. {kamera} would mean
+reading a name, and not reading it is what makes the leak impossible rather than merely
+unintended; anyone adding it must add the `camera_class = 'community'` gate too. Do not select the
+name "just in case".
 
 WHY LIVENESS IS ONE JS PREDICATE, NOT A SQL WHERE CLAUSE
 --------------------------------------------------------
@@ -77,22 +79,32 @@ instead of a foreign-key exception.
 import { query, queryOne, execute, transaction } from '../database/connectionPool.js';
 import { getLocalDate } from './timeService.js';
 import { assertSafeOutboundUrl, isSafeOutboundUrl } from '../utils/outboundUrlPolicy.js';
+import {
+    OFFER_EXTRA_FIELDS, buildPublicPayload, buildOfferWhatsAppUrl, deleteAffiliateImage,
+    normalizeWhatsAppNumber, normalizeWhatsAppMessage, normalizeProductPrice,
+} from './affiliateOfferExtras.js';
 
 export const AFFILIATE_PLACEMENTS = ['popup', 'area', 'landing', 'playback'];
 export const AFFILIATE_TARGET_MODES = ['all', 'area', 'camera'];
 export const AFFILIATE_BILLING_MODES = ['lifetime', 'term'];
 
 /*
- * The ONLY two column names that may reach the stat UPSERT. Null-prototype and frozen on
+ * The ONLY three column names that may reach the stat UPSERT. Null-prototype and frozen on
  * purpose: on a plain object literal, `STAT_COLUMN_BY_LINK['constructor']` returns an
  * inherited function rather than undefined, and that value would be template-interpolated
  * into SQL by a `map[link] || 'impressions'` style lookup. SQLite cannot parameterize an
  * identifier, so interpolation is unavoidable — the defence is that the interpolated value
- * can only ever be one of these two literals.
+ * can only ever be one of these three literals, chosen by a key the query string cannot forge
+ * into anything else.
+ *
+ * 'w' (a WhatsApp tap) gets its own counter rather than being folded into product_clicks: it is a
+ * different intent — starting a conversation, not browsing — and two intents in one number is a
+ * number nobody can read.
  */
 const STAT_COLUMN_BY_LINK = Object.freeze(Object.assign(Object.create(null), {
     p: 'product_clicks',
     s: 'store_clicks',
+    w: 'whatsapp_clicks',
 }));
 
 const MAX_STATS_DAYS = 365;
@@ -258,17 +270,17 @@ function isOfferRowLive(row, today = getLocalDate()) {
 /* --------------------------------------------------------------- public resolution */
 
 /**
- * The SELECT list IS the first allow-list: no product_url, no raw store_url, no price_rupiah,
- * no contact_note, no partner_id. `has_store_url` is computed in SQL so the partner's raw URL
- * never even enters this process on the resolve path — the public payload advertises our own
- * /go redirector, never the destination.
+ * The SELECT list IS the first allow-list, and it remains one even now that both destination URLs
+ * are public: it still never reads the partner's price_rupiah (what the operator charges the
+ * shop), their contact_note, or partner_id, and it reads nothing about the contract beyond the
+ * four columns liveness needs. Add a column here only once buildPublicPayload actually emits it.
  */
 const RESOLVE_SELECT = `
-    SELECT o.id, o.product_title, o.description, o.placements,
-           o.active AS offer_active,
-           p.store_name,
-           p.active AS partner_active, p.billing_mode, p.start_date, p.end_date,
-           CASE WHEN p.store_url IS NOT NULL AND TRIM(p.store_url) <> '' THEN 1 ELSE 0 END AS has_store_url
+    SELECT o.id, o.product_title, o.description, o.placements, o.product_url,
+           o.whatsapp_number, o.whatsapp_message, o.product_price_rupiah,
+           o.image_base, o.image_width, o.image_height, o.active AS offer_active,
+           p.store_name, p.store_url,
+           p.active AS partner_active, p.billing_mode, p.start_date, p.end_date
     FROM affiliate_offers o
     JOIN affiliate_partners p ON p.id = o.partner_id
     WHERE (
@@ -287,20 +299,6 @@ const RESOLVE_SELECT = `
         o.priority ASC,
         o.id DESC
 `;
-
-/**
- * The six public keys, spelled out. Do not spread a row into this object — see the file header.
- */
-export function buildPublicPayload(row) {
-    return {
-        id: row.id,
-        product_title: row.product_title,
-        description: row.description || null,
-        store_name: row.store_name,
-        product_href: `/api/public/affiliate/offers/${row.id}/go?l=p`,
-        store_href: row.has_store_url ? `/api/public/affiliate/offers/${row.id}/go?l=s` : null,
-    };
-}
 
 const REDIRECT_SELECT = `
     SELECT o.id, o.active AS offer_active, o.product_url,
@@ -324,7 +322,8 @@ const OFFER_SELECT = `
         p.store_name, p.active AS partner_active, p.billing_mode, p.start_date, p.end_date,
         (SELECT COALESCE(SUM(s.impressions), 0) FROM affiliate_offer_stats s WHERE s.offer_id = o.id) AS total_impressions,
         (SELECT COALESCE(SUM(s.product_clicks), 0) FROM affiliate_offer_stats s WHERE s.offer_id = o.id) AS total_product_clicks,
-        (SELECT COALESCE(SUM(s.store_clicks), 0) FROM affiliate_offer_stats s WHERE s.offer_id = o.id) AS total_store_clicks
+        (SELECT COALESCE(SUM(s.store_clicks), 0) FROM affiliate_offer_stats s WHERE s.offer_id = o.id) AS total_store_clicks,
+        (SELECT COALESCE(SUM(s.whatsapp_clicks), 0) FROM affiliate_offer_stats s WHERE s.offer_id = o.id) AS total_whatsapp_clicks
     FROM affiliate_offers o
     JOIN affiliate_partners p ON p.id = o.partner_id
 `;
@@ -420,8 +419,12 @@ class AffiliateOfferService {
     /**
      * Resolve the destination for /go. Re-checks liveness on every read — see the file header.
      *
+     * 'w' counts but has no destination: the WhatsApp anchor points straight at wa.me, so /go?l=w
+     * exists only as a beacon. Null (a 404) rather than falling through to the product URL, which
+     * would file one intent as another and land the visitor somewhere else.
+     *
      * @param {number|string} offerId
-     * @param {'p'|'s'} link
+     * @param {'p'|'s'|'w'} link
      * @returns {{url: string}|null} null means 404; the caller must never redirect on null
      */
     resolveOfferForRedirect(offerId, link) {
@@ -450,7 +453,11 @@ class AffiliateOfferService {
         }
     }
 
-    /** Best-effort counter. Never throws, including on an unknown `link`. */
+    /**
+     * Best-effort counter for 'p' | 's' | 'w' (product / store / WhatsApp). Never throws, unknown
+     * `link` included: the frozen table above lets the query string pick WHICH counter, never the
+     * identifier that reaches SQL.
+     */
     recordClick(offerId, link) {
         try {
             bumpStat(offerId, statColumnFor(link));
@@ -563,8 +570,8 @@ class AffiliateOfferService {
      */
     deletePartner(id) {
         const partner = this.requirePartnerRow(id);
-        const offerIds = query('SELECT id FROM affiliate_offers WHERE partner_id = ?', [partner.id])
-            .map((row) => row.id);
+        const offers = query('SELECT id, image_base FROM affiliate_offers WHERE partner_id = ?', [partner.id]);
+        const offerIds = offers.map((row) => row.id);
 
         const run = transaction(() => {
             for (const offerId of offerIds) {
@@ -575,6 +582,10 @@ class AffiliateOfferService {
             execute('DELETE FROM affiliate_partners WHERE id = ?', [partner.id]);
         });
         run();
+        // Photos after the rows, same ordering rule as deleteOffer.
+        for (const row of offers) {
+            if (row.image_base) deleteAffiliateImage(row.image_base);
+        }
         return true;
     }
 
@@ -633,11 +644,13 @@ class AffiliateOfferService {
             throw notFound('Partner tidak ditemukan');
         }
 
+        // No photo columns here: setOfferImage writes those, once ffmpeg has made the renditions.
         const result = execute(`
             INSERT INTO affiliate_offers
                 (partner_id, product_title, description, product_url,
-                 target_mode, placements, priority, active)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                 target_mode, placements, priority, active,
+                 whatsapp_number, whatsapp_message, product_price_rupiah)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [
             partnerId,
             normalizeText(data.product_title, 'product_title', { required: true }),
@@ -647,6 +660,9 @@ class AffiliateOfferService {
             JSON.stringify(normalizePlacements(data.placements ?? ['popup'])),
             normalizePriority(data.priority),
             toActiveFlag(data.active),
+            normalizeWhatsAppNumber(data.whatsapp_number),
+            normalizeWhatsAppMessage(data.whatsapp_message),
+            normalizeProductPrice(data.product_price_rupiah),
         ]);
 
         this.setOfferTargets(result.lastInsertRowid, data);
@@ -683,6 +699,12 @@ class AffiliateOfferService {
         if (data.priority !== undefined) assign('priority', normalizePriority(data.priority));
         if (data.active !== undefined) assign('active', toActiveFlag(data.active));
 
+        // The three optional extras, through the SAME normalisers createOffer used, so a PUT can
+        // never store what a POST would refuse. `undefined` = not sent; '' = cleared, i.e. NULL.
+        for (const [column, normalize] of Object.entries(OFFER_EXTRA_FIELDS)) {
+            if (data[column] !== undefined) assign(column, normalize(data[column]));
+        }
+
         if (fields.length > 0) {
             assign('updated_at', nowSql());
             execute(`UPDATE affiliate_offers SET ${fields.join(', ')} WHERE id = ?`, [...values, existing.id]);
@@ -698,6 +720,35 @@ class AffiliateOfferService {
         return this.getOffer(existing.id);
     }
 
+    /**
+     * Point an offer at a freshly encoded photo — or, with `image = null`, forget the photo:
+     * clearing image_base IS how "no photo" is expressed, since presence is the switch and there
+     * is no show_image flag to unset. The row is updated BEFORE the old renditions are unlinked,
+     * so a crash in between leaves an orphan file rather than a live card whose <img> 404s.
+     *
+     * @param {number|string} offerId
+     * @param {{imageBase: string, width: number, height: number, bytes: number}|null} image
+     */
+    setOfferImage(offerId, image = null) {
+        const existing = this.requireOfferRow(offerId);
+        const next = image ? image.imageBase : null;
+        execute(`
+            UPDATE affiliate_offers
+            SET image_base = ?, image_width = ?, image_height = ?, image_bytes = ?, updated_at = ?
+            WHERE id = ?
+        `, [next, image?.width ?? null, image?.height ?? null, image?.bytes ?? null, nowSql(), existing.id]);
+
+        if (existing.image_base && existing.image_base !== next) {
+            deleteAffiliateImage(existing.image_base);
+        }
+        return this.getOffer(existing.id);
+    }
+
+    /** Remove the photo. Sugar for setOfferImage(id, null) — the ordering rule lives there. */
+    clearOfferImage(offerId) {
+        return this.setOfferImage(offerId, null);
+    }
+
     deleteOffer(id) {
         const offer = this.requireOfferRow(id);
         const run = transaction(() => {
@@ -706,6 +757,9 @@ class AffiliateOfferService {
             execute('DELETE FROM affiliate_offers WHERE id = ?', [offer.id]);
         });
         run();
+        // Files after the rows (see setOfferImage): an orphan file is recoverable, a row pointing
+        // at a deleted file is a broken card.
+        if (offer.image_base) deleteAffiliateImage(offer.image_base);
         return true;
     }
 
@@ -715,7 +769,7 @@ class AffiliateOfferService {
         const num = typeof days === 'number' ? days : Number(String(days ?? '').trim());
         const window = Number.isInteger(num) && num > 0 && num <= MAX_STATS_DAYS ? num : DEFAULT_STATS_DAYS;
         return query(`
-            SELECT stat_date, impressions, product_clicks, store_clicks
+            SELECT stat_date, impressions, product_clicks, store_clicks, whatsapp_clicks
             FROM affiliate_offer_stats
             WHERE offer_id = ?
             ORDER BY stat_date DESC
@@ -734,6 +788,12 @@ export const resolveOfferForContext = affiliateOfferService.resolveOfferForConte
 export const resolveOfferForRedirect = affiliateOfferService.resolveOfferForRedirect.bind(affiliateOfferService);
 export const recordImpression = affiliateOfferService.recordImpression.bind(affiliateOfferService);
 export const recordClick = affiliateOfferService.recordClick.bind(affiliateOfferService);
+export const setOfferImage = affiliateOfferService.setOfferImage.bind(affiliateOfferService);
+export const clearOfferImage = affiliateOfferService.clearOfferImage.bind(affiliateOfferService);
+
+// Re-exported from affiliateOfferExtras so the split is invisible to callers and tests that
+// already import them from here. One implementation, two import paths.
+export { buildPublicPayload, buildOfferWhatsAppUrl };
 
 export { AffiliateOfferService };
 export default affiliateOfferService;

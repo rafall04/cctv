@@ -35,6 +35,7 @@ import CameraDetailPanel from './CameraDetailPanel.jsx';
 import RelatedCamerasStrip from './RelatedCamerasStrip.jsx';
 import SponsorBadge from '../SponsorBadge.jsx';
 import UnderVideoCommerceSlot from '../commerce/UnderVideoCommerceSlot.jsx';
+import PromoBanner from '../promo/PromoBanner.jsx';
 import { isAdsMobileViewport, shouldRenderAdSlot } from '../ads/adsConfig.js';
 import {
     getPublicPopupBodyStyle,
@@ -1546,9 +1547,7 @@ function VideoPopup({
                     </div>
                 </div>
 
-                {/* Below the fold: metadata, related cameras, codec note,
-                    and the sponsor ad — scrolled to via the backdrop so the
-                    video + controls own the first screen. */}
+                {/* Below the fold: shop offer, metadata, house promo, related cameras, codec note — the video + controls own the first screen. */}
                 {!isFullscreen && (
                     <>
                         <UnderVideoCommerceSlot cameraId={camera?.id} />
@@ -1558,6 +1557,7 @@ function VideoPopup({
                             onShare={handleShare}
                             onToggleFavorite={onToggleFavorite}
                         />
+                        <PromoBanner placement="popup" cameraId={camera?.id} className="border-t border-edge bg-surface px-3 py-3" />
                         <RelatedCamerasStrip
                             cameras={relatedCameras}
                             onCameraClick={onRelatedCameraClick}

@@ -14,7 +14,9 @@ import { isSafeImageBase, promoImagePaths, PROMO_MEDIA_FILENAME_RE, PROMO_IMAGE_
 
 const { MAX_BODY_SIZE, MAX_UPLOAD_BODY_SIZE } = INPUT_SANITIZER_CONFIG;
 
-describe('body-size allowance is scoped to exactly one route', () => {
+// The allowance now covers a second upload route (POST /api/admin/affiliate/offers/:id/image);
+// what is asserted here is the SHAPE of the scoping — exact method + whole path, never a prefix.
+describe('body-size allowance is scoped to exact method+path pairs', () => {
     it('grants the upload ceiling to POST /api/promo-banners/:id/image', () => {
         expect(resolveBodySizeLimit({ method: 'POST', url: '/api/promo-banners/7/image' })).toBe(MAX_UPLOAD_BODY_SIZE);
         expect(resolveBodySizeLimit({ method: 'POST', url: '/api/promo-banners/7/image?x=1' })).toBe(MAX_UPLOAD_BODY_SIZE);

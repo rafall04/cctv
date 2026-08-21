@@ -1,15 +1,33 @@
 /*
- * UnderVideoCommerceSlot.test.jsx — arbitration for the single commercial strip under the live video.
+ * UnderVideoCommerceSlot.test.jsx — the commercial strip directly under the live video.
  *
- * The one invariant worth a test file: this slot has exactly ONE occupant. A paid affiliate offer
- * takes it when one resolves; the operator's own installation promo takes it otherwise; the two
- * never appear together, and when neither resolves the strip must not exist at all — no bare
- * bordered box under the video on the majority of cameras.
+ * ── WHAT CHANGED, AND WHY THESE TESTS WERE REWRITTEN (2026-08-21) ─────────────────────────────
+ * This slot used to ARBITRATE: affiliate offer OR house promo, never both, on the theory that five
+ * blocks already sat under the video and the popup has a history of becoming unusable at 390px.
+ * The reasoning was sound; the premise was never measured. Checked on a real Android phone, the
+ * offer card is a title, an optional photo and a button — far lighter than a poster — and both fit.
  *
- * PromoBanner is rendered FOR REAL here (only its service is stubbed) rather than mocked out. That
- * is deliberate: mocking the component would prove the slot rendered *something*, while what the
- * arbitration rule is actually about is whether the promo gets to fetch, count an impression and
- * paint. Stubbing the service lets the test observe all three.
+ * So the promo did not lose the slot, it MOVED: VideoPopup now mounts this slot directly under the
+ * video and <PromoBanner> separately, below CameraDetailPanel. Both are visible; they are no longer
+ * mutually exclusive. Every assertion of the form "the promo must not render" or "never both at
+ * once" was therefore testing a design that no longer exists, and has been dropped.
+ *
+ * What survived is everything that is still true, and it is the load-bearing half:
+ *   · the resolve is DEFERRED behind an IntersectionObserver and fires at most once per mount —
+ *     that GET is what counts the impression server-side, so it must mean "the block reached the
+ *     screen", not "a popup opened",
+ *   · nothing renders while the fetch is in flight — no skeleton, no reserved box, because the slot
+ *     sits under a starting video and the majority of cameras have no offer,
+ *   · with no offer there is no strip AT ALL: the chrome lives on the inner div, so an empty slot
+ *     leaves no bare bordered box under the video,
+ *   · switching camera invalidates the answer,
+ *   · a failed resolve is indistinguishable from "no offer" — a visitor never sees an error for a
+ *     shop link that did not load.
+ *
+ * promoBannerService is still mocked, and asserted NEVER CALLED. Not arbitration — a
+ * re-introduction guard: if anyone remounts PromoBanner inside this slot, it fetches through that
+ * service and this file fails, which is the cheapest possible alarm for "the promo is stacked under
+ * the video again".
  *
  * Plain DOM assertions on purpose: this project does not load @testing-library/jest-dom.
  */
@@ -28,45 +46,38 @@ const { getPublicPromoBanner, trackPromoBannerClick } = vi.hoisted(() => ({
 vi.mock('../../services/affiliateService', () => ({ resolveAffiliateOfferOnce }));
 vi.mock('../../services/promoBannerService', () => ({ getPublicPromoBanner, trackPromoBannerClick }));
 
+/** The thirteen-key public payload (v2). */
 const OFFER = {
     id: 12,
     product_title: 'Kamera IP Outdoor 3MP',
     description: 'Tahan hujan, night vision 30 meter.',
     store_name: 'Toko Sinar Elektronik',
+    product_url: 'https://toko-sinar.example/produk/kamera-ip-3mp',
+    store_url: 'https://toko-sinar.example',
     product_href: '/api/public/affiliate/offers/12/go?l=p',
     store_href: '/api/public/affiliate/offers/12/go?l=s',
-};
-
-const PROMO = {
-    id: 7,
-    title: 'Pemasangan CCTV Gratis',
-    alt_text: 'Promo pemasangan CCTV gratis',
-    image_base: 'promo-0123456789ab',
-    image_width: 1200,
-    image_height: 894,
-    cta_label: 'Tanya Pemasangan',
-    cta_url: 'https://wa.me/6281234567890?text=Halo',
+    whatsapp_url: 'https://wa.me/6281234567890?text=Halo',
+    price_rupiah: 150000,
+    image_base: null,
+    image_width: null,
+    image_height: null,
 };
 
 const SLOT_CLASSES = 'border-t border-edge bg-surface px-3 py-3';
+const SLOT_SELECTOR = `.${SLOT_CLASSES.split(' ').join('.')}`;
 
 const noOffer = () => resolveAffiliateOfferOnce.mockResolvedValue({ success: true, data: null });
 const anOffer = (offer = OFFER) => resolveAffiliateOfferOnce.mockResolvedValue({ success: true, data: offer });
-const noPromo = () => getPublicPromoBanner.mockResolvedValue({ success: true, data: null });
-const aPromo = () => getPublicPromoBanner.mockResolvedValue({ success: true, data: PROMO });
 
-/** Did PromoBanner actually paint? Its label and its poster are the only visible evidence. */
-const promoIsShowing = () => screen.queryByText('Promo') !== null || screen.queryByAltText(PROMO.alt_text) !== null;
 const affiliateIsShowing = () => screen.queryByTestId('affiliate-offer-card') !== null;
 
 /**
  * Let every pending effect and resolved promise land before asserting a NEGATIVE.
  *
  * findBy* resolves from a MutationObserver callback, which is a microtask scheduled during the
- * commit — it can therefore run BEFORE React flushes passive effects. Assert "the promo never
- * fetched" straight after a findBy and the assertion may be reading a moment at which a wrongly
- * mounted PromoBanner simply had not got to its effect yet. Verified: without this flush, seeding
- * the component with `{resolved && (…)}` (both branches at once) still passed intermittently.
+ * commit — it can therefore run BEFORE React flushes passive effects, so an assertion made straight
+ * after a findBy may be reading a moment at which a wrongly mounted child simply had not reached
+ * its effect yet.
  */
 const settle = async () => {
     await act(async () => {
@@ -78,8 +89,9 @@ const settle = async () => {
 
 beforeEach(() => {
     vi.clearAllMocks();
-    // jsdom implements no IntersectionObserver; both components then fetch immediately, which is
-    // the behaviour most of these tests want. The deferral itself is stubbed explicitly below.
+    // jsdom implements no IntersectionObserver, so the component falls back to fetching
+    // immediately — the behaviour most of these tests want. The deferral itself is stubbed
+    // explicitly in its own test.
     delete globalThis.IntersectionObserver;
 });
 
@@ -87,178 +99,116 @@ afterEach(() => {
     vi.unstubAllGlobals();
 });
 
-describe('UnderVideoCommerceSlot — arbitration', () => {
-    it('gives the slot to the affiliate offer, and the promo does not render', async () => {
+describe('UnderVideoCommerceSlot — one occupant, and it is the offer', () => {
+    it('fills the strip with the resolved affiliate offer', async () => {
         anOffer();
-        aPromo(); // a promo IS available — it must still lose
 
         render(<UnderVideoCommerceSlot cameraId={11} />);
 
         await screen.findByTestId('affiliate-offer-card');
         expect(screen.getByText(OFFER.product_title)).not.toBeNull();
-        await settle();
-
-        // The explicit negative. Not just "no promo pixels": PromoBanner is never mounted, so it
-        // never fetches and never counts an impression for a slot it did not get.
-        expect(promoIsShowing()).toBe(false);
-        expect(getPublicPromoBanner).not.toHaveBeenCalled();
+        expect(screen.getByText('Toko rekanan')).not.toBeNull();
     });
 
-    it('gives the slot to the promo when no offer resolves, and the affiliate card does not render', async () => {
-        noOffer();
-        aPromo();
+    it('does not render the house promo — that block moved below CameraDetailPanel', async () => {
+        anOffer();
 
         render(<UnderVideoCommerceSlot cameraId={11} />);
-
-        expect(await screen.findByAltText(PROMO.alt_text)).not.toBeNull();
-        expect(screen.getByText('Promo')).not.toBeNull();
-        await settle();
-
-        // The other explicit negative.
-        expect(affiliateIsShowing()).toBe(false);
-        expect(screen.queryByText('Toko rekanan')).toBeNull();
-    });
-
-    it('never shows both at once, whichever resolves', async () => {
-        anOffer();
-        aPromo();
-
-        const { rerender } = render(<UnderVideoCommerceSlot cameraId={11} />);
         await screen.findByTestId('affiliate-offer-card');
         await settle();
-        expect(affiliateIsShowing()).toBe(true);
-        expect(promoIsShowing()).toBe(false);
 
+        // Not arbitration (both are visible in VideoPopup now, one under the video and one under
+        // the metadata) — this asserts OWNERSHIP: PromoBanner is not mounted HERE, so it neither
+        // fetches nor counts an impression from inside this strip.
+        expect(getPublicPromoBanner).not.toHaveBeenCalled();
+        expect(screen.queryByText('Promo')).toBeNull();
+    });
+
+    it('does not summon the promo when there is no offer either — an empty slot stays empty', async () => {
         noOffer();
-        rerender(<UnderVideoCommerceSlot cameraId={12} />);
-        await screen.findByAltText(PROMO.alt_text);
-        await settle();
-        expect(promoIsShowing()).toBe(true);
-        expect(affiliateIsShowing()).toBe(false);
-    });
-
-    it('treats a failed affiliate resolve exactly like "no offer" — the promo takes the slot', async () => {
-        resolveAffiliateOfferOnce.mockResolvedValue({ success: false, message: 'boom' });
-        aPromo();
-
-        render(<UnderVideoCommerceSlot cameraId={11} />);
-
-        expect(await screen.findByAltText(PROMO.alt_text)).not.toBeNull();
-        expect(screen.queryByText(/boom/)).toBeNull();
-    });
-
-    it('renders nothing at all while the affiliate resolve is still in flight', async () => {
-        let release;
-        resolveAffiliateOfferOnce.mockReturnValue(new Promise((resolve) => { release = resolve; }));
-        aPromo();
 
         const { container } = render(<UnderVideoCommerceSlot cameraId={11} />);
+        await waitFor(() => expect(resolveAffiliateOfferOnce).toHaveBeenCalled());
         await settle();
 
-        // No skeleton, no reserved box: the promo must not be mounted before it is known that the
-        // affiliate offer did not take the slot, or its impression would be counted either way.
-        expect(container.textContent).toBe('');
         expect(getPublicPromoBanner).not.toHaveBeenCalled();
+        expect(container.textContent).toBe('');
+    });
 
-        await act(async () => { release({ success: true, data: null }); });
-        await screen.findByAltText(PROMO.alt_text);
+    it('hands the offer through to the card as payload v2 — real shop URL, not the redirector', async () => {
+        anOffer();
+
+        render(<UnderVideoCommerceSlot cameraId={11} />);
+        await screen.findByTestId('affiliate-offer-card');
+
+        const product = screen.getByRole('link', { name: /Lihat barang/i });
+        expect(product.getAttribute('href')).toBe(OFFER.product_url);
+        expect(product.getAttribute('href').startsWith('/api/public/affiliate/')).toBe(false);
     });
 });
 
 describe('UnderVideoCommerceSlot — the empty strip', () => {
-    it('draws no bordered strip when there is neither an offer nor a promo', async () => {
+    it('draws no bordered strip when no offer resolves', async () => {
         noOffer();
-        noPromo();
 
         const { container } = render(<UnderVideoCommerceSlot cameraId={11} />);
 
-        await waitFor(() => expect(getPublicPromoBanner).toHaveBeenCalled());
+        await waitFor(() => expect(resolveAffiliateOfferOnce).toHaveBeenCalled());
+        await settle();
 
-        // This is the load-bearing part: the strip's chrome is handed to PromoBanner as a prop
-        // (which applies it only once a promo resolves) instead of being worn by an always-present
-        // outer div here. Put it on an outer div and every camera with neither — the common case —
-        // gets an empty bordered box under the video.
+        // Load-bearing: the strip's chrome lives on the INNER div, rendered only once an offer
+        // exists. Move it to the outer wrapper and every camera without an offer — the common case
+        // — gets an empty bordered box under the video.
         expect(container.querySelector('.border-t')).toBeNull();
         expect(container.querySelector('.bg-surface')).toBeNull();
         expect(screen.getByTestId('under-video-commerce-slot').getAttribute('class')).toBeNull();
         expect(container.textContent).toBe('');
     });
 
-    it('wears the strip chrome on the affiliate branch', async () => {
+    it('renders nothing at all while the resolve is still in flight', async () => {
+        let release;
+        resolveAffiliateOfferOnce.mockReturnValue(new Promise((resolve) => { release = resolve; }));
+
+        const { container } = render(<UnderVideoCommerceSlot cameraId={11} />);
+        await settle();
+
+        // No skeleton, no reserved box: a placeholder that resolves to "nothing" is a layout shift
+        // on the majority of cameras, directly under a video that is still starting.
+        expect(container.textContent).toBe('');
+        expect(container.querySelector(SLOT_SELECTOR)).toBeNull();
+
+        await act(async () => { release({ success: true, data: OFFER }); });
+        await screen.findByTestId('affiliate-offer-card');
+    });
+
+    it('wears the strip chrome only around a real offer', async () => {
         anOffer();
-        noPromo();
 
         const { container } = render(<UnderVideoCommerceSlot cameraId={11} />);
         await screen.findByTestId('affiliate-offer-card');
 
-        const strip = container.querySelector(`[data-testid="under-video-commerce-slot"] > .${SLOT_CLASSES.split(' ').join('.')}`);
+        const strip = container.querySelector(`[data-testid="under-video-commerce-slot"] > ${SLOT_SELECTOR}`);
         expect(strip).not.toBeNull();
         expect(strip.querySelector('[data-testid="affiliate-offer-card"]')).not.toBeNull();
-    });
-
-    it('hands the same strip chrome to PromoBanner on the promo branch', async () => {
-        noOffer();
-        aPromo();
-
-        const { container } = render(<UnderVideoCommerceSlot cameraId={11} />);
-        await screen.findByAltText(PROMO.alt_text);
-
-        const strip = container.querySelector(`.${SLOT_CLASSES.split(' ').join('.')}`);
-        expect(strip).not.toBeNull();
-        // Worn by PromoBanner's own wrapper, not by this component's outer div.
-        expect(strip.getAttribute('data-testid')).toBeNull();
         expect(screen.getByTestId('under-video-commerce-slot').getAttribute('class')).toBeNull();
     });
-});
 
-describe('UnderVideoCommerceSlot — outbound anchors', () => {
-    it('ships the affiliate anchors with target=_blank and all four rel tokens', async () => {
-        anOffer();
-        noPromo();
+    it('degrades silently when the resolve fails — a visitor never sees an error for a shop link', async () => {
+        resolveAffiliateOfferOnce.mockResolvedValue({ success: false, message: 'boom' });
 
-        render(<UnderVideoCommerceSlot cameraId={11} />);
-        await screen.findByTestId('affiliate-offer-card');
+        const { container } = render(<UnderVideoCommerceSlot cameraId={11} />);
+        await waitFor(() => expect(resolveAffiliateOfferOnce).toHaveBeenCalled());
+        await settle();
 
-        const links = screen.getAllByRole('link');
-        expect(links.length).toBe(2);
-        for (const link of links) {
-            expect(link.getAttribute('target')).toBe('_blank');
-            const rel = (link.getAttribute('rel') || '').split(/\s+/);
-            expect(rel).toContain('noopener');
-            expect(rel).toContain('noreferrer');
-            expect(rel).toContain('nofollow');
-            expect(rel).toContain('sponsored');
-        }
-    });
-
-    it('uses the payload hrefs verbatim — the slot builds no partner URL of its own', async () => {
-        anOffer();
-        noPromo();
-
-        render(<UnderVideoCommerceSlot cameraId={11} />);
-        await screen.findByTestId('affiliate-offer-card');
-
-        expect(screen.getByRole('link', { name: /Lihat barang/i }).getAttribute('href')).toBe(OFFER.product_href);
-        expect(screen.getByRole('link', { name: /Toko Sinar Elektronik/i }).getAttribute('href')).toBe(OFFER.store_href);
-    });
-
-    it('shows only the product link when the partner has no store URL', async () => {
-        anOffer({ ...OFFER, store_href: null });
-        noPromo();
-
-        render(<UnderVideoCommerceSlot cameraId={11} />);
-        await screen.findByTestId('affiliate-offer-card');
-
-        const links = screen.getAllByRole('link');
-        expect(links).toHaveLength(1);
-        expect(links[0].getAttribute('href')).toBe(OFFER.product_href);
+        expect(screen.queryByText(/boom/)).toBeNull();
+        expect(affiliateIsShowing()).toBe(false);
+        expect(container.textContent).toBe('');
     });
 });
 
 describe('UnderVideoCommerceSlot — resolving', () => {
     it('asks for this surface and this camera', async () => {
         noOffer();
-        noPromo();
 
         render(<UnderVideoCommerceSlot cameraId={42} />);
 
@@ -270,7 +220,6 @@ describe('UnderVideoCommerceSlot — resolving', () => {
 
     it('drops the previous camera\'s offer and re-resolves when the camera changes', async () => {
         anOffer();
-        noPromo();
 
         const { rerender } = render(<UnderVideoCommerceSlot cameraId={11} />);
         await screen.findByTestId('affiliate-offer-card');
@@ -308,7 +257,6 @@ describe('UnderVideoCommerceSlot — resolving', () => {
             });
         };
         anOffer();
-        noPromo();
 
         render(<UnderVideoCommerceSlot cameraId={11} />);
 

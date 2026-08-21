@@ -1,10 +1,13 @@
 /*
-Purpose: Register every affiliate endpoint — two public routes plus eleven admin-only ones.
-Caller: backend/server.js, registered WITHOUT a prefix (all paths below are absolute, same style as
-        settingsRoutes/promoBannerRoutes) so ONE registration line mounts the whole feature.
-Deps: affiliateController, authMiddleware/requireAdmin.
+Purpose: Register every affiliate endpoint — two public routes, twelve admin-only ones, and (nested)
+         the /api/affiliate-media/ static handler for product photos.
+Caller: backend/routes/commerceRoutes.js, registered WITHOUT a prefix (all paths below are absolute,
+        same style as settingsRoutes/promoBannerRoutes) so ONE registration line mounts the feature.
+Deps: affiliateController, authMiddleware/requireAdmin, promoImageService (upload ceiling),
+      affiliateMediaRoutes.
 MainFuncs: affiliateRoutes (default export, a single Fastify plugin).
-SideEffects: Adds 13 routes. No DB access here — routes stay thin (guardrails.test.js enforces it).
+SideEffects: Adds 14 routes plus the nested media handler. No DB access here — routes stay thin
+             (guardrails.test.js enforces it).
 
 WHY ABSOLUTE PATHS AND A SINGLE PLUGIN
 --------------------------------------
@@ -28,6 +31,20 @@ Role gating: middleware/customerAccessPolicy.js denies the `customer` role by de
 whitelist, and /api/admin is not in it — so subscriber accounts cannot reach these handlers even
 before requireAdmin runs. The public pair is intentionally unauthenticated: it is what an anonymous
 visitor watching a camera hits.
+
+WHY THE MEDIA HANDLER IS NESTED HERE
+------------------------------------
+server.js has one line of headroom and this feature already spent it. routes/affiliateMediaRoutes.js
+is therefore registered from inside this plugin — the same trick promoBannerRoutes uses for
+promoMediaRoutes — so the whole affiliate feature, images included, still costs the caller a single
+`await fastify.register(affiliateRoutes)`.
+
+THE ONE ROUTE ALLOWED A BODY OVER THE GLOBAL 1MB CAP
+----------------------------------------------------
+POST /api/admin/affiliate/offers/:id/image carries a base64 product photo. Its `bodyLimit` below
+must stay in agreement with the matching entry in middleware/inputSanitizer.js LARGE_BODY_ROUTES,
+which is matched on METHOD + WHOLE PATH (never a prefix — a prefix would hand the allowance to
+every admin affiliate route, including the ones an unauthenticated caller can reach the hook of).
 */
 
 import {
@@ -43,20 +60,33 @@ import {
     createAffiliateOffer,
     updateAffiliateOffer,
     deleteAffiliateOffer,
+    uploadAffiliateOfferImage,
     getAffiliateOfferStats,
 } from '../controllers/affiliateController.js';
 import { authMiddleware, requireAdmin } from '../middleware/authMiddleware.js';
+import { MAX_AFFILIATE_UPLOAD_BYTES } from '../services/promoImageService.js';
+import affiliateMediaRoutes from './affiliateMediaRoutes.js';
 
 const PUBLIC_BASE = '/api/public/affiliate';
 const ADMIN_BASE = '/api/admin/affiliate';
 
+// base64 inflates by 4/3; add headroom for the surrounding JSON envelope. Same arithmetic as
+// promoBannerRoutes, applied to the AFFILIATE ceiling (5 MiB today, deliberately its own constant
+// so a future product-photo limit can move without touching posters): 7344128 bytes.
+const UPLOAD_BODY_LIMIT = Math.ceil(MAX_AFFILIATE_UPLOAD_BYTES * 1.4) + 4096;
+
 export default async function affiliateRoutes(fastify, options) {
+    // Product photos live under their own prefix; registering them here rather than in server.js
+    // keeps the whole feature at one registration line. See the header.
+    await fastify.register(affiliateMediaRoutes);
+
     /* ---------------------------------------------------------------- public */
 
     /*
-     * Resolve one offer for one viewing context. The response is a hand-built allow-list of six
-     * keys (id, product_title, description, store_name, product_href, store_href) built in the
-     * service — no partner_id, no targeting, no schedule, no price, no contact note, and above all
+     * Resolve one offer for one viewing context. The response is a hand-built allow-list of
+     * thirteen keys, built in the service — the visible content, the real outbound URLs, the /go
+     * hrefs, a prebuilt wa.me link, the price, the photo. Never partner_id, targeting, schedule,
+     * priority, stats, the operator's own contact note, the fee charged to the shop, and above all
      * NO camera or area field: a public commerce slot must not become a way to enumerate cameras.
      * Uncacheable by design (the handler sets Cache-Control: no-store); never wire cacheMiddleware
      * to it, since a replayed response would replay the impression it was counted for.
@@ -64,9 +94,10 @@ export default async function affiliateRoutes(fastify, options) {
     fastify.get(`${PUBLIC_BASE}/offer`, getPublicAffiliateOffer);
 
     /*
-     * The only path from a visitor to a partner's site. Re-checks liveness on every hit and answers
-     * 302 (never 301 — see the controller header for why a cached permanent redirect would be
-     * unrevokable). Counts only real navigations.
+     * Two jobs, one event. `?beacon=1` -> 204 and a counted tap (l=p|s|w), gated on Sec-Fetch-Site
+     * being same-origin/same-site; without it -> the no-JS 302 for l=p|s (never 301 — see the
+     * controller header for why a cached permanent redirect would be unrevokable), 404 for l=w.
+     * Why the beacon gate is the stricter of the two is argued at length in the controller header.
      */
     fastify.get(`${PUBLIC_BASE}/offers/:id/go`, goAffiliateOffer);
 
@@ -88,6 +119,18 @@ export default async function affiliateRoutes(fastify, options) {
     fastify.get(`${ADMIN_BASE}/offers/:id`, adminOnly, getAffiliateOffer);
     fastify.put(`${ADMIN_BASE}/offers/:id`, adminOnly, updateAffiliateOffer);
     fastify.delete(`${ADMIN_BASE}/offers/:id`, adminOnly, deleteAffiliateOffer);
+
+    /*
+     * Product photo upload. The ONLY affiliate route allowed a body over the global 1MB cap, and
+     * the limit here must agree with middleware/inputSanitizer.js LARGE_BODY_ROUTES (8MiB there,
+     * 7344128 bytes here — the route is the tighter of the two, so ffmpeg is never handed a body
+     * the sanitizer would have let through). Clearing the photo is a normal offer update with
+     * image_base = null: presence is the switch, there is no show_image flag to keep in sync.
+     */
+    fastify.post(`${ADMIN_BASE}/offers/:id/image`, {
+        preHandler: [authMiddleware, requireAdmin],
+        bodyLimit: UPLOAD_BODY_LIMIT,
+    }, uploadAffiliateOfferImage);
 
     // Daily rollup for one offer. Registered after /offers/:id so the static segment is explicit;
     // Fastify's radix router resolves this unambiguously either way.

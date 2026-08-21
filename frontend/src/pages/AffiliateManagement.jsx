@@ -22,6 +22,15 @@
  * admin has no reason to need a shortcut that bypasses that.
  *
  * NOTE ON THE NUMBERS: the counters are directional, not billable. See STATS_HONESTY below.
+ *
+ * WHAT THE OFFER LIST SAYS ABOUT THE THREE OPTIONAL EXTRAS
+ * --------------------------------------------------------
+ * A photo, a price and a WhatsApp button are each switched on by being filled in and off by being
+ * cleared — there is no show_x flag anywhere in this feature. A list that only showed the filled
+ * ones would therefore be ambiguous ("did I not set a price, or is this row just not showing it?"),
+ * so every offer row states all three either way, including the empty case in words. The photo is
+ * shown as an actual thumbnail rather than a "punya foto" badge: the operator uploaded a picture
+ * to be looked at, and a badge cannot tell them they attached the wrong one.
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -35,6 +44,7 @@ import {
     updateOffer,
     deleteOffer,
     getOfferStats,
+    affiliateImageSrc,
     normalizePlacements,
     normalizeTargetIds,
 } from '../services/affiliateAdminService';
@@ -159,7 +169,8 @@ function OfferStatsPanel({ offerId }) {
                 impressions: acc.impressions + (Number(row.impressions) || 0),
                 product_clicks: acc.product_clicks + (Number(row.product_clicks) || 0),
                 store_clicks: acc.store_clicks + (Number(row.store_clicks) || 0),
-            }), { impressions: 0, product_clicks: 0, store_clicks: 0 });
+                whatsapp_clicks: acc.whatsapp_clicks + (Number(row.whatsapp_clicks) || 0),
+            }), { impressions: 0, product_clicks: 0, store_clicks: 0, whatsapp_clicks: 0 });
 
             setState({ loading: false, error: null, totals, days: rows.length });
         });
@@ -174,15 +185,26 @@ function OfferStatsPanel({ offerId }) {
         return <p className="mt-3 text-xs text-status-warn">{state.error}</p>;
     }
 
-    const { impressions, product_clicks: productClicks, store_clicks: storeClicks } = state.totals;
+    /*
+     * Every counter is read through Number(...) || 0 rather than destructured raw: `whatsapp_clicks`
+     * arrived later than the other three, so a stats row written before that migration — or a
+     * backend that pre-computes `totals` without it — would otherwise render an empty cell where a
+     * zero belongs. A missing number and a genuine zero look identical to an operator; only one of
+     * them is true.
+     *
+     * Four across is deliberately two-by-two on a phone: four columns of tabular numerals in a
+     * 320px card either wrap mid-label or force the row wider than the viewport.
+     */
+    const readCount = (key) => Number(state.totals?.[key]) || 0;
 
     return (
         <div className="mt-3 rounded-card border border-edge bg-surface-sunken p-3">
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 {[
-                    { label: 'Tayang', value: impressions },
-                    { label: 'Klik barang', value: productClicks },
-                    { label: 'Klik toko', value: storeClicks },
+                    { label: 'Tayang', value: readCount('impressions') },
+                    { label: 'Klik barang', value: readCount('product_clicks') },
+                    { label: 'Klik toko', value: readCount('store_clicks') },
+                    { label: 'Klik WA', value: readCount('whatsapp_clicks') },
                 ].map((stat) => (
                     <div key={stat.label} className="min-w-0">
                         <p className="truncate text-xs text-content-subtle">{stat.label}</p>
@@ -193,6 +215,50 @@ function OfferStatsPanel({ offerId }) {
             <p className="mt-2 text-xs text-content-subtle">
                 30 hari terakhir{state.days ? ` · ${state.days} hari ada datanya` : ' · belum ada data'}. {STATS_HONESTY}
             </p>
+        </div>
+    );
+}
+
+/*
+ * The three optional extras as the list sees them: photo, price, WhatsApp. Each is reported even
+ * when it is unset, in words, because "empty" is a real configuration here rather than a gap — the
+ * empty state IS the off switch, so a row that stayed silent about it would be hiding half the
+ * setting. The photo is the exception to the wording rule: when there is one, the thumbnail says
+ * it better than any label could, so the "Foto:" line only appears when there is nothing to show.
+ */
+function OfferExtras({ offer }) {
+    // 160px is the small rendition — the list shows dozens of these, and the 320px file is for the
+    // form's preview where the operator is actually inspecting the picture.
+    const thumb = affiliateImageSrc(offer.image_base, '160');
+    const price = Number.isInteger(offer.product_price_rupiah) ? offer.product_price_rupiah : null;
+    const whatsapp = String(offer.whatsapp_number || '').trim();
+
+    return (
+        <div className="mt-2 flex flex-wrap items-start gap-3">
+            {thumb && (
+                <img
+                    src={thumb}
+                    alt={`Foto ${offer.product_title}`}
+                    loading="lazy"
+                    className="h-16 w-16 shrink-0 rounded-card border border-edge object-cover"
+                />
+            )}
+            <div className="min-w-0 flex-1">
+                {!thumb && <Row label="Foto:"><span className="text-content-subtle">tidak ditampilkan</span></Row>}
+                <Row label="Harga:">
+                    {price === null
+                        ? <span className="text-content-subtle">tidak ditampilkan</span>
+                        // Rp0 is a real, deliberate value and reads as "gratis" to a visitor — it is
+                        // NOT the same as leaving the price empty, so the list never renders it as
+                        // a bare "Rp0" that could be mistaken for "unset".
+                        : (price === 0 ? 'Rp0 · gratis' : formatRupiah(price))}
+                </Row>
+                <Row label="WhatsApp:">
+                    {whatsapp
+                        ? <span className="font-mono">{whatsapp}</span>
+                        : <span className="text-content-subtle">tombol tidak ditampilkan</span>}
+                </Row>
+            </div>
         </div>
     );
 }
@@ -237,6 +303,8 @@ function OfferRow({ offer, partner, areaNameById, onEdit, onDelete }) {
                     <Row label="Link barang:"><UrlText value={offer.product_url} /></Row>
                     {offer.description && <Row label="Deskripsi:">{offer.description}</Row>}
                     <Row label="Prioritas:">{offer.priority ?? 100}</Row>
+
+                    <OfferExtras offer={offer} />
 
                     {partnerBlocked && (
                         <p className="mt-2 rounded-control border border-status-warn/30 bg-status-warn/10 px-3 py-2 text-xs text-status-warn">
@@ -375,6 +443,16 @@ export default function AffiliateManagement() {
         await reloadOffers();
     };
 
+    /*
+     * Returns the saved row, and — unlike the partner form — leaves the editor OPEN on it.
+     *
+     * Both facts are load-bearing for the product photo. The image endpoint needs an offer id, so
+     * a photo picked while the offer was still a draft can only be uploaded after this save; the
+     * form flushes it from its own closure the moment onSubmit resolves. Closing the editor here
+     * would unmount that form mid-upload, and the operator would lose the progress line and the
+     * preview of the picture they just attached. Staying on the saved offer is also what the promo
+     * banner page does, so the two upload flows behave the same way.
+     */
     const handleOfferSubmit = async (payload) => {
         setSaving(true);
         const result = editingOffer?.id
@@ -384,11 +462,12 @@ export default function AffiliateManagement() {
 
         if (!result.success) {
             showNotification({ type: 'error', title: 'Gagal menyimpan barang', message: result.message });
-            return;
+            return null;
         }
         showNotification({ type: 'success', title: editingOffer?.id ? 'Barang diperbarui' : 'Barang dibuat' });
-        setEditingOffer(null);
         await reloadOffers();
+        setEditingOffer(result.data || null);
+        return result.data || null;
     };
 
     const handleDelete = async () => {
@@ -520,6 +599,10 @@ export default function AffiliateManagement() {
                                 saving={saving}
                                 onSubmit={handleOfferSubmit}
                                 onCancel={() => setEditingOffer(null)}
+                                // A photo upload (or removal) writes the offer row without going
+                                // through onSubmit, so the list would keep showing the old
+                                // thumbnail until something else refetched it.
+                                onUploaded={reloadOffers}
                             />
                         </Card>
                     )}
