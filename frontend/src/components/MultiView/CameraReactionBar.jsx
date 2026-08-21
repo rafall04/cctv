@@ -8,9 +8,18 @@
  * IT RENDERS CHIPS, NOT A BAR — 2026-08-21
  * This used to be its own row of two bespoke buttons under the actions row, which under the video
  * on a phone meant a third stacked row of controls. It now returns a bare Fragment of two
- * ActionChips that the panel drops into the single scrolling row, so the vote is the FIRST thing
+ * ActionChips that the panel drops into its single wrapping row, so the vote is the FIRST thing
  * under the video instead of the third. The data and the optimistic state stayed here on purpose:
  * the panel composes the row, it does not fetch for it.
+ *
+ * ONE OF THE TWO KEEPS ITS WORD
+ * "Bagus" is the only chip in the whole row that stays labelled below `sm`: it is the most-tapped
+ * control there, and it is the one whose number is on screen — a bare digit next to a thumb, with
+ * no word attached, is not a count of anything in particular. "Bermasalah" takes ActionChip's
+ * `compact` like the four panel chips, which is what lets all six fit one line on a 375px phone
+ * instead of scrolling two of them off the edge. Its count goes with its label below `sm` (the
+ * chip must stay a 44px square) but NOT out of its accessible name — ActionChip appends it there,
+ * so a screen reader still hears "Tandai kamera ini bermasalah, 2".
  *
  * BOTH COUNTS ARE SHOWN — OWNER'S DECISION, 2026-08-02
  * The first cut printed likes only. The owner overruled it so the page says what visitors actually
@@ -25,9 +34,10 @@
  *
  * THE "TERSIMPAN" HINT LEFT THE ROW, NOT THE PAGE
  * It is the only thing that tells a visitor their tap registered AND that it is reversible, so it
- * had to survive. It cannot ride inside a horizontally scrolling row — it would sit ~220px to the
- * right of the chip that triggered it, off-screen on a 360px phone. So we hand the panel a boolean
- * through `onSavedChange` and it prints the line under the row, where it is actually read.
+ * had to survive. It cannot ride inside the chip row: a sentence among six chips is the item that
+ * forces the row onto a second line, and it would then sit wherever the wrap put it rather than
+ * under the chip that triggered it. So we hand the panel a boolean through `onSavedChange` and it
+ * prints the line under the row, where it is actually read.
  */
 
 import { useCallback, useEffect, useState } from 'react';
@@ -99,6 +109,7 @@ export default function CameraReactionBar({ cameraId, onSavedChange }) {
 
     return (
         <>
+            {/* No `compact`: this one keeps its word and its number at every width. */}
             <ActionChip
                 testId="camera-reaction-like"
                 icon={<IkonJempol />}
@@ -108,19 +119,24 @@ export default function CameraReactionBar({ cameraId, onSavedChange }) {
                 disabled={busy}
                 onClick={() => vote(1)}
                 ariaLabel="Kamera ini bagus"
+                title="Kamera ini bagus"
             />
             {/* Jempol ke bawah = jempol ke atas diputar 180°, sama seperti pasangan ikon
                 Lucide aslinya — bukan jalan pintas, kedua ikon itu memang saling berputar.
-                "Bermasalah" is a REPORT control, not a fault state: it never turns red. */}
+                "Bermasalah" is a REPORT control, not a fault state: it never turns red — and
+                icon-only below `sm`, "Tandai …" is what stops the bare thumb from being read as an
+                accusation the visitor did not intend to make. */}
             <ActionChip
                 testId="camera-reaction-dislike"
+                compact
                 icon={<IkonJempol kebawah />}
                 label="Bermasalah"
                 count={state.dislikes}
                 pressed={state.myValue === -1}
                 disabled={busy}
                 onClick={() => vote(-1)}
-                ariaLabel="Kamera ini bermasalah"
+                ariaLabel="Tandai kamera ini bermasalah"
+                title="Tandai kamera ini bermasalah"
             />
         </>
     );

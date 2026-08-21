@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 
 /*
- * Purpose: Prove the collapse of three stacked control rows into ONE scrolling chip row lost
- *          nothing — every action a visitor could reach before is still reachable, in one render.
+ * Purpose: Prove the collapse of three stacked control rows into ONE WRAPPING chip row lost
+ *          nothing — every action a visitor could reach before is still reachable, in one render,
+ *          without swiping.
  * Caller: Vitest frontend suite.
  * Deps: React Testing Library, mocked cameraFeedbackService / vehicleCountService / saweriaConfig.
  * SideEffects: jsdom render only.
@@ -10,8 +11,25 @@
  * THE TEST THAT MATTERS MOST
  * "rapikan namun tetap jelas semuanya" — tidy it up, but keep all of it legible. A density pass is
  * exactly the kind of change that quietly drops a control nobody notices until a visitor goes
- * looking for it, so the first test below asserts all six chips in a single render, in order. It
- * is the assertion an over-eager tidy-up trips on.
+ * looking for it, so the first test below asserts all six chips in a single render, in order, BY
+ * ACCESSIBLE NAME. It is the assertion an over-eager tidy-up trips on.
+ *
+ * WHY "BY ACCESSIBLE NAME" IS NOT A STYLE PREFERENCE HERE
+ * Five of the six chips are icon-only below `sm`. Their visible text is not what identifies them to
+ * a screen reader, to speech control, or to the long-press tooltip a sighted visitor uses to check
+ * a glyph before committing — the accessible name is, and it is the ONLY thing left. So the name is
+ * what the tests query on. Drop an `aria-label` while tidying and this file goes red, which is the
+ * whole point of writing it this way.
+ *
+ * AND WHY THE SCROLLER TESTS ARE GONE — 2026-08-21, ON EVIDENCE
+ * The previous round pinned `overflow-x-auto` + `[contain:paint]` on this row, on the theory that a
+ * scroller has ONE height at every font scale while a wrapping row grows a second line. A
+ * photograph from the owner's real Android phone settled it the other way: only three and a half
+ * button-sized chips fit, so "Area" and "Lapor" were not cramped, they were INVISIBLE until you
+ * swiped — and on a desktop pointer, where no scrollbar is drawn, there was no evidence they
+ * existed at all. Scrolling hides; wrapping does not. Those assertions were therefore INVERTED, not
+ * deleted: the row is now asserted to carry no overflow-x utility at all, loudly, because that is
+ * the regression this round exists to prevent.
  */
 
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
@@ -100,13 +118,22 @@ describe('CameraDetailPanel — nothing was lost', () => {
         // Order is frequency, not seniority: the two one-tap judgements first, the form last.
         expect(chipLabels(row)).toEqual(['Bagus', 'Bermasalah', 'Bagikan', 'Favorit', 'Area', 'Lapor']);
 
-        // Same six again by accessible name, because the visible word is not always the whole story.
-        expect(within(row).getByRole('button', { name: 'Kamera ini bagus' })).toBeTruthy();
-        expect(within(row).getByRole('button', { name: 'Kamera ini bermasalah' })).toBeTruthy();
+        /*
+         * The same six again BY ACCESSIBLE NAME, and this is the assertion that carries the round.
+         * Five of them are icon-only below `sm`, so their visible word is no longer what identifies
+         * them — the name is the only thing a screen reader, speech control or a long-press tooltip
+         * has left. Every one is the FULL sentence rather than the icon's name, and the vote's count
+         * rides along in it so "Bagus, 1" is announced as one thing.
+         */
+        expect(within(row).getByRole('button', { name: 'Kamera ini bagus, 1' })).toBeTruthy();
+        expect(within(row).getByRole('button', { name: 'Tandai kamera ini bermasalah' })).toBeTruthy();
         expect(within(row).getByRole('button', { name: 'Bagikan kamera ini' })).toBeTruthy();
         expect(within(row).getByRole('button', { name: 'Tambah kamera ini ke favorit' })).toBeTruthy();
         expect(within(row).getByRole('link', { name: 'Buka area' })).toBeTruthy();
         expect(within(row).getByRole('button', { name: 'Laporkan masalah pada kamera ini' })).toBeTruthy();
+
+        // Six controls, six names — nothing is behind a menu, a disclosure or a swipe.
+        expect(within(row).getAllByRole('button').length + within(row).getAllByRole('link').length).toBe(6);
     });
 
     it('still fires the camera share and the favourite toggle', async () => {
@@ -169,20 +196,55 @@ describe('CameraDetailPanel — the area chip is a link', () => {
     });
 });
 
-describe('CameraDetailPanel — one scrolling row, never a second line', () => {
+describe('CameraDetailPanel — the row WRAPS, and never scrolls', () => {
     /*
-     * A wrapping row is the same disease with an extra step: at Android's 1.3x font scaling six
-     * chips wrap to two lines and on a narrow phone to three, pushing the video down again and
-     * making the panel's height depend on the reader's font setting. A scroller has one height at
-     * every scale.
+     * THE regression this round exists to fix, so it is asserted loudly and from both sides.
+     * A scroller was tried, and on a real 375px Android phone it hid "Area" and "Lapor" behind a
+     * swipe — on desktop, with no scrollbar drawn, it hid the fact that there was anything to swipe
+     * to at all. A control nobody can see is worse than a control on a second line.
      */
-    it('scrolls horizontally instead of wrapping', async () => {
+    it('carries NO horizontal scroll utility of any kind, and wraps instead', async () => {
         renderPanel();
 
         const cls = (await screen.findByTestId('camera-action-row')).getAttribute('class');
-        expect(cls).toMatch(/\boverflow-x-auto\b/);
-        expect(cls, 'wrapping is what the scroller exists to replace').not.toMatch(/\bflex-wrap\b/);
+        // Not just overflow-x-auto: any overflow-x that scrolls hides an action behind a swipe.
+        expect(cls, 'horizontal scrolling for primary actions IS the bug').not.toMatch(/\boverflow-x-auto\b/);
+        expect(cls, 'overflow-x-scroll hides the same actions the same way').not.toMatch(/\boverflow-x-scroll\b/);
+        expect(cls).not.toMatch(/\boverflow-auto\b/);
+        expect(cls).not.toMatch(/\boverflow-scroll\b/);
+        // Wrapping is the fallback for the widths the sizing cannot cover (320px, 1.3x font scale):
+        // a second line keeps every action visible and reachable.
+        expect(cls, 'the row must wrap, not scroll').toMatch(/\bflex-wrap\b/);
         expect(cls, 'a flex row that cannot shrink widens the page').toMatch(/\bmin-w-0\b/);
+    });
+
+    /* Moving the scroller one level up would hide the same two actions the same way — the row
+       having no overflow-x of its own is not enough on its own. */
+    it('is not sitting inside a horizontal scroller either', async () => {
+        renderPanel();
+        const row = await screen.findByTestId('camera-action-row');
+
+        for (let el = row; el && el !== document.body; el = el.parentElement) {
+            const cls = el.getAttribute('class') || '';
+            expect(cls, `${cls}: an ancestor scroller hides the row's tail just as well`)
+                .not.toMatch(/\boverflow-x-(auto|scroll)\b/);
+        }
+    });
+
+    /*
+     * The scroller's own machinery went with it. `[contain:paint]` and the `-mx-3` bleed existed
+     * ONLY to keep a horizontal strip's overflow out of the document's scrollable rect — the thing
+     * that makes in-app WebViews zoom the whole page out (2026-07 mobile incident). A wrapping row
+     * produces no horizontal overflow to contain, so leaving them behind would only leave the next
+     * reader guessing what they were guarding against.
+     */
+    it('sheds the scroll machinery it no longer needs', async () => {
+        renderPanel();
+
+        const cls = (await screen.findByTestId('camera-action-row')).getAttribute('class');
+        expect(cls, 'nothing left to contain once the row wraps').not.toMatch(/\[contain:paint\]/);
+        expect(cls, 'the negative-margin bleed belonged to the scroller').not.toMatch(/-mx-3/);
+        expect(cls, 'a wrapping row still has to stay inside the panel').toMatch(/\bmax-w-full\b/);
     });
 
     /*
@@ -190,7 +252,7 @@ describe('CameraDetailPanel — one scrolling row, never a second line', () => {
      * mobile incident behind it: in-app WebViews fit their initial zoom to the widest content, so
      * one over-wide strip shrinks the whole page into a narrow column.
      */
-    it('never lets the strip reach the page: no w-screen, no fixed, no 100vw on any ancestor', async () => {
+    it('never lets the row reach the page: no w-screen, no fixed, no 100vw on any ancestor', async () => {
         renderPanel();
         const row = await screen.findByTestId('camera-action-row');
 
@@ -200,12 +262,6 @@ describe('CameraDetailPanel — one scrolling row, never a second line', () => {
             expect(cls, `${cls}: a fixed ancestor escapes the root overflow-x: clip guard`).not.toMatch(/\bfixed\b/);
             expect(cls, `${cls}: 100vw grows with the very overflow it causes`).not.toMatch(/100vw/);
         }
-
-        // Its overflow must be contained, or it reaches the document's scrollable rect through
-        // every clipping ancestor and the WebView zooms the page out to fit it.
-        expect(row.getAttribute('class')).toMatch(/\[contain:paint\]/);
-        // Bleeding to the panel edge is done with a negative margin, never a viewport unit.
-        expect(row.getAttribute('class')).toMatch(/-mx-3/);
     });
 
     /* "Bermasalah" is a REPORT control, not a fault state. Nothing in this row is broken. */
@@ -219,6 +275,102 @@ describe('CameraDetailPanel — one scrolling row, never a second line', () => {
         await screen.findByTestId('camera-reaction-dislike');
         expect(screen.getByTestId('camera-reaction-dislike').getAttribute('aria-pressed')).toBe('true');
         expect(row.innerHTML, 'status-fault is reserved for genuine faults').not.toMatch(/status-fault/);
+    });
+});
+
+/*
+ * The row fits one line on a phone because five of the six chips drop their LABEL, not their hit
+ * area. That trade is only honest while the accessible name and the 44px square both hold, so both
+ * are asserted here rather than left to ActionChip's own unit tests: this is the file that knows
+ * WHICH chips are compact and which one is not.
+ */
+describe('CameraDetailPanel — icon-only below sm, and paid for properly', () => {
+    /* "Bagus" is the exception, and the contract names it: the most-tapped control in the row keeps
+       its word and its number at every size. A bare digit next to a thumb counts nothing in
+       particular. */
+    it('keeps the literal text "Bagus" on screen unconditionally', async () => {
+        renderPanel();
+
+        const bagus = await screen.findByTestId('camera-reaction-like');
+        const label = [...bagus.querySelectorAll('span')].find((s) => s.textContent === 'Bagus');
+        expect(label, 'the word "Bagus" left the chip entirely').toBeTruthy();
+        expect(label.getAttribute('class'), '"Bagus" must not be hidden at any width').toBeNull();
+        expect(bagus.textContent).toBe('Bagus1');
+    });
+
+    /*
+     * An icon is a SMALLER visual target than a labelled pill, so the tappable box goes UP when the
+     * word goes away — never down to match the ink. 44px is the platform floor on iOS and Android
+     * alike; docs/frontend-guide.md records that this app's 26–30px icon buttons were measurably
+     * unreliable for a thumb.
+     */
+    it.each([
+        ['camera-reaction-dislike', 'Bermasalah'],
+        ['camera-action-share', 'Bagikan'],
+        ['camera-action-favorite', 'Favorit'],
+        ['camera-action-area', 'Area'],
+        ['camera-action-report', 'Lapor'],
+    ])('gives %s a 44x44 target and hides only its label pixels', async (testId, word) => {
+        renderPanel();
+        await screen.findByTestId('camera-reaction-like');
+
+        const chip = screen.getByTestId(testId);
+        const cls = chip.getAttribute('class');
+        expect(cls, `${word}: an icon-only control needs the whole 44px`).toMatch(/\bmin-h-\[44px\]/);
+        expect(cls, `${word}: 44px wide too, or the square collapses to the glyph`).toMatch(/\bmin-w-\[44px\]/);
+
+        // The word is still in the DOM and still in the name — only its pixels go away below `sm`.
+        const label = [...chip.querySelectorAll('span')].find((s) => s.textContent === word);
+        expect(label.getAttribute('class')).toBe('hidden sm:inline');
+    });
+
+    /*
+     * Each name is the FULL sentence, never the icon's name, and it is repeated in `title` so a
+     * long-press or hover tooltip says the same thing. Below `sm` these two attributes are the
+     * entire statement of what the control does.
+     */
+    it.each([
+        ['camera-reaction-dislike', 'Tandai kamera ini bermasalah'],
+        ['camera-action-share', 'Bagikan kamera ini'],
+        ['camera-action-favorite', 'Tambah kamera ini ke favorit'],
+        ['camera-action-area', 'Buka area'],
+        ['camera-action-report', 'Laporkan masalah pada kamera ini'],
+    ])('names %s "%s" in BOTH aria-label and title', async (testId, name) => {
+        renderPanel();
+        await screen.findByTestId('camera-reaction-like');
+
+        const chip = screen.getByTestId(testId);
+        // The dislike chip's count rides into aria-label; here it is 0, so the two match exactly.
+        expect(chip.getAttribute('aria-label')).toBe(name);
+        expect(chip.getAttribute('title')).toBe(name);
+    });
+
+    /* A keyboard user has no hover to fall back on, and an icon gives them nothing else to go on. */
+    it('draws a visible focus ring on every control in the row', async () => {
+        renderPanel();
+        const row = await screen.findByTestId('camera-action-row');
+        await screen.findByTestId('camera-reaction-like');
+
+        const controls = [...within(row).getAllByRole('button'), ...within(row).getAllByRole('link')];
+        expect(controls).toHaveLength(6);
+        for (const control of controls) {
+            expect(
+                control.getAttribute('class'),
+                `${control.getAttribute('aria-label')}: no focus ring`
+            ).toMatch(/focus-visible:ring-2/);
+        }
+    });
+
+    /* Toggles say so; one-shot actions do not pretend to be toggles. */
+    it('keeps aria-pressed on the toggles and off the one-shot actions', async () => {
+        renderPanel();
+        await screen.findByTestId('camera-reaction-like');
+
+        expect(screen.getByTestId('camera-reaction-like').getAttribute('aria-pressed')).toBe('false');
+        expect(screen.getByTestId('camera-reaction-dislike').getAttribute('aria-pressed')).toBe('false');
+        expect(screen.getByTestId('camera-action-favorite').getAttribute('aria-pressed')).toBe('false');
+        expect(screen.getByTestId('camera-action-report').getAttribute('aria-pressed')).toBe('false');
+        expect(screen.getByTestId('camera-action-share').hasAttribute('aria-pressed')).toBe(false);
     });
 });
 
@@ -247,10 +399,11 @@ describe('CameraDetailPanel — the vote still behaves, and still says so', () =
 
     /*
      * The hint is the only thing that tells a visitor the tap registered AND that it is reversible.
-     * It moved OUT of the row on purpose: inside a horizontal scroller it would sit ~220px past the
-     * right edge of a 360px phone, which is the same as deleting it.
+     * It moved OUT of the row on purpose: a sentence among six chips is the item that forces the
+     * wrap, and it would then land wherever the wrap happened to put it rather than directly under
+     * the chip it is talking about.
      */
-    it('prints "Tersimpan · ketuk lagi untuk batal" after a vote, outside the scroller', async () => {
+    it('prints "Tersimpan · ketuk lagi untuk batal" after a vote, under the row', async () => {
         renderPanel();
         const row = await screen.findByTestId('camera-action-row');
         expect(screen.queryByText(/Tersimpan/)).toBeNull();
@@ -259,7 +412,7 @@ describe('CameraDetailPanel — the vote still behaves, and still says so', () =
 
         const hint = await screen.findByText('Tersimpan · ketuk lagi untuk batal');
         expect(hint.getAttribute('role')).toBe('status');
-        expect(row.contains(hint), 'inside the scroller it would be off-screen on a phone').toBe(false);
+        expect(row.contains(hint), 'a sentence inside the row is what forces it onto a second line').toBe(false);
     });
 
     it('takes the hint away again when the visitor withdraws the vote', async () => {
@@ -297,7 +450,7 @@ describe('CameraDetailPanel — the Lapor chip owns the form', () => {
     });
 
     /* The form renders directly beneath its own chip — a disclosure that opens somewhere else is a
-       jump cut — and beneath the row, not inside the scroller. */
+       jump cut — and beneath the row, never as a seventh item inside it. */
     it('renders the form under the row, not inside it', async () => {
         renderPanel();
         const row = await screen.findByTestId('camera-action-row');

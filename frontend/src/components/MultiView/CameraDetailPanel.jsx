@@ -1,5 +1,5 @@
 /*
- * Purpose: Render minimal public camera metadata and every popup action as ONE scrolling chip row
+ * Purpose: Render minimal public camera metadata and every popup action as ONE wrapping chip row
  *          directly under the live video.
  * Caller: VideoPopup public single-camera modal.
  * Deps: landingCameraInsights, publicGrowthShare, common/ActionChip, CameraReactionBar,
@@ -16,17 +16,42 @@
  * rows of chrome for one video also reads as three unrelated groups of controls rather than "the
  * things you can do here". They are now one row, in one order, in one appearance (ActionChip).
  *
- * WHY IT SCROLLS INSTEAD OF WRAPPING
- * A wrapping row is the same disease with an extra step: at Android's 1.3× font scaling six chips
- * wrap to two lines, and on a narrow phone to three — the video is pushed down again, and the
- * height of the panel changes with the user's font setting, so nothing below it sits where the
- * layout was designed for. A horizontal scroller has ONE height at every font scale, and a chip
- * clipped at the right edge is itself the affordance that there is more (this is exactly YouTube's
- * mobile pattern, and visitors already read it). `[contain:paint]` is not decoration: without it a
- * horizontal strip's overflow reaches the document's scrollable rect even through clipping
- * ancestors, and in-app WebViews then zoom the whole page out to fit it — the 2026-07 mobile
- * incident. `-mx-3 px-3` bleeds the scroll area to the panel edges without any viewport unit, so
- * the page itself never gains a horizontal scrollbar.
+ * WHY IT WRAPS INSTEAD OF SCROLLING — REVERSED 2026-08-21, ON EVIDENCE
+ * The first cut of this row scrolled horizontally, on the theory that a scroller has ONE height at
+ * every font scale while a wrapping row grows a second line. That theory lost to a photograph: on
+ * the owner's Android phone only three and a half button-sized chips fit, so "Area" and "Lapor"
+ * were not merely cramped, they were INVISIBLE until you swiped — and on a desktop pointer, where
+ * no scrollbar is drawn, there was no evidence they existed at all. A control nobody can see is
+ * worse than a control on a second line. Scrolling hides; wrapping does not.
+ *
+ * The height objection is real but small, and it is now mostly answered by size rather than by
+ * clipping: five of the six chips drop their label below `sm` (ActionChip's `compact`), which is
+ * what makes them fit on one line to begin with. Wrapping is the FALLBACK for the cases the
+ * arithmetic below cannot cover — a 320px device, 1.3× font scaling — and in those cases a second
+ * line is exactly the right answer, because every action stays visible and reachable.
+ *
+ * THE ARITHMETIC (MEASURED IN CHROMIUM, NOT ESTIMATED)
+ * The popup is `w-full` on a phone and its backdrop has no horizontal padding, so this panel's
+ * `px-3` is the only inset: a 375px viewport leaves 351px of usable row. Five compact chips are
+ * 44px each = 220px; the labelled "Bagus 1" chip measures 90px (20 padding + 16 icon + 6 + label +
+ * 6 + count). Chips total 310px, so five gaps have 41px to share at 375px — and only 26px at 360px,
+ * which is the width that actually decides this, because 360 is the commonest Android viewport
+ * there is. Hence `gap-x-1` (4px): 330px needed against 336px available at 360px (6px of slack) and
+ * 351px at 375px (21px). `gap-2` (8px) needs 350px — it would clear 375px by one pixel and wrap on
+ * every 360px phone, so the gap is the thing that gave way. Touch targets were never a candidate:
+ * they are the floor. From `sm` the pressure is gone and the row breathes again at `sm:gap-x-2`;
+ * `gap-y-2` keeps 8px between lines so a wrapped row never looks glued to the first.
+ *
+ * Measured outcome: ONE line at 360/375/393/412px, TWO lines at 320px and at 375px with Android's
+ * 1.3× font scale (the row grows 48px → 104px tall), and zero horizontal page overflow at every
+ * one of those — which is the guardrail the old scroller needed `[contain:paint]` to satisfy.
+ *
+ * All of the scroll machinery went with the scroller — `overflow-x-auto`, `overscroll-x-contain`,
+ * `[-webkit-overflow-scrolling:touch]`, `[contain:paint]` and the `-mx-3 px-3` bleed. Those existed
+ * to make a horizontal strip behave (containment kept its overflow out of the document's
+ * scrollable rect, which is what makes in-app WebViews zoom the whole page out — the 2026-07 mobile
+ * incident). A wrapping row produces no horizontal overflow to contain, so keeping them would only
+ * leave the next reader wondering what they were guarding against.
  *
  * ORDER IS FREQUENCY, NOT SENIORITY
  * Bagus, Bermasalah, Bagikan, Favorit, Area, Lapor. The two one-tap judgements come first because
@@ -37,7 +62,9 @@
  * The shop card below has its own share, for the ITEM. Two controls with the same word, a screen
  * apart, is ambiguous — so this one carries aria-label="Bagikan kamera ini" and the shop's is
  * icon-only with aria-label="Bagikan barang". Visually the context does the work; for a screen
- * reader and for a long-press tooltip, the labels do.
+ * reader and for a long-press tooltip, the labels do. Below `sm` this chip is now icon-only too,
+ * which promotes that label from a nicety to the only statement of what the arrow does — so every
+ * chip here passes BOTH `ariaLabel` and `title` with the full sentence, never the icon's name.
  */
 
 import { useEffect, useState } from 'react';
@@ -127,7 +154,8 @@ export default function CameraDetailPanel({
        the row, the form renders under it. The form still owns everything else about itself. */
     const [reportOpen, setReportOpen] = useState(false);
     /* A boolean handed up by CameraReactionBar: "this visitor's vote is recorded". The bar cannot
-       print the hint itself without putting it inside the scroller, where it would be off-screen. */
+       print the hint itself without putting a sentence inside a row of chips, where it would
+       either widen the row or wrap on its own. */
     const [reactionSaved, setReactionSaved] = useState(false);
 
     const cameraId = camera?.id;
@@ -174,20 +202,26 @@ export default function CameraDetailPanel({
                 )}
             </div>
 
-            {/* THE row. no-scrollbar because a permanent horizontal scrollbar under a video looks
-                like breakage on desktop; the clipped chip on the right is the affordance instead.
-                overscroll-x-contain stops a flick at the end of the row from turning into the
-                browser's back gesture on Android. py-0.5 keeps focus rings off the clip edge. */}
+            {/* THE row. It wraps — see the arithmetic at the top of this file — so there is no
+                scroll container, no bleed and nothing clipped: every action is on screen at every
+                width, on a second line when it has to be. `min-w-0`/`max-w-full` keep the row
+                inside the panel so the page can never gain a horizontal scrollbar, and py-0.5
+                gives the focus rings room to draw without touching the row above. */}
             <div
                 data-testid="camera-action-row"
-                className="no-scrollbar -mx-3 mt-2 flex min-w-0 max-w-full items-center gap-2 overflow-x-auto overscroll-x-contain px-3 py-0.5 [contain:paint] [-webkit-overflow-scrolling:touch]"
+                className="mt-2 flex min-w-0 max-w-full flex-wrap items-center gap-x-1 gap-y-2 py-0.5 sm:gap-x-2"
             >
                 {/* Renders two chips, or nothing at all if the feedback endpoint is down. The rest
                     of the row is unaffected either way. */}
                 <CameraReactionBar cameraId={cameraId} onSavedChange={setReactionSaved} />
 
+                {/* From here down every chip is `compact` — icon-only below `sm`, labelled from
+                    `sm` up. "Bagus" (in CameraReactionBar above) is the one exception: it is the
+                    most-tapped control in the row and the one carrying a number, and a bare digit
+                    beside a thumb is not a count of anything in particular. */}
                 <ActionChip
                     testId="camera-action-share"
+                    compact
                     icon={<IkonBagikan />}
                     label="Bagikan"
                     onClick={onShare}
@@ -198,6 +232,7 @@ export default function CameraDetailPanel({
                 {onToggleFavorite && (
                     <ActionChip
                         testId="camera-action-favorite"
+                        compact
                         icon={<IkonBintang terisi={isFavorite} />}
                         label="Favorit"
                         pressed={isFavorite}
@@ -205,9 +240,11 @@ export default function CameraDetailPanel({
                         /* The visible label stays one word in both states so the chip does not
                            change width — and jog the whole row — every time it is tapped. The
                            state is carried by the filled star, the pressed styling, aria-pressed
-                           and this label. */
+                           and this name. The title repeats that name in full rather than a
+                           shorter paraphrase: below `sm` the long-press tooltip is the only way a
+                           sighted visitor can check what the star does before committing to it. */
                         ariaLabel={isFavorite ? 'Hapus kamera ini dari favorit' : 'Tambah kamera ini ke favorit'}
-                        title={isFavorite ? 'Hapus dari favorit' : 'Tambah ke favorit'}
+                        title={isFavorite ? 'Hapus kamera ini dari favorit' : 'Tambah kamera ini ke favorit'}
                     />
                 )}
 
@@ -215,15 +252,17 @@ export default function CameraDetailPanel({
                     salin alamat tautan all keep working. */}
                 <ActionChip
                     testId="camera-action-area"
+                    compact
                     icon={<IkonArea />}
                     label="Area"
                     href={buildAreaPath(camera)}
                     ariaLabel="Buka area"
-                    title="Buka halaman area"
+                    title="Buka area"
                 />
 
                 <ActionChip
                     testId="camera-action-report"
+                    compact
                     icon={<IkonLapor />}
                     label="Lapor"
                     pressed={reportOpen}
@@ -234,8 +273,9 @@ export default function CameraDetailPanel({
             </div>
 
             {/* Under the row, not inside it: this is what tells a visitor the tap registered and
-                that it can be taken back. Inside a scroller it would sit past the right edge of a
-                360px phone, which is the same as deleting it. */}
+                that it can be taken back. As a seventh item in the row it would be the thing that
+                forces the wrap, and it would land wherever the wrap happened to put it instead of
+                directly under the chip it is talking about. */}
             {reactionSaved && (
                 <p className="mt-1.5 text-[11px] text-content-subtle" role="status">
                     Tersimpan · ketuk lagi untuk batal

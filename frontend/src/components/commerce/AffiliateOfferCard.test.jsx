@@ -574,9 +574,38 @@ describe('AffiliateOfferCard — one action row, and a CTA that does not shout',
         // `w-full` is the whole regression: a full-width red-ish button directly under a starting
         // stream competes with the stream.
         expect(cls).not.toMatch(/\bw-full\b/);
-        // Still visually primary, and still not a fault colour.
+        // Sized to content: it shares one row with WhatsApp and the two utilities.
+        expect(cls).toMatch(/\binline-flex\b/);
+        // It earns its primacy from padding and fill, never from taking the row.
+        expect(cls).toMatch(/\bpx-4\b/);
+        expect(cls).toMatch(/\bpy-2\b/);
+        // Still visually primary (filled), and still not a fault colour.
         expect(cls).toMatch(/bg-primary/);
         expect(cls).not.toMatch(/status-fault/);
+        // A keyboard user must be able to see where they are.
+        expect(cls).toMatch(/focus-visible:outline-2/);
+    });
+
+    /*
+     * The CTA sits directly beside the utilities that are 44px tall, so it must not be the only
+     * control on the row that forgot a thumb exists.
+     */
+    it('keeps every control on the row a real touch target', () => {
+        show();
+
+        const row = productLink().parentElement;
+        for (const control of row.querySelectorAll('a, button')) {
+            const cls = control.getAttribute('class');
+            const tall = /\bmin-h-\[(\d+)px\]/.exec(cls);
+            const square = /\bh-11\b/.test(cls);
+            expect(
+                Boolean(tall) || square,
+                `${control.getAttribute('aria-label')}: declares no minimum height`
+            ).toBe(true);
+            if (tall) {
+                expect(Number(tall[1])).toBeGreaterThanOrEqual(40);
+            }
+        }
     });
 
     it('leaves the row holding only what is present when the optional controls are gone', () => {
@@ -743,19 +772,28 @@ describe('AffiliateOfferCard — honesty, tokens and the mobile hard rules', () 
         }
     });
 
-    it('gives the two icon-only buttons a thumb-sized square instead of a label to pad them', () => {
+    /*
+     * 44px, not 40px, and not shrinking at `sm` either. An icon with no label is a SMALLER visual
+     * target than a labelled control, so its hit area goes UP to compensate — the same rule the chip
+     * row above this card follows for its five compact chips. The 4px mismatch against the labelled
+     * controls beside them is deliberate: `items-center` centres it, and an honest tap target beats
+     * a flush edge.
+     */
+    it('gives the two icon-only buttons a 44px thumb-sized square instead of a label to pad them', () => {
         show();
 
-        // With the label gone there is nothing left to give these height, so the box is explicit.
-        // 40px (h-10) on a phone, easing to 36px from sm where a pointer is doing the work.
         for (const button of [
             screen.getByRole('button', { name: 'Salin link barang' }),
             screen.getByRole('button', { name: 'Bagikan barang' }),
         ]) {
             const cls = button.getAttribute('class');
-            expect(cls).toMatch(/\bh-10\b/);
-            expect(cls).toMatch(/\bw-10\b/);
+            expect(cls).toMatch(/\bh-11\b/);
+            expect(cls).toMatch(/\bw-11\b/);
             expect(cls).toMatch(/shrink-0/);
+            // It does not get to shrink on a pointer device it may never meet.
+            expect(cls, 'an unlabelled glyph does not shrink at sm').not.toMatch(/\bsm:h-\d/);
+            // A keyboard user has no hover to fall back on, and no label to read either.
+            expect(cls).toMatch(/focus-visible:outline-2/);
         }
     });
 

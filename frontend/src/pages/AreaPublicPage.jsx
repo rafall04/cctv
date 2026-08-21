@@ -4,6 +4,27 @@
  * Deps: React Router, CameraThumbnail, VideoPopup, publicGrowthService, publicGrowthShare.
  * MainFuncs: AreaPublicPage.
  * SideEffects: Fetches public area/camera data and updates document metadata.
+ *
+ * ── WHAT CHANGED 2026-08-21 (header controls) AND WHY ─────────────────────────────────────────
+ * "Kembali ke CCTV Publik" and "Bagikan Area" were two stacked blocks above the page title
+ * (`flex-col … sm:flex-row`), so on a phone the first screen of an area page was two rows of
+ * chrome — one of them a filled primary button — before the visitor reached the <h1> naming the
+ * area. They now share ONE row at every width: back left, share right.
+ *   · Labels shorten below `sm` ("Kembali", "Bagikan") through plain responsive utilities, with
+ *     the full label kept in aria-label AND title. Shortening is not hiding: nothing moved behind
+ *     a scroll, a menu or a disclosure, and no JS window-width state was introduced.
+ *   · Both controls are 44px high — this is the top of a public page, reached by thumb.
+ *   · Share went from a filled primary block to the primary TINT (`bg-primary-100`, the
+ *     pre-declared token — `bg-primary/10` compiles to nothing against `--primary-color`). It is
+ *     still visibly the action of the two; it just no longer out-shouts the title and the cameras.
+ *   · The share result moved out of the row and below it, right-aligned. "Browser tidak mendukung
+ *     share otomatis." beside a button is how a row gets wider than a 320px screen.
+ *
+ * TWO "Kembali ke CCTV Publik", and why both stay: the other one lives in the `notFound` early
+ * return — the 404 state's only way out, rendered when this header does not exist at all. They are
+ * mutually exclusive branches, not a duplicate and not a mobile/desktop pair, so only the header
+ * copy was restyled. Do not "deduplicate" them into one component; a dead-end page's escape hatch
+ * legitimately looks different from a working page's back control.
  */
 
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -49,6 +70,34 @@ function updateAreaMetadata(area) {
 
 function formatCount(value) {
     return Number(value || 0).toLocaleString('id-ID');
+}
+
+/*
+ * The two header controls share ONE shape, declared once so "kembali" and "bagikan" cannot drift
+ * apart again: a 44px-high compact control with a bordered idle look, and an accent variant for the
+ * one that acts. 44px because these are the first things a thumb meets on the page.
+ * `bg-primary-100` is the pre-declared 10% tint in tailwind.config.js — `bg-primary/10` compiles to
+ * NOTHING here, because `--primary-color` holds a full colour rather than the channel triplet
+ * Tailwind needs to compute alpha from.
+ */
+const HEADER_CONTROL = 'inline-flex min-h-[44px] min-w-0 items-center gap-1.5 rounded-control border px-3 text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary';
+const HEADER_CONTROL_IDLE = 'border-edge bg-surface-sunken text-content-muted hover:border-edge-strong hover:bg-surface-raised hover:text-content';
+const HEADER_CONTROL_ACCENT = 'border-primary bg-primary-100 text-primary hover:bg-primary-200';
+
+function BackIcon() {
+    return (
+        <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+        </svg>
+    );
+}
+
+function ShareIcon() {
+    return (
+        <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M8.7 10.7l6.6-3.4M8.7 13.3l6.6 3.4M18 8a2 2 0 100-4 2 2 0 000 4zM6 14a2 2 0 100-4 2 2 0 000 4zM18 20a2 2 0 100-4 2 2 0 000 4z" />
+        </svg>
+    );
 }
 
 /*
@@ -401,28 +450,53 @@ export default function AreaPublicPage() {
         <main className="min-h-screen bg-surface-sunken text-content">
             <section className="border-b border-edge bg-surface">
                 <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
-                    <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    {/*
+                      * ONE row at every width: back on the left, share on the right. These used to
+                      * be two stacked blocks that pushed the page's own <h1> below the fold on a
+                      * phone — a filled primary "Bagikan Area" shouting above the title of the
+                      * thing it shares. Nothing is hidden to achieve the row: the labels shorten
+                      * ("Kembali", "Bagikan") below `sm` via plain Tailwind responsive utilities,
+                      * and the FULL label stays in aria-label + title, so a screen reader and a
+                      * long-press both still get the whole sentence. No JS width state — that
+                      * flickers on first paint and has nothing to say that CSS cannot.
+                      */}
+                    <div className="mb-5 flex items-center justify-between gap-2">
                         <Link
                             to="/"
-                            className="inline-flex w-fit items-center rounded-control border border-edge bg-surface-sunken px-3 py-2 text-sm font-semibold text-content-muted transition-colors hover:border-edge-strong hover:text-content"
+                            aria-label="Kembali ke CCTV Publik"
+                            title="Kembali ke CCTV Publik"
+                            className={`${HEADER_CONTROL} ${HEADER_CONTROL_IDLE}`}
                         >
-                            Kembali ke CCTV Publik
+                            <BackIcon />
+                            <span className="truncate">
+                                Kembali<span className="hidden sm:inline"> ke CCTV Publik</span>
+                            </span>
                         </Link>
-                        <div className="flex flex-col items-start gap-1 sm:items-end">
-                            <button
-                                type="button"
-                                onClick={handleShare}
-                                className="inline-flex w-fit rounded-control bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-600"
-                            >
-                                Bagikan Area
-                            </button>
-                            {shareMessage && (
-                                <span role="status" className="text-xs font-medium text-content-muted">
-                                    {shareMessage}
-                                </span>
-                            )}
-                        </div>
+                        {/*
+                          * Tinted, not filled. Sharing an area is a useful thing to offer and a
+                          * poor thing to demand: it keeps the brand colour so it still reads as
+                          * THE action here, without out-shouting the live cameras below it.
+                          */}
+                        <button
+                            type="button"
+                            onClick={handleShare}
+                            aria-label="Bagikan Area"
+                            title="Bagikan Area"
+                            className={`${HEADER_CONTROL} ${HEADER_CONTROL_ACCENT}`}
+                        >
+                            <ShareIcon />
+                            <span className="truncate">
+                                Bagikan<span className="hidden sm:inline"> Area</span>
+                            </span>
+                        </button>
                     </div>
+                    {/* The result of the share lives BELOW the row, never inside it: a sentence
+                        this long sitting next to a button is what widens a row on a 320px phone. */}
+                    {shareMessage && (
+                        <p role="status" className="mb-4 text-right text-xs font-medium text-content-muted">
+                            {shareMessage}
+                        </p>
+                    )}
                     <div className="flex flex-col gap-2">
                         <div className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">
                             Area CCTV

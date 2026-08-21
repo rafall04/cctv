@@ -36,6 +36,26 @@
  *                frees the action row to hold exactly four controls.
  * Nothing was removed, no flag was introduced, and every beacon still fires with the same `l=`.
  *
+ * ── WHAT CHANGED 2026-08-21 (second pass — sizing only) AND WHY ───────────────────────────────
+ * Same five capabilities, same DOM, same hrefs, same beacons. Three numbers moved on the action
+ * row, and nothing else in this file was touched:
+ *   · CTA        `px-3` → `px-4`. It stays sized to its content and never `w-full`, so it reads as
+ *                the primary thing to do without becoming a filled bar under a starting stream:
+ *                the extra horizontal padding is what buys it presence, instead of width.
+ *   · copy/share 40px square → 44px (`h-11 w-11`, and no `sm:` shrink any more). An icon with no
+ *                label is a SMALLER visual target than a labelled chip, so its hit area goes UP,
+ *                never down — 44px is the floor for a control whose whole affordance is a 16px
+ *                glyph, and it does not get to shrink on a pointer device it may never meet.
+ *   · labelled   `sm:min-h-0` → `sm:min-h-[36px]`, the same floor common/ActionChip uses for the
+ *                chip row directly above this card. Identical in practice (py-2 + text-sm already
+ *                measures 36px) but stated rather than inferred, so the two rows cannot drift.
+ * The two icon buttons therefore sit 4px taller than the labelled controls beside them. That is
+ * deliberate, not an oversight: `items-center` on the row centres the mismatch, and an honest tap
+ * target beats a flush edge.
+ * Padding now lives on the two variants rather than on ACTION_BASE. Two `px-*` classes in one
+ * string do not "override" each other — same specificity, so whichever Tailwind emits last wins,
+ * which is not something a component should be betting on.
+ *
  * ── Presence is the switch ────────────────────────────────────────────────────────────────────
  * Every part of this card renders only when its data is present, and disappears when the operator
  * clears the field: no photo key → no photo, no whatsapp_url → no WhatsApp button, price_rupiah
@@ -108,9 +128,9 @@
  * ── Mobile hard rules obeyed here (each earned by a production bug) ───────────────────────────
  * The action row is `flex flex-wrap` with `min-w-0` items and `truncate` labels, because Android
  * font scaling at 1.3× is the classic way a row of buttons grows wider than the viewport: at 1×
- * the four controls share one line, above that they wrap instead of widening the card. Touch
- * targets are `min-h-[40px] sm:min-h-0`, and the two icon-only buttons are a fixed 40px square
- * (36px from sm) so they stay thumb-sized without a label to pad them out. The photo carries
+ * the four controls share one line, above that they wrap instead of widening the card. Labelled
+ * targets are `min-h-[40px] sm:min-h-[36px]`; the two icon-only buttons are a fixed 44px square at
+ * every width, because a glyph with no label is the smallest target on the card. The photo carries
  * width/height AND a fixed CSS box, so it reserves its exact space before the bytes land — no
  * layout shift under a starting video, and no tall poster from a portrait upload. Nothing in this
  * tree is an iframe or an embed, nothing is sized in viewport units, and nothing is position-fixed.
@@ -132,13 +152,19 @@ const FOCUS_RING = 'focus-visible:outline focus-visible:outline-2 focus-visible:
 
 /* Sized to content, not to the row: the CTA under a live video must read as primary without
    becoming the loudest thing on the screen. `min-w-0` + a truncating label is what lets four
-   controls share one line at 1× and wrap — rather than widen — at Android's 1.3× font scale. */
-const ACTION_BASE = `inline-flex min-h-[40px] min-w-0 items-center justify-center gap-1.5 rounded-control px-3 py-2 text-sm font-semibold transition-colors ${FOCUS_RING} sm:min-h-0`;
-const PRIMARY_ACTION = `${ACTION_BASE} bg-primary text-white hover:opacity-90`;
-const SECONDARY_ACTION = `${ACTION_BASE} border border-edge bg-surface font-medium text-content-muted hover:border-edge-strong hover:bg-surface-raised hover:text-content`;
+   controls share one line at 1× and wrap — rather than widen — at Android's 1.3× font scale.
+   Horizontal padding is NOT set here: each variant owns its own, so the primary can be roomier
+   than the secondary without two competing `px-*` in one class string. */
+const ACTION_BASE = `inline-flex min-h-[40px] min-w-0 items-center justify-center gap-1.5 rounded-control py-2 text-sm font-semibold transition-colors ${FOCUS_RING} sm:min-h-[36px]`;
 
-/* Icon-only, so the tap target cannot borrow height from a label: a fixed square instead. */
-const ICON_ACTION = `inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-control border border-edge bg-surface text-content-muted transition-colors hover:border-edge-strong hover:bg-surface-raised hover:text-content ${FOCUS_RING} sm:h-9 sm:w-9`;
+/* px-4, not px-3: the CTA earns its primacy from padding and fill, never from taking the row. */
+const PRIMARY_ACTION = `${ACTION_BASE} px-4 bg-primary text-white hover:opacity-90`;
+const SECONDARY_ACTION = `${ACTION_BASE} px-3 border border-edge bg-surface font-medium text-content-muted hover:border-edge-strong hover:bg-surface-raised hover:text-content`;
+
+/* Icon-only, so the tap target cannot borrow height from a label: a fixed 44px square instead, at
+   every width. An unlabelled glyph is the smallest thing on this card to aim at, so it gets the
+   biggest hit area — and it does not shrink at `sm:` the way a labelled control safely can. */
+const ICON_ACTION = `inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-control border border-edge bg-surface text-content-muted transition-colors hover:border-edge-strong hover:bg-surface-raised hover:text-content ${FOCUS_RING}`;
 
 /* Rides the honesty-label row. Capped at 60% so a long shop name can never push "TOKO REKANAN"
    off its own line; the label is the disclosure and always wins the space it needs. */

@@ -4,6 +4,17 @@
  * Deps: React Testing Library, MemoryRouter, vitest, AreaPublicPage, mocked public growth and stream APIs.
  * MainFuncs: AreaPublicPage render tests.
  * SideEffects: Mocks public growth API.
+ *
+ * ── THE HEADER ROW (2026-08-21) ───────────────────────────────────────────────────────────────
+ * "Kembali ke CCTV Publik" and "Bagikan Area" used to stack as two full-width rows ABOVE the <h1>,
+ * the second of them a filled primary block — so the first screen of an area page on a phone was
+ * two rows of chrome shouting above the name of the thing they were about. They now share ONE row:
+ * back left, share right.
+ * The last describe block below pins that, and pins the two things the fix is not allowed to cost:
+ *   · nothing hides. The labels SHORTEN below `sm` through plain responsive utilities and the FULL
+ *     label stays in aria-label AND title — no scroll, no menu, no disclosure, and no JS
+ *     window-width state (which flickers on first paint and complicates hydration).
+ *   · both stay thumb-sized and keyboard-visible: 44px high, with a focus ring.
  */
 
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
@@ -55,6 +66,16 @@ function renderPage(path = '/area/kab-surabaya') {
             </Routes>
         </MemoryRouter>
     );
+}
+
+/** The smallest payload that gets the page past `loading` and onto its real header. */
+function mockArea() {
+    getAreaMock.mockResolvedValue({
+        success: true,
+        data: { name: 'KAB SURABAYA', slug: 'kab-surabaya', camera_count: 1, online_count: 1, total_views: 9 },
+    });
+    getAreaCamerasMock.mockResolvedValue({ success: true, data: [] });
+    getTrendingCamerasMock.mockResolvedValue({ success: true, data: [] });
 }
 
 describe('AreaPublicPage', () => {
@@ -242,6 +263,107 @@ describe('AreaPublicPage', () => {
                 streams: { hls: '/hls/camera-8/index.m3u8' },
             }),
         }));
+    });
+
+    it('keeps the back and share controls on ONE row, both named in full', async () => {
+        mockArea();
+
+        renderPage();
+
+        const back = await screen.findByRole('link', { name: 'Kembali ke CCTV Publik' });
+        const share = screen.getByRole('button', { name: 'Bagikan Area' });
+
+        // ONE row, not two stacked blocks: the shared parent is what makes that a fact rather than
+        // a screenshot, and `flex-col` is exactly the thing that used to push the <h1> below the fold.
+        const row = back.parentElement;
+        expect(row.contains(share), 'back and share must share one row').toBe(true);
+        expect(row.getAttribute('class')).toMatch(/\bflex\b/);
+        expect(row.getAttribute('class'), 'stacking them is the regression').not.toMatch(/\bflex-col\b/);
+        expect(row.getAttribute('class'), 'back left, share right').toMatch(/justify-between/);
+
+        // Back first in the DOM, share second — reading order matches the visual one.
+        expect([...row.children].indexOf(back)).toBe(0);
+        expect([...row.children].indexOf(share)).toBe(1);
+
+        // The row is above the title, and the title is still on the page.
+        expect(screen.getByRole('heading', { level: 1, name: /KAB SURABAYA/i })).toBeTruthy();
+        expect(back.getAttribute('href')).toBe('/');
+    });
+
+    /*
+     * The labels shorten below `sm`; they do not disappear. The word that survives at every width is
+     * the one that carries the meaning ("Kembali", "Bagikan"), and the rest is a `hidden sm:inline`
+     * span — a CSS decision, so there is no window-width state to flicker on first paint.
+     */
+    it('shortens the header labels below sm without hiding them, and keeps the full name', async () => {
+        mockArea();
+
+        renderPage();
+
+        const back = await screen.findByRole('link', { name: 'Kembali ke CCTV Publik' });
+        const share = screen.getByRole('button', { name: 'Bagikan Area' });
+
+        expect(back.textContent).toBe('Kembali ke CCTV Publik');
+        expect(share.textContent).toBe('Bagikan Area');
+
+        // The half that hides is the qualifier, never the verb.
+        const backTail = [...back.querySelectorAll('span')].find((s) => s.textContent === ' ke CCTV Publik');
+        const shareTail = [...share.querySelectorAll('span')].find((s) => s.textContent === ' Area');
+        expect(backTail.getAttribute('class')).toBe('hidden sm:inline');
+        expect(shareTail.getAttribute('class')).toBe('hidden sm:inline');
+
+        // A long-press or hover still says the whole sentence.
+        expect(back.getAttribute('title')).toBe('Kembali ke CCTV Publik');
+        expect(share.getAttribute('title')).toBe('Bagikan Area');
+    });
+
+    /*
+     * These are the first things a thumb meets on a public page, and the share used to be a filled
+     * primary block shouting above the title. It keeps the brand colour — it is still THE action
+     * here — through the pre-declared tint. `bg-primary/10` compiles to NOTHING against
+     * `--primary-color`, which holds a full colour rather than the channel triplet Tailwind needs.
+     */
+    it('keeps both header controls thumb-sized, focusable and off the fault colour', async () => {
+        mockArea();
+
+        renderPage();
+
+        const back = await screen.findByRole('link', { name: 'Kembali ke CCTV Publik' });
+        const share = screen.getByRole('button', { name: 'Bagikan Area' });
+
+        for (const control of [back, share]) {
+            const cls = control.getAttribute('class');
+            expect(cls).toMatch(/\bmin-h-\[44px\]/);
+            expect(cls).toMatch(/focus-visible:outline-2/);
+            expect(cls, 'nothing here is a fault').not.toMatch(/status-fault/);
+            expect(cls).not.toMatch(/(^|[\s:-])gray-\d/);
+            expect(cls).not.toMatch(/(^|[\s:])(dark|light)-\d/);
+        }
+
+        const shareCls = share.getAttribute('class');
+        expect(shareCls, 'the tint, not the fill — it must not out-shout the title').toContain('bg-primary-100');
+        expect(shareCls, 'bg-primary/10 compiles to nothing here').not.toMatch(/bg-primary\/\d/);
+    });
+
+    /* The result of the share is a whole sentence; beside a button it is how a row gets wider than a
+       320px screen. It belongs below the row. */
+    it('prints the share result below the row, never inside it', async () => {
+        const nativeShare = vi.fn().mockRejectedValue(new Error('Share unavailable'));
+        Object.defineProperty(window.navigator, 'share', { configurable: true, value: nativeShare });
+        Object.defineProperty(window.navigator, 'clipboard', {
+            configurable: true,
+            value: { writeText: vi.fn().mockResolvedValue(undefined) },
+        });
+        mockArea();
+
+        renderPage();
+
+        const back = await screen.findByRole('link', { name: 'Kembali ke CCTV Publik' });
+        const row = back.parentElement;
+        fireEvent.click(screen.getByRole('button', { name: 'Bagikan Area' }));
+
+        const status = await screen.findByRole('status');
+        expect(row.contains(status)).toBe(false);
     });
 
     it('shows the selected camera immediately while stream resolution is still pending', async () => {

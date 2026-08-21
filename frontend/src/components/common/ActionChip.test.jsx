@@ -12,6 +12,16 @@
  * three padding scales, two idle borders, one control that was not a button at all — is exactly
  * what a shared primitive is supposed to make impossible. That guarantee is only real if something
  * asserts it, so the class contract is tested here rather than six times over in the panel.
+ *
+ * AND WHY `compact` IS TESTED HARDEST — 2026-08-21
+ * Six button-sized chips do not fit a 375px phone. The first attempt put them in a horizontal
+ * scroller and, on the owner's real Android phone, "Area" and "Lapor" were simply INVISIBLE until
+ * you swiped. The fix is `compact`: icon-only below `sm`, labelled from `sm` up. That trade is only
+ * safe while two things hold, so both are asserted below and neither may be relaxed:
+ *   · the accessible name survives the label going away (it is the ONLY thing left that says what
+ *     the control does — for a screen reader, and for a long-press tooltip), and
+ *   · the TOUCH TARGET GROWS rather than shrinks: 44x44, because a 16px glyph is a smaller visual
+ *     target than a 90px pill and the thumb has to be given back what the eye lost.
  */
 
 import { fireEvent, render, screen } from '@testing-library/react';
@@ -126,11 +136,12 @@ describe('ActionChip', () => {
     });
 
     /*
-     * The row scrolls, it does not wrap: a chip must refuse to shrink and refuse to break its own
-     * word, and it must stay thumb-sized at Android's font scaling. Truncating "Bermasalah" to
-     * "Berma…" would destroy the word to save space a scrolling row does not need to save.
+     * The ROW wraps; the CHIP does not. A chip refuses to shrink and refuses to break its own word,
+     * which is what makes the wrap happen at a chip boundary instead of halfway through one:
+     * truncating "Bermasalah" to "Berma…" would destroy the word to buy space a second line gives
+     * away for free.
      */
-    it('keeps a thumb-sized target and refuses to shrink or wrap', () => {
+    it('keeps a thumb-sized target and refuses to shrink or break its own word', () => {
         render(<ActionChip label="Bermasalah" onClick={vi.fn()} />);
 
         const cls = classesOf(screen.getByRole('button'));
@@ -147,6 +158,137 @@ describe('ActionChip', () => {
         }
     });
 
+    /*
+     * A keyboard user has no hover to fall back on, and an icon-only chip gives them nothing else
+     * to go on. The ring is declared in BASE so every chip gets it — asserting it here is what
+     * stops a future "tidy" from stripping it from the shared string.
+     */
+    it('draws a visible focus ring on every chip, labelled or not', () => {
+        const { rerender } = render(<ActionChip label="Bagikan" onClick={vi.fn()} />);
+        expect(screen.getByRole('button').getAttribute('class')).toMatch(/focus-visible:ring-2/);
+
+        rerender(<ActionChip compact label="Bagikan" onClick={vi.fn()} />);
+        expect(screen.getByRole('button').getAttribute('class')).toMatch(/focus-visible:ring-2/);
+
+        rerender(<ActionChip compact label="Area" href="/area/x" />);
+        expect(screen.getByRole('link').getAttribute('class')).toMatch(/focus-visible:ring-2/);
+    });
+});
+
+/*
+ * `compact` is the whole point of the 2026-08-21 pass: it is what lets six actions sit on ONE line
+ * of a 375px phone without any of them hiding behind a scroll. Everything below guards the price of
+ * that — the name and the hit area — because those are what a later tidy-up quietly takes back.
+ */
+describe('ActionChip — compact: the word goes away, the meaning does not', () => {
+    const labelSpanOf = (chip) => [...chip.querySelectorAll('span')].find((s) => s.textContent === 'Bagikan');
+
+    it('hides only the label PIXELS below sm — the word stays in the DOM and in the name', () => {
+        render(<ActionChip compact label="Bagikan" onClick={vi.fn()} ariaLabel="Bagikan kamera ini" />);
+
+        const chip = screen.getByRole('button', { name: 'Bagikan kamera ini' });
+        const span = labelSpanOf(chip);
+        // `hidden sm:inline` — a CSS decision made before React exists. A JS window-width state
+        // would flicker on first paint and make the markup depend on when a resize listener ran.
+        expect(span.getAttribute('class')).toBe('hidden sm:inline');
+        expect(chip.textContent).toBe('Bagikan');
+    });
+
+    it('keeps the label visible at every width when it is NOT compact', () => {
+        render(<ActionChip label="Bagikan" onClick={vi.fn()} ariaLabel="Bagikan kamera ini" />);
+
+        const span = labelSpanOf(screen.getByRole('button'));
+        expect(span.getAttribute('class'), 'a labelled chip must never hide its word').toBeNull();
+    });
+
+    /*
+     * The hit area goes UP when the label goes away — never down to match the ink. 44px is the
+     * platform floor on both iOS and Android, and docs/frontend-guide.md records that the 26–30px
+     * icon buttons elsewhere in this app were measurably unreliable for a thumb.
+     */
+    it('grows the touch target to a 44x44 square once it is icon-only', () => {
+        render(<ActionChip compact icon={<svg />} label="Lapor" onClick={vi.fn()} />);
+
+        const cls = classesOf(screen.getByRole('button'));
+        expect(cls).toContain('min-h-[44px]');
+        expect(cls).toContain('min-w-[44px]');
+    });
+
+    /* A labelled pill is ~90px of thumb-catching width already, so it does not need the square —
+       and forcing one on it would widen the row that compact exists to narrow. */
+    it('does not force the square onto a labelled chip', () => {
+        render(<ActionChip icon={<svg />} label="Bagus" onClick={vi.fn()} />);
+
+        const cls = classesOf(screen.getByRole('button'));
+        expect(cls).toContain('min-h-[40px]');
+        expect(cls).not.toContain('min-w-[44px]');
+    });
+
+    /*
+     * The digits are hidden with the word — the chip has to stay a 44px square — but the count is
+     * appended to the accessible name HERE, in the primitive, so hiding it stays a visual decision
+     * rather than a loss of information: "Tandai kamera ini bermasalah, 2".
+     */
+    it('carries the count into the accessible name even while its digits are hidden', () => {
+        render(
+            <ActionChip
+                compact
+                label="Bermasalah"
+                count={2}
+                onClick={vi.fn()}
+                ariaLabel="Tandai kamera ini bermasalah"
+            />
+        );
+
+        const chip = screen.getByRole('button', { name: 'Tandai kamera ini bermasalah, 2' });
+        expect(chip.querySelector('.tabular-nums').getAttribute('class')).toMatch(/\bhidden sm:inline\b/);
+    });
+
+    it('appends the count for a labelled chip too, so "Bagus, 4" is announced as one thing', () => {
+        render(<ActionChip label="Bagus" count={4} onClick={vi.fn()} ariaLabel="Kamera ini bagus" />);
+
+        expect(screen.getByRole('button', { name: 'Kamera ini bagus, 4' })).toBeTruthy();
+    });
+
+    /*
+     * The name falls back to the visible word, so a compact chip can never end up nameless even if
+     * a caller forgets `ariaLabel`. Nameless is the one outcome an icon-only control cannot survive.
+     */
+    it('never ends up nameless: the visible word is the fallback name', () => {
+        render(<ActionChip compact icon={<svg />} label="Favorit" onClick={vi.fn()} />);
+
+        expect(screen.getByRole('button', { name: 'Favorit' })).toBeTruthy();
+    });
+
+    /* The tooltip is the sighted visitor's only way to check an icon before committing to it. */
+    it('passes the full sentence through to title, for the long-press tooltip', () => {
+        render(
+            <ActionChip
+                compact
+                label="Lapor"
+                onClick={vi.fn()}
+                ariaLabel="Laporkan masalah pada kamera ini"
+                title="Laporkan masalah pada kamera ini"
+            />
+        );
+
+        expect(screen.getByRole('button').getAttribute('title')).toBe('Laporkan masalah pada kamera ini');
+    });
+
+    /* Compact applies to the anchor form too — "Area" is the chip that navigates. */
+    it('applies to an anchor exactly as it does to a button', () => {
+        render(<ActionChip compact icon={<svg />} label="Area" href="/area/ds-dander" ariaLabel="Buka area" />);
+
+        const chip = screen.getByRole('link', { name: 'Buka area' });
+        expect(chip.tagName).toBe('A');
+        expect(chip.getAttribute('href')).toBe('/area/ds-dander');
+        const cls = classesOf(chip);
+        expect(cls).toContain('min-h-[44px]');
+        expect(cls).toContain('min-w-[44px]');
+    });
+});
+
+describe('ActionChip — naming, disabling and the icon slot', () => {
     /*
      * Two controls a screen apart both said "Bagikan" — one for the camera, one for the shop item.
      * The chip has to be able to carry the label that tells them apart, for a screen reader and for
