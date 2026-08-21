@@ -1,40 +1,51 @@
 /*
  * Purpose: Let a visitor say whether a camera is any good, in one tap, without an account.
- * Caller: components/MultiView/CameraDetailPanel.jsx (inside the public video popup).
- * Deps: cameraFeedbackService.
+ * Caller: components/MultiView/CameraDetailPanel.jsx — rendered INSIDE the action chip row.
+ * Deps: cameraFeedbackService, common/ActionChip.
  * MainFuncs: CameraReactionBar.
- * SideEffects: One GET per camera opened; one POST per tap.
+ * SideEffects: One GET per camera opened; one POST per tap; reports "vote saved" upward.
+ *
+ * IT RENDERS CHIPS, NOT A BAR — 2026-08-21
+ * This used to be its own row of two bespoke buttons under the actions row, which under the video
+ * on a phone meant a third stacked row of controls. It now returns a bare Fragment of two
+ * ActionChips that the panel drops into the single scrolling row, so the vote is the FIRST thing
+ * under the video instead of the third. The data and the optimistic state stayed here on purpose:
+ * the panel composes the row, it does not fetch for it.
  *
  * BOTH COUNTS ARE SHOWN — OWNER'S DECISION, 2026-08-02
  * The first cut printed likes only. The owner overruled it so the page says what visitors actually
  * reported: a camera whose picture has gone useless is a fact about what someone is being offered,
  * and showing the praise while hiding the complaints turns the counter into an advertisement.
- * The voter also sees their own choice, or the button could not show its state.
+ * The voter also sees their own choice, or the chip could not show its state.
  *
  * FAILURE IS SILENCE
  * This sits directly under a live player. A feedback endpoint that is down must not render an
- * error next to the video — the bar simply does not appear.
+ * error next to the video — the two chips simply do not appear, and the rest of the row (Bagikan,
+ * Favorit, Area, Lapor) is untouched because they are the panel's children, not ours.
+ *
+ * THE "TERSIMPAN" HINT LEFT THE ROW, NOT THE PAGE
+ * It is the only thing that tells a visitor their tap registered AND that it is reversible, so it
+ * had to survive. It cannot ride inside a horizontally scrolling row — it would sit ~220px to the
+ * right of the chip that triggered it, off-screen on a 360px phone. So we hand the panel a boolean
+ * through `onSavedChange` and it prints the line under the row, where it is actually read.
  */
 
 import { useCallback, useEffect, useState } from 'react';
+import ActionChip from '../common/ActionChip.jsx';
 import cameraFeedbackService from '../../services/cameraFeedbackService';
-
-const BASE = 'inline-flex items-center gap-1.5 rounded-control border px-3 py-2 text-xs font-medium transition-colors';
-const IDLE = 'border-edge text-content-muted hover:border-edge-strong hover:bg-surface-raised';
-const ACTIVE = 'border-primary bg-primary/10 text-primary';
 
 /*
  * SVG, BUKAN EMOJI 👍/👎 — diganti 2026-08-14.
  *
  * Alasan yang menentukan bukan selera: emoji tidak ikut mewarisi warna tombol. Emoji digambar
- * oleh fon sistem dengan warnanya sendiri, jadi saat tombol berpindah ke keadaan terpilih
+ * oleh fon sistem dengan warnanya sendiri, jadi saat chip berpindah ke keadaan terpilih
  * (`text-primary`) jempolnya tetap kuning — keadaan aktif hanya terbaca dari bingkai dan latar,
  * setengah dari sinyalnya hilang. SVG di bawah memakai `currentColor`, sehingga ikut berubah
  * bersama teksnya.
  *
  * Dua alasan lain: rupa emoji berbeda-beda antar sistem (Android, iOS, Windows menggambar
  * jempol yang tidak mirip satu sama lain, dan sebagian memakai warna kulit bawaan), dan
- * ukurannya tidak mengikuti skala ikon lain di kartu yang sama.
+ * ukurannya tidak mengikuti skala ikon lain di baris yang sama.
  */
 function IkonJempol({ kebawah = false }) {
     return (
@@ -55,7 +66,7 @@ function IkonJempol({ kebawah = false }) {
     );
 }
 
-export default function CameraReactionBar({ cameraId }) {
+export default function CameraReactionBar({ cameraId, onSavedChange }) {
     const [state, setState] = useState(null);
     const [busy, setBusy] = useState(false);
 
@@ -69,7 +80,12 @@ export default function CameraReactionBar({ cameraId }) {
         return () => { alive = false; };
     }, [cameraId]);
 
-    /* Tapping the side you already chose withdraws it — the same button is the undo. */
+    /* Every hook stays above the conditional return below — React error #310. */
+    useEffect(() => {
+        onSavedChange?.(Boolean(state && state.myValue !== 0));
+    }, [state, onSavedChange]);
+
+    /* Tapping the side you already chose withdraws it — the same chip is the undo. */
     const vote = useCallback(async (value) => {
         if (busy || !state) return;
         setBusy(true);
@@ -82,43 +98,30 @@ export default function CameraReactionBar({ cameraId }) {
     if (!state) return null;
 
     return (
-        <div className="mt-2 flex flex-wrap items-center gap-2" data-testid="camera-reaction-bar">
-            <button
-                type="button"
+        <>
+            <ActionChip
+                testId="camera-reaction-like"
+                icon={<IkonJempol />}
+                label="Bagus"
+                count={state.likes}
+                pressed={state.myValue === 1}
+                disabled={busy}
                 onClick={() => vote(1)}
+                ariaLabel="Kamera ini bagus"
+            />
+            {/* Jempol ke bawah = jempol ke atas diputar 180°, sama seperti pasangan ikon
+                Lucide aslinya — bukan jalan pintas, kedua ikon itu memang saling berputar.
+                "Bermasalah" is a REPORT control, not a fault state: it never turns red. */}
+            <ActionChip
+                testId="camera-reaction-dislike"
+                icon={<IkonJempol kebawah />}
+                label="Bermasalah"
+                count={state.dislikes}
+                pressed={state.myValue === -1}
                 disabled={busy}
-                aria-pressed={state.myValue === 1}
-                aria-label="Kamera ini bagus"
-                className={`${BASE} ${state.myValue === 1 ? ACTIVE : IDLE} disabled:opacity-60`}
-            >
-                <IkonJempol />
-                <span>Bagus</span>
-                {/*
-                  * Counts are omitted at zero rather than printed as "0". On a fresh install all 36
-                  * cameras would otherwise show a row of zeroes, which reads as a verdict ("nobody
-                  * rates anything here") when the truth is that nobody has voted yet.
-                  */}
-                {state.likes > 0 && <span className="tabular-nums">{state.likes}</span>}
-            </button>
-
-            <button
-                type="button"
                 onClick={() => vote(-1)}
-                disabled={busy}
-                aria-pressed={state.myValue === -1}
-                aria-label="Kamera ini bermasalah"
-                className={`${BASE} ${state.myValue === -1 ? ACTIVE : IDLE} disabled:opacity-60`}
-            >
-                {/* Jempol ke bawah = jempol ke atas diputar 180°, sama seperti pasangan ikon
-                    Lucide aslinya — bukan jalan pintas, kedua ikon itu memang saling berputar. */}
-                <IkonJempol kebawah />
-                <span>Bermasalah</span>
-                {state.dislikes > 0 && <span className="tabular-nums">{state.dislikes}</span>}
-            </button>
-
-            {state.myValue !== 0 && (
-                <span className="text-[11px] text-content-subtle">Tersimpan · ketuk lagi untuk batal</span>
-            )}
-        </div>
+                ariaLabel="Kamera ini bermasalah"
+            />
+        </>
     );
 }

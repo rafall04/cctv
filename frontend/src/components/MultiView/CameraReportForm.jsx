@@ -6,6 +6,13 @@
  * MainFuncs: CameraReportForm.
  * SideEffects: One GET for the category list on first open; one POST per submission.
  *
+ * THE TRIGGER LEFT, THE FORM STAYED — 2026-08-21
+ * Opening this used to be an underlined link on a line of its own, the third stacked row of
+ * controls under the video. The trigger is now the "Lapor" chip in the panel's single action row,
+ * so `open` is owned by the panel and arrives as a prop; everything below the row — the category
+ * list, the incident time, the submit, the reset-on-camera-change — is unchanged and still lives
+ * here. Only the button moved.
+ *
  * INLINE, NOT A MODAL — ON PURPOSE
  * Public components on this site carry raw high z-index values that have outranked every modal
  * before (the public dock once covered dialogs outright). An inline disclosure inside the panel
@@ -24,10 +31,11 @@ let cachedCategories = null;
 
 const CHIP = 'rounded-control border px-2.5 py-1.5 text-xs font-medium transition-colors';
 const CHIP_IDLE = 'border-edge text-content-muted hover:border-edge-strong';
-const CHIP_ON = 'border-primary bg-primary/10 text-primary';
+/* `bg-primary-100` and not `bg-primary/10`: --primary-color is a bare CSS variable, so Tailwind
+   cannot compute alpha for it and the /10 form compiled to nothing. See common/ActionChip.jsx. */
+const CHIP_ON = 'border-primary bg-primary-100 text-primary';
 
-export default function CameraReportForm({ cameraId }) {
-    const [open, setOpen] = useState(false);
+export default function CameraReportForm({ cameraId, open = false, onClose }) {
     const [categories, setCategories] = useState(cachedCategories);
     const [category, setCategory] = useState('');
     const [message, setMessage] = useState('');
@@ -36,14 +44,21 @@ export default function CameraReportForm({ cameraId }) {
     const [result, setResult] = useState(null);
 
     /* Everything resets when the popup moves to another camera — a half-typed report about one
-       feed must never be submitted against a different one. */
+       feed must never be submitted against a different one. (`open` resets in the panel, which
+       owns it now.) */
     useEffect(() => {
-        setOpen(false);
         setCategory('');
         setMessage('');
         setOccurredAt('');
         setResult(null);
     }, [cameraId]);
+
+    /* Reopening after a send starts clean: the thank-you belongs to the report that was sent, and
+       leaving it up would turn the chip into a dead control for anyone with a second thing to
+       report on the same camera. */
+    useEffect(() => {
+        if (open) setResult(null);
+    }, [open]);
 
     useEffect(() => {
         if (!open || categories) return undefined;
@@ -70,13 +85,13 @@ export default function CameraReportForm({ cameraId }) {
 
         if (res?.success) {
             setResult({ ok: true, message: res.message || 'Laporan terkirim. Terima kasih.' });
-            setOpen(false);
+            onClose?.();
             return;
         }
         // The server's own Indonesian message says what to fix ("pilih Lainnya hanya kalau…",
         // "terlalu banyak laporan"); replacing it with a generic failure would lose that.
         setResult({ ok: false, message: res?.message || 'Gagal mengirim laporan' });
-    }, [busy, cameraId, category, message, occurredAt]);
+    }, [busy, cameraId, category, message, occurredAt, onClose]);
 
     if (result?.ok) {
         return (
@@ -86,17 +101,8 @@ export default function CameraReportForm({ cameraId }) {
         );
     }
 
-    if (!open) {
-        return (
-            <button
-                type="button"
-                onClick={() => setOpen(true)}
-                className="mt-2 text-[11px] font-medium text-content-muted underline underline-offset-2 hover:text-content"
-            >
-                Laporkan masalah pada kamera ini
-            </button>
-        );
-    }
+    /* Closed renders nothing at all — the chip in the row above IS the trigger now. */
+    if (!open) return null;
 
     return (
         <form onSubmit={submit} className="mt-2 rounded-control border border-edge bg-surface-sunken p-3">
@@ -159,7 +165,7 @@ export default function CameraReportForm({ cameraId }) {
                 </button>
                 <button
                     type="button"
-                    onClick={() => setOpen(false)}
+                    onClick={() => onClose?.()}
                     className="rounded-control border border-edge px-3 py-1.5 text-xs font-medium text-content-muted"
                 >
                     Batal

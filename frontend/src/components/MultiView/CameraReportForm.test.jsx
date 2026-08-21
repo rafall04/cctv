@@ -6,6 +6,13 @@
  * Caller: Vitest frontend suite.
  * Deps: React Testing Library, mocked cameraFeedbackService.
  * SideEffects: jsdom render only.
+ *
+ * THE TRIGGER LEFT, THE FORM STAYED — 2026-08-21
+ * Opening this used to be an underlined "Laporkan masalah pada kamera ini" on a line of its own,
+ * the third stacked row of controls under the video. The trigger is now the "Lapor" chip in
+ * CameraDetailPanel's single action row, so `open` arrives as a prop and closing is a call to
+ * `onClose`. Everything the form itself does — categories, incident time, submit, the refusal
+ * message, the reset on camera change — is unchanged, and every one of those tests is still here.
  */
 
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
@@ -23,9 +30,11 @@ const CATEGORIES = [
     { key: 'lainnya', label: 'Lainnya' },
 ];
 
-const openForm = async () => {
-    fireEvent.click(screen.getByRole('button', { name: 'Laporkan masalah pada kamera ini' }));
-    return screen.findByRole('button', { name: 'Gambar buram' });
+/* Open it the way the panel does, and wait for the categories to land. */
+const renderOpen = async (props = {}) => {
+    const utils = render(<CameraReportForm cameraId={16} open onClose={vi.fn()} {...props} />);
+    await screen.findByRole('button', { name: 'Gambar buram' });
+    return utils;
 };
 
 beforeEach(() => {
@@ -35,17 +44,34 @@ beforeEach(() => {
 });
 
 describe('CameraReportForm', () => {
-    /* The page exists to show a picture; an always-open form pushes the video down the phone. */
-    it('stays collapsed until the visitor asks for it', () => {
-        render(<CameraReportForm cameraId={16} />);
+    /*
+     * The page exists to show a picture; an always-open form pushes the video down the phone. The
+     * closed form now renders NOTHING — the chip in the row above is the trigger.
+     *
+     * NOTE: this test must stay first in the file. The module caches the category list for the
+     * whole session (it is identical for every visitor), so only the first test in a fresh module
+     * registry can observe the cold-cache fetch.
+     */
+    it('renders nothing and fetches nothing until the panel opens it, then fetches once', async () => {
+        const { rerender, container } = render(<CameraReportForm cameraId={16} onClose={vi.fn()} />);
 
-        expect(screen.getByRole('button', { name: 'Laporkan masalah pada kamera ini' })).toBeTruthy();
+        expect(container.innerHTML).toBe('');
         expect(cameraFeedbackService.getReportCategories).not.toHaveBeenCalled();
+
+        rerender(<CameraReportForm cameraId={16} open onClose={vi.fn()} />);
+        await screen.findByRole('button', { name: 'Gambar buram' });
+        expect(cameraFeedbackService.getReportCategories).toHaveBeenCalledTimes(1);
+
+        // The list never changes within a session, so reopening must not re-fetch it.
+        rerender(<CameraReportForm cameraId={16} onClose={vi.fn()} />);
+        rerender(<CameraReportForm cameraId={16} open onClose={vi.fn()} />);
+        await screen.findByRole('button', { name: 'Gambar buram' });
+        expect(cameraFeedbackService.getReportCategories).toHaveBeenCalledTimes(1);
     });
 
     it('sends the chosen category with the report', async () => {
-        render(<CameraReportForm cameraId={16} />);
-        fireEvent.click(await openForm());
+        await renderOpen();
+        fireEvent.click(screen.getByRole('button', { name: 'Gambar buram' }));
 
         fireEvent.click(screen.getByRole('button', { name: 'Kirim' }));
 
@@ -55,16 +81,27 @@ describe('CameraReportForm', () => {
     });
 
     it('will not submit before a category is chosen', async () => {
-        render(<CameraReportForm cameraId={16} />);
-        await openForm();
+        await renderOpen();
 
         expect(screen.getByRole('button', { name: 'Kirim' }).disabled).toBe(true);
     });
 
+    it('carries the free-text keterangan through, trimmed', async () => {
+        await renderOpen();
+        fireEvent.click(screen.getByRole('button', { name: 'Gambar buram' }));
+        fireEvent.change(screen.getByLabelText(/Keterangan/), { target: { value: '  lensa berembun  ' } });
+
+        fireEvent.click(screen.getByRole('button', { name: 'Kirim' }));
+
+        await waitFor(() => expect(cameraFeedbackService.submitReport).toHaveBeenCalledWith(16, {
+            category: 'buram', message: 'lensa berembun', occurredAt: null,
+        }));
+    });
+
     /* A blurry lens does not happen at 14.30 — only an incident has a time worth asking for. */
     it('asks when it happened only for an incident', async () => {
-        render(<CameraReportForm cameraId={16} />);
-        fireEvent.click(await openForm());
+        await renderOpen();
+        fireEvent.click(screen.getByRole('button', { name: 'Gambar buram' }));
 
         expect(screen.queryByLabelText(/Perkiraan waktu kejadian/)).toBeNull();
 
@@ -73,8 +110,7 @@ describe('CameraReportForm', () => {
     });
 
     it('carries the incident time through to the report', async () => {
-        render(<CameraReportForm cameraId={16} />);
-        await openForm();
+        await renderOpen();
         fireEvent.click(screen.getByRole('button', { name: 'Ada kejadian di rekaman' }));
         fireEvent.change(screen.getByLabelText(/Perkiraan waktu kejadian/), { target: { value: '2026-08-02T14:30' } });
 
@@ -86,20 +122,50 @@ describe('CameraReportForm', () => {
     });
 
     it('tells the visitor their words are not published', async () => {
-        render(<CameraReportForm cameraId={16} />);
-        await openForm();
+        await renderOpen();
 
         expect(screen.getByText(/hanya dibaca pengelola, tidak ditampilkan di halaman/)).toBeTruthy();
     });
 
     it('confirms and closes the form once the report lands', async () => {
-        render(<CameraReportForm cameraId={16} />);
-        fireEvent.click(await openForm());
+        const onClose = vi.fn();
+        await renderOpen({ onClose });
+        fireEvent.click(screen.getByRole('button', { name: 'Gambar buram' }));
 
         fireEvent.click(screen.getByRole('button', { name: 'Kirim' }));
 
         expect(await screen.findByText('Laporan terkirim. Terima kasih.')).toBeTruthy();
         expect(screen.queryByRole('button', { name: 'Kirim' })).toBeNull();
+        // The panel owns `open`, so closing means telling the panel — the chip un-presses with it.
+        expect(onClose).toHaveBeenCalled();
+    });
+
+    /*
+     * Reopening after a send starts clean: the thank-you belongs to the report that was sent, and
+     * leaving it up would turn the chip into a dead control for anyone with a second thing to
+     * report on the same camera.
+     */
+    it('starts clean when the chip is used again after a send', async () => {
+        const { rerender } = await renderOpen();
+        fireEvent.click(screen.getByRole('button', { name: 'Gambar buram' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Kirim' }));
+        await screen.findByText('Laporan terkirim. Terima kasih.');
+
+        rerender(<CameraReportForm cameraId={16} onClose={vi.fn()} />);
+        rerender(<CameraReportForm cameraId={16} open onClose={vi.fn()} />);
+
+        expect(await screen.findByRole('button', { name: 'Kirim' })).toBeTruthy();
+        expect(screen.queryByText('Laporan terkirim. Terima kasih.')).toBeNull();
+    });
+
+    /* "Batal" is the second way out, and it goes through the same door the chip does. */
+    it('hands closing back to the panel when the visitor cancels', async () => {
+        const onClose = vi.fn();
+        await renderOpen({ onClose });
+
+        fireEvent.click(screen.getByRole('button', { name: 'Batal' }));
+
+        expect(onClose).toHaveBeenCalledTimes(1);
     });
 
     /** The server's message names what to fix; a generic failure would throw that away. */
@@ -107,22 +173,41 @@ describe('CameraReportForm', () => {
         cameraFeedbackService.submitReport.mockResolvedValue({
             success: false, message: 'Terlalu banyak laporan dari perangkat ini. Coba lagi nanti.',
         });
-        render(<CameraReportForm cameraId={16} />);
-        fireEvent.click(await openForm());
+        const onClose = vi.fn();
+        await renderOpen({ onClose });
+        fireEvent.click(screen.getByRole('button', { name: 'Gambar buram' }));
 
         fireEvent.click(screen.getByRole('button', { name: 'Kirim' }));
 
         expect((await screen.findByRole('alert')).textContent).toMatch(/Terlalu banyak laporan/);
         expect(screen.getByRole('button', { name: 'Kirim' })).toBeTruthy();
+        expect(onClose).not.toHaveBeenCalled();
     });
 
     /* A half-typed report about one feed must never be submitted against a different one. */
-    it('resets itself when the popup moves to another camera', async () => {
-        const { rerender } = render(<CameraReportForm cameraId={16} />);
-        fireEvent.click(await openForm());
+    it('resets its answers when the popup moves to another camera', async () => {
+        const { rerender } = await renderOpen();
+        fireEvent.click(screen.getByRole('button', { name: 'Gambar buram' }));
+        fireEvent.change(screen.getByLabelText(/Keterangan/), { target: { value: 'gambar hitam' } });
+        expect(screen.getByRole('button', { name: 'Kirim' }).disabled).toBe(false);
 
-        rerender(<CameraReportForm cameraId={25} />);
+        rerender(<CameraReportForm cameraId={25} open onClose={vi.fn()} />);
 
-        expect(screen.getByRole('button', { name: 'Laporkan masalah pada kamera ini' })).toBeTruthy();
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Kirim' }).disabled).toBe(true));
+        expect(screen.getByLabelText(/Keterangan/).value).toBe('');
+        expect(screen.getByRole('button', { name: 'Gambar buram' }).getAttribute('aria-pressed')).toBe('false');
+    });
+
+    /*
+     * Semantic tokens only, and no fault red: a visitor filling in a report has not established
+     * that anything is broken. The refusal message is a warning, which is what status-warn is for.
+     */
+    it('dresses itself in semantic tokens and never claims a fault', async () => {
+        const { container } = await renderOpen();
+
+        expect(container.innerHTML).not.toMatch(/status-fault/);
+        expect(container.innerHTML).not.toMatch(/(^|[\s"':-])gray-\d/);
+        expect(container.querySelector('form').getAttribute('class')).toContain('border-edge');
+        expect(container.querySelector('form').getAttribute('class')).toContain('bg-surface-sunken');
     });
 });

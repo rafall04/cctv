@@ -1,7 +1,8 @@
 /*
  * AffiliateOfferCard.test.jsx — the paid "Toko rekanan" card.
  *
- * Five properties are under test here. Layout is not one of them.
+ * Six properties are under test here. Pixel layout is not one of them — but the five ARRANGEMENT
+ * facts in (6) are, because each of them is a rule the density pass has to keep, not a taste.
  *
  *  1. PRESENCE IS THE SWITCH. Photo, price, WhatsApp button and store link each appear only when
  *     their own field arrived, and vanish when the operator clears it. There is no show_x boolean
@@ -32,8 +33,28 @@
  *
  *  5. THE HONESTY LABEL AND THE MOBILE HARD RULES hold: "Toko rekanan" is present, nothing is a
  *     fault (`status-fault` is red and a shop link is not an error), nothing is an iframe, and the
- *     action rows wrap with truncating labels because Android font scaling at 1.3x is how a row of
+ *     action row wraps with truncating labels because Android font scaling at 1.3x is how a row of
  *     buttons grows wider than the viewport.
+ *
+ *  6. THE DENSITY PASS (2026-08-21) HOLDS. This card sits under a starting live video, and the
+ *     arrangement is what keeps it from competing with the stream. Five facts, each asserted:
+ *       · ONE action row. The CTA, WhatsApp and both utilities share it; the CTA is sized to its
+ *         content instead of `w-full`, so it still reads as primary without being the loudest thing
+ *         on the screen.
+ *       · COPY AND SHARE ARE ICON-ONLY, AND STILL NAMED. Dropping the visible label costs a screen
+ *         reader everything unless the accessible name carries it, so "Salin link barang" /
+ *         "Bagikan barang" are asserted verbatim. They are also what disambiguates this card's
+ *         share from the CAMERA's "Bagikan" chip a few pixels above it: same verb, different
+ *         object, and only the accessible name says which.
+ *       · TITLE AND PRICE SHARE ONE LINE — title yields (`min-w-0 flex-1 truncate`), price never
+ *         does (`shrink-0 tabular-nums`). Asserted as classes AND as a shared parent, because
+ *         either one alone can be true while the line is broken.
+ *       · THE PHOTO IS A FIXED SQUARE WITH INTRINSIC DIMENSIONS. width/height reserve the box before
+ *         the bytes land (no layout shift under a starting video) and the fixed box stops a portrait
+ *         upload from making the card as tall as the phone.
+ *       · THE SHOP LINK RIDES THE DISCLOSURE ROW, next to "Toko rekanan" — the disclosure and the
+ *         shop it discloses are one thought, and it frees the action row to hold exactly four
+ *         controls.
  *
  * affiliateService is mocked so the beacon is observable and no network transport is involved; the
  * letters it is called with ('p'/'s'/'w') are checked against the REAL module in one test, so the
@@ -118,7 +139,8 @@ describe('AffiliateOfferCard — presence is the switch: the photo', () => {
         const img = container.querySelector('img');
         expect(img).not.toBeNull();
         expect(img.getAttribute('src')).toBe(`/api/affiliate-media/${OFFER.image_base}-320.webp`);
-        // 1x and 2x of a ~96px box — the backend generates exactly these two and nothing larger.
+        // 1x and 2x of the 64/80px thumbnail box — the backend generates exactly these two and
+        // nothing larger, because this loads under a live video where every kilobyte competes.
         expect(img.getAttribute('srcset')).toContain(`/api/affiliate-media/${OFFER.image_base}-160.webp 160w`);
         expect(img.getAttribute('srcset')).toContain(`/api/affiliate-media/${OFFER.image_base}-320.webp 320w`);
         // Dimensions reserve the box before the bytes land: no layout shift under a starting video.
@@ -177,19 +199,32 @@ describe('AffiliateOfferCard — presence is the switch: the price', () => {
 });
 
 describe('AffiliateOfferCard — presence is the switch: the WhatsApp button', () => {
-    it('shows "Tanya barang ini" when the partner supplied a WhatsApp number', () => {
+    it('shows the WhatsApp button when the partner supplied a number', () => {
         show();
 
         const link = whatsappLink();
         expect(link.getAttribute('href')).toBe(OFFER.whatsapp_url);
-        expect(screen.getByText('Tanya barang ini')).not.toBeNull();
+        expect(screen.getByText('Tanya')).not.toBeNull();
+    });
+
+    it('shortens the VISIBLE label to "Tanya" but keeps the long form in the accessible name', () => {
+        show();
+
+        // The density pass cut the visible label so four controls fit one row at 390px. What must
+        // not be cut with it: which product this asks about, and that it opens WhatsApp — a link
+        // announced as bare "Tanya" tells a screen-reader user nothing about where it leads.
+        const link = whatsappLink();
+        expect(link.getAttribute('aria-label')).toBe(`Tanya barang ini lewat WhatsApp: ${OFFER.product_title}`);
+        // Long-press on a phone shows the title attribute, so it carries the same sentence.
+        expect(link.getAttribute('title')).toBe(link.getAttribute('aria-label'));
+        expect(screen.queryByText('Tanya barang ini')).toBeNull();
     });
 
     it('drops the WhatsApp button entirely once the number is cleared', () => {
         show({ whatsapp_url: null });
 
         expect(screen.queryByRole('link', { name: /WhatsApp/i })).toBeNull();
-        expect(screen.queryByText('Tanya barang ini')).toBeNull();
+        expect(screen.queryByText('Tanya')).toBeNull();
     });
 });
 
@@ -221,6 +256,19 @@ describe('AffiliateOfferCard — presence is the switch: the store link', () => 
 
         expect(screen.queryByText(OFFER.description)).toBeNull();
         expect(screen.getByText(OFFER.product_title)).not.toBeNull();
+    });
+});
+
+describe('AffiliateOfferCard — presence is the switch, and nothing else is', () => {
+    it('ignores show_* flags entirely — the field being there IS the switch', () => {
+        // There is deliberately no show_photo / show_price anywhere in this feature, and this is the
+        // guard against one appearing: two pieces of state describing one thing eventually disagree,
+        // and the operator's requirement was "clear the field to hide it", not "tick a box".
+        const { container } = show({ show_photo: false, show_price: false, show_whatsapp: false });
+
+        expect(container.querySelector('img')).not.toBeNull();
+        expect(screen.getByTestId('affiliate-offer-price')).not.toBeNull();
+        expect(whatsappLink()).not.toBeNull();
     });
 });
 
@@ -442,6 +490,212 @@ describe('AffiliateOfferCard — copy and share send the shop URL, never /go', (
     });
 });
 
+describe('AffiliateOfferCard — the two "Bagikan" do not collide', () => {
+    /*
+     * The chip row above this card shares the CAMERA. This card shares the ITEM. Before the density
+     * pass both said the single word "Bagikan", a few pixels apart, and nothing in the DOM said
+     * which was which. The fix was to make this pair icon-only AND to name their object out loud —
+     * which means the accessible name is now the ONLY carrier of that meaning, and is therefore
+     * asserted verbatim rather than by pattern.
+     */
+    it('names the copy button "Salin link barang" exactly', () => {
+        show();
+
+        expect(screen.getByRole('button', { name: 'Salin link barang' })).not.toBeNull();
+    });
+
+    it('names the share button "Bagikan barang" exactly — never the bare verb', () => {
+        show();
+
+        expect(screen.getByRole('button', { name: 'Bagikan barang' })).not.toBeNull();
+        // The camera's own control is the bare "Bagikan". If this card ever answers to that name
+        // too, the two are ambiguous again for anyone not looking at the pixels.
+        expect(screen.queryByRole('button', { name: 'Bagikan' })).toBeNull();
+    });
+
+    it.each([
+        ['Salin link barang'],
+        ['Bagikan barang'],
+    ])('carries "%s" as a long-press title as well, not only for the screen reader', (name) => {
+        show();
+
+        expect(screen.getByRole('button', { name }).getAttribute('title')).toBe(name);
+    });
+
+    it('shows an icon and no visible text on either — the label lives in the accessible name now', () => {
+        show();
+
+        for (const name of ['Salin link barang', 'Bagikan barang']) {
+            const button = screen.getByRole('button', { name });
+            expect(button.textContent).toBe('');
+            expect(button.querySelector('svg')).not.toBeNull();
+            // Decorative: the button already has a name, so the icon must not repeat itself into it.
+            expect(button.querySelector('svg').getAttribute('aria-hidden')).toBe('true');
+        }
+    });
+
+    it('still copies and still shares the product URL from the icon-only controls', async () => {
+        const writeText = vi.fn().mockResolvedValue(undefined);
+        const share = vi.fn().mockResolvedValue(undefined);
+        stubNavigator('clipboard', { writeText });
+        stubNavigator('share', share);
+        show();
+
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', { name: 'Salin link barang' }));
+        });
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', { name: 'Bagikan barang' }));
+        });
+
+        // Losing the visible label must not have quietly rewired what the buttons act on.
+        expect(writeText).toHaveBeenCalledWith(OFFER.product_url);
+        expect(share).toHaveBeenCalledWith(expect.objectContaining({ url: OFFER.product_url }));
+    });
+});
+
+describe('AffiliateOfferCard — one action row, and a CTA that does not shout', () => {
+    it('puts the CTA, WhatsApp and both utilities in ONE row', () => {
+        show();
+
+        // Three stacked rows of chrome under a starting video was the bug being fixed. Asserting the
+        // shared parent is what makes "one row" a fact instead of a screenshot.
+        const row = productLink().parentElement;
+        expect(row.contains(whatsappLink())).toBe(true);
+        expect(row.contains(screen.getByRole('button', { name: 'Salin link barang' }))).toBe(true);
+        expect(row.contains(screen.getByRole('button', { name: 'Bagikan barang' }))).toBe(true);
+        expect(row.getAttribute('class')).toMatch(/flex-wrap/);
+    });
+
+    it('sizes the CTA to its content — primary, but never full-width under a live video', () => {
+        show();
+
+        const cls = productLink().getAttribute('class');
+        // `w-full` is the whole regression: a full-width red-ish button directly under a starting
+        // stream competes with the stream.
+        expect(cls).not.toMatch(/\bw-full\b/);
+        // Still visually primary, and still not a fault colour.
+        expect(cls).toMatch(/bg-primary/);
+        expect(cls).not.toMatch(/status-fault/);
+    });
+
+    it('leaves the row holding only what is present when the optional controls are gone', () => {
+        show({ whatsapp_url: null, product_url: null });
+
+        // No WhatsApp number, and only the redirector to offer — so the row is the CTA alone. It
+        // must not grow a placeholder to fill the space it used to share.
+        const row = productLink().parentElement;
+        expect(row.querySelectorAll('a, button')).toHaveLength(1);
+    });
+});
+
+describe('AffiliateOfferCard — title and price share one line', () => {
+    const title = () => screen.getByRole('heading', { level: 3 });
+
+    it('lets the title yield space and never lets the price yield any', () => {
+        show();
+
+        // Two halves of one rule: without min-w-0 a flex child refuses to shrink below its content
+        // and truncate never engages; without shrink-0 the price is what gets squeezed instead.
+        expect(title().getAttribute('class')).toMatch(/min-w-0/);
+        expect(title().getAttribute('class')).toMatch(/flex-1/);
+        expect(title().getAttribute('class')).toMatch(/truncate/);
+
+        const price = screen.getByTestId('affiliate-offer-price');
+        expect(price.getAttribute('class')).toMatch(/shrink-0/);
+        // A price is a number that changes between offers: it gets tabular figures.
+        expect(price.getAttribute('class')).toMatch(/tabular-nums/);
+    });
+
+    it('really is ONE line — same flex parent, not two stacked blocks', () => {
+        show();
+
+        const row = title().parentElement;
+        expect(row).toBe(screen.getByTestId('affiliate-offer-price').parentElement);
+        expect(row.getAttribute('class')).toMatch(/\bflex\b/);
+    });
+
+    it('keeps the full title reachable although it truncates', () => {
+        const longTitle = 'Kamera IP Outdoor 3MP PTZ Dual Lens 8x Zoom Warna Malam Hari Anti Air IP67';
+        show({ product_title: longTitle });
+
+        // Truncation is a visual clamp, so nothing may be LOST to it: long-press shows the title
+        // attribute and the CTA's accessible name carries the whole string too.
+        expect(title().getAttribute('title')).toBe(longTitle);
+        expect(productLink().getAttribute('aria-label')).toBe(`Lihat barang: ${longTitle}`);
+    });
+
+    it('gives the price the whole line to itself when the title row is all there is', () => {
+        show({ price_rupiah: 0 });
+
+        expect(screen.getByTestId('affiliate-offer-price').parentElement).toBe(title().parentElement);
+    });
+});
+
+describe('AffiliateOfferCard — the photo is a thumbnail, not a poster', () => {
+    const photo = (container) => container.querySelector('img');
+
+    it('reserves its exact box before the bytes land', () => {
+        const { container } = show();
+
+        const img = photo(container);
+        // Intrinsic dimensions are what stop the card from jumping as the photo decodes — under a
+        // video that is still starting, a shift here moves the controls out from under a thumb.
+        expect(img.getAttribute('width')).toBe(String(OFFER.image_width));
+        expect(img.getAttribute('height')).toBe(String(OFFER.image_height));
+        expect(img.getAttribute('decoding')).toBe('async');
+        expect(img.getAttribute('sizes')).toBe('(min-width: 640px) 80px, 64px');
+    });
+
+    it('lives in a FIXED square box, so a portrait upload cannot make the card phone-tall', () => {
+        const { container } = show();
+
+        const box = photo(container).parentElement;
+        const cls = box.getAttribute('class');
+        expect(cls).toMatch(/\bh-16\b/);
+        expect(cls).toMatch(/\bw-16\b/);
+        expect(cls).toMatch(/shrink-0/);
+        // The box crops; the image fills it. Without overflow-hidden the crop does not happen.
+        expect(cls).toMatch(/overflow-hidden/);
+        expect(photo(container).getAttribute('class')).toMatch(/object-cover/);
+    });
+
+    it('still carries dimensions the browser can use when the operator uploaded a square', () => {
+        const { container } = show({ image_width: 800, image_height: 800 });
+
+        expect(photo(container).getAttribute('width')).toBe('800');
+        expect(photo(container).getAttribute('height')).toBe('800');
+    });
+});
+
+describe('AffiliateOfferCard — the shop link rides the disclosure row', () => {
+    it('sits beside "Toko rekanan", because the disclosure and the shop are one thought', () => {
+        show();
+
+        const label = screen.getByText('Toko rekanan');
+        expect(label.parentElement.contains(storeLink())).toBe(true);
+        // And therefore NOT inside the action row, which is now exactly four controls wide.
+        expect(productLink().parentElement.contains(storeLink())).toBe(false);
+    });
+
+    it('never lets a long shop name push the disclosure off its own line', () => {
+        show({ store_name: 'Toko Sinar Elektronik Jaya Abadi Sentosa Bojonegoro' });
+
+        // The label IS the disclosure: it always wins the space it needs, so the link is capped.
+        const cls = storeLink().getAttribute('class');
+        expect(cls).toMatch(/max-w-\[60%\]/);
+        expect(cls).toMatch(/min-w-0/);
+        expect(storeLink().querySelector('.truncate')).not.toBeNull();
+    });
+
+    it('leaves the disclosure standing on its own when there is no shop URL', () => {
+        show(NO_STORE);
+
+        expect(screen.getByText('Toko rekanan')).not.toBeNull();
+        expect(screen.queryByRole('link', { name: /toko/i })).toBeNull();
+    });
+});
+
 describe('AffiliateOfferCard — honesty, tokens and the mobile hard rules', () => {
     it('shows the "Toko rekanan" label — commercial content on a public surface says so', () => {
         show();
@@ -477,15 +731,31 @@ describe('AffiliateOfferCard — honesty, tokens and the mobile hard rules', () 
         expect(container.querySelector('iframe, embed, object')).toBeNull();
         // Nothing sized in viewport units and nothing position-fixed.
         expect(container.innerHTML).not.toMatch(/w-screen|100vw|\bfixed\b/);
-        // Both action rows wrap: with Android font scaling at 1.3x a row of buttons is the classic
-        // way a card grows wider than the viewport.
-        expect(container.querySelectorAll('.flex-wrap').length).toBeGreaterThanOrEqual(2);
+        // The action row wraps: with Android font scaling at 1.3x a row of buttons is the classic
+        // way a card grows wider than the viewport, so above 1x these wrap instead of widening.
+        expect(container.querySelectorAll('.flex-wrap').length).toBeGreaterThanOrEqual(1);
 
         for (const link of screen.getAllByRole('link')) {
             const cls = link.getAttribute('class');
             expect(cls).toMatch(/min-h-\[40px\]/);
             expect(cls).toMatch(/min-w-0/);
             expect(link.querySelector('.truncate')).not.toBeNull();
+        }
+    });
+
+    it('gives the two icon-only buttons a thumb-sized square instead of a label to pad them', () => {
+        show();
+
+        // With the label gone there is nothing left to give these height, so the box is explicit.
+        // 40px (h-10) on a phone, easing to 36px from sm where a pointer is doing the work.
+        for (const button of [
+            screen.getByRole('button', { name: 'Salin link barang' }),
+            screen.getByRole('button', { name: 'Bagikan barang' }),
+        ]) {
+            const cls = button.getAttribute('class');
+            expect(cls).toMatch(/\bh-10\b/);
+            expect(cls).toMatch(/\bw-10\b/);
+            expect(cls).toMatch(/shrink-0/);
         }
     });
 

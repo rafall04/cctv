@@ -10,6 +10,32 @@
  * SideEffects: one fire-and-forget counting beacon per outbound tap; clipboard write / native
  *          share sheet on the two utility buttons.
  *
+ * ── WHAT CHANGED 2026-08-21 (density pass) AND WHY ────────────────────────────────────────────
+ * On a real phone this card was three stacked rows of chrome under a starting video: a banner-ish
+ * photo, a full-width red-ish primary button on its own line, then a second line holding the shop
+ * link + "Salin link" + "Bagikan". A full-width primary CTA directly under a live stream competes
+ * with the stream, and the second "Bagikan" collided with the camera's own "Bagikan" a few pixels
+ * above it — two controls, same word, different objects.
+ *
+ * Five capabilities are unchanged; only their density and their labels moved:
+ *   · photo      full-width-ish banner → FIXED 64/80px square thumbnail beside the text. A portrait
+ *                photo used to make the whole card as tall as the phone; a fixed box cannot.
+ *   · title+price now share one line — title `min-w-0 flex-1 truncate`, price `shrink-0
+ *                tabular-nums` on the right. The full title stays reachable via the `title`
+ *                attribute and via the CTA's aria-label, so truncation hides nothing.
+ *   · CTA        `w-full` → sized to its content, still `bg-primary` so it still reads as primary.
+ *                It now shares ONE row with WhatsApp + the two icon buttons.
+ *   · WhatsApp   visible label shortened "Tanya barang ini" → "Tanya" so the row fits 390px. The
+ *                accessible name still carries the long form AND the word WhatsApp.
+ *   · copy/share ICON-ONLY, and disambiguated by aria-label/title: "Salin link barang" /
+ *                "Bagikan barang". The chip row above this card owns the camera's share; inside
+ *                this card, sharing means the ITEM. Visually the card does that work; for a screen
+ *                reader and for a long-press tooltip the label has to say it out loud.
+ *   · shop link  moved onto the honesty-label row ("TOKO REKANAN … NamaToko ↗"), which is where it
+ *                belongs — the disclosure and the shop it discloses are one thought — and which
+ *                frees the action row to hold exactly four controls.
+ * Nothing was removed, no flag was introduced, and every beacon still fires with the same `l=`.
+ *
  * ── Presence is the switch ────────────────────────────────────────────────────────────────────
  * Every part of this card renders only when its data is present, and disappears when the operator
  * clears the field: no photo key → no photo, no whatsapp_url → no WhatsApp button, price_rupiah
@@ -73,16 +99,21 @@
  * ── Honesty & tokens ──────────────────────────────────────────────────────────────────────────
  * The "Toko rekanan" label is not decoration. It is the same shape as PromoBanner's "Promo" and
  * the ad slots' "Iklan": commercial content on a public surface says so, in the same place, every
- * time. Do not remove it and do not make it quieter than the surrounding copy.
+ * time. Do not remove it and do not make it quieter than the surrounding copy — the density pass
+ * moved the shop link ONTO this row but left the label's own size, weight and colour untouched,
+ * for exactly that reason.
  * `status-fault` (red) is deliberately absent everywhere below — a shop link is not a fault, and
  * neither is a clipboard that refused to open.
  *
  * ── Mobile hard rules obeyed here (each earned by a production bug) ───────────────────────────
- * Action rows are `flex flex-wrap` with `min-w-0` items and `truncate` labels, because Android
- * font scaling at 1.3× is the classic way a row of buttons grows wider than the viewport. Touch
- * targets are `min-h-[40px] sm:min-h-0`. The photo carries width/height so it reserves its box
- * before the bytes land — no layout shift under a starting video. Nothing in this tree is an
- * iframe or an embed, nothing is sized in viewport units, and nothing is position-fixed.
+ * The action row is `flex flex-wrap` with `min-w-0` items and `truncate` labels, because Android
+ * font scaling at 1.3× is the classic way a row of buttons grows wider than the viewport: at 1×
+ * the four controls share one line, above that they wrap instead of widening the card. Touch
+ * targets are `min-h-[40px] sm:min-h-0`, and the two icon-only buttons are a fixed 40px square
+ * (36px from sm) so they stay thumb-sized without a label to pad them out. The photo carries
+ * width/height AND a fixed CSS box, so it reserves its exact space before the bytes land — no
+ * layout shift under a starting video, and no tall poster from a portrait upload. Nothing in this
+ * tree is an iframe or an embed, nothing is sized in viewport units, and nothing is position-fixed.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -91,15 +122,35 @@ import { AFFILIATE_LINK, countAffiliateClick } from '../../services/affiliateSer
 /** Where the WebP renditions are served. Matches backend routes/affiliateMediaRoutes.js. */
 const MEDIA_BASE = '/api/affiliate-media';
 
-/** The two renditions the backend generates for an offer photo: 1× and 2× of a ~96px thumbnail. */
+/** The two renditions the backend generates for an offer photo: 1× and 2× of the thumbnail box. */
 const IMAGE_RENDITIONS = [160, 320];
 
 /** How long "Tersalin" stays on screen. Long enough to read, short enough not to become chrome. */
 const COPY_FEEDBACK_MS = 2200;
 
-const ACTION_BASE = 'flex min-h-[40px] w-full min-w-0 items-center justify-center gap-1.5 rounded-control px-3 py-2 text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:min-h-0 sm:w-auto';
+const FOCUS_RING = 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary';
+
+/* Sized to content, not to the row: the CTA under a live video must read as primary without
+   becoming the loudest thing on the screen. `min-w-0` + a truncating label is what lets four
+   controls share one line at 1× and wrap — rather than widen — at Android's 1.3× font scale. */
+const ACTION_BASE = `inline-flex min-h-[40px] min-w-0 items-center justify-center gap-1.5 rounded-control px-3 py-2 text-sm font-semibold transition-colors ${FOCUS_RING} sm:min-h-0`;
+const PRIMARY_ACTION = `${ACTION_BASE} bg-primary text-white hover:opacity-90`;
 const SECONDARY_ACTION = `${ACTION_BASE} border border-edge bg-surface font-medium text-content-muted hover:border-edge-strong hover:bg-surface-raised hover:text-content`;
-const UTILITY_ACTION = 'inline-flex min-h-[40px] min-w-0 max-w-full items-center justify-center gap-1.5 rounded-control border border-edge bg-surface px-3 py-2 text-xs font-medium text-content-muted transition-colors hover:border-edge-strong hover:bg-surface-raised hover:text-content focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:min-h-0';
+
+/* Icon-only, so the tap target cannot borrow height from a label: a fixed square instead. */
+const ICON_ACTION = `inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-control border border-edge bg-surface text-content-muted transition-colors hover:border-edge-strong hover:bg-surface-raised hover:text-content ${FOCUS_RING} sm:h-9 sm:w-9`;
+
+/* Rides the honesty-label row. Capped at 60% so a long shop name can never push "TOKO REKANAN"
+   off its own line; the label is the disclosure and always wins the space it needs. */
+const STORE_LINK = `inline-flex min-h-[40px] min-w-0 max-w-[60%] items-center gap-1 rounded-control px-2 text-xs font-medium text-content-muted transition-colors hover:text-content ${FOCUS_RING} sm:min-h-0 sm:py-1`;
+
+function ShopIcon() {
+    return (
+        <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 8h14l-1 12H6L5 8zm4 0V6a3 3 0 016 0v2" />
+        </svg>
+    );
+}
 
 function ExternalLinkIcon() {
     return (
@@ -119,7 +170,7 @@ function WhatsAppIcon() {
 
 function CopyIcon() {
     return (
-        <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
+        <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" d="M8 8V6a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2h-2M6 8h8a2 2 0 012 2v8a2 2 0 01-2 2H6a2 2 0 01-2-2v-8a2 2 0 012-2z" />
         </svg>
     );
@@ -127,7 +178,7 @@ function CopyIcon() {
 
 function ShareIcon() {
     return (
-        <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
+        <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" d="M8.7 10.7l6.6-3.4M8.7 13.3l6.6 3.4M18 8a2 2 0 100-4 2 2 0 000 4zM6 14a2 2 0 100-4 2 2 0 000 4zM18 20a2 2 0 100-4 2 2 0 000 4z" />
         </svg>
     );
@@ -250,53 +301,85 @@ export default function AffiliateOfferCard({ offer, className = '' }) {
 
     return (
         <article className={className || undefined} data-testid="affiliate-offer-card">
-            <div className="flex items-center justify-between gap-2 pb-2">
-                <span className="text-xs font-medium uppercase tracking-wide text-content-subtle">Toko rekanan</span>
+            {/* Disclosure row: what this block is, and — on the right — whose shop it is. */}
+            <div className="flex items-center justify-between gap-2 pb-1.5">
+                <span className="inline-flex min-w-0 items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-content-subtle">
+                    <ShopIcon />
+                    Toko rekanan
+                </span>
+
+                {storeHref && (
+                    <a
+                        href={storeHref}
+                        target="_blank"
+                        rel="noopener noreferrer nofollow sponsored"
+                        onClick={handleStoreClick}
+                        aria-label={`Buka toko ${storeLabel}`}
+                        title={`Buka toko ${storeLabel}`}
+                        className={STORE_LINK}
+                    >
+                        <span className="truncate">{storeLabel}</span>
+                        <ExternalLinkIcon />
+                    </a>
+                )}
             </div>
 
             <div className="rounded-card border border-edge bg-surface-sunken p-3">
                 <div className="flex gap-3">
                     {offer.image_base && (
-                        /* Thumbnail, not poster: 160/320 covers 1× and 2× of this ~96px box, which
-                           is why the backend generates those two and nothing larger. It loads
-                           under a live video on a phone, where every kilobyte competes with the
+                        /* Thumbnail, not poster: a fixed square box, so a portrait upload cannot
+                           make this card as tall as the phone. 160/320 covers 1× and 2× of it,
+                           which is why the backend generates those two and nothing larger — it
+                           loads under a live video, where every kilobyte competes with the
                            stream. */
-                        <div className="w-20 shrink-0 overflow-hidden rounded-card border border-edge bg-surface sm:w-24">
+                        <div className="h-16 w-16 shrink-0 overflow-hidden rounded-card border border-edge bg-surface sm:h-20 sm:w-20">
                             <img
                                 src={`${MEDIA_BASE}/${offer.image_base}-320.webp`}
                                 srcSet={buildSrcSet(offer.image_base)}
-                                sizes="(min-width: 640px) 96px, 80px"
+                                sizes="(min-width: 640px) 80px, 64px"
                                 width={offer.image_width || undefined}
                                 height={offer.image_height || undefined}
                                 alt={offer.product_title}
                                 loading="lazy"
                                 decoding="async"
-                                className="h-auto w-full max-w-full"
+                                /* max-w-full is redundant next to w-full inside an
+                                   overflow-hidden fixed box, and it stays anyway: it is the
+                                   clamp the mobile guard looks for, and it costs nothing. */
+                                className="h-full w-full max-w-full object-cover"
                             />
                         </div>
                     )}
 
                     <div className="min-w-0 flex-1">
-                        <h3 className="text-sm font-semibold leading-snug text-content">{offer.product_title}</h3>
+                        {/* One line, two jobs: the title yields space, the price never does. */}
+                        <div className="flex items-baseline gap-2">
+                            <h3 title={offer.product_title} className="min-w-0 flex-1 truncate text-sm font-semibold leading-snug text-content">
+                                {offer.product_title}
+                            </h3>
+
+                            {hasPrice && (
+                                <span
+                                    data-testid="affiliate-offer-price"
+                                    className="shrink-0 text-sm font-bold tabular-nums text-content"
+                                >
+                                    {formatRupiah(offer.price_rupiah)}
+                                </span>
+                            )}
+                        </div>
 
                         {offer.description && (
                             /* Clamped, not truncated to one line: the description is the only place
                                the partner gets to explain the product, but it must not push the
-                               camera detail panel off the first screen of a phone. */
-                            <p className="mt-1 line-clamp-3 text-sm leading-relaxed text-content-muted">{offer.description}</p>
-                        )}
-
-                        {hasPrice && (
-                            <p className="mt-1.5 text-base font-bold text-content" data-testid="affiliate-offer-price">
-                                {formatRupiah(offer.price_rupiah)}
-                            </p>
+                               camera detail panel off the first screen of a phone. Two lines beside
+                               an 80px thumbnail is the budget. */
+                            <p className="mt-1 line-clamp-2 text-sm leading-snug text-content-muted">{offer.description}</p>
                         )}
                     </div>
                 </div>
 
-                {/* flex-wrap + min-w-0 + truncate: with Android font scaling at 1.3× a two-button
-                    row is the classic way a card grows wider than the viewport. Here the buttons
-                    stack on narrow screens and only share a line from sm upwards. */}
+                {/* ONE action row. flex-wrap + min-w-0 + truncate: with Android font scaling at
+                    1.3× a row of buttons is the classic way a card grows wider than the viewport,
+                    so above 1× these wrap onto a second line instead of widening the card. */}
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                     <a
                         href={productHref}
@@ -304,7 +387,7 @@ export default function AffiliateOfferCard({ offer, className = '' }) {
                         rel="noopener noreferrer nofollow sponsored"
                         onClick={handleProductClick}
                         aria-label={`Lihat barang: ${offer.product_title}`}
-                        className={`${ACTION_BASE} bg-primary text-white hover:opacity-90 sm:flex-1`}
+                        className={PRIMARY_ACTION}
                     >
                         <span className="truncate">Lihat barang</span>
                         <ExternalLinkIcon />
@@ -317,41 +400,38 @@ export default function AffiliateOfferCard({ offer, className = '' }) {
                             rel="noopener noreferrer nofollow sponsored"
                             onClick={handleWhatsAppClick}
                             aria-label={`Tanya barang ini lewat WhatsApp: ${offer.product_title}`}
-                            className={`${SECONDARY_ACTION} sm:max-w-[60%]`}
+                            title={`Tanya barang ini lewat WhatsApp: ${offer.product_title}`}
+                            className={SECONDARY_ACTION}
                         >
                             <WhatsAppIcon />
-                            <span className="truncate">Tanya barang ini</span>
-                        </a>
-                    )}
-                </div>
-
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                    {storeHref && (
-                        <a
-                            href={storeHref}
-                            target="_blank"
-                            rel="noopener noreferrer nofollow sponsored"
-                            onClick={handleStoreClick}
-                            aria-label={`Buka toko ${storeLabel}`}
-                            className={UTILITY_ACTION}
-                        >
-                            <span className="truncate">{storeLabel}</span>
-                            <ExternalLinkIcon />
+                            <span className="truncate">Tanya</span>
                         </a>
                     )}
 
                     {/* Both utilities share one link — the shop URL. With only the redirector
-                        available there is nothing worth sending anyone, so they do not render. */}
+                        available there is nothing worth sending anyone, so they do not render.
+                        Icon-only: the camera's own "Bagikan" sits a few pixels above this card, so
+                        the label here has to name its object rather than repeat the verb. */}
                     {productUrl && (
                         <>
-                            <button type="button" onClick={copyShareUrl} className={UTILITY_ACTION}>
+                            <button
+                                type="button"
+                                onClick={copyShareUrl}
+                                aria-label="Salin link barang"
+                                title="Salin link barang"
+                                className={ICON_ACTION}
+                            >
                                 <CopyIcon />
-                                <span className="truncate">Salin link</span>
                             </button>
 
-                            <button type="button" onClick={handleShare} className={UTILITY_ACTION}>
+                            <button
+                                type="button"
+                                onClick={handleShare}
+                                aria-label="Bagikan barang"
+                                title="Bagikan barang"
+                                className={ICON_ACTION}
+                            >
                                 <ShareIcon />
-                                <span className="truncate">Bagikan</span>
                             </button>
                         </>
                     )}

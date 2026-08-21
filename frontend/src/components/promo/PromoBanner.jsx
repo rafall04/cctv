@@ -6,6 +6,22 @@
  * MainFuncs: PromoBanner.
  * SideEffects: One GET per mount once scrolled into view (which is what counts the
  *   impression server-side); one fire-and-forget POST per outbound CTA click.
+ *
+ * ── WHAT CHANGED 2026-08-21 (density pass) AND WHY ──────────────────────────────
+ * The poster itself was NOT touched: it still renders at full width and fully
+ * visible, which is a deliberate product decision — a promo you have to guess at
+ * is not a promo. Under a live video the block was simply carrying more chrome
+ * than content around it, so only the label row was tightened:
+ *   · the single-child `flex justify-between` wrapper is gone — it was reserving
+ *     space for a right-hand element this banner has never had;
+ *   · "PROMO" dropped `font-medium` → normal weight. Quieter, but the size and
+ *     the `text-content-subtle` colour are unchanged: this label is the honesty
+ *     disclosure that says the poster is house advertising, so it may become
+ *     lighter, never smaller and never lower-contrast;
+ *   · the gap above the poster went `pb-2` → `pb-1.5`.
+ * Fetching, IntersectionObserver-gated impression counting, the className
+ * passthrough, the lightbox and the CTA (including its `mt-2` offset) are all
+ * byte-for-byte what they were.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -187,11 +203,12 @@ export default function PromoBanner({ placement, cameraId, areaId, className = '
         <div ref={wrapperRef} className={promo ? className : undefined}>
             {promo && (
                 <>
-                    <div className="flex items-center justify-between gap-2 pb-2">
-                        {/* Labelled honestly: this is house advertising by the operator,
-                            not editorial content and not a third-party network ad. */}
-                        <span className="text-xs font-medium uppercase tracking-wide text-content-subtle">Promo</span>
-                    </div>
+                    {/* Labelled honestly: this is house advertising by the operator, not
+                        editorial content and not a third-party network ad. Normal weight
+                        rather than font-medium — quiet chrome, but never smaller than
+                        text-xs and never below text-content-subtle, because the label IS
+                        the disclosure. */}
+                    <span className="block pb-1.5 text-xs uppercase tracking-wide text-content-subtle">Promo</span>
 
                     <button
                         type="button"
