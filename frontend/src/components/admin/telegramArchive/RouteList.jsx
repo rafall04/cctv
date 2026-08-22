@@ -82,7 +82,10 @@ export function RouteList({ routes, cameras = [], areas = [], busyId, onToggle, 
                                         </div>
                                     </div>
 
-                                    <div className="flex shrink-0 items-center gap-2">
+                                    {/* flex-wrap, not shrink: the three labels are the whole point of
+                                        the row (see the header note), and at 1.5x font they need
+                                        ~325px of a 224px line — so they move down instead of out. */}
+                                    <div className="flex shrink-0 flex-wrap items-center gap-2">
                                         <button
                                             type="button"
                                             className={btnGhost}

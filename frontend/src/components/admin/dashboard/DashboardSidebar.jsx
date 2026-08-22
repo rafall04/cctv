@@ -41,7 +41,7 @@ function ActivityLog({ logs = [] }) {
                             <div className="min-w-0 flex-1">
                                 <p className="text-sm font-medium text-content">{log.details}</p>
                                 <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
-                                    <span className="text-xs text-content-muted">{log.username}</span>
+                                    <span className="min-w-0 break-all text-xs text-content-muted">{log.username}</span>
                                     <span className="text-xs text-content-subtle" aria-hidden="true">&bull;</span>
                                     <span className="break-words font-mono text-xs tabular-nums text-content-muted">{log.created_at_wib}</span>
                                 </div>

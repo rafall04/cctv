@@ -96,8 +96,8 @@ export default function RegistrationsTab({ registrations, run, busy }) {
                     <div className="space-y-3 md:hidden">
                         {registrations.map((reg) => (
                             <div key={reg.id} className="rounded-2xl border border-edge bg-surface p-4">
-                                <p className="font-semibold text-content">{reg.username}</p>
-                                <p className="mt-0.5 text-sm text-content-muted">{reg.phone || reg.email || '—'}</p>
+                                <p className="break-words font-semibold text-content">{reg.username}</p>
+                                <p className="mt-0.5 break-words text-sm text-content-muted">{reg.phone || reg.email || '—'}</p>
                                 <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-sm text-content-muted">
                                     <PlanTag reg={reg} />
                                     <span className="text-xs text-content-subtle">{formatDateTime(reg.created_at)}</span>

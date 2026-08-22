@@ -255,17 +255,19 @@ function PlaybackTimeline({
                     )}
                 </div>
 
-                <div className="flex items-center gap-6 mt-3 text-xs text-gray-600 dark:text-gray-400">
+                {/* Wraps on purpose: three swatch+label pairs on one nowrap row measure 409px at
+                  * the Android 1.5x font scale, i.e. wider than a 320px phone. */}
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-3 text-xs text-content-muted">
                     <div className="flex items-center gap-2">
-                        <div className="w-4 h-4 bg-emerald-500 rounded"></div>
+                        <div className="w-4 h-4 shrink-0 bg-emerald-500 rounded"></div>
                         <span>Tersedia</span>
                     </div>
                     <div className="flex items-center gap-2">
-                        <div className="w-4 h-4 bg-primary-500 rounded"></div>
+                        <div className="w-4 h-4 shrink-0 bg-primary-500 rounded"></div>
                         <span>Diputar</span>
                     </div>
                     <div className="flex items-center gap-2">
-                        <div className="w-4 h-4 bg-red-500/30 rounded"></div>
+                        <div className="w-4 h-4 shrink-0 bg-red-500/30 rounded"></div>
                         <span>Hilang</span>
                     </div>
                 </div>

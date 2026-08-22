@@ -177,11 +177,13 @@ export default function CustomerCameraIPs() {
                                         <div className="flex items-start justify-between gap-2">
                                             <div className="min-w-0">
                                                 <p className="truncate font-semibold text-content">{e.camera_name}</p>
-                                                <p className="text-xs text-content-subtle">{e.owner}</p>
+                                                <p className="break-words text-xs text-content-subtle">{e.owner}</p>
                                             </div>
                                             <Badge kind={e.kind} />
                                         </div>
-                                        <p className="mt-2 font-mono text-xs text-content-muted">{e.ip || e.host || '—'}{e.port ? `:${e.port}` : ''}</p>
+                                        {/* Host/IP is one unbreakable token (a full IPv6 is 39 chars): without break-all its
+                                            ink overflows the card and pushes the admin shell sideways at 1.5x font. */}
+                                        <p className="mt-2 break-all font-mono text-xs text-content-muted">{e.ip || e.host || '—'}{e.port ? `:${e.port}` : ''}</p>
                                     </div>
                                 ))}
                             </div>

@@ -508,7 +508,10 @@ export default function TelegramArchiveLibrary() {
                         </label>
                     </div>
 
-                    <div className="flex items-center justify-between gap-2">
+                    {/* Wraps, like the camera-grid pager: a Button's label span is `truncate`
+                      * (white-space:nowrap), so each button's min-content is its WHOLE label and
+                      * the three of them need 410px at Android's 1.5x font scale. */}
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                         <Button
                             size="sm"
                             variant="secondary"

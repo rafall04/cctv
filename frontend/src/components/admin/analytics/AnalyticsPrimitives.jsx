@@ -74,7 +74,7 @@ export function PeriodSelector({ value, onChange, customDate, onCustomDateChange
 
     return (
         <div className="flex flex-wrap items-center gap-2">
-            <div className="flex bg-surface-sunken rounded-xl p-1">
+            <div className="flex flex-wrap bg-surface-sunken rounded-xl p-1">
                 {periods.map((period) => (
                     <button
                         key={period.value}

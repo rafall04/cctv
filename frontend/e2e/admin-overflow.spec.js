@@ -99,6 +99,11 @@ const ADMIN_CAMERAS = Array.from({ length: 750 }, (_, i) => ({
     total_views: 1000 + i,
     resolution: '1920x1080',
     codec: 'h265',
+    /* Four in five record, as in production. Load-bearing beyond realism: the admin playback page
+     * filters /api/cameras down to `enable_recording` and renders "Belum Ada Recording Tersedia"
+     * for an empty result — i.e. without this field that whole page measures an empty box. */
+    enable_recording: i % 5 === 0 ? 0 : 1,
+    recording_duration_hours: [4, 8, 24, 72][i % 4],
 }));
 
 const ADMIN_AREAS = Array.from({ length: 40 }, (_, i) => ({
@@ -182,15 +187,830 @@ const LANDING_SETTINGS = {
     },
 };
 
-/* Ordered: first regex that matches the pathname wins, so put the specific ones first. */
+/* ------------------------------------------------- fixtures, part 2: the rest of the surface
+ *
+ * The three pages above were the audit's starting point. Everything below was added when coverage
+ * was extended to every remaining /admin route that renders a list or a form (27 more), and the
+ * same anti-vacuity rule governs it: an empty admin page cannot overflow, so a fixture that renders
+ * "Belum ada data" is worth exactly nothing. Four pages proved that the hard way — /admin/dashboard,
+ * /admin/analytics, /admin/playback-analytics and /admin/recordings each threw a TypeError and
+ * rendered the ErrorBoundary when handed `data: []`, because they read `data.summary.totalCameras`,
+ * `data.pagination.pageSize`, `data.rate.source` and so on. A page showing an error card measures
+ * clean and tells you nothing, which is why every page here has a `ready` selector keyed to real
+ * rendered content rather than to a heading that exists either way.
+ *
+ * The recurring worst-case shapes, in order of how often they actually broke something:
+ *   1. an unbreakable token (URL / filename / stream key / IPv6 / user-agent) with no break-all;
+ *   2. a <select> whose min-content width is its widest <option> (see the CameraManagement note);
+ *   3. a long human name in a flex/grid child that has no min-w-0.
+ * So those three appear on every page that can hold them.
+ */
+
+/* One unbreakable ~120-char URL and one ~78-char filename — the exact two shapes that produced the
+ * 689px and 584px defects this file was created for. */
+const LONG_URL = 'https://cctv.example.invalid/arsip/rekaman/kamera-simpang-empat-jalan-raya-bojonegoro-selatan/2026-08-22T07-40-00_segmen-0001.mp4';
+const LONG_FILENAME = 'camera1169_2026-08-22T07-40-00_sampai_07-50-00_segmen-rekaman-0001.mp4';
+/* Full-length IPv6 and a real mobile UA: both are single unbreakable tokens in log tables. */
+const LONG_IPV6 = '2404:8000:1027:8a3c:1c2b:9f4d:aa71:3e02';
+const LONG_UA = 'Mozilla/5.0 (Linux; Android 13; SM-A536E) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36';
+const LONG_EMAIL = 'operator.kecamatan.bojonegoro.selatan@dinaskominfo-kabupaten.example.go.id';
+const LONG_PERSON = 'Bapak Penanggung Jawab Kemitraan Wilayah Timur Kabupaten';
+const LONG_USERNAME = 'operator_kecamatan_bojonegoro_selatan_01';
+
+const ADMIN_USERS = Array.from({ length: 24 }, (_, i) => ({
+    id: i + 1,
+    username: i === 0 ? LONG_USERNAME : `operator_wilayah_${String(i + 1).padStart(2, '0')}`,
+    email: LONG_EMAIL,
+    phone: '628123456789',
+    role: ['admin', 'viewer', 'customer', 'operator'][i % 4],
+    created_at: '2026-08-01 09:15:00',
+}));
+
+const FEEDBACK_ITEMS = Array.from({ length: 20 }, (_, i) => ({
+    id: i + 1,
+    name: `Pengunjung Dengan Nama Yang Panjang Sekali Nomor ${i + 1}`,
+    email: LONG_EMAIL,
+    message: 'Kamera di simpang empat jalan raya sering buram ketika malam hari dan suaranya tidak '
+        + `keluar sama sekali, mohon diperiksa petugas. Tautan buktinya ${LONG_URL}`,
+    status: ['unread', 'read', 'resolved'][i % 3],
+    created_at: '2026-08-20 07:45:00',
+}));
+
+const SECURITY_LOGS = Array.from({ length: 50 }, (_, i) => ({
+    id: i + 1,
+    event_type: ['login_failed', 'rate_limit_exceeded', 'csrf_validation_failed', 'access_denied', 'admin_action'][i % 5],
+    username: i === 0 ? LONG_USERNAME : `operator_wilayah_${String(i + 1).padStart(2, '0')}`,
+    ip_address: LONG_IPV6,
+    endpoint: '/api/admin/billing/subscriptions/1249/perpanjangan-otomatis-bulanan',
+    user_agent: LONG_UA,
+    details: JSON.stringify({
+        reason: 'invalid_password', endpoint_type: 'admin', required_role: 'admin',
+        actual_role: 'viewer', target_type: 'camera', target_id: 1169, lock_type: 'ip',
+    }),
+    timestamp: '2026-08-22 07:41:03',
+}));
+
+const HEALTH_DEBUG = {
+    summary: { total: 750, healthy: 612, degraded: 61, offline: 58, unresolved: 19 },
+    pagination: { page: 1, limit: 25, total: 750, totalPages: 30 },
+    items: Array.from({ length: 25 }, (_, i) => ({
+        cameraId: i + 1,
+        cameraName: cameraName(i + 1),
+        areaName: AREA_NAMES[i % AREA_NAMES.length],
+        state: ['healthy', 'degraded', 'unresolved', 'suspect'][i % 4],
+        confidence: 0.72,
+        errorClass: 'rtsp_connect_timeout_after_three_retries',
+        availability_state: i % 3 ? 'online' : 'offline',
+        effectiveOnline: i % 3 !== 0,
+        healthMode: 'internal_probe_with_runtime_evidence',
+        healthStrategy: 'runtime_evidence_then_probe_then_fallback',
+        policy_mode: 'on_demand',
+        source_profile: 'internal_rtsp_h265_substream_720p',
+        lastReason: 'runtime_reader_absent_and_probe_failed',
+        failureScore: 3.5,
+        /* Unbreakable, and the panel renders these with break-all — so this is the fixture that
+         * proves break-all is actually doing its job rather than being decorative. */
+        runtimeTarget: `rtsp://127.0.0.1:8554/kamera-simpang-empat-bojonegoro-selatan-${i + 1}/substream`,
+        probeTarget: `${LONG_URL}?probe=${i + 1}`,
+        fallbackTarget: `http://127.0.0.1:8888/kamera-simpang-empat-bojonegoro-selatan-${i + 1}/index.m3u8`,
+        providerDomain: 'origin-hls-provider-eksternal-yang-panjang.example.invalid',
+        probeMethod: 'HEAD',
+        httpStatus: 404,
+        contentType: 'application/vnd.apple.mpegurl',
+        usedFallback: i % 2 === 0,
+        configured: true,
+        ready: i % 3 !== 0,
+        sourceReady: i % 3 !== 0,
+        readerCount: i % 4,
+        realViewerCount: i % 3,
+        deliveryType: 'hls_proxy',
+        lastProbeAt: '2026-08-22T07:41:03.000Z',
+        lastRuntimeSuccessAt: '2026-08-22T07:39:11.000Z',
+        lastRuntimeFreshAt: '2026-08-22T07:39:11.000Z',
+        lastRuntimeSignalType: 'reader_bytes_advanced',
+        runtimeGraceUntil: '2026-08-22T07:45:00.000Z',
+        domainBackoffUntil: '2026-08-22T08:10:00.000Z',
+        monitoring_state: 'active',
+        monitoring_reason: 'published_and_enabled',
+        availability_reason: 'probe_failed_after_runtime_absent',
+        availability_confidence: 0.68,
+        close_after_seconds: 60,
+    })),
+};
+
+const DASHBOARD_STATS = {
+    summary: { totalCameras: 750, activeCameras: 612, disabledCameras: 138, totalAreas: 40, activeViewers: 97 },
+    system: {
+        platform: 'linux', arch: 'x64', cpus: 8,
+        cpuModel: 'Intel(R) Xeon(R) Gold 6248R CPU @ 3.00GHz dengan nama panjang sekali',
+        cpuLoad: 47, totalMem: 67_553_994_752, freeMem: 42_949_672_960, usedMem: 24_604_321_792,
+        memUsagePercent: 36, uptime: 986_400, loadAvg: [1.24, 1.08, 0.97],
+    },
+    streams: Array.from({ length: 24 }, (_, i) => ({
+        id: i + 1,
+        name: cameraName(i + 1),
+        ready: i % 3 !== 0,
+        state: ['ready', 'buffering', 'offline', 'maintenance'][i % 4],
+        viewers: i % 11,
+        sessions: i % 4 === 0 ? [{
+            sessionId: `sess-${i}-panjang-sekali-abcdef0123456789`,
+            ipAddress: LONG_IPV6, deviceType: 'mobile',
+            startedAt: '2026-08-22T07:30:00.000Z', durationSeconds: 412,
+        }] : [],
+        bytesReceived: 128_000_000 + i, bytesSent: 512_000_000 + i,
+        streamSource: 'internal', operationalState: ['online', 'offline', 'maintenance'][i % 3],
+    })),
+    recentLogs: Array.from({ length: 10 }, (_, i) => ({
+        id: i + 1,
+        action: 'camera_updated_by_admin_via_bulk_policy_editor',
+        username: LONG_USERNAME,
+        details: `Kamera "${cameraName(i + 1)}" diubah kelasnya menjadi community`,
+        created_at: '2026-08-22 07:41:03',
+        created_at_wib: '22 Agu 2026 14:41 WIB',
+    })),
+    mtxConnected: true,
+    cameraStatusBreakdown: { online: 612, offline: 121, maintenance: 17 },
+    topCameras: Array.from({ length: 5 }, (_, i) => ({ id: i + 1, name: cameraName(i + 1), viewers: 30 - i })),
+    allSessions: Array.from({ length: 30 }, (_, i) => ({
+        sessionId: `sess-${i}-panjang-sekali-abcdef0123456789`,
+        cameraId: i + 1, cameraName: cameraName(i + 1),
+        ipAddress: LONG_IPV6, deviceType: ['mobile', 'desktop', 'tablet'][i % 3],
+        startedAt: '2026-08-22T07:30:00.000Z', durationSeconds: 412 + i,
+    })),
+};
+
+/* QuickStatsCards reads a DIFFERENT stats object from the same page (getTodayStats), keyed on
+ * `current`/`comparison` rather than `summary` — hence a second fixture on the same route family. */
+const TODAY_STATS = {
+    current: { totalSessions: 18_432, uniqueViewers: 7_211, avgDuration: 268, totalWatchTime: 4_939_776, activeNow: 97 },
+    compare: { totalSessions: 16_002, uniqueViewers: 6_540, avgDuration: 241, totalWatchTime: 3_856_482 },
+    comparison: { sessionsChange: 15.2, viewersChange: 10.3, durationChange: 11.2 },
+    cameras: { total: 750, online: 612, offline: 121, maintenance: 17 },
+    period: 'today',
+};
+
+const ANALYTIC_SESSIONS = Array.from({ length: 25 }, (_, i) => ({
+    id: i + 1,
+    session_id: `sess-${i}-panjang-sekali-abcdef0123456789`,
+    camera_id: i + 1,
+    camera_name: cameraName(i + 1),
+    ip_address: LONG_IPV6,
+    device_type: ['mobile', 'desktop', 'tablet'][i % 3],
+    user_agent: LONG_UA,
+    started_at: '2026-08-22T07:30:00.000Z',
+    ended_at: '2026-08-22T07:37:00.000Z',
+    duration_seconds: 412 + i,
+}));
+
+const VIEWER_ANALYTICS = {
+    overview: { totalSessions: 18_432, uniqueViewers: 7_211, avgDuration: 268, totalWatchTime: 4_939_776, activeNow: 97 },
+    comparison: { sessionsChange: 15.2, viewersChange: 10.3, durationChange: 11.2 },
+    charts: { daily: Array.from({ length: 14 }, (_, i) => ({ date: `2026-08-${String(i + 8).padStart(2, '0')}`, sessions: 1200 + i * 13, uniqueViewers: 540 + i * 7 })) },
+    recentSessions: ANALYTIC_SESSIONS,
+    topCameras: Array.from({ length: 10 }, (_, i) => ({
+        camera_id: i + 1, camera_name: cameraName(i + 1),
+        total_views: 4000 - i * 90, unique_viewers: 1800 - i * 40, total_watch_time: 900_000 - i * 1000,
+    })),
+    deviceBreakdown: [
+        { device_type: 'mobile', count: 12_884, percentage: 69.9 },
+        { device_type: 'desktop', count: 4_102, percentage: 22.3 },
+        { device_type: 'tablet', count: 1_446, percentage: 7.8 },
+    ],
+    topVisitors: Array.from({ length: 10 }, (_, i) => ({
+        ip_address: LONG_IPV6, total_sessions: 210 - i * 8, cameras_watched: 24 - i, total_watch_time: 120_000 - i * 900,
+    })),
+    peakHours: Array.from({ length: 24 }, (_, i) => ({ hour: i, sessions: 200 + ((i * 37) % 900), unique_visitors: 80 + ((i * 13) % 400) })),
+    cameraPerformance: [],
+};
+
+const HISTORY_PAGE = {
+    items: ANALYTIC_SESSIONS,
+    pagination: { page: 1, pageSize: 25, totalItems: 18_432, totalPages: 738 },
+    summary: { totalItems: 18_432, uniqueViewers: 7_211, totalWatchTime: 4_939_776 },
+};
+
+const PLAYBACK_TOKENS = Array.from({ length: 12 }, (_, i) => ({
+    id: i + 1,
+    label: `Token Keluarga Bapak ${LONG_PERSON} Nomor ${i + 1}`,
+    token_prefix: `VVC9E2XA${String(i).padStart(4, '0')}`,
+    scope_type: ['all', 'camera', 'area'][i % 3],
+    camera_ids: i % 3 === 1 ? [1, 2, 3, 4, 5, 6, 7, 8] : [],
+    allowed_camera_ids: i % 3 === 1 ? [1, 2, 3, 4, 5, 6, 7, 8] : [],
+    camera_rules: i % 3 === 1 ? [{ camera_id: 1, enabled: true, playback_window_hours: 72, note: 'Kamera depan rumah' }] : [],
+    playback_window_hours: 72,
+    expires_at: '2026-12-31 23:59:59',
+    is_active: i % 4 !== 3,
+    active_session_count: i % 3,
+    session_timeout_seconds: 1800,
+    max_active_sessions: 3,
+    client_note: `Catatan klien yang panjang untuk ${LONG_PERSON}`,
+    share_template: `Halo, ini tautan rekaman CCTV Anda: ${LONG_URL}`,
+}));
+
+const PLAYBACK_TOKEN_AUDIT = Array.from({ length: 50 }, (_, i) => ({
+    id: i + 1,
+    event_type: ['token_created', 'token_revoked', 'session_started', 'session_denied', 'share_regenerated'][i % 5],
+    token_label: `Token Keluarga Bapak ${LONG_PERSON} Nomor ${(i % 12) + 1}`,
+    token_prefix: `VVC9E2XA${String(i % 12).padStart(4, '0')}`,
+    actor_username: LONG_USERNAME,
+    camera_id: (i % 12) + 1,
+    camera_name: cameraName((i % 12) + 1),
+    ip_address: LONG_IPV6,
+    user_agent: LONG_UA,
+    detail_json: JSON.stringify({ preset: 'client_30_hari', camera_count: 8, timeout_seconds: 1800, max_active_sessions: 3, share_key_prefix: 'VVC9E2XA', reason: 'expired', reused: false, cleared: 2 }),
+    created_at: '2026-08-22 07:41:03',
+}));
+
+const PLAYBACK_PRODUCTS = {
+    coverage: { hours: 168, oldestSegmentAt: '2026-08-15T00:00:00.000Z' },
+    products: Array.from({ length: 5 }, (_, i) => ({
+        id: i + 1,
+        key: `paket_akses_playback_bulanan_wilayah_${i + 1}`,
+        label: i === 0 ? 'Coba Gratis 1 Hari Untuk Pengunjung Baru' : `Paket Akses Playback ${30 * i} Hari Wilayah Kabupaten`,
+        description: 'Bisa memutar ulang rekaman kamera publik sejauh jendela yang tertera, dengan '
+            + 'tautan yang bisa dibagikan ke anggota keluarga lain.',
+        price_rupiah: i === 0 ? 0 : 25_000 * i,
+        window_hours: 24 * (i + 1),
+        coverage_hours: 168,
+        validity_days: 30 * (i || 1),
+        sort_order: i,
+        is_trial: i === 0,
+        enabled: i % 2 === 0,
+        exceeds_coverage: i === 4,
+    })),
+};
+
+const CAMERA_REPORTS = {
+    pagination: { page: 1, limit: 25, total: 214, totalPages: 9 },
+    summary: {
+        total: 214, open: 63,
+        byStatus: { baru: 41, dibaca: 22, selesai: 151 },
+        byCategory: { buram: 41, mati: 12, arah_salah: 10 },
+    },
+    categories: [
+        { key: 'buram', label: 'Gambar buram atau berbayang' },
+        { key: 'mati', label: 'Kamera mati total' },
+        { key: 'arah_salah', label: 'Arah kamera bergeser dari semestinya' },
+    ],
+    cameras: ADMIN_CAMERAS.slice(0, 40).map((c) => ({ id: c.id, name: c.name, reports: 3 })),
+    reports: Array.from({ length: 25 }, (_, i) => ({
+        id: i + 1,
+        cameraId: i + 1,
+        cameraName: cameraName(i + 1),
+        areaName: AREA_NAMES[i % AREA_NAMES.length],
+        categoryLabel: 'Arah kamera bergeser dari semestinya',
+        message: 'Sejak kemarin sore gambarnya menghadap ke tembok, padahal biasanya menghadap ke '
+            + `simpang. Saya sudah coba buka lewat tautan ${LONG_URL} dan hasilnya sama saja.`,
+        status: ['baru', 'dibaca', 'selesai'][i % 3],
+        createdAt: '2026-08-22T07:41:03.000Z',
+        occurredAt: '2026-08-21T17:20:00.000Z',
+    })),
+};
+
+const CAMERA_REACTIONS = {
+    totals: { cameras: 750, rated: 318, likes: 4_812, dislikes: 671 },
+    cameras: ADMIN_CAMERAS.slice(0, 60).map((c, i) => ({
+        id: c.id,
+        name: c.name,
+        areaName: c.area_name,
+        enabled: i % 5 !== 0,
+        likes: 200 - i,
+        dislikes: i % 17,
+        total: 200 - i + (i % 17),
+        lastVoteAt: '2026-08-22T07:41:03.000Z',
+    })),
+};
+
+const NOTIF_RUNS = Array.from({ length: 20 }, (_, i) => ({
+    id: i + 1,
+    cameraName: cameraName(i + 1),
+    eventType: i % 2 ? 'offline' : 'online',
+    success: i % 4 !== 3,
+    sentCount: i % 3,
+    targetCount: 2,
+    skippedReason: i % 4 === 3 ? 'camera_area_tidak_termasuk_dalam_lingkup_peringatan_telegram' : null,
+    createdAt: '2026-08-22 07:41:03',
+}));
+
+const SPONSOR_PACKAGES = Array.from({ length: 4 }, (_, i) => ({
+    id: i + 1,
+    key: `paket_sponsor_wilayah_kabupaten_bojonegoro_${i + 1}`,
+    name: `Paket Sponsor Utama Wilayah Kabupaten Bojonegoro ${i + 1}`,
+    color: ['#2563eb', '#16a34a', '#f59e0b', '#dc2626'][i],
+    default_price: 500_000 * (i + 1),
+    default_camera_limit: 5 * (i + 1),
+    features: ['Logo di bawah video live', 'Nama di daftar kamera', 'Tautan ke toko'],
+    sort_order: i,
+    sponsor_count: 3 + i,
+}));
+
+const SPONSORS = Array.from({ length: 12 }, (_, i) => ({
+    id: i + 1,
+    name: `CV SUMBER REJEKI ELEKTRONIK DAN PERKAKAS TEKNIK MANDIRI SEJAHTERA ${i + 1}`,
+    package: `paket_sponsor_wilayah_kabupaten_bojonegoro_${(i % 4) + 1}`,
+    package_name: SPONSOR_PACKAGES[i % 4].name,
+    package_color: SPONSOR_PACKAGES[i % 4].color,
+    contact_name: LONG_PERSON,
+    contact_email: LONG_EMAIL,
+    contact_phone: '628123456789',
+    url: LONG_URL,
+    logo: `${LONG_URL}#logo-${i + 1}.png`,
+    price: 500_000 * ((i % 4) + 1),
+    camera_limit: 5 * ((i % 4) + 1),
+    camera_count: i % 6,
+    start_date: '2026-01-01',
+    end_date: '2026-12-31',
+    active: i % 5 !== 0,
+    notes: 'Catatan kesepakatan yang panjang supaya barisnya terisi seperti data sungguhan.',
+}));
+
+const SPONSOR_STATS = { total_sponsors: 12, active_sponsors: 9, monthly_revenue: 7_500_000, expiring_soon: 2 };
+
+const PROMO_BANNERS = Array.from({ length: 8 }, (_, i) => ({
+    id: i + 1,
+    title: `PROMO PEMASANGAN CCTV RUMAH DAN TOKO GRATIS SURVEI WILAYAH ${i + 1}`,
+    image_base: `/api/promo-media/promo-pemasangan-cctv-wilayah-kabupaten-${i + 1}`,
+    target_mode: ['all', 'area', 'camera'][i % 3],
+    camera_ids: i % 3 === 2 ? [1, 2, 3, 4, 5] : [],
+    area_ids: i % 3 === 1 ? [1, 2] : [],
+    placements: ['popup', 'landing', 'playback'],
+    start_date: '2026-08-01',
+    end_date: '2026-09-30',
+    schedule_state: ['live', 'scheduled', 'ended'][i % 3],
+    is_live: i % 3 === 0,
+    total_impressions: 128_400 + i * 37,
+    total_clicks: 2_140 + i * 3,
+}));
+
+const RECORDING_OVERVIEW = {
+    cameras: ADMIN_CAMERAS.slice(0, 30).map((c, i) => ({
+        id: c.id,
+        camera_id: c.id,
+        name: c.name,
+        camera_name: c.name,
+        location: c.location,
+        enabled: 1,
+        enable_recording: i % 4 !== 3 ? 1 : 0,
+        recording_duration_hours: [4, 8, 24, 72][i % 4],
+        stream_source: 'internal',
+        runtime_status: ['recording', 'idle', 'error'][i % 3],
+        segment_count: 1_432 - i,
+        total_size: 42_949_672_960 - i * 1000,
+        oldest_segment: '2026-08-15T00:00:00.000Z',
+        newest_segment: '2026-08-22T07:40:00.000Z',
+        storage: { total_size: 42_949_672_960 - i * 1000, oldest_segment: '2026-08-15T00:00:00.000Z', newest_segment: '2026-08-22T07:40:00.000Z' },
+    })),
+};
+
+const RECORDING_HEALTH = {
+    generatedAt: '2026-08-22T07:41:03.000Z',
+    status: { level: 'warn', reasons: ['antrian_recovery_menumpuk_lebih_dari_lima_puluh_berkas', 'dua_kamera_gagal_restart_berturut_turut'] },
+    scheduler: { running: true, tasks: [{ name: 'recording_segment_rotator_setiap_sepuluh_menit', healthy: true, lastRun: '2026-08-22T07:40:00.000Z' }] },
+    recovery: { queue: { queued: 51, oldestAgeSeconds: 4820 }, diagnostics: { active: 12, terminal: 3 } },
+    restarts: { last24h: { total: 18, succeeded: 16, failed: 2 } },
+};
+
+const RECORDING_CAPACITY = {
+    cameras: 30,
+    rate: { source: 'measured', bytesPerCameraHour: 1_395_864_371, sampleCameras: 11, sampleHours: 168 },
+    disk: { usedByRecordingsBytes: 96_636_764_160, freeBytes: 118_111_600_640, reservedBytes: 21_474_836_480, safeBytes: 96_636_764_160 },
+    retention: { currentHours: 72 },
+    projections: [4, 8, 24, 72, 168].map((hours) => ({ hours, bytes: 1_395_864_371 * 30 * hours, fits: hours <= 24, isCurrent: hours === 72 })),
+};
+
+const RECORDING_RESTARTS = Array.from({ length: 20 }, (_, i) => ({
+    id: i + 1,
+    camera_name: cameraName(i + 1),
+    reason: 'segmen_nol_byte_terdeteksi_tiga_kali_berturut_turut_pada_pipa_ffmpeg',
+    restart_time: '2026-08-22 07:20:00',
+    recovery_time: '2026-08-22 07:20:35',
+    success: i % 5 !== 4,
+}));
+
+const RECORDING_ASSURANCE = {
+    summary: { cameras: 30, recording: 26, total: 30 },
+    cameras: ADMIN_CAMERAS.slice(0, 30).map((c, i) => ({
+        id: c.id,
+        name: c.name,
+        health: ['ok', 'warn', 'fault'][i % 3],
+        reasons: i % 3 ? ['jeda_rekaman_melebihi_ambang_batas_yang_diizinkan'] : [],
+        recent_gap: { gap_count: i % 3, max_gap_seconds: 180 * (i % 3) },
+        seconds_since_latest_end: 45 + i,
+    })),
+};
+
+const BILLING_CUSTOMERS = Array.from({ length: 18 }, (_, i) => ({
+    id: i + 1,
+    username: i === 0 ? LONG_USERNAME : `pelanggan_wilayah_${String(i + 1).padStart(2, '0')}`,
+    email: LONG_EMAIL,
+    phone: '628123456789',
+    balance: 250_000 - i * 1000,
+    account_status: ['active', 'suspended'][i % 2],
+    camera_count: i % 5,
+    plan_key: `paket_sewa_cctv_bulanan_wilayah_kabupaten_${(i % 3) + 1}`,
+    plan_is_trial: i % 7 === 0,
+    plan_max_cameras: 5,
+    trial_ends_at: '2026-09-01',
+    suspended_subscriptions: i % 3,
+}));
+
+const BILLING_SUBSCRIPTIONS = Array.from({ length: 18 }, (_, i) => ({
+    id: i + 1,
+    customer_username: BILLING_CUSTOMERS[i % BILLING_CUSTOMERS.length].username,
+    camera_name: cameraName(i + 1),
+    area_name: AREA_NAMES[i % AREA_NAMES.length],
+    camera_is_online: i % 3 !== 0,
+    camera_is_public: 0,
+    monthly_price: 150_000,
+    status: ['active', 'suspended'][i % 2],
+    wallet_balance: 250_000 - i * 1000,
+}));
+
+const BILLING_PAYMENTS = Array.from({ length: 25 }, (_, i) => ({
+    id: i + 1,
+    user_id: (i % 18) + 1,
+    username: BILLING_CUSTOMERS[i % BILLING_CUSTOMERS.length].username,
+    amount: 150_000,
+    gateway: 'tripay_qris_bank_transfer_virtual_account',
+    status: ['paid', 'pending', 'failed'][i % 3],
+    failure_reason: i % 3 === 2 ? 'kadaluarsa_sebelum_pembayaran_diselesaikan_oleh_pelanggan' : null,
+    created_at: '2026-08-22 07:41:03',
+}));
+
+const BILLING_PLANS = Array.from({ length: 4 }, (_, i) => ({
+    id: i + 1,
+    key: `paket_sewa_cctv_bulanan_wilayah_kabupaten_${i + 1}`,
+    name: `Paket Sewa CCTV Bulanan Wilayah Kabupaten Bojonegoro ${i + 1}`,
+    monthly_price: 150_000 * (i + 1),
+    max_cameras: 5 * (i + 1),
+    is_trial: i === 0,
+    trial_days: i === 0 ? 7 : 0,
+    active: 1,
+}));
+
+const BILLING_REGISTRATIONS = Array.from({ length: 8 }, (_, i) => ({
+    id: i + 1,
+    username: `calon_pelanggan_wilayah_${String(i + 1).padStart(2, '0')}`,
+    email: LONG_EMAIL,
+    phone: '628123456789',
+    plan_name: BILLING_PLANS[i % 4].name,
+    plan_is_trial: i % 4 === 0,
+    plan_trial_days: 7,
+    created_at: '2026-08-22 07:41:03',
+}));
+
+const BILLING_CAMERA_IPS = {
+    summary: { total: 42, public_count: 31, private_count: 9, unresolved_count: 2 },
+    public_ips: Array.from({ length: 31 }, (_, i) => `114.79.${i}.${(i * 7) % 250}`),
+    endpoints: Array.from({ length: 42 }, (_, i) => ({
+        camera_id: i + 1,
+        camera_name: cameraName(i + 1),
+        customer_username: BILLING_CUSTOMERS[i % BILLING_CUSTOMERS.length].username,
+        host: i % 5 === 0 ? LONG_IPV6 : `114.79.${i}.${(i * 7) % 250}`,
+        port: 554,
+        kind: ['public', 'private', 'invalid'][i % 3],
+    })),
+};
+
+const VOUCHER_PROFILES = Array.from({ length: 6 }, (_, i) => ({
+    id: i + 1,
+    name: `Profil Voucher Harian Wilayah Kecamatan Bojonegoro Selatan ${i + 1}`,
+    description: 'Berlaku untuk semua kamera di area berbayar yang dipilih, sekali pakai per kode.',
+    duration_minutes: 60 * (i + 1),
+    code_validity_days: 30,
+    max_uses_per_code: 1,
+    price: 5_000 * (i + 1),
+    online_purchasable: i % 2 === 0,
+    area_ids: [1, 2, 3],
+    active: i % 3 !== 2,
+}));
+
+const VOUCHER_CODES = Array.from({ length: 40 }, (_, i) => ({
+    id: i + 1,
+    code: `RAFCCTV-${String(i + 1).padStart(4, '0')}-XKQP-9F2D`,
+    profile_id: (i % 6) + 1,
+    buyer_name: `Pembeli Dengan Nama Yang Panjang Sekali Nomor ${i + 1}`,
+    buyer_phone: '628123456789',
+    status: ['unused', 'redeemed', 'revoked'][i % 3],
+    redeemed_count: i % 2,
+    expires_at: '2026-12-31 23:59:59',
+}));
+
+const VOUCHER_SETTINGS = { enabled: true, gated_area_ids: [1, 2, 3] };
+
+const RONDA_CAMERAS = {
+    available: true,
+    kesiapan: { kurang: [], perlu_disetel: ['camera1169 belum punya grup Telegram tujuan'] },
+    cameras: Array.from({ length: 6 }, (_, i) => ({
+        name: `camera${1169 + i}`,
+        status: { online: i % 3 !== 0, sourceOk: i % 4 !== 3, reconnects: i % 5, eventsToday: 12 + i },
+        config: {
+            label: cameraName(i + 1),
+            area: AREA_NAMES[i % AREA_NAMES.length],
+            enabled: i % 4 !== 3,
+            alert_hours: '22:00-04:00',
+            tg_cooldown: 12, tg_cooldown_off: 300,
+            chat_id: '-1002345678901',
+            confirm_classes: 'person,car,motorcycle',
+            min_area: 700, confirm_conf: 0.15, proc_w: 960, target_fps: 5,
+            crop_limit: '0,0,1,1', retention_days: 7, max_snaps: 50,
+            ignore: [[[0.1, 0.1], [0.3, 0.1], [0.3, 0.3], [0.1, 0.3]]],
+            roi: [[[0.4, 0.4], [0.9, 0.4], [0.9, 0.9], [0.4, 0.9]]],
+        },
+    })),
+};
+
+const RONDA_AVAILABLE = ADMIN_CAMERAS.slice(0, 40).map((c) => ({ id: c.id, name: c.name, area: c.area_name }));
+
+const VEHICLE_CAMERAS = Array.from({ length: 6 }, (_, i) => ({
+    camera_id: i + 1,
+    nama_kamera: cameraName(i + 1),
+    aktif: i % 4 !== 3,
+    berjalan: i % 3 === 0,
+    garis: [{ nama: `Garis hitung arah utara menuju selatan ${i + 1}`, a: [0.1, 0.5], b: [0.9, 0.5] }],
+}));
+
+const VEHICLE_AVAILABLE = ADMIN_CAMERAS.slice(0, 40).map((c, i) => ({ id: c.id, name: c.name, sudah_diatur: i < 6 }));
+
+const VEHICLE_DRAFT = {
+    camera_id: 1,
+    nama_kamera: cameraName(1),
+    aktif: true,
+    label: cameraName(1),
+    model: 'yolov8n_kendaraan_kabupaten_bojonegoro.pt',
+    imgsz: 640, conf: 0.35, conf_gambar: 0.5, fps: 5, min_gerak: 12, min_umur: 3,
+    /* A 2-component direction VECTOR, not a label: the page calls .toFixed() on both components,
+     * so a string here renders the ErrorBoundary instead of the settings form. */
+    arah_arus: [1, 0],
+    nama_arah: { plus: 'Menuju Kota Bojonegoro Selatan Lewat Simpang', minus: 'Menuju Kecamatan Dander Lewat Jembatan' },
+    /* `{a, b}` endpoints, not `{pt: [...]}`: the line editor indexes garis[0].a[0] directly and a
+     * differently-shaped point list takes the whole page down with the ErrorBoundary. */
+    garis: [
+        { nama: 'Garis hitung arah utara menuju selatan lewat simpang', a: [0.1, 0.5], b: [0.9, 0.52] },
+        { nama: 'Garis hitung arah barat menuju timur lewat jembatan', a: [0.15, 0.7], b: [0.85, 0.72] },
+    ],
+};
+
+const VEHICLE_SUMMARY = {
+    total: 18_432,
+    total_10_menit: 412,
+    total_jenis: { mobil: 9_120, motor: 8_001, truk: 1_311, bus: 421, sepeda: 679 },
+    arah: {
+        'Menuju Kota Bojonegoro Selatan Lewat Simpang': 9_800,
+        'Menuju Kecamatan Dander Lewat Jembatan': 8_632,
+    },
+    diperbarui: '2026-08-22T07:41:03.000Z',
+    mulai: '2026-08-22T00:00:00.000Z',
+    fps: 4.8, frame_diproses: 1_284_000, frame_dijatuhkan_sumber: 812,
+    jumlah_garis: 1, model: 'yolov8n_kendaraan_kabupaten_bojonegoro.pt',
+    sambung_ulang: 2, setelan_dimuat_ulang: 4, umur_frame_terakhir_detik: 0.4,
+};
+
+const TG_ARCHIVE_OVERVIEW = {
+    available: true,
+    groups: Array.from({ length: 4 }, (_, i) => ({
+        chatId: `-100234567890${i}`,
+        title: `Arsip CCTV Kecamatan Bojonegoro Selatan Wilayah ${i + 1}`,
+        canPost: true,
+    })),
+    areas: ADMIN_AREAS.slice(0, 6).map((a) => ({ id: a.id, name: a.name })),
+    routes: Array.from({ length: 8 }, (_, i) => ({
+        id: i + 1,
+        label: `Rute arsip ${cameraName(i + 1)}`,
+        scope: ['camera', 'area', 'all'][i % 3],
+        cameraId: i + 1,
+        areaId: (i % 6) + 1,
+        chatId: `-100234567890${i % 4}`,
+        enabled: i % 4 !== 3,
+    })),
+    cameras: ADMIN_CAMERAS.slice(0, 30).map((c, i) => ({
+        id: c.id,
+        name: c.name,
+        areaName: c.area_name,
+        targets: i % 5 === 4 ? [] : [{
+            chatId: `-100234567890${i % 4}`,
+            label: `Arsip CCTV Kecamatan Bojonegoro Selatan Wilayah ${(i % 4) + 1}`,
+            mode: i % 2 ? 'copy' : 'move',
+            detail: 'rute per-kamera',
+            missing: false,
+        }],
+    })),
+};
+
+const TG_ARCHIVE_ACTIVITY = {
+    available: true,
+    totals: [
+        { status: 'uploaded', files: 128_400, bytes: 42_949_672_960 },
+        { status: 'pending', files: 51, bytes: 1_073_741_824 },
+        { status: 'failed', files: 7, bytes: 134_217_728 },
+        { status: 'skipped', files: 312, bytes: 0 },
+    ],
+    recent: Array.from({ length: 20 }, (_, i) => ({
+        segmentId: i + 1,
+        cameraId: 1169 + i,
+        filename: LONG_FILENAME.replace('0001', String(i + 1).padStart(4, '0')),
+        fileSize: 104_857_600 + i,
+        status: ['uploaded', 'pending', 'failed'][i % 3],
+    })),
+};
+
+const TG_LIBRARY_SUMMARY = {
+    total: 128_400,
+    playable: 127_988,
+    bytes: 42_949_672_960,
+    cameras: ADMIN_CAMERAS.slice(0, 30).map((c) => ({ id: c.id, name: c.name, segments: 4_280 })),
+};
+
+/* This one route answers `{ data: [...], meta: { total } }` — rows at the top level, count beside
+ * them — so it needs the __body escape hatch. Timestamps are `recordedAt`/`recordedUntil`: the
+ * timeline drops any row it cannot parse a start time from, and a fixture using startedAt/endedAt
+ * renders "Belum ada segmen" while looking perfectly plausible in the source. */
+const TG_LIBRARY = {
+    __body: {
+        success: true,
+        meta: { total: 128_400 },
+        data: Array.from({ length: 25 }, (_, i) => {
+            const start = new Date(Date.UTC(2026, 7, 22, 0, 10 * i, 0));
+            const end = new Date(start.getTime() + 600_000);
+            return {
+                segmentId: i + 1,
+                cameraId: 1169 + i,
+                cameraName: cameraName(i + 1),
+                areaName: AREA_NAMES[i % AREA_NAMES.length],
+                filename: LONG_FILENAME.replace('0001', String(i + 1).padStart(4, '0')),
+                fileSize: 104_857_600 + i,
+                playable: i % 9 !== 8,
+                recordedAt: start.toISOString(),
+                recordedUntil: end.toISOString(),
+                durationSeconds: 600,
+            };
+        }),
+    },
+};
+
+/* Flat key/value settings, exactly as /api/settings returns them. The ad scripts are the realistic
+ * worst case here: a single <textarea> value with no whitespace for hundreds of characters. */
+const ADS_SETTINGS = {
+    ads_enabled: '1', ads_provider: 'adsterra',
+    ads_desktop_enabled: '1', ads_mobile_enabled: '1',
+    ads_popup_slots_enabled: '1', ads_popup_preferred_slot: 'bottom',
+    ads_hide_social_bar_on_popup: '1', ads_hide_floating_widgets_on_popup: '1',
+    ads_popup_desktop_max_height: '250', ads_popup_mobile_max_height: '120',
+    ads_playback_native_enabled: '1', ads_playback_native_desktop_enabled: '1', ads_playback_native_mobile_enabled: '1',
+    ads_playback_native_script: '<script async="async" data-cfasync="false" src="//pl12345678.effectivegatecpm.example/9f2d1c4b7a6e5d3f0a1b2c3d4e5f6a7b/invoke.js"></script><div id="container-9f2d1c4b7a6e5d3f0a1b2c3d4e5f6a7b"></div>',
+    ads_playback_popunder_enabled: '0', ads_playback_popunder_desktop_enabled: '0', ads_playback_popunder_mobile_enabled: '0',
+    ads_playback_popunder_script: '<script type="text/javascript" src="//pl87654321.effectivegatecpm.example/1a/2b/3c/1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d.js"></script>',
+    ads_social_bar_enabled: '1',
+    ads_social_bar_script: '<script type="text/javascript" src="//pl11223344.effectivegatecpm.example/aa/bb/cc/aabbccddeeff00112233445566778899.js"></script>',
+    ads_footer_banner_enabled: '1',
+    ads_footer_banner_script: '<script type="text/javascript">atOptions={"key":"aabbccddeeff00112233445566778899","format":"iframe","height":50,"width":320,"params":{}};</script>',
+    ads_after_cameras_native_enabled: '1',
+    ads_after_cameras_native_script: '<script async="async" data-cfasync="false" src="//pl99887766.effectivegatecpm.example/aabbccddeeff00112233445566778899/invoke.js"></script>',
+};
+
+const MAP_CENTER = { latitude: -7.1500, longitude: 111.8817, zoom: 13 };
+
+/* The admin playback page's segment list. Without this the page renders "Belum ada rekaman" and
+ * the whole right-hand column — the densest part of the layout — is never measured. */
+const PLAYBACK_SEGMENTS = {
+    playback_policy: { scope: 'admin_full', can_share: true, window_hours: null },
+    coverage: {
+        from: '2026-08-15T00:00:00.000Z',
+        to: '2026-08-22T08:00:00.000Z',
+        runs: [{ from: '2026-08-22T00:00:00.000Z', to: '2026-08-22T08:00:00.000Z' }],
+    },
+    segments: Array.from({ length: 25 }, (_, i) => {
+        const start = new Date(Date.UTC(2026, 7, 22, 0, 10 * i, 0));
+        return {
+            id: i + 1,
+            filename: LONG_FILENAME.replace('0001', String(i + 1).padStart(4, '0')),
+            start_time: start.toISOString(),
+            end_time: new Date(start.getTime() + 600_000).toISOString(),
+            duration: 600,
+            file_size: 104_857_600 + i,
+            source: 'local',
+        };
+    }),
+};
+
+/* AreaCard reads far more than the affiliate fixture's areas carry, and every one of those extra
+ * fields is a chip or a number rendered in the card's header row. */
+const AREAS_OVERVIEW = Array.from({ length: 40 }, (_, i) => ({
+    id: i + 1,
+    name: AREA_NAMES[i % AREA_NAMES.length],
+    slug: `area-${i + 1}`,
+    kecamatan: 'KECAMATAN BOJONEGORO SELATAN DAN SEKITARNYA',
+    kelurahan: 'KELURAHAN SUMBEREJO WETAN NOMOR SATU',
+    rt: String((i % 12) + 1).padStart(2, '0'),
+    rw: String((i % 6) + 1).padStart(2, '0'),
+    latitude: -7.15 + i * 0.001,
+    longitude: 111.88 + i * 0.001,
+    camera_count: 12 + i,
+    online: 8 + (i % 5),
+    offline: 2 + (i % 3),
+    degraded: i % 2,
+    maintenance: i % 4 === 0 ? 1 : 0,
+    passive: i % 3,
+    internal: 9 + (i % 4),
+    external: 3 + (i % 2),
+    dominant: 'internal',
+    coverage_scope: 'kecamatan',
+    total_views: 5000 + i,
+    description: 'Deskripsi area yang panjang supaya kartunya terisi seperti di produksi.',
+    show_on_grid_default: 1,
+    grid_default_camera_limit: 12,
+    internal_ingest_policy_default: 'on_demand',
+    internal_on_demand_close_after_seconds: 60,
+    external_health_mode_override: null,
+    viewport_zoom_override: null,
+}));
+
+/* Ordered: first regex that matches the pathname wins, so put the specific ones first.
+ *
+ * A fixture value is normally the `data` payload. Wrap it as `{ __body: {...} }` when the page
+ * reads a key that sits BESIDE data rather than inside it — /api/feedback and /api/admin/security/logs
+ * both put `pagination` at the top level of the response, and a fixture that nests it under `data`
+ * leaves the pager reading `undefined`. */
 const API_FIXTURES = [
     [/^\/api\/admin\/affiliate\/partners$/, AFFILIATE_PARTNERS],
     [/^\/api\/admin\/affiliate\/offers$/, AFFILIATE_OFFERS],
     [/^\/api\/settings\/landing-page$/, LANDING_SETTINGS],
+    [/^\/api\/settings\/map-center$/, MAP_CENTER],
     [/^\/api\/cameras$/, ADMIN_CAMERAS],
     [/^\/api\/areas$/, ADMIN_AREAS],
-    [/^\/api\/areas\/overview$/, ADMIN_AREAS],
+    [/^\/api\/areas\/overview$/, AREAS_OVERVIEW],
     [/^\/api\/cameras\/active$/, ADMIN_CAMERAS.slice(0, 24)],
+
+    [/^\/api\/admin\/stats\/today/, TODAY_STATS],
+    [/^\/api\/admin\/stats$/, DASHBOARD_STATS],
+    [/^\/api\/admin\/debug\/camera-health$/, HEALTH_DEBUG],
+    [/^\/api\/admin\/security\/logs$/, { __body: { success: true, data: SECURITY_LOGS, pagination: { page: 1, limit: 50, total: 4321, totalPages: 87 } } }],
+    [/^\/api\/admin\/security\/stats$/, {
+        total_events: 4321,
+        events_by_type: [
+            { event_type: 'login_failed', count: 812 },
+            { event_type: 'rate_limit_exceeded', count: 1904 },
+            { event_type: 'csrf_validation_failed', count: 233 },
+            { event_type: 'access_denied', count: 671 },
+            { event_type: 'admin_action', count: 701 },
+        ],
+    }],
+    [/^\/api\/users$/, ADMIN_USERS],
+    [/^\/api\/feedback\/stats$/, { total: 143, unread: 12, read: 88, resolved: 43 }],
+    [/^\/api\/feedback$/, { __body: { success: true, data: FEEDBACK_ITEMS, pagination: { page: 1, limit: 20, total: 143, totalPages: 8 } } }],
+
+    [/^\/api\/admin\/analytics\/viewers\/history$/, HISTORY_PAGE],
+    [/^\/api\/admin\/analytics\/viewers$/, VIEWER_ANALYTICS],
+    [/^\/api\/admin\/analytics\/realtime$/, { activeSessions: ANALYTIC_SESSIONS.slice(0, 8), activeViewers: 97 }],
+    [/^\/api\/playback-viewer\/history$/, HISTORY_PAGE],
+    [/^\/api\/playback-viewer\/analytics$/, VIEWER_ANALYTICS],
+    [/^\/api\/playback-viewer\/active$/, { activeSessions: ANALYTIC_SESSIONS.slice(0, 8), activeViewers: 12 }],
+
+    [/^\/api\/admin\/playback-tokens\/audit$/, PLAYBACK_TOKEN_AUDIT],
+    [/^\/api\/admin\/playback-tokens$/, PLAYBACK_TOKENS],
+    [/^\/api\/admin\/playback-products$/, PLAYBACK_PRODUCTS],
+    [/^\/api\/admin\/cameras\/reports$/, CAMERA_REPORTS],
+    [/^\/api\/admin\/cameras\/reactions$/, CAMERA_REACTIONS],
+    [/^\/api\/admin\/notification-diagnostics\/runs$/, NOTIF_RUNS],
+
+    [/^\/api\/sponsor-packages$/, SPONSOR_PACKAGES],
+    [/^\/api\/sponsors\/stats$/, SPONSOR_STATS],
+    [/^\/api\/sponsors$/, SPONSORS],
+    [/^\/api\/promo-banners$/, PROMO_BANNERS],
+
+    [/^\/api\/recordings\/\d+\/segments$/, PLAYBACK_SEGMENTS],
+    [/^\/api\/recordings\/overview$/, RECORDING_OVERVIEW],
+    [/^\/api\/recordings\/restarts$/, RECORDING_RESTARTS],
+    [/^\/api\/recordings\/assurance$/, RECORDING_ASSURANCE],
+    [/^\/api\/admin\/recording-health$/, RECORDING_HEALTH],
+    [/^\/api\/admin\/recording-capacity$/, RECORDING_CAPACITY],
+
+    [/^\/api\/admin\/billing\/camera-ips$/, BILLING_CAMERA_IPS],
+    [/^\/api\/admin\/billing\/customers$/, BILLING_CUSTOMERS],
+    [/^\/api\/admin\/billing\/subscriptions$/, BILLING_SUBSCRIPTIONS],
+    [/^\/api\/admin\/billing\/payments$/, BILLING_PAYMENTS],
+    [/^\/api\/admin\/billing\/plans$/, BILLING_PLANS],
+    [/^\/api\/admin\/billing\/registrations$/, BILLING_REGISTRATIONS],
+    [/^\/api\/admin\/billing\/registration-settings$/, { open: true, require_approval: true, default_plan_key: BILLING_PLANS[0].key }],
+    [/^\/api\/admin\/billing\/promos$/, []],
+
+    [/^\/api\/admin\/voucher\/settings$/, VOUCHER_SETTINGS],
+    [/^\/api\/admin\/voucher\/profiles$/, VOUCHER_PROFILES],
+    [/^\/api\/admin\/voucher\/codes$/, VOUCHER_CODES],
+
+    [/^\/api\/admin\/ronda\/available$/, RONDA_AVAILABLE],
+    [/^\/api\/admin\/ronda\/cameras$/, RONDA_CAMERAS],
+    [/^\/api\/admin\/vehicle-count\/available$/, VEHICLE_AVAILABLE],
+    [/^\/api\/admin\/vehicle-count\/cameras\/\d+\/ringkasan$/, VEHICLE_SUMMARY],
+    [/^\/api\/admin\/vehicle-count\/cameras\/\d+$/, VEHICLE_DRAFT],
+    [/^\/api\/admin\/vehicle-count\/cameras$/, VEHICLE_CAMERAS],
+
+    [/^\/api\/admin\/telegram-archive\/overview$/, TG_ARCHIVE_OVERVIEW],
+    [/^\/api\/admin\/telegram-archive\/activity$/, TG_ARCHIVE_ACTIVITY],
+    [/^\/api\/admin\/telegram-archive\/library\/summary$/, TG_LIBRARY_SUMMARY],
+    [/^\/api\/admin\/telegram-archive\/library$/, TG_LIBRARY],
+
+    [/^\/api\/settings$/, ADS_SETTINGS],
 ];
 
 /*
@@ -225,10 +1045,12 @@ test.beforeEach(async ({ page, context }) => {
         if (!local) return route.abort();
         if (url.pathname.startsWith('/api/')) {
             const fixture = API_FIXTURES.find(([pattern]) => pattern.test(url.pathname));
+            const value = fixture ? fixture[1] : [];
+            const body = value && value.__body ? value.__body : { success: true, data: value };
             return route.fulfill({
                 status: 200,
                 contentType: 'application/json',
-                body: JSON.stringify({ success: true, data: fixture ? fixture[1] : [] }),
+                body: JSON.stringify(body),
             });
         }
         return route.continue();
@@ -327,11 +1149,109 @@ const measureAdminShell = () => {
     };
 };
 
+/*
+ * THE TWO NON-OVERFLOW DEFECTS THIS AUDIT ALSO RECORDS
+ * ----------------------------------------------------
+ * Both are the same family of bug as the overflow ones — content that is present in the DOM but
+ * unreachable on a phone — and neither is visible to a code review:
+ *
+ *   (a) TAP TARGETS. A control smaller than 44px in either axis is hard to hit on a touch screen
+ *       (WCAG 2.5.5 AAA; 2.5.8 AA sets the floor at 24px). `min(width, height)` is the honest
+ *       measure: a 200x30 button fails on height even though it looks generous.
+ *   (b) TRUNCATION WITH NO RECOVERY. `truncate` renders an ellipsis and silently discards the rest
+ *       of the string. That is fine when the full value is recoverable — a `title` (or aria-label)
+ *       gives it back on hover/long-press — and a data-loss bug when it is not. On admin pages the
+ *       truncated thing is usually the camera name or the filename, i.e. the identifying field.
+ *
+ * These are REPORTED, not asserted: they are pre-existing and pervasive, and turning them into
+ * failures now would bury the overflow signal this file exists to protect. The numbers land in the
+ * run output as `AUDIT {...}` lines, one per page/viewport/font combination.
+ */
+const auditPageControls = () => {
+    const main = document.querySelector('main');
+    if (!main) return { smallTargets: [], truncatedNoTitle: [] };
+
+    const describe = (el) => {
+        const cls = (el.getAttribute('class') || '').slice(0, 60);
+        const text = (el.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 40);
+        const name = el.getAttribute('aria-label') || text || el.getAttribute('placeholder') || '';
+        return `<${el.tagName.toLowerCase()}${el.type ? ` type=${el.type}` : ''} class="${cls}">${name ? ` — "${name}"` : ''}`;
+    };
+
+    const visible = (el, rect) => {
+        if (!rect.width || !rect.height) return false;
+        const cs = getComputedStyle(el);
+        return cs.visibility !== 'hidden' && cs.display !== 'none' && cs.opacity !== '0';
+    };
+
+    const smallTargets = [];
+    const CONTROLS = 'button, a[href], input, select, textarea, summary, [role="button"], [role="tab"], [role="switch"], [role="checkbox"], [tabindex]:not([tabindex="-1"])';
+    for (const el of main.querySelectorAll(CONTROLS)) {
+        const rect = el.getBoundingClientRect();
+        if (!visible(el, rect)) continue;
+        // A hidden checkbox behind a styled label is the normal toggle pattern, not a small target.
+        if (el.tagName === 'INPUT' && (el.type === 'checkbox' || el.type === 'radio') && getComputedStyle(el).appearance === 'none' && rect.width < 4) continue;
+        const min = Math.min(rect.width, rect.height);
+        if (min < 44) smallTargets.push({ px: Math.round(min * 10) / 10, w: Math.round(rect.width), h: Math.round(rect.height), what: describe(el) });
+    }
+
+    const truncatedNoTitle = [];
+    for (const el of main.querySelectorAll('*')) {
+        const rect = el.getBoundingClientRect();
+        if (!visible(el, rect)) continue;
+        const cs = getComputedStyle(el);
+        const clipsInline = cs.textOverflow === 'ellipsis' && (cs.overflowX === 'hidden' || cs.overflowX === 'clip');
+        const clipsBlock = cs.webkitLineClamp && cs.webkitLineClamp !== 'none';
+        if (!clipsInline && !clipsBlock) continue;
+        const cut = clipsInline ? el.scrollWidth > el.clientWidth + 1 : el.scrollHeight > el.clientHeight + 1;
+        if (!cut) continue;
+        if (el.title || el.getAttribute('aria-label')) continue;
+        // A control's own accessible name comes from elsewhere; only flag content text.
+        if (el.closest('[title]')) continue;
+        truncatedNoTitle.push({
+            lost: Math.max(el.scrollWidth - el.clientWidth, el.scrollHeight - el.clientHeight),
+            text: (el.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 70),
+            what: `<${el.tagName.toLowerCase()} class="${(el.getAttribute('class') || '').slice(0, 60)}">`,
+        });
+    }
+
+    smallTargets.sort((a, b) => a.px - b.px);
+    truncatedNoTitle.sort((a, b) => b.lost - a.lost);
+    return { smallTargets, truncatedNoTitle };
+};
+
 async function assertNoAdminOverflow(page, label) {
     const m = await page.evaluate(measureAdminShell);
     expect(m.found, `${label}: no <main> — this page did not render inside AdminLayout, so nothing was measured`).toBe(true);
 
-    expect(
+    const audit = await page.evaluate(auditPageControls);
+    // One machine-readable line per measurement: this is the audit's actual output.
+    console.log(`AUDIT ${JSON.stringify({
+        label,
+        vw: m.vw,
+        mainScrollW: m.mainScrollW,
+        mainClientW: m.mainClientW,
+        overflowPx: Math.max(0, m.mainScrollW - m.mainClientW),
+        worstRight: m.worstRight,
+        limit: m.limit,
+        worstWhat: m.worstWhat,
+        fixed: m.fixed,
+        fixedWhat: m.fixed > m.vw + 1 ? m.fixedWhat : null,
+        rootScrollW: m.rootScrollW,
+        smallTargets: audit.smallTargets.length,
+        smallTargetSamples: audit.smallTargets.slice(0, 6),
+        truncatedNoTitle: audit.truncatedNoTitle.length,
+        truncatedSamples: audit.truncatedNoTitle.slice(0, 6),
+    })}`);
+
+    /*
+     * SOFT, on purpose. A page is measured four times (two widths x two font scales) and the audit
+     * needs all four numbers; a hard expect aborts the test at the first one and hides the rest —
+     * which matters here because every defect the first run found existed ONLY at 1.5x font, i.e.
+     * strictly after a failure at normal font would have stopped the test. Soft expects still fail
+     * the test at the end, so CI keeps the same verdict it had before.
+     */
+    expect.soft(
         m.mainScrollW,
         `${label}: the admin scroll container is ${m.mainScrollW}px wide but only ${m.mainClientW}px fits `
         + `(viewport ${m.vw}px). The page scrolls sideways. documentElement.scrollWidth says `
@@ -341,19 +1261,28 @@ async function assertNoAdminOverflow(page, label) {
         + 'unbreakable token without break-all.',
     ).toBeLessThanOrEqual(m.mainClientW + 1);
 
-    expect(
+    expect.soft(
         m.worstRight,
         `${label}: an element reaches ${m.worstRight}px, past the container's right edge at ${m.limit}px `
         + `(viewport ${m.vw}px) — ${m.worstWhat}`,
     ).toBeLessThanOrEqual(m.limit + 1);
 
-    expect(
+    expect.soft(
         m.fixed,
         `${label}: a position:fixed element reaches ${m.fixed}px on a ${m.vw}px viewport — ${m.fixedWhat}`,
     ).toBeLessThanOrEqual(m.vw + 1);
 
     return m;
 }
+
+/*
+ * Matching by text on these pages needs the `visible=true` filter, always. Every admin page that
+ * targets cameras renders the 750-camera list into a <select>, so a bare `text=<camera name>` hits
+ * an <option> first — and an <option> in a closed select is never visible, so the wait times out on
+ * a page that rendered perfectly. Anti-vacuity is unaffected: it still demands a RENDERED element
+ * carrying fixture text.
+ */
+const shown = (page, selector) => page.locator(`${selector} >> visible=true`).first();
 
 /*
  * `ready` is the anti-vacuity gate, one per page: a selector that only exists once the page has
@@ -390,6 +1319,210 @@ const ADMIN_PAGES = [
         url: '/admin/settings',
         ready: '#landing_area_coverage',
     },
+
+    /* ---- the rest of the admin surface, added in the 2026-08 coverage extension ----
+     *
+     * Every `ready` below is keyed to a value that comes from a FIXTURE, never to a heading or a
+     * button that renders regardless. That is the difference between "the page loaded" and "the
+     * page loaded with rows in it", and only the second one can overflow. Where a page's real
+     * density lives behind a button (a create/edit modal), `open` clicks through to it — the
+     * affiliate case is the precedent: both original defects were invisible until the editor and
+     * its camera picker were on screen. */
+    {
+        name: 'admin dashboard (24 live streams + 30 sessions)',
+        url: '/admin/dashboard',
+        /* The stream panel sorts by viewers and shows the top 8, so camera 0001 need not be among
+         * them — match the shared name prefix instead of a specific row. */
+        ready: 'text=SIMPANG EMPAT JALAN RAYA NAMA KAMERA YANG SENGAJA SANGAT PANJANG SEKALI',
+    },
+    {
+        name: 'admin health-debug (25-row diagnostics table, unbreakable RTSP/HLS targets)',
+        url: '/admin/health-debug',
+        ready: `text=${cameraName(1)}`,
+    },
+    {
+        name: 'admin security (50 log rows, full IPv6 + mobile UA)',
+        url: '/admin/security',
+        ready: `text=${LONG_IPV6}`,
+    },
+    {
+        name: 'admin import-export (workflow form)',
+        url: '/admin/import-export',
+        ready: '#import-profile-select',
+    },
+    {
+        name: 'admin backup-restore (upload + scope form)',
+        url: '/admin/backup-restore',
+        ready: 'text=2. Scope & Matching',
+    },
+    {
+        name: 'admin areas (40 area cards)',
+        url: '/admin/areas',
+        ready: 'text=KELURAHAN SUMBEREJO WETAN NOMOR SATU',
+    },
+    {
+        name: 'admin areas (create form open)',
+        url: '/admin/areas',
+        ready: 'text=KELURAHAN SUMBEREJO WETAN NOMOR SATU',
+        open: async (page) => {
+            await page.getByRole('button', { name: /Tambah Area/ }).first().click();
+            await expect(page.getByRole('dialog').first()).toBeVisible();
+        },
+    },
+    {
+        name: 'admin users (24 rows)',
+        url: '/admin/users',
+        ready: `text=${LONG_USERNAME}`,
+    },
+    {
+        name: 'admin users (create form open)',
+        url: '/admin/users',
+        ready: `text=${LONG_USERNAME}`,
+        open: async (page) => {
+            await page.getByRole('button', { name: /Tambah Pengguna/ }).first().click();
+            await expect(page.getByRole('dialog').first()).toBeVisible();
+        },
+    },
+    {
+        name: 'admin feedback (20 messages + detail panel)',
+        url: '/admin/feedback',
+        ready: 'text=Pengunjung Dengan Nama Yang Panjang Sekali Nomor 1',
+    },
+    {
+        name: 'admin analytics (charts + 25-row session history)',
+        url: '/admin/analytics',
+        /* Keyed to the session table, not the camera name: the name also fills a <select>, and an
+         * <option> is never "visible", so a camera-name ready selector waits forever on a page that
+         * actually rendered fine. */
+        ready: `text=${LONG_IPV6}`,
+    },
+    {
+        name: 'admin playback-analytics (charts + 25-row session history)',
+        url: '/admin/playback-analytics',
+        ready: `text=${LONG_IPV6}`,
+    },
+    {
+        name: 'admin playback-tokens (12 tokens + 50 audit rows + issue form)',
+        url: '/admin/playback-tokens',
+        ready: 'text=Token Keluarga Bapak',
+    },
+    {
+        name: 'admin playback-products (5 package cards, each an inline form)',
+        url: '/admin/playback-products',
+        ready: 'text=Coba Gratis 1 Hari Untuk Pengunjung Baru',
+    },
+    {
+        name: 'admin camera-reports (25 reports + filters)',
+        url: '/admin/camera-reports',
+        ready: 'text=Arah kamera bergeser dari semestinya',
+    },
+    {
+        name: 'admin camera-reactions (60 rated cameras)',
+        url: '/admin/camera-reactions',
+        ready: `text=${cameraName(1)}`,
+    },
+    {
+        name: 'admin notification-diagnostics (750-camera picker + 20 runs)',
+        url: '/admin/notification-diagnostics',
+        ready: 'text=camera_area_tidak_termasuk_dalam_lingkup_peringatan_telegram',
+    },
+    {
+        name: 'admin sponsors (12 sponsors + 4 packages + assignment picker)',
+        url: '/admin/sponsors',
+        ready: 'text=CV SUMBER REJEKI ELEKTRONIK DAN PERKAKAS TEKNIK MANDIRI SEJAHTERA 1',
+    },
+    {
+        name: 'admin sponsors (create form open)',
+        url: '/admin/sponsors',
+        ready: 'text=CV SUMBER REJEKI ELEKTRONIK DAN PERKAKAS TEKNIK MANDIRI SEJAHTERA 1',
+        open: async (page) => {
+            await page.getByRole('button', { name: /Tambah Sponsor/ }).first().click();
+            await expect(page.getByRole('dialog').first()).toBeVisible();
+        },
+    },
+    {
+        name: 'admin promo-banners (8 promos)',
+        url: '/admin/promo-banners',
+        ready: 'text=PROMO PEMASANGAN CCTV RUMAH DAN TOKO GRATIS SURVEI WILAYAH 1',
+    },
+    {
+        name: 'admin promo-banners (create form open, 750-camera picker)',
+        url: '/admin/promo-banners',
+        ready: 'text=PROMO PEMASANGAN CCTV RUMAH DAN TOKO GRATIS SURVEI WILAYAH 1',
+        open: async (page) => {
+            await page.getByRole('button', { name: /Tambah promo/i }).first().click();
+        },
+    },
+    {
+        name: 'admin ads (script textareas, long unbreakable ad tags)',
+        url: '/admin/ads',
+        ready: '#ads_playback_native_script',
+    },
+    {
+        name: 'admin recordings (30 camera cards + capacity + health + restart log)',
+        url: '/admin/recordings',
+        ready: `text=${cameraName(1)}`,
+    },
+    {
+        name: 'admin billing (18 customers — default tab, wallet forms + table)',
+        url: '/admin/billing',
+        ready: `text=${LONG_USERNAME}`,
+    },
+    {
+        name: 'admin billing (18 subscriptions tab)',
+        url: '/admin/billing',
+        ready: `text=${LONG_USERNAME}`,
+        open: async (page) => {
+            await page.getByRole('button', { name: /^Langganan/ }).first().click();
+            await expect(shown(page, `text=${cameraName(1)}`)).toBeVisible();
+        },
+    },
+    {
+        name: 'admin billing (8 pending registrations tab)',
+        url: '/admin/billing',
+        ready: `text=${LONG_USERNAME}`,
+        open: async (page) => {
+            await page.getByRole('button', { name: /^Persetujuan/ }).first().click();
+            await expect(shown(page, 'text=calon_pelanggan_wilayah_01')).toBeVisible();
+        },
+    },
+    {
+        name: 'admin voucher (6 profiles + 40 codes)',
+        url: '/admin/voucher',
+        ready: 'text=RAFCCTV-0001-XKQP-9F2D',
+    },
+    {
+        name: 'admin ronda (6 camera config panels)',
+        url: '/admin/ronda',
+        ready: `text=${cameraName(1)}`,
+    },
+    {
+        name: 'admin hitung-kendaraan (6 cameras + line editor + counters)',
+        url: '/admin/hitung-kendaraan',
+        ready: `text=${cameraName(1)}`,
+    },
+    {
+        name: 'admin telegram-archive (8 routes + 30-camera routing table + activity)',
+        url: '/admin/telegram-archive',
+        ready: 'text=Rute arsip',
+    },
+    {
+        name: 'admin arsip (25 segments in a day timeline)',
+        url: '/admin/arsip',
+        ready: `text=${cameraName(1)}`,
+    },
+    {
+        name: 'admin customer-ips (42 routing endpoints)',
+        url: '/admin/customer-ips',
+        ready: `text=${cameraName(1)}`,
+    },
+    {
+        name: 'admin playback (admin_full scope, 600-camera picker, 25 segments)',
+        url: '/admin/playback',
+        /* Camera 1 is one of the 20% with enable_recording: 0, so the playback picker drops it —
+         * match camera 2, which the picker does carry. */
+        ready: `text=${cameraName(2)}`,
+    },
 ];
 
 /* The public spec's width (Pixel 5, from playwright.config.js) plus 320 — the narrowest phone still
@@ -405,9 +1538,15 @@ for (const spec of ADMIN_PAGES) {
             await page.setViewportSize({ width: vp.width, height: vp.height });
             await page.goto(spec.url, { waitUntil: 'networkidle' });
 
+            /* DUMP_TEXT=1 prints what the page actually rendered. Adding a page here almost always
+             * fails the `ready` gate once first — a fixture key is wrong, or the only match is an
+             * <option> — and this is how you tell those two apart in one run instead of guessing. */
+            if (process.env.DUMP_TEXT) {
+                console.log(`TEXT[${spec.url}] ` + await page.evaluate(() => (document.querySelector('main')?.innerText || '').replace(/\s+/g, ' ').slice(0, 900)));
+            }
             // Anti-vacuity: prove we are on the real page, not the login redirect or a spinner.
             await expect(
-                page.locator(spec.ready).first(),
+                shown(page, spec.ready),
                 `${spec.name}: did not render (auth stub broken, or fixtures rejected) — nothing was measured`,
             ).toBeVisible({ timeout: 15_000 });
 

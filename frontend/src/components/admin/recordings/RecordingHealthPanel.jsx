@@ -135,7 +135,9 @@ export default function RecordingHealthPanel() {
                     {reasons.map((reason) => (
                         <li key={reason} className="flex items-start gap-2 text-xs text-content-muted">
                             <span className="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-gray-400 dark:bg-gray-500" />
-                            {reason}
+                            {/* Reason codes are one unbreakable snake_case token: min-w-0 lets the
+                                flex item shrink, break-words then breaks the token itself. */}
+                            <span className="min-w-0 break-words">{reason}</span>
                         </li>
                     ))}
                 </ul>
@@ -175,11 +177,11 @@ export default function RecordingHealthPanel() {
                     <div className="mt-2 divide-y divide-gray-100 dark:divide-gray-700/60">
                         {scheduler.tasks.map((task) => (
                             <div key={task.name} className="flex flex-wrap items-center justify-between gap-2 py-2">
-                                <div className="flex items-center gap-2">
+                                <div className="flex min-w-0 items-center gap-2">
                                     <span
-                                        className={`h-2 w-2 rounded-full ${task.healthy ? 'bg-emerald-500' : task.lastError ? 'bg-red-500' : 'bg-amber-500'}`}
+                                        className={`h-2 w-2 shrink-0 rounded-full ${task.healthy ? 'bg-emerald-500' : task.lastError ? 'bg-red-500' : 'bg-amber-500'}`}
                                     />
-                                    <span className="text-sm font-medium text-content">{task.name}</span>
+                                    <span className="min-w-0 break-words text-sm font-medium text-content">{task.name}</span>
                                 </div>
                                 <div className="flex items-center gap-3 text-xs text-content-muted">
                                     <span>{task.runCount}× jalan</span>
@@ -187,7 +189,7 @@ export default function RecordingHealthPanel() {
                                     <span>{formatDuration(task.lastDurationMs)}</span>
                                 </div>
                                 {task.lastError && (
-                                    <p className="w-full text-xs text-red-600 dark:text-red-300">Error: {task.lastError}</p>
+                                    <p className="w-full break-words text-xs text-red-600 dark:text-red-300">Error: {task.lastError}</p>
                                 )}
                             </div>
                         ))}

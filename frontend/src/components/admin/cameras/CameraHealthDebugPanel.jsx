@@ -344,7 +344,7 @@ export default function CameraHealthDebugPanel({
                             <div className="text-content-muted">
                                 Menampilkan {items.length} dari {pagination?.totalItems ?? items.length} camera(s)
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
                                 <button
                                     type="button"
                                     onClick={() => onPageChange(Math.max(1, (pagination?.page || 1) - 1))}

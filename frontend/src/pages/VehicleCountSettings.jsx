@@ -419,7 +419,7 @@ export default function VehicleCountSettings() {
 
                             {/* Angka operasional: inilah yang menjawab "sehat atau tidak", dan
                                 sengaja hanya ada di sini — di halaman publik semuanya jargon. */}
-                            <p className="mt-2 border-t border-edge pt-2 text-xs text-content-subtle">
+                            <p className="mt-2 break-words border-t border-edge pt-2 text-xs text-content-subtle">
                                 {ringkasan.fps} fps · {Number(ringkasan.frame_diproses || 0).toLocaleString('id-ID')} frame ·
                                 {' '}frame terakhir {ringkasan.umur_frame_terakhir_detik}s lalu ·
                                 {' '}dijatuhkan {ringkasan.frame_dijatuhkan_sumber} ·

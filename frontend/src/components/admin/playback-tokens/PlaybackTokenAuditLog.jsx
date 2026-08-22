@@ -144,12 +144,16 @@ export default function PlaybackTokenAuditLog({
             <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                 <h2 className="text-lg font-semibold text-content">Log Aktivitas Token</h2>
                 {/* The backend has always supported filtering by token; the page just never asked. */}
-                <label className="flex items-center gap-2 text-xs text-content-muted">
+                {/* Both min-w-0s are load-bearing: a <select> is sized by its widest <option> —
+                  * a token label here — and `max-w-44` is 11rem, i.e. 264px once Android's 1.5x
+                  * font scale moves the root to 24px. Without them the pair refuses to shrink and
+                  * the card is 372px wide inside a 320px phone. */}
+                <label className="flex min-w-0 items-center gap-2 text-xs text-content-muted">
                     Token
                     <select
                         value={filterTokenId}
                         onChange={(event) => onFilterTokenId?.(event.target.value)}
-                        className="max-w-44 rounded-control border border-edge bg-surface px-2 py-1 text-xs text-content"
+                        className="min-w-0 max-w-44 rounded-control border border-edge bg-surface px-2 py-1 text-xs text-content"
                     >
                         <option value="">Semua token</option>
                         {tokens.map((token) => (
@@ -170,8 +174,11 @@ export default function PlaybackTokenAuditLog({
                             <LogCard key={log.id} log={log} formatTokenDate={formatTokenDate} />
                         ))}
                     </ul>
-                    <div className="mt-3 flex items-center justify-between gap-3">
-                        <p className="font-mono text-xs tabular-nums text-content-subtle">{logs.length} aktivitas</p>
+                    {/* Wraps: Button's label span is `truncate`, i.e. white-space:nowrap, so the
+                      * button's min-content is the WHOLE label — 236px at the Android 1.5x font
+                      * scale, which does not share a 320px row with the count. */}
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                        <p className="min-w-0 font-mono text-xs tabular-nums text-content-subtle">{logs.length} aktivitas</p>
                         {canShowMore && (
                             <Button size="sm" variant="secondary" onClick={onShowMore}>
                                 Tampilkan lebih banyak

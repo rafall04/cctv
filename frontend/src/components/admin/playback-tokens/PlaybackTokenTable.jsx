@@ -179,8 +179,11 @@ function TokenCard({
 }) {
     const sessions = token.active_session_count || 0;
 
+    // The card's `min-w-0` is load-bearing: it is a GRID item (see the `ul` below) and a grid
+    // item's default `min-width: auto` is min-content, so the single auto column grew to the
+    // card's widest unshrinkable row instead of the card shrinking to the column.
     return (
-        <li className="rounded-card border border-edge bg-surface p-4">
+        <li className="min-w-0 rounded-card border border-edge bg-surface p-4">
             <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                     {/* The name leads and never truncates — it is the only thing distinguishing

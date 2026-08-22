@@ -48,7 +48,7 @@ const SORT_OPTIONS = [
 
 function TopMetricCard({ title, children }) {
     return (
-        <section className="rounded-2xl border border-edge bg-surface p-5">
+        <section className="min-w-0 rounded-2xl border border-edge bg-surface p-5">
             <h2 className="text-lg font-semibold text-content">{title}</h2>
             <div className="mt-4">{children}</div>
         </section>
@@ -312,7 +312,7 @@ export default function ViewerAnalytics() {
                 lastUpdate={lastUpdate}
                 filters={(
                     <div className="grid gap-3 rounded-2xl border border-edge bg-surface p-4 lg:grid-cols-[minmax(0,1fr)_260px]">
-                        <div>
+                        <div className="min-w-0">
                             <div className="mb-1 text-sm font-medium text-content">Periode</div>
                             <PeriodSelector
                                 value={period}
@@ -321,7 +321,7 @@ export default function ViewerAnalytics() {
                                 onCustomDateChange={selectCustomDate}
                             />
                         </div>
-                        <label className="space-y-1 text-sm">
+                        <label className="min-w-0 space-y-1 text-sm">
                             <span className="font-medium text-content">Kamera</span>
                             <select value={selectedCamera} onChange={(event) => selectCamera(event.target.value)} className="w-full rounded-xl border border-edge bg-surface px-3 py-2 dark:text-white">
                                 <option value="">Semua Kamera</option>
@@ -340,7 +340,7 @@ export default function ViewerAnalytics() {
                 <div className="space-y-6">
                     <ViewerAnalyticsSummaryGrid overview={overview} comparison={comparison} />
                     <div className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
-                        <div className="space-y-4">
+                        <div className="min-w-0 space-y-4">
                             <RealtimeActivityChart />
                             <ViewerAnalyticsChartsSection
                                 charts={charts}
@@ -365,10 +365,10 @@ export default function ViewerAnalytics() {
                                         className="w-full rounded-xl border border-edge p-3 text-left transition-colors hover:bg-surface-sunken"
                                     >
                                         <div className="flex items-center justify-between gap-3">
-                                            <div className="font-semibold text-content">{session.camera_name}</div>
+                                            <div className="min-w-0 break-words font-semibold text-content">{session.camera_name}</div>
                                             {renderDeviceBadge(session.device_type)}
                                         </div>
-                                        <div className="mt-1 font-mono text-xs text-content-muted">{session.ip_address}</div>
+                                        <div className="mt-1 break-all font-mono text-xs text-content-muted">{session.ip_address}</div>
                                         <div className="mt-2 text-xs text-content-muted">
                                             {formatDateTime(session.started_at, { storage: TIMESTAMP_STORAGE.LOCAL_SQL })} • {formatWatchTime(session.duration_seconds)}
                                         </div>
@@ -470,7 +470,7 @@ export default function ViewerAnalytics() {
                         emptyDescription="Riwayat live akan muncul setelah ada pengunjung yang menonton."
                         filters={(
                             <div className="grid gap-3 lg:grid-cols-4">
-                                <label className="space-y-1 text-sm">
+                                <label className="min-w-0 space-y-1 text-sm">
                                     <span className="font-medium text-content">Kamera</span>
                                     <select value={selectedCamera} onChange={(event) => selectCamera(event.target.value)} className="w-full rounded-xl border border-edge bg-surface px-3 py-2 dark:text-white">
                                         <option value="">Semua Kamera</option>
@@ -479,7 +479,7 @@ export default function ViewerAnalytics() {
                                         ))}
                                     </select>
                                 </label>
-                                <label className="space-y-1 text-sm">
+                                <label className="min-w-0 space-y-1 text-sm">
                                     <span className="font-medium text-content">Perangkat</span>
                                     <select value={historyDeviceType} onChange={(event) => setHistoryDeviceType(event.target.value)} className="w-full rounded-xl border border-edge bg-surface px-3 py-2 dark:text-white">
                                         <option value="">Semua Perangkat</option>
@@ -489,7 +489,7 @@ export default function ViewerAnalytics() {
                                         <option value="unknown">Unknown</option>
                                     </select>
                                 </label>
-                                <label className="space-y-1 text-sm">
+                                <label className="min-w-0 space-y-1 text-sm">
                                     <span className="font-medium text-content">Urutkan</span>
                                     <select value={historySort} onChange={(event) => setHistorySort(event.target.value)} className="w-full rounded-xl border border-edge bg-surface px-3 py-2 dark:text-white">
                                         {SORT_OPTIONS.map((option) => (
@@ -497,7 +497,7 @@ export default function ViewerAnalytics() {
                                         ))}
                                     </select>
                                 </label>
-                                <label className="space-y-1 text-sm">
+                                <label className="min-w-0 space-y-1 text-sm">
                                     <span className="font-medium text-content">Cari</span>
                                     <input
                                         value={historySearch}

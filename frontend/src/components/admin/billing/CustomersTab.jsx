@@ -70,12 +70,20 @@ export default function CustomersTab({ customers, plans, run, busy }) {
         if (ok) setAdjustForm({ user_id: '', direction: 'credit', amount: 10000, reason: '' });
     };
 
+    /*
+     * `title` membawa nama paket yang SEDANG terpilih secara utuh. Kontrol ini `min-w-0` dan
+     * `w-full` di kartu ponsel supaya tidak lagi meluapkan halaman, tapi konsekuensinya teks
+     * terlipatnya terpotong — dan paket di sini berawalan sama panjang ("Paket Sewa CCTV
+     * Bulanan Wilayah Kabupaten Bojonegoro …"), jadi tanpa ini operator tidak bisa tahu paket
+     * mana yang sedang aktif tanpa membuka dropdown-nya lebih dulu.
+     */
     const planSelect = (customer, extra = '') => (
         <select
             value={customer.plan_key || ''}
+            title={plans.find((plan) => plan.key === customer.plan_key)?.name || '(tanpa paket)'}
             disabled={busy}
             onChange={(e) => changePlan(customer, e.target.value)}
-            className={`rounded-lg border border-edge bg-surface-sunken px-2 py-1 text-xs text-content ${extra}`}
+            className={`min-w-0 rounded-lg border border-edge bg-surface-sunken px-2 py-1 text-xs text-content ${extra}`}
         >
             <option value="">(tanpa paket)</option>
             {plans.map((plan) => (
@@ -183,7 +191,7 @@ export default function CustomersTab({ customers, plans, run, busy }) {
                                         <p className="shrink-0 font-bold text-content">{formatRupiah(customer.balance)}</p>
                                     </div>
                                     <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-content-muted">
-                                        {planSelect(customer)}
+                                        {planSelect(customer, 'w-full')}
                                         <span>Kamera: {customer.camera_count}{customer.plan_max_cameras ? `/${customer.plan_max_cameras}` : ''}</span>
                                         <StatusCell customer={customer} />
                                     </div>
