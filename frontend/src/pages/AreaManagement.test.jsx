@@ -8,7 +8,7 @@
  * SideEffects: Renders jsdom UI with mocked async service responses only.
  */
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import AreaManagement from './AreaManagement';
 import { TestRouter } from '../test/renderWithRouter';
@@ -136,6 +136,33 @@ describe('AreaManagement', () => {
         await screen.findByText('Area A');
         expect(screen.getByText('1 Internal • 3 External')).toBeTruthy();
         expect(getAdminOverview).toHaveBeenCalled();
+    });
+
+    /*
+     * Bulk Policy Center goes through ui/Modal now. It used to hand-roll its own scrim + panel +
+     * header, which cost it the body scroll lock (a touch-drag aimed at these selects scrolled the
+     * area cards behind it) and pinned it to max-h-[90vh], where `vh` still counts the phone URL
+     * bar. It has no <form> — both actions are plain onClick — so what has to hold is that it is a
+     * real dialog carrying the config, and that Batal still closes it.
+     */
+    it('membuka Bulk Policy Center sebagai dialog, dan Batal menutupnya', async () => {
+        render(
+            <TestRouter>
+                <AreaManagement />
+            </TestRouter>
+        );
+
+        await screen.findByText('Area A');
+        fireEvent.click(screen.getByTitle('Pengaturan Massal Kamera'));
+
+        const dialog = screen.getByRole('dialog');
+        expect(dialog.getAttribute('aria-modal')).toBe('true');
+        expect(within(dialog).getByText('Bulk Policy Center')).toBeTruthy();
+        expect(within(dialog).getByText('Area: Area A')).toBeTruthy();
+        expect(within(dialog).getByLabelText('Health Monitoring')).toBeTruthy();
+
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Batal' }));
+        await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     });
 
     it('memaksa preview proxy policy ke target external_hls_only', async () => {

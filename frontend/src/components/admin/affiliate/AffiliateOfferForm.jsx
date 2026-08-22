@@ -3,12 +3,20 @@
  *          the outbound product link, which cameras it appears under, its priority, and the three
  *          OPTIONAL extras a visitor may see: a photo, a price, and a WhatsApp button.
  * Caller: pages/AffiliateManagement.jsx.
- * Deps: components/ui (Field, Button, inputClasses), affiliateAdminService (URL + WhatsApp policy
- *       mirrors, image upload/removal, media path builder, read-side normalisers),
- *       NotificationContext.
- * MainFuncs: AffiliateOfferForm.
+ * Deps: components/ui (Field, Button, inputClasses), AffiliateTargetPicker, affiliateAdminService
+ *       (URL + WhatsApp policy mirrors, image upload/removal, media path builder, read-side
+ *       normalisers), NotificationContext.
+ * MainFuncs: AffiliateOfferForm, OFFER_FORM_ID.
  * SideEffects: Reads a local file into base64 and POSTs it to the offer image endpoint; clears a
  *              stored photo through an offer update. Everything else is handed to onSubmit.
+ *
+ * THE FORM RENDERS NO BUTTONS OF ITS OWN
+ * --------------------------------------
+ * This is the body of a ui/Modal, so Simpan and Batal belong to the dialog's pinned footer where
+ * they stay reachable above the keyboard and above env(safe-area-inset-bottom) — 24 fields is far
+ * more than one phone screen, and an action row at the bottom of that stack is a scroll away.
+ * That is also why the caller passes `dismissible={false}`: a stray tap on the backdrop next to the
+ * longest form in admin would throw the whole draft away with no undo.
  *
  * THE THREE EXTRAS: PRESENCE IS THE SWITCH, AND THE FORM HAS TO SAY SO
  * -------------------------------------------------------------------
@@ -74,6 +82,7 @@ import {
     MAX_WHATSAPP_MESSAGE_LEN,
 } from '../../../services/affiliateAdminService';
 import { useNotification } from '../../../contexts/NotificationContext';
+import AffiliateTargetPicker from './AffiliateTargetPicker';
 
 /*
  * Phase 1 wires exactly one surface: the slot under the live video. The column accepts a list
@@ -96,6 +105,13 @@ const TARGET_OPTIONS = [
 // SOURCE file: what comes out the other side is a pair of small WebP renditions.
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 const ACCEPTED_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
+
+/*
+ * The dialog's Simpan button lives in the Modal FOOTER, outside this <form>, and reaches back in
+ * through `form={OFFER_FORM_ID}`. Exported rather than typed twice: a footer button pointing at an
+ * id that no longer exists does not error, it just silently stops submitting.
+ */
+export const OFFER_FORM_ID = 'affiliate-offer-form';
 
 const EMPTY = {
     partner_id: '',
@@ -140,72 +156,7 @@ function imageFromOffer(row) {
     };
 }
 
-/**
- * Searchable multi-select, same shape as the promo banner's picker. Cameras number in the
- * hundreds, so the list is filtered and capped — an unfiltered 750-row checkbox list is both
- * unusable and slow to render.
- */
-function TargetPicker({ label, options, selected, onChange, searchable }) {
-    const [term, setTerm] = useState('');
-
-    const visible = useMemo(() => {
-        const needle = term.trim().toLowerCase();
-        const matched = needle
-            ? options.filter((option) => option.label.toLowerCase().includes(needle))
-            : options;
-        return matched.slice(0, 200);
-    }, [options, term]);
-
-    const toggle = (id) => {
-        onChange(selected.includes(id) ? selected.filter((value) => value !== id) : [...selected, id]);
-    };
-
-    return (
-        <div className="rounded-card border border-edge bg-surface-sunken p-3">
-            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                <span className="min-w-0 truncate text-xs font-semibold text-content-muted">{label}</span>
-                <span role="status" className="shrink-0 font-mono text-xs tabular-nums text-content-subtle">{selected.length} dipilih</span>
-            </div>
-
-            {searchable && (
-                <input
-                    type="search"
-                    value={term}
-                    onChange={(event) => setTerm(event.target.value)}
-                    placeholder="Cari nama…"
-                    aria-label={`Cari ${label}`}
-                    className={inputClasses({ className: 'mb-2' })}
-                />
-            )}
-
-            <div className="max-h-56 space-y-1 overflow-y-auto">
-                {visible.length === 0 && <p role="status" className="py-2 text-xs text-content-subtle">Tidak ada yang cocok.</p>}
-                {visible.map((option) => (
-                    <label
-                        key={option.id}
-                        className="flex min-h-11 cursor-pointer items-center gap-2 rounded-control px-2 py-1 text-sm text-content-muted hover:bg-surface-raised"
-                    >
-                        <input
-                            type="checkbox"
-                            checked={selected.includes(option.id)}
-                            onChange={() => toggle(option.id)}
-                            className="h-4 w-4 shrink-0"
-                        />
-                        <span className="min-w-0 truncate">{option.label}</span>
-                    </label>
-                ))}
-            </div>
-
-            {options.length > visible.length && (
-                <p className="mt-2 text-xs text-content-subtle">
-                    Menampilkan {visible.length} dari {options.length}. Gunakan pencarian untuk mempersempit.
-                </p>
-            )}
-        </div>
-    );
-}
-
-export default function AffiliateOfferForm({ offer, partners, areas, cameras, saving, onSubmit, onCancel, onUploaded }) {
+export default function AffiliateOfferForm({ offer, partners, areas, cameras, onSubmit, onUploaded }) {
     const [form, setForm] = useState(EMPTY);
     // '' is meaningful: no price shown. See the header — this must never become 0 on its own.
     const [priceDigits, setPriceDigits] = useState('');
@@ -500,7 +451,7 @@ export default function AffiliateOfferForm({ offer, partners, areas, cameras, sa
     };
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form id={OFFER_FORM_ID} onSubmit={handleSubmit} className="space-y-5">
             <Field
                 as="select"
                 label="Mitra pemilik barang"
@@ -744,7 +695,7 @@ export default function AffiliateOfferForm({ offer, partners, areas, cameras, sa
                 </div>
 
                 {form.target_mode === 'area' && (
-                    <TargetPicker
+                    <AffiliateTargetPicker
                         label="Area"
                         options={areaOptions}
                         selected={form.area_ids}
@@ -753,7 +704,7 @@ export default function AffiliateOfferForm({ offer, partners, areas, cameras, sa
                     />
                 )}
                 {form.target_mode === 'camera' && (
-                    <TargetPicker
+                    <AffiliateTargetPicker
                         label="Kamera"
                         options={cameraOptions}
                         selected={form.camera_ids}
@@ -781,13 +732,6 @@ export default function AffiliateOfferForm({ offer, partners, areas, cameras, sa
                 />
                 <span className="min-w-0">Aktif</span>
             </label>
-
-            <div className="flex flex-wrap gap-2 border-t border-edge pt-4">
-                <Button type="submit" variant="primary" loading={saving}>
-                    {saving ? 'Menyimpan…' : 'Simpan barang'}
-                </Button>
-                <Button type="button" onClick={onCancel}>Batal</Button>
-            </div>
         </form>
     );
 }

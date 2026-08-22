@@ -63,6 +63,24 @@ describe('VoucherManagement', () => {
         await waitFor(() => expect(svc.updateSettings).toHaveBeenCalledWith(true));
     });
 
+    /*
+     * The test above proves the flag flips; it cannot see WHAT was asked, which is how the dialog
+     * shipped for months with its consequences passed as `body` — a key useConfirm does not read.
+     * Turning this flag on puts public cameras behind a lock, so the consequence has to be on
+     * screen, and only `message` puts it there.
+     */
+    it('asks with the consequence in `message`, the key useConfirm actually renders', async () => {
+        svc.updateSettings.mockResolvedValue({ success: true, data: { enabled: true, gated_area_ids: [1] } });
+        render(<VoucherManagement />);
+        fireEvent.click(await screen.findByText(/Fitur non-aktif/));
+
+        await waitFor(() => expect(confirmFn).toHaveBeenCalled());
+        const opts = confirmFn.mock.calls.at(-1)[0];
+        expect(opts.message).toMatch(/terkunci untuk pengunjung tanpa voucher aktif/);
+        expect(Object.keys(opts).filter((k) => !['title', 'message', 'confirmLabel', 'cancelLabel', 'tone'].includes(k)))
+            .toEqual([]);
+    });
+
     it('marks an ungated area as berbayar', async () => {
         svc.setAreaGated.mockResolvedValue({ success: true, data: { area_id: 2, is_access_gated: 1 } });
         render(<VoucherManagement />);

@@ -2,8 +2,13 @@
  * Purpose: Editor for one provider promo banner — poster upload, targeting, schedule, CTA.
  * Caller: pages/PromoBannerManagement.jsx.
  * Deps: promoBannerService (upload), NotificationContext.
- * MainFuncs: PromoBannerForm.
+ * MainFuncs: PromoBannerForm, PROMO_FORM_ID.
  * SideEffects: Reads a local file into base64 and POSTs it to the image endpoint.
+ *
+ * NO ACTION ROW HERE. This is the body of a ui/Modal, so Simpan and Batal live in the dialog's
+ * pinned footer — reachable above the keyboard and above env(safe-area-inset-bottom) instead of a
+ * two-dozen-field scroll away — and reach back into the form through `form={PROMO_FORM_ID}`. The
+ * caller passes dismissible={false} so a stray backdrop tap cannot discard the draft.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -27,6 +32,9 @@ const TARGET_OPTIONS = [
 // file is refused before it is read into memory and sent over a slow uplink.
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 const ACCEPTED_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
+
+/* The Modal footer's Simpan button sits outside this <form> and targets it by id. */
+export const PROMO_FORM_ID = 'promo-banner-form';
 
 const EMPTY = {
     title: '',
@@ -120,7 +128,7 @@ function TargetPicker({ label, options, selected, onChange, searchable }) {
     );
 }
 
-export default function PromoBannerForm({ promo, areas, cameras, onSubmit, onCancel, onUploaded, saving }) {
+export default function PromoBannerForm({ promo, areas, cameras, onSubmit, onUploaded }) {
     const [form, setForm] = useState(EMPTY);
     const [uploading, setUploading] = useState(false);
     const [uploadInfo, setUploadInfo] = useState(null);
@@ -315,7 +323,7 @@ export default function PromoBannerForm({ promo, areas, cameras, onSubmit, onCan
     const previewSrc = pendingPreview || (storedImageBase ? `/api/promo-media/${storedImageBase}-640.webp` : null);
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form id={PROMO_FORM_ID} onSubmit={handleSubmit} className="space-y-5">
             <Field label="Judul promo" hint="Hanya untuk pengelolaan internal — tidak tampil di poster.">
                 <input
                     type="text"
@@ -413,7 +421,15 @@ export default function PromoBannerForm({ promo, areas, cameras, onSubmit, onCan
             </fieldset>
 
             {/* --------------------------------------------------------- targeting */}
-            <fieldset className="space-y-3">
+            {/*
+              * `min-w-0` is load-bearing, not tidy-up. A <fieldset> keeps the UA default
+              * `min-inline-size: min-content` and Tailwind preflight never resets it, so with the
+              * 750-camera picker open this block refused to shrink and measured 729px inside a
+              * 391px dialog body (1092px at 1.5x root font) — the picker's checkbox column ran off
+              * the panel edge. Identical defect to the 689px affiliate one, found the moment the
+              * admin-overflow guard could finally see inside a dialog. Do not remove it.
+              */}
+            <fieldset className="min-w-0 space-y-3">
                 <legend className="text-sm font-medium text-content">Tampil di kamera mana</legend>
                 <div className="grid gap-2 sm:grid-cols-3">
                     {TARGET_OPTIONS.map((option) => (
@@ -511,23 +527,6 @@ export default function PromoBannerForm({ promo, areas, cameras, onSubmit, onCan
                 <input type="checkbox" checked={form.active} onChange={(event) => set('active', event.target.checked)} className="h-4 w-4" />
                 Aktif
             </label>
-
-            <div className="flex flex-wrap gap-2 border-t border-edge pt-4">
-                <button
-                    type="submit"
-                    disabled={saving}
-                    className="rounded-control bg-primary px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-                >
-                    {saving ? 'Menyimpan…' : 'Simpan'}
-                </button>
-                <button
-                    type="button"
-                    onClick={onCancel}
-                    className="rounded-control border border-edge bg-surface px-4 py-2 text-sm font-medium text-content-muted transition-colors hover:border-edge-strong hover:text-content"
-                >
-                    Batal
-                </button>
-            </div>
         </form>
     );
 }

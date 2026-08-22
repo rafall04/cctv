@@ -3,7 +3,9 @@
  *   overflow guard is structurally unable to see (see THE BLIND SPOT below).
  * Caller: playwright.config.js (npm run test:e2e; e2e job in CI).
  * Deps: @playwright/test, built dist served by vite preview; all /api/* mocked, external hosts blocked.
- * MainFuncs: admin-shell overflow assertions per admin page, at 393px and 320px, normal and 1.5x font.
+ * MainFuncs: admin-shell overflow assertions per admin page, at 393px and 320px, normal and 1.5x
+ *   font; plus, whenever a dialog is on screen, the same assertions taken on the DIALOG PANEL —
+ *   which <main> structurally cannot see (see measureAdminDialogs).
  * SideEffects: None outside the test browser (an admin session is faked in localStorage).
  *
  * THE BLIND SPOT THIS FILE EXISTS TO CLOSE (measured 2026-08, commit e16eb92)
@@ -28,25 +30,29 @@
  *
  * So this file does NOT reuse the public measure(). It measures the scroll container itself.
  *
- * WHAT IT FOUND THE FIRST TIME IT RAN — these are NOT flakes, do not silence them
- * ------------------------------------------------------------------------------
- * /admin/affiliate is green. The other two pages are red at 1.5x font ONLY (both are clean at
- * normal font, at 320px and 393px alike), on two pre-existing defects of the same family as the
- * ones that prompted this file — an intrinsic control width that nothing lets shrink:
+ * And a THIRD layer swallows it once a dialog opens: ui/Modal is `fixed inset-0` and out of flow,
+ * so it contributes nothing to <main> either. That one gets its own measurement — the long note
+ * above measureAdminDialogs, with the RED/GREEN proof that it can actually fail.
  *
- *   - src/pages/CameraManagement.jsx:93 — the filter row `grid gap-3 md:grid-cols-2 xl:grid-cols-4`
- *     has no min-w-0 on its items, and a grid item's default `min-width: auto` is min-content. At
- *     24px root font the area <select> measures 417px min-content (a <select> is sized by its widest
- *     <option>) and the search <input> 294px, inside a 222px column — so every item stretches to
- *     450-466px. The <input> is reported as the offender only because it is the first element at
- *     that width; the <select> is what sets it. Note the input alone (294 > 222) overflows with an
- *     EMPTY area list, so this is structural, not a property of the fixture.
- *   - src/components/admin/settings/GeneralSettingsPanel.jsx:262,304,358,400 — four
- *     <input type="datetime-local"> render 335px each at 24px root font (measured with 1-character
- *     fixture values, so this is entirely data-independent) and push <main> to 427px.
+ * WHAT IT FOUND WHEN IT FIRST RAN — 24 real defects across 11 pages, all since fixed (f31879b).
+ * Most of them appeared ONLY at 1.5x root font, which is why that second measurement pass exists
+ * and why it must not be dropped: an accessibility font size is the main case here, not the edge.
  *
- * Fixing those is a src change and deliberately out of this file's scope. Until then `npm run
- * test:e2e` reports 4 failures here, each naming its own culprit.
+ * WHAT THE DIALOG MEASUREMENT FOUND THE FIRST TIME IT RAN — NOT a flake, do not silence it
+ * ---------------------------------------------------------------------------------------
+ * Adding measureAdminDialogs (below) turned up a defect of that exact same family, sitting in the
+ * one admin form that had ALREADY gone through ui/Modal — i.e. in the part of the surface no
+ * measurement in this file could previously reach:
+ *
+ *   - src/pages/VoucherManagement.jsx:547 — the "Area yang dibuka" <fieldset> has no `min-w-0`, so
+ *     it keeps the UA default `min-inline-size: min-content` (Tailwind preflight never resets it —
+ *     the same defect that produced the 689px affiliate bug). At 320px with 24px root font its
+ *     area list measures 353px inside a 318px dialog body: the dialog scrolls sideways and the
+ *     checkbox column runs 34px off the panel edge. Clean at 393px and clean at normal font, like
+ *     every other defect in this family. One `min-w-0` on the <fieldset> fixes it.
+ *
+ * That is a src change and deliberately out of this file's scope. Until it lands, `npm run
+ * test:e2e` reports exactly ONE failure here — 92 passed, 1 failed — and it names its own culprit.
  */
 
 import { test, expect } from '@playwright/test';
@@ -1150,6 +1156,159 @@ const measureAdminShell = () => {
 };
 
 /*
+ * THE SECOND BLIND SPOT: A DIALOG IS OUT OF FLOW, SO <main> CANNOT SEE IT EITHER
+ * ------------------------------------------------------------------------------
+ * src/components/ui/Modal.jsx renders `fixed inset-0 …` and does NOT createPortal. A position:fixed
+ * subtree is out of normal flow, so it contributes NOTHING to main.scrollWidth — and
+ * measureAdminShell()'s sweep discards it twice over:
+ *
+ *   - the overlay is the only `fixed` box in the tree, so the fixed bucket records ONE
+ *     full-viewport rect (inset-0) and, being exactly viewport-wide, it always passes;
+ *   - everything inside the panel sits under `overflow-hidden` (the panel) or `overflow-y-auto`
+ *     (its body), so insideNestedScroller() returns true and skips the entire dialog.
+ *
+ * Net effect: the instant an inline admin form becomes a Modal, its overflow test goes VACUOUS —
+ * green no matter how wide the dialog content is. That is not hypothetical: it is exactly the trade
+ * the modal-unification work makes on the pages that still render their form inline, and this
+ * measurement is the price of making that trade safe. Coverage has to be MAINTAINED across the
+ * conversion, not just kept green.
+ *
+ * WHAT IS MEASURED — HORIZONTAL ONLY. A dialog that scrolls VERTICALLY is working as designed
+ * (max-h-[92dvh] + an overflow-y-auto body is the whole point), so nothing here looks at height.
+ *
+ *   (a) the dialog's scrollable BODY REGION: scrollWidth vs clientWidth. From Modal.jsx the panel
+ *       is `flex flex-col overflow-hidden` over three children — header, body
+ *       (`min-h-0 flex-1 overflow-y-auto`), optional footer — so the body is the one direct child
+ *       that is a scroll container, and Tailwind's `overflow-y-auto` leaves overflow-x computing to
+ *       `auto`: it absorbs its content's horizontal overflow exactly the way <main> does, which is
+ *       why the body's OWN scrollWidth is the honest number. It is located by computed style rather
+ *       than by class name, so this also measures the hand-rolled dialogs that put the scroller on
+ *       the panel itself — there the panel is its own body region and (a) collapses into (b).
+ *       AreaFormModal.jsx used to be the example here and is a ui/Modal since the 2026-08 dialog
+ *       unification; what still takes that shape is the analytics session DRAWER
+ *       (components/admin/analytics/AnalyticsHistoryTable.jsx, panel is `overflow-y-auto`), which
+ *       is why the entry 'admin analytics (session drawer open, hand-rolled panel)' exists — the
+ *       fallback branch needs a page proving it, or it is a claim rather than a measurement.
+ *   (b) the PANEL: scrollWidth vs clientWidth. `overflow: hidden` still reports true content width,
+ *       so this is what catches a header or a footer — neither of which scrolls — pushed wide by a
+ *       long title or an action row that refuses to wrap.
+ *   (c) a right-edge sweep naming the widest offender, same idiom and same skip rules as the shell
+ *       sweep, because naming the element is what made the last round fixable in one pass.
+ *
+ * PROVEN ABLE TO FAIL — do not take this on faith, and re-prove it if you change the measurement.
+ * The recipe is 30 seconds: in the `open` step of 'admin users (create form open)', append a
+ * `<div style="width:900px">` to the dialog's body region, then run
+ *   npx playwright test e2e/admin-overflow.spec.js -g "users \(create form open\) @393px"
+ * Measured 2026-08-22, Pixel-5 profile at 393px:
+ *   RED   → body region 932px wide, only 391px fits (948/391 at 1.5x font); offender named as
+ *           `<div class="e2e-injected-overflow">` reaching 917px past a panel edge at 393px.
+ *   GREEN → body region 391/391 with the injection removed.
+ * The number that matters in that RED run: main.scrollWidth read 393/393 and rootScrollW 393, so
+ * ALL FOUR pre-existing assertions in this file passed while the dialog was 2.4x too wide. Note
+ * panelScrollW also stayed 391 — the panel's `overflow-hidden` body absorbed it — which is why (a)
+ * is the load-bearing measurement and (b) alone would have been a decoration.
+ *
+ * RE-PROVEN the same day on the three forms that moved into ui/Modal (ronda add-camera,
+ * hitung-kendaraan settings, telegram-archive route), because a conversion that keeps the suite
+ * green while measuring nothing is exactly the trade this flag exists to prevent. Same injection
+ * dropped into each `open` step: all three went RED at 932px of body against 391px that fits (948
+ * at 1.5x font), each naming `<div class="e2e-injected-overflow">`, while main.scrollWidth still
+ * read 393/393 — and the untouched voucher dialog stayed green in the same run.
+ *
+ * RE-PROVEN AGAIN on the four dialogs that moved into ui/Modal next — camera add/edit, camera
+ * class, area create/edit, and the Bulk Policy Center that was inlined in AreaManagement.jsx — plus
+ * the analytics session drawer, which is the one entry left in the `bodyIsPanel` shape. Same
+ * injection, RED on all five: 932px of body against 391px that fits at 393px (948 at 1.5x font,
+ * 318px that fits at 320px), each naming `<div class="e2e-injected-overflow">`, while
+ * main.scrollWidth read 393/393 throughout. The drawer's numbers differ (948/392, 972/392 at 1.5x)
+ * BECAUSE the fallback fired — panel and body region are one element there, which is what proves
+ * that branch runs rather than merely existing.
+ */
+const measureAdminDialogs = () => {
+    const isVisible = (el, rect) => {
+        if (!rect.width && !rect.height) return false;
+        const cs = getComputedStyle(el);
+        return cs.visibility !== 'hidden' && cs.display !== 'none';
+    };
+
+    const panels = Array.from(document.querySelectorAll('[role="dialog"]'))
+        .filter((el) => isVisible(el, el.getBoundingClientRect()));
+    if (!panels.length) return { found: false, panels: 0 };
+
+    const describe = (el) => {
+        const cls = (el.getAttribute('class') || '').slice(0, 90);
+        const text = (el.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 60);
+        return `<${el.tagName.toLowerCase()} class="${cls}">${text ? ` — "${text}"` : ''}`;
+    };
+
+    const measureOne = (panel) => {
+        const rect = panel.getBoundingClientRect();
+        const limit = rect.right;
+
+        /* Modal.jsx's body is the only DIRECT child that scrolls; a hand-rolled dialog may scroll on
+         * the panel itself, in which case the panel is its own body region. */
+        const body = Array.from(panel.children).find((c) => {
+            const oy = getComputedStyle(c).overflowY;
+            return oy === 'auto' || oy === 'scroll';
+        }) || panel;
+
+        /* Same rule as the shell sweep — a nested scroller INSIDE the dialog (the picker's own
+         * max-h list, a table wrapper) is deliberately scrollable and being wide is its job. The
+         * walk stops at the panel, and the body region is exempt: it is the container being
+         * measured, so treating it as a nested scroller would re-create the exact blindness the
+         * top of this file exists to document. */
+        const insideNestedScroller = (el) => {
+            let p = el.parentElement;
+            while (p && p !== panel) {
+                if (p !== body) {
+                    const ox = getComputedStyle(p).overflowX;
+                    if (ox === 'hidden' || ox === 'auto' || ox === 'scroll' || ox === 'clip') return true;
+                }
+                p = p.parentElement;
+            }
+            return false;
+        };
+
+        let worst = null;
+        for (const el of panel.querySelectorAll('*')) {
+            const r = el.getBoundingClientRect();
+            if (!isVisible(el, r)) continue;
+            // A fixed box escapes the panel's clip; the shell's fixed bucket already measures it
+            // against the viewport, which is the only meaningful limit for it.
+            if (getComputedStyle(el).position === 'fixed') continue;
+            if (insideNestedScroller(el)) continue;
+            if (r.right <= limit + 1) continue;
+            if (!worst || r.right > worst.right) worst = { right: Math.round(r.right), what: describe(el) };
+        }
+
+        const heading = panel.querySelector('h1, h2, h3');
+        return {
+            title: ((heading && heading.textContent) || panel.getAttribute('aria-label') || '(untitled)').trim().slice(0, 60),
+            panelScrollW: panel.scrollWidth,
+            panelClientW: panel.clientWidth,
+            bodyScrollW: body.scrollWidth,
+            bodyClientW: body.clientWidth,
+            // true = a hand-rolled dialog scrolling on the panel, so (a) and (b) are one number.
+            bodyIsPanel: body === panel,
+            panelRight: Math.round(rect.right),
+            limit: Math.round(limit),
+            worstRight: worst ? worst.right : 0,
+            worstWhat: worst ? worst.what : null,
+        };
+    };
+
+    const excess = (m) => Math.max(
+        m.panelScrollW - m.panelClientW,
+        m.bodyScrollW - m.bodyClientW,
+        m.worstRight ? m.worstRight - m.limit : 0,
+    );
+    // With two dialogs on screen the interesting one is the broken one, not the topmost one.
+    const worstPanel = panels.map(measureOne).reduce((a, b) => (excess(b) > excess(a) ? b : a));
+
+    return { found: true, panels: panels.length, vw: document.documentElement.clientWidth, ...worstPanel };
+};
+
+/*
  * THE TWO NON-OVERFLOW DEFECTS THIS AUDIT ALSO RECORDS
  * ----------------------------------------------------
  * Both are the same family of bug as the overflow ones — content that is present in the DOM but
@@ -1220,10 +1379,11 @@ const auditPageControls = () => {
     return { smallTargets, truncatedNoTitle };
 };
 
-async function assertNoAdminOverflow(page, label) {
+async function assertNoAdminOverflow(page, label, { expectDialog = false } = {}) {
     const m = await page.evaluate(measureAdminShell);
     expect(m.found, `${label}: no <main> — this page did not render inside AdminLayout, so nothing was measured`).toBe(true);
 
+    const d = await page.evaluate(measureAdminDialogs);
     const audit = await page.evaluate(auditPageControls);
     // One machine-readable line per measurement: this is the audit's actual output.
     console.log(`AUDIT ${JSON.stringify({
@@ -1242,6 +1402,21 @@ async function assertNoAdminOverflow(page, label) {
         smallTargetSamples: audit.smallTargets.slice(0, 6),
         truncatedNoTitle: audit.truncatedNoTitle.length,
         truncatedSamples: audit.truncatedNoTitle.slice(0, 6),
+        // null on every page with no dialog on screen — the shape those lines had before dialogs
+        // were measured at all, so the audit output stays diffable across the modal conversion.
+        dialog: d.found ? {
+            panels: d.panels,
+            title: d.title,
+            panelScrollW: d.panelScrollW,
+            panelClientW: d.panelClientW,
+            bodyScrollW: d.bodyScrollW,
+            bodyClientW: d.bodyClientW,
+            bodyIsPanel: d.bodyIsPanel,
+            overflowPx: Math.max(0, d.bodyScrollW - d.bodyClientW, d.panelScrollW - d.panelClientW),
+            worstRight: d.worstRight,
+            limit: d.limit,
+            worstWhat: d.worstWhat,
+        } : null,
     })}`);
 
     /*
@@ -1272,6 +1447,61 @@ async function assertNoAdminOverflow(page, label) {
         `${label}: a position:fixed element reaches ${m.fixed}px on a ${m.vw}px viewport — ${m.fixedWhat}`,
     ).toBeLessThanOrEqual(m.vw + 1);
 
+    /*
+     * ANTI-VACUITY GATE for the dialog measurement. Hard, not soft, and deliberately so: a page
+     * flagged `dialog: true` whose modal did not open measured NOTHING new, and letting that run to
+     * the end would print four green dialog assertions taken on an empty result — the precise
+     * failure mode this measurement was added to prevent. Same class as the `m.found` check above.
+     */
+    if (expectDialog) {
+        expect(
+            d.found,
+            `${label}: expected a ui/Modal on screen (this page's spec sets dialog: true) but no visible `
+            + '[role="dialog"] was found, so the dialog measurement was VACUOUS. Either the `open` step '
+            + 'no longer opens the form, or the form stopped being a dialog — do not "fix" this by '
+            + 'dropping the flag.',
+        ).toBe(true);
+    }
+
+    // Pages with no dialog on screen behave EXACTLY as before this measurement existed.
+    if (!d.found) return m;
+
+    expect.soft(
+        d.bodyScrollW,
+        `${label}: the dialog "${d.title}" scrolls SIDEWAYS — its body region is ${d.bodyScrollW}px wide `
+        + `but only ${d.bodyClientW}px fits (viewport ${d.vw}px, panel ${d.panelClientW}px). `
+        + `main.scrollWidth says ${m.mainScrollW}/${m.mainClientW} — that number is blind to a dialog, `
+        + 'which is `fixed inset-0` and therefore out of flow (see the dialog note above measureAdminDialogs). '
+        + `Widest offender: ${d.worstWhat || '(none past the panel edge — look for a nested scroller inside the dialog that should not scroll)'}`
+        + ` at ${d.worstRight}px. Usual cause: a flex/grid child or <fieldset> without min-w-0, an `
+        + 'unbreakable token without break-all, or a fixed-width control in a form column.',
+    ).toBeLessThanOrEqual(d.bodyClientW + 1);
+
+    /* Only meaningful when the panel and the body region are different boxes. On a hand-rolled
+     * dialog that scrolls on the panel itself they are the same number, and asserting it twice would
+     * print a second, contradictory message ("the body is not the culprit") for one defect. */
+    if (!d.bodyIsPanel) {
+        expect.soft(
+            d.panelScrollW,
+            `${label}: the dialog "${d.title}" PANEL is ${d.panelScrollW}px wide but only ${d.panelClientW}px `
+            + 'fits. The body region is not the culprit here — the header and the footer do not scroll, so '
+            + 'this is a long title, a description, or an action row that will not wrap. '
+            + `Widest offender: ${d.worstWhat || '(none past the panel edge)'} at ${d.worstRight}px.`,
+        ).toBeLessThanOrEqual(d.panelClientW + 1);
+    }
+
+    expect.soft(
+        d.worstRight,
+        `${label}: inside the dialog "${d.title}", an element reaches ${d.worstRight}px, past the panel's `
+        + `right edge at ${d.limit}px (viewport ${d.vw}px) — ${d.worstWhat}`,
+    ).toBeLessThanOrEqual(d.limit + 1);
+
+    expect.soft(
+        d.panelRight,
+        `${label}: the dialog "${d.title}" itself reaches ${d.panelRight}px on a ${d.vw}px viewport — the `
+        + 'panel is wider than the screen, so part of the dialog is unreachable.',
+    ).toBeLessThanOrEqual(d.vw + 1);
+
     return m;
 }
 
@@ -1292,15 +1522,28 @@ const shown = (page, selector) => page.locator(`${selector} >> visible=true`).fi
  * `open` drives the page into the state the audit measured. The affiliate defects only appear with
  * the offer editor open on a camera-targeted row — the picker is not reachable from a URL, so the
  * test clicks its way there and then asserts the picker is on screen before measuring.
+ *
+ * `dialog: true` says the state `open` reaches is a DIALOG, and turns the dialog measurement from
+ * best-effort into a requirement: no visible [role="dialog"] then fails the test outright. Set it
+ * on every entry whose `open` ends with a ui/Modal on screen — including when an inline form is
+ * converted to one, which is the whole point. Without the flag a conversion silently trades a real
+ * <main> measurement for a dialog nobody measures, and the suite stays green through it.
  */
 const ADMIN_PAGES = [
     {
         name: 'admin affiliate (offer editor, 750-camera picker open)',
         url: '/admin/affiliate',
         ready: 'text=Toko Rekanan',
+        /* ui/Modal since the 2026-08 form conversion (AffiliateManagement.jsx). The editor used to
+         * be an inline <Card>, which <main> measured directly; now it is `fixed inset-0` and <main>
+         * cannot see one pixel of it. Without this flag the two defects this entry was WRITTEN for
+         * — the 689px <fieldset> and the off-screen search box, both inside the picker below —
+         * would have become unmeasurable on the same day the form moved. */
+        dialog: true,
         open: async (page) => {
             await page.getByRole('tab', { name: /Barang/ }).click();
             await page.getByRole('button', { name: 'Ubah' }).first().click();
+            await expect(page.getByRole('dialog').first()).toBeVisible();
             // The picker itself — the widest thing on the page and the thing both defects lived in.
             await expect(
                 page.getByLabel('Cari Kamera'),
@@ -1310,9 +1553,60 @@ const ADMIN_PAGES = [
         },
     },
     {
+        /* The list BEHIND the dialog. The entry above still measures <main>, but only ever with the
+         * editor open — and an 85-char store name plus a 120-char unbreakable product URL are a
+         * list-row problem, not a dialog one. Measuring the closed state too keeps the rows covered
+         * now that the form no longer sits among them. */
+        name: 'admin affiliate (partner + offer lists, no editor)',
+        url: '/admin/affiliate',
+        ready: 'text=TOKO KAMERA PENGAWAS DAN AKSESORIS JARINGAN SERBA ADA CABANG BOJONEGORO PUSAT SATU',
+        open: async (page) => {
+            await page.getByRole('tab', { name: /Barang/ }).click();
+            await expect(shown(page, 'text=/KAMERA IP OUTDOOR 3MP ANTI AIR/')).toBeVisible();
+        },
+    },
+    {
         name: 'admin cameras (list, 750 rows)',
         url: '/admin/cameras',
         ready: `text=${cameraName(1)}`,
+    },
+    {
+        /* The add/edit camera form: the densest dialog in admin after the affiliate editor — four
+         * field sections, a delivery-type picker and an embedded map. It was ALWAYS `fixed
+         * inset-0`, so <main> never saw it and no entry here measured it; converting it to ui/Modal
+         * (CameraFormModal.jsx) is what finally makes it reachable, and this entry is that gain. */
+        name: 'admin cameras (add-camera form open, ui/Modal)',
+        url: '/admin/cameras',
+        ready: `text=${cameraName(1)}`,
+        dialog: true,
+        open: async (page) => {
+            await page.getByRole('button', { name: 'Tambah Kamera' }).first().click();
+            await expect(page.getByRole('dialog').first()).toBeVisible();
+            /* Keyed INSIDE the panel: proves the field sections rendered, not just the shell.
+             * By id, not by label — the list behind the dialog has its own "Filter area" <select>,
+             * so getByLabel('Area') is ambiguous on this page. */
+            await expect(page.locator('#camera-area')).toBeVisible();
+        },
+    },
+    {
+        /* The visibility/class dialog on a camera row — short, but it carries the two longest
+         * warning paragraphs in admin plus an owner <select> whose options are user rows. Same
+         * story as the entry above: `fixed inset-0` from birth, measured by nothing until it
+         * became a ui/Modal. */
+        name: 'admin cameras (class dialog open, ui/Modal)',
+        url: '/admin/cameras',
+        ready: `text=${cameraName(1)}`,
+        dialog: true,
+        open: async (page) => {
+            await page.getByTitle('Ubah kelas kamera (publik / privat)').first().click();
+            await expect(page.getByRole('dialog').first()).toBeVisible();
+            /* Owner Private is the branch that adds the widest thing in the dialog: an owner
+             * <select> whose options are the 24-row /api/users fixture, LONG_USERNAME included.
+             * (The retroactive-history warning is NOT reachable here — it needs a camera that is
+             * ALREADY owner_private, and every fixture camera is community.) */
+            await page.getByRole('radio', { name: /Owner Private/i }).click();
+            await expect(page.getByLabel('Pemilik kamera')).toBeVisible();
+        },
     },
     {
         name: 'admin settings (dense form)',
@@ -1364,9 +1658,30 @@ const ADMIN_PAGES = [
         name: 'admin areas (create form open)',
         url: '/admin/areas',
         ready: 'text=KELURAHAN SUMBEREJO WETAN NOMOR SATU',
+        /* ui/Modal since the 2026-08 dialog unification (AreaFormModal.jsx). It used to hand-roll
+         * its own panel and scroll on it, which is the `bodyIsPanel` shape — that branch is now
+         * proven by the analytics drawer entry below instead. Either way the flag stays: this is a
+         * 14-field form with a map picker, and <main> cannot see one pixel of it. */
+        dialog: true,
         open: async (page) => {
             await page.getByRole('button', { name: /Tambah Area/ }).first().click();
             await expect(page.getByRole('dialog').first()).toBeVisible();
+            // Keyed INSIDE the panel: proves the form body rendered, not just the dialog shell.
+            await expect(shown(page, 'text=Default Health Monitoring External')).toBeVisible();
+        },
+    },
+    {
+        /* The Bulk Policy Center — 9 selects and a preview column in a two-column grid, i.e. the
+         * densest dialog on this page. It was inlined in pages/AreaManagement.jsx and hand-rolled
+         * its own chrome; it is a ui/Modal now, so this entry is what keeps it measured at all. */
+        name: 'admin areas (bulk policy center open, ui/Modal)',
+        url: '/admin/areas',
+        ready: 'text=KELURAHAN SUMBEREJO WETAN NOMOR SATU',
+        dialog: true,
+        open: async (page) => {
+            await page.getByTitle('Pengaturan Massal Kamera').first().click();
+            await expect(page.getByRole('dialog').first()).toBeVisible();
+            await expect(page.getByLabel('Health Monitoring')).toBeVisible();
         },
     },
     {
@@ -1378,6 +1693,9 @@ const ADMIN_PAGES = [
         name: 'admin users (create form open)',
         url: '/admin/users',
         ready: `text=${LONG_USERNAME}`,
+        // ui/Modal (UserManagement.jsx:524) — the reference call site the dialog measurement was
+        // written against, and the one the RED/GREEN proof in the header was taken on.
+        dialog: true,
         open: async (page) => {
             await page.getByRole('button', { name: /Tambah Pengguna/ }).first().click();
             await expect(page.getByRole('dialog').first()).toBeVisible();
@@ -1397,6 +1715,23 @@ const ADMIN_PAGES = [
         ready: `text=${LONG_IPV6}`,
     },
     {
+        /* THE ENTRY THAT PROVES THE `bodyIsPanel` FALLBACK, inherited from 'admin areas (create
+         * form open)' when that one became a ui/Modal. AnalyticsHistoryDrawer
+         * (components/admin/analytics/AnalyticsHistoryTable.jsx:25) is still hand-rolled and puts
+         * `overflow-y-auto` on the PANEL, so measureAdminDialogs finds no scrolling direct child
+         * and falls back to the panel itself. Without a page in this shape that branch is a claim,
+         * not a measurement. It is also a genuinely dense dialog: a full IPv6, a mobile UA string
+         * and a 70-char camera name in a max-w-lg side sheet. */
+        name: 'admin analytics (session drawer open, hand-rolled panel)',
+        url: '/admin/analytics',
+        ready: `text=${LONG_IPV6}`,
+        dialog: true,
+        open: async (page) => {
+            await shown(page, `text=${LONG_IPV6}`).click();
+            await expect(page.getByRole('dialog').first()).toBeVisible();
+        },
+    },
+    {
         name: 'admin playback-analytics (charts + 25-row session history)',
         url: '/admin/playback-analytics',
         ready: `text=${LONG_IPV6}`,
@@ -1410,6 +1745,36 @@ const ADMIN_PAGES = [
         name: 'admin playback-products (5 package cards, each an inline form)',
         url: '/admin/playback-products',
         ready: 'text=Coba Gratis 1 Hari Untuk Pengunjung Baru',
+    },
+    {
+        /* The add-package dialog has ALWAYS been a ui/Modal, so the entry above — which measures
+         * <main> — never saw a pixel of it. It earns its own entry now because its action row moved
+         * out of the form body into ui/Modal's `footer`, and the footer is the one part of a dialog
+         * the body measurement CANNOT see: it sits outside the scroll container, so a wide button
+         * row there widens the panel and only the panel assertion reports it.
+         *
+         * PROVEN to bite, and the proof carries a caveat worth keeping. Appending a 3466px nowrap
+         * <div> to the footer: with the footer's own `justify-end` the element lands at left −3090,
+         * right 376 — 3090px of it clipped off the LEFT edge, unreachable — and every assertion
+         * stays green, because scrollWidth only counts overflow past the inline-END edge and the
+         * right-edge sweep sees a right edge inside the panel. Flip the same footer to
+         * justify-start and it fails loudly at both widths and both font scales: panelScrollW 3482
+         * vs clientW 391, offender named. So this entry does measure the footer — but a
+         * justify-end row that overflows leftwards is invisible to a scrollWidth-based guard
+         * ANYWHERE (the inline action row this replaced had the same shape and the same blind
+         * spot), and closing it needs a left-edge check, not another entry. */
+        name: 'admin playback-products (create form open, ui/Modal)',
+        url: '/admin/playback-products',
+        ready: 'text=Coba Gratis 1 Hari Untuk Pengunjung Baru',
+        dialog: true,
+        open: async (page) => {
+            await page.getByRole('button', { name: 'Tambah paket' }).first().click();
+            await expect(page.getByRole('dialog').first()).toBeVisible();
+            // Keyed INSIDE the panel: the last field of the body proves the form rendered, not just
+            // the shell — and the submit button proves the pinned footer came with it.
+            await expect(page.getByLabel('Masa berlaku (hari)')).toBeVisible();
+            await expect(page.getByRole('button', { name: 'Buat paket' })).toBeVisible();
+        },
     },
     {
         name: 'admin camera-reports (25 reports + filters)',
@@ -1435,6 +1800,8 @@ const ADMIN_PAGES = [
         name: 'admin sponsors (create form open)',
         url: '/admin/sponsors',
         ready: 'text=CV SUMBER REJEKI ELEKTRONIK DAN PERKAKAS TEKNIK MANDIRI SEJAHTERA 1',
+        // ui/Modal (SponsorManagement.jsx:598) — a form dialog carrying a camera-assignment list.
+        dialog: true,
         open: async (page) => {
             await page.getByRole('button', { name: /Tambah Sponsor/ }).first().click();
             await expect(page.getByRole('dialog').first()).toBeVisible();
@@ -1449,8 +1816,24 @@ const ADMIN_PAGES = [
         name: 'admin promo-banners (create form open, 750-camera picker)',
         url: '/admin/promo-banners',
         ready: 'text=PROMO PEMASANGAN CCTV RUMAH DAN TOKO GRATIS SURVEI WILAYAH 1',
+        /* The note that used to sit here said: when this form moves into ui/Modal, add `dialog:
+         * true` in the SAME change, or the conversion silently swaps a real measurement for none at
+         * all. That move happened (PromoBannerManagement.jsx), so here is the flag.
+         *
+         * The `open` step also had to grow. It only clicked "Tambah promo", which left the form on
+         * its default target_mode of 'all' — the 750-camera picker this entry is NAMED after never
+         * rendered, so the widest thing on the page was never on screen. Selecting "Kamera
+         * tertentu" is what makes the name true. */
+        dialog: true,
         open: async (page) => {
             await page.getByRole('button', { name: /Tambah promo/i }).first().click();
+            await expect(page.getByRole('dialog').first()).toBeVisible();
+            await page.getByRole('radio', { name: /Kamera tertentu/ }).click();
+            await expect(
+                page.getByLabel('Cari Kamera'),
+                'the camera picker never rendered, so this run measured a 3-radio form',
+            ).toBeVisible();
+            await expect(page.getByText(/Menampilkan 200 dari 750/)).toBeVisible();
         },
     },
     {
@@ -1492,19 +1875,84 @@ const ADMIN_PAGES = [
         ready: 'text=RAFCCTV-0001-XKQP-9F2D',
     },
     {
+        /* Dialog coverage from day one. This page ALREADY renders its form through ui/Modal
+         * (VoucherManagement.jsx:467, size="lg"), so the dialog measurement is exercised by the
+         * suite now rather than only once the inline forms are converted. It earned its place on
+         * the first run: an lg dialog holding a 5-field number grid and a <fieldset> of 40 area
+         * rows at 320px/1.5x font is the entry that surfaced the VoucherManagement defect recorded
+         * at the top of this file. */
+        name: 'admin voucher (profile form open, ui/Modal)',
+        url: '/admin/voucher',
+        ready: 'text=RAFCCTV-0001-XKQP-9F2D',
+        dialog: true,
+        open: async (page) => {
+            await page.getByRole('button', { name: /Tambah Profil/ }).first().click();
+            await expect(page.getByRole('dialog').first()).toBeVisible();
+            // Keyed to a control INSIDE the panel: proves the form body rendered, not just the shell.
+            await expect(shown(page, 'text=Area yang dibuka')).toBeVisible();
+        },
+    },
+    {
         name: 'admin ronda (6 camera config panels)',
         url: '/admin/ronda',
         ready: `text=${cameraName(1)}`,
     },
     {
-        name: 'admin hitung-kendaraan (6 cameras + line editor + counters)',
+        /* The add-camera form moved into ui/Modal, so <main> can no longer see it — this entry is
+         * the replacement measurement, not an extra. It carries the 40-camera picker, whose option
+         * labels are the longest strings on the page. */
+        name: 'admin ronda (add-camera form open, ui/Modal)',
+        url: '/admin/ronda',
+        ready: `text=${cameraName(1)}`,
+        dialog: true,
+        open: async (page) => {
+            await page.getByRole('button', { name: /Tambah Kamera/ }).first().click();
+            await expect(page.getByRole('dialog').first()).toBeVisible();
+            // Keyed INSIDE the panel: proves the form body rendered, not just the dialog shell.
+            await expect(shown(page, 'text=Nama area (untuk pesan)')).toBeVisible();
+        },
+    },
+    {
+        /* The counting SETTINGS form is a dialog now; what stays in <main> is the camera list plus
+         * the live counter panel of the auto-selected camera (still dense: a 5-tile grid, a
+         * per-direction list and the operational one-liner). The form itself is measured by the
+         * entry below. */
+        name: 'admin hitung-kendaraan (6 cameras + live counters)',
         url: '/admin/hitung-kendaraan',
         ready: `text=${cameraName(1)}`,
+    },
+    {
+        /* Where the line editor, the 4 direction presets and the 8-field settings grid live now.
+         * The page auto-SELECTS the first camera but deliberately does not auto-open this dialog,
+         * so the click is required. */
+        name: 'admin hitung-kendaraan (settings form open, ui/Modal)',
+        url: '/admin/hitung-kendaraan',
+        ready: `text=${cameraName(1)}`,
+        dialog: true,
+        open: async (page) => {
+            await page.getByRole('button', { name: 'Ubah setelan' }).first().click();
+            await expect(page.getByRole('dialog').first()).toBeVisible();
+            await expect(shown(page, 'text=Nyalakan penghitungan')).toBeVisible();
+        },
     },
     {
         name: 'admin telegram-archive (8 routes + 30-camera routing table + activity)',
         url: '/admin/telegram-archive',
         ready: 'text=Rute arsip',
+    },
+    {
+        /* RouteForm used to render unconditionally, i.e. <main> measured it on every run of the
+         * entry above. It is a dialog now, so this entry inherits that coverage — including the
+         * group <select> whose option labels are 50+ characters. */
+        name: 'admin telegram-archive (route form open, ui/Modal)',
+        url: '/admin/telegram-archive',
+        ready: 'text=Rute arsip',
+        dialog: true,
+        open: async (page) => {
+            await page.getByRole('button', { name: '+ Tambah rute' }).first().click();
+            await expect(page.getByRole('dialog').first()).toBeVisible();
+            await expect(shown(page, 'text=Grup Telegram')).toBeVisible();
+        },
     },
     {
         name: 'admin arsip (25 segments in a day timeline)',
@@ -1554,13 +2002,14 @@ for (const spec of ADMIN_PAGES) {
             // Let lazy admin chunks and deferred mounts settle.
             await page.waitForTimeout(600);
 
-            await assertNoAdminOverflow(page, `${spec.name} @${vp.label}`);
+            const opts = { expectDialog: !!spec.dialog };
+            await assertNoAdminOverflow(page, `${spec.name} @${vp.label}`, opts);
 
             // Android "large text" (~1.5x) — the setting that turned a merely-tight admin row into
             // an off-screen one before the toggles got min-w-0 + truncate.
             await page.evaluate(() => { document.documentElement.style.fontSize = '24px'; });
             await page.waitForTimeout(300);
-            await assertNoAdminOverflow(page, `${spec.name} @${vp.label} @1.5x font`);
+            await assertNoAdminOverflow(page, `${spec.name} @${vp.label} @1.5x font`, opts);
         });
     }
 }

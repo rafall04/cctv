@@ -9,7 +9,7 @@
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import PromoBannerForm from './PromoBannerForm';
+import PromoBannerForm, { PROMO_FORM_ID } from './PromoBannerForm';
 
 const { uploadPromoBannerImage, showNotification } = vi.hoisted(() => ({
     uploadPromoBannerImage: vi.fn(),
@@ -40,16 +40,25 @@ function makeFile({ name = 'poster.png', type = 'image/png', size = 1024 } = {})
     return file;
 }
 
+/*
+ * The form no longer renders its own Simpan button: it is the body of a ui/Modal, and the footer
+ * button lives OUTSIDE the <form>, reaching in through `form={PROMO_FORM_ID}`. That association is
+ * exactly what these tests must keep exercising — a footer pointing at a stale id does not throw,
+ * it just quietly stops submitting — so the harness reproduces the real call site rather than
+ * dropping the click. The button text matches PromoBannerManagement's footer.
+ */
 function renderForm(props = {}) {
     return render(
-        <PromoBannerForm
-            promo={null}
-            areas={AREAS}
-            cameras={CAMERAS}
-            onSubmit={vi.fn()}
-            onCancel={vi.fn()}
-            {...props}
-        />
+        <>
+            <PromoBannerForm
+                promo={null}
+                areas={AREAS}
+                cameras={CAMERAS}
+                onSubmit={vi.fn()}
+                {...props}
+            />
+            <button type="submit" form={PROMO_FORM_ID}>Simpan</button>
+        </>
     );
 }
 
@@ -63,6 +72,25 @@ beforeEach(() => {
     });
     globalThis.URL.createObjectURL = vi.fn(() => 'blob:preview');
     globalThis.URL.revokeObjectURL = vi.fn();
+});
+
+describe('the Modal footer can reach the form', () => {
+    it('carries PROMO_FORM_ID so an outside submit button owns it', () => {
+        const { container } = renderForm({ promo: null });
+        const form = container.querySelector('form');
+
+        expect(form).not.toBeNull();
+        expect(form.id).toBe(PROMO_FORM_ID);
+        // Not cosmetic: this is what makes the external button its submitter.
+        expect(screen.getByRole('button', { name: 'Simpan' }).form).toBe(form);
+    });
+
+    it('renders no action row of its own — the dialog footer owns Simpan and Batal', () => {
+        const { container } = renderForm({ promo: null });
+
+        expect(container.querySelector('form button[type="submit"]')).toBeNull();
+        expect(screen.queryByRole('button', { name: 'Batal' })).toBeNull();
+    });
 });
 
 describe('poster picker on a NEW promo', () => {

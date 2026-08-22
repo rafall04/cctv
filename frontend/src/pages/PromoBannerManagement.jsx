@@ -2,9 +2,20 @@
  * Purpose: Admin page for the provider's own promo posters — list, create, edit, delete,
  *   and read impression/click figures.
  * Caller: App.jsx route /admin/promo-banners (admin only).
- * Deps: promoBannerService, areaService, cameraService, PromoBannerForm, ConfirmDialog.
+ * Deps: promoBannerService, areaService, cameraService, PromoBannerForm, components/ui (Button,
+ *   Modal), ConfirmContext.useConfirm.
  * MainFuncs: PromoBannerManagement.
  * SideEffects: Admin CRUD against /api/promo-banners.
+ *
+ * THE EDITOR IS A ui/Modal, AND IT IS dismissible={false}
+ * -------------------------------------------------------
+ * It used to be an inline <section> shoved above the list, which pushed the rows off screen the
+ * moment "Tambah promo" was pressed. As a dialog it matches every other admin form and inherits the
+ * focus trap, Escape, scroll lock and pinned footer instead of re-deciding each one here.
+ *
+ * `dismissible={false}` is deliberately the OPPOSITE of ui/Modal's default. This form is ~24 fields
+ * plus a poster upload; a backdrop tap beside it would silently throw all of that away, and there
+ * is no draft anywhere to recover it from. Closing is Batal, and only Batal.
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -17,8 +28,9 @@ import {
 import { areaService } from '../services/areaService';
 import { cameraService } from '../services/cameraService';
 import { useNotification } from '../contexts/NotificationContext';
-import PromoBannerForm from '../components/admin/promo/PromoBannerForm';
-import ConfirmDialog from '../components/ui/ConfirmDialog';
+import { useConfirm } from '../contexts/ConfirmContext';
+import { Button, Modal } from '../components/ui';
+import PromoBannerForm, { PROMO_FORM_ID } from '../components/admin/promo/PromoBannerForm';
 
 const PLACEMENT_LABELS = {
     popup: 'Bawah video live',
@@ -143,8 +155,8 @@ export default function PromoBannerManagement() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [editing, setEditing] = useState(null);
-    const [pendingDelete, setPendingDelete] = useState(null);
     const { showNotification } = useNotification();
+    const confirm = useConfirm();
 
     const loadPromos = useCallback(async () => {
         const result = await getAllPromoBanners();
@@ -226,19 +238,31 @@ export default function PromoBannerManagement() {
         return result.data || null;
     };
 
-    const handleDelete = async () => {
-        if (!pendingDelete) {
+    /*
+     * The app-wide ConfirmProvider owns the dialog, so the page keeps no `pendingDelete` row in
+     * state just to feed one it mounted itself — `await confirm(...)` reads top-to-bottom, like the
+     * 16 other call sites.
+     */
+    const handleDelete = async (promo) => {
+        const confirmed = await confirm({
+            title: 'Hapus promo?',
+            message: `"${promo.title}" beserta gambar dan statistiknya akan dihapus permanen.`,
+            confirmLabel: 'Hapus',
+            cancelLabel: 'Batal',
+            tone: 'danger',
+        });
+        if (!confirmed) {
             return;
         }
-        const result = await deletePromoBanner(pendingDelete.id);
-        setPendingDelete(null);
+
+        const result = await deletePromoBanner(promo.id);
 
         if (!result.success) {
             showNotification({ type: 'error', title: 'Gagal menghapus', message: result.message });
             return;
         }
         showNotification({ type: 'success', title: 'Promo dihapus' });
-        if (editing?.id === pendingDelete.id) {
+        if (editing?.id === promo.id) {
             setEditing(null);
         }
         await loadPromos();
@@ -254,33 +278,15 @@ export default function PromoBannerManagement() {
                         Terpisah dari Sponsor dan dari Iklan — tetap tayang walau iklan dimatikan.
                     </p>
                 </div>
-                {!editing && (
-                    <button
-                        type="button"
-                        onClick={() => setEditing({})}
-                        className="rounded-control bg-primary px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
-                    >
-                        Tambah promo
-                    </button>
-                )}
+                {/*
+                  * No longer hidden while the editor is open: the editor is a dialog now, so it
+                  * covers the page, traps focus and locks scroll. Hiding the button as well only
+                  * made the header jump every time the dialog opened and closed.
+                  * <Button> rather than a hand-rolled class string so the 44px coarse-pointer
+                  * target comes from the primitive instead of being re-decided here.
+                  */}
+                <Button variant="primary" onClick={() => setEditing({})}>Tambah promo</Button>
             </header>
-
-            {editing && (
-                <section className="rounded-card border border-edge bg-surface p-4 shadow-e1">
-                    <h2 className="mb-4 text-base font-semibold text-content">
-                        {editing.id ? `Ubah: ${editing.title}` : 'Promo baru'}
-                    </h2>
-                    <PromoBannerForm
-                        promo={editing.id ? editing : null}
-                        areas={areas}
-                        cameras={cameras}
-                        saving={saving}
-                        onSubmit={handleSubmit}
-                        onUploaded={loadPromos}
-                        onCancel={() => setEditing(null)}
-                    />
-                </section>
-            )}
 
             <section className="space-y-3">
                 {loading && <p className="text-sm text-content-muted">Memuat…</p>}
@@ -300,21 +306,35 @@ export default function PromoBannerManagement() {
                         promo={promo}
                         areaNameById={areaNameById}
                         onEdit={setEditing}
-                        onDelete={setPendingDelete}
+                        onDelete={handleDelete}
                     />
                 ))}
             </section>
 
-            {pendingDelete && (
-                <ConfirmDialog
-                    title="Hapus promo?"
-                    message={`"${pendingDelete.title}" beserta gambar dan statistiknya akan dihapus permanen.`}
-                    confirmLabel="Hapus"
-                    cancelLabel="Batal"
-                    tone="danger"
-                    onConfirm={handleDelete}
-                    onCancel={() => setPendingDelete(null)}
-                />
+            {editing && (
+                <Modal
+                    title={editing.id ? `Ubah: ${editing.title}` : 'Promo baru'}
+                    size="xl"
+                    // See the header: NOT the ui/Modal default, and that is the whole point.
+                    dismissible={false}
+                    onClose={() => setEditing(null)}
+                    footer={(
+                        <>
+                            <Button onClick={() => setEditing(null)} disabled={saving}>Batal</Button>
+                            <Button type="submit" form={PROMO_FORM_ID} variant="primary" loading={saving}>
+                                {saving ? 'Menyimpan…' : 'Simpan'}
+                            </Button>
+                        </>
+                    )}
+                >
+                    <PromoBannerForm
+                        promo={editing.id ? editing : null}
+                        areas={areas}
+                        cameras={cameras}
+                        onSubmit={handleSubmit}
+                        onUploaded={loadPromos}
+                    />
+                </Modal>
             )}
         </div>
     );

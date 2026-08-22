@@ -392,3 +392,98 @@ describe('guardrail: a themed canvas must theme its text too', () => {
         ).toBe(null);
     });
 });
+
+describe('guardrail: an option/prop the receiver never reads is dropped in silence', () => {
+    /*
+     * Same failure shape as the token typo-proofing above, one layer up: JavaScript does not care
+     * that nobody reads your key, and React does not care that nobody declared your prop. Both
+     * throw the value away without a word, and the call site keeps working — it just stops saying
+     * what it was written to say. Three of these shipped:
+     *
+     *   - TelegramArchiveSettings passed `confirmText`/`variant`; useConfirm reads `confirmLabel`
+     *     and `tone`, so a destructive delete asked with the default "Ya" and no danger colour.
+     *   - VoucherManagement passed the consequences of locking public cameras as `body`; useConfirm
+     *     reads `message`, so the dialog asked the question with the consequences nowhere on screen.
+     *   - DashboardStreams passed `onAddCamera` to a preset that declared no props, so the wired
+     *     navigation was dead and the empty state offered no way out.
+     *
+     * Every one of them was found by hand, months later. Scoped deliberately: these two receivers
+     * are small, closed lists, which is what makes a static check honest here rather than a
+     * best-effort prop-type reimplementation.
+     */
+    const sources = walk(SRC_ROOT).map((f) => [rel(f), fs.readFileSync(f, 'utf8')]);
+    // Comments live INSIDE several of these argument objects (they explain the copy). Dropping them
+    // first is what keeps the key regexes below reading code rather than prose.
+    const decomment = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').filter((l) => !l.trim().startsWith('//')).join('\n');
+    /** The argument text of a call, read by balancing parentheses from `open`. */
+    const argOf = (src, open) => {
+        let depth = 0;
+        for (let i = open; i < src.length; i++) {
+            if (src[i] === '(') depth++;
+            else if (src[i] === ')' && --depth === 0) return src.slice(open + 1, i);
+        }
+        return '';
+    };
+
+    it('every useConfirm option is a key ConfirmContext actually renders', () => {
+        // Mirrors the destructuring in contexts/ConfirmContext.jsx — extend both together.
+        const API = ['title', 'message', 'confirmLabel', 'cancelLabel', 'tone'];
+        const offenders = [];
+        for (const [r, raw] of sources) {
+            if (r === 'contexts/ConfirmContext.jsx') continue; // the definition, not a call site
+            const src = decomment(raw);
+            // `[^.\w]` keeps window.confirm() and showConfirm() out of the sweep.
+            for (const m of src.matchAll(/(?:^|[^.\w])confirm\s*\(/g)) {
+                const arg = argOf(src, m.index + m[0].length - 1).trim();
+                if (!arg.startsWith('{')) continue; // confirm('plain string') is a supported form
+                for (const k of arg.matchAll(/[{,]\s*(\w+)\s*:/g)) {
+                    if (!API.includes(k[1])) offenders.push(`${r}: confirm({ ${k[1]}: … }) — not read (API: ${API.join(', ')})`);
+                }
+            }
+        }
+        expect(
+            offenders,
+            `\nuseConfirm option nobody reads — the dialog renders without it and nothing warns:\n  ${offenders.join('\n  ')}\n`,
+        ).toEqual([]);
+    });
+
+    it('every prop passed to an EmptyState preset is one the preset declares', () => {
+        const emptyState = fs.readFileSync(path.join(SRC_ROOT, 'components/ui/EmptyState.jsx'), 'utf8');
+        const declared = {};
+        for (const m of emptyState.matchAll(/export function (\w+)\(([^)]*)\)/g)) {
+            const params = m[2].trim();
+            declared[m[1]] = params.startsWith('{')
+                ? [...params.matchAll(/(\w+)\s*(?:=[^,}]*)?\s*[,}]/g)].map((p) => p[1])
+                : [];
+        }
+        // React reads these itself; they never reach the component's props.
+        const REACT_OWNED = ['key', 'ref'];
+        const offenders = [];
+        for (const [r, raw] of sources) {
+            if (r === 'components/ui/EmptyState.jsx') continue;
+            for (const name of Object.keys(declared)) {
+                for (const m of raw.matchAll(new RegExp(`<${name}[\\s/>]`, 'g'))) {
+                    // Brace-aware: an attribute value can contain '>' (`onAddCamera={() => nav()}`),
+                    // so scanning to the first '>' would cut the tag in half and miss props.
+                    let depth = 0;
+                    let i = m.index + name.length + 1;
+                    for (; i < raw.length; i++) {
+                        if (raw[i] === '{') depth++;
+                        else if (raw[i] === '}') depth--;
+                        else if (raw[i] === '>' && depth === 0) break;
+                    }
+                    const attrs = raw.slice(m.index + name.length + 1, i);
+                    for (const a of attrs.matchAll(/(?:^|\s)(\w+)=/g)) {
+                        if (!declared[name].includes(a[1]) && !REACT_OWNED.includes(a[1])) {
+                            offenders.push(`${r}: <${name} ${a[1]}={…}> — ${name}() declares ${declared[name].length ? declared[name].join(', ') : 'no props'}`);
+                        }
+                    }
+                }
+            }
+        }
+        expect(
+            offenders,
+            `\nProp React will drop on the floor — declare it in EmptyState.jsx or stop passing it:\n  ${offenders.join('\n  ')}\n`,
+        ).toEqual([]);
+    });
+});

@@ -11,7 +11,7 @@
  * terlihat "tidak menyimpan". Tes ini memastikan payload-nya persis, bukan sekadar terkirim.
  */
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import VehicleCountSettings from './VehicleCountSettings';
 import vehicleCountAdminService from '../services/vehicleCountAdminService';
@@ -95,6 +95,7 @@ describe('VehicleCountSettings', () => {
     it('mengirim tepat field yang diterima skema rute — tidak lebih, tidak kurang', async () => {
         render(<VehicleCountSettings />);
         fireEvent.click(await screen.findByText('SOSRODILOGO'));
+        fireEvent.click(await screen.findByText('Ubah setelan'));
         fireEvent.click(await screen.findByText('Simpan setelan'));
 
         await waitFor(() => expect(vehicleCountAdminService.saveCamera).toHaveBeenCalled());
@@ -143,6 +144,7 @@ describe('VehicleCountSettings', () => {
         });
         render(<VehicleCountSettings />);
         fireEvent.click(await screen.findByText('SOSRODILOGO'));
+        fireEvent.click(await screen.findByText('Ubah setelan'));
         fireEvent.click(await screen.findByText('Simpan setelan'));
 
         await waitFor(() => expect(showNotification).toHaveBeenCalledWith(
@@ -151,11 +153,65 @@ describe('VehicleCountSettings', () => {
     });
 
     /*
-     * REGRESI (audit keseragaman admin, 2026-08-22): ini satu-satunya aksi merusak di seluruh
-     * permukaan admin yang langsung jalan tanpa bertanya. Tombolnya memakai KELAS_TOMBOL yang
-     * sama dengan dua tetangganya dan duduk persis di antara "Simpan setelan" dan "Tutup", jadi
-     * satu salah pencet membuang garis hitung, arah arus, model dan seluruh ambang yang sudah
-     * disetel manual — tanpa jalan kembali.
+     * Formulirnya kini ui/Modal. Dua hal yang dijaga sekaligus:
+     *  - setelannya benar-benar berada DI DALAM dialog (kalau suatu saat kembali menjadi formulir
+     *    inline, pengukuran overflow e2e untuk halaman ini akan diam-diam kehilangan sasarannya);
+     *  - "Hapus dari daftar" TIDAK ikut masuk ke dialog. ConfirmDialog memasang jerat fokusnya
+     *    sendiri, dan dua jerat yang hidup bersamaan saling merebut Tab.
+     */
+    it('menaruh setelan di dalam dialog, dan tombol hapus tetap di luar', async () => {
+        render(<VehicleCountSettings />);
+        fireEvent.click(await screen.findByText('SOSRODILOGO'));
+
+        expect(screen.queryByRole('dialog')).toBeNull();          // memilih ≠ mengedit
+        expect(screen.getByText('Hapus dari daftar')).toBeTruthy();
+
+        fireEvent.click(screen.getByText('Ubah setelan'));
+
+        const dialog = await screen.findByRole('dialog');
+        expect(within(dialog).getByText('Simpan setelan')).toBeTruthy();
+        expect(within(dialog).getByText('Nyalakan penghitungan')).toBeTruthy();
+        expect(within(dialog).queryByText('Hapus dari daftar')).toBeNull();
+    });
+
+    /*
+     * `ubah()` menulis langsung ke draft, dan panel di halaman membaca draft itu juga — jadi
+     * "Batal" yang cuma menutup dialog akan meninggalkan centang yang TIDAK tersimpan tampil di
+     * halaman seolah sudah berlaku. Batal harus memuat ulang keadaan yang benar-benar tersimpan.
+     */
+    it('membatalkan membuang perubahan yang belum disimpan, bukan sekadar menutup', async () => {
+        render(<VehicleCountSettings />);
+        fireEvent.click(await screen.findByText('SOSRODILOGO'));
+        fireEvent.click(await screen.findByText('Ubah setelan'));
+
+        const dialog = await screen.findByRole('dialog');
+        fireEvent.click(within(dialog).getByLabelText('Nyalakan penghitungan'));
+        expect(await screen.findByText('penghitungan dimatikan')).toBeTruthy();
+
+        fireEvent.click(within(dialog).getByText('Batal'));
+
+        await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+        // ...dan panel kembali menyebut keadaan yang tersimpan di server, bukan centang tadi.
+        expect(await screen.findByText('penghitungan dinyalakan')).toBeTruthy();
+        expect(vehicleCountAdminService.saveCamera).not.toHaveBeenCalled();
+    });
+
+    it('menutup dialog setelah tersimpan, supaya angka hitungannya terlihat lagi', async () => {
+        render(<VehicleCountSettings />);
+        fireEvent.click(await screen.findByText('SOSRODILOGO'));
+        fireEvent.click(await screen.findByText('Ubah setelan'));
+        fireEvent.click(await screen.findByText('Simpan setelan'));
+
+        await waitFor(() => expect(vehicleCountAdminService.saveCamera).toHaveBeenCalled());
+        await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    });
+
+    /*
+     * REGRESI (audit keseragaman admin, 2026-08-22): ini dulu satu-satunya aksi merusak di
+     * seluruh permukaan admin yang langsung jalan tanpa bertanya — satu salah pencet membuang
+     * garis hitung, arah arus, model dan seluruh ambang yang disetel manual, tanpa jalan kembali.
+     * Sejak formulirnya pindah ke ui/Modal, tombolnya duduk di panel kamera (di luar dialog) dan
+     * memakai varian dangerGhost, tetapi konfirmasinya tetap yang menahan salah pencet.
      *
      * Dua arah diuji dengan sengaja. Mock yang selalu menjawab "ya" akan membiarkan konfirmasinya
      * dihapus lagi tanpa ada tes yang merah.

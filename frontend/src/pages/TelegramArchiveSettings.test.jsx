@@ -74,8 +74,20 @@ function renderPage() {
     return render(<TelegramArchiveSettings />);
 }
 
+/*
+ * The route form is a ui/Modal now, so "the page has loaded" can no longer be "the form is on
+ * screen" — it is the button that opens it. Note the trigger reads "+ Tambah rute" while the submit
+ * button inside the dialog reads "Tambah rute": exact-name role queries keep the two apart.
+ */
 async function waitForLoaded() {
-    await screen.findByText('Tambah rute baru');
+    await screen.findByRole('button', { name: '+ Tambah rute' });
+}
+
+/** Loaded page → open add-route dialog. Every field-level test starts here. */
+async function openAddForm() {
+    await waitForLoaded();
+    fireEvent.click(screen.getByRole('button', { name: '+ Tambah rute' }));
+    return screen.findByRole('dialog');
 }
 
 /** The picker is the default path; these switch to the plain id field. */
@@ -97,6 +109,8 @@ describe('loading and empty states', () => {
         renderPage();
         expect(await screen.findByText(/belum terpasang di server ini/i)).toBeTruthy();
         expect(screen.queryByText('Tambah rute baru')).toBeNull();
+        // ...and no way to summon it either: the dialog trigger is gone with the rest of the page.
+        expect(screen.queryByRole('button', { name: '+ Tambah rute' })).toBeNull();
     });
 
     it('summarises how many cameras are actually archived', async () => {
@@ -122,7 +136,7 @@ describe('loading and empty states', () => {
 describe('scope switching', () => {
     it('shows the camera picker for camera scope and swaps to areas for area scope', async () => {
         renderPage();
-        await waitForLoaded();
+        await openAddForm();
 
         expect(screen.getByLabelText('Kamera')).toBeTruthy();
         expect(screen.queryByLabelText('Area')).toBeNull();
@@ -134,7 +148,7 @@ describe('scope switching', () => {
 
     it('hides both pickers for "all cameras"', async () => {
         renderPage();
-        await waitForLoaded();
+        await openAddForm();
         fireEvent.change(screen.getByLabelText('Cakupan'), { target: { value: 'all' } });
         expect(screen.queryByLabelText('Kamera')).toBeNull();
         expect(screen.queryByLabelText('Area')).toBeNull();
@@ -144,7 +158,7 @@ describe('scope switching', () => {
 describe('group picker (discovered groups)', () => {
     it('offers every discovered group instead of asking for an id', async () => {
         renderPage();
-        await waitForLoaded();
+        await openAddForm();
 
         const picker = screen.getByLabelText('Grup Telegram');
         expect(picker.tagName).toBe('SELECT');
@@ -155,7 +169,7 @@ describe('group picker (discovered groups)', () => {
 
     it('flags a group the bot may not post files to, right in the option', async () => {
         renderPage();
-        await waitForLoaded();
+        await openAddForm();
         const locked = [...screen.getByLabelText('Grup Telegram').options]
             .find((o) => o.value === '-5599990000');
         expect(locked.textContent).toMatch(/bot tak boleh kirim file/i);
@@ -163,7 +177,7 @@ describe('group picker (discovered groups)', () => {
 
     it('picking a group fills the route name and confirms permission without a server call', async () => {
         renderPage();
-        await waitForLoaded();
+        await openAddForm();
 
         fireEvent.change(screen.getByLabelText('Grup Telegram'), { target: { value: '-5562560753' } });
 
@@ -174,7 +188,7 @@ describe('group picker (discovered groups)', () => {
 
     it('does not overwrite a route name the operator already typed', async () => {
         renderPage();
-        await waitForLoaded();
+        await openAddForm();
 
         fireEvent.change(screen.getByLabelText('Nama rute'), { target: { value: 'Punya Saya' } });
         fireEvent.change(screen.getByLabelText('Grup Telegram'), { target: { value: '-5562560753' } });
@@ -184,7 +198,7 @@ describe('group picker (discovered groups)', () => {
 
     it('saves the picked group id', async () => {
         renderPage();
-        await waitForLoaded();
+        await openAddForm();
 
         fireEvent.change(screen.getByLabelText('Kamera'), { target: { value: '1435' } });
         fireEvent.change(screen.getByLabelText('Grup Telegram'), { target: { value: '-5562560753' } });
@@ -201,7 +215,7 @@ describe('group picker (discovered groups)', () => {
             data: { ...structuredClone(OVERVIEW), groups: [] },
         });
         renderPage();
-        await waitForLoaded();
+        await openAddForm();
 
         expect(screen.getByLabelText('Grup Telegram').tagName).toBe('INPUT');
         expect(screen.getByText(/Belum ada grup terdeteksi/i)).toBeTruthy();
@@ -216,7 +230,7 @@ describe('chat id verification (manual fallback)', () => {
             data: { chatId: '-5510674082', title: 'CCTV SELATAN AHASS DANDER', type: 'group', canSendDocuments: true },
         });
         renderPage();
-        await waitForLoaded();
+        await openAddForm();
 
         goManual();
         fireEvent.change(screen.getByLabelText('Grup Telegram'), { target: { value: '-5510674082' } });
@@ -232,7 +246,7 @@ describe('chat id verification (manual fallback)', () => {
             data: { chatId: '-1', title: 'Grup Terkunci', type: 'group', canSendDocuments: false },
         });
         renderPage();
-        await waitForLoaded();
+        await openAddForm();
 
         goManual();
         fireEvent.change(screen.getByLabelText('Grup Telegram'), { target: { value: '-5510674082' } });
@@ -244,7 +258,7 @@ describe('chat id verification (manual fallback)', () => {
     it('surfaces a rejected chat id and keeps no verification', async () => {
         verifyChat.mockRejectedValue({ response: { data: { message: 'Telegram menolak: chat not found' } } });
         renderPage();
-        await waitForLoaded();
+        await openAddForm();
 
         goManual();
         fireEvent.change(screen.getByLabelText('Grup Telegram'), { target: { value: '-9999999999' } });
@@ -261,7 +275,7 @@ describe('chat id verification (manual fallback)', () => {
             data: { chatId: '-5510674082', title: 'Grup A', type: 'group', canSendDocuments: true },
         });
         renderPage();
-        await waitForLoaded();
+        await openAddForm();
 
         goManual();
         const input = screen.getByLabelText('Grup Telegram');
@@ -275,7 +289,7 @@ describe('chat id verification (manual fallback)', () => {
 
     it('does not call the server with an empty chat id', async () => {
         renderPage();
-        await waitForLoaded();
+        await openAddForm();
         goManual();
         fireEvent.click(screen.getByRole('button', { name: 'Periksa' }));
         expect(verifyChat).not.toHaveBeenCalled();
@@ -286,7 +300,7 @@ describe('chat id verification (manual fallback)', () => {
 describe('creating a route', () => {
     it('sends the camera payload and reloads', async () => {
         renderPage();
-        await waitForLoaded();
+        await openAddForm();
 
         fireEvent.change(screen.getByLabelText('Kamera'), { target: { value: '1435' } });
         goManual();
@@ -306,7 +320,7 @@ describe('creating a route', () => {
 
     it('sends areaId (and no cameraId) for an area route', async () => {
         renderPage();
-        await waitForLoaded();
+        await openAddForm();
 
         fireEvent.change(screen.getByLabelText('Cakupan'), { target: { value: 'area' } });
         fireEvent.change(screen.getByLabelText('Area'), { target: { value: '3' } });
@@ -322,7 +336,7 @@ describe('creating a route', () => {
 
     it('trims whitespace out of the chat id before sending', async () => {
         renderPage();
-        await waitForLoaded();
+        await openAddForm();
 
         fireEvent.change(screen.getByLabelText('Kamera'), { target: { value: '1435' } });
         goManual();
@@ -336,7 +350,7 @@ describe('creating a route', () => {
     it('shows the server validation message instead of failing silently', async () => {
         createRoute.mockRejectedValue({ response: { data: { message: 'Rute yang sama persis sudah ada' } } });
         renderPage();
-        await waitForLoaded();
+        await openAddForm();
 
         fireEvent.change(screen.getByLabelText('Kamera'), { target: { value: '1441' } });
         goManual();
@@ -389,15 +403,25 @@ describe('editing, toggling, deleting', () => {
         expect(control.value).toBe('-5544332211');   // never silently reset
     });
 
-    it('cancels an edit without saving', async () => {
+    /*
+     * Batal now also CLOSES the dialog, so the old "the field went back to empty" assertion has no
+     * field left to read. Same guarantee, stated against the new structure: nothing was saved, the
+     * dialog is gone, and the draft it was holding did not survive into the next one.
+     */
+    it('cancels an edit without saving, and does not keep the abandoned draft', async () => {
         renderPage();
         await waitForLoaded();
 
         fireEvent.click(screen.getByRole('button', { name: 'Ubah' }));
+        expect(await screen.findByRole('dialog')).toBeTruthy();
         fireEvent.click(screen.getByRole('button', { name: 'Batal' }));
 
-        expect(screen.getByLabelText('Grup Telegram').value).toBe('');
+        await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
         expect(updateRoute).not.toHaveBeenCalled();
+
+        await openAddForm();
+        expect(screen.getByLabelText('Grup Telegram').value).toBe('');
+        expect(screen.getByLabelText('Nama rute').value).toBe('');
     });
 
     it('toggles a route off without touching any other field', async () => {
@@ -428,6 +452,47 @@ describe('editing, toggling, deleting', () => {
 
         fireEvent.click(screen.getByRole('button', { name: 'Hapus' }));
         await waitFor(() => expect(deleteRoute).toHaveBeenCalledWith('arsip-selatan-ahass'));
+    });
+});
+
+/*
+ * Structure, not behaviour — and worth asserting because both facts are load-bearing elsewhere:
+ * the e2e overflow guard only measures this form while it is a [role="dialog"], and "add" and
+ * "edit" being ONE dialog is what keeps the two paths from drifting apart.
+ */
+describe('the form is one dialog, for both adding and editing', () => {
+    it('renders the fields inside the dialog, not on the page', async () => {
+        renderPage();
+        const dialog = await openAddForm();
+
+        expect(within(dialog).getByLabelText('Cakupan')).toBeTruthy();
+        expect(within(dialog).getByLabelText('Grup Telegram')).toBeTruthy();
+        expect(within(dialog).getByRole('button', { name: 'Tambah rute' })).toBeTruthy();
+    });
+
+    it('re-uses the same dialog for an edit, only relabelled', async () => {
+        renderPage();
+        await waitForLoaded();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Ubah' }));
+
+        const dialogs = await screen.findAllByRole('dialog');
+        expect(dialogs).toHaveLength(1);
+        expect(within(dialogs[0]).getByText('Ubah rute')).toBeTruthy();
+        expect(within(dialogs[0]).getByRole('button', { name: 'Simpan perubahan' })).toBeTruthy();
+        expect(screen.queryByText('Tambah rute baru')).toBeNull();
+    });
+
+    it('closes itself once the route is saved', async () => {
+        renderPage();
+        await openAddForm();
+
+        fireEvent.change(screen.getByLabelText('Kamera'), { target: { value: '1435' } });
+        fireEvent.change(screen.getByLabelText('Grup Telegram'), { target: { value: '-5562560753' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Tambah rute' }));
+
+        await waitFor(() => expect(createRoute).toHaveBeenCalled());
+        await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     });
 });
 

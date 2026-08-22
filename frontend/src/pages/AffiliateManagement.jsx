@@ -3,9 +3,21 @@
  *   deal) and BARANG (the product cards shown under a live camera), plus the per-offer counters.
  * Caller: App.jsx route /admin/affiliate (admin only; the route + menu entry are wired by hand).
  * Deps: affiliateAdminService, areaService, cameraService, AffiliatePartnerForm,
- *   AffiliateOfferForm, components/ui, ConfirmDialog, billingFormat.formatRupiah.
+ *   AffiliateOfferForm, components/ui (incl. Modal), ConfirmContext.useConfirm,
+ *   billingFormat.formatRupiah.
  * MainFuncs: AffiliateManagement.
  * SideEffects: Admin CRUD against /api/admin/affiliate/*.
+ *
+ * BOTH EDITORS ARE ui/Modal, AND BOTH ARE dismissible={false}
+ * -----------------------------------------------------------
+ * They used to be inline <Card>s pushed above the list, which meant "Tambah barang" scrolled the
+ * rows away and the operator lost their place. As dialogs they match the other six admin forms and
+ * inherit the focus trap, Escape, scroll lock and pinned footer for free.
+ *
+ * `dismissible={false}` is not a default being restated — it is the opposite of ui/Modal's default,
+ * chosen because these are the two longest forms in admin (the offer editor alone has ~24 fields
+ * plus a photo upload). A backdrop tap next to the dialog would otherwise discard the lot silently,
+ * which trades a layout inconsistency for data loss. Batal is explicit; nothing else closes them.
  *
  * WHY EVERY URL ON THIS PAGE IS PLAIN TEXT AND NEVER A LIVE <a href>
  * -----------------------------------------------------------------
@@ -51,10 +63,10 @@ import {
 import { areaService } from '../services/areaService';
 import { cameraService } from '../services/cameraService';
 import { useNotification } from '../contexts/NotificationContext';
-import { Badge, Button, Card, PageHeader, Tabs, TabPanel } from '../components/ui';
-import ConfirmDialog from '../components/ui/ConfirmDialog';
-import AffiliatePartnerForm from '../components/admin/affiliate/AffiliatePartnerForm';
-import AffiliateOfferForm from '../components/admin/affiliate/AffiliateOfferForm';
+import { useConfirm } from '../contexts/ConfirmContext';
+import { Badge, Button, Card, Modal, PageHeader, Tabs, TabPanel } from '../components/ui';
+import AffiliatePartnerForm, { PARTNER_FORM_ID } from '../components/admin/affiliate/AffiliatePartnerForm';
+import AffiliateOfferForm, { OFFER_FORM_ID } from '../components/admin/affiliate/AffiliateOfferForm';
 // Reused rather than re-implemented: money renders identically to every other rupiah figure in
 // admin (INTEGER rupiah, id-ID grouping, no decimals).
 import { formatRupiah } from '../components/admin/billing/billingFormat';
@@ -344,8 +356,8 @@ export default function AffiliateManagement() {
     const [saving, setSaving] = useState(false);
     const [editingPartner, setEditingPartner] = useState(null);
     const [editingOffer, setEditingOffer] = useState(null);
-    const [pendingDelete, setPendingDelete] = useState(null);
     const { showNotification } = useNotification();
+    const confirm = useConfirm();
 
     const reloadPartners = useCallback(async () => {
         const result = await listPartners();
@@ -471,13 +483,37 @@ export default function AffiliateManagement() {
         return result.data || null;
     };
 
-    const handleDelete = async () => {
-        if (!pendingDelete) {
+    /*
+     * The cascade number is the whole point of this sentence: deleting a mitra takes its barang and
+     * every counter attached to them, and nothing else on screen says how many that is.
+     */
+    const deleteMessage = (kind, row) => {
+        if (kind === 'partner') {
+            const count = offerCountByPartner.get(String(row.id)) || 0;
+            return `"${row.store_name}" akan dihapus permanen`
+                + (count > 0 ? `, beserta ${count} barang dan seluruh statistiknya.` : '.');
+        }
+        return `"${row.product_title}" beserta statistiknya akan dihapus permanen.`;
+    };
+
+    /*
+     * The app-wide ConfirmProvider owns the dialog, so this page no longer hand-mounts one or keeps
+     * a `pendingDelete` row in state to feed it — `await confirm(...)` is the same control flow as
+     * window.confirm and reads top-to-bottom, which is what the other 16 call sites do.
+     */
+    const handleDelete = async (kind, row) => {
+        const confirmed = await confirm({
+            title: kind === 'partner' ? 'Hapus mitra?' : 'Hapus barang?',
+            message: deleteMessage(kind, row),
+            confirmLabel: 'Hapus',
+            cancelLabel: 'Batal',
+            tone: 'danger',
+        });
+        if (!confirmed) {
             return;
         }
-        const { kind, row } = pendingDelete;
+
         const result = kind === 'partner' ? await deletePartner(row.id) : await deleteOffer(row.id);
-        setPendingDelete(null);
 
         if (!result.success) {
             showNotification({ type: 'error', title: 'Gagal menghapus', message: result.message });
@@ -499,19 +535,6 @@ export default function AffiliateManagement() {
         }
     };
 
-    const deleteMessage = () => {
-        if (!pendingDelete) {
-            return '';
-        }
-        const { kind, row } = pendingDelete;
-        if (kind === 'partner') {
-            const count = offerCountByPartner.get(String(row.id)) || 0;
-            return `"${row.store_name}" akan dihapus permanen`
-                + (count > 0 ? `, beserta ${count} barang dan seluruh statistiknya.` : '.');
-        }
-        return `"${row.product_title}" beserta statistiknya akan dihapus permanen.`;
-    };
-
     const tabs = [
         { id: 'partners', label: 'Mitra', badge: <Badge mono>{partners.length}</Badge> },
         { id: 'offers', label: 'Barang', badge: <Badge mono>{offers.length}</Badge> },
@@ -526,12 +549,15 @@ export default function AffiliateManagement() {
                     + '"Toko rekanan" ke pengunjung. Terpisah dari Promo Pemasangan (milik sendiri), '
                     + 'Sponsor (logo), dan Iklan (jaringan iklan).'
                 }
+                /*
+                 * The button no longer hides while an editor is open: the editor is a dialog now,
+                 * so it covers the page, traps focus and locks scroll — nothing behind it is
+                 * reachable. Hiding it as well only made the header jump on every open and close.
+                 */
                 actions={
                     tab === 'partners'
-                        ? !editingPartner && (
-                            <Button variant="primary" onClick={() => setEditingPartner({})}>Tambah mitra</Button>
-                        )
-                        : !editingOffer && (
+                        ? <Button variant="primary" onClick={() => setEditingPartner({})}>Tambah mitra</Button>
+                        : (
                             <Button
                                 variant="primary"
                                 onClick={() => setEditingOffer({})}
@@ -550,21 +576,7 @@ export default function AffiliateManagement() {
 
             {!loading && tab === 'partners' && (
                 <TabPanel id="partners" idPrefix="affiliate" className="space-y-3">
-                    {editingPartner && (
-                        <Card>
-                            <h2 className="mb-4 text-sm font-semibold text-content">
-                                {editingPartner.id ? `Ubah mitra: ${editingPartner.store_name}` : 'Mitra baru'}
-                            </h2>
-                            <AffiliatePartnerForm
-                                partner={editingPartner.id ? editingPartner : null}
-                                saving={saving}
-                                onSubmit={handlePartnerSubmit}
-                                onCancel={() => setEditingPartner(null)}
-                            />
-                        </Card>
-                    )}
-
-                    {partners.length === 0 && !editingPartner && (
+                    {partners.length === 0 && (
                         <div className="rounded-card border border-dashed border-edge bg-surface-sunken p-8 text-center">
                             <p className="text-sm text-content-muted">Belum ada mitra.</p>
                             <p className="mt-1 text-xs text-content-subtle">
@@ -579,7 +591,7 @@ export default function AffiliateManagement() {
                             partner={partner}
                             offerCount={offerCountByPartner.get(String(partner.id)) || 0}
                             onEdit={setEditingPartner}
-                            onDelete={(row) => setPendingDelete({ kind: 'partner', row })}
+                            onDelete={(row) => handleDelete('partner', row)}
                         />
                     ))}
                 </TabPanel>
@@ -587,28 +599,7 @@ export default function AffiliateManagement() {
 
             {!loading && tab === 'offers' && (
                 <TabPanel id="offers" idPrefix="affiliate" className="space-y-3">
-                    {editingOffer && (
-                        <Card>
-                            <h2 className="mb-4 text-sm font-semibold text-content">
-                                {editingOffer.id ? `Ubah barang: ${editingOffer.product_title}` : 'Barang baru'}
-                            </h2>
-                            <AffiliateOfferForm
-                                offer={editingOffer.id ? editingOffer : null}
-                                partners={partners}
-                                areas={areas}
-                                cameras={cameras}
-                                saving={saving}
-                                onSubmit={handleOfferSubmit}
-                                onCancel={() => setEditingOffer(null)}
-                                // A photo upload (or removal) writes the offer row without going
-                                // through onSubmit, so the list would keep showing the old
-                                // thumbnail until something else refetched it.
-                                onUploaded={reloadOffers}
-                            />
-                        </Card>
-                    )}
-
-                    {offers.length === 0 && !editingOffer && (
+                    {offers.length === 0 && (
                         <div className="rounded-card border border-dashed border-edge bg-surface-sunken p-8 text-center">
                             <p className="text-sm text-content-muted">Belum ada barang.</p>
                             <p className="mt-1 text-xs text-content-subtle">
@@ -626,22 +617,63 @@ export default function AffiliateManagement() {
                             partner={partnerById.get(String(offer.partner_id)) || null}
                             areaNameById={areaNameById}
                             onEdit={setEditingOffer}
-                            onDelete={(row) => setPendingDelete({ kind: 'offer', row })}
+                            onDelete={(row) => handleDelete('offer', row)}
                         />
                     ))}
                 </TabPanel>
             )}
 
-            {pendingDelete && (
-                <ConfirmDialog
-                    title={pendingDelete.kind === 'partner' ? 'Hapus mitra?' : 'Hapus barang?'}
-                    message={deleteMessage()}
-                    confirmLabel="Hapus"
-                    cancelLabel="Batal"
-                    tone="danger"
-                    onConfirm={handleDelete}
-                    onCancel={() => setPendingDelete(null)}
-                />
+            {editingPartner && (
+                <Modal
+                    title={editingPartner.id ? `Ubah mitra: ${editingPartner.store_name}` : 'Mitra baru'}
+                    size="lg"
+                    // See the header: NOT the ui/Modal default. A backdrop tap must not bin a draft.
+                    dismissible={false}
+                    onClose={() => setEditingPartner(null)}
+                    footer={(
+                        <>
+                            <Button onClick={() => setEditingPartner(null)} disabled={saving}>Batal</Button>
+                            <Button type="submit" form={PARTNER_FORM_ID} variant="primary" loading={saving}>
+                                {saving ? 'Menyimpan…' : 'Simpan mitra'}
+                            </Button>
+                        </>
+                    )}
+                >
+                    <AffiliatePartnerForm
+                        partner={editingPartner.id ? editingPartner : null}
+                        onSubmit={handlePartnerSubmit}
+                    />
+                </Modal>
+            )}
+
+            {editingOffer && (
+                <Modal
+                    title={editingOffer.id ? `Ubah barang: ${editingOffer.product_title}` : 'Barang baru'}
+                    size="xl"
+                    // ~24 fields plus a photo upload — the single most expensive draft in admin.
+                    dismissible={false}
+                    onClose={() => setEditingOffer(null)}
+                    footer={(
+                        <>
+                            <Button onClick={() => setEditingOffer(null)} disabled={saving}>Batal</Button>
+                            <Button type="submit" form={OFFER_FORM_ID} variant="primary" loading={saving}>
+                                {saving ? 'Menyimpan…' : 'Simpan barang'}
+                            </Button>
+                        </>
+                    )}
+                >
+                    <AffiliateOfferForm
+                        offer={editingOffer.id ? editingOffer : null}
+                        partners={partners}
+                        areas={areas}
+                        cameras={cameras}
+                        onSubmit={handleOfferSubmit}
+                        // A photo upload (or removal) writes the offer row without going through
+                        // onSubmit, so the list would keep showing the old thumbnail until
+                        // something else refetched it.
+                        onUploaded={reloadOffers}
+                    />
+                </Modal>
             )}
         </div>
     );

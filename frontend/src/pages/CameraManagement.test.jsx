@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import CameraManagement from './CameraManagement';
 
@@ -101,12 +101,44 @@ describe('CameraManagement', () => {
         });
     });
 
+    /*
+     * The camera form is a ui/Modal since the 2026-08 dialog unification. Two things moved with it
+     * that break SILENTLY, which is why they are asserted rather than left to the eye:
+     *   1. Create/Update now sits in the pinned FOOTER, outside <form>, joined to it only by
+     *      form="camera-form". A stale id does not throw — the button just stops saving. (The two
+     *      submit tests below used to reach the form via `Create.closest('form')`; that path no
+     *      longer exists, so the association it proved is asserted here instead.)
+     *   2. dismissible={false} is the OPPOSITE of ui/Modal's default. Nothing but this test keeps it
+     *      from being "tidied" back and turning a mistap on the scrim into a discarded RTSP URL.
+     */
+    it('membuka sebagai dialog: Create terhubung ke form di luarnya, dan tak bisa ditutup tak sengaja', async () => {
+        render(<CameraManagement />);
+
+        fireEvent.click(await screen.findByRole('button', { name: 'Tambah Kamera' }));
+
+        const dialog = screen.getByRole('dialog');
+        expect(dialog.getAttribute('aria-modal')).toBe('true');
+
+        const form = dialog.querySelector('form');
+        const create = within(dialog).getByRole('button', { name: 'Create' });
+        expect(form.contains(create)).toBe(false);
+        expect(create.form).toBe(form);
+
+        expect(screen.queryByRole('button', { name: 'Tutup dialog' })).toBeNull();
+        fireEvent.keyDown(dialog, { key: 'Escape' });
+        expect(screen.getByRole('dialog')).not.toBeNull();
+
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+        await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    });
+
     it('mewajibkan RTSP untuk kamera internal', async () => {
         render(<CameraManagement />);
 
         fireEvent.click(await screen.findByRole('button', { name: 'Tambah Kamera' }));
         fireEvent.change(screen.getByLabelText(/Name/i), { target: { value: 'Lobby Cam' } });
-        fireEvent.submit(screen.getByRole('button', { name: 'Create' }).closest('form'));
+        // Create lives in the dialog FOOTER now, outside <form> — reach the form through a field.
+        fireEvent.submit(screen.getByLabelText(/Name/i).closest('form'));
 
         await waitFor(() => {
             expect(screen.getByText('RTSP URL is required')).toBeTruthy();
@@ -126,7 +158,7 @@ describe('CameraManagement', () => {
         });
         expect(screen.getByLabelText(/Mode TLS/i)).toBeTruthy();
         expect(screen.getByLabelText(/Gunakan Proxy/i).disabled).toBe(false);
-        fireEvent.submit(screen.getByRole('button', { name: 'Create' }).closest('form'));
+        fireEvent.submit(screen.getByLabelText(/Name/i).closest('form'));
 
         await waitFor(() => {
             expect(createCamera).toHaveBeenCalledTimes(1);

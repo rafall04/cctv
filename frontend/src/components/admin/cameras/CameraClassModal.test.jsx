@@ -10,7 +10,7 @@
  * the whole recording history, which is the one thing the button does not look like it does.
  */
 import { describe, it, expect, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import CameraClassModal from './CameraClassModal';
 
 const USERS = [
@@ -85,6 +85,32 @@ describe('CameraClassModal — kelas kamera', () => {
         buka({ isSaving: true });
         expect(screen.getByRole('button', { name: /Menyimpan/i }).disabled).toBe(true);
         expect(screen.getByRole('button', { name: /Batal/i }).disabled).toBe(true);
+    });
+
+    /*
+     * It renders through ui/Modal now, so Simpan sits in the pinned footer OUTSIDE <form>, joined to
+     * it only by form="camera-class-form". A stale id does not throw — the button silently stops
+     * submitting, and every case above that clicks Simpan would go quietly vacuous with it.
+     *
+     * Unlike the camera and area FORMS, this one keeps ui/Modal's dismissible default on purpose:
+     * nothing here is typed, the controls re-seed from the camera on every open, and dismissing
+     * submits nothing — so a stray scrim tap costs one tap and cannot lose work.
+     */
+    it('adalah dialog: Simpan terhubung ke form di luarnya, dan boleh ditutup', () => {
+        const { onClose } = buka();
+
+        const dialog = screen.getByRole('dialog');
+        expect(dialog.getAttribute('aria-modal')).toBe('true');
+        expect(within(dialog).getByText('Kelas kamera')).toBeTruthy();
+        expect(within(dialog).getByText('Rumah Depan')).toBeTruthy();
+
+        const form = dialog.querySelector('form');
+        expect(form.contains(simpan())).toBe(false);
+        expect(simpan().form).toBe(form);
+
+        fireEvent.click(screen.getByRole('button', { name: 'Tutup dialog' }));
+        fireEvent.keyDown(dialog, { key: 'Escape' });
+        expect(onClose).toHaveBeenCalledTimes(2);
     });
 });
 

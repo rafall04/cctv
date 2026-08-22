@@ -17,6 +17,7 @@ import { useConfirm } from '../contexts/ConfirmContext';
 import rondaAdminService from '../services/rondaAdminService';
 import RondaZoneEditor from '../components/admin/ronda/RondaZoneEditor';
 import PanduanPanel from '../components/admin/PanduanPanel';
+import { Button, Modal } from '../components/ui';
 import { TableSkeleton } from '../components/ui/Skeleton';
 
 const HOUR_PRESETS = [
@@ -228,7 +229,9 @@ export function RondaSettings() {
     const remove = async (name, label) => {
         const ok = await confirm({
             title: `Hapus "${label}" dari pemantauan?`,
-            body: 'Kamera berhenti dipantau dan peringatannya dimatikan. Foto yang sudah tersimpan tidak ikut dihapus.',
+            // `message`, not `body`: useConfirm reads `message` and silently drops anything else, so
+            // this dialog was asking "Hapus?" with no consequences attached.
+            message: 'Kamera berhenti dipantau dan peringatannya dimatikan. Foto yang sudah tersimpan tidak ikut dihapus.',
             confirmLabel: 'Hapus',
             tone: 'danger',
         });
@@ -265,16 +268,12 @@ export function RondaSettings() {
                         Sebagian besar perubahan berlaku sekitar 15 detik tanpa menyalakan ulang.
                     </p>
                 </div>
+                {/* Opens the dialog; it no longer flips to "Batal", because the dialog carries its
+                    own Batal and the page behind it is inert while it is open. */}
                 {available && (
-                    <button
-                        type="button"
-                        onClick={() => setAdding((v) => !v)}
-                        className="min-h-[44px] rounded-control bg-primary-500 px-4 py-2 text-sm font-semibold
-                                   text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500
-                                   sm:min-h-0"
-                    >
-                        {adding ? 'Batal' : '+ Tambah Kamera'}
-                    </button>
+                    <Button variant="primary" onClick={() => setAdding(true)}>
+                        + Tambah Kamera
+                    </Button>
                 )}
             </header>
 
@@ -315,77 +314,7 @@ export function RondaSettings() {
                 </div>
             )}
 
-            {adding && (
-                <section className="rounded-card border border-edge bg-surface-raised p-4 shadow-e1">
-                    <h2 className="font-semibold text-content">Tambah Kamera ke Pemantauan</h2>
-                    {availableCams.length === 0 ? (
-                        <p className="mt-2 text-sm text-content-muted">
-                            Semua kamera komunitas sudah dipantau, atau belum ada kamera yang punya stream aktif.
-                        </p>
-                    ) : (
-                        <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                            <div className="sm:col-span-2">
-                                <label className={labelClass} htmlFor="new-cam">Kamera</label>
-                                <select
-                                    id="new-cam"
-                                    className={inputClass}
-                                    value={newCam.camera_id}
-                                    onChange={(e) => setNewCam((s) => ({ ...s, camera_id: e.target.value }))}
-                                >
-                                    <option value="">— pilih kamera —</option>
-                                    {availableCams.map((c) => (
-                                        <option key={c.id} value={c.id}>
-                                            {c.name}{c.area ? ` — ${c.area}` : ''}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div>
-                                <label className={labelClass} htmlFor="new-area">Nama area (untuk pesan)</label>
-                                <input
-                                    id="new-area"
-                                    className={inputClass}
-                                    value={newCam.area}
-                                    placeholder="RT 02 DANDER"
-                                    onChange={(e) => setNewCam((s) => ({ ...s, area: e.target.value }))}
-                                />
-                            </div>
-                            <div>
-                                <label className={labelClass} htmlFor="new-chat">ID grup Telegram</label>
-                                <input
-                                    id="new-chat"
-                                    className={inputClass}
-                                    value={newCam.chat_id}
-                                    placeholder="-1001234567890"
-                                    onChange={(e) => setNewCam((s) => ({ ...s, chat_id: e.target.value }))}
-                                />
-                            </div>
-                            <div className="sm:col-span-2">
-                                <label className={labelClass} htmlFor="new-hours">Jam ronda</label>
-                                <input
-                                    id="new-hours"
-                                    className={inputClass}
-                                    value={newCam.alert_hours}
-                                    onChange={(e) => setNewCam((s) => ({ ...s, alert_hours: e.target.value }))}
-                                />
-                            </div>
-                            <div className="sm:col-span-2">
-                                <button
-                                    type="button"
-                                    onClick={create}
-                                    disabled={busy === 'create'}
-                                    className="w-full rounded-control bg-primary-500 px-4 py-2.5 text-sm font-semibold text-white
-                                               disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 sm:w-auto"
-                                >
-                                    {busy === 'create' ? 'Menyiapkan…' : 'Tambahkan & Mulai Pantau'}
-                                </button>
-                            </div>
-                        </div>
-                    )}
-                </section>
-            )}
-
-            {available && cameras.length === 0 && !adding && (
+            {available && cameras.length === 0 && (
                 <div className="rounded-card border border-edge bg-surface-raised p-4 text-sm text-content-muted">
                     Belum ada kamera yang dipantau. Klik “Tambah Kamera” untuk mulai.
                 </div>
@@ -628,6 +557,93 @@ export function RondaSettings() {
                     </section>
                 );
             })}
+
+            {adding && (
+                <Modal
+                    title="Tambah Kamera ke Pemantauan"
+                    description="Kamera yang dipilih mulai dipantau begitu ini disimpan."
+                    size="lg"
+                    onClose={() => setAdding(false)}
+                    /* dismissible={false}: a stray tap on the scrim would throw away the four fields
+                       already typed, with nothing to undo it. Closing has to be deliberate. */
+                    dismissible={false}
+                    footer={(
+                        <>
+                            <Button onClick={() => setAdding(false)} disabled={busy === 'create'}>
+                                Batal
+                            </Button>
+                            {availableCams.length > 0 && (
+                                <Button
+                                    type="submit"
+                                    form="ronda-add-form"
+                                    variant="primary"
+                                    loading={busy === 'create'}
+                                >
+                                    {busy === 'create' ? 'Menyiapkan…' : 'Tambahkan & Mulai Pantau'}
+                                </Button>
+                            )}
+                        </>
+                    )}
+                >
+                    {availableCams.length === 0 ? (
+                        <p className="text-sm text-content-muted">
+                            Semua kamera komunitas sudah dipantau, atau belum ada kamera yang punya stream aktif.
+                        </p>
+                    ) : (
+                        <form
+                            id="ronda-add-form"
+                            onSubmit={(e) => { e.preventDefault(); create(); }}
+                            className="grid gap-3 sm:grid-cols-2"
+                        >
+                            <div className="min-w-0 sm:col-span-2">
+                                <label className={labelClass} htmlFor="new-cam">Kamera</label>
+                                <select
+                                    id="new-cam"
+                                    className={inputClass}
+                                    value={newCam.camera_id}
+                                    onChange={(e) => setNewCam((s) => ({ ...s, camera_id: e.target.value }))}
+                                >
+                                    <option value="">— pilih kamera —</option>
+                                    {availableCams.map((c) => (
+                                        <option key={c.id} value={c.id}>
+                                            {c.name}{c.area ? ` — ${c.area}` : ''}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="min-w-0">
+                                <label className={labelClass} htmlFor="new-area">Nama area (untuk pesan)</label>
+                                <input
+                                    id="new-area"
+                                    className={inputClass}
+                                    value={newCam.area}
+                                    placeholder="RT 02 DANDER"
+                                    onChange={(e) => setNewCam((s) => ({ ...s, area: e.target.value }))}
+                                />
+                            </div>
+                            <div className="min-w-0">
+                                <label className={labelClass} htmlFor="new-chat">ID grup Telegram</label>
+                                <input
+                                    id="new-chat"
+                                    className={inputClass}
+                                    value={newCam.chat_id}
+                                    placeholder="-1001234567890"
+                                    onChange={(e) => setNewCam((s) => ({ ...s, chat_id: e.target.value }))}
+                                />
+                            </div>
+                            <div className="min-w-0 sm:col-span-2">
+                                <label className={labelClass} htmlFor="new-hours">Jam ronda</label>
+                                <input
+                                    id="new-hours"
+                                    className={inputClass}
+                                    value={newCam.alert_hours}
+                                    onChange={(e) => setNewCam((s) => ({ ...s, alert_hours: e.target.value }))}
+                                />
+                            </div>
+                        </form>
+                    )}
+                </Modal>
+            )}
         </div>
     );
 }

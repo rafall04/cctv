@@ -8,9 +8,28 @@
  * SideEffects: Renders jsdom-only modal markup.
  */
 
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import AreaFormModal from './AreaFormModal';
+
+const BASE_FORM_DATA = {
+    name: 'Area A',
+    description: 'Deskripsi',
+    rt: '01',
+    rw: '02',
+    kelurahan: 'Kelurahan A',
+    kecamatan: 'Kecamatan A',
+    latitude: '',
+    longitude: '',
+    external_health_mode_override: 'default',
+    coverage_scope: 'default',
+    viewport_zoom_override: '',
+    show_on_grid_default: true,
+    grid_default_camera_limit: '12',
+    internal_ingest_policy_default: 'default',
+    internal_on_demand_close_after_seconds: '',
+    internal_rtsp_transport_default: 'default',
+};
 
 function MockLocationPicker({ onLocationChange }) {
     return (
@@ -30,24 +49,7 @@ describe('AreaFormModal', () => {
         render(
             <AreaFormModal
                 editingArea={{ id: 1, name: 'Area A' }}
-                formData={{
-                    name: 'Area A',
-                    description: 'Deskripsi',
-                    rt: '01',
-                    rw: '02',
-                    kelurahan: 'Kelurahan A',
-                    kecamatan: 'Kecamatan A',
-                    latitude: '',
-                    longitude: '',
-                    external_health_mode_override: 'default',
-                    coverage_scope: 'default',
-                    viewport_zoom_override: '',
-                    show_on_grid_default: true,
-                    grid_default_camera_limit: '12',
-                    internal_ingest_policy_default: 'default',
-                    internal_on_demand_close_after_seconds: '',
-                    internal_rtsp_transport_default: 'default',
-                }}
+                formData={BASE_FORM_DATA}
                 formErrors={{ name: 'Nama wajib diisi' }}
                 error="Gagal menyimpan"
                 submitting={false}
@@ -90,5 +92,50 @@ describe('AreaFormModal', () => {
         expect(onLocationChange).toHaveBeenCalledWith('-7.1', '111.9');
         expect(onSubmit).toHaveBeenCalled();
         expect(onClose).toHaveBeenCalled();
+    });
+
+    /*
+     * The form moved into ui/Modal (2026-08 dialog unification). Both things below fail SILENTLY:
+     *   1. Perbarui/Simpan now sits in the pinned FOOTER, outside <form>, joined to it only by
+     *      form="area-form" — a stale id does not throw, the button just stops saving. The test
+     *      above still clicks that button and still expects onSubmit, so it only passes while the
+     *      association holds; this asserts the mechanism directly so a break says what broke.
+     *   2. dismissible={false} is the OPPOSITE of ui/Modal's default. The file it replaced carried a
+     *      comment claiming "No ESC-to-close" while passing onEscape: onClose — i.e. Escape DID
+     *      discard the draft. Nothing but a test keeps that from coming back.
+     */
+    it('adalah dialog: tombol simpan di footer terhubung ke form, dan tak bisa ditutup tak sengaja', () => {
+        const onSubmit = vi.fn((event) => event.preventDefault());
+        const onClose = vi.fn();
+
+        render(
+            <AreaFormModal
+                editingArea={null}
+                formData={BASE_FORM_DATA}
+                formErrors={{}}
+                error=""
+                submitting={false}
+                LocationPickerComponent={MockLocationPicker}
+                onChange={vi.fn()}
+                onSubmit={onSubmit}
+                onClose={onClose}
+                onErrorDismiss={vi.fn()}
+                onLocationChange={vi.fn()}
+            />
+        );
+
+        const dialog = screen.getByRole('dialog');
+        expect(dialog.getAttribute('aria-modal')).toBe('true');
+        expect(within(dialog).getByText('Tambah Area')).toBeTruthy();
+
+        const form = dialog.querySelector('form');
+        const simpan = within(dialog).getByRole('button', { name: 'Simpan' });
+        expect(form.contains(simpan)).toBe(false);
+        expect(simpan.form).toBe(form);
+
+        // dismissible={false}: ui/Modal hides its own close button and ignores Escape.
+        expect(screen.queryByRole('button', { name: 'Tutup dialog' })).toBeNull();
+        fireEvent.keyDown(dialog, { key: 'Escape' });
+        expect(onClose).not.toHaveBeenCalled();
     });
 });

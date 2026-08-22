@@ -233,12 +233,20 @@ export function NoActivityEmptyState() {
 }
 
 // No streams/viewers
-export function NoStreamsEmptyState() {
+/*
+ * `onAddCamera` is declared because the ONE caller has always passed it: Dashboard.jsx wires
+ * `() => navigate('/admin/cameras')` through DashboardStreams into here. Undeclared, React dropped
+ * it without a word and the empty streams table offered no way out — a dead handler and a missing
+ * call-to-action. The label says where the button actually goes; it does not add a camera by itself.
+ */
+export function NoStreamsEmptyState({ onAddCamera }) {
     return (
         <EmptyState
             illustration="NoCamera"
             title="Tidak Ada Stream Aktif"
             description="Belum ada viewer yang menonton kamera saat ini. Data viewer akan muncul ketika ada yang mengakses stream."
+            action={onAddCamera}
+            actionLabel="Kelola Kamera"
         />
     );
 }

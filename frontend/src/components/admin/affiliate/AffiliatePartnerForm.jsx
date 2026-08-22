@@ -2,9 +2,12 @@
  * Purpose: Editor for one affiliate MITRA — the shop and the commercial deal behind it
  *          (store name, store link, internal note, lifetime-vs-term contract, price, active).
  * Caller: pages/AffiliateManagement.jsx.
- * Deps: components/ui (Field, Button, inputClasses), NotificationContext.
- * MainFuncs: AffiliatePartnerForm.
+ * Deps: components/ui (Field, inputClasses), NotificationContext.
+ * MainFuncs: AffiliatePartnerForm, PARTNER_FORM_ID.
  * SideEffects: None of its own — it hands a plain payload to the caller's onSubmit.
+ *
+ * NO BUTTONS HERE: this is the body of a ui/Modal, so Simpan and Batal live in the dialog's pinned
+ * footer and reach back in through `form={PARTNER_FORM_ID}`.
  *
  * THREE THINGS HERE ARE DELIBERATE AND MUST NOT BE "TIDIED UP"
  * -----------------------------------------------------------
@@ -24,9 +27,12 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { Field, Button, inputClasses } from '../../ui';
+import { Field, inputClasses } from '../../ui';
 import { describeOutboundUrlProblem } from '../../../services/affiliateAdminService';
 import { useNotification } from '../../../contexts/NotificationContext';
+
+/* The Modal footer's Simpan button is outside this <form> and targets it by id. */
+export const PARTNER_FORM_ID = 'affiliate-partner-form';
 
 const EMPTY = {
     store_name: '',
@@ -64,7 +70,7 @@ function groupDigits(digits) {
     return Number.parseInt(digits, 10).toLocaleString('id-ID');
 }
 
-export default function AffiliatePartnerForm({ partner, saving, onSubmit, onCancel }) {
+export default function AffiliatePartnerForm({ partner, onSubmit }) {
     const [form, setForm] = useState(EMPTY);
     // Held as a digit string so the caret does not jump while the operator types into a
     // separator-formatted field.
@@ -138,7 +144,7 @@ export default function AffiliatePartnerForm({ partner, saving, onSubmit, onCanc
     };
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form id={PARTNER_FORM_ID} onSubmit={handleSubmit} className="space-y-5">
             <Field
                 label="Nama toko"
                 required
@@ -259,13 +265,6 @@ export default function AffiliatePartnerForm({ partner, saving, onSubmit, onCanc
                 Mematikan mitra langsung menghentikan semua barangnya, termasuk link keluar yang
                 sudah tersebar — link itu dicek ulang setiap kali diklik.
             </p>
-
-            <div className="flex flex-wrap gap-2 border-t border-edge pt-4">
-                <Button type="submit" variant="primary" loading={saving}>
-                    {saving ? 'Menyimpan…' : 'Simpan mitra'}
-                </Button>
-                <Button type="button" onClick={onCancel}>Batal</Button>
-            </div>
         </form>
     );
 }

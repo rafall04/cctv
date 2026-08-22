@@ -16,11 +16,12 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNotification } from '../contexts/NotificationContext';
 import { useConfirm } from '../contexts/ConfirmContext';
 import telegramArchiveService from '../services/telegramArchiveService';
-import RouteForm from '../components/admin/telegramArchive/RouteForm';
+import RouteForm, { ROUTE_FORM_ID } from '../components/admin/telegramArchive/RouteForm';
 import RouteList from '../components/admin/telegramArchive/RouteList';
 import CameraRouting from '../components/admin/telegramArchive/CameraRouting';
 import ArchiveActivity from '../components/admin/telegramArchive/ArchiveActivity';
 import { card } from '../components/admin/telegramArchive/archiveUi';
+import { Button, Modal } from '../components/ui';
 import { TableSkeleton } from '../components/ui/Skeleton';
 
 const EMPTY_DRAFT = { scope: 'camera', cameraId: '', areaId: '', chatId: '', label: '', enabled: true };
@@ -34,6 +35,13 @@ export function TelegramArchiveSettings() {
     const [loading, setLoading] = useState(true);
     const [draft, setDraft] = useState(EMPTY_DRAFT);
     const [editingId, setEditingId] = useState(null);
+    /*
+     * ONE dialog for both "tambah" and "ubah", not two. There is one draft, one submit handler and
+     * one set of fields; `editingId` is the only difference, and it already decides create-vs-update
+     * inside handleSubmit. A second dialog would be the same form twice, free to drift apart —
+     * exactly how the "add" and "edit" paths of a form start disagreeing about validation.
+     */
+    const [formOpen, setFormOpen] = useState(false);
     const [verifying, setVerifying] = useState(false);
     const [verified, setVerified] = useState(null);
     const [saving, setSaving] = useState(false);
@@ -120,12 +128,21 @@ export function TelegramArchiveSettings() {
             setDraft(EMPTY_DRAFT);
             setEditingId(null);
             setVerified(null);
+            setFormOpen(false);
             await load();
         } catch (error) {
             showNotification(error.response?.data?.message || 'Gagal menyimpan rute', 'error');
         } finally {
             setSaving(false);
         }
+    };
+
+    const handleAdd = () => {
+        setEditingId(null);
+        setDraft(EMPTY_DRAFT);
+        setVerified(null);
+        setManualChat(false);
+        setFormOpen(true);
     };
 
     const handleEdit = (route) => {
@@ -143,10 +160,13 @@ export function TelegramArchiveSettings() {
             label: route.label ?? '',
             enabled: route.enabled !== false,
         });
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        // No scrollTo any more: the form used to sit above the list, so editing a route near the
+        // bottom moved the fields off-screen. A dialog comes to the operator instead.
+        setFormOpen(true);
     };
 
     const handleCancelEdit = () => {
+        setFormOpen(false);
         setEditingId(null);
         setDraft(EMPTY_DRAFT);
         setVerified(null);
@@ -218,41 +238,26 @@ export function TelegramArchiveSettings() {
 
     return (
         <div className="space-y-5">
-            <header>
-                <h1 className="text-xl font-semibold text-content sm:text-2xl">
-                    Arsip Rekaman ke Telegram
-                </h1>
-                <p className="mt-1.5 max-w-prose text-sm leading-relaxed text-content-muted">
-                    Menentukan rekaman kamera mana dikirim ke grup Telegram mana, setiap 10 menit.
-                    Kamera yang tidak punya rute tidak dikirim sama sekali.
-                </p>
-                <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-content-subtle">
-                    <span className="font-mono tabular-nums text-content-muted">
-                        {routedCount}/{cameras.length}
-                    </span>
-                    <span>kamera perekam sedang diarsipkan</span>
-                    <span aria-hidden="true">·</span>
-                    <span>perubahan berlaku ±1 menit, tanpa menyalakan ulang apa pun</span>
+            <header className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                    <h1 className="text-xl font-semibold text-content sm:text-2xl">
+                        Arsip Rekaman ke Telegram
+                    </h1>
+                    <p className="mt-1.5 max-w-prose text-sm leading-relaxed text-content-muted">
+                        Menentukan rekaman kamera mana dikirim ke grup Telegram mana, setiap 10 menit.
+                        Kamera yang tidak punya rute tidak dikirim sama sekali.
+                    </p>
+                    <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-content-subtle">
+                        <span className="font-mono tabular-nums text-content-muted">
+                            {routedCount}/{cameras.length}
+                        </span>
+                        <span>kamera perekam sedang diarsipkan</span>
+                        <span aria-hidden="true">·</span>
+                        <span>perubahan berlaku ±1 menit, tanpa menyalakan ulang apa pun</span>
+                    </div>
                 </div>
+                <Button variant="primary" onClick={handleAdd}>+ Tambah rute</Button>
             </header>
-
-            <RouteForm
-                draft={draft}
-                setField={setField}
-                cameras={cameras}
-                areas={areas}
-                groups={groups}
-                editing={Boolean(editingId)}
-                manual={manualChat}
-                onToggleManual={() => { setManualChat((v) => !v); setVerified(null); }}
-                onPickGroup={handlePickGroup}
-                onSubmit={handleSubmit}
-                onCancel={handleCancelEdit}
-                onVerify={handleVerify}
-                verifying={verifying}
-                verified={verified}
-                saving={saving}
-            />
 
             <RouteList
                 routes={routes}
@@ -267,6 +272,42 @@ export function TelegramArchiveSettings() {
             <CameraRouting cameras={cameras} routedCount={routedCount} />
 
             <ArchiveActivity activity={activity} />
+
+            {formOpen && (
+                <Modal
+                    title={editingId ? 'Ubah rute' : 'Tambah rute baru'}
+                    description="Rekaman kamera yang dipilih dikirim ke grup ini setiap 10 menit."
+                    size="lg"
+                    onClose={handleCancelEdit}
+                    /* dismissible={false}: the group id is often pasted from another app and then
+                       verified against Telegram — losing that to a mis-tap on the scrim would mean
+                       doing the check again. */
+                    dismissible={false}
+                    footer={(
+                        <>
+                            <Button onClick={handleCancelEdit} disabled={saving}>Batal</Button>
+                            <Button type="submit" form={ROUTE_FORM_ID} variant="primary" loading={saving}>
+                                {saving ? 'Menyimpan…' : editingId ? 'Simpan perubahan' : 'Tambah rute'}
+                            </Button>
+                        </>
+                    )}
+                >
+                    <RouteForm
+                        draft={draft}
+                        setField={setField}
+                        cameras={cameras}
+                        areas={areas}
+                        groups={groups}
+                        manual={manualChat}
+                        onToggleManual={() => { setManualChat((v) => !v); setVerified(null); }}
+                        onPickGroup={handlePickGroup}
+                        onSubmit={handleSubmit}
+                        onVerify={handleVerify}
+                        verifying={verifying}
+                        verified={verified}
+                    />
+                </Modal>
+            )}
         </div>
     );
 }

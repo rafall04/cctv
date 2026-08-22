@@ -165,8 +165,37 @@ export default function PlaybackProductManagement() {
                     description="Paket baru selalu berbayar — paket coba gratis hanya ada satu dan sudah disediakan sistem."
                     onClose={() => page.setShowCreate(false)}
                     size="md"
+                    /* dismissible={false} is the OPPOSITE of ui/Modal's default, and deliberately:
+                       seven fields with nothing saved anywhere, including two the operator has to
+                       reason about (depth vs validity) rather than type from memory. A mis-tap on
+                       the scrim would throw the lot away without asking. */
+                    dismissible={false}
+                    /*
+                     * The action row is the Modal's `footer`, not the last row of the form body.
+                     * ui/Modal pins the footer OUTSIDE the scroll container and pads it with
+                     * env(safe-area-inset-bottom); built inside the body — which is what this page
+                     * did — it scrolled away below eight fields, so on a phone "Buat paket" was
+                     * off-screen until the operator scrolled to the very end. The submit button
+                     * reaches the form from out there via form="playback-product-form".
+                     */
+                    footer={(
+                        <>
+                            <Button variant="ghost" size="sm" onClick={() => page.setShowCreate(false)}>
+                                Batal
+                            </Button>
+                            <Button
+                                type="submit"
+                                form="playback-product-form"
+                                variant="primary"
+                                size="sm"
+                                loading={page.creating}
+                            >
+                                Buat paket
+                            </Button>
+                        </>
+                    )}
                 >
-                    <form onSubmit={submitCreate} className="space-y-3">
+                    <form id="playback-product-form" onSubmit={submitCreate} className="space-y-3">
                         <Field
                             label="Kode paket"
                             value={draft.key}
@@ -225,15 +254,6 @@ export default function PlaybackProductManagement() {
                                 onChange={(e) => set({ validity_days: e.target.value })}
                                 required
                             />
-                        </div>
-
-                        <div className="flex flex-wrap justify-end gap-2 border-t border-edge pt-3">
-                            <Button type="button" variant="ghost" size="sm" onClick={() => page.setShowCreate(false)}>
-                                Batal
-                            </Button>
-                            <Button type="submit" variant="primary" size="sm" loading={page.creating}>
-                                Buat paket
-                            </Button>
                         </div>
                     </form>
                 </Modal>

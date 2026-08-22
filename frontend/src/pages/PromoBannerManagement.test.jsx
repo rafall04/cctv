@@ -4,7 +4,7 @@
  * Plain DOM assertions on purpose: this project does not load @testing-library/jest-dom.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import PromoBannerManagement from './PromoBannerManagement';
 
 const h = vi.hoisted(() => ({
@@ -15,6 +15,7 @@ const h = vi.hoisted(() => ({
     getAllAreas: vi.fn(),
     getAllCameras: vi.fn(),
     showNotification: vi.fn(),
+    confirm: vi.fn(),
 }));
 
 vi.mock('../services/promoBannerService', () => ({
@@ -28,6 +29,9 @@ vi.mock('../services/cameraService', () => ({ cameraService: { getAllCameras: h.
 vi.mock('../contexts/NotificationContext', () => ({
     useNotification: () => ({ showNotification: h.showNotification }),
 }));
+// The page reads the app-wide ConfirmProvider now instead of mounting its own ConfirmDialog, so
+// the hook has to exist here or every render throws before it can assert anything.
+vi.mock('../contexts/ConfirmContext', () => ({ useConfirm: () => h.confirm }));
 
 const PROMO = {
     id: 7,
@@ -49,6 +53,8 @@ beforeEach(() => {
     h.getAllPromoBanners.mockResolvedValue({ success: true, data: [PROMO] });
     h.getAllAreas.mockResolvedValue({ success: true, data: [{ id: 2, name: 'DANDER' }] });
     h.getAllCameras.mockResolvedValue({ success: true, data: [{ id: 11, name: 'CCTV DANDER' }] });
+    h.confirm.mockResolvedValue(true);
+    h.deletePromoBanner.mockResolvedValue({ success: true });
 });
 
 describe('loading is resilient', () => {
@@ -117,6 +123,79 @@ describe('status chip follows the SERVER schedule state', () => {
 
         expect(await screen.findByText(label)).not.toBeNull();
         expect(screen.queryByText('Tayang')).toBeNull();
+    });
+});
+
+/*
+ * The editor moved from an inline <section> into ui/Modal. These assertions replace the ones that
+ * used to be implicit in "the form is just there on the page": the form must still be reachable,
+ * its Simpan button must still own it now that the button sits OUTSIDE the <form> in the dialog
+ * footer, and the dialog must NOT be dismissible — this is a ~24-field draft with no recovery.
+ */
+describe('the editor is a non-dismissible dialog', () => {
+    const openEditor = async () => {
+        render(<PromoBannerManagement />);
+        fireEvent.click(await screen.findByRole('button', { name: 'Tambah promo' }));
+        return screen.getByRole('dialog');
+    };
+
+    it('opens as a dialog holding the form, not as an inline section', async () => {
+        const dialog = await openEditor();
+
+        expect(dialog.getAttribute('aria-modal')).toBe('true');
+        expect(within(dialog).getByText('Promo baru')).not.toBeNull();
+        expect(within(dialog).getByLabelText('Pilih gambar poster')).not.toBeNull();
+    });
+
+    it('lets the footer Simpan submit the form it sits outside of', async () => {
+        const dialog = await openEditor();
+        const form = dialog.querySelector('form');
+        const save = within(dialog).getByRole('button', { name: 'Simpan' });
+
+        // The button is in the pinned footer, the form is in the scrollable body: the only thing
+        // connecting them is form="promo-banner-form", and a stale id fails silently.
+        expect(form.contains(save)).toBe(false);
+        expect(save.form).toBe(form);
+    });
+
+    it('offers no way to dismiss it except Batal', async () => {
+        const dialog = await openEditor();
+
+        // dismissible={false}: ui/Modal hides its own close button and ignores Escape.
+        expect(screen.queryByRole('button', { name: 'Tutup dialog' })).toBeNull();
+        fireEvent.keyDown(dialog, { key: 'Escape' });
+        expect(screen.getByRole('dialog')).not.toBeNull();
+
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Batal' }));
+        await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    });
+
+    it('keeps the list visible behind it, instead of pushing the rows off screen', async () => {
+        await openEditor();
+        // The old inline editor rendered ABOVE the list and shoved it down; a dialog does not.
+        expect(screen.getByText('Pemasangan Gratis')).not.toBeNull();
+    });
+});
+
+describe('deleting goes through the app-wide confirm', () => {
+    it('deletes only after the operator says yes', async () => {
+        render(<PromoBannerManagement />);
+        fireEvent.click(await screen.findByRole('button', { name: 'Hapus' }));
+
+        await waitFor(() => expect(h.confirm).toHaveBeenCalledWith(
+            expect.objectContaining({ tone: 'danger', message: expect.stringContaining('Pemasangan Gratis') })
+        ));
+        await waitFor(() => expect(h.deletePromoBanner).toHaveBeenCalledWith(7));
+    });
+
+    it('does not delete when the operator backs out', async () => {
+        h.confirm.mockResolvedValue(false);
+
+        render(<PromoBannerManagement />);
+        fireEvent.click(await screen.findByRole('button', { name: 'Hapus' }));
+
+        await waitFor(() => expect(h.confirm).toHaveBeenCalled());
+        expect(h.deletePromoBanner).not.toHaveBeenCalled();
     });
 });
 

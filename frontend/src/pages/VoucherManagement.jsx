@@ -141,7 +141,10 @@ export default function VoucherManagement() {
         const next = !enabled;
         if (next && !(await confirm({
             title: 'Aktifkan pembatasan akses voucher?',
-            body: 'Kamera di area yang ditandai "berbayar" akan terkunci untuk pengunjung tanpa voucher aktif. Pastikan ada area yang ditandai + profil voucher dulu.',
+            // `message`, not `body`: useConfirm reads `message` and drops any other key silently, so
+            // this dialog asked "Aktifkan pembatasan akses voucher?" with the consequences — that
+            // public cameras go behind a lock — nowhere on screen.
+            message: 'Kamera di area yang ditandai "berbayar" akan terkunci untuk pengunjung tanpa voucher aktif. Pastikan ada area yang ditandai + profil voucher dulu.',
             confirmLabel: 'Aktifkan',
         }))) return;
         setSavingFlag(true);
@@ -544,7 +547,15 @@ export default function VoucherManagement() {
                                 Aktif
                             </label>
                         </div>
-                        <fieldset>
+                        {/*
+                          * `min-w-0` bukan hiasan: <fieldset> mempertahankan `min-inline-size:
+                          * min-content` bawaan browser yang tidak pernah direset Tailwind preflight,
+                          * jadi ia melebar mengikuti nama area terpanjang alih-alih menciut ke
+                          * dialognya. Terukur 353px di dalam panel 318px — dan `main.scrollWidth`
+                          * melaporkan 320/320 yang bersih, karena dialog itu `fixed` dan di luar
+                          * aliran. Bentuk yang sama pernah membuat pemilih kamera affiliate 689px.
+                          */}
+                        <fieldset className="min-w-0">
                             <legend className="mb-1.5 text-xs font-semibold text-content-muted">Area yang dibuka *</legend>
                             <div className="max-h-40 divide-y divide-edge overflow-y-auto rounded-control border border-edge">
                                 {areas.length === 0 ? (

@@ -208,6 +208,51 @@ describe('PlaybackProductManagement editing', () => {
 });
 
 describe('PlaybackProductManagement adding a package', () => {
+    /*
+     * Asserted STRUCTURALLY because both shapes behave identically under a click: the action row
+     * used to be the last row of the form body, where ui/Modal scrolls it away below eight fields —
+     * on a phone "Buat paket" was off-screen until the operator reached the very end. In `footer`
+     * it is pinned outside the scroll container, and the submit button reaches the form through
+     * form="playback-product-form" rather than by containment. Nothing else in this file can tell
+     * the two apart, so without this the move would silently revert.
+     */
+    it('pins the action row in the dialog footer, not at the end of the scrolling form', async () => {
+        render(<PlaybackProductManagement />);
+        await screen.findByText('Bulanan');
+        fireEvent.click(screen.getByRole('button', { name: 'Tambah paket' }));
+
+        const dialog = screen.getByRole('dialog');
+        const body = dialog.children[1];
+        const footer = dialog.lastElementChild;
+        const form = document.getElementById('playback-product-form');
+        const submit = screen.getByRole('button', { name: 'Buat paket' });
+
+        expect(body.contains(form)).toBe(true);
+        expect(footer).not.toBe(body);
+        expect(footer.contains(submit)).toBe(true);
+        expect(form.contains(submit)).toBe(false);
+        expect(submit.getAttribute('form')).toBe('playback-product-form');
+        expect(footer.contains(screen.getByRole('button', { name: 'Batal' }))).toBe(true);
+    });
+
+    /*
+     * dismissible={false} is the OPPOSITE of ui/Modal's default, so nothing but this test keeps it:
+     * restore the default and a mis-tap on the scrim silently discards seven filled-in fields.
+     * ui/Modal expresses it by hiding its own close button and ignoring Escape.
+     */
+    it('will not let a stray tap on the scrim discard the draft', async () => {
+        render(<PlaybackProductManagement />);
+        await screen.findByText('Bulanan');
+        fireEvent.click(screen.getByRole('button', { name: 'Tambah paket' }));
+
+        expect(screen.queryByRole('button', { name: 'Tutup dialog' })).toBeNull();
+        fireEvent.keyDown(document, { key: 'Escape' });
+        fireEvent.click(screen.getByRole('dialog').parentElement);
+
+        expect(screen.getByRole('dialog')).toBeTruthy();
+        expect(screen.getByLabelText('Kode paket')).toBeTruthy();
+    });
+
     it('creates a paid package and puts it in the list', async () => {
         playbackProductService.createProduct.mockResolvedValue({
             success: true,
