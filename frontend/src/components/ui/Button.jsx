@@ -37,11 +37,16 @@ export const BUTTON_VARIANTS = {
     dangerGhost: 'text-status-fault hover:bg-status-fault/10',
 };
 
-// `sm` is 44px on touch-sized viewports and only compacts to 36px from `sm:` up, where a pointer
-// is doing the aiming. That keeps dense table rows possible without shipping 36px tap targets to
-// phones.
+// `sm` is 44px by default and compacts to 36px ONLY under `@media (pointer: fine)` — i.e. when a
+// mouse, trackpad or stylus is doing the aiming. Dense table rows stay possible on a desktop
+// without ever shipping a 36px tap target to a finger.
+//
+// This used to be gated on `sm:` (>=640px), which read viewport WIDTH as a proxy for pointer type.
+// It is wrong at an entirely ordinary size: iPad portrait is 768px — touch, but above `sm:` — so
+// every row-action button on an admin page measured 36px there, under the 44px floor, on a device
+// where only a finger is available. Width never implied a mouse; the media query is the real signal.
 const SIZES = {
-    sm: 'min-h-11 sm:min-h-9 px-3 text-xs',
+    sm: 'min-h-11 pointer-fine:min-h-9 px-3 text-xs',
     md: 'min-h-11 px-4 text-sm',
     lg: 'min-h-12 px-5 text-sm',
 };
@@ -105,7 +110,9 @@ export function IconButton({
     children,
     ...rest
 }) {
-    const box = size === 'sm' ? 'h-11 w-11 sm:h-9 sm:w-9' : 'h-11 w-11';
+    // Same rule as SIZES.sm above, and for the same reason — an icon-only row action is the most
+    // common `sm` control in the admin tables, so it cannot be the one left on the width proxy.
+    const box = size === 'sm' ? 'h-11 w-11 pointer-fine:h-9 pointer-fine:w-9' : 'h-11 w-11';
     return (
         <button
             type={type}

@@ -1,3 +1,5 @@
+import plugin from 'tailwindcss/plugin';
+
 /** @type {import('tailwindcss').Config} */
 export default {
     content: [
@@ -153,5 +155,27 @@ export default {
             },
         },
     },
-    plugins: [],
+    plugins: [
+        /*
+         * `pointer-fine:` — apply only where the PRIMARY input device can point precisely
+         * (mouse, trackpad, stylus). The counterpart is no variant at all: the unprefixed
+         * utility is the touch-safe default and `pointer-fine:` opts out of it.
+         *
+         * Why this exists: compact 36px controls were previously gated on `sm:` (>=640px),
+         * i.e. viewport WIDTH used as a proxy for pointer TYPE. The proxy is wrong at a very
+         * ordinary place — iPad portrait is 768px, a touch device well above the `sm:`
+         * breakpoint — so every row-action button on an admin page shipped a 36px tap target
+         * to a finger, under the 44px floor. Width has never implied a mouse; ask the media
+         * query that actually knows.
+         *
+         * `pointer` (not `any-pointer`) is deliberate: it describes the pointer the user is
+         * most likely to be aiming with, so a touch laptop with a trackpad correctly gets the
+         * compact size, while a tablet or phone — at ANY width — keeps the 44px target.
+         *
+         * Tailwind 3.4 has no built-in `pointer-*` variant (that landed in v4), so it is
+         * registered here. Drop this plugin when the project moves to v4 and the core
+         * `pointer-fine:` variant covers it.
+         */
+        plugin(({ addVariant }) => addVariant('pointer-fine', '@media (pointer: fine)')),
+    ],
 };
