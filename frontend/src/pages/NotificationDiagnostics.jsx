@@ -1,12 +1,13 @@
 /*
 Purpose: Render admin workflow for Telegram camera notification routing preview, drill delivery, and recent diagnostic audit rows.
 Caller: App.jsx protected /admin/notification-diagnostics route.
-Deps: adminService, cameraService, React hooks, TimezoneContext, Tailwind admin UI classes.
+Deps: adminService, cameraService, React hooks, TimezoneContext, components/ui (PageHeader), Tailwind admin UI classes.
 MainFuncs: NotificationDiagnostics.
 SideEffects: Fetches cameras/diagnostics and can trigger Telegram diagnostic drill sends.
 */
 
 import { useEffect, useMemo, useState } from 'react';
+import { PageHeader } from '../components/ui';
 import { adminService } from '../services/adminService';
 import { cameraService } from '../services/cameraService';
 import { TIMESTAMP_STORAGE, useTimezone } from '../contexts/TimezoneContext';
@@ -107,12 +108,10 @@ export default function NotificationDiagnostics() {
 
     return (
         <div className="space-y-6">
-            <div>
-                <h1 className="text-2xl font-bold text-content">Diagnostik Notifikasi</h1>
-                <p className="mt-1 text-sm text-content-muted">
-                    Preview routing dan kirim drill Telegram untuk memastikan CCTV masuk ke grup yang tepat.
-                </p>
-            </div>
+            <PageHeader
+                title="Diagnostik Notifikasi"
+                description="Preview routing dan kirim drill Telegram untuk memastikan CCTV masuk ke grup yang tepat."
+            />
 
             <section className="rounded-lg border border-edge bg-surface p-4">
                 <div className="grid gap-4 md:grid-cols-[1fr_180px_auto_auto] md:items-end">

@@ -9,8 +9,10 @@
 
 import { useMemo, useState } from 'react';
 import billingAdminService from '../../../services/billingAdminService';
-import { formatRupiah, formatDateTime, StatusBadge, PAY_STATUS_BADGES, DesktopTable } from './billingFormat';
+import { formatRupiah, formatDateTime, StatusBadge, PAY_STATUS_BADGES } from './billingFormat';
+import { TableShell } from '../../ui/DataTable';
 import { useConfirm } from '../../../contexts/ConfirmContext';
+import { Card } from '../../ui/Card';
 
 const FILTERS = [
     { key: 'all', label: 'Semua' },
@@ -81,7 +83,7 @@ export default function PaymentsTab({ payments, run, busy }) {
 
     if (payments.length === 0) {
         return (
-            <div className="rounded-2xl border border-dashed border-edge px-4 py-12 text-center text-sm text-content-muted">
+            <div className="rounded-card border border-dashed border-edge px-4 py-12 text-center text-sm text-content-muted">
                 Belum ada pembayaran.
             </div>
         );
@@ -92,50 +94,56 @@ export default function PaymentsTab({ payments, run, busy }) {
             {FilterBar}
 
             {filtered.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-edge px-4 py-10 text-center text-sm text-content-muted">
+                <div className="rounded-card border border-dashed border-edge px-4 py-10 text-center text-sm text-content-muted">
                     Tidak ada pembayaran berstatus ini.
                 </div>
             ) : (
             <>
-            {/* Desktop: table */}
-            <DesktopTable minWidth="min-w-[680px]">
-                <thead>
-                    <tr className="text-left text-xs uppercase text-content-muted">
-                        <th className="px-3 py-2">ID</th>
-                        <th className="px-3 py-2">Pelanggan</th>
-                        <th className="px-3 py-2">Gateway</th>
-                        <th className="px-3 py-2 text-right">Nominal</th>
-                        <th className="px-3 py-2 text-center">Status</th>
-                        <th className="px-3 py-2">Dibuat</th>
-                        <th className="px-3 py-2 text-right">Aksi</th>
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-edge">
-                    {filtered.map((payment) => (
-                        <tr key={payment.id} className="bg-surface">
-                            <td className="px-3 py-2 text-content-muted">#{payment.id}</td>
-                            <td className="px-3 py-2">
-                                <span className="font-medium text-content">{payment.username || payment.user_id}</span>
-                                {payment.failure_reason && (
-                                    <p className="mt-0.5 max-w-[220px] truncate text-[11px] text-red-500" title={payment.failure_reason}>
-                                        ⚠ {payment.failure_reason}
-                                    </p>
-                                )}
-                            </td>
-                            <td className="px-3 py-2 text-content-muted">{payment.gateway}</td>
-                            <td className="px-3 py-2 text-right font-semibold">{formatRupiah(payment.amount)}</td>
-                            <td className="px-3 py-2 text-center"><StatusBadge className={PAY_STATUS_BADGES[payment.status] || ''}>{payment.status}</StatusBadge></td>
-                            <td className="px-3 py-2 whitespace-nowrap text-content-muted">{formatDateTime(payment.created_at)}</td>
-                            <td className="px-3 py-2 text-right"><ConfirmBtn payment={payment} busy={busy} onConfirm={confirmPaid} /></td>
+            {/*
+              * Desktop: table. The pixel min-width stays on the raw <table>: <Table> hardcodes
+              * `min-w-full`, and Tailwind emits `.min-w-full` AFTER every `.min-w-[Npx]`, so it
+              * would win the cascade and crush the columns instead of letting them scroll.
+              */}
+            <TableShell className="hidden md:block">
+                <table className="w-full min-w-[680px] text-sm">
+                    <thead>
+                        <tr className="text-left text-xs uppercase text-content-muted">
+                            <th className="px-3 py-2">ID</th>
+                            <th className="px-3 py-2">Pelanggan</th>
+                            <th className="px-3 py-2">Gateway</th>
+                            <th className="px-3 py-2 text-right">Nominal</th>
+                            <th className="px-3 py-2 text-center">Status</th>
+                            <th className="px-3 py-2">Dibuat</th>
+                            <th className="px-3 py-2 text-right">Aksi</th>
                         </tr>
-                    ))}
-                </tbody>
-            </DesktopTable>
+                    </thead>
+                    <tbody className="divide-y divide-edge">
+                        {filtered.map((payment) => (
+                            <tr key={payment.id}>
+                                <td className="px-3 py-2 text-content-muted">#{payment.id}</td>
+                                <td className="px-3 py-2">
+                                    <span className="font-medium text-content">{payment.username || payment.user_id}</span>
+                                    {payment.failure_reason && (
+                                        <p className="mt-0.5 max-w-[220px] truncate text-[11px] text-red-500" title={payment.failure_reason}>
+                                            ⚠ {payment.failure_reason}
+                                        </p>
+                                    )}
+                                </td>
+                                <td className="px-3 py-2 text-content-muted">{payment.gateway}</td>
+                                <td className="px-3 py-2 text-right font-semibold">{formatRupiah(payment.amount)}</td>
+                                <td className="px-3 py-2 text-center"><StatusBadge className={PAY_STATUS_BADGES[payment.status] || ''}>{payment.status}</StatusBadge></td>
+                                <td className="px-3 py-2 whitespace-nowrap text-content-muted">{formatDateTime(payment.created_at)}</td>
+                                <td className="px-3 py-2 text-right"><ConfirmBtn payment={payment} busy={busy} onConfirm={confirmPaid} /></td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </TableShell>
 
             {/* Mobile: cards */}
             <div className="space-y-3 md:hidden">
                 {filtered.map((payment) => (
-                    <div key={payment.id} className="rounded-2xl border border-edge bg-surface p-4">
+                    <Card key={payment.id}>
                         <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0">
                                 <p className="truncate font-semibold text-content">{payment.username || payment.user_id}</p>
@@ -152,7 +160,7 @@ export default function PaymentsTab({ payments, run, busy }) {
                             <p className="font-bold text-content">{formatRupiah(payment.amount)}</p>
                             <ConfirmBtn payment={payment} full={false} busy={busy} onConfirm={confirmPaid} />
                         </div>
-                    </div>
+                    </Card>
                 ))}
             </div>
             </>

@@ -21,17 +21,21 @@ const PADDING = {
  * @param {'none'|'sm'|'md'|'lg'} [padding='md']
  * @param {boolean} [raised] use the hover/nested surface step instead of the base card surface
  * @param {boolean} [interactive] adds hover affordance; pair with a real button/link wrapper
+ * @param {string} [as='div'] element to render. Same escape hatch CardTitle already has: several
+ *   admin panels ARE the form (`<form className={cardClass}>`), and without this they had to keep
+ *   hand-rolling the panel chrome — which is how the billing tabs ended up with a private
+ *   `cardClass` on a different radius. Chrome stays owned here whatever the tag.
  */
-export function Card({ padding = 'md', raised = false, interactive = false, className = '', children, ...rest }) {
+export function Card({ as: Tag = 'div', padding = 'md', raised = false, interactive = false, className = '', children, ...rest }) {
     return (
-        <div
+        <Tag
             className={`rounded-card border border-edge ${raised ? 'bg-surface-raised' : 'bg-surface'} ${PADDING[padding] ?? PADDING.md} ${
                 interactive ? 'transition-colors hover:border-edge-strong hover:bg-surface-raised' : ''
             } ${className}`}
             {...rest}
         >
             {children}
-        </div>
+        </Tag>
     );
 }
 

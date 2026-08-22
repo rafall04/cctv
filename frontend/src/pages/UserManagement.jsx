@@ -16,7 +16,7 @@ import { NoUsersEmptyState } from '../components/ui/EmptyState';
 import { Alert } from '../components/ui/Alert';
 import {
     Badge, Button, Card, Field, IconButton, Modal, PageHeader,
-    Table, TBody, TD, TH, THead, TR,
+    Table, TableShell, TBody, TD, TH, THead, TR,
 } from '../components/ui';
 import { TIMESTAMP_STORAGE, useTimezone } from '../contexts/TimezoneContext';
 
@@ -443,7 +443,7 @@ export default function UserManagement() {
                     <NoUsersEmptyState onAddUser={openAddModal} />
                 </Card>
             ) : (
-                <div className="overflow-x-auto rounded-card border border-edge bg-surface">
+                <TableShell>
                     <Table>
                         <THead>
                             <TR>
@@ -502,7 +502,7 @@ export default function UserManagement() {
                             })}
                         </TBody>
                     </Table>
-                </div>
+                </TableShell>
             )}
 
             {showSelfDeleteWarning && (

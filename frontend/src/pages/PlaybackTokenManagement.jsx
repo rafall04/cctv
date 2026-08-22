@@ -1,12 +1,12 @@
 /*
  * Purpose: Admin page shell for creating, sharing, listing, and revoking scoped playback tokens.
  * Caller: App.jsx protected admin route.
- * Deps: playback token management hook and admin playback-token components.
+ * Deps: playback token management hook, admin playback-token components, components/ui (PageHeader/Button/Modal).
  * MainFuncs: PlaybackTokenManagement.
  * SideEffects: Delegates admin token API calls and browser share/copy effects to usePlaybackTokenManagementPage.
  */
 
-import { Button, Modal } from '../components/ui';
+import { Button, Modal, PageHeader } from '../components/ui';
 import PlaybackTokenAuditLog from '../components/admin/playback-tokens/PlaybackTokenAuditLog.jsx';
 import PlaybackTokenForm from '../components/admin/playback-tokens/PlaybackTokenForm.jsx';
 import PlaybackTokenSharePanel from '../components/admin/playback-tokens/PlaybackTokenSharePanel.jsx';
@@ -18,12 +18,10 @@ export default function PlaybackTokenManagement() {
 
     return (
         <div className="space-y-6 py-6">
-            <div>
-                <h1 className="text-2xl font-bold text-content">Token Putar Ulang</h1>
-                <p className="mt-1 text-sm text-content-muted">
-                    Buat token playback publik dengan scope kamera, masa berlaku, policy device, dan template share.
-                </p>
-            </div>
+            <PageHeader
+                title="Token Putar Ulang"
+                description="Buat token playback publik dengan scope kamera, masa berlaku, policy device, dan template share."
+            />
 
             <PlaybackTokenForm
                 form={page.form}

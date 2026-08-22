@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import billingAdminService from '../services/billingAdminService';
 import { useNotification } from '../contexts/NotificationContext';
+import { Button, Card, PageHeader, TableShell } from '../components/ui';
 
 const KIND_BADGE = {
     public: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
@@ -80,21 +81,17 @@ export default function CustomerCameraIPs() {
 
     return (
         <div className="space-y-5">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
-                    <h1 className="text-xl font-bold text-content sm:text-2xl">IP Kamera Pelanggan (Routing)</h1>
-                    <p className="mt-0.5 text-sm text-content-muted">
-                        Daftar host/IP kamera pelanggan untuk di-route ke ISP broadband. Hanya alamat — kredensial RTSP tidak ditampilkan.
-                    </p>
-                </div>
-                <button
-                    onClick={load}
-                    disabled={loading}
-                    className="shrink-0 rounded-xl border border-edge-strong px-3 py-2 text-sm text-content-muted transition-colors hover:bg-surface-sunken disabled:opacity-50"
-                >
-                    {loading ? 'Memuat…' : 'Muat ulang'}
-                </button>
-            </div>
+            <PageHeader
+                title="IP Kamera Pelanggan (Routing)"
+                description="Daftar host/IP kamera pelanggan untuk di-route ke ISP broadband. Hanya alamat — kredensial RTSP tidak ditampilkan."
+                /* Was a hand-rolled <button> with `focus:` chrome only and a 36px box on touch;
+                   ui/Button carries the focus-visible ring, the 44px floor and the busy state. */
+                actions={(
+                    <Button onClick={load} loading={loading}>
+                        {loading ? 'Memuat…' : 'Muat ulang'}
+                    </Button>
+                )}
+            />
 
             {loading ? (
                 <div className="py-16 text-center text-content-muted">Memuat & meresolve IP…</div>
@@ -112,7 +109,7 @@ export default function CustomerCameraIPs() {
                     )}
 
                     {/* The deliverable: deduplicated public IPs for the routing rule. */}
-                    <div className="rounded-2xl border border-edge bg-surface p-4">
+                    <Card>
                         <div className="flex items-center justify-between gap-2">
                             <h2 className="font-semibold text-content">IP Publik unik untuk routing broadband ({publicIps.length})</h2>
                             <button
@@ -134,16 +131,16 @@ export default function CustomerCameraIPs() {
                             />
                         )}
                         <p className="mt-2 text-xs text-content-subtle">IP DDNS bisa berubah sewaktu-waktu — muat ulang sebelum memperbarui rule.</p>
-                    </div>
+                    </Card>
 
                     {endpoints.length === 0 ? (
-                        <div className="rounded-2xl border border-dashed border-edge px-4 py-12 text-center text-sm text-content-muted">
+                        <div className="rounded-card border border-dashed border-edge px-4 py-12 text-center text-sm text-content-muted">
                             Belum ada kamera pelanggan (subscriber).
                         </div>
                     ) : (
                         <div>
                             {/* Desktop: table */}
-                            <div className="hidden overflow-x-auto rounded-2xl border border-edge md:block">
+                            <TableShell className="hidden md:block">
                                 <table className="w-full min-w-[680px] text-sm">
                                     <thead>
                                         <tr className="text-left text-xs uppercase text-content-muted">
@@ -157,7 +154,7 @@ export default function CustomerCameraIPs() {
                                     </thead>
                                     <tbody className="divide-y divide-edge">
                                         {endpoints.map((e) => (
-                                            <tr key={e.camera_id} className="bg-surface">
+                                            <tr key={e.camera_id}>
                                                 <td className="px-3 py-2 font-medium text-content">{e.camera_name}</td>
                                                 <td className="px-3 py-2 text-content-muted">{e.owner}</td>
                                                 <td className="px-3 py-2 font-mono text-xs text-content-muted">{e.host || '—'}</td>
@@ -168,12 +165,12 @@ export default function CustomerCameraIPs() {
                                         ))}
                                     </tbody>
                                 </table>
-                            </div>
+                            </TableShell>
 
                             {/* Mobile: cards */}
                             <div className="space-y-3 md:hidden">
                                 {endpoints.map((e) => (
-                                    <div key={e.camera_id} className="rounded-2xl border border-edge bg-surface p-4">
+                                    <Card key={e.camera_id}>
                                         <div className="flex items-start justify-between gap-2">
                                             <div className="min-w-0">
                                                 <p className="truncate font-semibold text-content">{e.camera_name}</p>
@@ -184,7 +181,7 @@ export default function CustomerCameraIPs() {
                                         {/* Host/IP is one unbreakable token (a full IPv6 is 39 chars): without break-all its
                                             ink overflows the card and pushes the admin shell sideways at 1.5x font. */}
                                         <p className="mt-2 break-all font-mono text-xs text-content-muted">{e.ip || e.host || '—'}{e.port ? `:${e.port}` : ''}</p>
-                                    </div>
+                                    </Card>
                                 ))}
                             </div>
                         </div>

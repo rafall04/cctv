@@ -21,10 +21,13 @@ import RouteList from '../components/admin/telegramArchive/RouteList';
 import CameraRouting from '../components/admin/telegramArchive/CameraRouting';
 import ArchiveActivity from '../components/admin/telegramArchive/ArchiveActivity';
 import { card } from '../components/admin/telegramArchive/archiveUi';
-import { Button, Modal } from '../components/ui';
+import { Button, Modal, PageHeader } from '../components/ui';
 import { TableSkeleton } from '../components/ui/Skeleton';
 
 const EMPTY_DRAFT = { scope: 'camera', cameraId: '', areaId: '', chatId: '', label: '', enabled: true };
+
+// One spelling of the title for all three of this page's states — loading, unavailable, and loaded.
+const JUDUL = 'Arsip Rekaman ke Telegram';
 
 export function TelegramArchiveSettings() {
     const { showNotification } = useNotification();
@@ -216,7 +219,7 @@ export function TelegramArchiveSettings() {
     if (loading) {
         return (
             <div className="space-y-5">
-                <h1 className="text-xl font-semibold text-content">Arsip Rekaman ke Telegram</h1>
+                <PageHeader title={JUDUL} />
                 <TableSkeleton rows={5} />
             </div>
         );
@@ -225,7 +228,7 @@ export function TelegramArchiveSettings() {
     if (overview && overview.available === false) {
         return (
             <div className="space-y-5">
-                <h1 className="text-xl font-semibold text-content">Arsip Rekaman ke Telegram</h1>
+                <PageHeader title={JUDUL} />
                 <div className={`${card} p-6`}>
                     <p className="text-sm leading-relaxed text-content-muted">
                         Layanan arsip (<code className="text-content">tg-archive</code>) belum terpasang di
@@ -238,26 +241,22 @@ export function TelegramArchiveSettings() {
 
     return (
         <div className="space-y-5">
-            <header className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
-                    <h1 className="text-xl font-semibold text-content sm:text-2xl">
-                        Arsip Rekaman ke Telegram
-                    </h1>
-                    <p className="mt-1.5 max-w-prose text-sm leading-relaxed text-content-muted">
-                        Menentukan rekaman kamera mana dikirim ke grup Telegram mana, setiap 10 menit.
-                        Kamera yang tidak punya rute tidak dikirim sama sekali.
-                    </p>
-                    <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-content-subtle">
-                        <span className="font-mono tabular-nums text-content-muted">
+            <PageHeader
+                title={JUDUL}
+                description="Menentukan rekaman kamera mana dikirim ke grup Telegram mana, setiap 10 menit. Kamera yang tidak punya rute tidak dikirim sama sekali."
+                meta={(
+                    <>
+                        <span className="font-mono tabular-nums text-xs text-content-muted">
                             {routedCount}/{cameras.length}
                         </span>
-                        <span>kamera perekam sedang diarsipkan</span>
-                        <span aria-hidden="true">·</span>
-                        <span>perubahan berlaku ±1 menit, tanpa menyalakan ulang apa pun</span>
-                    </div>
-                </div>
-                <Button variant="primary" onClick={handleAdd}>+ Tambah rute</Button>
-            </header>
+                        <span className="text-xs text-content-subtle">kamera perekam sedang diarsipkan</span>
+                        {/* Decorative separator: it reads as "middle dot" otherwise. */}
+                        <span aria-hidden="true" className="text-xs text-content-subtle">·</span>
+                        <span className="text-xs text-content-subtle">perubahan berlaku ±1 menit, tanpa menyalakan ulang apa pun</span>
+                    </>
+                )}
+                actions={<Button variant="primary" onClick={handleAdd}>+ Tambah rute</Button>}
+            />
 
             <RouteList
                 routes={routes}

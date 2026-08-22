@@ -3,7 +3,7 @@
  *   and read impression/click figures.
  * Caller: App.jsx route /admin/promo-banners (admin only).
  * Deps: promoBannerService, areaService, cameraService, PromoBannerForm, components/ui (Button,
- *   Modal), ConfirmContext.useConfirm.
+ *   Modal, PageHeader), ConfirmContext.useConfirm.
  * MainFuncs: PromoBannerManagement.
  * SideEffects: Admin CRUD against /api/promo-banners.
  *
@@ -29,7 +29,7 @@ import { areaService } from '../services/areaService';
 import { cameraService } from '../services/cameraService';
 import { useNotification } from '../contexts/NotificationContext';
 import { useConfirm } from '../contexts/ConfirmContext';
-import { Button, Modal } from '../components/ui';
+import { Button, Modal, PageHeader } from '../components/ui';
 import PromoBannerForm, { PROMO_FORM_ID } from '../components/admin/promo/PromoBannerForm';
 
 const PLACEMENT_LABELS = {
@@ -270,23 +270,16 @@ export default function PromoBannerManagement() {
 
     return (
         <div className="space-y-6">
-            <header className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                    <h1 className="text-xl font-bold text-content">Promo Pemasangan</h1>
-                    <p className="mt-1 text-sm text-content-muted">
-                        Poster promosi milik provider sendiri, tampil di bawah video live dan halaman publik lain.
-                        Terpisah dari Sponsor dan dari Iklan — tetap tayang walau iklan dimatikan.
-                    </p>
-                </div>
-                {/*
-                  * No longer hidden while the editor is open: the editor is a dialog now, so it
-                  * covers the page, traps focus and locks scroll. Hiding the button as well only
-                  * made the header jump every time the dialog opened and closed.
-                  * <Button> rather than a hand-rolled class string so the 44px coarse-pointer
-                  * target comes from the primitive instead of being re-decided here.
-                  */}
-                <Button variant="primary" onClick={() => setEditing({})}>Tambah promo</Button>
-            </header>
+            {/*
+              * The action is no longer hidden while the editor is open: the editor is a dialog now,
+              * so it covers the page, traps focus and locks scroll. Hiding the button as well only
+              * made the header jump every time the dialog opened and closed.
+              */}
+            <PageHeader
+                title="Promo Pemasangan"
+                description="Poster promosi milik provider sendiri, tampil di bawah video live dan halaman publik lain. Terpisah dari Sponsor dan dari Iklan — tetap tayang walau iklan dimatikan."
+                actions={<Button variant="primary" onClick={() => setEditing({})}>Tambah promo</Button>}
+            />
 
             <section className="space-y-3">
                 {loading && <p className="text-sm text-content-muted">Memuat…</p>}

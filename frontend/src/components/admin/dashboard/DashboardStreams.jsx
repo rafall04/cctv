@@ -20,7 +20,7 @@ import { useFocusTrap } from '../../../hooks/useFocusTrap';
 import { Modal } from '../../ui/Modal';
 import { Badge } from '../../ui/Badge';
 import { Button, IconButton } from '../../ui/Button';
-import { Table, THead, TBody, TR, TH, TD } from '../../ui/DataTable';
+import { Table, TableShell, THead, TBody, TR, TH, TD } from '../../ui/DataTable';
 
 function getStreamPriorityScore(stream) {
     const viewerScore = (stream.viewers || 0) * 100;
@@ -313,7 +313,7 @@ export function DashboardStreamsPanel({
                 )}
             </div>
 
-            <div data-testid="dashboard-streams-panel" className="overflow-x-auto rounded-card border border-edge bg-surface">
+            <TableShell data-testid="dashboard-streams-panel">
                 <Table>
                     <THead>
                         <TR>
@@ -347,7 +347,7 @@ export function DashboardStreamsPanel({
                         )}
                     </TBody>
                 </Table>
-            </div>
+            </TableShell>
         </div>
     );
 }

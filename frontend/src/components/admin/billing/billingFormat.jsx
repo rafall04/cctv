@@ -56,16 +56,9 @@ export function StatusBadge({ className = '', children }) {
     );
 }
 
-export const cardClass = 'bg-surface border border-edge rounded-2xl p-4';
-export const inputClass = 'w-full px-3 py-2 bg-surface-sunken border border-edge rounded-xl text-sm text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary';
-
-// Wrapper for the desktop table half of each tab: horizontal scroll is a safety net for
-// tablet widths; `min-w` on the inner <table> is what actually lets it scroll instead of
-// crushing the columns. Mobile uses cards instead (see each tab's md:hidden block).
-export function DesktopTable({ children, minWidth = 'min-w-[640px]' }) {
-    return (
-        <div className="hidden overflow-x-auto md:block">
-            <table className={`w-full ${minWidth} text-sm`}>{children}</table>
-        </div>
-    );
-}
+/*
+ * cardClass / inputClass / DesktopTable used to live here — a private mini design system that
+ * duplicated components/ui Card, Field.inputClasses and TableShell, and was re-declared verbatim in
+ * three more files. They are gone; import the real primitives instead. cardClass also used
+ * rounded-2xl, so every billing panel had a different corner radius from the rest of admin.
+ */

@@ -17,7 +17,7 @@ import { useConfirm } from '../contexts/ConfirmContext';
 import vehicleCountAdminService from '../services/vehicleCountAdminService';
 import CountingLineEditor from '../components/admin/vehicle-count/CountingLineEditor.jsx';
 import PanduanPanel from '../components/admin/PanduanPanel.jsx';
-import { Button, Modal } from '../components/ui';
+import { Button, Modal, PageHeader } from '../components/ui';
 
 /*
  * `text-base sm:text-sm`, bukan `text-sm` saja: Safari iOS memperbesar seluruh halaman begitu
@@ -303,13 +303,10 @@ export default function VehicleCountSettings() {
 
     return (
         <div className="flex flex-col gap-4">
-            <header className="flex flex-col gap-1">
-                <h1 className="text-xl font-semibold text-content">Hitung Kendaraan</h1>
-                <p className="text-sm text-content-muted">
-                    Nyalakan penghitungan otomatis di kamera mana pun, lalu gambar garis hitungnya
-                    langsung di atas gambar kamera.
-                </p>
-            </header>
+            <PageHeader
+                title="Hitung Kendaraan"
+                description="Nyalakan penghitungan otomatis di kamera mana pun, lalu gambar garis hitungnya langsung di atas gambar kamera."
+            />
 
             <PanduanPanel
                 judul="Panduan singkat"

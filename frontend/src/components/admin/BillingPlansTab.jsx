@@ -11,9 +11,9 @@
 import { useEffect, useState } from 'react';
 import billingAdminService from '../../services/billingAdminService';
 import { settingsService as appSettingsService } from '../../services/settingsService';
-
-const inputClass = 'w-full px-3 py-2 bg-surface-sunken border border-edge rounded-xl text-sm text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary';
-const cardClass = 'bg-surface border border-edge rounded-2xl p-4';
+import { Card } from '../ui/Card';
+import { TableShell } from '../ui/DataTable';
+import { inputClasses } from '../ui/Field';
 
 function formatRupiah(value) {
     return `Rp${Number(value || 0).toLocaleString('id-ID')}`;
@@ -105,7 +105,12 @@ export default function BillingPlansTab({ plans, regSettings, run, busy }) {
                         + Paket Baru
                     </button>
                 </div>
-                <div className="overflow-x-auto">
+                {/*
+                  * The pixel min-width stays on the raw <table>: <Table> hardcodes `min-w-full`,
+                  * and Tailwind emits `.min-w-full` AFTER every `.min-w-[Npx]`, so it would win
+                  * the cascade and crush the columns instead of letting them scroll.
+                  */}
+                <TableShell>
                     <table className="w-full min-w-[680px] text-sm">
                         <thead>
                             <tr className="text-left text-xs uppercase text-content-muted">
@@ -121,7 +126,7 @@ export default function BillingPlansTab({ plans, regSettings, run, busy }) {
                         </thead>
                         <tbody className="divide-y divide-edge">
                             {plans.map((plan) => (
-                                <tr key={plan.id} className="bg-surface">
+                                <tr key={plan.id}>
                                     <td className="px-3 py-2">
                                         <p className="font-medium text-content">{plan.name}</p>
                                         <p className="text-xs text-content-subtle">{plan.key}</p>
@@ -186,11 +191,11 @@ export default function BillingPlansTab({ plans, regSettings, run, busy }) {
                             ))}
                         </tbody>
                     </table>
-                </div>
+                </TableShell>
             </div>
 
             <div className="space-y-4">
-                <div className={cardClass}>
+                <Card>
                     <h3 className="font-semibold text-content">Penagihan Harian</h3>
                     <label className="mt-2 flex items-start gap-2 text-sm text-content-muted">
                         <input
@@ -245,7 +250,7 @@ export default function BillingPlansTab({ plans, regSettings, run, busy }) {
                                 () => billingAdminService.updateRegistrationSettings({ default_plan_key: e.target.value }),
                                 'Paket default disimpan'
                             )}
-                            className={`mt-1 ${inputClass}`}
+                            className={inputClasses({ className: 'mt-1' })}
                         >
                             {plans.map((plan) => (
                                 <option key={plan.id} value={plan.key}>
@@ -254,27 +259,27 @@ export default function BillingPlansTab({ plans, regSettings, run, busy }) {
                             ))}
                         </select>
                     </label>
-                </div>
+                </Card>
 
                 {editing !== null && (
-                    <form onSubmit={handleSubmit} className={cardClass}>
+                    <Card as="form" onSubmit={handleSubmit}>
                         <h3 className="font-semibold text-content">
                             {editing === 'new' ? 'Paket Baru' : `Edit Paket: ${editing.name}`}
                         </h3>
                         <div className="mt-3 space-y-2">
                             {editing === 'new' && (
-                                <input name="key" value={form.key} onChange={handleChange} required pattern="[a-z0-9_\-]{2,40}" className={inputClass} placeholder="key unik (mis. premium)" />
+                                <input name="key" value={form.key} onChange={handleChange} required pattern="[a-z0-9_\-]{2,40}" className={inputClasses()} placeholder="key unik (mis. premium)" />
                             )}
-                            <input name="name" value={form.name} onChange={handleChange} required minLength={2} className={inputClass} placeholder="Nama paket" />
-                            <input name="description" value={form.description} onChange={handleChange} className={inputClass} placeholder="Deskripsi singkat (opsional)" />
+                            <input name="name" value={form.name} onChange={handleChange} required minLength={2} className={inputClasses()} placeholder="Nama paket" />
+                            <input name="description" value={form.description} onChange={handleChange} className={inputClasses()} placeholder="Deskripsi singkat (opsional)" />
                             <label className="block text-xs text-content-muted">
                                 Harga per kamera per bulan (rupiah)
-                                <input name="price_per_camera" type="number" min="0" step="1000" value={form.price_per_camera} onChange={handleChange} required className={`mt-1 ${inputClass}`} />
+                                <input name="price_per_camera" type="number" min="0" step="1000" value={form.price_per_camera} onChange={handleChange} required className={inputClasses({ className: 'mt-1' })} />
                             </label>
                             {!form.is_trial && (
                                 <label className="block text-xs text-content-muted">
                                     Tambahan harga bila kamera merekam (rupiah)
-                                    <input name="recording_price_per_camera" type="number" min="0" step="1000" value={form.recording_price_per_camera} onChange={handleChange} className={`mt-1 ${inputClass}`} />
+                                    <input name="recording_price_per_camera" type="number" min="0" step="1000" value={form.recording_price_per_camera} onChange={handleChange} className={inputClasses({ className: 'mt-1' })} />
                                     <span className="mt-1 block text-content-subtle">
                                         0 = rekaman tidak dikenakan biaya tambahan. Ditagihkan di atas harga tonton, per kamera.
                                     </span>
@@ -283,7 +288,7 @@ export default function BillingPlansTab({ plans, regSettings, run, busy }) {
                             {!form.is_trial && (
                                 <label className="block text-xs text-content-muted">
                                     Rekaman disimpan berapa hari
-                                    <input name="recording_retention_days" type="number" min="0" max="365" value={form.recording_retention_days} onChange={handleChange} className={`mt-1 ${inputClass}`} />
+                                    <input name="recording_retention_days" type="number" min="0" max="365" value={form.recording_retention_days} onChange={handleChange} className={inputClasses({ className: 'mt-1' })} />
                                     <span className="mt-1 block text-content-subtle">
                                         Tampil di daftar harga yang dibaca calon pelanggan. Isi hanya bila
                                         Anda yakin bisa menepatinya — 0 berarti belum ditetapkan, dan
@@ -293,11 +298,11 @@ export default function BillingPlansTab({ plans, regSettings, run, busy }) {
                             )}
                             <label className="block text-xs text-content-muted">
                                 Maksimal kamera
-                                <input name="max_cameras" type="number" min="1" max="100" value={form.max_cameras} onChange={handleChange} required className={`mt-1 ${inputClass}`} />
+                                <input name="max_cameras" type="number" min="1" max="100" value={form.max_cameras} onChange={handleChange} required className={inputClasses({ className: 'mt-1' })} />
                             </label>
                             <label className="block text-xs text-content-muted">
                                 Urutan tampil
-                                <input name="sort_order" type="number" min="0" max="999" value={form.sort_order} onChange={handleChange} className={`mt-1 ${inputClass}`} />
+                                <input name="sort_order" type="number" min="0" max="999" value={form.sort_order} onChange={handleChange} className={inputClasses({ className: 'mt-1' })} />
                             </label>
                             <label className="flex items-center gap-2 text-sm text-content-muted">
                                 <input name="is_trial" type="checkbox" checked={form.is_trial} onChange={handleChange} />
@@ -306,7 +311,7 @@ export default function BillingPlansTab({ plans, regSettings, run, busy }) {
                             {form.is_trial && (
                                 <label className="block text-xs text-content-muted">
                                     Durasi trial (hari)
-                                    <input name="trial_days" type="number" min="1" max="90" value={form.trial_days} onChange={handleChange} required className={`mt-1 ${inputClass}`} />
+                                    <input name="trial_days" type="number" min="1" max="90" value={form.trial_days} onChange={handleChange} required className={inputClasses({ className: 'mt-1' })} />
                                 </label>
                             )}
                             <div className="flex gap-2 pt-1">
@@ -318,7 +323,7 @@ export default function BillingPlansTab({ plans, regSettings, run, busy }) {
                                 </button>
                             </div>
                         </div>
-                    </form>
+                    </Card>
                 )}
             </div>
         </div>

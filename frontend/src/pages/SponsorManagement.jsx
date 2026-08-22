@@ -1,7 +1,7 @@
 /*
 Purpose: Admin sponsor management — package catalog CRUD, sponsor CRUD with multi-camera picker, per-camera quick-swap.
 Caller: Protected admin sponsor route.
-Deps: React hooks, NotificationContext, sponsorService, sponsorPackageService, cameraService, SponsorPackagePanel.
+Deps: React hooks, NotificationContext, sponsorService, sponsorPackageService, cameraService, SponsorPackagePanel, components/ui (PageHeader/Button/Modal/StatTile).
 MainFuncs: SponsorManagement.
 SideEffects: Calls admin sponsor / sponsor-packages / camera APIs.
 */
@@ -14,7 +14,7 @@ import sponsorPackageService from '../services/sponsorPackageService';
 import { cameraService } from '../services/cameraService';
 import { TableSkeleton, StatCardSkeleton } from '../components/ui/Skeleton';
 import SponsorPackagePanel from '../components/admin/sponsors/SponsorPackagePanel.jsx';
-import { Button, Modal, StatTile, inputClasses } from '../components/ui';
+import { Button, Modal, PageHeader, StatTile, inputClasses } from '../components/ui';
 
 // Pre-bound Tailwind color classes — using template literals against the
 // `color` field would silently get purged by the JIT compiler. The list
@@ -344,25 +344,28 @@ function SponsorManagement() {
 
     return (
         <div className="space-y-5">
-            {/* Header */}
-            <div className="flex justify-between items-center">
-                <div>
-                    <h1 className="text-2xl font-bold text-content">Manajemen Sponsor</h1>
-                    <p className="text-content-muted text-sm mt-1">
-                        Kelola profil paket, sponsor lokal, & penugasan kamera-nya.
-                        <span className="ml-1 text-content-muted">(Ads-network di halaman Ads, terpisah.)</span>
-                    </p>
-                </div>
-                <button
-                    onClick={openCreate}
-                    disabled={packages.length === 0}
-                    className="bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
-                    title={packages.length === 0 ? 'Buat minimal 1 profil paket dulu' : 'Tambah sponsor baru'}
-                >
-                    <span>+</span>
-                    <span>Tambah Sponsor</span>
-                </button>
-            </div>
+            {/*
+              * This header is the one PageHeader's squeeze fix was measured against: it went
+              * straight to `justify-between items-center` with no stacking and no `min-w-0`, so on a
+              * 320px phone the title column kept only 179px and the button pushed 90px off screen at
+              * 1.5x font. The primitive stacks below `sm` instead. The trailing span was also a
+              * no-op — `text-content-muted` inside a `text-content-muted` paragraph — so the second
+              * sentence is just part of the description now.
+              */}
+            <PageHeader
+                title="Manajemen Sponsor"
+                description="Kelola profil paket, sponsor lokal, & penugasan kamera-nya. (Ads-network di halaman Ads, terpisah.)"
+                actions={(
+                    <Button
+                        variant="primary"
+                        onClick={openCreate}
+                        disabled={packages.length === 0}
+                        title={packages.length === 0 ? 'Buat minimal 1 profil paket dulu' : 'Tambah sponsor baru'}
+                    >
+                        Tambah Sponsor
+                    </Button>
+                )}
+            />
 
             {/* Stats */}
             {stats && (

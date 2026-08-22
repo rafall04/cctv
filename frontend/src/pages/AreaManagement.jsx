@@ -12,7 +12,7 @@ import { areaService } from '../services/areaService';
 import { cameraService } from '../services/cameraService';
 import { settingsService } from '../services/settingsService';
 import { useNotification } from '../contexts/NotificationContext';
-import { StatCardSkeleton, CameraCardSkeleton, NoAreasEmptyState, Alert, Button, Field, Modal } from '../components/ui';
+import { StatCardSkeleton, CameraCardSkeleton, NoAreasEmptyState, Alert, Button, Field, Modal, PageHeader } from '../components/ui';
 import AreaCard from '../components/admin/areas/AreaCard';
 import AreaFormModal from '../components/admin/areas/AreaFormModal';
 import BulkPolicyPreview from '../components/admin/areas/BulkPolicyPreview';
@@ -378,13 +378,18 @@ export default function AreaManagement() {
 
     return (
         <div className="space-y-8">
-            {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-                <div>
-                    <p className="text-sm font-semibold text-primary mb-1">Manajemen Lokasi</p>
-                    <h1 className="text-2xl font-bold text-content">Area</h1>
-                    <p className="text-content-muted mt-1">Kelompokkan kamera berdasarkan RT, RW, Kelurahan, Kecamatan</p>
-                </div>
+            {/* THE FOUR CONTROLS ARE NOT IN `actions`, AND THAT WAS MEASURED. That slot is
+                `shrink-0`, so it is as wide as the max-content SUM of what it holds and never wraps
+                — right for the one or two buttons other routes put there, wrong for a cluster this
+                wide. All four overflowed <main> by 205px at 720px and 396px at 720px/1.5x, naming
+                the actions div as the offender; the guard measures 320/393, where this header is
+                still stacked, so it cannot see that band. Own row, shrinkable, wraps. */}
+            <div className="space-y-4">
+                <PageHeader
+                    eyebrow="Manajemen Lokasi"
+                    title="Area"
+                    description="Kelompokkan kamera berdasarkan RT, RW, Kelurahan, Kecamatan"
+                />
                 <div className="flex items-center gap-3 flex-wrap">
                     <Link
                         to="/admin/backup-restore?scope=unresolved_only"
@@ -394,7 +399,7 @@ export default function AreaManagement() {
                     </Link>
                     {kecamatans.length > 0 && (
                         <select value={filterKecamatan} onChange={(e) => setFilterKecamatan(e.target.value)}
-                            className="min-w-0 max-w-full px-4 py-2.5 bg-white dark:bg-gray-800/80 border border-edge rounded-xl text-content text-sm focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary">
+                            className="min-w-0 max-w-full px-4 py-2.5 bg-surface border border-edge rounded-xl text-content text-sm focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary">
                             <option value="">Semua Kecamatan</option>
                             {kecamatans.map(k => <option key={k} value={k}>{k}</option>)}
                         </select>

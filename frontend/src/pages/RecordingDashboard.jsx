@@ -1,7 +1,7 @@
 /*
 Purpose: Admin dashboard for monitoring and controlling CCTV recording state.
 Caller: Admin router recording page.
-Deps: recordingService, NotificationContext, recording dashboard data hook, recording UI components.
+Deps: recordingService, NotificationContext, recording dashboard data hook, recording UI components, components/ui (PageHeader/Button).
 MainFuncs: RecordingDashboard(), recording start/stop/settings handlers.
 SideEffects: Calls recording APIs, refreshes dashboard data, displays operator notifications.
 */
@@ -9,6 +9,7 @@ SideEffects: Calls recording APIs, refreshes dashboard data, displays operator n
 import { useState } from 'react';
 import recordingService from '../services/recordingService';
 import { useNotification } from '../contexts/NotificationContext';
+import { Button, PageHeader } from '../components/ui';
 import { TableSkeleton, StatCardSkeleton } from '../components/ui/Skeleton';
 import { useRecordingDashboardData } from '../hooks/admin/useRecordingDashboardData';
 import RecordingSummaryCards from '../components/admin/recordings/RecordingSummaryCards';
@@ -102,31 +103,40 @@ export default function RecordingDashboard() {
 
     return (
         <div className="space-y-4 md:space-y-6">
-            <div className="rounded-2xl border border-edge bg-surface p-5 shadow-sm md:p-6">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                    <div>
-                        <p className="text-sm font-semibold text-primary">Recording Overview</p>
-                        <h1 className="mt-2 text-2xl font-bold text-content">Dasbor Rekaman</h1>
-                        <p className="mt-1 text-sm text-content">
-                            Monitor recording aktif, kapasitas segmen, dan auto-restart kamera.
-                        </p>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                        <span className="rounded-full bg-surface-sunken px-3 py-1.5 font-mono text-xs font-medium tabular-nums text-content-muted">
-                            Update terakhir: {formatLastUpdate(lastSuccessfulUpdate)}
-                        </span>
-                        <button
-                            onClick={() => fetchData({ mode: 'initial' })}
-                            className="inline-flex items-center gap-2 rounded-xl border border-edge bg-surface px-4 py-2.5 text-sm font-medium text-content shadow-sm transition-colors hover:bg-surface-raised"
-                        >
-                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            {/*
+              * The `rounded-2xl border bg-surface p-5` panel this header used to sit in is GONE, and
+              * that is the point of the migration here rather than a side effect of it. This was the
+              * only admin route that boxed its own title: measured against the same header bare, the
+              * panel cost the title 42px of line at 320px and 62px at 320px/1.5x (288 -> 246,
+              * 272 -> 210) and turned "Dasbor Rekaman" into a two-line title on a phone. It also said
+              * the wrong thing — the surface/edge tokens mark a content GROUPING, so panelling the h1
+              * filed the page's own identity as one of its sections. See PageHeader.jsx.
+              *
+              * The timestamp goes to `meta` and the button to `actions`: one is state, the other is a
+              * control, and they were only adjacent before because both were "the right-hand side".
+              */}
+            <PageHeader
+                eyebrow="Recording Overview"
+                title="Dasbor Rekaman"
+                description="Monitor recording aktif, kapasitas segmen, dan auto-restart kamera."
+                meta={(
+                    <span className="rounded-full bg-surface-sunken px-3 py-1.5 font-mono text-xs font-medium tabular-nums text-content-muted">
+                        Update terakhir: {formatLastUpdate(lastSuccessfulUpdate)}
+                    </span>
+                )}
+                actions={(
+                    <Button
+                        onClick={() => fetchData({ mode: 'initial' })}
+                        icon={(
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                             </svg>
-                            Refresh
-                        </button>
-                    </div>
-                </div>
-            </div>
+                        )}
+                    >
+                        Refresh
+                    </Button>
+                )}
+            />
 
             {refreshError && !error && (
                 <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300">

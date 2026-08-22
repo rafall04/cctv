@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { PageHeader, Tabs, TabPanel } from '../../components/ui';
 import { cameraService } from '../../services/cameraService';
 import { useNotification } from '../../contexts/NotificationContext';
+
+const TABS = [
+    { id: 'import', label: 'Import Center' },
+    { id: 'export', label: 'Export Database' },
+];
 
 const IMPORT_MODE_OPTIONS = [
     { value: 'upload_json', label: 'Upload JSON' },
@@ -415,12 +421,10 @@ export default function ImportExport() {
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-2xl font-bold text-content">Pusat Kendali Impor</h1>
-                    <p className="text-content-muted">Preview dulu, lalu commit hanya row yang memang valid dan eligible.</p>
-                </div>
-            </div>
+            <PageHeader
+                title="Pusat Kendali Impor"
+                description="Preview dulu, lalu commit hanya row yang memang valid dan eligible."
+            />
 
             <div className="rounded-2xl border border-amber-200 bg-amber-50/80 dark:bg-amber-500/10 dark:border-amber-500/20 p-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
@@ -434,17 +438,10 @@ export default function ImportExport() {
                 </Link>
             </div>
 
-            <div className="flex space-x-1 border-b border-edge">
-                <button onClick={() => setActiveTab('import')} className={`px-4 py-2 font-medium text-sm transition-colors ${activeTab === 'import' ? 'text-primary border-b-2 border-primary' : 'text-content-muted hover:text-content-muted'}`}>
-                    Import Center
-                </button>
-                <button onClick={() => setActiveTab('export')} className={`px-4 py-2 font-medium text-sm transition-colors ${activeTab === 'export' ? 'text-primary border-b-2 border-primary' : 'text-content-muted hover:text-content-muted'}`}>
-                    Export Database
-                </button>
-            </div>
+            <Tabs tabs={TABS} activeId={activeTab} onChange={setActiveTab} idPrefix="importexport" />
 
             {activeTab === 'export' && (
-                <div className="bg-surface rounded-xl shadow-sm border border-edge p-6">
+                <TabPanel id="export" idPrefix="importexport" className="bg-surface rounded-xl shadow-sm border border-edge p-6">
                     <div className="p-4 bg-primary-50 dark:bg-primary-900/10 text-primary-900 dark:text-primary-100 rounded-xl border border-primary-200 dark:border-primary-800/30">
                         <h3 className="font-semibold text-lg mb-2">Full Database Export</h3>
                         <p className="text-sm mb-4">Unduh snapshot JSON untuk seluruh kamera yang saat ini ada di database. Field private seperti `private_rtsp_url` tidak ikut diekspor di jalur umum ini.</p>
@@ -452,11 +449,11 @@ export default function ImportExport() {
                             {isProcessing ? 'Processing Download...' : 'Export to JSON'}
                         </button>
                     </div>
-                </div>
+                </TabPanel>
             )}
 
             {activeTab === 'import' && (
-                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                <TabPanel id="import" idPrefix="importexport" className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                     <div className="lg:col-span-1 space-y-4">
                         <div className="bg-surface rounded-xl shadow-sm border border-edge p-5 space-y-4">
                             <div>
@@ -694,7 +691,7 @@ export default function ImportExport() {
                             </div>
                         </div>
                     </div>
-                </div>
+                </TabPanel>
             )}
         </div>
     );

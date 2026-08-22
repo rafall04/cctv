@@ -7,7 +7,10 @@
 
 import { useMemo, useState } from 'react';
 import billingAdminService from '../../../services/billingAdminService';
-import { formatRupiah, StatusBadge, SUB_STATUS_BADGES, cardClass, inputClass, DesktopTable } from './billingFormat';
+import { formatRupiah, StatusBadge, SUB_STATUS_BADGES } from './billingFormat';
+import { Card } from '../../ui/Card';
+import { TableShell } from '../../ui/DataTable';
+import { inputClasses } from '../../ui/Field';
 import { useConfirm } from '../../../contexts/ConfirmContext';
 
 
@@ -69,26 +72,26 @@ export default function SubscriptionsTab({ subscriptions, assignableCameras, cus
     };
 
     const assignFormEl = (
-        <form onSubmit={submitAssign} className={cardClass}>
+        <Card as="form" onSubmit={submitAssign}>
             <h3 className="font-semibold text-content">Assign Kamera ke Pelanggan</h3>
             <p className="mt-1 text-xs text-content-muted">
                 Kamera menjadi kelas <code>subscriber</code>: hilang dari publik, hanya bisa dilihat pelanggan, dan mulai ditagih hari ini.
             </p>
             <div className="mt-3 space-y-2">
-                <select value={assignForm.camera_id} onChange={(e) => setAssignForm({ ...assignForm, camera_id: e.target.value })} required className={inputClass}>
+                <select value={assignForm.camera_id} onChange={(e) => setAssignForm({ ...assignForm, camera_id: e.target.value })} required className={inputClasses()}>
                     <option value="">Pilih kamera…</option>
                     {assignableCameras.map((camera) => (
                         <option key={camera.id} value={camera.id}>#{camera.id} {camera.name} ({camera.camera_class || 'community'})</option>
                     ))}
                 </select>
-                <select value={assignForm.user_id} onChange={(e) => setAssignForm({ ...assignForm, user_id: e.target.value })} required className={inputClass}>
+                <select value={assignForm.user_id} onChange={(e) => setAssignForm({ ...assignForm, user_id: e.target.value })} required className={inputClasses()}>
                     <option value="">Pilih pelanggan…</option>
                     {customers.map((c) => (<option key={c.id} value={c.id}>{c.username}</option>))}
                 </select>
-                <input type="number" min="1000" step="1000" value={assignForm.monthly_price} onChange={(e) => setAssignForm({ ...assignForm, monthly_price: e.target.value })} required className={inputClass} placeholder="Harga per bulan (mis. 20000)" />
+                <input type="number" min="1000" step="1000" value={assignForm.monthly_price} onChange={(e) => setAssignForm({ ...assignForm, monthly_price: e.target.value })} required className={inputClasses()} placeholder="Harga per bulan (mis. 20000)" />
                 <button type="submit" disabled={busy} className="w-full rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-600 disabled:opacity-50">Assign & Mulai Tagih</button>
             </div>
-        </form>
+        </Card>
     );
 
     return (
@@ -97,14 +100,14 @@ export default function SubscriptionsTab({ subscriptions, assignableCameras, cus
 
             <div className="lg:order-1 lg:col-span-2">
                 {subscriptions.length === 0 ? (
-                    <div className="rounded-2xl border border-dashed border-edge px-4 py-12 text-center text-sm text-content-muted">
+                    <div className="rounded-card border border-dashed border-edge px-4 py-12 text-center text-sm text-content-muted">
                         Belum ada langganan. Assign kamera ke pelanggan lewat form{' '}
                         <span className="lg:hidden">di atas</span><span className="hidden lg:inline">di samping</span>.
                     </div>
                 ) : (
                     <>
                         {/* Monitoring: customer cameras per area */}
-                        <div className="mb-3 rounded-2xl border border-edge bg-surface p-3">
+                        <Card padding="sm" className="mb-3">
                             <h3 className="text-sm font-semibold text-content">Monitoring per Area</h3>
                             <div className="mt-2 flex flex-wrap gap-2">
                                 {areaSummary.map((g) => (
@@ -117,43 +120,50 @@ export default function SubscriptionsTab({ subscriptions, assignableCameras, cus
                                     </div>
                                 ))}
                             </div>
-                        </div>
+                        </Card>
 
-                        {/* Desktop: table */}
-                        <DesktopTable minWidth="min-w-[560px]">
-                            <thead>
-                                <tr className="text-left text-xs uppercase text-content-muted">
-                                    <th className="px-3 py-2">Kamera</th>
-                                    <th className="px-3 py-2">Pelanggan</th>
-                                    <th className="px-3 py-2 text-right">Harga/bulan</th>
-                                    <th className="px-3 py-2 text-center">Status</th>
-                                    <th className="px-3 py-2 text-right">Aksi</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-edge">
-                                {subscriptions.map((sub) => (
-                                    <tr key={sub.id} className="bg-surface">
-                                        <td className="px-3 py-2">
-                                            <p className="font-medium text-content">{sub.camera_name}</p>
-                                            <p className="text-xs text-content-subtle">
-                                                {sub.area_name || 'Tanpa area'} · {sub.camera_is_online === 1 ? 'online' : 'offline'}{sub.camera_is_public ? ' · publik' : ''}
-                                            </p>
-                                        </td>
-                                        <td className="px-3 py-2 text-content-muted">
-                                            {sub.customer_username}<span className="ml-1 text-xs text-content-subtle">({formatRupiah(sub.wallet_balance || 0)})</span>
-                                        </td>
-                                        <td className="px-3 py-2 text-right">{formatRupiah(sub.monthly_price)}</td>
-                                        <td className="px-3 py-2 text-center"><StatusBadge className={SUB_STATUS_BADGES[sub.status] || ''}>{sub.status}</StatusBadge></td>
-                                        <td className="px-3 py-2"><Actions sub={sub} busy={busy} onToggleStatus={toggleStatus} onCancel={cancelSub} /></td>
+                        {/*
+                          * Desktop: table. The pixel min-width stays on the raw <table>: <Table>
+                          * hardcodes `min-w-full`, and Tailwind emits `.min-w-full` AFTER every
+                          * `.min-w-[Npx]`, so it would win the cascade and crush the columns
+                          * instead of letting them scroll.
+                          */}
+                        <TableShell className="hidden md:block">
+                            <table className="w-full min-w-[560px] text-sm">
+                                <thead>
+                                    <tr className="text-left text-xs uppercase text-content-muted">
+                                        <th className="px-3 py-2">Kamera</th>
+                                        <th className="px-3 py-2">Pelanggan</th>
+                                        <th className="px-3 py-2 text-right">Harga/bulan</th>
+                                        <th className="px-3 py-2 text-center">Status</th>
+                                        <th className="px-3 py-2 text-right">Aksi</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </DesktopTable>
+                                </thead>
+                                <tbody className="divide-y divide-edge">
+                                    {subscriptions.map((sub) => (
+                                        <tr key={sub.id}>
+                                            <td className="px-3 py-2">
+                                                <p className="font-medium text-content">{sub.camera_name}</p>
+                                                <p className="text-xs text-content-subtle">
+                                                    {sub.area_name || 'Tanpa area'} · {sub.camera_is_online === 1 ? 'online' : 'offline'}{sub.camera_is_public ? ' · publik' : ''}
+                                                </p>
+                                            </td>
+                                            <td className="px-3 py-2 text-content-muted">
+                                                {sub.customer_username}<span className="ml-1 text-xs text-content-subtle">({formatRupiah(sub.wallet_balance || 0)})</span>
+                                            </td>
+                                            <td className="px-3 py-2 text-right">{formatRupiah(sub.monthly_price)}</td>
+                                            <td className="px-3 py-2 text-center"><StatusBadge className={SUB_STATUS_BADGES[sub.status] || ''}>{sub.status}</StatusBadge></td>
+                                            <td className="px-3 py-2"><Actions sub={sub} busy={busy} onToggleStatus={toggleStatus} onCancel={cancelSub} /></td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </TableShell>
 
                         {/* Mobile: cards */}
                         <div className="space-y-3 md:hidden">
                             {subscriptions.map((sub) => (
-                                <div key={sub.id} className="rounded-2xl border border-edge bg-surface p-4">
+                                <Card key={sub.id}>
                                     <div className="flex items-start justify-between gap-2">
                                         <div className="min-w-0">
                                             <p className="truncate font-semibold text-content">{sub.camera_name}</p>
@@ -168,7 +178,7 @@ export default function SubscriptionsTab({ subscriptions, assignableCameras, cus
                                     </div>
                                     <p className="mt-2 text-sm text-content-muted">{formatRupiah(sub.monthly_price)}/bulan</p>
                                     {sub.status !== 'cancelled' && <div className="mt-3"><Actions sub={sub} full busy={busy} onToggleStatus={toggleStatus} onCancel={cancelSub} /></div>}
-                                </div>
+                                </Card>
                             ))}
                         </div>
                     </>

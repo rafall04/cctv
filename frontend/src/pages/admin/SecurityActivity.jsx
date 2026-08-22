@@ -7,6 +7,7 @@ SideEffects: Fetches paginated security logs and 7-day stats.
 */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Button, PageHeader } from '../../components/ui';
 import { adminService } from '../../services/adminService';
 import { useNotification } from '../../contexts/NotificationContext';
 import { useTimezone, parseBackendDateInput, TIMESTAMP_STORAGE } from '../../contexts/TimezoneContext';
@@ -70,6 +71,15 @@ function StatTile({ label, value, tone }) {
             <div className="text-xs font-medium text-content-muted">{label}</div>
             <div className={`mt-1 text-2xl font-bold ${tone || 'text-content'}`}>{value}</div>
         </div>
+    );
+}
+
+// Module level: inline in the header this was a new component type every render.
+function RefreshIcon() {
+    return (
+        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+        </svg>
     );
 }
 
@@ -163,25 +173,12 @@ export default function SecurityActivity() {
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                    <p className="text-sm font-semibold text-primary">Keamanan</p>
-                    <h1 className="text-2xl font-bold text-content">Aktivitas Keamanan</h1>
-                    <p className="mt-1 text-sm text-content-muted">
-                        Login gagal, lockout, rate-limit, CSRF, penolakan akses, dan aksi admin.
-                    </p>
-                </div>
-                <button
-                    type="button"
-                    onClick={refresh}
-                    className="inline-flex items-center gap-2 self-start rounded-xl border border-edge bg-surface px-4 py-2.5 text-sm font-medium text-content shadow-sm transition-colors hover:bg-surface-sunken"
-                >
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    Refresh
-                </button>
-            </div>
+            <PageHeader
+                eyebrow="Keamanan"
+                title="Aktivitas Keamanan"
+                description="Login gagal, lockout, rate-limit, CSRF, penolakan akses, dan aksi admin."
+                actions={<Button onClick={refresh} icon={<RefreshIcon />}>Refresh</Button>}
+            />
 
             {/* Stats — last 7 days */}
             <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">

@@ -8,7 +8,10 @@
 
 import { useState } from 'react';
 import billingAdminService from '../../../services/billingAdminService';
-import { formatRupiah, StatusBadge, SUB_STATUS_BADGES, cardClass, inputClass, DesktopTable } from './billingFormat';
+import { formatRupiah, StatusBadge, SUB_STATUS_BADGES } from './billingFormat';
+import { Card } from '../../ui/Card';
+import { TableShell } from '../../ui/DataTable';
+import { inputClasses } from '../../ui/Field';
 import { useConfirm } from '../../../contexts/ConfirmContext';
 
 function AccountTag({ status }) {
@@ -93,43 +96,50 @@ export default function CustomersTab({ customers, plans, run, busy }) {
     );
 
     const topupForm_ = (
-        <form onSubmit={submitTopup} className={cardClass}>
+        <Card as="form" onSubmit={submitTopup}>
             <h3 className="font-semibold text-content">Top-up Manual</h3>
             <p className="mt-1 text-xs text-content-muted">Untuk pembayaran tunai/transfer langsung ke admin.</p>
             <div className="mt-3 space-y-2">
-                <select value={topupForm.user_id} onChange={(e) => setTopupForm({ ...topupForm, user_id: e.target.value })} required className={inputClass}>
+                <select value={topupForm.user_id} onChange={(e) => setTopupForm({ ...topupForm, user_id: e.target.value })} required className={inputClasses()}>
                     <option value="">Pilih pelanggan…</option>
                     {customers.map((c) => (<option key={c.id} value={c.id}>{c.username} ({formatRupiah(c.balance)})</option>))}
                 </select>
-                <input type="number" min="1000" step="1000" value={topupForm.amount} onChange={(e) => setTopupForm({ ...topupForm, amount: e.target.value })} required className={inputClass} placeholder="Nominal" />
-                <input type="text" value={topupForm.note} onChange={(e) => setTopupForm({ ...topupForm, note: e.target.value })} className={inputClass} placeholder="Catatan (opsional)" />
+                <input type="number" min="1000" step="1000" value={topupForm.amount} onChange={(e) => setTopupForm({ ...topupForm, amount: e.target.value })} required className={inputClasses()} placeholder="Nominal" />
+                <input type="text" value={topupForm.note} onChange={(e) => setTopupForm({ ...topupForm, note: e.target.value })} className={inputClasses()} placeholder="Catatan (opsional)" />
                 <button type="submit" disabled={busy} className="w-full rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-600 disabled:opacity-50">Tambah Saldo</button>
             </div>
-        </form>
+        </Card>
     );
 
     const adjustForm_ = (
-        <form onSubmit={submitAdjust} className={cardClass}>
+        <Card as="form" onSubmit={submitAdjust}>
             <h3 className="font-semibold text-content">Penyesuaian Saldo</h3>
             <p className="mt-1 text-xs text-content-muted">Koreksi manual: tambah (kompensasi) atau kurangi (refund). Tercatat di riwayat &amp; audit.</p>
             <div className="mt-3 space-y-2">
-                <select value={adjustForm.user_id} onChange={(e) => setAdjustForm({ ...adjustForm, user_id: e.target.value })} required className={inputClass}>
+                <select value={adjustForm.user_id} onChange={(e) => setAdjustForm({ ...adjustForm, user_id: e.target.value })} required className={inputClasses()}>
                     <option value="">Pilih pelanggan…</option>
                     {customers.map((c) => (<option key={c.id} value={c.id}>{c.username} ({formatRupiah(c.balance)})</option>))}
                 </select>
                 <div className="flex gap-2">
-                    <select value={adjustForm.direction} onChange={(e) => setAdjustForm({ ...adjustForm, direction: e.target.value })} className={`${inputClass} w-auto shrink-0`}>
+                    {/*
+                      * `!w-auto`, not `w-auto`: inputClasses() hardcodes `w-full`, and Tailwind
+                      * emits `.w-full` AFTER `.w-auto`, so the plain utility lost the cascade. The
+                      * select then took the whole flex row while `shrink-0` stopped it giving any
+                      * back, crushing the Nominal input beside it to 26px — measured by the
+                      * overflow guard's small-target sampler, not guessed.
+                      */}
+                    <select value={adjustForm.direction} onChange={(e) => setAdjustForm({ ...adjustForm, direction: e.target.value })} className={inputClasses({ className: '!w-auto shrink-0' })}>
                         <option value="credit">+ Tambah</option>
                         <option value="debit">− Kurangi</option>
                     </select>
-                    <input type="number" min="1" step="1000" value={adjustForm.amount} onChange={(e) => setAdjustForm({ ...adjustForm, amount: e.target.value })} required className={inputClass} placeholder="Nominal" />
+                    <input type="number" min="1" step="1000" value={adjustForm.amount} onChange={(e) => setAdjustForm({ ...adjustForm, amount: e.target.value })} required className={inputClasses()} placeholder="Nominal" />
                 </div>
-                <input type="text" value={adjustForm.reason} onChange={(e) => setAdjustForm({ ...adjustForm, reason: e.target.value })} required maxLength={200} className={inputClass} placeholder="Alasan (wajib) — mis. refund kelebihan bayar" />
+                <input type="text" value={adjustForm.reason} onChange={(e) => setAdjustForm({ ...adjustForm, reason: e.target.value })} required maxLength={200} className={inputClasses()} placeholder="Alasan (wajib) — mis. refund kelebihan bayar" />
                 <button type="submit" disabled={busy || !adjustForm.reason.trim()} className={`w-full rounded-xl px-4 py-2 text-sm font-medium text-white transition-colors disabled:opacity-50 ${adjustForm.direction === 'debit' ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}>
                     {adjustForm.direction === 'debit' ? 'Kurangi Saldo' : 'Tambah Saldo'}
                 </button>
             </div>
-        </form>
+        </Card>
     );
 
     return (
@@ -139,48 +149,55 @@ export default function CustomersTab({ customers, plans, run, busy }) {
 
             <div className="lg:order-1 lg:col-span-2">
                 {customers.length === 0 ? (
-                    <div className="rounded-2xl border border-dashed border-edge px-4 py-12 text-center text-sm text-content-muted">
+                    <div className="rounded-card border border-dashed border-edge px-4 py-12 text-center text-sm text-content-muted">
                         Belum ada pelanggan. Pelanggan bisa daftar mandiri di <code>/daftar</code>, atau buat user role <code>customer</code> di halaman Users.
                     </div>
                 ) : (
                     <>
-                        {/* Desktop: table */}
-                        <DesktopTable minWidth="min-w-[620px]">
-                            <thead>
-                                <tr className="text-left text-xs uppercase text-content-muted">
-                                    <th className="px-3 py-2">Pelanggan</th>
-                                    <th className="px-3 py-2">Kontak</th>
-                                    <th className="px-3 py-2">Paket</th>
-                                    <th className="px-3 py-2 text-right">Saldo</th>
-                                    <th className="px-3 py-2 text-center">Kamera</th>
-                                    <th className="px-3 py-2 text-center">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-edge">
-                                {customers.map((customer) => (
-                                    <tr key={customer.id} className="bg-surface">
-                                        <td className="px-3 py-2 font-medium text-content">
-                                            {customer.username}<AccountTag status={customer.account_status} />
-                                        </td>
-                                        <td className="px-3 py-2 text-content-muted">{customer.phone || customer.email || '—'}</td>
-                                        <td className="px-3 py-2">
-                                            {planSelect(customer)}
-                                            {customer.plan_is_trial === 1 && customer.trial_ends_at && (
-                                                <p className="mt-0.5 text-[10px] text-content-subtle">trial s/d {String(customer.trial_ends_at).slice(0, 10)}</p>
-                                            )}
-                                        </td>
-                                        <td className="px-3 py-2 text-right font-semibold text-content">{formatRupiah(customer.balance)}</td>
-                                        <td className="px-3 py-2 text-center">{customer.camera_count}{customer.plan_max_cameras ? `/${customer.plan_max_cameras}` : ''}</td>
-                                        <td className="px-3 py-2 text-center"><StatusCell customer={customer} /></td>
+                        {/*
+                          * Desktop: table. The pixel min-width stays on the raw <table>: <Table>
+                          * hardcodes `min-w-full`, and Tailwind emits `.min-w-full` AFTER every
+                          * `.min-w-[Npx]`, so it would win the cascade and crush the columns
+                          * instead of letting them scroll.
+                          */}
+                        <TableShell className="hidden md:block">
+                            <table className="w-full min-w-[620px] text-sm">
+                                <thead>
+                                    <tr className="text-left text-xs uppercase text-content-muted">
+                                        <th className="px-3 py-2">Pelanggan</th>
+                                        <th className="px-3 py-2">Kontak</th>
+                                        <th className="px-3 py-2">Paket</th>
+                                        <th className="px-3 py-2 text-right">Saldo</th>
+                                        <th className="px-3 py-2 text-center">Kamera</th>
+                                        <th className="px-3 py-2 text-center">Status</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </DesktopTable>
+                                </thead>
+                                <tbody className="divide-y divide-edge">
+                                    {customers.map((customer) => (
+                                        <tr key={customer.id}>
+                                            <td className="px-3 py-2 font-medium text-content">
+                                                {customer.username}<AccountTag status={customer.account_status} />
+                                            </td>
+                                            <td className="px-3 py-2 text-content-muted">{customer.phone || customer.email || '—'}</td>
+                                            <td className="px-3 py-2">
+                                                {planSelect(customer)}
+                                                {customer.plan_is_trial === 1 && customer.trial_ends_at && (
+                                                    <p className="mt-0.5 text-[10px] text-content-subtle">trial s/d {String(customer.trial_ends_at).slice(0, 10)}</p>
+                                                )}
+                                            </td>
+                                            <td className="px-3 py-2 text-right font-semibold text-content">{formatRupiah(customer.balance)}</td>
+                                            <td className="px-3 py-2 text-center">{customer.camera_count}{customer.plan_max_cameras ? `/${customer.plan_max_cameras}` : ''}</td>
+                                            <td className="px-3 py-2 text-center"><StatusCell customer={customer} /></td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </TableShell>
 
                         {/* Mobile: cards */}
                         <div className="space-y-3 md:hidden">
                             {customers.map((customer) => (
-                                <div key={customer.id} className="rounded-2xl border border-edge bg-surface p-4">
+                                <Card key={customer.id}>
                                     <div className="flex items-start justify-between gap-2">
                                         <div className="min-w-0">
                                             <p className="truncate font-semibold text-content">
@@ -195,7 +212,7 @@ export default function CustomersTab({ customers, plans, run, busy }) {
                                         <span>Kamera: {customer.camera_count}{customer.plan_max_cameras ? `/${customer.plan_max_cameras}` : ''}</span>
                                         <StatusCell customer={customer} />
                                     </div>
-                                </div>
+                                </Card>
                             ))}
                         </div>
                     </>

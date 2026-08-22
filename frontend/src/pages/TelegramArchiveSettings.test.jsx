@@ -114,9 +114,12 @@ describe('loading and empty states', () => {
     });
 
     it('summarises how many cameras are actually archived', async () => {
-        const { container } = renderPage();
+        renderPage();
         await waitForLoaded();
-        const header = container.querySelector('header');
+        // The page header is components/ui/PageHeader now, which renders a <div>, not a <header>.
+        // Scoping by the h1's own column pins the summary to the same block as the title — a
+        // tighter claim than the old landmark query, which any <header> on the page would satisfy.
+        const header = screen.getByRole('heading', { level: 1, name: /Arsip Rekaman ke Telegram/i }).parentElement;
         expect(within(header).getByText('1/2')).toBeTruthy();
         expect(within(header).getByText(/kamera perekam sedang diarsipkan/i)).toBeTruthy();
     });

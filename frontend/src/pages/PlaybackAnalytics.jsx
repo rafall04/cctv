@@ -8,7 +8,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AnalyticsHistoryTable, { AnalyticsHistoryDrawer, renderDeviceBadge, renderDurationText } from '../components/admin/analytics/AnalyticsHistoryTable';
-import { AnalyticsTabNav, AnalyticsWorkspaceHeader } from '../components/admin/analytics/AnalyticsWorkspace';
+import { AnalyticsWorkspaceHeader } from '../components/admin/analytics/AnalyticsWorkspace';
+import { Tabs, TabPanel } from '../components/ui';
 import { formatWatchTime } from '../components/admin/analytics/AnalyticsPrimitives';
 import { adminService } from '../services/adminService';
 import { cameraService } from '../services/cameraService';
@@ -400,7 +401,7 @@ export default function PlaybackAnalytics() {
                 )}
             />
 
-            <AnalyticsTabNav tabs={TABS} activeTab={activeTab} onChange={setActiveTab} />
+            <Tabs tabs={TABS} activeId={activeTab} onChange={setActiveTab} idPrefix="playback-analytics" />
 
             {error && (
                 <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-300">
@@ -409,7 +410,7 @@ export default function PlaybackAnalytics() {
             )}
 
             {activeTab === 'overview' && (
-                <div className="space-y-6">
+                <TabPanel id="overview" idPrefix="playback-analytics" className="space-y-6">
                     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                         <StatCard label="Viewer Aktif Playback" value={loading ? '...' : overview.activeViewers || 0} tone="emerald" />
                         <StatCard label="Total Sesi Playback" value={loading ? '...' : overview.totalSessions || 0} tone="blue" />
@@ -466,11 +467,11 @@ export default function PlaybackAnalytics() {
                             ))}
                         </div>
                     </SectionCard>
-                </div>
+                </TabPanel>
             )}
 
             {activeTab === 'active' && (
-                <div className="space-y-6">
+                <TabPanel id="active" idPrefix="playback-analytics" className="space-y-6">
                     <SectionCard title="Viewer Playback Aktif">
                         {activeSessions.length === 0 ? (
                             <div className="rounded-xl border border-dashed border-edge px-4 py-6 text-sm text-content-muted">
@@ -510,11 +511,11 @@ export default function PlaybackAnalytics() {
                         <StatCard label="Sesi Preview Aktif" value={activeByAccess.public_preview || 0} tone="blue" />
                         <StatCard label="Sesi Admin Aktif" value={activeByAccess.admin_full || 0} tone="emerald" />
                     </div>
-                </div>
+                </TabPanel>
             )}
 
             {activeTab === 'history' && (
-                <div className="space-y-4">
+                <TabPanel id="history" idPrefix="playback-analytics" className="space-y-4">
                     {historyError && (
                         <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
                             {historyError}
@@ -583,11 +584,11 @@ export default function PlaybackAnalytics() {
                             </div>
                         )}
                     />
-                </div>
+                </TabPanel>
             )}
 
             {activeTab === 'top' && (
-                <div className="grid gap-4 xl:grid-cols-3">
+                <TabPanel id="top" idPrefix="playback-analytics" className="grid gap-4 xl:grid-cols-3">
                     <SectionCard title="Top Kamera Playback">
                         <div className="space-y-3">
                             {topCameras.map((camera) => (
@@ -625,11 +626,11 @@ export default function PlaybackAnalytics() {
                             ))}
                         </div>
                     </SectionCard>
-                </div>
+                </TabPanel>
             )}
 
             {activeTab === 'audience' && (
-                <div className="grid gap-4 xl:grid-cols-2">
+                <TabPanel id="audience" idPrefix="playback-analytics" className="grid gap-4 xl:grid-cols-2">
                     <SectionCard title="Device Breakdown">
                         <div className="space-y-3">
                             {deviceBreakdown.map((item) => (
@@ -662,7 +663,7 @@ export default function PlaybackAnalytics() {
                             )}
                         </div>
                     </SectionCard>
-                </div>
+                </TabPanel>
             )}
         </div>
     );

@@ -180,7 +180,7 @@ describe('PlaybackAnalytics', () => {
         render(<PlaybackAnalytics />);
 
         await screen.findByText('Analitik Putar Ulang');
-        fireEvent.click(screen.getByRole('button', { name: 'History' }));
+        fireEvent.click(screen.getByRole('tab', { name: 'History' }));
 
         await waitFor(() => {
             expect(screen.getByText('Riwayat Playback')).toBeTruthy();
@@ -197,7 +197,7 @@ describe('PlaybackAnalytics', () => {
         render(<PlaybackAnalytics />);
 
         await screen.findByText('Analitik Putar Ulang');
-        fireEvent.click(screen.getByRole('button', { name: 'History' }));
+        fireEvent.click(screen.getByRole('tab', { name: 'History' }));
 
         await screen.findByText('Riwayat Playback');
         fireEvent.click(screen.getByRole('button', { name: '2' }));

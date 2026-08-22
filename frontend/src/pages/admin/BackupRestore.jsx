@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { PageHeader } from '../../components/ui';
 import { cameraService } from '../../services/cameraService';
 import { areaService } from '../../services/areaService';
 import { useNotification } from '../../contexts/NotificationContext';
@@ -187,21 +188,19 @@ export default function BackupRestore() {
 
     return (
         <div className="space-y-8">
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-                <div>
-                    <p className="text-sm font-semibold text-primary mb-1">Pemulihan Metadata Kamera</p>
-                    <h1 className="text-2xl font-bold text-content">Backup Restore</h1>
-                    <p className="text-content-muted mt-1">
-                        Cocokkan backup lama ke kamera existing lalu pulihkan URL source yang hilang tanpa membuat duplikat baru.
-                    </p>
-                </div>
-                <Link
-                    to="/admin/import-export"
-                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-surface-sunken text-content-muted hover:bg-surface-sunken transition-colors"
-                >
-                    Kembali ke Import/Export
-                </Link>
-            </div>
+            <PageHeader
+                eyebrow="Pemulihan Metadata Kamera"
+                title="Backup Restore"
+                description="Cocokkan backup lama ke kamera existing lalu pulihkan URL source yang hilang tanpa membuat duplikat baru."
+                actions={(
+                    <Link
+                        to="/admin/import-export"
+                        className="inline-flex items-center gap-2 rounded-control bg-surface-sunken px-4 py-2.5 text-content-muted transition-colors hover:bg-surface-raised"
+                    >
+                        Kembali ke Import/Export
+                    </Link>
+                )}
+            />
 
             <div className="rounded-2xl border border-blue-200 bg-blue-50/80 dark:bg-blue-500/10 dark:border-blue-500/20 p-5">
                 <p className="font-semibold text-blue-900 dark:text-blue-200">Gunakan restore untuk kamera unresolved</p>

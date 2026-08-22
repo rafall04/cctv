@@ -6,8 +6,10 @@
  */
 
 import billingAdminService from '../../../services/billingAdminService';
-import { DesktopTable, formatDateTime } from './billingFormat';
+import { formatDateTime } from './billingFormat';
+import { TableShell } from '../../ui/DataTable';
 import { useConfirm } from '../../../contexts/ConfirmContext';
+import { Card } from '../../ui/Card';
 
 function PlanTag({ reg }) {
     if (!reg.plan_name) return <span className="text-content-subtle">—</span>;
@@ -63,39 +65,46 @@ export default function RegistrationsTab({ registrations, run, busy }) {
             </p>
 
             {registrations.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-edge px-4 py-12 text-center text-sm text-content-muted">
+                <div className="rounded-card border border-dashed border-edge px-4 py-12 text-center text-sm text-content-muted">
                     Tidak ada pendaftaran yang menunggu persetujuan. 🎉
                 </div>
             ) : (
                 <>
-                    {/* Desktop: table */}
-                    <DesktopTable minWidth="min-w-[560px]">
-                        <thead>
-                            <tr className="text-left text-xs uppercase text-content-muted">
-                                <th className="px-3 py-2">Calon Pelanggan</th>
-                                <th className="px-3 py-2">Kontak</th>
-                                <th className="px-3 py-2">Paket Dipilih</th>
-                                <th className="px-3 py-2">Daftar</th>
-                                <th className="px-3 py-2 text-right">Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-edge">
-                            {registrations.map((reg) => (
-                                <tr key={reg.id} className="bg-surface">
-                                    <td className="px-3 py-2 font-medium text-content">{reg.username}</td>
-                                    <td className="px-3 py-2 text-content-muted">{reg.phone || reg.email || '—'}</td>
-                                    <td className="px-3 py-2 text-content-muted"><PlanTag reg={reg} /></td>
-                                    <td className="px-3 py-2 text-content-muted">{formatDateTime(reg.created_at)}</td>
-                                    <td className="px-3 py-2"><ActionButtons reg={reg} busy={busy} onApprove={approve} onReject={reject} /></td>
+                    {/*
+                      * Desktop: table. The pixel min-width stays on the raw <table> rather than
+                      * moving to <Table>: Table hardcodes `min-w-full`, and Tailwind emits
+                      * `.min-w-full` AFTER every `.min-w-[Npx]`, so it would win the cascade and
+                      * silently crush the columns instead of letting them scroll.
+                      */}
+                    <TableShell className="hidden md:block">
+                        <table className="w-full min-w-[560px] text-sm">
+                            <thead>
+                                <tr className="text-left text-xs uppercase text-content-muted">
+                                    <th className="px-3 py-2">Calon Pelanggan</th>
+                                    <th className="px-3 py-2">Kontak</th>
+                                    <th className="px-3 py-2">Paket Dipilih</th>
+                                    <th className="px-3 py-2">Daftar</th>
+                                    <th className="px-3 py-2 text-right">Aksi</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </DesktopTable>
+                            </thead>
+                            <tbody className="divide-y divide-edge">
+                                {registrations.map((reg) => (
+                                    <tr key={reg.id}>
+                                        <td className="px-3 py-2 font-medium text-content">{reg.username}</td>
+                                        <td className="px-3 py-2 text-content-muted">{reg.phone || reg.email || '—'}</td>
+                                        <td className="px-3 py-2 text-content-muted"><PlanTag reg={reg} /></td>
+                                        <td className="px-3 py-2 text-content-muted">{formatDateTime(reg.created_at)}</td>
+                                        <td className="px-3 py-2"><ActionButtons reg={reg} busy={busy} onApprove={approve} onReject={reject} /></td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </TableShell>
 
                     {/* Mobile: cards */}
                     <div className="space-y-3 md:hidden">
                         {registrations.map((reg) => (
-                            <div key={reg.id} className="rounded-2xl border border-edge bg-surface p-4">
+                            <Card key={reg.id}>
                                 <p className="break-words font-semibold text-content">{reg.username}</p>
                                 <p className="mt-0.5 break-words text-sm text-content-muted">{reg.phone || reg.email || '—'}</p>
                                 <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-sm text-content-muted">
@@ -103,7 +112,7 @@ export default function RegistrationsTab({ registrations, run, busy }) {
                                     <span className="text-xs text-content-subtle">{formatDateTime(reg.created_at)}</span>
                                 </div>
                                 <div className="mt-3"><ActionButtons reg={reg} full busy={busy} onApprove={approve} onReject={reject} /></div>
-                            </div>
+                            </Card>
                         ))}
                     </div>
                 </>

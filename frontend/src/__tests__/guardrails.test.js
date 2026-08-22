@@ -263,7 +263,29 @@ describe('guardrail: legacy grey ratchet (design tokens)', () => {
     // Fixing a shared primitive is worth more than a page: the result propagates everywhere it is
     // used. The only greys left there are Skeleton's video-tile gradient, which is deliberately
     // dark in BOTH themes (over-video chrome — see docs/frontend-guide.md).
-    const BASELINE = 660;
+    // 2026-08-22, migrasi chrome admin (tab strip + PageHeader + TableShell): 613 -> 608.
+    //
+    // Angka BASELINE lama, 660, sudah BASI sejak dua commit sebelumnya — perbaikan luapan admin
+    // dan konversi modal masing-masing menghapus grey tanpa pernah menurunkan plafonnya. Jadi
+    // hitungan sebenarnya sebelum fase ini adalah 613, bukan 660, dan fase ini menghapus LIMA,
+    // bukan lima puluh dua. Nilai 608 benar; ceritanya yang harus jujur.
+    //
+    // Dicatat begini karena repo ini pernah membayar mahal untuk komentar penjaga yang berisi
+    // KLAIM alih-alih bukti — sapuan permukaan publik menemukan tiga komentar keamanan yang
+    // menyatakan properti yang tidak dimiliki kodenya, dan justru komentar itulah yang membuat
+    // pembaca berikutnya berhenti memeriksa. Sebuah berkas penjaga adalah tempat terakhir yang
+    // boleh menyimpan angka karangan.
+    //
+    // Kelima yang benar-benar hilang di fase ini: `hover:text-gray-800 dark:hover:text-gray-200`
+    // pada tombol tab buatan tangan BillingManagement (2), pasangan `bg-white dark:bg-gray-800/80`
+    // pada filter area yang sebenarnya hanya `bg-surface` dieja panjang, dan isian
+    // `bg-gray-500 hover:bg-gray-600` pada sakelar fitur voucher yang tidak sadar tema sama sekali
+    // — keadaan "mati"-nya menampilkan abu yang sama di mode gelap dan terang.
+    //
+    // Pelajaran yang tetap berlaku: mengadopsi primitif menghapus grey sebagai efek samping,
+    // karena grey legacy hidup persis di markup yang digantikan. Turunkan angka ini setiap kali,
+    // jangan biarkan basi lagi seperti 660.
+    const BASELINE = 608;
 
     it(`-gray-N usage count stays <= ${BASELINE} and shrinks over time`, () => {
         let count = 0;

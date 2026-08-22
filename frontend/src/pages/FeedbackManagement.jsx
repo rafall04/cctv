@@ -1,11 +1,12 @@
 /*
  * Purpose: Admin feedback management page with filters, list, detail, and status actions.
  * Caller: Protected admin feedback route.
- * Deps: Feedback services/components, feedback data hook, TimezoneContext.
+ * Deps: Feedback services/components, feedback data hook, TimezoneContext, components/ui (PageHeader/Button).
  * MainFuncs: FeedbackManagement.
  * SideEffects: Fetches feedback data and updates/deletes feedback rows through API calls.
  */
 
+import { Button, PageHeader } from '../components/ui';
 import { feedbackService } from '../services/feedbackService';
 import { useNotification } from '../contexts/NotificationContext';
 import { useConfirm } from '../contexts/ConfirmContext';
@@ -88,19 +89,15 @@ export default function FeedbackManagement() {
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                    <h1 className="text-2xl font-bold text-content">Kritik & Saran</h1>
-                    <p className="text-content-muted mt-1">Kelola feedback dari pengunjung</p>
-                </div>
-                <button
-                    onClick={refreshAll}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-surface-sunken hover:bg-surface-sunken rounded-lg transition-colors"
-                >
-                    <FeedbackIcons.Refresh />
-                    Refresh
-                </button>
-            </div>
+            <PageHeader
+                title="Kritik & Saran"
+                description="Kelola feedback dari pengunjung"
+                actions={(
+                    <Button onClick={refreshAll} icon={<FeedbackIcons.Refresh />}>
+                        Refresh
+                    </Button>
+                )}
+            />
 
             <FeedbackStatsGrid stats={stats} />
             <FeedbackFilterBar filter={filter} onChange={handleFilterChange} />

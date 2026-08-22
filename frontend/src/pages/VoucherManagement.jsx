@@ -2,7 +2,7 @@
  * Purpose: Admin management for the voucher area-access feature — global on/off flag, per-area
  *          "berbayar" toggles, voucher-profile CRUD, and code generation/listing/revocation.
  * Caller: Protected admin route /admin/voucher (adminOnly).
- * Deps: React hooks, NotificationContext, ConfirmContext, voucherAdminService, areaService, Skeleton.
+ * Deps: React hooks, NotificationContext, ConfirmContext, voucherAdminService, areaService, components/ui (PageHeader/Button/Field/Modal/Skeleton).
  * MainFuncs: VoucherManagement.
  * SideEffects: Calls /api/admin/voucher/* + /api/areas.
  */
@@ -13,7 +13,7 @@ import { useConfirm } from '../contexts/ConfirmContext';
 import voucherAdminService from '../services/voucherAdminService';
 import { areaService } from '../services/areaService';
 import { TableSkeleton } from '../components/ui/Skeleton';
-import { Button, Field, Modal } from '../components/ui';
+import { Button, Field, Modal, PageHeader } from '../components/ui';
 
 const inputClass =
     'w-full bg-surface border border-edge-strong rounded-lg px-3 py-2 text-content text-sm focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary';
@@ -293,24 +293,38 @@ export default function VoucherManagement() {
     return (
         <div className="space-y-5">
             {/* Header + global flag */}
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold text-content">Voucher Akses CCTV</h1>
-                    <p className="text-content-muted text-sm mt-1">
-                        Batasi akses live kamera per-area dengan kode voucher berdurasi. Tandai area
-                        “berbayar”, buat profil, lalu bagikan kodenya.
-                    </p>
-                </div>
-                <button
-                    onClick={toggleFlag}
-                    disabled={savingFlag}
-                    className={`px-4 py-2.5 rounded-lg font-semibold text-white transition-colors disabled:opacity-60 ${
-                        enabled ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-500 hover:bg-gray-600'
-                    }`}
-                >
-                    {enabled ? '● Fitur AKTIF — klik untuk matikan' : '○ Fitur non-aktif — klik untuk aktifkan'}
-                </button>
-            </div>
+            <PageHeader
+                title="Voucher Akses CCTV"
+                description="Batasi akses live kamera per-area dengan kode voucher berdurasi. Tandai area “berbayar”, buat profil, lalu bagikan kodenya."
+                actions={(
+                    /*
+                     * Deliberately NOT <Button>: the primitive truncates its label in a nowrap span,
+                     * and this one is a 38-character sentence. Truncated to "○ Fitur non-aktif — klik
+                     * untuk…" it would stop saying what clicking does, which is the entire control.
+                     * A wrapping label is the right answer here, so the chrome stays local — but on
+                     * TOKENS, which is also what removes the last two raw greys on this page.
+                     *
+                     * The old raw-grey fill was not theme-aware (identical in both themes) and read
+                     * as "disabled" rather than "off"; the off state is now the neutral outline the
+                     * Button primitive uses for `secondary`, and the on state moves to `status-live`
+                     * — the token that already means "running" everywhere else in the tree.
+                     * `aria-pressed` is new: this is a toggle, and its state used to be carried only
+                     * by the ●/○ glyph and the fill colour.
+                     */
+                    <button
+                        onClick={toggleFlag}
+                        disabled={savingFlag}
+                        aria-pressed={enabled}
+                        className={`min-h-11 rounded-control px-4 py-2.5 text-sm font-semibold transition-colors disabled:opacity-60 ${
+                            enabled
+                                ? 'bg-status-live text-white hover:opacity-90'
+                                : 'border border-edge-strong bg-surface text-content hover:bg-surface-raised'
+                        }`}
+                    >
+                        {enabled ? '● Fitur AKTIF — klik untuk matikan' : '○ Fitur non-aktif — klik untuk aktifkan'}
+                    </button>
+                )}
+            />
 
             {!enabled && (
                 <div className="rounded-xl border border-amber-300 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">

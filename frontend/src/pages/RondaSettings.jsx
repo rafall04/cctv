@@ -17,7 +17,7 @@ import { useConfirm } from '../contexts/ConfirmContext';
 import rondaAdminService from '../services/rondaAdminService';
 import RondaZoneEditor from '../components/admin/ronda/RondaZoneEditor';
 import PanduanPanel from '../components/admin/PanduanPanel';
-import { Button, Modal } from '../components/ui';
+import { Button, Modal, PageHeader } from '../components/ui';
 import { TableSkeleton } from '../components/ui/Skeleton';
 
 const HOUR_PRESETS = [
@@ -260,22 +260,17 @@ export function RondaSettings() {
 
     return (
         <div className="space-y-4">
-            <header className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                    <h1 className="text-xl font-semibold text-content">Pengaturan Ronda</h1>
-                    <p className="mt-1 text-sm text-content-muted">
-                        Tambah kamera, atur jam siaga, grup Telegram, area pantau, dan kepekaan.
-                        Sebagian besar perubahan berlaku sekitar 15 detik tanpa menyalakan ulang.
-                    </p>
-                </div>
-                {/* Opens the dialog; it no longer flips to "Batal", because the dialog carries its
-                    own Batal and the page behind it is inert while it is open. */}
-                {available && (
+            <PageHeader
+                title="Pengaturan Ronda"
+                description="Tambah kamera, atur jam siaga, grup Telegram, area pantau, dan kepekaan. Sebagian besar perubahan berlaku sekitar 15 detik tanpa menyalakan ulang."
+                /* Opens the dialog; it no longer flips to "Batal", because the dialog carries its
+                   own Batal and the page behind it is inert while it is open. */
+                actions={available && (
                     <Button variant="primary" onClick={() => setAdding(true)}>
                         + Tambah Kamera
                     </Button>
                 )}
-            </header>
+            />
 
             <PanduanPanel
                 judul="Panduan singkat"

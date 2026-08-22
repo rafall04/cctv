@@ -118,10 +118,26 @@ describe('RecordingDashboard', () => {
     it('merender header overview dan pill update dengan tone dark-mode yang eksplisit', () => {
         render(<RecordingDashboard />);
 
-        expect(screen.getByText('Dasbor Rekaman')).toBeTruthy();
-        expect(screen.getByText(/Monitor recording aktif/i).className).toMatch(/text-content/);
+        // The title is now the route's h1 (it came from PageHeader), not a bare styled div.
+        expect(screen.getByRole('heading', { level: 1, name: 'Dasbor Rekaman' })).toBeTruthy();
+        expect(screen.getByText(/Monitor recording aktif/i).className).toMatch(/text-content-muted/);
         expect(screen.getByText(/Update terakhir:/i).className).toMatch(/text-content-muted/);
         expect(screen.getByRole('button', { name: /Refresh/i }).className).toMatch(/text-content/);
+    });
+
+    /*
+     * Replaces nothing that was asserted before — this page's header WAS the boxed one, and the
+     * migration's whole point here was dropping that box (PageHeader.jsx explains what the panel
+     * cost the title on a phone). Without this, the wrapper could come back and every other
+     * assertion in the file would still pass.
+     */
+    it('tidak lagi membungkus judul halaman dalam panel kartu', () => {
+        const { container } = render(<RecordingDashboard />);
+
+        const heading = screen.getByRole('heading', { level: 1, name: 'Dasbor Rekaman' });
+        for (let node = heading.parentElement; node && node !== container; node = node.parentElement) {
+            expect(node.className).not.toMatch(/\bborder\b|\bbg-surface\b|\bshadow-sm\b|\brounded-2xl\b/);
+        }
     });
 
     it('renders assurance counters and camera diagnostics when assurance data exists', () => {

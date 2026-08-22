@@ -1,3 +1,4 @@
+import { Button, PageHeader } from '../../components/ui';
 import CameraHealthDebugPanel from '../../components/admin/cameras/CameraHealthDebugPanel';
 import { useHealthDebugPage } from '../../hooks/admin/useHealthDebugPage';
 
@@ -19,22 +20,15 @@ export default function HealthDebug() {
     return (
         <div className="space-y-8">
             <div className="space-y-2">
-                <p className="text-sm font-semibold text-primary">Operations</p>
-                <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-                    <div>
-                        <h1 className="text-3xl font-bold text-content">Diagnostik Kesehatan</h1>
-                        <p className="text-sm text-content-muted">
-                            Diagnostik internal backend health, runtime evidence, dan status publik playable.
-                        </p>
-                    </div>
-                    <button
-                        type="button"
-                        onClick={refresh}
-                        className="inline-flex items-center justify-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-600"
-                    >
-                        Refresh
-                    </button>
-                </div>
+                {/* Was the surface's single `text-3xl` title — 8px larger than the next-biggest
+                    admin h1 — plus a `text-sm` eyebrow that read as one block with the description
+                    below it. Both now come from the primitive. */}
+                <PageHeader
+                    eyebrow="Operations"
+                    title="Diagnostik Kesehatan"
+                    description="Diagnostik internal backend health, runtime evidence, dan status publik playable."
+                    actions={<Button variant="primary" onClick={refresh}>Refresh</Button>}
+                />
                 {refreshError ? (
                     <p className="text-sm text-amber-600 dark:text-amber-300">
                         Refresh background terakhir gagal. Data yang tampil masih hasil fetch sukses sebelumnya.

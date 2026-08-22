@@ -12,8 +12,8 @@ import billingAdminService from '../../services/billingAdminService';
 import { useNotification } from '../../contexts/NotificationContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
 
-const inputClass = 'w-full px-3 py-2 bg-surface-sunken border border-edge rounded-xl text-sm text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary';
-const cardClass = 'bg-surface border border-edge rounded-2xl p-4';
+import { Card } from '../ui/Card';
+import { inputClasses } from '../ui/Field';
 
 const EMPTY = { code: '', type: 'percent', value: 10, max_bonus: '', min_topup: 0, max_uses: '', per_user_limit: 1, expires_at: '', description: '' };
 
@@ -117,13 +117,13 @@ export default function PromoTab() {
                 </div>
 
                 {promos.length === 0 ? (
-                    <div className="rounded-2xl border border-dashed border-edge px-4 py-12 text-center text-sm text-content-muted">
+                    <div className="rounded-card border border-dashed border-edge px-4 py-12 text-center text-sm text-content-muted">
                         Belum ada kode promo.
                     </div>
                 ) : (
                     <div className="space-y-2">
                         {promos.map((p) => (
-                            <div key={p.id} className={`${cardClass} flex flex-wrap items-center gap-x-4 gap-y-2`}>
+                            <Card key={p.id} className="flex flex-wrap items-center gap-x-4 gap-y-2">
                                 <div className="min-w-0 flex-1">
                                     <div className="flex items-center gap-2">
                                         <span className="font-mono font-semibold text-content">{p.code}</span>
@@ -147,19 +147,19 @@ export default function PromoTab() {
                                         Hapus
                                     </button>
                                 </div>
-                            </div>
+                            </Card>
                         ))}
                     </div>
                 )}
             </div>
 
             {showForm && (
-                <form onSubmit={handleCreate} className={`${cardClass} space-y-2`}>
+                <Card as="form" onSubmit={handleCreate} className="space-y-2">
                     <h3 className="font-semibold text-content">Kode Promo Baru</h3>
-                    <input name="code" value={form.code} onChange={handleChange} required pattern="[A-Za-z0-9_\-]{3,30}" className={`${inputClass} uppercase`} placeholder="KODE (mis. HEMAT10)" />
+                    <input name="code" value={form.code} onChange={handleChange} required pattern="[A-Za-z0-9_\-]{3,30}" className={inputClasses({ className: 'uppercase' })} placeholder="KODE (mis. HEMAT10)" />
                     <label className="block text-xs text-content-muted">
                         Tipe
-                        <select name="type" value={form.type} onChange={handleChange} className={`mt-1 ${inputClass}`}>
+                        <select name="type" value={form.type} onChange={handleChange} className={inputClasses({ className: 'mt-1' })}>
                             <option value="percent">Bonus persen saat top-up</option>
                             <option value="flat">Bonus flat saat top-up</option>
                             <option value="gift">Hadiah saldo (tukar langsung)</option>
@@ -167,39 +167,39 @@ export default function PromoTab() {
                     </label>
                     <label className="block text-xs text-content-muted">
                         {form.type === 'percent' ? 'Persen bonus (1-100)' : form.type === 'flat' ? 'Bonus (rupiah)' : 'Saldo hadiah (rupiah)'}
-                        <input name="value" type="number" min="1" value={form.value} onChange={handleChange} required className={`mt-1 ${inputClass}`} />
+                        <input name="value" type="number" min="1" value={form.value} onChange={handleChange} required className={inputClasses({ className: 'mt-1' })} />
                     </label>
                     {form.type === 'percent' && (
                         <label className="block text-xs text-content-muted">
                             Maks bonus (rupiah, opsional)
-                            <input name="max_bonus" type="number" min="0" value={form.max_bonus} onChange={handleChange} className={`mt-1 ${inputClass}`} placeholder="mis. 25000" />
+                            <input name="max_bonus" type="number" min="0" value={form.max_bonus} onChange={handleChange} className={inputClasses({ className: 'mt-1' })} placeholder="mis. 25000" />
                         </label>
                     )}
                     {form.type !== 'gift' && (
                         <label className="block text-xs text-content-muted">
                             Min top-up (rupiah)
-                            <input name="min_topup" type="number" min="0" value={form.min_topup} onChange={handleChange} className={`mt-1 ${inputClass}`} />
+                            <input name="min_topup" type="number" min="0" value={form.min_topup} onChange={handleChange} className={inputClasses({ className: 'mt-1' })} />
                         </label>
                     )}
                     <div className="grid grid-cols-2 gap-2">
                         <label className="block text-xs text-content-muted">
                             Kuota total (kosong = tak terbatas)
-                            <input name="max_uses" type="number" min="1" value={form.max_uses} onChange={handleChange} className={`mt-1 ${inputClass}`} />
+                            <input name="max_uses" type="number" min="1" value={form.max_uses} onChange={handleChange} className={inputClasses({ className: 'mt-1' })} />
                         </label>
                         <label className="block text-xs text-content-muted">
                             Maks per akun
-                            <input name="per_user_limit" type="number" min="1" value={form.per_user_limit} onChange={handleChange} className={`mt-1 ${inputClass}`} />
+                            <input name="per_user_limit" type="number" min="1" value={form.per_user_limit} onChange={handleChange} className={inputClasses({ className: 'mt-1' })} />
                         </label>
                     </div>
                     <label className="block text-xs text-content-muted">
                         Kedaluwarsa (opsional)
-                        <input name="expires_at" type="date" value={form.expires_at} onChange={handleChange} className={`mt-1 ${inputClass}`} />
+                        <input name="expires_at" type="date" value={form.expires_at} onChange={handleChange} className={inputClasses({ className: 'mt-1' })} />
                     </label>
-                    <input name="description" value={form.description} onChange={handleChange} className={inputClass} placeholder="Deskripsi singkat (opsional)" />
+                    <input name="description" value={form.description} onChange={handleChange} className={inputClasses()} placeholder="Deskripsi singkat (opsional)" />
                     <button type="submit" disabled={busy} className="w-full rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-600 disabled:opacity-50">
                         Buat Kode
                     </button>
-                </form>
+                </Card>
             )}
         </div>
     );

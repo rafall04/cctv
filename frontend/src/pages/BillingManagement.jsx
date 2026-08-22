@@ -4,12 +4,13 @@
  *          Each data tab is a table on desktop and stacked cards on mobile.
  * Caller: App.jsx /admin/billing (adminOnly) inside AdminLayout (which already supplies page
  *         padding + bottom-dock spacing, so this page adds none horizontally).
- * Deps: billingAdminService, cameraService, per-tab components.
+ * Deps: billingAdminService, cameraService, components/ui (PageHeader/Button/Tabs/TabPanel), per-tab components.
  * MainFuncs: BillingManagement.
  * SideEffects: Fetches billing data; mutations via billingAdminService through `run`.
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Button, PageHeader, Tabs, TabPanel } from '../components/ui';
 import billingAdminService from '../services/billingAdminService';
 import { cameraService } from '../services/cameraService';
 import { useNotification } from '../contexts/NotificationContext';
@@ -90,68 +91,68 @@ export default function BillingManagement() {
         [cameras, subscriptions]
     );
 
+    // The "ada persetujuan menunggu" dot rides in the Tabs `badge` slot instead of being absolutely
+    // positioned in the button's corner: the primitive's tab is already a flex row, so an inline dot
+    // needs no `relative` parent. That is a data-shape change, not a change to the shared component.
+    // It also carries an sr-only word — the amber dot used to be colour-only, so a screen reader was
+    // told nothing at all about pending approvals.
+    const pendingBadge = registrations.length > 0 && tab !== 'registrations' ? (
+        <span className="h-2 w-2 shrink-0 rounded-full bg-status-warn">
+            <span className="sr-only">perlu ditinjau</span>
+        </span>
+    ) : null;
+
     const tabs = [
-        { key: 'registrations', label: `Persetujuan${registrations.length ? ` (${registrations.length})` : ''}`, highlight: registrations.length > 0 },
-        { key: 'customers', label: `Pelanggan (${customers.length})` },
-        { key: 'subscriptions', label: `Langganan (${subscriptions.length})` },
-        { key: 'payments', label: `Pembayaran (${payments.length})` },
-        { key: 'plans', label: `Paket & Trial (${plans.length})` },
-        { key: 'promos', label: 'Promo' },
-        { key: 'gateway', label: 'Gateway Pembayaran' },
+        { id: 'registrations', label: `Persetujuan${registrations.length ? ` (${registrations.length})` : ''}`, badge: pendingBadge },
+        { id: 'customers', label: `Pelanggan (${customers.length})` },
+        { id: 'subscriptions', label: `Langganan (${subscriptions.length})` },
+        { id: 'payments', label: `Pembayaran (${payments.length})` },
+        { id: 'plans', label: `Paket & Trial (${plans.length})` },
+        { id: 'promos', label: 'Promo' },
+        { id: 'gateway', label: 'Gateway Pembayaran' },
     ];
 
     return (
         <div className="space-y-5">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
-                    <h1 className="text-xl font-bold text-content sm:text-2xl">Billing Pelanggan</h1>
-                    <p className="mt-0.5 text-sm text-content-muted">
-                        Sewa CCTV prabayar — saldo dipotong harian, kamera ditangguhkan otomatis saat saldo habis.
-                    </p>
-                </div>
-                <button
-                    onClick={() => run(() => billingAdminService.runCharges(), 'Charge dijalankan')}
-                    disabled={busy}
-                    className="shrink-0 whitespace-nowrap rounded-xl border border-edge-strong px-3 py-2 text-sm text-content-muted transition-colors hover:bg-surface-sunken disabled:opacity-50"
-                >
-                    Jalankan charge harian
-                </button>
-            </div>
-
-            {/* Horizontally scrollable on small screens so all 6 tabs stay reachable without squishing. */}
-            <div className="-mx-1 flex gap-1 overflow-x-auto border-b border-edge px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                {tabs.map((t) => (
-                    <button
-                        key={t.key}
-                        onClick={() => setTab(t.key)}
-                        className={`relative shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors ${tab === t.key
-                            ? 'border-primary text-primary'
-                            : `border-transparent hover:text-gray-800 dark:hover:text-gray-200 ${t.highlight ? 'text-amber-600 dark:text-amber-400' : 'text-content-muted'}`
-                        }`}
+            {/* This page had already hand-rolled `text-xl sm:text-2xl` — the exact pair PageHeader
+                settled on — so adopting the primitive is a pixel-identical title and one less copy
+                of the header layout to keep in step. */}
+            <PageHeader
+                title="Billing Pelanggan"
+                description="Sewa CCTV prabayar — saldo dipotong harian, kamera ditangguhkan otomatis saat saldo habis."
+                actions={(
+                    <Button
+                        onClick={() => run(() => billingAdminService.runCharges(), 'Charge dijalankan')}
+                        disabled={busy}
                     >
-                        {t.label}
-                        {t.highlight && tab !== t.key && (
-                            <span className="absolute right-0.5 top-1 h-2 w-2 rounded-full bg-amber-500" />
-                        )}
-                    </button>
-                ))}
-            </div>
+                        Jalankan charge harian
+                    </Button>
+                )}
+            />
 
-            {loading ? (
-                <div className="py-16 text-center text-content-muted">Memuat data billing…</div>
-            ) : (
-                <>
-                    {tab === 'registrations' && <RegistrationsTab registrations={registrations} run={run} busy={busy} />}
-                    {tab === 'customers' && <CustomersTab customers={customers} plans={plans} run={run} busy={busy} />}
-                    {tab === 'subscriptions' && (
-                        <SubscriptionsTab subscriptions={subscriptions} assignableCameras={assignableCameras} customers={customers} run={run} busy={busy} />
-                    )}
-                    {tab === 'payments' && <PaymentsTab payments={payments} run={run} busy={busy} />}
-                    {tab === 'plans' && <BillingPlansTab plans={plans} regSettings={regSettings} run={run} busy={busy} />}
-                    {tab === 'promos' && <PromoTab />}
-                    {tab === 'gateway' && <PaymentGatewayTab />}
-                </>
-            )}
+            {/* Shared primitive: role=tablist/tab + aria-selected + roving tabindex + Arrow/Home/End,
+                44px targets, and it still scrolls horizontally so all seven stay reachable on a phone. */}
+            <Tabs tabs={tabs} activeId={tab} onChange={setTab} idPrefix="billing" />
+
+            {/* One panel, keyed by the active tab, so aria-controls always resolves — including while
+                the data is still loading. */}
+            <TabPanel id={tab} idPrefix="billing">
+                {loading ? (
+                    <div className="py-16 text-center text-content-muted">Memuat data billing…</div>
+                ) : (
+                    <>
+                        {tab === 'registrations' && <RegistrationsTab registrations={registrations} run={run} busy={busy} />}
+                        {tab === 'customers' && <CustomersTab customers={customers} plans={plans} run={run} busy={busy} />}
+                        {tab === 'subscriptions' && (
+                            <SubscriptionsTab subscriptions={subscriptions} assignableCameras={assignableCameras} customers={customers} run={run} busy={busy} />
+                        )}
+                        {tab === 'payments' && <PaymentsTab payments={payments} run={run} busy={busy} />}
+                        {tab === 'plans' && <BillingPlansTab plans={plans} regSettings={regSettings} run={run} busy={busy} />}
+                        {tab === 'promos' && <PromoTab />}
+                        {tab === 'gateway' && <PaymentGatewayTab />}
+                    </>
+                )}
+            </TabPanel>
         </div>
     );
 }

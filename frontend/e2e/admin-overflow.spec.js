@@ -53,6 +53,17 @@
  *
  * That is a src change and deliberately out of this file's scope. Until it lands, `npm run
  * test:e2e` reports exactly ONE failure here — 92 passed, 1 failed — and it names its own culprit.
+ *
+ * APA YANG "HIJAU" DI SINI TIDAK BERARTI — batas yang dibuktikan dengan sengaja merusak, 2026-08-22.
+ * Penjaga ini mengukur KOTAK elemen, bukan tintanya. Mengganti `break-words` jadi
+ * `whitespace-nowrap` pada judul halaman membuat teksnya benar-benar terpotong — probe DOM
+ * membaca h1 scrollWidth 290 lawan clientWidth 272 di 320px/1,5x — dan KEDUA asersi tetap hijau,
+ * karena kotak h1-nya sendiri tidak pernah melewati wadahnya; yang meluber cuma isinya, lalu
+ * dipotong `overflow` leluhurnya.
+ *
+ * Jadi hijau di sini berarti "tidak ada kotak elemen yang melewati wadahnya", BUKAN "tidak ada
+ * yang terpotong secara visual". Jangan pakai suite ini sebagai bukti bahwa sebuah judul atau
+ * label masih terbaca utuh; untuk itu ukur scrollWidth vs clientWidth elemen teksnya sendiri.
  */
 
 import { test, expect } from '@playwright/test';
@@ -1856,7 +1867,8 @@ const ADMIN_PAGES = [
         url: '/admin/billing',
         ready: `text=${LONG_USERNAME}`,
         open: async (page) => {
-            await page.getByRole('button', { name: /^Langganan/ }).first().click();
+            // role=tab, not button: the strip moved onto components/ui/Tabs.
+            await page.getByRole('tab', { name: /^Langganan/ }).first().click();
             await expect(shown(page, `text=${cameraName(1)}`)).toBeVisible();
         },
     },
@@ -1865,7 +1877,7 @@ const ADMIN_PAGES = [
         url: '/admin/billing',
         ready: `text=${LONG_USERNAME}`,
         open: async (page) => {
-            await page.getByRole('button', { name: /^Persetujuan/ }).first().click();
+            await page.getByRole('tab', { name: /^Persetujuan/ }).first().click();
             await expect(shown(page, 'text=calon_pelanggan_wilayah_01')).toBeVisible();
         },
     },

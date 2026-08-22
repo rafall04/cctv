@@ -15,10 +15,15 @@
 
 /**
  * Scroll container for a table. Keep the overflow HERE, never on an ancestor of the whole page.
+ *
+ * Spreads rest props like its siblings below. Without that, a caller that needs a `data-testid` or
+ * an aria attribute on the scroll container has to hand-roll the div — which is exactly how a
+ * site stays un-migrated. The className stays a suffix so a caller can add spacing but the
+ * scroll/radius/border/surface chrome is never overridable.
  */
-export function TableShell({ className = '', children }) {
+export function TableShell({ className = '', children, ...rest }) {
     return (
-        <div className={`overflow-x-auto rounded-card border border-edge bg-surface ${className}`}>
+        <div className={`overflow-x-auto rounded-card border border-edge bg-surface ${className}`} {...rest}>
             {children}
         </div>
     );

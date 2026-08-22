@@ -15,7 +15,8 @@ import { RetentionMetrics } from '../components/RetentionMetrics';
 import DailyDetailModal from '../components/admin/analytics/DailyDetailModal';
 import { ActiveViewerCard, PeriodSelector } from '../components/admin/analytics/AnalyticsPrimitives';
 import AnalyticsHistoryTable, { AnalyticsHistoryDrawer, renderDeviceBadge, renderDurationText } from '../components/admin/analytics/AnalyticsHistoryTable';
-import { AnalyticsTabNav, AnalyticsWorkspaceHeader } from '../components/admin/analytics/AnalyticsWorkspace';
+import { AnalyticsWorkspaceHeader } from '../components/admin/analytics/AnalyticsWorkspace';
+import { Tabs, TabPanel } from '../components/ui';
 import { summarizeUserAgent } from '../utils/admin/deviceLabel.js';
 import ViewerAnalyticsAudienceSection from '../components/admin/analytics/ViewerAnalyticsAudienceSection';
 import ViewerAnalyticsChartsSection from '../components/admin/analytics/ViewerAnalyticsChartsSection';
@@ -334,10 +335,10 @@ export default function ViewerAnalytics() {
                 )}
             />
 
-            <AnalyticsTabNav tabs={TABS} activeTab={activeTab} onChange={setActiveTab} />
+            <Tabs tabs={TABS} activeId={activeTab} onChange={setActiveTab} idPrefix="viewer-analytics" />
 
             {activeTab === 'overview' && (
-                <div className="space-y-6">
+                <TabPanel id="overview" idPrefix="viewer-analytics" className="space-y-6">
                     <ViewerAnalyticsSummaryGrid overview={overview} comparison={comparison} />
                     <div className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
                         <div className="min-w-0 space-y-4">
@@ -377,11 +378,11 @@ export default function ViewerAnalytics() {
                             </div>
                         </TopMetricCard>
                     </div>
-                </div>
+                </TabPanel>
             )}
 
             {activeTab === 'active' && (
-                <div className="space-y-6">
+                <TabPanel id="active" idPrefix="viewer-analytics" className="space-y-6">
                     <section className="rounded-2xl border border-edge bg-surface p-6">
                         <div className="mb-4 flex items-center justify-between">
                             <div>
@@ -437,11 +438,11 @@ export default function ViewerAnalytics() {
                             </div>
                         </TopMetricCard>
                     </div>
-                </div>
+                </TabPanel>
             )}
 
             {activeTab === 'history' && (
-                <div className="space-y-4">
+                <TabPanel id="history" idPrefix="viewer-analytics" className="space-y-4">
                     {historyError && (
                         <Alert type="warning" title="Riwayat sesi" message={historyError} />
                     )}
@@ -509,11 +510,11 @@ export default function ViewerAnalytics() {
                             </div>
                         )}
                     />
-                </div>
+                </TabPanel>
             )}
 
             {activeTab === 'top' && (
-                <div className="grid gap-4 xl:grid-cols-3">
+                <TabPanel id="top" idPrefix="viewer-analytics" className="grid gap-4 xl:grid-cols-3">
                     <TopMetricCard title="Top Kamera">
                         <div className="space-y-3">
                             {topCameras.map((camera) => (
@@ -552,11 +553,11 @@ export default function ViewerAnalytics() {
                             ))}
                         </div>
                     </TopMetricCard>
-                </div>
+                </TabPanel>
             )}
 
             {activeTab === 'audience' && (
-                <div className="space-y-6">
+                <TabPanel id="audience" idPrefix="viewer-analytics" className="space-y-6">
                     <ViewerAnalyticsAudienceSection
                         topCameras={topCameras}
                         deviceBreakdown={deviceBreakdown}
@@ -566,7 +567,7 @@ export default function ViewerAnalytics() {
                     />
                     {retention && <RetentionMetrics data={retention} />}
                     {cameraPerformance.length > 0 && <CameraPerformanceTable data={cameraPerformance} />}
-                </div>
+                </TabPanel>
             )}
         </div>
     );
