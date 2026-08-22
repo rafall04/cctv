@@ -90,7 +90,7 @@ export default function CameraManagement() {
                       * native chevron sitting on the clipped text. Four columns fits the same
                       * eight slots in two clean rows with room for the labels.
                       */}
-                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                    <div className="grid gap-3 [&>*]:min-w-0 md:grid-cols-2 xl:grid-cols-4">
                         <input
                             type="text"
                             value={filters.search}

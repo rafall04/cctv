@@ -58,7 +58,7 @@ export function Field({
     };
 
     return (
-        <div className={className}>
+        <div className={`min-w-0 ${className}`.trim()}>
             {/*
               * The required marker sits OUTSIDE <label>. Inside, it becomes part of the label's
               * text content, so the control's accessible name turns into "Nama pengguna *" —

@@ -98,7 +98,7 @@ function mapResponseToSettings(data) {
 
 function Field({ label, htmlFor, hint, children }) {
     return (
-        <div>
+        <div className="min-w-0">
             <label htmlFor={htmlFor} className="block text-sm font-medium text-content-muted mb-2">
                 {label}
             </label>

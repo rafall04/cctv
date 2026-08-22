@@ -65,7 +65,7 @@ export default function CameraGrid({
                     <span className="text-content-muted">
                         Halaman {page} dari {totalPages} · {cameras.length} kamera
                     </span>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                         <button
                             type="button"
                             onClick={() => setPage((current) => Math.max(1, current - 1))}
