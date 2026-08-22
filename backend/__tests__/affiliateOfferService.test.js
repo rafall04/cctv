@@ -2,7 +2,7 @@
  * Purpose: Prove the affiliate feature's data rules - the thirteen-key public payload (anti-leak),
  *          the three optional extras (WhatsApp / price / photo, each switched by PRESENCE alone),
  *          targeting precedence, the liveness re-check the /go redirect performs on every read,
- *          the guarded daily stat UPSERT, and the bounded count throttle.
+ *          the guarded PER-SURFACE daily stat UPSERT, and the bounded count throttle.
  * Caller: Backend test gate (vitest, node env).
  * Deps: vitest, better-sqlite3 (in-memory, real schema), mocked connectionPool + pinned timeService.
  * MainFuncs: resolveOfferForContext / resolveOfferForRedirect / recordImpression / recordClick /
@@ -13,7 +13,7 @@
  * -------------------------------------------
  * Most of what is being asserted here IS the SQL: the specificity ORDER BY that decides which one
  * offer a viewer sees, the EXISTS targeting sub-selects, and above all the stat UPSERT, whose two
- * defences (`WHERE EXISTS` and the `ON CONFLICT (offer_id, stat_date)` target) only exist inside the
+ * defences (`WHERE EXISTS` and the `ON CONFLICT (offer_id, stat_date, placement)` target) only exist inside the
  * database. A mocked execute() can never raise a constraint error and never resolves a conflict
  * target, so it would report green against a broken statement - the exact failure mode the repo's
  * "a mock cannot prove a constraint" guardrail was written for.
@@ -65,6 +65,10 @@ import affiliateOfferService, {
     resolveOfferForRedirect,
     setOfferImage,
     statColumnFor,
+    // Imported from the OFFER service on purpose although they live in affiliateStatsService now:
+    // the re-export is what keeps every existing caller working, so it is worth exercising.
+    placementFromGoQuery,
+    statPlacementFor,
 } from '../services/affiliateOfferService.js';
 import { PUBLIC_PAYLOAD_KEYS } from '../services/affiliateOfferExtras.js';
 import {
@@ -85,6 +89,13 @@ import {
  * this fixture disagree with production about the one distinction the whole price feature rests
  * on: NULL means "this offer advertises no price", 0 means "gratis". A fixture that cannot express
  * the difference cannot fail when the code loses it.
+ *
+ * affiliate_offer_stats is spelled as zz_20260823_add_affiliate_stats_placement.js REBUILDS it:
+ * `placement TEXT NOT NULL` with NO DEFAULT, inside a widened `UNIQUE (offer_id, stat_date,
+ * placement)`. Both halves are load-bearing here for the same reason as the price column. A
+ * DEFAULT would let a writer that forgot its surface still produce a row, and the fixture could
+ * never fail on the bug the split exists to prevent; the old two-column UNIQUE would let the first
+ * surface of the day absorb the other three and the counts would silently blend back together.
  */
 function resetSchema() {
     db.exec(`
@@ -149,11 +160,12 @@ function resetSchema() {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             offer_id INTEGER NOT NULL,
             stat_date TEXT NOT NULL,
+            placement TEXT NOT NULL,
             impressions INTEGER NOT NULL DEFAULT 0,
             product_clicks INTEGER NOT NULL DEFAULT 0,
             store_clicks INTEGER NOT NULL DEFAULT 0,
             whatsapp_clicks INTEGER NOT NULL DEFAULT 0,
-            UNIQUE (offer_id, stat_date),
+            UNIQUE (offer_id, stat_date, placement),
             FOREIGN KEY (offer_id) REFERENCES affiliate_offers(id) ON DELETE CASCADE
         );
 
@@ -868,23 +880,24 @@ describe('partnerScheduleState - one definition shared by resolve, redirect and 
     });
 });
 
-describe('stat writes - the guarded daily UPSERT', () => {
-    it('accumulates into ONE row per offer per day instead of one row per event', () => {
+describe('stat writes - the guarded per-surface daily UPSERT', () => {
+    it('accumulates into ONE row per offer per day per surface instead of one row per event', () => {
         const partner = makePartner();
         const offer = makeOffer(partner.id);
 
-        recordImpression(offer.id);
-        recordImpression(offer.id);
-        recordClick(offer.id, 'p');
-        recordClick(offer.id, 's');
-        recordClick(offer.id, 's');
-        recordClick(offer.id, 'w');
+        recordImpression(offer.id, 'popup');
+        recordImpression(offer.id, 'popup');
+        recordClick(offer.id, 'p', 'popup');
+        recordClick(offer.id, 's', 'popup');
+        recordClick(offer.id, 's', 'popup');
+        recordClick(offer.id, 'w', 'popup');
 
         const rows = statRows();
         expect(rows).toHaveLength(1);
         expect(rows[0]).toMatchObject({
             offer_id: offer.id,
             stat_date: TODAY,
+            placement: 'popup',
             impressions: 2,
             product_clicks: 1,
             store_clicks: 2,
@@ -892,12 +905,79 @@ describe('stat writes - the guarded daily UPSERT', () => {
         });
     });
 
+    it('keeps the four surfaces apart instead of blending them into one number', () => {
+        /*
+         * THE REASON THE COLUMN EXISTS. One visitor going landing -> area -> camera adds three
+         * impressions to one offer; blended they read as "this product is getting popular" when
+         * the truth may be "we put it in more places", and those two call for opposite decisions.
+         *
+         * Four surfaces with deliberately DIFFERENT counts, so a regression that dropped placement
+         * from the conflict target shows up as one row carrying the sum, rather than as a total
+         * that still happens to add up.
+         */
+        const partner = makePartner();
+        const offer = makeOffer(partner.id, { placements: ['popup', 'area', 'landing', 'playback'] });
+
+        recordImpression(offer.id, 'popup');
+        recordImpression(offer.id, 'area');
+        recordImpression(offer.id, 'area');
+        recordImpression(offer.id, 'landing');
+        recordClick(offer.id, 'p', 'playback');
+
+        const byPlacement = Object.fromEntries(statRows().map((row) => [row.placement, row]));
+        expect(Object.keys(byPlacement).sort()).toEqual(['area', 'landing', 'playback', 'popup']);
+        expect(byPlacement.popup.impressions).toBe(1);
+        expect(byPlacement.area.impressions).toBe(2);
+        expect(byPlacement.landing.impressions).toBe(1);
+        expect(byPlacement.playback).toMatchObject({ impressions: 0, product_clicks: 1 });
+    });
+
+    it('writes NOTHING when the caller forgets the placement, and still does not throw', () => {
+        /*
+         * The whole point of NOT NULL with no default, restated at the JS boundary. A writer that
+         * cannot say where an event happened must LOSE its count - loudly on stderr, invisibly to
+         * the visitor - instead of piling every surface into whichever bucket a default named.
+         * Both counters, because forgetting an argument is a per-call-site mistake.
+         */
+        const partner = makePartner();
+        const offer = makeOffer(partner.id);
+
+        expect(() => recordImpression(offer.id)).not.toThrow();
+        expect(() => recordClick(offer.id, 'p')).not.toThrow();
+        expect(statRows()).toEqual([]);
+    });
+
+    it('writes nothing for a placement that is not one of the four surfaces', () => {
+        const partner = makePartner();
+        const offer = makeOffer(partner.id);
+
+        const bogusPlacements = ['under-video', 'POPUP', '', ' popup ', 'constructor', '__proto__',
+            'toString', 'impressions', null, 7, ['popup']];
+        for (const bogus of bogusPlacements) {
+            expect(() => recordImpression(offer.id, bogus), String(bogus)).not.toThrow();
+            expect(() => recordClick(offer.id, 'p', bogus), String(bogus)).not.toThrow();
+        }
+        expect(statRows()).toEqual([]);
+    });
+
+    it('lets the database refuse a NULL placement too (the guard behind the guard)', () => {
+        // The frozen map is the front door; this is what still holds if anyone ever writes a
+        // second one. A mocked execute() could not raise this, which is why the fixture is a real
+        // SQLite carrying the real NOT NULL from the migration.
+        const partner = makePartner();
+        const offer = makeOffer(partner.id);
+
+        expect(() => db.prepare(
+            'INSERT INTO affiliate_offer_stats (offer_id, stat_date, placement, impressions) VALUES (?, ?, ?, 1)'
+        ).run(offer.id, TODAY, null)).toThrow(/NOT NULL/i);
+    });
+
     it('files the count under the WIB local date, not the UTC date', () => {
         // getLocalDate() is pinned above. A regression to SQLite's date('now') would write the real
         // UTC day here, which for the first 7 hours of every WIB day is yesterday in Bojonegoro.
         const partner = makePartner();
         const offer = makeOffer(partner.id);
-        recordImpression(offer.id);
+        recordImpression(offer.id, 'popup');
 
         expect(statRows()[0].stat_date).toBe(TODAY);
     });
@@ -915,9 +995,9 @@ describe('stat writes - the guarded daily UPSERT', () => {
         const b = makeOffer(partner.id, { product_title: 'B' });
         const c = makeOffer(partner.id, { product_title: 'C', whatsapp_number: '081298765432' });
 
-        recordClick(a.id, 'p');
-        recordClick(b.id, 's');
-        recordClick(c.id, 'w');
+        recordClick(a.id, 'p', 'popup');
+        recordClick(b.id, 's', 'popup');
+        recordClick(c.id, 'w', 'popup');
 
         const byOffer = Object.fromEntries(statRows().map((r) => [r.offer_id, r]));
         expect(byOffer[a.id]).toMatchObject({ product_clicks: 1, store_clicks: 0, whatsapp_clicks: 0, impressions: 0 });
@@ -931,24 +1011,25 @@ describe('stat writes - the guarded daily UPSERT', () => {
         const partner = makePartner();
         makeOffer(partner.id);
 
-        expect(() => recordClick(999999, 'w')).not.toThrow();
+        expect(() => recordClick(999999, 'w', 'popup')).not.toThrow();
         expect(statRows()).toEqual([]);
     });
 
-    it('cannot create a stat row for an offer id that does not exist', () => {
+    it('cannot create a stat row for an offer id that does not exist, on any surface', () => {
         // The id comes straight out of a public URL. Without the WHERE EXISTS guard a forged or
-        // stale id would either mint orphan rows or raise a foreign-key error on a visitor request.
+        // stale id would either mint orphan rows or raise a foreign-key error on a visitor request
+        // - and widening the unique key gave a forged id four buckets to aim at instead of one.
         const partner = makePartner();
         makeOffer(partner.id);
 
-        expect(() => recordImpression(999999)).not.toThrow();
-        expect(() => recordClick(999999, 'p')).not.toThrow();
+        expect(() => recordImpression(999999, 'landing')).not.toThrow();
+        expect(() => recordClick(999999, 'p', 'area')).not.toThrow();
         expect(statRows()).toEqual([]);
     });
 
     it('ignores a non-integer id without throwing', () => {
-        expect(() => recordImpression(null)).not.toThrow();
-        expect(() => recordClick('1; DROP TABLE affiliate_offers', 'p')).not.toThrow();
+        expect(() => recordImpression(null, 'popup')).not.toThrow();
+        expect(() => recordClick('1; DROP TABLE affiliate_offers', 'p', 'popup')).not.toThrow();
         expect(statRows()).toEqual([]);
         expect(db.prepare("SELECT name FROM sqlite_master WHERE name = 'affiliate_offers'").get()).toBeTruthy();
     });
@@ -957,8 +1038,8 @@ describe('stat writes - the guarded daily UPSERT', () => {
         const partner = makePartner();
         const offer = makeOffer(partner.id);
 
-        expect(() => recordClick(offer.id, 'impressions')).not.toThrow();
-        expect(() => recordClick(offer.id, undefined)).not.toThrow();
+        expect(() => recordClick(offer.id, 'impressions', 'popup')).not.toThrow();
+        expect(() => recordClick(offer.id, undefined, 'popup')).not.toThrow();
         expect(statRows()).toEqual([]);
     });
 
@@ -983,17 +1064,119 @@ describe('stat writes - the guarded daily UPSERT', () => {
         expect(thrown.statusCode).toBe(400);
     });
 
-    it('serves the daily series back to the admin panel', () => {
+    it('maps only the four surfaces to a placement value and throws on anything else', () => {
+        /*
+         * `placement` is BOUND with `?`, so unlike the column above it is not an injection risk.
+         * It is validated for the other reason: an unrecognised surface must fail loudly instead
+         * of minting a bucket nobody will ever be able to read. The four are spelled out here
+         * rather than looped from AFFILIATE_PLACEMENTS - a test that reuses the constant it is
+         * checking proves nothing about what the constant says.
+         */
+        for (const placement of ['popup', 'area', 'landing', 'playback']) {
+            expect(statPlacementFor(placement)).toBe(placement);
+        }
+
+        for (const bogus of ['under-video', 'POPUP', '', ' popup', 'constructor', '__proto__',
+            'toString', 'placements', null, undefined, 7, ['popup']]) {
+            expect(() => statPlacementFor(bogus), String(bogus)).toThrow();
+        }
+
+        let thrown = null;
+        try {
+            statPlacementFor(undefined);
+        } catch (error) {
+            thrown = error;
+        }
+        expect(thrown.statusCode).toBe(400);
+    });
+
+    it('files a /go link minted before this change under popup, and refuses an unknown surface', () => {
+        /*
+         * BACKWARD COMPATIBILITY, NOT CONVENIENCE. Every /go URL already bookmarked, cached or
+         * pasted into WhatsApp was minted while the under-video popup was the only wired surface,
+         * so 'popup' is the TRUTH for all of them - the same reasoning the migration used to stamp
+         * every existing row. A caller that sends a surface we do not recognise must NOT inherit
+         * that default; it gets null, which the counters refuse.
+         */
+        expect(placementFromGoQuery(undefined)).toBe('popup');
+        expect(placementFromGoQuery(null)).toBe('popup');
+        expect(placementFromGoQuery('')).toBe('popup');
+        expect(placementFromGoQuery('   ')).toBe('popup');
+
+        expect(placementFromGoQuery('area')).toBe('area');
+        expect(placementFromGoQuery('landing')).toBe('landing');
+        expect(placementFromGoQuery(' playback ')).toBe('playback');
+
+        for (const bogus of ['under-video', 'POPUP', 'constructor', '__proto__', 'toString', 7, ['area'], {}]) {
+            expect(placementFromGoQuery(bogus), String(bogus)).toBeNull();
+        }
+    });
+
+    it('serves the daily series, the per-surface breakdown AND the total to the admin panel', () => {
+        const partner = makePartner();
+        const offer = makeOffer(partner.id, { placements: ['popup', 'landing'] });
+        recordImpression(offer.id, 'popup');
+        recordClick(offer.id, 'p', 'popup');
+        recordClick(offer.id, 'w', 'popup');
+        recordImpression(offer.id, 'landing');
+        recordImpression(offer.id, 'landing');
+
+        const stats = affiliateOfferService.getOfferStats(offer.id, 30);
+
+        expect(stats.days).toBe(30);
+        expect(stats.rows).toEqual([
+            { stat_date: TODAY, placement: 'landing', impressions: 2, product_clicks: 0, store_clicks: 0, whatsapp_clicks: 0 },
+            { stat_date: TODAY, placement: 'popup', impressions: 1, product_clicks: 1, store_clicks: 0, whatsapp_clicks: 1 },
+        ]);
+        // "Is this offer working at all" - one number over every surface.
+        expect(stats.totals).toEqual({ impressions: 3, product_clicks: 1, store_clicks: 0, whatsapp_clicks: 1 });
+        // "...and which surface is worth selling" - busiest first, so the answer reads off the top.
+        expect(stats.by_placement).toEqual([
+            { placement: 'landing', impressions: 2, product_clicks: 0, store_clicks: 0, whatsapp_clicks: 0 },
+            { placement: 'popup', impressions: 1, product_clicks: 1, store_clicks: 0, whatsapp_clicks: 1 },
+        ]);
+    });
+
+    it('reports only surfaces that actually have counts, never a fabricated zero row', () => {
+        // An offer was never published to 'area'. Emitting "area: 0 impressions" would read like a
+        // placement that failed, which is a different fact from a placement that never ran.
+        const partner = makePartner();
+        const offer = makeOffer(partner.id, { placements: ['popup'] });
+        recordImpression(offer.id, 'popup');
+
+        expect(affiliateOfferService.getOfferStats(offer.id, 30).by_placement)
+            .toEqual([{ placement: 'popup', impressions: 1, product_clicks: 0, store_clicks: 0, whatsapp_clicks: 0 }]);
+    });
+
+    it('keeps a whole day of surfaces in view instead of cutting it off after `days` rows', () => {
+        /*
+         * One day used to be one row, so "the last N days" was `ORDER BY stat_date DESC LIMIT N`.
+         * One day is now up to FOUR rows, and that LIMIT would return popup+area for the oldest day
+         * in view and silently drop landing and playback - a breakdown missing exactly the surfaces
+         * this change added. The window is a date range now; this is the test that says so.
+         */
+        const partner = makePartner();
+        const offer = makeOffer(partner.id, { placements: ['popup', 'area', 'landing', 'playback'] });
+        for (const placement of ['popup', 'area', 'landing', 'playback']) {
+            recordImpression(offer.id, placement);
+        }
+
+        const stats = affiliateOfferService.getOfferStats(offer.id, 1);
+        expect(stats.rows).toHaveLength(4);
+        expect(stats.totals.impressions).toBe(4);
+    });
+
+    it('leaves days outside the window out of both aggregates', () => {
         const partner = makePartner();
         const offer = makeOffer(partner.id);
-        recordImpression(offer.id);
-        recordClick(offer.id, 'p');
+        recordImpression(offer.id, 'popup');
+        // 11 days before the pinned TODAY: inside a 30-day window, outside a 7-day one.
+        db.prepare('INSERT INTO affiliate_offer_stats (offer_id, stat_date, placement, impressions) VALUES (?, ?, ?, 5)')
+            .run(offer.id, '2026-08-01', 'popup');
 
-        recordClick(offer.id, 'w');
-
-        expect(affiliateOfferService.getOfferStats(offer.id, 30)).toEqual([
-            { stat_date: TODAY, impressions: 1, product_clicks: 1, store_clicks: 0, whatsapp_clicks: 1 },
-        ]);
+        expect(affiliateOfferService.getOfferStats(offer.id, 30).totals.impressions).toBe(6);
+        expect(affiliateOfferService.getOfferStats(offer.id, 7).totals.impressions).toBe(1);
+        expect(affiliateOfferService.getOfferStats(offer.id, 7).rows).toHaveLength(1);
     });
 });
 
@@ -1040,7 +1223,11 @@ describe('write-path rules', () => {
     it('removes an offer with its targets and its stats', () => {
         const partner = makePartner();
         const offer = makeOffer(partner.id, { target_mode: 'camera', camera_ids: [11] });
-        recordImpression(offer.id);
+        recordImpression(offer.id, 'popup');
+        // Assert the row EXISTS before deleting it: a counter call that quietly wrote nothing (a
+        // forgotten placement, say) would leave "no stat rows afterwards" true for the wrong
+        // reason, and this test would pass while deleteOffer stopped cleaning up entirely.
+        expect(statRows()).toHaveLength(1);
 
         affiliateOfferService.deleteOffer(offer.id);
 
@@ -1052,7 +1239,8 @@ describe('write-path rules', () => {
     it('removes a partner together with every offer, target and stat row under it', () => {
         const partner = makePartner();
         const offer = makeOffer(partner.id, { target_mode: 'area', area_ids: [2] });
-        recordClick(offer.id, 'p');
+        recordClick(offer.id, 'p', 'area');
+        expect(statRows()).toHaveLength(1); // same anti-vacuity precondition as the test above
 
         affiliateOfferService.deletePartner(partner.id);
 

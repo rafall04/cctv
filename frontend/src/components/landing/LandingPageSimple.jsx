@@ -11,6 +11,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useBranding } from '../../contexts/BrandingContext';
 import { useCameras } from '../../contexts/CameraContext';
 import InlineAdSlot from '../ads/InlineAdSlot';
+import AffiliateOfferSlot from '../commerce/AffiliateOfferSlot.jsx';
 import PromoBanner from '../promo/PromoBanner.jsx';
 import { isAdsMobileViewport, shouldRenderAdSlot } from '../ads/adsConfig';
 import { shouldDisableAnimations } from '../../utils/animationControl';
@@ -365,6 +366,11 @@ export default function LandingPageSimple({
                     <CamerasMountSkeleton />
                 ))}
             </main>
+
+            {/* Simple mode gets the partner offer too: it is a title, a button and at most one
+                64px thumbnail — lighter than the poster below it. Landing context, so
+                target_mode='all' only. */}
+            <AffiliateOfferSlot placement="landing" className="mx-auto mt-4 w-full max-w-2xl px-4" />
 
             {/* Simple mode still gets the house promo: it is one lazy image, not a
                 heavy effect, and this is the front page for low-end devices too. */}

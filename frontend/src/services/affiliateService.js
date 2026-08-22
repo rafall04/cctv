@@ -3,14 +3,22 @@
  *          belongs under one public viewing context, sanitise the payload before it becomes an
  *          <a href>, keep a client-side de-duplication guard so an impression is not counted again
  *          just because the viewer reopened the same popup, and count outbound taps.
- * Caller: components/commerce/UnderVideoCommerceSlot.jsx (resolve) and
+ * Caller: components/commerce/AffiliateOfferSlot.jsx (resolve) and
  *          components/commerce/AffiliateOfferCard.jsx (click counting). Public surfaces only.
  * Deps: shared apiClient, requestPolicy (SILENT_PUBLIC).
  * MainFuncs: getPublicAffiliateOffer, resolveAffiliateOfferOnce, clearAffiliateOfferCache,
- *          buildAffiliateBeaconUrl, countAffiliateClick, AFFILIATE_LINK.
+ *          buildAffiliateBeaconUrl, countAffiliateClick, AFFILIATE_LINK, AFFILIATE_PLACEMENTS.
  * SideEffects: one GET per resolved context per day (the GET is what counts the impression
  *          server-side); one fire-and-forget beacon per outbound tap; reads/writes a few
  *          sessionStorage keys.
+ *
+ * ── Every count says WHICH SURFACE it came from ───────────────────────────────────────────────
+ * The offer block renders on four surfaces. One visitor going landing → area → camera legitimately
+ * produces three impressions, and blending them into one number makes "this product is
+ * interesting" indistinguishable from "we put it in more places". So `placement` travels with the
+ * resolve, with the de-duplication key, and with the click beacon — a count that cannot say where
+ * it happened is a count the backend is specified to refuse (the stats column is NOT NULL with no
+ * default).
  *
  * Contract (mirrors promoBannerService): methods NEVER throw. On failure they return
  * `{ success: false, message }`. A context with no offer is `{ success: true, data: null }` —
@@ -92,6 +100,16 @@ const IMAGE_BASE_RE = /^[a-z0-9][a-z0-9-]{0,63}$/;
 
 /** The three things a visitor can tap, and the letters the backend counts them under. */
 export const AFFILIATE_LINK = Object.freeze({ PRODUCT: 'p', STORE: 's', WHATSAPP: 'w' });
+
+/**
+ * The four public surfaces an offer can occupy. Mirrors AFFILIATE_PLACEMENTS in
+ * backend/services/affiliateOfferService.js, which is the authority — this copy exists so nothing
+ * a caller mistypes reaches a URL or a storage key. An unknown value is dropped rather than sent:
+ * the backend's NOT NULL column is what turns "a writer forgot the surface" into a loud failure,
+ * and smuggling a made-up surface past it would be the exact bucket-everything-together failure
+ * the split exists to end.
+ */
+export const AFFILIATE_PLACEMENTS = Object.freeze(['popup', 'area', 'landing', 'playback']);
 
 const COUNTABLE_LINKS = Object.freeze(['p', 's', 'w']);
 
@@ -256,8 +274,19 @@ function contextKey({ placement, cameraId, areaId }, day) {
     return `${CONTEXT_KEY_PREFIX}${placement || 'unknown'}:${cameraId ?? ''}:${areaId ?? ''}:${day}`;
 }
 
-function seenKey(offerId, day) {
-    return `${SEEN_KEY_PREFIX}${offerId}:${day}`;
+/**
+ * Scoped by SURFACE as well as by offer and day.
+ *
+ * Without the placement segment this mark reads "offer 12 was already counted today", which stops
+ * being true the moment the same offer can appear on four surfaces: the landing page's impression
+ * is not the area page's impression, and both are owed. It happens that the paired context key
+ * below already carries the placement, so the AND in resolveAffiliateOfferOnce would have covered
+ * this — but only by accident of the two being read together. A guard whose correctness depends on
+ * its partner is a guard that breaks the first time someone simplifies the condition, so this key
+ * states the scope it means.
+ */
+function seenKey(placement, offerId, day) {
+    return `${SEEN_KEY_PREFIX}${placement || 'unknown'}:${offerId}:${day}`;
 }
 
 function readCachedOffer(key) {
@@ -279,10 +308,13 @@ function readCachedOffer(key) {
  * inside one browsing session (reopening the popup, a route change, apiClient replaying a failed
  * GET). Suppressing an honest impression tomorrow, or in a tab the visitor opened fresh, is not
  * this guard's business — the backend's own throttle owns that.
+ *
+ * Both keys are per-surface, so a visitor who reaches the same offer on a second surface is NOT
+ * de-duplicated into silence there: that second impression is a real one and is owed its own row.
  */
-function rememberOffer(key, offer, day) {
+function rememberOffer(key, offer, day, placement) {
     writeStorage(key, JSON.stringify(offer));
-    writeStorage(seenKey(offer.id, day), '1');
+    writeStorage(seenKey(placement, offer.id, day), '1');
 }
 
 /**
@@ -335,22 +367,24 @@ export const getPublicAffiliateOffer = async ({ placement, cameraId, areaId } = 
  * impression to protect, and caching "nothing here" for a whole session would hide an offer the
  * operator publishes while a viewer is still browsing.
  *
- * Honest limitation: two different contexts that happen to resolve to the SAME offer inside one
- * session count twice. Nothing client-side can prevent that — the offer id is only known after the
- * resolve, which is the call that counts.
+ * Two different contexts that resolve to the SAME offer inside one session count twice. Across
+ * SURFACES that is now the intended behaviour, not a limitation — landing, area and popup each owe
+ * their own row, which is the whole reason the stats key gained `placement`. Within one surface it
+ * remains an honest limitation for two different cameras that share an area-wide offer: the offer
+ * id is only known after the resolve, and the resolve is the call that counts.
  */
 export const resolveAffiliateOfferOnce = async ({ placement, cameraId, areaId } = {}) => {
     const day = localDayKey();
     const key = contextKey({ placement, cameraId, areaId }, day);
 
     const cached = readCachedOffer(key);
-    if (cached && readStorage(seenKey(cached.id, day))) {
+    if (cached && readStorage(seenKey(placement, cached.id, day))) {
         return { success: true, data: cached, fromCache: true };
     }
 
     const result = await getPublicAffiliateOffer({ placement, cameraId, areaId });
     if (result.success && result.data) {
-        rememberOffer(key, result.data, day);
+        rememberOffer(key, result.data, day, placement);
     }
     return { ...result, data: result.data ?? null, fromCache: false };
 };
@@ -388,16 +422,27 @@ export const clearAffiliateOfferCache = () => {
  * hrefs already depend on that), and same-origin is what makes the backend's Sec-Fetch-Site gate
  * accept the count.
  *
+ * `placement` rides along so the click lands in the same per-surface bucket the impression did. It
+ * is validated against AFFILIATE_PLACEMENTS rather than interpolated, for the same reason `link`
+ * is: everything in this string has to be something we already decided to send.
+ *
+ * An unrecognised placement is OMITTED, not defaulted and not fatal. The tap still counts as a tap
+ * — a visitor's click is real whatever the caller forgot — and the backend's NOT NULL column is
+ * where "this write does not say where it happened" turns into a loud failure. Substituting
+ * 'popup' here would be exactly the silent bucket-everything-together the split exists to end.
+ *
  * @param {number|string} offerId
  * @param {'p'|'s'|'w'} link
- * @returns {string|null} null when either argument is not something we will send
+ * @param {'popup'|'area'|'landing'|'playback'} [placement] - the surface the card was rendered on
+ * @returns {string|null} null when the id or the link is not something we will send
  */
-export const buildAffiliateBeaconUrl = (offerId, link) => {
+export const buildAffiliateBeaconUrl = (offerId, link, placement) => {
     const id = Number(offerId);
     if (!Number.isInteger(id) || id <= 0 || !COUNTABLE_LINKS.includes(link)) {
         return null;
     }
-    return `${BASE}/offers/${id}/go?l=${link}&beacon=1`;
+    const surface = AFFILIATE_PLACEMENTS.includes(placement) ? `&placement=${placement}` : '';
+    return `${BASE}/offers/${id}/go?l=${link}&beacon=1${surface}`;
 };
 
 /**
@@ -424,10 +469,11 @@ export const buildAffiliateBeaconUrl = (offerId, link) => {
  *
  * @param {number|string} offerId
  * @param {'p'|'s'|'w'} link - product, store, or WhatsApp
+ * @param {'popup'|'area'|'landing'|'playback'} [placement] - the surface the card was rendered on
  * @returns {boolean} whether a request was dispatched (false = nothing to send, or no transport)
  */
-export const countAffiliateClick = (offerId, link) => {
-    const url = buildAffiliateBeaconUrl(offerId, link);
+export const countAffiliateClick = (offerId, link, placement) => {
+    const url = buildAffiliateBeaconUrl(offerId, link, placement);
     if (!url) {
         return false;
     }
@@ -469,4 +515,5 @@ export default {
     buildAffiliateBeaconUrl,
     countAffiliateClick,
     AFFILIATE_LINK,
+    AFFILIATE_PLACEMENTS,
 };

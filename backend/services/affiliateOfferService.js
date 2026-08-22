@@ -4,7 +4,8 @@ Purpose: Own the affiliate feature's data rules — pick ONE partner offer for a
 Caller: affiliateController (public resolve + /go redirect, admin partner/offer CRUD + stats + photo).
 Deps: database/connectionPool (query/queryOne/execute/transaction), services/timeService
       (getLocalDate — WIB), utils/outboundUrlPolicy (https-only URL validation),
-      services/affiliateOfferExtras (WhatsApp/price/photo rules + the public payload shape).
+      services/affiliateOfferExtras (WhatsApp/price/photo rules + the public payload shape),
+      services/affiliateStatsService (placement vocabulary + the per-surface counters).
 MainFuncs: resolveOfferForContext, resolveOfferForRedirect, recordImpression, recordClick,
            listPartners/getPartner/createPartner/updatePartner/deletePartner, listOffers/getOffer/
            createOffer/updateOffer/deleteOffer/setOfferTargets/setOfferImage, getOfferStats.
@@ -66,14 +67,13 @@ while it is still today in Bojonegoro. Row timestamps (created_at/updated_at) st
 match the CURRENT_TIMESTAMP default the migration gives created_at; mixing the two zones in
 one column pair is what makes such a column unreadable later.
 
-WHY THE COUNTERS NEVER THROW
-----------------------------
-recordImpression/recordClick sit on the public request path. A counter is not worth a 500 to
-a visitor, so their guard swallows everything; the failure is reported to stderr at most once
-a minute (a broken DB would otherwise write a line per request — the exact "steady state,
-logged per item" pattern the logging policy forbids). The UPSERT is guarded by
-`WHERE EXISTS (SELECT 1 FROM affiliate_offers ...)` so a stale or forged id is a silent no-op
-instead of a foreign-key exception.
+WHERE THE COUNTERS LIVE (AND WHY THEY MOVED)
+--------------------------------------------
+Every count now has to say WHICH SURFACE it happened on, and this file had one line of headroom
+against the 800-line ratchet. services/affiliateStatsService.js therefore owns the placement
+vocabulary, the two frozen lookup maps, the guarded UPSERT and the admin rollup; the methods below
+are thin delegates and the module is re-exported at the bottom, so every existing import path still
+resolves. Its header carries the reasoning the counters used to argue for here.
 */
 
 import { query, queryOne, execute, transaction } from '../database/connectionPool.js';
@@ -83,36 +83,14 @@ import {
     OFFER_EXTRA_FIELDS, buildPublicPayload, buildOfferWhatsAppUrl, deleteAffiliateImage,
     normalizeWhatsAppNumber, normalizeWhatsAppMessage, normalizeProductPrice,
 } from './affiliateOfferExtras.js';
+import {
+    AFFILIATE_PLACEMENTS, readOfferStats, recordOfferClick, recordOfferImpression,
+} from './affiliateStatsService.js';
 
-export const AFFILIATE_PLACEMENTS = ['popup', 'area', 'landing', 'playback'];
 export const AFFILIATE_TARGET_MODES = ['all', 'area', 'camera'];
 export const AFFILIATE_BILLING_MODES = ['lifetime', 'term'];
 
-/*
- * The ONLY three column names that may reach the stat UPSERT. Null-prototype and frozen on
- * purpose: on a plain object literal, `STAT_COLUMN_BY_LINK['constructor']` returns an
- * inherited function rather than undefined, and that value would be template-interpolated
- * into SQL by a `map[link] || 'impressions'` style lookup. SQLite cannot parameterize an
- * identifier, so interpolation is unavoidable — the defence is that the interpolated value
- * can only ever be one of these three literals, chosen by a key the query string cannot forge
- * into anything else.
- *
- * 'w' (a WhatsApp tap) gets its own counter rather than being folded into product_clicks: it is a
- * different intent — starting a conversation, not browsing — and two intents in one number is a
- * number nobody can read.
- */
-const STAT_COLUMN_BY_LINK = Object.freeze(Object.assign(Object.create(null), {
-    p: 'product_clicks',
-    s: 'store_clicks',
-    w: 'whatsapp_clicks',
-}));
-
-const MAX_STATS_DAYS = 365;
-const DEFAULT_STATS_DAYS = 30;
-const STAT_ERROR_LOG_INTERVAL_MS = 60_000;
 const TEXT_LIMITS = { store_name: 120, contact_note: 500, product_title: 160, description: 500 };
-
-let lastStatErrorLoggedAt = 0;
 
 /* ------------------------------------------------------------------ small helpers */
 
@@ -224,14 +202,6 @@ export function normalizeBillingMode(mode) {
         throw badRequest(`billing_mode harus salah satu dari: ${AFFILIATE_BILLING_MODES.join(', ')}`);
     }
     return mode;
-}
-
-/** Maps the public `?l=` value to a stat column, or throws. Never interpolate `link` itself. */
-export function statColumnFor(link) {
-    if (typeof link !== 'string' || !Object.hasOwn(STAT_COLUMN_BY_LINK, link)) {
-        throw badRequest('Link tidak dikenal');
-    }
-    return STAT_COLUMN_BY_LINK[link];
 }
 
 /* ------------------------------------------------------- liveness (single source) */
@@ -356,29 +326,6 @@ function decorateOffer(row) {
     };
 }
 
-/* -------------------------------------------------------------------- stats writer */
-
-function logStatFailure(context, error) {
-    const now = Date.now();
-    if (now - lastStatErrorLoggedAt < STAT_ERROR_LOG_INTERVAL_MS) return;
-    lastStatErrorLoggedAt = now;
-    console.error(`[Affiliate] stat write failed (${context}):`, error.message);
-}
-
-function bumpStat(offerId, column, amount = 1) {
-    const id = toPositiveInt(offerId);
-    if (!id) return;
-    // Guarded UPSERT: one statement per event, and the EXISTS makes an unknown offer a silent
-    // no-op rather than a foreign-key throw. UNIQUE(offer_id, stat_date) is the conflict target.
-    execute(`
-        INSERT INTO affiliate_offer_stats (offer_id, stat_date, ${column})
-        SELECT ?, ?, ?
-        WHERE EXISTS (SELECT 1 FROM affiliate_offers WHERE id = ?)
-        ON CONFLICT (offer_id, stat_date)
-        DO UPDATE SET ${column} = ${column} + ?
-    `, [id, getLocalDate(), amount, id, amount]);
-}
-
 /* ------------------------------------------------------------------------ service */
 
 class AffiliateOfferService {
@@ -444,26 +391,27 @@ class AffiliateOfferService {
         return { url: String(url).trim() };
     }
 
-    /** Best-effort counter. Never throws — see "WHY THE COUNTERS NEVER THROW". */
-    recordImpression(offerId) {
-        try {
-            bumpStat(offerId, 'impressions');
-        } catch (error) {
-            logStatFailure('impression', error);
-        }
+    /**
+     * Best-effort counter. Never throws — see affiliateStatsService.
+     *
+     * @param {number|string} offerId
+     * @param {'popup'|'area'|'landing'|'playback'} placement WHERE it was shown. No default: a
+     *        caller that omits it counts nothing, rather than inflating another surface's number.
+     */
+    recordImpression(offerId, placement) {
+        recordOfferImpression(offerId, placement);
     }
 
     /**
-     * Best-effort counter for 'p' | 's' | 'w' (product / store / WhatsApp). Never throws, unknown
-     * `link` included: the frozen table above lets the query string pick WHICH counter, never the
-     * identifier that reaches SQL.
+     * Best-effort counter for 'p' | 's' | 'w' (product / store / WhatsApp) on ONE surface. Never
+     * throws — an unknown link or an unknown/missing placement included.
+     *
+     * @param {number|string} offerId
+     * @param {'p'|'s'|'w'} link
+     * @param {'popup'|'area'|'landing'|'playback'} placement REQUIRED, as above.
      */
-    recordClick(offerId, link) {
-        try {
-            bumpStat(offerId, statColumnFor(link));
-        } catch (error) {
-            logStatFailure('click', error);
-        }
+    recordClick(offerId, link, placement) {
+        recordOfferClick(offerId, link, placement);
     }
 
     /* ------------------------------------------------------------ partners (admin) */
@@ -763,18 +711,14 @@ class AffiliateOfferService {
         return true;
     }
 
-    /** Daily series for the admin panel, newest day first. */
-    getOfferStats(id, days = DEFAULT_STATS_DAYS) {
-        const offer = this.requireOfferRow(id);
-        const num = typeof days === 'number' ? days : Number(String(days ?? '').trim());
-        const window = Number.isInteger(num) && num > 0 && num <= MAX_STATS_DAYS ? num : DEFAULT_STATS_DAYS;
-        return query(`
-            SELECT stat_date, impressions, product_clicks, store_clicks, whatsapp_clicks
-            FROM affiliate_offer_stats
-            WHERE offer_id = ?
-            ORDER BY stat_date DESC
-            LIMIT ?
-        `, [offer.id, window]);
+    /**
+     * Admin rollup for one offer: `{ days, rows, by_placement, totals }` — the daily series
+     * (newest day first, one row per surface per day), the per-surface breakdown, and the total.
+     * requireOfferRow first, so an unknown id is a 404 rather than an empty series. The window
+     * clamp and the shape live in affiliateStatsService.
+     */
+    getOfferStats(id, days) {
+        return readOfferStats(this.requireOfferRow(id).id, days);
     }
 }
 
@@ -794,6 +738,11 @@ export const clearOfferImage = affiliateOfferService.clearOfferImage.bind(affili
 // Re-exported from affiliateOfferExtras so the split is invisible to callers and tests that
 // already import them from here. One implementation, two import paths.
 export { buildPublicPayload, buildOfferWhatsAppUrl };
+
+// Same deal for the counters' module: the vocabulary and the two validators keep resolving through
+// this file, so nothing outside had to learn where they moved.
+export { AFFILIATE_PLACEMENTS };
+export { statColumnFor, statPlacementFor, placementFromGoQuery } from './affiliateStatsService.js';
 
 export { AffiliateOfferService };
 export default affiliateOfferService;

@@ -34,7 +34,7 @@ import InlineAdSlot from '../ads/InlineAdSlot.jsx';
 import CameraDetailPanel from './CameraDetailPanel.jsx';
 import RelatedCamerasStrip from './RelatedCamerasStrip.jsx';
 import SponsorBadge from '../SponsorBadge.jsx';
-import UnderVideoCommerceSlot from '../commerce/UnderVideoCommerceSlot.jsx';
+import AffiliateOfferSlot from '../commerce/AffiliateOfferSlot.jsx';
 import PromoBanner from '../promo/PromoBanner.jsx';
 import { isAdsMobileViewport, shouldRenderAdSlot } from '../ads/adsConfig.js';
 import {
@@ -1558,7 +1558,7 @@ function VideoPopup({
                             onShare={handleShare}
                             onToggleFavorite={onToggleFavorite}
                         />
-                        <UnderVideoCommerceSlot cameraId={camera?.id} />
+                        <AffiliateOfferSlot placement="popup" cameraId={camera?.id} className="border-t border-edge bg-surface px-3 py-3" />
                         <PromoBanner placement="popup" cameraId={camera?.id} className="border-t border-edge bg-surface px-3 py-3" />
                         <RelatedCamerasStrip
                             cameras={relatedCameras}

@@ -30,6 +30,7 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import CameraThumbnail from '../components/CameraThumbnail';
+import AffiliateOfferSlot from '../components/commerce/AffiliateOfferSlot.jsx';
 import PromoBanner from '../components/promo/PromoBanner.jsx';
 import { resolvePublicPopupCamera } from '../services/publicCameraResolver';
 import publicGrowthService from '../services/publicGrowthService';
@@ -172,7 +173,16 @@ function AreaCameraMiniCard({ camera, metricLabel, metricValue, onClick }) {
         <button
             type="button"
             onClick={() => onClick(camera)}
-            className="rounded-card border border-edge bg-surface p-3 text-left transition-colors hover:border-edge-strong"
+            /* min-w-0 is load-bearing, and its absence overflowed this page by 12px on a 393px
+               phone until the e2e suite finally measured the area route (2026-08-23).
+               A grid item's `min-width: auto` resolves to its MIN-CONTENT width, and a `truncate`
+               child is `white-space: nowrap`, whose min-content equals its max-content — the whole
+               camera name on one line. So the card grew to fit the longest name and pushed the body
+               28px past its own column. `truncate` does not save it: overflow on the CHILD clips
+               the text, it does not shrink the parent that sized itself around it.
+               AreaCameraCard below never had this bug because `overflow-hidden` sits on the item
+               ITSELF, and the auto minimum size only applies while overflow is visible. */
+            className="min-w-0 rounded-card border border-edge bg-surface p-3 text-left transition-colors hover:border-edge-strong"
         >
             <div className="truncate text-sm font-semibold text-content">{camera.name}</div>
             <div className="mt-1 truncate text-xs text-content-muted">
@@ -596,6 +606,11 @@ export default function AreaPublicPage() {
                     </>
                 )}
             </section>
+
+            {/* Partner offer for this area, above the house promo — the same order the popup
+                uses. Area context only: there is no single camera on this page, so a
+                camera-targeted offer cannot match here. */}
+            <AffiliateOfferSlot placement="area" areaId={area?.id} className="mx-auto w-full max-w-2xl px-4 pb-4" />
 
             {/* House promo for this area. Sits outside the camera grid section so an
                 empty or errored grid still shows it. */}

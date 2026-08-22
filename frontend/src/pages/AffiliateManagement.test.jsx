@@ -9,6 +9,15 @@
  *      nothing but a test keeps it from being "tidied" back to the default and quietly turning a
  *      mistap into a lost 24-field draft.
  *
+ * Extended when the other three surfaces were unlocked, because two of those failures are also
+ * silent:
+ *   3. The placement boxes were rendered `disabled` with a note saying the surfaces were not wired.
+ *      Both are gone; a test that only counted four boxes would still pass against four disabled
+ *      ones, so the tests below tick them and follow the value through to updateOffer.
+ *   4. "Halaman depan" cannot match a camera-/area-targeted offer AT ALL. The warning that says so
+ *      is asserted absent, then present, then absent again after the target changes — a warning
+ *      that renders unconditionally would fail that middle-out shape, which is the point.
+ *
  * The real validators/normalisers are kept (only the network calls are stubbed): a fake
  * normalizeTargetIds would let the editor render a shape the page never actually produces.
  *
@@ -182,6 +191,137 @@ describe('the barang editor is a dialog', () => {
             product_title: 'Kamera Wi-Fi Indoor 3MP',
             target_mode: 'camera',
         })));
+    });
+});
+
+describe('lokasi tampil offers every surface the backend serves', () => {
+    const boxFor = (dialog, name) => within(dialog).getByRole('checkbox', { name });
+
+    it('renders all four surfaces, none of them locked, with the saved one ticked', async () => {
+        const dialog = await openOfferEditor();
+
+        const boxes = [
+            boxFor(dialog, /Bawah video live/),
+            boxFor(dialog, /Halaman area/),
+            boxFor(dialog, /Halaman depan/),
+            boxFor(dialog, /Halaman rekaman/),
+        ];
+        // `disabled` was the old state of this fieldset; four boxes that cannot be ticked would
+        // otherwise satisfy a test that merely counted them.
+        expect(boxes.map((box) => box.disabled)).toEqual([false, false, false, false]);
+        expect(boxes.map((box) => box.checked)).toEqual([true, false, false, false]);
+
+        // The note claiming the other three were not wired yet is now false and must be gone.
+        expect(within(dialog).queryByText(/belum tersambung|pilihannya dikunci/)).toBeNull();
+    });
+
+    it('warns that halaman depan can never match a camera-targeted barang, and stops warning when the target opens up', async () => {
+        const dialog = await openOfferEditor();
+        const warning = () => within(dialog).queryByText(/tidak akan pernah tampil di sana/);
+
+        // Seeded offer targets one camera and is popup-only: nothing to warn about yet.
+        expect(warning()).toBeNull();
+
+        fireEvent.click(boxFor(dialog, /Halaman depan/));
+        expect(warning()).not.toBeNull();
+
+        // Switching to "Semua kamera" makes the placement legitimate, so the warning must retract.
+        fireEvent.click(within(dialog).getByRole('radio', { name: /Semua kamera/ }));
+        expect(warning()).toBeNull();
+    });
+
+    it('carries the ticked surfaces through to updateOffer', async () => {
+        h.updateOffer.mockResolvedValue({ success: true, data: OFFER });
+        const dialog = await openOfferEditor();
+
+        fireEvent.click(boxFor(dialog, /Halaman area/));
+        fireEvent.click(boxFor(dialog, /Halaman rekaman/));
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Simpan barang' }));
+
+        await waitFor(() => expect(h.updateOffer).toHaveBeenCalledWith(9, expect.objectContaining({
+            placements: ['popup', 'area', 'playback'],
+        })));
+    });
+
+    it('refuses to save with every surface unticked instead of quietly re-ticking popup', async () => {
+        const dialog = await openOfferEditor();
+
+        fireEvent.click(boxFor(dialog, /Bawah video live/));
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Simpan barang' }));
+
+        await waitFor(() => expect(h.showNotification).toHaveBeenCalledWith(expect.objectContaining({
+            title: 'Lokasi tampil kosong',
+        })));
+        // The old fallback saved ['popup'] here — an offer republished to a surface the operator
+        // had just turned off, with a green toast over it.
+        expect(h.updateOffer).not.toHaveBeenCalled();
+    });
+});
+
+describe('the statistik panel splits the counts per surface', () => {
+    const STATS = {
+        days: 30,
+        rows: [
+            { stat_date: '2026-08-22', placement: 'popup', impressions: 20, product_clicks: 3, store_clicks: 1, whatsapp_clicks: 0 },
+            { stat_date: '2026-08-22', placement: 'area', impressions: 12, product_clicks: 2, store_clicks: 0, whatsapp_clicks: 1 },
+            { stat_date: '2026-08-21', placement: 'popup', impressions: 8, product_clicks: 1, store_clicks: 0, whatsapp_clicks: 0 },
+            { stat_date: '2026-08-21', placement: 'landing', impressions: 2, product_clicks: 0, store_clicks: 0, whatsapp_clicks: 0 },
+        ],
+        by_placement: [
+            { placement: 'popup', impressions: 28, product_clicks: 4, store_clicks: 1, whatsapp_clicks: 0 },
+            { placement: 'area', impressions: 12, product_clicks: 2, store_clicks: 0, whatsapp_clicks: 1 },
+            { placement: 'landing', impressions: 2, product_clicks: 0, store_clicks: 0, whatsapp_clicks: 0 },
+        ],
+        totals: { impressions: 42, product_clicks: 6, store_clicks: 1, whatsapp_clicks: 1 },
+    };
+
+    /** Opens the barang tab and expands the counters, returning the panel element. */
+    async function openStats() {
+        render(<AffiliateManagement />);
+        fireEvent.click(await screen.findByRole('tab', { name: /Barang/ }));
+        fireEvent.click(await screen.findByRole('button', { name: 'Statistik' }));
+        return waitFor(() => {
+            const panel = document.getElementById('offer-stats-9');
+            if (!panel) throw new Error('stats panel has not loaded');
+            return panel;
+        });
+    }
+
+    it('keeps the total AND lists each surface that actually earned something', async () => {
+        h.getOfferStats.mockResolvedValue({ success: true, data: STATS });
+        const panel = await openStats();
+
+        // The total answers "is this working at all" and must survive the breakdown landing next to it.
+        expect(within(panel).getByText('42')).not.toBeNull();
+
+        const rowFor = (label) => within(panel).getByText(label).closest('div');
+        expect(rowFor('Bawah video live').textContent).toContain('28 tayang');
+        expect(rowFor('Bawah video live').textContent).toContain('4 klik barang');
+        expect(rowFor('Halaman area').textContent).toContain('12 tayang');
+        expect(rowFor('Halaman area').textContent).toContain('1 klik WA');
+        expect(rowFor('Halaman depan').textContent).toContain('2 tayang');
+
+        // Playback earned nothing, so it has no row: reporting a fabricated "0 tayang" would read
+        // like a surface that failed rather than one that was never published to.
+        expect(within(panel).queryByText('Halaman rekaman')).toBeNull();
+    });
+
+    it('counts DAYS with data, not stat rows — one day is now up to four rows', async () => {
+        h.getOfferStats.mockResolvedValue({ success: true, data: STATS });
+        const panel = await openStats();
+
+        // Four rows across two dates. rows.length would say "4 hari", which grows when nothing but
+        // the placement list did.
+        expect(panel.textContent).toContain('2 hari ada datanya');
+        expect(panel.textContent).not.toContain('4 hari ada datanya');
+    });
+
+    it('keeps the "indikatif, bukan tagihan" note and drops the breakdown when nothing has been counted', async () => {
+        const panel = await openStats();
+
+        expect(panel.textContent).toContain('bukan tagihan');
+        expect(panel.textContent).toContain('belum ada data');
+        expect(within(panel).queryByText(/Per lokasi tampil/)).toBeNull();
     });
 });
 

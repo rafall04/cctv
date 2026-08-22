@@ -94,7 +94,10 @@ export default async function affiliateRoutes(fastify, options) {
     fastify.get(`${PUBLIC_BASE}/offer`, getPublicAffiliateOffer);
 
     /*
-     * Two jobs, one event. `?beacon=1` -> 204 and a counted tap (l=p|s|w), gated on Sec-Fetch-Site
+     * Two jobs, one event. `?placement=` says which surface the tap happened on and is spelled the
+     * same as on the resolve route above; omitting it files the tap under 'popup', which is there
+     * for links minted before per-surface counting existed, not as a convenience for new callers.
+     * `?beacon=1` -> 204 and a counted tap (l=p|s|w), gated on Sec-Fetch-Site
      * being same-origin/same-site; without it -> the no-JS 302 for l=p|s (never 301 — see the
      * controller header for why a cached permanent redirect would be unrevokable), 404 for l=w.
      * Why the beacon gate is the stricter of the two is argued at length in the controller header.

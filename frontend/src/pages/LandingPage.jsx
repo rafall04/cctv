@@ -23,6 +23,7 @@ import LandingHero from '../components/landing/LandingHero';
 import LandingFooter from '../components/landing/LandingFooter';
 import LandingCamerasSection from '../components/landing/LandingCamerasSection';
 import LandingPublicTopStack from '../components/landing/LandingPublicTopStack';
+import AffiliateOfferSlot from '../components/commerce/AffiliateOfferSlot.jsx';
 import PromoBanner from '../components/promo/PromoBanner.jsx';
 import LandingDiscoveryStrip from '../components/landing/LandingDiscoveryStrip';
 import LandingQuickAccessStrip from '../components/landing/LandingQuickAccessStrip';
@@ -324,6 +325,11 @@ function LandingPageContent({ onRefreshPauseChange }) {
                             />
                         </DeferUntilVisible>
                     )}
+
+                    {/* Partner offer, above the house promo. No camera and no area in context,
+                        so only target_mode='all' offers can ever appear here — see the note in
+                        AffiliateOfferSlot; that is the home page's nature, not a miss. */}
+                    <AffiliateOfferSlot placement="landing" className="mx-auto mt-6 w-full max-w-2xl px-4" />
 
                     {/* House promo. Deliberately NOT gated on the ads config — this is
                         the operator's own advertising and must keep showing when the

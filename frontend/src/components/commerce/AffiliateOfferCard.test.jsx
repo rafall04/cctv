@@ -102,7 +102,12 @@ const productLink = () => screen.getByRole('link', { name: /Lihat barang/i });
 const storeLink = () => screen.getByRole('link', { name: /Buka toko/i });
 const whatsappLink = () => screen.getByRole('link', { name: /WhatsApp/i });
 
-const show = (patch) => render(<AffiliateOfferCard offer={{ ...OFFER, ...patch }} />);
+/*
+ * Rendered as placement="area", deliberately NOT "popup": the card takes the surface from its host
+ * slot and stamps it on every beacon, and a fixture using the historical default would still pass
+ * if someone hardcoded 'popup' back into the counting path.
+ */
+const show = (patch) => render(<AffiliateOfferCard offer={{ ...OFFER, ...patch }} placement="area" />);
 
 /**
  * Click an anchor and report whether its default navigation survived.
@@ -363,7 +368,9 @@ describe('AffiliateOfferCard — counting one tap exactly once', () => {
         const notPrevented = clickAndKeepDefault(getLink());
 
         expect(countAffiliateClick).toHaveBeenCalledTimes(1);
-        expect(countAffiliateClick).toHaveBeenCalledWith(OFFER.id, letter);
+        // Third argument is the surface the card was rendered on — a tap that cannot say where it
+        // happened is a tap the per-placement stats table is specified to refuse.
+        expect(countAffiliateClick).toHaveBeenCalledWith(OFFER.id, letter, 'area');
         // The visitor's trip is the point of the click; the statistic is our bookkeeping.
         expect(notPrevented).toBe(true);
     });
@@ -382,7 +389,8 @@ describe('AffiliateOfferCard — counting one tap exactly once', () => {
 
         clickAndKeepDefault(storeLink());
 
-        expect(countAffiliateClick).not.toHaveBeenCalledWith(OFFER.id, 's');
+        // Asserted on the link letter alone, so this stays true whatever else a beacon carries.
+        expect(countAffiliateClick.mock.calls.some((call) => call[1] === 's')).toBe(false);
     });
 
     it('always beacons WhatsApp — l=w has no redirect target at all', () => {
@@ -393,7 +401,7 @@ describe('AffiliateOfferCard — counting one tap exactly once', () => {
         clickAndKeepDefault(whatsappLink());
 
         expect(countAffiliateClick).toHaveBeenCalledTimes(1);
-        expect(countAffiliateClick).toHaveBeenCalledWith(OFFER.id, 'w');
+        expect(countAffiliateClick).toHaveBeenCalledWith(OFFER.id, 'w', 'area');
     });
 
     it('counts one tap per tap — two taps, two beacons, never a batch or a debounce', () => {

@@ -63,7 +63,7 @@ redirector on ours.
 
 That moves the click OFF this endpoint, so the count has to travel separately:
 
-    GET …/go?l=p|s|w&beacon=1   -> 204 No Content, counts, no Location header, no body.
+    GET …/go?l=p|s|w&placement=…&beacon=1   -> 204 No Content, counts, no Location, no body.
 
 The 302 path is untouched and remains the no-JS fallback. What changes is the gate: a beacon is
 counted only when `sec-fetch-site` is `same-origin` or `same-site` — strictly less tolerant than
@@ -88,6 +88,22 @@ strip it — the same property services/streamHotlinkPolicy.js leans on for the 
 That gate falls back to Origin/Referer when the header is absent; this one does not, because there
 the fallback decides whether a visitor may WATCH, and here it decides only whether a counter moves.
 
+WHY EVERY COUNT CARRIES A `placement` — AND WHY THE THROTTLE KEY DOES TOO
+-------------------------------------------------------------------------
+One offer now appears on four surfaces (under the live video, area, landing, playback), so a count
+that does not say WHERE it happened is unreadable: a rising total could mean the product is
+interesting or merely that we put it in more places. The resolve endpoint already receives
+`?placement=`; the /go endpoint takes the same spelling (`?placement=`, NOT a second short name —
+one vocabulary, two endpoints) and hands it to the service, which refuses anything outside the four
+known surfaces.
+
+The per-IP throttle key had to grow with it. It collapses one identity + one event into a single
+count per 10s window, and a visitor going landing -> area -> camera does exactly that in well under
+10 seconds. Keyed on the offer alone, the second and third surfaces would be swallowed and the
+breakdown would be systematically wrong for the fastest-moving visitors — the users most likely to
+be real. The placement is therefore part of the key, so the collapse still catches a repeat of the
+SAME event on the SAME surface and nothing else.
+
 WHY l=w HAS NO REDIRECT TARGET
 ------------------------------
 `w` counts a WhatsApp tap. wa.me is a URL we could technically redirect to, but the deep link is
@@ -97,7 +113,7 @@ a free "our domain in front of your WhatsApp link" tool for anyone who finds it.
 `beacon=1` is therefore a 404: countable, not navigable, on purpose.
 */
 
-import affiliateOfferService from '../services/affiliateOfferService.js';
+import affiliateOfferService, { placementFromGoQuery } from '../services/affiliateOfferService.js';
 import {
     savePromoImage,
     MAX_AFFILIATE_UPLOAD_BYTES,
@@ -208,12 +224,12 @@ function isBeaconRequest(query = {}) {
  * redirect, so every path here swallows failure — but it swallows it LOUDLY on stderr, because
  * the service is specified to guard its own UPSERT and therefore should not be throwing.
  */
-function countImpression(request, offerId) {
+function countImpression(request, offerId, placement) {
     try {
-        if (!allowCount(`${resolveClientIp(request)}:i:${offerId}`)) {
+        if (!allowCount(`${resolveClientIp(request)}:i:${offerId}:${placement}`)) {
             return;
         }
-        affiliateOfferService.recordImpression(offerId);
+        affiliateOfferService.recordImpression(offerId, placement);
     } catch (error) {
         logControllerError('Affiliate impression write failed', error);
     }
@@ -223,21 +239,24 @@ function countImpression(request, offerId) {
  * @param {object} request Fastify request.
  * @param {number} offerId
  * @param {'p'|'s'|'w'} link
+ * @param {string|null} placement Which surface the tap happened on. null (an unrecognised
+ *        `?placement=`) reaches the service and is refused there — one validation point, one
+ *        throttled log — so a mistyped surface loses its count instead of borrowing another's.
  * @param {{beacon?: boolean}} [mode] Which gate applies — the two are NOT interchangeable, see the
  *        file header. The per-IP throttle key is shared between them on purpose: firing both the
  *        beacon and the 302 for one tap (a mis-wired frontend, or a no-JS fallback that also runs
  *        the handler) must still be one click.
  */
-function countClick(request, offerId, link, { beacon = false } = {}) {
+function countClick(request, offerId, link, placement, { beacon = false } = {}) {
     try {
         const passesGate = beacon ? shouldCountBeacon : shouldCountNavigation;
         if (!passesGate(request.headers || {})) {
             return;
         }
-        if (!allowCount(`${resolveClientIp(request)}:c:${offerId}:${link}`)) {
+        if (!allowCount(`${resolveClientIp(request)}:c:${offerId}:${link}:${placement}`)) {
             return;
         }
-        affiliateOfferService.recordClick(offerId, link);
+        affiliateOfferService.recordClick(offerId, link, placement);
     } catch (error) {
         logControllerError('Affiliate click write failed', error);
     }
@@ -262,14 +281,18 @@ export async function getPublicAffiliateOffer(request, reply) {
     reply.header('Cache-Control', 'no-store');
     try {
         const { placement, cameraId, areaId } = request.query || {};
+        const surface = typeof placement === 'string' ? placement : '';
         const offer = affiliateOfferService.resolveOfferForContext({
-            placement: typeof placement === 'string' ? placement : '',
+            placement: surface,
             cameraId: parseId(cameraId),
             areaId: parseId(areaId),
         });
 
         if (offer) {
-            countImpression(request, offer.id);
+            // The SAME string the resolver just accepted. An offer only resolves for one of the
+            // four known surfaces, so the impression cannot be filed under a placement that does
+            // not exist — the validation the resolve already did is the validation the write needs.
+            countImpression(request, offer.id, surface);
         }
 
         return reply.send({ success: true, data: offer || null });
@@ -280,7 +303,7 @@ export async function getPublicAffiliateOffer(request, reply) {
 }
 
 /**
- * One endpoint, two jobs: /api/public/affiliate/offers/:id/go?l=p|s|w[&beacon=1]
+ * One endpoint, two jobs: /api/public/affiliate/offers/:id/go?l=p|s|w[&placement=…][&beacon=1]
  *
  *   without `beacon`  -> 302 to the partner (l=p|s), or 404 (l=w). The no-JS fallback, unchanged.
  *   with `beacon=1`   -> 204 No Content. Counts the tap; the browser is already going to the real
@@ -328,8 +351,17 @@ export async function goAffiliateOffer(request, reply) {
                 : reply.code(400).send({ success: false, message: 'Parameter tautan tidak valid' });
         }
 
+        /*
+         * Which surface this tap happened on. Absent means a link minted before per-surface
+         * counting existed and is filed under 'popup' — backward compatibility, NOT convenience;
+         * the rule and the reason live on GO_LEGACY_PLACEMENT in affiliateStatsService. A present
+         * but unrecognised value yields null, which counts nothing and never blocks the redirect:
+         * a counter is not allowed to cost a visitor their destination.
+         */
+        const placement = placementFromGoQuery(request.query?.placement);
+
         if (beacon) {
-            countClick(request, id, link, { beacon: true });
+            countClick(request, id, link, placement, { beacon: true });
             // 204 = no body, and notably no Location: nothing here is a navigation.
             return reply.code(204).send();
         }
@@ -346,7 +378,7 @@ export async function goAffiliateOffer(request, reply) {
 
         // Count before redirecting: the service is synchronous (better-sqlite3), so the write is
         // already durable by the time the response leaves.
-        countClick(request, id, link);
+        countClick(request, id, link, placement);
 
         return reply.redirect(target.url, 302);
     } catch (error) {
@@ -580,6 +612,13 @@ export async function deleteAffiliateOffer(request, reply) {
     }
 }
 
+/**
+ * `data` is `{ days, rows, by_placement, totals }`: the daily series (one row per surface per day),
+ * the per-surface breakdown, and the window total. Both aggregates ship because they answer
+ * different questions — the total says whether the offer works at all, the breakdown says which
+ * surface is worth selling — and a panel that derives one from the other eventually disagrees with
+ * itself. The payload is admin-only; nothing here is public.
+ */
 export async function getAffiliateOfferStats(request, reply) {
     try {
         const id = parseId(request.params?.id);

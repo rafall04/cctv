@@ -1,6 +1,7 @@
 /*
  * Purpose: Admin page for the affiliate feature — MITRA (the partner shop and its commercial
- *   deal) and BARANG (the product cards shown under a live camera), plus the per-offer counters.
+ *   deal) and BARANG (the product cards shown on the four public surfaces), plus the per-offer
+ *   counters, totalled and broken down per surface.
  * Caller: App.jsx route /admin/affiliate (admin only; the route + menu entry are wired by hand).
  * Deps: affiliateAdminService, areaService, cameraService, AffiliatePartnerForm,
  *   AffiliateOfferForm, components/ui (incl. Modal), ConfirmContext.useConfirm,
@@ -34,6 +35,15 @@
  * admin has no reason to need a shortcut that bypasses that.
  *
  * NOTE ON THE NUMBERS: the counters are directional, not billable. See STATS_HONESTY below.
+ *
+ * WHY THE PANEL SHOWS A TOTAL *AND* A PER-SURFACE BREAKDOWN
+ * ---------------------------------------------------------
+ * They answer different questions and neither replaces the other. The total answers "is this offer
+ * working at all"; the breakdown answers "which surface is worth selling to the mitra". Blended,
+ * a rising total could equally mean "this product is interesting" or merely "we ticked more boxes",
+ * and those two readings call for opposite decisions. Both come straight from the endpoint rather
+ * than one being derived from the other here — a panel that recomputes an aggregate eventually
+ * disagrees with the number printed next to it.
  *
  * WHAT THE OFFER LIST SAYS ABOUT THE THREE OPTIONAL EXTRAS
  * --------------------------------------------------------
@@ -154,18 +164,18 @@ function PartnerRow({ partner, offerCount, onEdit, onDelete }) {
 /* -------------------------------------------------------------------- offers */
 
 function OfferStatsPanel({ offerId }) {
-    const [state, setState] = useState({ loading: true, error: null, totals: null, days: 0 });
+    const [state, setState] = useState({ loading: true, error: null, totals: null, byPlacement: [], days: 0 });
 
     useEffect(() => {
         let cancelled = false;
-        setState({ loading: true, error: null, totals: null, days: 0 });
+        setState({ loading: true, error: null, totals: null, byPlacement: [], days: 0 });
 
         getOfferStats(offerId, 30).then((result) => {
             if (cancelled) {
                 return;
             }
             if (!result.success) {
-                setState({ loading: false, error: result.message, totals: null, days: 0 });
+                setState({ loading: false, error: result.message, totals: null, byPlacement: [], days: 0 });
                 return;
             }
             /*
@@ -184,7 +194,20 @@ function OfferStatsPanel({ offerId }) {
                 whatsapp_clicks: acc.whatsapp_clicks + (Number(row.whatsapp_clicks) || 0),
             }), { impressions: 0, product_clicks: 0, store_clicks: 0, whatsapp_clicks: 0 });
 
-            setState({ loading: false, error: null, totals, days: rows.length });
+            /*
+             * Only surfaces that actually HAVE a row are listed: what happened, not what was
+             * configured. A surface with no rows would otherwise print a fabricated "0 tayang" that
+             * reads like a placement that failed rather than one that was never published there.
+             */
+            const byPlacement = Array.isArray(payload?.by_placement) ? payload.by_placement : [];
+            /*
+             * DISTINCT DATES, not rows.length. One day used to be one row; it is now one row PER
+             * SURFACE, so counting rows would report "8 hari ada datanya" for two days of a
+             * two-surface offer — a number that grows when nothing but the placement list did.
+             */
+            const days = new Set(rows.map((row) => row.stat_date)).size;
+
+            setState({ loading: false, error: null, totals, byPlacement, days });
         });
 
         return () => { cancelled = true; };
@@ -207,7 +230,8 @@ function OfferStatsPanel({ offerId }) {
      * Four across is deliberately two-by-two on a phone: four columns of tabular numerals in a
      * 320px card either wrap mid-label or force the row wider than the viewport.
      */
-    const readCount = (key) => Number(state.totals?.[key]) || 0;
+    const count = (source, key) => Number(source?.[key]) || 0;
+    const readCount = (key) => count(state.totals, key);
 
     return (
         <div id={`offer-stats-${offerId}`} className="mt-3 rounded-card border border-edge bg-surface-sunken p-3">
@@ -224,6 +248,27 @@ function OfferStatsPanel({ offerId }) {
                     </div>
                 ))}
             </div>
+            {state.byPlacement.length > 0 && (
+                <div className="mt-3 space-y-1 border-t border-edge pt-2">
+                    <p className="text-xs font-medium text-content-muted">
+                        Per lokasi tampil{' '}
+                        <span className="font-normal text-content-subtle">— yang belum pernah tayang tidak terdaftar.</span>
+                    </p>
+                    {state.byPlacement.map((row) => (
+                        <div key={row.placement} className="flex flex-wrap items-baseline justify-between gap-x-3 text-xs">
+                            <span className="min-w-0 truncate text-content">
+                                {PLACEMENT_LABELS[row.placement] || row.placement}
+                            </span>
+                            {/* Spelled out rather than a five-column grid: four bare numerals per row
+                                under four headers is unreadable at 320px, and this wraps instead. */}
+                            <span className="font-mono tabular-nums text-content-muted">
+                                {count(row, 'impressions')} tayang · {count(row, 'product_clicks')} klik barang
+                                {' · '}{count(row, 'store_clicks')} klik toko · {count(row, 'whatsapp_clicks')} klik WA
+                            </span>
+                        </div>
+                    ))}
+                </div>
+            )}
             <p className="mt-2 text-xs text-content-subtle">
                 30 hari terakhir{state.days ? ` · ${state.days} hari ada datanya` : ' · belum ada data'}. {STATS_HONESTY}
             </p>

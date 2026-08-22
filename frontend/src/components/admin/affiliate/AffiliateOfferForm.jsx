@@ -85,13 +85,25 @@ import { useNotification } from '../../../contexts/NotificationContext';
 import AffiliateTargetPicker from './AffiliateTargetPicker';
 
 /*
- * Phase 1 wires exactly one surface: the slot under the live video. The column accepts a list
- * because the promo banner already shows four surfaces and this will follow, but offering boxes
- * that resolve to nothing would let an operator publish an offer that appears nowhere and looks
- * configured. So: one option, rendered, locked on, and explained.
+ * The four surfaces the resolver actually serves (AFFILIATE_PLACEMENTS on the backend). Labelled
+ * the way whoever sells the slot talks about it, not by the key the code stores: 'popup' means
+ * nothing to an operator, "bawah video live" is a place they can picture.
+ *
+ * The counters are split by surface too, so ticking a second box does not blend into the first
+ * one's number — that is what the per-surface breakdown in the offer list reads.
+ *
+ * HALAMAN DEPAN IS THE ONE THAT CAN LIE
+ * -------------------------------------
+ * The landing page is not about any one camera, so there is no camera and no area to match
+ * against and a camera-/area-targeted offer can NEVER resolve there. The checkbox alone cannot
+ * say that, so the warning below the boxes does: without it, ticking landing on a camera-targeted
+ * offer is an indefinite wait for an impression that is not merely rare but impossible.
  */
 const PLACEMENT_OPTIONS = [
     { key: 'popup', label: 'Bawah video live', hint: 'Saat pengunjung menonton satu kamera.' },
+    { key: 'area', label: 'Halaman area', hint: 'Di halaman daftar kamera satu area.' },
+    { key: 'landing', label: 'Halaman depan', hint: 'Halaman utama — tanpa konteks kamera/area.' },
+    { key: 'playback', label: 'Halaman rekaman', hint: 'Saat pengunjung memutar rekaman.' },
 ];
 
 const TARGET_OPTIONS = [
@@ -233,6 +245,10 @@ export default function AffiliateOfferForm({ offer, partners, areas, cameras, on
     }, [offer, replacePendingPreview]);
 
     const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
+
+    const togglePlacement = (key) => set('placements', form.placements.includes(key)
+        ? form.placements.filter((value) => value !== key)
+        : [...form.placements, key]);
 
     const urlProblem = useMemo(
         () => describeOutboundUrlProblem(form.product_url, { required: true }),
@@ -414,6 +430,16 @@ export default function AffiliateOfferForm({ offer, partners, areas, cameras, on
             return;
         }
         /*
+         * The service refuses an empty list, but that refusal would arrive as a server error after
+         * a save the operator believed had gone through. Catching it here also rules out the
+         * tempting alternative — quietly re-ticking 'popup' on submit — which would resurrect the
+         * one surface they had just deliberately turned off.
+         */
+        if (form.placements.length === 0) {
+            showNotification({ type: 'warning', title: 'Lokasi tampil kosong', message: 'Pilih minimal satu lokasi tampil.' });
+            return;
+        }
+        /*
          * An offer targeted at "area"/"camera" with nothing ticked matches nothing and silently
          * never appears. Saying so beats letting the operator believe it is running.
          */
@@ -437,7 +463,7 @@ export default function AffiliateOfferForm({ offer, partners, areas, cameras, on
             whatsapp_message: form.whatsapp_message.trim() || null,
             product_price_rupiah: priceDigits === '' ? null : Number.parseInt(priceDigits, 10),
             target_mode: form.target_mode,
-            placements: form.placements.length ? form.placements : ['popup'],
+            placements: form.placements,
             priority: Number.isFinite(Number.parseInt(form.priority, 10)) ? Number.parseInt(form.priority, 10) : 100,
             active: Boolean(form.active),
             area_ids: form.target_mode === 'area' ? form.area_ids : [],
@@ -644,16 +670,25 @@ export default function AffiliateOfferForm({ offer, partners, areas, cameras, on
             </fieldset>
 
             {/* ----------------------------------------------------- lokasi tampil */}
-            <fieldset className="rounded-card border border-edge bg-surface-sunken p-3">
+            {/* min-w-0: a <fieldset> refuses to shrink below its content without it, and this one
+                holds a two-column grid inside the narrowest dialog in admin. */}
+            <fieldset className="min-w-0 rounded-card border border-edge bg-surface-sunken p-3">
                 <legend className="px-1 text-xs font-semibold text-content-muted">Lokasi tampil</legend>
-                <div className="space-y-2">
+                {form.placements.includes('landing') && form.target_mode !== 'all' && (
+                    <p className="mb-2 rounded-control border border-status-warn/30 bg-status-warn/10 px-3 py-2 text-xs text-status-warn">
+                        Halaman depan tidak terikat kamera mana pun, jadi barang dengan target{' '}
+                        {form.target_mode === 'area' ? 'area' : 'kamera'} tertentu{' '}
+                        <strong>tidak akan pernah tampil di sana</strong>. Pilih target &quot;Semua
+                        kamera&quot; kalau memang ingin tampil di halaman depan.
+                    </p>
+                )}
+                <div className="grid gap-2 sm:grid-cols-2">
                     {PLACEMENT_OPTIONS.map((option) => (
-                        <label key={option.key} className="flex min-h-11 items-start gap-2 rounded-control p-2 text-sm">
+                        <label key={option.key} className="flex min-h-11 cursor-pointer items-start gap-2 rounded-control p-2 text-sm hover:bg-surface-raised">
                             <input
                                 type="checkbox"
                                 checked={form.placements.includes(option.key)}
-                                readOnly
-                                disabled
+                                onChange={() => togglePlacement(option.key)}
                                 className="mt-0.5 h-4 w-4 shrink-0"
                             />
                             <span className="min-w-0">
@@ -664,9 +699,8 @@ export default function AffiliateOfferForm({ offer, partners, areas, cameras, on
                     ))}
                 </div>
                 <p className="mt-1 px-2 text-xs text-content-subtle">
-                    Untuk sekarang baru satu lokasi yang tersambung, jadi pilihannya dikunci. Halaman
-                    area, halaman depan dan halaman rekaman menyusul — kalau ditawarkan sekarang,
-                    barangnya akan terlihat &quot;terpasang&quot; padahal tidak muncul di mana pun.
+                    Boleh lebih dari satu, minimal satu. Tiap lokasi dihitung sendiri, jadi
+                    statistiknya bisa dibaca per lokasi.
                 </p>
             </fieldset>
 

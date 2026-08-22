@@ -2,7 +2,8 @@
  * Purpose: Render one affiliate ("Toko rekanan") offer as a labelled card — photo, title,
  *          description, price, and up to five actions: open the product, ask about it on WhatsApp,
  *          visit the shop, copy the link, share it.
- * Caller: UnderVideoCommerceSlot (below the live video).
+ * Caller: AffiliateOfferSlot, on any of the four public surfaces. The slot tells this card which
+ *          surface it is on; the card's only use for that is stamping the click beacons.
  * Deps: affiliateService (countAffiliateClick + AFFILIATE_LINK). The payload arrives fully
  *          resolved and already sanitised by that service; this component builds no URLs of its
  *          own except the media path for the photo.
@@ -93,6 +94,13 @@
  * the redirect counts it, and firing both would file one tap as two.
  * WhatsApp always beacons: `l=w` has no redirect target at all — wa.me is a deep link the phone
  * hands to another app, so a redirector would break it.
+ *
+ * Every beacon carries `placement`, so a tap is filed against the surface it happened on rather
+ * than blended across all four. KNOWN GAP, and it belongs to the backend rather than here: the
+ * `/go` FALLBACK path is counted by the 302, and `product_href` / `store_href` arrive prebuilt in
+ * the payload with no surface on them. The resolver knows the placement it was asked for, so that
+ * is where the two hrefs should be stamped — this component deliberately builds no URLs of its
+ * own, and appending a query parameter to a link it was handed would be exactly that.
  *
  * ── Why the anchors carry that exact rel ──────────────────────────────────────────────────────
  *   · noopener/noreferrer  the destination is a third-party page opened in a new tab; it must not
@@ -231,8 +239,11 @@ function buildSrcSet(imageBase) {
  *   { id, product_title, description, store_name, product_url, store_url, product_href,
  *     store_href, whatsapp_url, price_rupiah, image_base, image_width, image_height }
  * @param {string} [props.className] - wrapper classes supplied by the host slot
+ * @param {'popup'|'area'|'landing'|'playback'} [props.placement] - the surface this card is being
+ *   rendered on, supplied by the host slot. Used for one thing only: stamping the click beacons,
+ *   so a tap is filed against the surface that earned it.
  */
-export default function AffiliateOfferCard({ offer, className = '' }) {
+export default function AffiliateOfferCard({ offer, className = '', placement }) {
     /*
      * ALL HOOKS FIRST — the "nothing to render" guard lives below them (React error #310). Every
      * value they close over is read with `?.`, so they are safe to declare before the offer has
@@ -301,19 +312,19 @@ export default function AffiliateOfferCard({ offer, className = '' }) {
 
     const handleProductClick = useCallback(() => {
         if (productUrl) {
-            countAffiliateClick(offerId, AFFILIATE_LINK.PRODUCT);
+            countAffiliateClick(offerId, AFFILIATE_LINK.PRODUCT, placement);
         }
-    }, [offerId, productUrl]);
+    }, [offerId, productUrl, placement]);
 
     const handleStoreClick = useCallback(() => {
         if (storeUrl) {
-            countAffiliateClick(offerId, AFFILIATE_LINK.STORE);
+            countAffiliateClick(offerId, AFFILIATE_LINK.STORE, placement);
         }
-    }, [offerId, storeUrl]);
+    }, [offerId, storeUrl, placement]);
 
     const handleWhatsAppClick = useCallback(() => {
-        countAffiliateClick(offerId, AFFILIATE_LINK.WHATSAPP);
-    }, [offerId]);
+        countAffiliateClick(offerId, AFFILIATE_LINK.WHATSAPP, placement);
+    }, [offerId, placement]);
 
     // ── end of hooks ─────────────────────────────────────────────────────────────────────────
     const productHref = productUrl || offer?.product_href || null;
