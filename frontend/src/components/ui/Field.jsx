@@ -18,7 +18,7 @@ import { useId } from 'react';
 
 /** The one input chrome. Exported so a caller with a bespoke control can still match. */
 export function inputClasses({ invalid = false, className = '' } = {}) {
-    return `w-full min-h-11 rounded-control border bg-surface px-3 py-2 text-sm text-content placeholder:text-content-subtle transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-60 ${
+    return `w-full min-h-11 rounded-control border bg-surface px-3 py-2 text-base text-content placeholder:text-content-subtle sm:text-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-60 ${
         invalid ? 'border-status-fault' : 'border-edge hover:border-edge-strong'
     } ${className}`;
 }

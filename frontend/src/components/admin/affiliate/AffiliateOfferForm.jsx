@@ -164,7 +164,7 @@ function TargetPicker({ label, options, selected, onChange, searchable }) {
         <div className="rounded-card border border-edge bg-surface-sunken p-3">
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                 <span className="min-w-0 truncate text-xs font-semibold text-content-muted">{label}</span>
-                <span className="shrink-0 font-mono text-xs tabular-nums text-content-subtle">{selected.length} dipilih</span>
+                <span role="status" className="shrink-0 font-mono text-xs tabular-nums text-content-subtle">{selected.length} dipilih</span>
             </div>
 
             {searchable && (
@@ -179,11 +179,11 @@ function TargetPicker({ label, options, selected, onChange, searchable }) {
             )}
 
             <div className="max-h-56 space-y-1 overflow-y-auto">
-                {visible.length === 0 && <p className="py-2 text-xs text-content-subtle">Tidak ada yang cocok.</p>}
+                {visible.length === 0 && <p role="status" className="py-2 text-xs text-content-subtle">Tidak ada yang cocok.</p>}
                 {visible.map((option) => (
                     <label
                         key={option.id}
-                        className="flex min-h-[40px] cursor-pointer items-center gap-2 rounded-control px-2 py-1 text-sm text-content-muted hover:bg-surface-raised sm:min-h-0"
+                        className="flex min-h-11 cursor-pointer items-center gap-2 rounded-control px-2 py-1 text-sm text-content-muted hover:bg-surface-raised"
                     >
                         <input
                             type="checkbox"
@@ -487,7 +487,7 @@ export default function AffiliateOfferForm({ offer, partners, areas, cameras, sa
             product_price_rupiah: priceDigits === '' ? null : Number.parseInt(priceDigits, 10),
             target_mode: form.target_mode,
             placements: form.placements.length ? form.placements : ['popup'],
-            priority: Number.parseInt(form.priority, 10) || 100,
+            priority: Number.isFinite(Number.parseInt(form.priority, 10)) ? Number.parseInt(form.priority, 10) : 100,
             active: Boolean(form.active),
             area_ids: form.target_mode === 'area' ? form.area_ids : [],
             camera_ids: form.target_mode === 'camera' ? form.camera_ids : [],
@@ -559,7 +559,7 @@ export default function AffiliateOfferForm({ offer, partners, areas, cameras, sa
               * Grouped on purpose: "what you fill in is what appears" is a property of the GROUP,
               * so an operator who learns it once here never has to rediscover it per field.
               */}
-            <fieldset className="space-y-4 rounded-card border border-edge bg-surface-sunken p-3">
+            <fieldset className="min-w-0 space-y-4 rounded-card border border-edge bg-surface-sunken p-3">
                 <legend className="px-1 text-xs font-semibold text-content-muted">Tambahan opsional</legend>
                 <p className="px-1 text-xs text-content-subtle">
                     Foto, harga dan tombol WhatsApp berdiri sendiri-sendiri, dan{' '}
@@ -589,7 +589,7 @@ export default function AffiliateOfferForm({ offer, partners, areas, cameras, sa
                         onChange={handleFile}
                         disabled={uploading || removing}
                         aria-label="Pilih foto barang"
-                        className="block w-full text-sm text-content-muted file:mr-3 file:rounded-control file:border file:border-edge file:bg-surface file:px-3 file:py-1.5 file:text-sm file:text-content"
+                        className="block w-full text-sm text-content-muted file:mr-3 file:rounded-control file:border file:border-edge file:bg-surface file:min-h-11 file:px-4 file:text-sm file:text-content"
                     />
 
                     <p className="mt-2 text-xs text-content-subtle">
@@ -599,7 +599,7 @@ export default function AffiliateOfferForm({ offer, partners, areas, cameras, sa
                     </p>
                     {pendingFile && (
                         <p className="mt-1 text-xs text-content-muted">
-                            <strong>{pendingFile.name}</strong> akan diunggah otomatis begitu barang ini disimpan.
+                            <strong className="break-all">{pendingFile.name}</strong> akan diunggah otomatis begitu barang ini disimpan.
                         </p>
                     )}
                     {uploading && <p className="mt-2 text-xs text-content-muted">Mengunggah dan mengonversi…</p>}
@@ -697,7 +697,7 @@ export default function AffiliateOfferForm({ offer, partners, areas, cameras, sa
                 <legend className="px-1 text-xs font-semibold text-content-muted">Lokasi tampil</legend>
                 <div className="space-y-2">
                     {PLACEMENT_OPTIONS.map((option) => (
-                        <label key={option.key} className="flex min-h-[40px] items-start gap-2 rounded-control p-2 text-sm sm:min-h-0">
+                        <label key={option.key} className="flex min-h-11 items-start gap-2 rounded-control p-2 text-sm">
                             <input
                                 type="checkbox"
                                 checked={form.placements.includes(option.key)}
@@ -720,13 +720,13 @@ export default function AffiliateOfferForm({ offer, partners, areas, cameras, sa
             </fieldset>
 
             {/* --------------------------------------------------------- targeting */}
-            <fieldset className="space-y-3">
+            <fieldset className="min-w-0 space-y-3">
                 <legend className="text-xs font-semibold text-content-muted">Tampil di kamera mana</legend>
                 <div className="grid gap-2 sm:grid-cols-3">
                     {TARGET_OPTIONS.map((option) => (
                         <label
                             key={option.key}
-                            className="flex min-h-[40px] cursor-pointer items-start gap-2 rounded-card border border-edge bg-surface p-2 text-sm hover:border-edge-strong sm:min-h-0"
+                            className="flex min-h-11 cursor-pointer items-start gap-2 rounded-card border border-edge bg-surface p-2 text-sm hover:border-edge-strong"
                         >
                             <input
                                 type="radio"
@@ -772,7 +772,7 @@ export default function AffiliateOfferForm({ offer, partners, areas, cameras, sa
                 className="sm:max-w-xs"
             />
 
-            <label className="flex min-h-[40px] cursor-pointer items-center gap-2 text-sm text-content sm:min-h-0">
+            <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-content">
                 <input
                     type="checkbox"
                     checked={form.active}

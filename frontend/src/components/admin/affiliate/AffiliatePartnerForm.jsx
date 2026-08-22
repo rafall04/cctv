@@ -246,7 +246,7 @@ export default function AffiliatePartnerForm({ partner, saving, onSubmit, onCanc
                 </p>
             </div>
 
-            <label className="flex min-h-[40px] cursor-pointer items-center gap-2 text-sm text-content sm:min-h-0">
+            <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-content">
                 <input
                     type="checkbox"
                     checked={form.active}

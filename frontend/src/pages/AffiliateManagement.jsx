@@ -111,7 +111,7 @@ function PartnerRow({ partner, offerCount, onEdit, onDelete }) {
             <div className="flex flex-col gap-4 sm:flex-row">
                 <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="min-w-0 truncate text-base font-semibold text-content">{partner.store_name}</h3>
+                        <h3 title={partner.store_name} className="min-w-0 truncate text-base font-semibold text-content">{partner.store_name}</h3>
                         {partner.active
                             ? <Badge tone="live" dot>Aktif</Badge>
                             : <Badge tone="idle" dot>Nonaktif</Badge>}
@@ -198,7 +198,7 @@ function OfferStatsPanel({ offerId }) {
     const readCount = (key) => Number(state.totals?.[key]) || 0;
 
     return (
-        <div className="mt-3 rounded-card border border-edge bg-surface-sunken p-3">
+        <div id={`offer-stats-${offerId}`} className="mt-3 rounded-card border border-edge bg-surface-sunken p-3">
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 {[
                     { label: 'Tayang', value: readCount('impressions') },
@@ -286,7 +286,7 @@ function OfferRow({ offer, partner, areaNameById, onEdit, onDelete }) {
             <div className="flex flex-col gap-4 sm:flex-row">
                 <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="min-w-0 truncate text-base font-semibold text-content">{offer.product_title}</h3>
+                        <h3 title={offer.product_title} className="min-w-0 truncate text-base font-semibold text-content">{offer.product_title}</h3>
                         {offer.active
                             ? <Badge tone="live" dot>Aktif</Badge>
                             : <Badge tone="idle" dot>Nonaktif</Badge>}
@@ -320,6 +320,7 @@ function OfferRow({ offer, partner, areaNameById, onEdit, onDelete }) {
                         size="sm"
                         onClick={() => setShowStats((current) => !current)}
                         aria-expanded={showStats}
+                        aria-controls={`offer-stats-${offer.id}`}
                     >
                         {showStats ? 'Tutup statistik' : 'Statistik'}
                     </Button>
