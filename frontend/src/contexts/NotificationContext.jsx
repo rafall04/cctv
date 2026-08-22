@@ -21,25 +21,39 @@ const NotificationContext = createContext(null);
 
 // Notification type configurations
 export const NOTIFICATION_CONFIG = {
+    /*
+     * Theme-aware by construction. These four were hardcoded light ramps —
+     * `bg-emerald-50 border-emerald-200 text-emerald-800` and friends, with zero `dark:`
+     * variants — so every toast in dark mode was a pale card pasted onto a dark shell. It was
+     * the only piece of shared admin chrome that ignored the theme, and it is the piece an
+     * operator sees most often: all 20 admin pages raise notifications through here.
+     *
+     * The BODY text is `text-content`, not the status colour. A status colour on a 10% tint of
+     * itself is legible in one theme and marginal in the other, and this repo has already paid
+     * for a contrast pass once. The colour signal lives on the border and the icon, where it
+     * cannot cost readability. `status-*` are channel triplets in index.css, so slash-opacity
+     * genuinely compiles here — unlike `primary`, which holds a full colour and needs the
+     * pre-declared `primary-100` scale instead.
+     */
     success: {
         duration: 5000,
-        colorClass: 'bg-emerald-50 border-emerald-200 text-emerald-800',
-        iconColor: 'text-emerald-500',
+        colorClass: 'bg-status-live/10 border-status-live/30 text-content',
+        iconColor: 'text-status-live',
     },
     error: {
         duration: 8000,
-        colorClass: 'bg-red-50 border-red-200 text-red-800',
-        iconColor: 'text-red-500',
+        colorClass: 'bg-status-fault/10 border-status-fault/30 text-content',
+        iconColor: 'text-status-fault',
     },
     warning: {
         duration: 8000,
-        colorClass: 'bg-amber-50 border-amber-200 text-amber-800',
-        iconColor: 'text-amber-500',
+        colorClass: 'bg-status-warn/10 border-status-warn/30 text-content',
+        iconColor: 'text-status-warn',
     },
     info: {
         duration: 5000,
-        colorClass: 'bg-sky-50 border-sky-200 text-sky-800',
-        iconColor: 'text-sky-500',
+        colorClass: 'bg-primary-100 border-edge-strong text-content',
+        iconColor: 'text-primary',
     },
 };
 

@@ -32,6 +32,17 @@ vi.mock('../contexts/NotificationContext', () => ({
     useNotification: () => ({ showNotification }),
 }));
 
+/*
+ * Menghapus detektor dulu TIDAK bertanya apa-apa — satu-satunya aksi merusak di seluruh
+ * permukaan admin yang begitu, dan tombolnya duduk di antara "Simpan setelan" dan "Tutup".
+ * Mock ini bisa dikemudikan per-tes supaya jalur BATAL benar-benar teruji; mock yang selalu
+ * menjawab "ya" akan membuat konfirmasinya lolos tanpa pernah dijalankan.
+ */
+let jawabanKonfirmasi = true;
+vi.mock('../contexts/ConfirmContext', () => ({
+    useConfirm: () => () => Promise.resolve(jawabanKonfirmasi),
+}));
+
 const CONFIG = {
     camera_id: 15,
     aktif: true,
@@ -54,6 +65,7 @@ const CONFIG = {
 
 beforeEach(() => {
     vi.clearAllMocks();
+    jawabanKonfirmasi = true;
     vehicleCountAdminService.listCameras.mockResolvedValue({
         data: [{ ...CONFIG, nama_kamera: 'SOSRODILOGO' }],
     });
@@ -136,5 +148,35 @@ describe('VehicleCountSettings', () => {
         await waitFor(() => expect(showNotification).toHaveBeenCalledWith(
             expect.stringMatching(/minimal satu garis/i), 'error',
         ));
+    });
+
+    /*
+     * REGRESI (audit keseragaman admin, 2026-08-22): ini satu-satunya aksi merusak di seluruh
+     * permukaan admin yang langsung jalan tanpa bertanya. Tombolnya memakai KELAS_TOMBOL yang
+     * sama dengan dua tetangganya dan duduk persis di antara "Simpan setelan" dan "Tutup", jadi
+     * satu salah pencet membuang garis hitung, arah arus, model dan seluruh ambang yang sudah
+     * disetel manual — tanpa jalan kembali.
+     *
+     * Dua arah diuji dengan sengaja. Mock yang selalu menjawab "ya" akan membiarkan konfirmasinya
+     * dihapus lagi tanpa ada tes yang merah.
+     */
+    it('tidak menghapus apa pun kalau operator membatalkan', async () => {
+        jawabanKonfirmasi = false;
+        render(<VehicleCountSettings />);
+        fireEvent.click(await screen.findByText('SOSRODILOGO'));
+        fireEvent.click(await screen.findByText('Hapus dari daftar'));
+
+        await waitFor(() => expect(vehicleCountAdminService.getCamera).toHaveBeenCalled());
+        expect(vehicleCountAdminService.removeCamera).not.toHaveBeenCalled();
+    });
+
+    it('menghapus setelah operator menyetujui', async () => {
+        jawabanKonfirmasi = true;
+        vehicleCountAdminService.removeCamera.mockResolvedValue({ success: true });
+        render(<VehicleCountSettings />);
+        fireEvent.click(await screen.findByText('SOSRODILOGO'));
+        fireEvent.click(await screen.findByText('Hapus dari daftar'));
+
+        await waitFor(() => expect(vehicleCountAdminService.removeCamera).toHaveBeenCalled());
     });
 });

@@ -177,8 +177,8 @@ export function TelegramArchiveSettings() {
             title: 'Hapus rute ini?',
             message: `Rekaman untuk "${route.label || route.id}" berhenti dikirim ke Telegram. `
                 + 'File yang sudah terkirim tidak ikut terhapus.',
-            confirmText: 'Hapus',
-            variant: 'danger',
+            confirmLabel: 'Hapus',
+            tone: 'danger',
         });
         if (!ok) return;
         setBusyId(route.id);

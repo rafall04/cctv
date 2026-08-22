@@ -270,7 +270,7 @@ export default function VoucherManagement() {
     };
 
     const revokeCode = async (code) => {
-        if (!(await confirm({ title: `Cabut kode ${code.code}?`, body: 'Akses yang sedang berjalan dengan kode ini akan dihentikan.', confirmLabel: 'Cabut', tone: 'danger' }))) return;
+        if (!(await confirm({ title: `Cabut kode ${code.code}?`, message: 'Akses yang sedang berjalan dengan kode ini akan dihentikan.', confirmLabel: 'Cabut', tone: 'danger' }))) return;
         const res = await voucherAdminService.revokeCode(code.id);
         if (!res?.success) { notifyError('Gagal mencabut kode', res?.message); return; }
         notifySuccess('Kode dicabut');

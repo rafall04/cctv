@@ -476,7 +476,7 @@ export default function AreaManagement() {
                     </div>
                 ) : (
                     <div className="bg-surface border border-edge rounded-2xl">
-                        <NoAreasEmptyState onCreateArea={openAddModal} />
+                        <NoAreasEmptyState onAddArea={openAddModal} />
                     </div>
                 )
             ) : (

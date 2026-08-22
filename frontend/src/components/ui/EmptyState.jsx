@@ -135,7 +135,7 @@ export function EmptyState({
                     {action && (
                         <button
                             onClick={action}
-                            className="px-6 py-2.5 bg-sky-500 hover:bg-sky-600 text-white font-medium rounded-lg transition-colors shadow-sm"
+                            className="px-6 py-2.5 bg-primary hover:bg-primary-600 text-white font-medium rounded-lg transition-colors shadow-sm"
                         >
                             {actionLabel || 'Take Action'}
                         </button>

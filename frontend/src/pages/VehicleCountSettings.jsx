@@ -13,6 +13,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { useNotification } from '../contexts/NotificationContext';
+import { useConfirm } from '../contexts/ConfirmContext';
 import vehicleCountAdminService from '../services/vehicleCountAdminService';
 import CountingLineEditor from '../components/admin/vehicle-count/CountingLineEditor.jsx';
 import PanduanPanel from '../components/admin/PanduanPanel.jsx';
@@ -139,6 +140,7 @@ function Baris({ label, anak, keterangan }) {
 
 export default function VehicleCountSettings() {
     const { showNotification } = useNotification();
+    const confirm = useConfirm();
     const [terpasang, setTerpasang] = useState([]);
     const [tersedia, setTersedia] = useState([]);
     const [dipilih, setDipilih] = useState(null);
@@ -240,6 +242,20 @@ export default function VehicleCountSettings() {
 
     const hapus = async () => {
         if (!dipilih) return;
+
+        /*
+         * Satu-satunya aksi merusak di seluruh permukaan admin yang tidak bertanya. Tombolnya
+         * memakai KELAS_TOMBOL yang sama dengan dua tetangganya dan duduk di antara "Simpan
+         * setelan" dan "Tutup" — satu salah pencet membuang geometri garis hitung, arah aliran,
+         * model, imgsz, conf, fps dan sisanya, tanpa jalan kembali.
+         */
+        if (!(await confirm({
+            title: 'Hapus detektor kamera ini?',
+            message: 'Semua setelan detektornya — garis hitung, arah, model dan ambang — ikut hilang dan tidak bisa dikembalikan.',
+            confirmLabel: 'Hapus',
+            tone: 'danger',
+        }))) return;
+
         try {
             await vehicleCountAdminService.removeCamera(dipilih);
             setDipilih(null);
