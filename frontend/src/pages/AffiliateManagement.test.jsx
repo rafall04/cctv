@@ -357,3 +357,68 @@ describe('deleting goes through the app-wide confirm', () => {
         expect(h.deletePartner).not.toHaveBeenCalled();
     });
 });
+
+/*
+ * REGRESI, dilaporkan operator 2026-08-23: "pilih rekaman, klik simpan barang, tidak ada respon."
+ *
+ * Simpanannya BERHASIL setiap kali — barang id 3 di produksi memang berubah. Yang tidak ada
+ * umpan baliknya, dan itu dua cacat yang kebetulan saling menutupi:
+ *
+ *   1. Toast sukses dirender DI BELAKANG dialog (z mentah, dijaga di components/ui/adoption.test.jsx).
+ *   2. Dialognya tidak pernah menutup, jadi layarnya tampak persis sama sebelum dan sesudah.
+ *
+ * Salah satu saja masih menyisakan tanda: toast tanpa penutupan masih terlihat, penutupan tanpa
+ * toast masih terasa. Berdua, tombolnya jadi tidak bisa dibedakan dari tombol mati. Karena itu
+ * penutupan diuji di sini SEBAGAI PERILAKU, bukan lewat pemindaian: hanya render sungguhan yang
+ * membuktikan onDone benar-benar sampai melewati form.
+ */
+describe('menyimpan barang memberi tanda bahwa sesuatu terjadi', () => {
+    it('menutup dialog setelah simpanan berhasil', async () => {
+        h.updateOffer.mockResolvedValue({ success: true, data: OFFER });
+        const dialog = await openOfferEditor();
+
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Simpan barang' }));
+
+        await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    });
+
+    it('memunculkan notifikasi sukses, bukan diam', async () => {
+        h.updateOffer.mockResolvedValue({ success: true, data: OFFER });
+        const dialog = await openOfferEditor();
+
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Simpan barang' }));
+
+        await waitFor(() => expect(h.showNotification).toHaveBeenCalledWith(
+            expect.objectContaining({ type: 'success' }),
+        ));
+    });
+
+    /*
+     * Sisi lain yang sama pentingnya: kegagalan TIDAK boleh menutup. Menutup dialog pada
+     * penolakan akan membuang ketikan operator dan menyisakan pesan galat yang menunjuk formulir
+     * yang sudah tidak ada.
+     */
+    it('mempertahankan dialog beserta isiannya ketika halaman menolak', async () => {
+        h.updateOffer.mockResolvedValue({ success: false, message: 'URL toko tidak sah' });
+        const dialog = await openOfferEditor();
+
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Simpan barang' }));
+
+        await waitFor(() => expect(h.showNotification).toHaveBeenCalledWith(
+            expect.objectContaining({ type: 'error' }),
+        ));
+        expect(screen.queryByRole('dialog')).not.toBeNull();
+    });
+
+    /* Mitra sudah menutup sejak awal — dikunci supaya kedua editor tidak berpisah perilaku lagi. */
+    it('menutup dialog mitra dengan cara yang sama', async () => {
+        h.updatePartner.mockResolvedValue({ success: true, data: PARTNER });
+        render(<AffiliateManagement />);
+        fireEvent.click(await screen.findByRole('button', { name: 'Ubah' }));
+        const dialog = screen.getByRole('dialog');
+
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Simpan mitra' }));
+
+        await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    });
+});

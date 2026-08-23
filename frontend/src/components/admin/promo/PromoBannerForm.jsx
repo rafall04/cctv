@@ -128,7 +128,7 @@ function TargetPicker({ label, options, selected, onChange, searchable }) {
     );
 }
 
-export default function PromoBannerForm({ promo, areas, cameras, onSubmit, onUploaded }) {
+export default function PromoBannerForm({ promo, areas, cameras, onSubmit, onUploaded, onDone }) {
     const [form, setForm] = useState(EMPTY);
     const [uploading, setUploading] = useState(false);
     const [uploadInfo, setUploadInfo] = useState(null);
@@ -308,6 +308,17 @@ export default function PromoBannerForm({ promo, areas, cameras, onSubmit, onUpl
         // while it was still a draft.
         if (saved?.id && pendingFile) {
             await uploadFile(saved.id, pendingFile);
+        }
+
+        /*
+         * Menutup dialog adalah langkah TERAKHIR, setelah poster di atas terkirim — menutup lebih
+         * awal akan melepas form ini di tengah unggahan dan menelantarkan gambarnya.
+         *
+         * Dijaga oleh `saved`: kalau halaman menolak isian, ia sudah menjelaskan alasannya, jadi
+         * dialog tetap terbuka di atas ketikan operator alih-alih membuangnya.
+         */
+        if (saved) {
+            onDone?.();
         }
     };
 

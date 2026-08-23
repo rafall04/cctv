@@ -168,7 +168,7 @@ function imageFromOffer(row) {
     };
 }
 
-export default function AffiliateOfferForm({ offer, partners, areas, cameras, onSubmit, onUploaded }) {
+export default function AffiliateOfferForm({ offer, partners, areas, cameras, onSubmit, onUploaded, onDone }) {
     const [form, setForm] = useState(EMPTY);
     // '' is meaningful: no price shown. See the header — this must never become 0 on its own.
     const [priceDigits, setPriceDigits] = useState('');
@@ -473,6 +473,18 @@ export default function AffiliateOfferForm({ offer, partners, areas, cameras, on
         // Now that the offer has an id, flush the photo picked while it was still a draft.
         if (saved?.id && pendingFile) {
             await uploadFile(saved.id, pendingFile);
+        }
+
+        /*
+         * Closing is the LAST thing, not something the page does the moment the record lands. The
+         * photo above uploads only after the offer has an id; closing earlier would unmount this
+         * form mid-request and strand the picture with no way to tell.
+         *
+         * `saved` is falsy when the page refused the payload — it already explained why, so the
+         * dialog stays open on the operator's input instead of discarding it.
+         */
+        if (saved) {
+            onDone?.();
         }
     };
 

@@ -153,3 +153,60 @@ describe('guardrail: admin tables are wrapped by TableShell', () => {
         expect(migrated.length).toBeGreaterThan(0);
     });
 });
+
+/*
+ * REGRESI (dilaporkan operator, 2026-08-23): "pilih rekaman, klik simpan, tidak ada respon."
+ *
+ * Simpanannya BERHASIL — barang id 3 di produksi tercatat berubah pada detik itu. Yang hilang
+ * umpan baliknya, karena dua cacat bertumpuk:
+ *
+ *   1. ToastContainer memakai `z-[60]` mentah sementara Modal memakai `z-modal` (1400 vs 1300 di
+ *      tailwind.config.js). Tiernya pernah dinaikkan — komentar konfignya sendiri mencatat "modal
+ *      was 60 and toast was 70" — tapi wadah toast tidak ikut dipindahkan. Jadi SETIAP notifikasi
+ *      yang muncul saat dialog terbuka dirender DI BELAKANGNYA, tak terlihat.
+ *   2. Dialog barangnya tidak pernah menutup sesudah simpan.
+ *
+ * Bersama: tombol ditekan, data tersimpan, pesan suksesnya tak terlihat, dan dialognya tetap
+ * terbuka tampak persis sama. Sempurna sebagai "tidak terjadi apa-apa".
+ *
+ * Angka z mentah di mana pun di components/ui adalah cara cacat ini muncul, jadi itu yang dijaga —
+ * bukan sekadar satu berkas yang kebetulan salah.
+ */
+describe('guardrail: lapisan z memakai tier bernama, bukan angka mentah', () => {
+    const UI_FILES = walk(path.join(SRC_ROOT, 'components/ui')).map(rel);
+
+    it('tidak ada komponen ui yang memakai z-[angka] mentah', () => {
+        /* ConfirmDialog sengaja dikecualikan: nilainya memang harus mengalahkan popup video
+         * full-screen, dan alasannya tertulis di berkasnya. Kalau ia dipindah ke `z-dialog`,
+         * keluarkan dari sini — jangan tambahkan entri baru untuk membungkam kegagalan. */
+        const ALLOWED = ['components/ui/ConfirmDialog.jsx'];
+
+        const offenders = UI_FILES
+            .filter((r) => !ALLOWED.includes(r))
+            .filter((r) => /className=[^>]*\bz-\[\d+\]/.test(stripComments(read(r))));
+
+        expect(
+            offenders,
+            `Pakai tier bernama (z-modal, z-toast, …) bukan angka mentah: ${offenders.join(', ')}`,
+        ).toEqual([]);
+    });
+
+    it('toast berada DI ATAS modal, kalau tidak umpan baliknya tak terlihat', () => {
+        const toast = read('components/ui/ToastContainer.jsx');
+        const modal = read('components/ui/Modal.jsx');
+
+        expect(toast).toMatch(/\bz-toast\b/);
+        expect(modal).toMatch(/\bz-modal\b/);
+
+        const config = fs.readFileSync(path.join(SRC_ROOT, '..', 'tailwind.config.js'), 'utf8');
+        /* String.raw, karena di template literal biasa `\s` luruh jadi `s` — polanya jadi
+         * `modal:s*'(d+)'`, tak pernah cocok, dan kedua tier terbaca NaN. NaN > NaN memang gagal,
+         * tapi karena alasan yang salah: pemeriksaannya jadi tak bisa lulus, bukan tak bisa bohong. */
+        const tier = (name) => Number(config.match(new RegExp(String.raw`${name}:\s*'(\d+)'`))?.[1]);
+
+        /* Kalau nama tiernya diganti, ini yang jatuh lebih dulu — bukan perbandingan NaN yang bisu. */
+        expect(Number.isFinite(tier('toast')), 'zIndex.toast tak terbaca dari tailwind.config.js').toBe(true);
+        expect(Number.isFinite(tier('modal')), 'zIndex.modal tak terbaca dari tailwind.config.js').toBe(true);
+        expect(tier('toast')).toBeGreaterThan(tier('modal'));
+    });
+});

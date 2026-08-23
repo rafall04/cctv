@@ -218,3 +218,40 @@ describe('stats readout', () => {
         expect(screen.queryByText(/NaN/)).toBeNull();
     });
 });
+
+/*
+ * REGRESI SAUDARA. Cacat "tidak ada respon" dilaporkan di halaman Toko Rekanan, tapi form barang
+ * di sana adalah SALINAN dari PromoBannerForm — termasuk salinan bagian yang menahan dialog tetap
+ * terbuka sesudah simpan. Jadi halaman ini menyandang cacat yang sama, hanya belum dilaporkan.
+ *
+ * Menguji keduanya sengaja: dua form yang berbagi asal usul berhak berbagi jaring pengaman, kalau
+ * tidak perbaikan di satu tempat akan lepas lagi lewat tempat satunya.
+ */
+describe('menyimpan promo memberi tanda bahwa sesuatu terjadi', () => {
+    const openExisting = async () => {
+        render(<PromoBannerManagement />);
+        fireEvent.click(await screen.findByRole('button', { name: 'Ubah' }));
+        return screen.getByRole('dialog');
+    };
+
+    it('menutup dialog setelah simpanan berhasil', async () => {
+        h.updatePromoBanner.mockResolvedValue({ success: true, data: PROMO });
+        const dialog = await openExisting();
+
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Simpan' }));
+
+        await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    });
+
+    it('mempertahankan dialog beserta isiannya ketika halaman menolak', async () => {
+        h.updatePromoBanner.mockResolvedValue({ success: false, message: 'judul kosong' });
+        const dialog = await openExisting();
+
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Simpan' }));
+
+        await waitFor(() => expect(h.showNotification).toHaveBeenCalledWith(
+            expect.objectContaining({ type: 'error' }),
+        ));
+        expect(screen.queryByRole('dialog')).not.toBeNull();
+    });
+});

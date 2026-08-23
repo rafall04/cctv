@@ -231,8 +231,11 @@ export default function PromoBannerManagement() {
         });
 
         await loadPromos();
-        // Stay on the saved banner so the operator keeps editing it — and so the form
-        // can attach a poster that was picked before this promo had an id.
+        /*
+         * Menahan promo yang baru tersimpan — BUKAN menutup dialog di sini. Form masih perlu id
+         * ini untuk melepas poster yang dipilih saat promo belum punya id; menutup sekarang akan
+         * melepas form di tengah unggahan. Form yang memanggil onDone setelah unggahannya beres.
+         */
         setEditing(result.data || null);
         // Returned so the form knows the new id and can flush a pending upload.
         return result.data || null;
@@ -326,6 +329,7 @@ export default function PromoBannerManagement() {
                         cameras={cameras}
                         onSubmit={handleSubmit}
                         onUploaded={loadPromos}
+                        onDone={() => setEditing(null)}
                     />
                 </Modal>
             )}

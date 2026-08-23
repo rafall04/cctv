@@ -524,6 +524,12 @@ export default function AffiliateManagement() {
         }
         showNotification({ type: 'success', title: editingOffer?.id ? 'Barang diperbarui' : 'Barang dibuat' });
         await reloadOffers();
+        /*
+         * The dialog is NOT closed here. The form still has work to do after this resolves — a
+         * photo picked while the offer was a draft can only be uploaded once the offer has an id,
+         * and unmounting mid-upload would strand it. The form calls onDone when it is genuinely
+         * finished; that is what closes the dialog.
+         */
         setEditingOffer(result.data || null);
         return result.data || null;
     };
@@ -713,6 +719,7 @@ export default function AffiliateManagement() {
                         areas={areas}
                         cameras={cameras}
                         onSubmit={handleOfferSubmit}
+                        onDone={() => setEditingOffer(null)}
                         // A photo upload (or removal) writes the offer row without going through
                         // onSubmit, so the list would keep showing the old thumbnail until
                         // something else refetched it.
