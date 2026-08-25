@@ -21,7 +21,7 @@
  */
 
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
-import { startLivePictureWatch } from './livePictureWatch.js';
+import { hasPicture, startLivePictureWatch } from './livePictureWatch.js';
 
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => vi.useRealTimers());
@@ -144,5 +144,72 @@ describe('watchdog gambar-hidup: sesudah vonis', () => {
         });
 
         expect(onNoPicture).not.toHaveBeenCalled();
+    });
+});
+/*
+ * DILAPORKAN PEMILIK 2026-08-25: tiga kamera hitam pekat di sebagian perangkat, dengan lencana
+ * LIVE menyala dan TANPA pesan galat apa pun. Ketiganya HEVC (hvc1), dua di antaranya tanpa trek
+ * audio.
+ *
+ * Akar masalahnya ada di predikat vonis. hasPicture() dulu hanya memeriksa videoWidth/Height,
+ * dan komentarnya mengklaim "Dimensions are only known once the decoder has actually described
+ * a frame". Klaim itu SALAH untuk HLS/MSE: dimensi berasal dari metadata yang di-parse hls.js di
+ * JavaScript, bukan dari dekoder. Diukur langsung di browser pada stream produksi 1444:
+ * loadedmetadata, loadeddata, canplay, dan playing SEMUANYA menyala dengan videoWidth=2304
+ * sementara totalVideoFrames masih 0; bingkai pertama baru datang 3,6 detik kemudian.
+ *
+ * Jadi perangkat yang menerima byte HEVC lalu gagal men-decode-nya memenuhi syarat vonis dengan
+ * sempurna — persis kegagalan yang modul ini ditulis untuk mencegah. Dan vonis itu bukan label
+ * salah yang terkoreksi belakangan: di VideoPopup ia melucuti LIMA penangan galat sekaligus,
+ * yang semuanya diawali `if (... || isLive) return`.
+ *
+ * Penjaga sesudah-vonis pun tak bisa menyelamatkan: ia menuntut currentTime MAJU, sedangkan
+ * dua dari tiga kamera itu tidak punya audio, jadi tidak ada apa pun yang menggerakkan jam saat
+ * video mandek. Hasilnya persegi hitam permanen tanpa satu pun pesan.
+ */
+describe('vonis hidup menuntut bingkai, bukan sekadar dimensi', () => {
+    it('menolak menyebut hidup saat dimensi ADA tetapi nol bingkai ter-decode', () => {
+        const video = videoTiruan();
+        video._frames = 0;
+
+        expect(hasPicture(video)).toBe(false);
+    });
+
+    it('menyebut hidup begitu satu bingkai benar-benar ter-decode', () => {
+        const video = videoTiruan();
+        video._frames = 1;
+
+        expect(hasPicture(video)).toBe(true);
+    });
+
+    /*
+     * Safari pada sebagian versi tidak mengekspos penghitung mana pun. Di sana dimensi adalah
+     * satu-satunya sinyal yang kita punya, dan memperlakukan "tidak tahu" sebagai "nol bingkai"
+     * akan mematikan stream yang jalan normal.
+     */
+    it('kembali ke dimensi saja bila browser tidak melaporkan bingkai', () => {
+        const video = videoTiruan();
+        delete video.getVideoPlaybackQuality;
+
+        expect(hasPicture(video)).toBe(true);
+    });
+
+    it('tidak memvonis hidup, dan akhirnya melapor gagal, untuk stream yang tak pernah men-decode', () => {
+        const video = videoTiruan();
+        const onPicture = vi.fn();
+        const onNoPicture = vi.fn();
+        video._frames = 0;
+
+        startLivePictureWatch(video, { onPicture, onNoPicture });
+
+        // Byte mengalir, dimensi diketahui, tapi dekoder tidak menghasilkan apa pun.
+        majukan(10);
+        expect(onPicture).not.toHaveBeenCalled();
+        expect(onNoPicture).not.toHaveBeenCalled();
+
+        // Sesudah tenggat noPictureAfterMs, pengunjung HARUS diberi tahu — bukan dibiarkan
+        // menatap persegi hitam yang mengaku LIVE.
+        majukan(24);
+        expect(onNoPicture).toHaveBeenCalledTimes(1);
     });
 });

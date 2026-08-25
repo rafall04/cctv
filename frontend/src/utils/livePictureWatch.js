@@ -21,9 +21,31 @@
  * So the verdict now needs a picture, and the watch does not end at the verdict.
  */
 
-/** Dimensions are only known once the decoder has actually described a frame. */
+/**
+ * A frame has actually been DECODED — not merely described.
+ *
+ * This used to be dimensions alone, on the belief that "dimensions are only known once the
+ * decoder has described a frame". That belief is wrong for HLS/MSE: hls.js parses the track
+ * metadata in JavaScript and hands it to the media element, so videoWidth is populated with no
+ * decoder involvement at all. Measured against production stream 1444 in a real browser:
+ * loadedmetadata, loadeddata, canplay AND playing all fired with videoWidth=2304 while
+ * totalVideoFrames was still 0; the first frame arrived 3.6s later.
+ *
+ * So a device that accepts HEVC bytes and then fails to decode them satisfied this test
+ * perfectly — the exact failure this module was written to prevent, committed by the module
+ * itself. Three public cameras were reported as a permanently black rectangle wearing a LIVE
+ * badge, with no error, because declaring live disarms all five error handlers in VideoPopup.
+ *
+ * Dimensions are still required: they are what proves a VIDEO track exists at all.
+ */
 export function hasPicture(video) {
-    return Boolean(video) && video.videoWidth > 0 && video.videoHeight > 0;
+    if (!video || !(video.videoWidth > 0) || !(video.videoHeight > 0)) {
+        return false;
+    }
+    const frames = countDecodedFrames(video);
+    // null means the browser refuses to say (some Safari builds). Dimensions are the only
+    // signal available there, and treating "unknown" as "none" would kill streams that play.
+    return frames === null || frames > 0;
 }
 
 /**
