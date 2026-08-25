@@ -202,6 +202,37 @@ server {
     root APP_DIR_PLACEHOLDER/frontend/dist;
     index index.html;
 
+    # ---------------------------------------------------------------
+    # KOMPRESI
+    # nginx.conf Ubuntu memasang `gzip on` tetapi gzip_types-nya dikomentari, dan
+    # bawaan nginx hanya text/html — jadi JS/CSS dikirim MENTAH. Terukur di produksi
+    # 2026-08-25: App.js 278 KB mentah lawan 82 KB ter-gzip, CSS 131 KB lawan 20 KB.
+    # Di belakang CDN hal ini tersamarkan, tetapi setiap cache miss tetap menarik versi
+    # mentah — dan pemasangan TANPA CDN mengirim mentah ke SETIAP pengunjung.
+    #
+    # text/html sengaja TIDAK didaftarkan: nginx selalu mengompresinya, dan menyebutnya
+    # di sini memicu peringatan "duplicate MIME type".
+    # gzip_vary wajib di belakang CDN supaya cache dikunci per Accept-Encoding.
+    # Segmen video (.ts) dan playlist TIDAK didaftarkan: sudah terkompresi, mengulanginya
+    # hanya membakar CPU tanpa mengecilkan apa pun.
+    # ---------------------------------------------------------------
+    gzip on;
+    gzip_vary on;
+    gzip_proxied any;
+    gzip_comp_level 6;
+    gzip_min_length 1024;
+    gzip_types
+        text/plain
+        text/css
+        text/javascript
+        application/javascript
+        application/json
+        application/manifest+json
+        application/xml
+        image/svg+xml;
+    # Pakai berkas .gz siap-pakai bila ada (nol CPU per permintaan); aman bila tidak ada.
+    gzip_static on;
+
     client_max_body_size 10M;
 
     # Security: Block sensitive files
@@ -216,6 +247,17 @@ server {
     add_header X-XSS-Protection "1; mode=block" always;
 
     # Service Worker
+    # `.webmanifest` tidak ada di mime.types bawaan nginx, jadi ia keluar sebagai
+    # application/octet-stream: tidak ikut gzip, DAN tipenya salah menurut spesifikasi PWA.
+    #
+    # SENGAJA memakai `default_type` pada satu location, BUKAN blok `types { }` di tingkat
+    # server: `types` MENGGANTIKAN seluruh tabel MIME yang diwarisi, sehingga JS, CSS, dan
+    # gambar ikut berubah jadi application/octet-stream.
+    location = /site.webmanifest {
+        default_type application/manifest+json;
+        expires 1d;
+    }
+
     location = /sw.js {
         add_header Cache-Control "no-store, no-cache, must-revalidate";
         try_files $uri =404;
