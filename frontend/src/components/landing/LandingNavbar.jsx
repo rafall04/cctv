@@ -100,12 +100,26 @@ export default function Navbar({ branding, layoutMode, onLayoutToggle }) {
                         {/* The sales page is useless if nothing points at it. Kept to one short word
                             and flex-none so Android font-scaling cannot widen this row past the
                             viewport — the failure mode the mobile-viewport rules were written for. */}
-                        <Link
-                            to="/sewa"
+                        {/*
+                          * <a>, BUKAN <Link>. Halaman jualan adalah HTML statis di
+                          * frontend/public/sewa/ yang dilayani nginx lewat try_files $uri/ —
+                          * App.jsx:147 mencatat ketiadaan rutenya memang disengaja. Tapi <Link>
+                          * adalah navigasi sisi-klien: react-router menanganinya sendiri, tidak
+                          * menemukan rute, lalu catch-all di App.jsx:455 memantulkannya ke "/".
+                          * Tombolnya kelihatan berfungsi dan tidak pernah membuka apa pun, jadi
+                          * satu-satunya jalur penjualan di permukaan publik mati diam-diam.
+                          * <a> memaksa muat dokumen penuh, dan nginx yang menjawab.
+                          *
+                          * Garis miring di akhir WAJIB: "/sewa" memicu 301 nginx ke direktori,
+                          * dan pengalihan itu membocorkan port internal (:800) sehingga
+                          * menggantung dari luar. Menunjuk langsung ke bentuk final.
+                          */}
+                        <a
+                            href="/sewa/"
                             className="flex-none rounded-control border border-edge bg-surface px-2.5 py-2 text-xs font-medium text-content transition-colors hover:border-edge-strong hover:bg-surface-raised"
                         >
                             Sewa
-                        </Link>
+                        </a>
                         <LayoutModeToggle
                             layoutMode={layoutMode}
                             onChange={handleLayoutChange}

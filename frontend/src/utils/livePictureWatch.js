@@ -69,6 +69,20 @@ export function startLivePictureWatch(video, {
     // phone decoding a 2560x1440 stream can legitimately take several seconds to show frame one.
     // Firing early would turn a slow stream into a false "unsupported" verdict.
     noPictureAfterMs = 15000,
+    /*
+     * Berapa lama waktu boleh maju TANPA satu pun bingkai baru sebelum dekodernya divonis mati.
+     *
+     * Ini dulu nol: satu tick sepi langsung memvonis. Pada tick 500 ms itu berarti sumber apa pun
+     * di bawah ~4 fps rutin menghasilkan tick tanpa bingkai baru dan divonis "codec tidak
+     * didukung" padahal gambarnya jalan. Tidak terlihat selama watchdog ini hanya menjaga ubin
+     * Multi-View; menjadi berbahaya begitu ia memegang pemutar utama, karena 182 kamera publik
+     * memakai origin HLS pihak ketiga yang laju bingkainya di luar kendali kita.
+     *
+     * Tiga detik mentoleransi sumber selambat ~0,33 fps namun tetap menangkap dekoder yang
+     * benar-benar mati dalam tiga detik — bingkainya membeku SELAMANYA, jadi menunggu sebentar
+     * tidak menghilangkan bukti, hanya menghindari menuduh yang lambat.
+     */
+    stalledGiveUpMs = 3000,
 } = {}) {
     if (!video) return () => {};
 
@@ -77,6 +91,7 @@ export function startLivePictureWatch(video, {
     let live = false;
     let framesAtVerdict = null;
     let stillTimeAdvancing = null;
+    let stalledSince = null;
 
     const stop = () => {
         if (timer !== null) {
@@ -115,7 +130,8 @@ export function startLivePictureWatch(video, {
         }
 
         // Past the verdict. The stream said it was live; make it keep proving it. A decoder that
-        // dies mid-stream leaves currentTime advancing while the frame counter stands still —
+        // dies mid-stream leaves currentTime advancing while the frame counter stands still,
+        // and it stays that way — so this waits stalledGiveUpMs before believing it.
         // the one shape that produces a black rectangle nothing else in the app would question.
         const frames = countDecodedFrames(video);
         const advanced = video.currentTime > stillTimeAdvancing;
@@ -124,9 +140,12 @@ export function startLivePictureWatch(video, {
         if (frames === null || framesAtVerdict === null) return;
         if (frames > framesAtVerdict) {
             framesAtVerdict = frames;
+            stalledSince = null;
             return;
         }
-        giveUp();
+        // Sepi. Catat KAPAN mulai sepi, lalu beri waktu — lihat stalledGiveUpMs.
+        if (stalledSince === null) stalledSince = Date.now();
+        if (Date.now() - stalledSince >= stalledGiveUpMs) giveUp();
     };
 
     timer = setInterval(tick, intervalMs);

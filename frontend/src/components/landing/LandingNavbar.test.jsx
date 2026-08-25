@@ -87,4 +87,40 @@ describe('LandingNavbar', () => {
         cameraContextState.cameras = [{ id: 1, status: 'active', is_online: 1 }];
         cameraContextState.dataUnavailable = false;
     });
+    /*
+     * Halaman jualan adalah HTML STATIS (frontend/public/sewa/), dan App.jsx:147 mencatat bahwa
+     * ketiadaan rute SPA untuknya memang disengaja. Konsekuensinya tombol ini TIDAK boleh berupa
+     * <Link>: navigasi sisi-klien tidak menemukan rute, lalu catch-all App.jsx:455 memantulkannya
+     * ke "/". Tombolnya tampak berfungsi dan tidak pernah membuka apa pun — satu-satunya jalur
+     * penjualan di permukaan publik mati tanpa suara.
+     *
+     * Diuji lewat DOM, bukan lewat nama komponen, karena yang menentukan memang atribut yang
+     * dihasilkan: <Link to="/x"> juga merender <a href="/x">, yang membedakannya adalah react-
+     * router memasang penangan klik di atasnya. Karena itu yang dikunci adalah bentuk href-nya —
+     * termasuk garis miring akhir, sebab "/sewa" memicu 301 nginx yang membocorkan port internal
+     * (:800) dan menggantung dari luar.
+     */
+    it('membuka halaman jualan lewat navigasi dokumen penuh, bukan rute SPA', () => {
+        render(
+            <MemoryRouter>
+                <LandingNavbar branding={branding} layoutMode="full" onLayoutToggle={vi.fn()} />
+            </MemoryRouter>
+        );
+
+        const sewa = screen.getByRole('link', { name: 'Sewa' });
+        expect(sewa.getAttribute('href')).toBe('/sewa/');
+
+        /*
+         * Href saja TIDAK cukup, dan itu jerat yang nyaris saya tinggalkan di sini: <Link
+         * to="/sewa/"> merender <a href="/sewa/"> yang identik, jadi asersi href di atas akan
+         * tetap hijau sementara bug-nya kembali utuh.
+         *
+         * Yang benar-benar membedakan adalah PERILAKU KLIK: react-router memanggil
+         * preventDefault() pada navigasi internal supaya browser tidak memuat ulang dokumen.
+         * Sebuah <a> polos membiarkannya. Jadi itulah yang diperiksa.
+         */
+        const klik = new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 });
+        sewa.dispatchEvent(klik);
+        expect(klik.defaultPrevented).toBe(false);
+    });
 });
