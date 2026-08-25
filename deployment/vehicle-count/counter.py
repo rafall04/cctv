@@ -132,6 +132,65 @@ def dalam_ruas(p0, p1, s0, s1, a, b):
     return 0.0 <= tt <= 1.0
 
 
+
+def muat_state(stats_path, ctr, nama_arah):
+    """Lanjutkan hitungan dari state terakhir; kembalikan epoch 'mulai' atau None.
+
+    Tanpa ini, tiap restart mengulang dari nol — dan halaman publik yang menampilkan
+    "sejak <tanggal>" ikut kehilangan seluruh riwayatnya. Itu membuat restart jadi mahal,
+    sehingga proses dibiarkan berjalan berminggu-minggu sampai melambat sendiri (terukur
+    2,2 fps setelah 11,7 hari, sementara proses baru dengan model yang sama 12,6 fps).
+    Resume membuat restart murah, dan proses yang bisa di-restart murah bisa dijaga sehat.
+
+    Dibaca dari `total_mentah` yang berkunci '+'/'-'. State lama tidak punya kunci itu, jadi
+    ada cadangan yang memetakan lewat NAMA arah — dipakai sekali saat naik dari versi lama.
+    Kalau namanya sudah diganti sejak state ditulis, hitungan itu tidak bisa diklaim milik
+    arah mana pun, dan lebih baik mulai dari nol daripada menaruhnya di arah yang salah.
+    """
+    try:
+        with open(stats_path, encoding='utf-8') as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return None
+
+    mentah = data.get('total_mentah')
+    if isinstance(mentah, dict):
+        sumber = {a: mentah.get(a) or {} for a in ('+', '-')}
+    else:
+        # State lama: hanya berkunci nama tampilan.
+        arah = data.get('arah') or {}
+        sumber = {}
+        for a in ('+', '-'):
+            nama = nama_arah.get(a)
+            if nama not in arah:
+                print(f'[state] arah "{nama}" tidak ada di state lama - mulai dari nol', flush=True)
+                return None
+            sumber[a] = arah[nama] or {}
+
+    dipulihkan = 0
+    for a in ('+', '-'):
+        for jenis, jml in (sumber.get(a) or {}).items():
+            try:
+                jml = int(jml)
+            except (TypeError, ValueError):
+                continue
+            if jml > 0:
+                ctr.total[a][jenis] = jml
+                dipulihkan += jml
+
+    mulai = None
+    teks = str(data.get('mulai') or '').replace(' WIB', '').strip()
+    if teks:
+        try:
+            mulai = datetime.strptime(teks, '%Y-%m-%d %H:%M:%S').replace(tzinfo=WIB).timestamp()
+        except ValueError:
+            mulai = None
+
+    print(f'[state] dilanjutkan: {dipulihkan} kendaraan'
+          + (f", sejak {teks}" if teks else ''), flush=True)
+    return mulai
+
+
 class Penghitung:
     def __init__(self, cam_id, nama_arah):
         self.nama_arah = nama_arah
@@ -236,7 +295,7 @@ def main():
           f'{len(setel.garis_px)} garis | kelas {VEH}', flush=True)
 
     jejak = {}
-    mulai = time.time()
+    mulai = muat_state(stats_path, ctr, setel.nama_arah) or time.time()
     n = 0
     t_fps = time.time()
     fps_ukur = 0.0
@@ -390,6 +449,9 @@ def main():
                 'jumlah_garis': len(garis),
                 'arah': {setel.nama_arah[a]: {j: ctr.total[a][j] for j in URUT}
                          for a in ('+', '-')},
+                # Berkunci '+'/'-' supaya resume tidak bergantung pada nama arah,
+                # yang bisa diganti operator kapan saja dari panel.
+                'total_mentah': {a: dict(ctr.total[a]) for a in ('+', '-')},
                 'total_jenis': {j: ctr.total['+'][j] + ctr.total['-'][j] for j in URUT},
                 'total': sum(ctr.total['+'].values()) + sum(ctr.total['-'].values()),
                 'total_10_menit': sum(total10.values()),
