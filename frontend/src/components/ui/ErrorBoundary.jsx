@@ -98,15 +98,24 @@ class ErrorBoundary extends Component {
 
                             {/* Content */}
                             <div className="p-6 space-y-4">
-                                {/* Error Message */}
-                                <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded-xl p-4">
-                                    <p className="text-sm font-semibold text-red-800 dark:text-red-400 mb-2">
-                                        Error Message:
+                                {/* Error Message — the raw text is a developer artefact (minified
+                                    React codes, asset URLs), so only DEV sees it. This boundary is
+                                    the public fallback too: PublicPageRoute renders it as-is. */}
+                                {import.meta.env.DEV ? (
+                                    <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded-xl p-4">
+                                        <p className="text-sm font-semibold text-red-800 dark:text-red-400 mb-2">
+                                            Error Message (Development):
+                                        </p>
+                                        <p className="text-sm text-red-600 dark:text-red-300 font-mono">
+                                            {this.state.error?.toString() || 'Unknown error'}
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <p className="text-sm text-content-muted">
+                                        Halaman ini gagal ditampilkan. Penyebabnya ada di sisi kami, bukan di
+                                        perangkat Anda, dan data Anda tidak terpengaruh. Coba lagi sebentar lagi.
                                     </p>
-                                    <p className="text-sm text-red-600 dark:text-red-300 font-mono">
-                                        {this.state.error?.toString() || 'Unknown error'}
-                                    </p>
-                                </div>
+                                )}
 
                                 {/* Error Details (Development only) */}
                                 {import.meta.env.DEV && this.state.errorInfo && (

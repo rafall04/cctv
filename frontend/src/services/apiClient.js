@@ -270,15 +270,17 @@ apiClient.interceptors.response.use(
         // Handle timeout errors
         // Requirements: 10.3
         if (isTimeoutError(error)) {
+            // The retry offer is part of the SAME announcement, so it lives under the same flag:
+            // a caller that asked for silence (every public surface does) used to get this toast
+            // anyway, with a button that re-hits a server already known to be slow.
             if (!shouldSuppressGlobalErrorNotification(originalRequest)) {
-                showErrorNotification('Request Timeout', ERROR_MESSAGES.TIMEOUT_ERROR);
-            }
+                showErrorNotification('Permintaan Melebihi Batas Waktu', ERROR_MESSAGES.TIMEOUT_ERROR);
 
-            // Offer retry option if callback is set
-            if (timeoutRetryCallback && originalRequest && !originalRequest._timeoutRetry) {
-                originalRequest._timeoutRetry = true;
-                const retryFn = () => apiClient(originalRequest);
-                timeoutRetryCallback(retryFn, originalRequest);
+                if (timeoutRetryCallback && originalRequest && !originalRequest._timeoutRetry) {
+                    originalRequest._timeoutRetry = true;
+                    const retryFn = () => apiClient(originalRequest);
+                    timeoutRetryCallback(retryFn, originalRequest);
+                }
             }
 
             // Attach parsed error info
@@ -308,7 +310,7 @@ apiClient.interceptors.response.use(
             }
 
             if (!shouldSuppressGlobalErrorNotification(originalRequest)) {
-                showErrorNotification('Connection Error', ERROR_MESSAGES.NETWORK_ERROR);
+                showErrorNotification('Koneksi Bermasalah', ERROR_MESSAGES.NETWORK_ERROR);
             }
             error.parsedError = parsedError;
             return Promise.reject(error);

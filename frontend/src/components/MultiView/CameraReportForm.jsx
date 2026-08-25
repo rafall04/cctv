@@ -131,7 +131,7 @@ export default function CameraReportForm({ cameraId, open = false, onClose }) {
                         type="datetime-local"
                         value={occurredAt}
                         onChange={(event) => setOccurredAt(event.target.value)}
-                        className="mt-1 w-full rounded-control border border-edge bg-surface px-2 py-1.5 text-xs text-content"
+                        className="mt-1 min-h-11 w-full rounded-control border border-edge bg-surface px-2 py-1.5 text-base text-content sm:min-h-0 sm:text-sm"
                     />
                 </label>
             )}
@@ -143,7 +143,7 @@ export default function CameraReportForm({ cameraId, open = false, onClose }) {
                     maxLength={500}
                     value={message}
                     onChange={(event) => setMessage(event.target.value)}
-                    className="mt-1 w-full rounded-control border border-edge bg-surface px-2 py-1.5 text-xs text-content"
+                    className="mt-1 w-full rounded-control border border-edge bg-surface px-2 py-1.5 text-base text-content sm:text-sm"
                 />
             </label>
 

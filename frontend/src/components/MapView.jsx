@@ -72,55 +72,40 @@ const createUserLocationIcon = () => {
     return icon;
 };
 
-// CCTV Marker - dengan support status (active, maintenance, tunnel, offline)
-const createCameraIcon = (status = 'active', isTunnel = false, isOnline = true, availabilityState = 'online') => {
-    // Status priority: maintenance > offline > tunnel > stable
-    let cacheKey;
-    if (status === 'maintenance') {
-        cacheKey = 'maintenance';
-    } else if (!isOnline) {
-        cacheKey = 'offline';
-    } else if (availabilityState === 'degraded') {
-        cacheKey = 'degraded';
-    } else if (isTunnel) {
-        cacheKey = 'tunnel';
-    } else {
-        cacheKey = 'stable';
+// CCTV Marker - tiap keadaan punya glyph + label sendiri; warna saja tak terbaca mata buta warna.
+const CCTV_GLYPH = '<path d="M18 10.48V6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-4.48l4 3.98v-11l-4 3.98z"/>';
+const CAMERA_MARKER_STATES = {
+    maintenance: {
+        label: 'perbaikan', color: '#ef4444', darkColor: '#dc2626',
+        glyph: '<path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" stroke-width="2" stroke="white" fill="none"/>',
+    },
+    offline: {
+        label: 'offline', color: '#6b7280', darkColor: '#4b5563',
+        glyph: '<path d="M6 6l12 12M6 18L18 6" stroke="white" stroke-width="3" stroke-linecap="round" fill="none"/>',
+    },
+    degraded: {
+        // Segitiga seru: beda BENTUK dari kamera sehat, bukan cuma beda rona amber vs oranye.
+        label: 'tidak stabil', color: '#f59e0b', darkColor: '#d97706',
+        glyph: '<path d="M12 3.6 1.9 21h20.2L12 3.6z" fill="none" stroke="white" stroke-width="2.2" stroke-linejoin="round"/><path d="M12 10v4.2" stroke="white" stroke-width="2.2" stroke-linecap="round"/><circle cx="12" cy="18" r="1.3"/>',
+    },
+    tunnel: { label: 'aktif', color: '#f97316', darkColor: '#ea580c', glyph: CCTV_GLYPH },
+    stable: { label: 'aktif', color: '#10b981', darkColor: '#059669', glyph: CCTV_GLYPH },
+};
+
+// Prioritas keadaan: maintenance > offline > degraded > tunnel > stable.
+const getCameraMarkerKey = (camera = {}) => {
+    if (camera.status === 'maintenance') return 'maintenance';
+    const state = getCameraAvailabilityState(camera);
+    if (state === 'offline' || state === 'degraded') return state;
+    return (camera.is_tunnel === 1 || camera.is_tunnel === true) ? 'tunnel' : 'stable';
+};
+
+const createCameraIcon = (stateKey = 'stable') => {
+    if (iconCache.has(stateKey)) {
+        return iconCache.get(stateKey);
     }
 
-    if (iconCache.has(cacheKey)) {
-        return iconCache.get(cacheKey);
-    }
-
-    let color, darkColor;
-    if (status === 'maintenance') {
-        color = '#ef4444'; // merah
-        darkColor = '#dc2626';
-    } else if (!isOnline) {
-        color = '#6b7280'; // abu-abu (offline)
-        darkColor = '#4b5563';
-    } else if (availabilityState === 'degraded') {
-        color = '#f59e0b';
-        darkColor = '#d97706';
-    } else if (isTunnel) {
-        color = '#f97316'; // orange
-        darkColor = '#ea580c';
-    } else {
-        color = '#10b981'; // hijau
-        darkColor = '#059669';
-    }
-
-    let iconSvg;
-    if (status === 'maintenance') {
-        // Wrench icon
-        iconSvg = '<path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" stroke-width="2" stroke="white" fill="none"/>';
-    } else if (!isOnline) {
-        // X icon
-        iconSvg = '<path d="M6 6l12 12M6 18L18 6" stroke="white" stroke-width="3" stroke-linecap="round" fill="none"/>';
-    } else {
-        // Simple CCTV icon
-        iconSvg = '<path d="M18 10.48V6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-4.48l4 3.98v-11l-4 3.98z"/>';
-    }
+    const { color, darkColor, glyph } = CAMERA_MARKER_STATES[stateKey] || CAMERA_MARKER_STATES.stable;
 
     const icon = L.divIcon({
         className: 'cctv-marker',
@@ -144,7 +129,7 @@ const createCameraIcon = (status = 'active', isTunnel = false, isOnline = true, 
                     justify-content: center;
                 ">
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="white" style="transform: rotate(45deg);">
-                        ${iconSvg}
+                        ${glyph}
                     </svg>
                 </div>
             </div>
@@ -153,8 +138,14 @@ const createCameraIcon = (status = 'active', isTunnel = false, isOnline = true, 
         iconAnchor: [22, 44],
     });
 
-    iconCache.set(cacheKey, icon);
+    iconCache.set(stateKey, icon);
     return icon;
+};
+
+// Status ikut ke title/alt marker supaya pembaca layar menerimanya juga, bukan hanya mata.
+const describeCameraMarker = (camera = {}) => {
+    const stateKey = getCameraMarkerKey(camera);
+    return { icon: createCameraIcon(stateKey), title: `${camera.name || 'Kamera'} (${CAMERA_MARKER_STATES[stateKey].label})` };
 };
 
 const buildBoundsFromCameras = (cameras = []) => {
@@ -465,15 +456,12 @@ const CameraMarker = memo(({ camera, onClick }) => {
     // Gunakan display coordinates jika ada (untuk offset)
     const lat = camera._displayLat ?? parseFloat(camera.latitude);
     const lng = camera._displayLng ?? parseFloat(camera.longitude);
-    const isTunnel = camera.is_tunnel === 1 || camera.is_tunnel === true;
-    const availabilityState = getCameraAvailabilityState(camera);
-    const isOnline = availabilityState !== 'offline';
-    const status = camera.status || 'active';
+    const { icon, title } = describeCameraMarker(camera);
 
     return (
         <Marker
-            position={[lat, lng]} title={camera.name}
-            icon={createCameraIcon(status, isTunnel, isOnline, availabilityState)}
+            position={[lat, lng]} title={title} alt={title}
+            icon={icon}
             eventHandlers={{ click: () => onClick(camera) }}
         />
     );
@@ -530,16 +518,12 @@ const ImperativeMarkerLayer = memo(({ cameras = [], onClick }) => {
 
             const lat = camera._displayLat ?? parseFloat(camera.latitude);
             const lng = camera._displayLng ?? parseFloat(camera.longitude);
-            const isTunnel = camera.is_tunnel === 1 || camera.is_tunnel === true;
-            const availabilityState = getCameraAvailabilityState(camera);
-            const isOnline = availabilityState !== 'offline';
-            const status = camera.status || 'active';
-            const icon = createCameraIcon(status, isTunnel, isOnline, availabilityState);
+            const { icon, title } = describeCameraMarker(camera);
 
             nextIds.add(camera.id);
             let marker = markersRef.current.get(camera.id);
             if (!marker) {
-                marker = L.marker([lat, lng], { icon, title: camera.name });
+                marker = L.marker([lat, lng], { icon, title, alt: title });
                 marker.on?.('click', () => {
                     const currentCamera = cameraLookupRef.current.get(camera.id);
                     if (currentCamera) {
@@ -554,6 +538,9 @@ const ImperativeMarkerLayer = memo(({ cameras = [], onClick }) => {
 
             marker.setLatLng?.([lat, lng]);
             marker.setIcon?.(icon);
+            // DivIcon dipakai ulang saat setIcon, jadi title lama tidak ikut diperbarui sendiri.
+            Object.assign(marker.options || {}, { title, alt: title });
+            marker.getElement?.()?.setAttribute?.('title', title);
         });
 
         markersRef.current.forEach((marker, cameraId) => {

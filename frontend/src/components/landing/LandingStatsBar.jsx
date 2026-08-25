@@ -172,8 +172,12 @@ function ListModal({ title, items, type, onClose, onCameraClick }) {
     );
 }
 
+// Kept word-for-word in sync with LandingPageSimple — both public modes must answer the same
+// outage the same way.
+const STATS_UNAVAILABLE_TEXT = 'Kami belum bisa mengambil data kamera saat ini.';
+
 export default function StatsBar({ onCameraClick }) {
-    const { cameras } = useCameras();
+    const { cameras, loading, dataUnavailable, refreshData } = useCameras();
     const [activeModal, setActiveModal] = useState(null);
     const disableAnimations = shouldDisableAnimations();
 
@@ -219,7 +223,16 @@ export default function StatsBar({ onCameraClick }) {
         [cameras],
     );
 
-    if (cameras.length === 0) return null;
+    /*
+     * Three states, not two: memuat / tak terjangkau / ada data. This board used to disappear
+     * entirely whenever the list was empty, so Full mode answered an outage by vanishing while
+     * Simple mode answered it with a confident "0". Now both render the same board with the same
+     * "belum diketahui" placeholder, and neither states a figure it does not have.
+     */
+    const unknown = loading || dataUnavailable;
+    const figure = (value) => (unknown ? '…' : value);
+    const drillDown = (key) => (unknown ? undefined : () => setActiveModal(key));
+    const figureClass = (known) => (unknown ? 'text-content-subtle' : known);
 
     const handleCameraItemClick = (camera) => {
         setActiveModal(null);
@@ -243,11 +256,11 @@ export default function StatsBar({ onCameraClick }) {
 
             <div className="grid grid-cols-2 gap-px overflow-hidden rounded-control border border-edge bg-edge">
                 <Metric
-                    value={stats.online}
+                    value={figure(stats.online)}
                     label="Online"
                     ariaLabel={`${stats.online} kamera online`}
-                    valueClass="text-status-live"
-                    onClick={() => setActiveModal('online')}
+                    valueClass={figureClass('text-status-live')}
+                    onClick={drillDown('online')}
                     disableAnimations={disableAnimations}
                 />
                 {/*
@@ -258,15 +271,15 @@ export default function StatsBar({ onCameraClick }) {
                   * colour on the ordinary case of a third-party feed being down.
                   */}
                 <Metric
-                    value={stats.offline}
+                    value={figure(stats.offline)}
                     label="Offline"
                     ariaLabel={`${stats.offline} kamera offline`}
-                    valueClass="text-status-idle"
-                    onClick={() => setActiveModal('offline')}
+                    valueClass={figureClass('text-status-idle')}
+                    onClick={drillDown('offline')}
                     disableAnimations={disableAnimations}
                 />
-                <Metric value={stats.total} label="Total unit" />
-                <Metric value={cities.length} label="Kota terpantau" />
+                <Metric value={figure(stats.total)} label="Total unit" valueClass={figureClass('text-content')} />
+                <Metric value={figure(cities.length)} label="Kota terpantau" valueClass={figureClass('text-content')} />
             </div>
 
             {stats.maintenance > 0 && (
@@ -284,11 +297,24 @@ export default function StatsBar({ onCameraClick }) {
 
             <div className="mt-3 flex items-center justify-between border-t border-edge pt-3">
                 <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-content-subtle">Menonton sekarang</span>
-                <span className="flex items-center gap-1.5 font-mono text-sm font-semibold tabular-nums text-data">
-                    <span className={`h-1.5 w-1.5 rounded-full bg-data ${disableAnimations ? '' : 'animate-pulse'}`} aria-hidden="true"></span>
-                    {liveViewersNow.toLocaleString('id-ID')}
+                <span className={`flex items-center gap-1.5 font-mono text-sm font-semibold tabular-nums ${unknown ? 'text-content-subtle' : 'text-data'}`}>
+                    <span className={`h-1.5 w-1.5 rounded-full ${unknown ? 'bg-status-idle' : `bg-data ${disableAnimations ? '' : 'animate-pulse'}`}`} aria-hidden="true"></span>
+                    {figure(liveViewersNow.toLocaleString('id-ID'))}
                 </span>
             </div>
+
+            {dataUnavailable && (
+                <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-edge pt-3">
+                    <p className="text-xs text-content-muted">{STATS_UNAVAILABLE_TEXT}</p>
+                    <button
+                        type="button"
+                        onClick={() => refreshData?.({ mode: 'initial' })}
+                        className="rounded-control border border-edge px-2.5 py-1 text-xs font-medium text-content transition-colors hover:border-edge-strong hover:bg-surface-raised"
+                    >
+                        Coba lagi
+                    </button>
+                </div>
+            )}
 
             {cities.length > 0 && (
                 <div className="mt-3 flex flex-wrap items-center gap-1.5">

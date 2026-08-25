@@ -9,7 +9,7 @@
  */
 import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import LandingPageSimple from './LandingPageSimple';
 
 vi.mock('../../contexts/ThemeContext', () => ({
@@ -28,14 +28,24 @@ vi.mock('../../contexts/BrandingContext', () => ({
     }),
 }));
 
+const HEALTHY_CAMERAS = [
+    { id: 1, is_online: 1 },
+    { id: 2, is_online: 0 },
+    { id: 3, is_online: 1 },
+];
+
+const cameraContextState = {
+    cameras: HEALTHY_CAMERAS,
+    loading: false,
+    dataUnavailable: false,
+};
+
 vi.mock('../../contexts/CameraContext', () => ({
     useCameras: () => ({
-        cameras: [
-            { id: 1, is_online: 1 },
-            { id: 2, is_online: 0 },
-            { id: 3, is_online: 1 },
-        ],
-        loading: false,
+        cameras: cameraContextState.cameras,
+        loading: cameraContextState.loading,
+        dataUnavailable: cameraContextState.dataUnavailable,
+        refreshData: () => {},
     }),
 }));
 
@@ -72,6 +82,12 @@ function renderWithRouter(ui) {
 }
 
 describe('LandingPageSimple', () => {
+    beforeEach(() => {
+        cameraContextState.cameras = HEALTHY_CAMERAS;
+        cameraContextState.loading = false;
+        cameraContextState.dataUnavailable = false;
+    });
+
     it('merender footer banner di bawah cameras section dan sebelum footer', async () => {
         const CamerasSection = () => <div data-testid="cameras-section">cameras</div>;
 
@@ -219,5 +235,50 @@ describe('LandingPageSimple', () => {
         );
 
         expect(screen.queryByText('feedback-widget')).toBeNull();
+    });
+
+    /*
+     * Outage honesty. With every /api/** call failing, this page used to render
+     * "0 ONLINE / 0 OFFLINE / 0 TOTAL / 0 KOTA" under a pulsing green dot — a total
+     * outage presented as a healthy, factual report of an empty network.
+     */
+    it('tidak menyatakan angka nol dan tidak menyalakan titik hijau saat data gagal diambil', async () => {
+        cameraContextState.cameras = [];
+        cameraContextState.dataUnavailable = true;
+        const CamerasSection = () => <div data-testid="cameras-section">cameras</div>;
+
+        renderWithRouter(
+            <LandingPageSimple
+                onCameraClick={vi.fn()}
+                onAddMulti={vi.fn()}
+                multiCameras={[]}
+                saweriaEnabled={false}
+                saweriaLink=""
+                CamerasSection={CamerasSection}
+                layoutMode="simple"
+                onLayoutToggle={vi.fn()}
+                favorites={[]}
+                onToggleFavorite={vi.fn()}
+                isFavorite={vi.fn(() => false)}
+                viewMode="grid"
+                setViewMode={vi.fn()}
+                adsConfig={null}
+            />
+        );
+
+        await screen.findByText('feedback-widget');
+
+        const board = screen.getByRole('region', { name: 'Status jaringan kamera' });
+        // No figure is asserted anywhere on the page — the placeholder stands in for all of them.
+        expect(screen.queryAllByText('0')).toHaveLength(0);
+        expect(within(board).getAllByText('…').length).toBeGreaterThan(0);
+        expect(within(board).getByText('Kami belum bisa mengambil data kamera saat ini.')).toBeTruthy();
+        expect(within(board).getByRole('button', { name: 'Coba lagi' })).toBeTruthy();
+        // Footer tally is a public claim too.
+        expect(within(document.querySelector('footer')).getAllByText('…').length).toBe(3);
+        // Nothing on the page paints the "healthy" green while we cannot reach the backend.
+        const green = [...document.querySelectorAll('[class*="status-live"]')];
+        expect(green).toHaveLength(0);
+        expect(screen.getByText('Tak terhubung')).toBeTruthy();
     });
 });

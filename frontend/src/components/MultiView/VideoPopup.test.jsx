@@ -785,6 +785,65 @@ describe('VideoPopup non-live states', () => {
             expect(screen.getByText('Ketuk untuk memutar')).toBeTruthy();
         });
     });
+
+    /*
+     * Kamera HLS internal yang gagal resolve URL dulu keluar dari efek pemuat SEBELUM
+     * startTimeout() terpasang: spinner "Menghubungkan..." selamanya, tanpa tombol coba lagi.
+     */
+    it('menyatakan error, bukan memutar selamanya, saat URL HLS tidak tersedia', async () => {
+        render(
+            <VideoPopup
+                camera={{ ...baseCamera, id: 41, delivery_type: 'internal_hls', streams: {} }}
+                onClose={vi.fn()}
+            />
+        );
+
+        await waitFor(() => {
+            expect(screen.getByText('CCTV Tidak Terkoneksi')).toBeTruthy();
+        });
+
+        expect(screen.queryByText('Menghubungkan...')).toBeNull();
+        expect(screen.getByTitle('Coba Lagi')).toBeTruthy();
+        expect(hlsInstances).toHaveLength(0);
+    });
+
+    /*
+     * LIVE harus berarti ada gambar. Byte yang diterima (readyState/buffered) dipenuhi juga oleh
+     * perangkat yang menerima byte lalu gagal men-decode-nya — itu layar hitam berlabel LIVE.
+     */
+    it('tidak mengklaim LIVE dari byte yang ter-buffer sampai ada bingkai', async () => {
+        render(
+            <VideoPopup camera={{ ...baseCamera, id: 42 }} onClose={vi.fn()} />
+        );
+
+        const video = await screen.findByTestId('grid-popup-video');
+        await waitFor(() => {
+            expect(hlsInstances).toHaveLength(1);
+        });
+
+        Object.defineProperty(video, 'readyState', { configurable: true, value: 4 });
+        Object.defineProperty(video, 'buffered', { configurable: true, value: { length: 1 } });
+        Object.defineProperty(video, 'paused', { configurable: true, value: false });
+        Object.defineProperty(video, 'currentTime', { configurable: true, value: 3, writable: true });
+
+        await act(async () => {
+            hlsInstances[0].emit('fragBuffered');
+            await new Promise((resolve) => setTimeout(resolve, 700));
+        });
+
+        expect(screen.queryByText('LIVE')).toBeNull();
+
+        Object.defineProperty(video, 'videoWidth', { configurable: true, value: 1280 });
+        Object.defineProperty(video, 'videoHeight', { configurable: true, value: 720 });
+
+        await act(async () => {
+            await new Promise((resolve) => setTimeout(resolve, 700));
+        });
+
+        await waitFor(() => {
+            expect(screen.getAllByText('LIVE').length).toBeGreaterThan(0);
+        });
+    });
 });
 
 

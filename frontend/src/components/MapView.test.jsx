@@ -87,10 +87,12 @@ vi.mock('react-router-dom', () => ({
 vi.mock('react-leaflet', () => ({
     MapContainer: ({ children }) => <div data-testid="map-container">{children}</div>,
     TileLayer: () => <div />,
-    Marker: ({ eventHandlers, position }) => (
+    Marker: ({ eventHandlers, position, title, icon }) => (
         <button
             data-testid={`marker-${position[0]}-${position[1]}`}
+            data-icon-html={icon?.html}
             onClick={() => eventHandlers?.click?.()}
+            title={title}
             type="button"
         >
             marker
@@ -115,7 +117,7 @@ vi.mock('leaflet', () => ({
                 mergeOptions: vi.fn(),
             },
         },
-        divIcon: vi.fn(() => ({})),
+        divIcon: vi.fn((options = {}) => ({ ...options })),
         latLngBounds: vi.fn((coords = []) => {
             if (!Array.isArray(coords) || coords.length === 0) {
                 return createMockBounds(-8, 111, -6, 113);
@@ -388,6 +390,62 @@ describe('MapView area filter visibility', () => {
         expect(screen.getByText('2 offline')).toBeTruthy();
         // Tunnel is internal transport jargon and must not resurface on a public surface.
         expect(screen.queryByText(/tunnel/i)).toBeNull();
+    });
+
+    // Status marker tidak boleh hanya lewat warna: amber "tidak stabil" vs oranye tunnel praktis
+    // sewarna, dan title marker dulu cuma nama kamera sehingga pembaca layar tak dapat statusnya.
+    it('menyebutkan status kamera pada title marker, bukan hanya lewat warna', async () => {
+        const degradedCamera = {
+            ...statusCameras[0],
+            id: 5,
+            name: 'Pasar',
+            latitude: '-7.1511',
+            longitude: '111.8819',
+            availability_state: 'degraded',
+        };
+
+        await act(async () => {
+            render(<MapView cameras={[...statusCameras, degradedCamera]} areas={[]} showAreaFilter={false} />);
+        });
+
+        await waitFor(() => {
+            expect(screen.getByTitle('Lobby (aktif)')).toBeTruthy();
+        });
+
+        expect(screen.getByTitle('Pasar (tidak stabil)')).toBeTruthy();
+        expect(screen.getByTitle('Gudang (offline)')).toBeTruthy();
+        expect(screen.getByTitle('Parkir (perbaikan)')).toBeTruthy();
+        // Tunnel hanya detail transport internal: kameranya sehat, jadi namanya tetap "aktif".
+        expect(screen.getByTitle('Gerbang (aktif)')).toBeTruthy();
+    });
+
+    it('memakai glyph berbeda untuk kamera tidak stabil, bukan sekadar rona lain', async () => {
+        const degradedCamera = {
+            ...statusCameras[0],
+            id: 5,
+            name: 'Pasar',
+            latitude: '-7.1511',
+            longitude: '111.8819',
+            availability_state: 'degraded',
+        };
+
+        await act(async () => {
+            render(<MapView cameras={[...statusCameras, degradedCamera]} areas={[]} showAreaFilter={false} />);
+        });
+
+        await waitFor(() => {
+            expect(screen.getByTitle('Lobby (aktif)')).toBeTruthy();
+        });
+
+        const glyphOf = (title) => (screen.getByTitle(title).getAttribute('data-icon-html') || '')
+            .match(/<svg[^>]*>([\s\S]*?)<\/svg>/)?.[1]
+            ?.trim();
+
+        expect(glyphOf('Pasar (tidak stabil)')).toBeTruthy();
+        expect(glyphOf('Pasar (tidak stabil)')).not.toBe(glyphOf('Lobby (aktif)'));
+        expect(glyphOf('Pasar (tidak stabil)')).not.toBe(glyphOf('Gerbang (aktif)'));
+        expect(glyphOf('Gudang (offline)')).not.toBe(glyphOf('Lobby (aktif)'));
+        expect(glyphOf('Parkir (perbaikan)')).not.toBe(glyphOf('Lobby (aktif)'));
     });
 
     it('tidak lagi merender label perbaikan pada status bar compact', async () => {

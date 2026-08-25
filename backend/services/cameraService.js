@@ -1044,14 +1044,8 @@ class CameraService {
             video_codec,
             stream_source,
             delivery_type,
-            external_hls_url,
-            external_stream_url,
-            external_embed_url,
-            external_snapshot_url,
-            external_origin_mode,
-            external_use_proxy,
-            external_tls_mode,
-            external_health_mode,
+            external_hls_url, external_stream_url, external_embed_url, external_snapshot_url,
+            external_origin_mode, external_use_proxy, external_tls_mode, external_health_mode,
             public_playback_mode,
             public_playback_preview_minutes,
             internal_ingest_policy_override,
@@ -1127,9 +1121,7 @@ class CameraService {
 
         const streamKey = uuidv4();
 
-        const areaIdValue = area_id === '' || area_id === null || area_id === undefined
-            ? null
-            : parseInt(area_id, 10);
+        const areaIdValue = area_id === '' || area_id === null || area_id === undefined ? null : parseInt(area_id, 10);
         const finalAreaId = Number.isNaN(areaIdValue) ? null : areaIdValue;
 
         const isEnabled = enabled === true || enabled === 1 ? 1 : (enabled === false || enabled === 0 ? 0 : 1);
@@ -1142,15 +1134,21 @@ class CameraService {
         const lng = Number.isNaN(lngValue) ? null : lngValue;
 
         const durationValue = recording_duration_hours !== undefined && recording_duration_hours !== '' && recording_duration_hours !== null
-            ? parseInt(recording_duration_hours, 10)
-            : 5;
+            ? parseInt(recording_duration_hours, 10) : 5;
         const recordingDuration = Number.isNaN(durationValue) ? 5 : durationValue;
 
         const cameraStatus = status || 'active';
 
+        // Tenancy is written by the INSERT itself: a rental camera must never exist as 'community',
+        // not even for the I/O between birth and the billing reclass (the public filter's community
+        // branch ignores is_public). Callers that say nothing still get 'community', as before.
+        const cameraClass = ['subscriber', 'owner_private'].includes(data.camera_class) ? data.camera_class : 'community';
+        const ownerUserId = cameraClass === 'community' ? null : (Number(data.owner_user_id) || null);
+
         const result = execute(
-            'INSERT INTO cameras (name, private_rtsp_url, description, location, group_name, area_id, enabled, is_tunnel, latitude, longitude, status, stream_key, enable_recording, recording_duration_hours, video_codec, stream_source, delivery_type, external_hls_url, external_stream_url, external_embed_url, external_snapshot_url, external_origin_mode, external_use_proxy, external_tls_mode, external_health_mode, public_playback_mode, public_playback_preview_minutes, internal_ingest_policy_override, internal_on_demand_close_after_seconds_override, internal_rtsp_transport_override, thumbnail_strategy, source_profile) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO cameras (camera_class, owner_user_id, name, private_rtsp_url, description, location, group_name, area_id, enabled, is_tunnel, latitude, longitude, status, stream_key, enable_recording, recording_duration_hours, video_codec, stream_source, delivery_type, external_hls_url, external_stream_url, external_embed_url, external_snapshot_url, external_origin_mode, external_use_proxy, external_tls_mode, external_health_mode, public_playback_mode, public_playback_preview_minutes, internal_ingest_policy_override, internal_on_demand_close_after_seconds_override, internal_rtsp_transport_override, thumbnail_strategy, source_profile) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
+                cameraClass, ownerUserId,
                 name,
                 deliveryConfig.deliveryType === 'internal_hls' ? private_rtsp_url : '',
                 description || null,

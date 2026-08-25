@@ -56,6 +56,7 @@ function seedSchema() {
             owner_user_id INTEGER,
             camera_class TEXT NOT NULL DEFAULT 'community',
             billing_status TEXT,
+            is_public INTEGER NOT NULL DEFAULT 0,
             updated_at TEXT DEFAULT CURRENT_TIMESTAMP
         );
         CREATE TABLE wallets (
@@ -138,6 +139,43 @@ describe('billingService', () => {
 
         expect(subscriptionRow(7).status).toBe('suspended');
         expect(cameraRow(7).billing_status).toBe('suspended');
+    });
+
+    /*
+     * A camera changing hands must not keep broadcasting on the new owner's behalf: B never agreed
+     * to publish anything. Re-assigning to the SAME owner (a renewal / price change) is not a
+     * handover and must leave their publish choice alone.
+     */
+    it('unpublishes when the camera moves to a different owner', () => {
+        db.prepare("INSERT INTO users (id, username, role) VALUES (43, 'sari', 'customer')").run();
+        walletService.credit({ userId: 42, amount: 10000 });
+        walletService.credit({ userId: 43, amount: 10000 });
+
+        billingService.assignSubscription({ camera_id: 7, user_id: 42, monthly_price: 21000 });
+        db.prepare('UPDATE cameras SET is_public = 1 WHERE id = 7').run(); // owner A publishes it
+        billingService.assignSubscription({ camera_id: 7, user_id: 43, monthly_price: 21000 });
+
+        expect(cameraRow(7).owner_user_id).toBe(43);
+        expect(cameraRow(7).is_public).toBe(0);
+    });
+
+    it('keeps the publish flag when the SAME owner re-assigns (renewal, not a handover)', () => {
+        walletService.credit({ userId: 42, amount: 10000 });
+        billingService.assignSubscription({ camera_id: 7, user_id: 42, monthly_price: 21000 });
+        db.prepare('UPDATE cameras SET is_public = 1 WHERE id = 7').run();
+
+        billingService.assignSubscription({ camera_id: 7, user_id: 42, monthly_price: 25000 });
+
+        expect(cameraRow(7).is_public).toBe(1);
+    });
+
+    it('unpublishes a community camera taken into a rental (it was public by class)', () => {
+        walletService.credit({ userId: 42, amount: 10000 });
+        db.prepare('UPDATE cameras SET is_public = 1 WHERE id = 8').run();
+
+        billingService.assignSubscription({ camera_id: 8, user_id: 42, monthly_price: 21000 });
+
+        expect(cameraRow(8).is_public).toBe(0);
     });
 
     it('rejects assignment to non-customer users', () => {

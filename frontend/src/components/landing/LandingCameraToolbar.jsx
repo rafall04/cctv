@@ -1,3 +1,4 @@
+import { useCameras } from '../../contexts/CameraContext';
 import LandingSearchBox from './LandingSearchBox';
 import LandingViewModeSwitch from './LandingViewModeSwitch';
 
@@ -10,6 +11,10 @@ export default function LandingCameraToolbar({
     searchProps,
     contextualControls = null,
 }) {
+    // Three states, not two: memuat / tak terjangkau / ada data. Announcing "0 kamera tersedia"
+    // when the initial load failed turns an outage into a factual-looking empty network.
+    const { dataUnavailable } = useCameras();
+
     return (
         <div className="mb-5 flex flex-col gap-4 sm:mb-6">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -18,7 +23,7 @@ export default function LandingCameraToolbar({
                         {title}
                     </h2>
                     <p className="mt-1 min-h-[1.25rem] text-sm text-content-muted">
-                        {isLoading ? 'Memuat kamera…' : (
+                        {isLoading ? 'Memuat kamera…' : dataUnavailable ? 'Kami belum bisa memuat daftar kamera.' : (
                             <>
                                 <span className="font-mono font-semibold tabular-nums text-content">{camerasCount}</span> kamera tersedia
                             </>

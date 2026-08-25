@@ -39,8 +39,13 @@ function pickFeaturedCamera(cameras) {
 }
 
 export default function Hero({ branding, landingSettings, disableHeavyEffects, onCameraClick }) {
-    const { cameras } = useCameras();
+    const { cameras, loading, dataUnavailable } = useCameras();
     const disableAnimations = shouldDisableAnimations();
+
+    // Same rule as the metric board below it: never state a figure we do not have, and never let
+    // the live dot pulse green for a network we cannot reach. Idle, not fault — the cameras are
+    // not broken, we just cannot see them from here.
+    const unknown = loading || dataUnavailable;
 
     // Copy stays branding-driven (admin-configured); only the two shipped defaults are
     // shortened. Everything structural around it is multi-city by construction.
@@ -77,14 +82,14 @@ export default function Hero({ branding, landingSettings, disableHeavyEffects, o
                     className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2"
                 >
                     <span className="flex items-center gap-2">
-                        <span className={`h-1.5 w-1.5 rounded-full bg-status-live ${disableAnimations ? '' : 'animate-pulse'}`}></span>
-                        <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-status-live">
+                        <span className={`h-1.5 w-1.5 rounded-full ${unknown ? 'bg-status-idle' : `bg-status-live ${disableAnimations ? '' : 'animate-pulse'}`}`}></span>
+                        <span className={`font-mono text-[10px] font-semibold uppercase tracking-[0.14em] ${unknown ? 'text-content-subtle' : 'text-status-live'}`}>
                             {landingSettings.hero_badge}
                         </span>
                     </span>
                     <span className="h-3 w-px bg-edge-strong" aria-hidden="true"></span>
                     <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-content-subtle">
-                        {cityCount} kota · siaran 24 jam
+                        {unknown ? '…' : cityCount} kota · siaran 24 jam
                     </span>
                     {branding.show_powered_by === 'true' && (
                         <span className="flex items-center gap-1.5 rounded-full border border-edge bg-surface px-2.5 py-1 text-[10px] font-semibold text-content-muted sm:ml-auto">

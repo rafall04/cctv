@@ -96,10 +96,7 @@ class BillingService {
         return row.price_per_camera + surcharge;
     }
 
-    /**
-     * Price a camera would carry on a given user's plan, before any subscription row exists.
-     * monthlyPriceFor() reads through the existing subscription, so assignment needs this variant.
-     */
+    /** Price on the user's plan before a subscription row exists (monthlyPriceFor reads through one). */
     _planPriceFor(userId, cameraId) {
         const row = queryOne(
             `SELECT COALESCE(c.enable_recording, 0) AS merekam,
@@ -183,7 +180,7 @@ class BillingService {
             throw err;
         }
 
-        const camera = queryOne('SELECT id, name FROM cameras WHERE id = ?', [cameraId]);
+        const camera = queryOne('SELECT id, name, owner_user_id FROM cameras WHERE id = ?', [cameraId]);
         if (!camera) {
             const err = new Error('Camera not found');
             err.statusCode = 404;
@@ -222,14 +219,18 @@ class BillingService {
             subscriptionId = result.lastInsertRowid;
         }
 
+        // Handover never inherits the previous holder's publish choice: only a re-assignment to the
+        // SAME owner keeps is_public, so B never finds A's camera already broadcasting under B's name.
         execute(
             `UPDATE cameras
              SET owner_user_id = ?, camera_class = 'subscriber', billing_status = 'active',
+                 is_public = CASE WHEN COALESCE(owner_user_id, 0) = ? THEN is_public ELSE 0 END,
                  updated_at = CURRENT_TIMESTAMP
              WHERE id = ?`,
-            [userId, cameraId]
+            [userId, userId, cameraId]
         );
         walletService.ensureWallet(userId);
+        invalidateCameraAccessCache(cameraId);
         cameraService.invalidateCameraCache();
 
         // Day-one charge: service starts today, so today is billed immediately.
@@ -389,11 +390,6 @@ class BillingService {
     // ------------------------------------------------------------------
 
     /**
-     * Charge `subscription` for `today` if not yet charged, then sync the
-     * subscription + camera state to the outcome. Shared by the hourly tick,
-     * assignment day-one billing, manual reactivation, and topup resume.
-     */
-    /**
      * Did this camera work at all on the billing day?
      *
      * Answered from camera_runtime_state.last_online_at, which is stamped only while the camera is
@@ -426,6 +422,7 @@ class BillingService {
         return localDateString(new Date(row.last_online_at)) === today;
     }
 
+    /** Charge `subscription` for `today` if unbilled, then sync subscription + camera to the outcome. */
     _chargeAndSync(subscription, today) {
         const daily = dailyCostOf(subscription.monthly_price);
 
@@ -526,10 +523,7 @@ class BillingService {
         cameraService.invalidateCameraCache();
     }
 
-    /**
-     * Owner trial snapshot, read fresh per charge decision. billing_plans may not
-     * exist on very old DBs mid-migration — treat lookup failures as "not on trial".
-     */
+    /** Owner trial snapshot, read fresh per charge decision. Lookup failure (old DB) = not on trial. */
     _getOwnerTrialState(userId) {
         try {
             const row = queryOne(
@@ -549,10 +543,7 @@ class BillingService {
         }
     }
 
-    /**
-     * Hourly tick (idempotent per local day). Cheap when everything is already
-     * charged: one SELECT, zero writes.
-     */
+    /** Hourly tick (idempotent per local day). Cheap when all charged: one SELECT, zero writes. */
     runDailyCharges(now = new Date()) {
         const today = localDateString(now);
         const due = query(
@@ -581,10 +572,7 @@ class BillingService {
         return summary;
     }
 
-    /**
-     * Called right after any wallet credit so a top-up reactivates the
-     * customer's cameras without waiting for the next hourly tick.
-     */
+    /** Called right after any wallet credit so a top-up resumes cameras before the next hourly tick. */
     tryResumeForUser(userId, now = new Date()) {
         const today = localDateString(now);
         const suspended = query(
@@ -637,13 +625,37 @@ class BillingService {
     }
 
     /**
+     * A rental stuck at class 'community' is a live leak, because that branch of the public filter
+     * ignores is_public entirely. Only rows that PROVE they are a rental are touched — a
+     * non-cancelled subscription row, or an owner_user_id, neither of which a genuine community
+     * camera ever carries (setCameraClass nulls the owner whenever it sets 'community').
+     */
+    healMisclassedSubscriberCameras() {
+        const BUKTI = `camera_class = 'community' AND (owner_user_id IS NOT NULL
+            OR id IN (SELECT camera_id FROM camera_subscriptions WHERE status != 'cancelled'))`;
+        const cameraIds = query(`SELECT id FROM cameras WHERE ${BUKTI}`).map((c) => c.id);
+        if (cameraIds.length === 0) return { healed: 0, cameraIds };
+        execute(`UPDATE cameras SET camera_class = 'subscriber', is_public = 0,
+                 owner_user_id = COALESCE(owner_user_id, (SELECT user_id FROM camera_subscriptions
+                     WHERE camera_id = cameras.id AND status != 'cancelled' ORDER BY id DESC LIMIT 1)),
+                 billing_status = COALESCE(billing_status, 'suspended'), updated_at = CURRENT_TIMESTAMP
+                 WHERE ${BUKTI}`);
+        cameraIds.forEach((id) => invalidateCameraAccessCache(id));
+        cameraService.invalidateCameraCache();
+        console.error(`[Billing][INTEGRITY] ${cameraIds.length} rental camera(s) were stuck as community → reclassed subscriber + unpublished: ${cameraIds.join(', ')}`);
+        return { healed: cameraIds.length, cameraIds };
+    }
+
+    /**
      * Integrity self-heal: a subscriber camera whose owner_user_id no longer exists is an
      * ORPHAN (e.g. the customer row was removed out-of-band). Such a camera must never keep
      * streaming or showing publicly, so we unpublish + suspend it (non-destructive, reversible
      * if the owner is later restored) and log loudly for review. Runs on scheduler start and
-     * is callable by an admin. Returns the cameras it healed.
+     * is callable by an admin. Returns the cameras it healed — the misclass sweep first, so a
+     * row that leaked AND lost its owner is caught by both in one pass.
      */
     healOrphanedSubscriberCameras() {
+        const misclassed = this.healMisclassedSubscriberCameras();
         const orphans = query(`
             SELECT id, name, owner_user_id FROM cameras
             WHERE camera_class = 'subscriber'
@@ -665,7 +677,8 @@ class BillingService {
         if (orphans.length > 0) {
             cameraService.invalidateCameraCache();
         }
-        return { healed: orphans.length, cameraIds: orphans.map((c) => c.id) };
+        const cameraIds = [...new Set([...misclassed.cameraIds, ...orphans.map((c) => c.id)])];
+        return { healed: cameraIds.length, cameraIds };
     }
 
     // ------------------------------------------------------------------

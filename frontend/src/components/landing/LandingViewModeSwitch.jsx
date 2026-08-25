@@ -26,14 +26,19 @@ export default function LandingViewModeSwitch({ viewMode, onChange }) {
      * `max-w-full` caps the row, `min-w-0` lets each button shrink below its
      * content, and `truncate` gives the label somewhere to go. The icons stay
      * `shrink-0` so a mode is always identifiable even if its word is clipped.
+     *
+     * The row was 36px tall — under the 40px thumb floor — and said which mode was
+     * open in background colour only, so `aria-pressed` now says it out loud too.
      */
     return (
         <div className="flex max-w-full items-center gap-1 rounded-control border border-edge bg-surface p-1">
             {buttons.map((button) => (
                 <button
                     key={button.key}
+                    type="button"
                     onClick={() => onChange(button.key)}
-                    className={`flex min-w-0 items-center justify-center gap-1.5 rounded-control px-3 py-2 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary sm:text-sm ${
+                    aria-pressed={viewMode === button.key}
+                    className={`flex min-h-[40px] min-w-0 items-center justify-center gap-1.5 rounded-control px-3 py-2 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary sm:min-h-0 sm:text-sm ${
                         viewMode === button.key
                             ? 'bg-primary text-white'
                             : 'text-content-muted hover:bg-surface-raised hover:text-content'

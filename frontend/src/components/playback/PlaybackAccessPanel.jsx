@@ -223,12 +223,12 @@ export default function PlaybackAccessPanel({ onIssued = null }) {
                         <label className="block text-xs">
                             <span className="text-content-subtle">Nama</span>
                             <input value={buyer.name} onChange={(e) => setBuyer((b) => ({ ...b, name: e.target.value }))}
-                                className="mt-1 w-full rounded-control border border-edge bg-surface-sunken px-2 py-1.5 text-content" />
+                                className="mt-1 min-h-11 w-full rounded-control border border-edge bg-surface-sunken px-2 py-1.5 text-base text-content sm:min-h-0 sm:text-sm" />
                         </label>
                         <label className="block text-xs">
                             <span className="text-content-subtle">Nomor HP</span>
                             <input type="tel" value={buyer.phone} onChange={(e) => setBuyer((b) => ({ ...b, phone: e.target.value }))}
-                                className="mt-1 w-full rounded-control border border-edge bg-surface-sunken px-2 py-1.5 text-content" />
+                                className="mt-1 min-h-11 w-full rounded-control border border-edge bg-surface-sunken px-2 py-1.5 text-base text-content sm:min-h-0 sm:text-sm" />
                         </label>
                     </div>
                     {paid.map((p) => (

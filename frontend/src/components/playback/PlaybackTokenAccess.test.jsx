@@ -320,3 +320,17 @@ describe('PlaybackTokenAccess camera coverage', () => {
         expect(screen.getByText('1 kamera')).toBeTruthy();
     });
 });
+
+/*
+ * A bare text-sm (14px) on the token box made Safari iOS zoom the page in the moment it was
+ * focused — on the one control a visitor MUST use to unlock the player.
+ */
+describe('PlaybackTokenAccess on a phone', () => {
+    it('keeps the token field at the 16px floor, shrinking only from sm up', () => {
+        setup();
+
+        const cls = screen.getByLabelText(/Token playback/).getAttribute('class');
+        expect(cls).toContain('text-base');
+        expect(cls).toContain('sm:text-sm');
+    });
+});

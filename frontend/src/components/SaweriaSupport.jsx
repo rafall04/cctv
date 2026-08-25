@@ -3,13 +3,14 @@
  *          banner arrives open, settles into a bubble on its own, and the full modal is kept
  *          for the one moment a visitor has actually received something.
  * Caller: Public landing full/simple pages.
- * Deps: React hooks, localStorage/window.open, animationControl, saweriaConfig.
+ * Deps: React hooks, localStorage/window.open, useFocusTrap, animationControl, saweriaConfig.
  * MainFuncs: SaweriaSupport.
  * SideEffects: Reads the shared Saweria config, stores banner preferences, opens the external link,
  *              registers the peek/collapse timers.
  */
 
 import { useState, useEffect, useMemo, useRef, useCallback, memo } from 'react';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 import { shouldDisableAnimations } from '../utils/animationControl';
 import { isSaweriaEnabled, SAWERIA_SUPPRESSED_KEY, SAWERIA_URL } from '../utils/saweriaConfig';
 
@@ -40,6 +41,7 @@ const SaweriaSupport = memo(function SaweriaSupport() {
     const bannerTouchedRef = useRef(false);
     const markBannerTouched = useCallback(() => { bannerTouchedRef.current = true; }, []);
     const disableAnimations = shouldDisableAnimations();
+    const modalRef = useRef(null);
 
     // Simplified - just use one variation
     const modalContent = useMemo(() => ({
@@ -146,6 +148,10 @@ const SaweriaSupport = memo(function SaweriaSupport() {
     const handleBannerClose = () => setShowBanner(false);
     const handleBannerSupport = () => window.open(SAWERIA_URL, '_blank', 'noopener,noreferrer');
 
+    // Backdrop click was the ONLY quick exit — a mouse-only path. Escape + a focus trap make
+    // the ask dismissible for keyboard and screen-reader visitors too.
+    useFocusTrap(modalRef, { active: showModal, onEscape: handleModalClose });
+
     if (!isReady || !isEnabled) return null;
 
     return (
@@ -153,15 +159,22 @@ const SaweriaSupport = memo(function SaweriaSupport() {
             {/* Modal - Simplified, no animations */}
             {showModal && (
                 <div className="fixed inset-0 z-modal flex items-center justify-center p-4 bg-black/70">
-                    <div className="absolute inset-0" onClick={handleModalClose} />
+                    <div className="absolute inset-0" onClick={handleModalClose} aria-hidden="true" />
 
-                    <div className="relative bg-surface border border-edge rounded-card shadow-e2 max-w-sm w-full max-h-[90vh] overflow-y-auto">
-                        <div className="bg-amber-500 p-4 text-center">
-                            <div className="w-12 h-12 mx-auto mb-2 bg-white/30 rounded-full flex items-center justify-center text-white">
+                    <div
+                        ref={modalRef}
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="saweria-modal-title"
+                        className="relative bg-surface border border-edge rounded-card shadow-e2 max-w-sm w-full max-h-[90vh] overflow-y-auto"
+                    >
+                        {/* amber-700, not amber-500: white on amber-500 is 2.15:1, half of what AA asks. */}
+                        <div className="bg-amber-700 p-4 text-center">
+                            <div className="w-12 h-12 mx-auto mb-2 bg-white/20 rounded-full flex items-center justify-center text-white">
                                 <CoffeeIcon />
                             </div>
-                            <h2 className="text-lg font-bold text-white">{modalContent.title}</h2>
-                            <p className="text-white/80 text-xs">{modalContent.subtitle}</p>
+                            <h2 id="saweria-modal-title" className="text-lg font-bold text-white">{modalContent.title}</h2>
+                            <p className="text-white text-xs">{modalContent.subtitle}</p>
                         </div>
 
                         <div className="p-4">
@@ -172,7 +185,7 @@ const SaweriaSupport = memo(function SaweriaSupport() {
                             <div className="flex flex-col gap-2">
                                 <button
                                     onClick={handleSupport}
-                                    className="w-full bg-amber-500 text-white font-semibold py-2.5 px-4 rounded-control text-sm transition-colors hover:bg-amber-600"
+                                    className="w-full bg-amber-700 text-white font-semibold py-2.5 px-4 rounded-control text-sm transition-colors hover:bg-amber-800"
                                 >
                                     Traktir Kopi Sekarang
                                 </button>
@@ -186,7 +199,7 @@ const SaweriaSupport = memo(function SaweriaSupport() {
 
                                 <button
                                     onClick={handleModalDontShow}
-                                    className="w-full text-gray-500 dark:text-gray-400 text-xs py-1"
+                                    className="w-full text-content-muted text-xs py-1"
                                 >
                                     Jangan Tampilkan Lagi
                                 </button>
@@ -211,14 +224,16 @@ const SaweriaSupport = memo(function SaweriaSupport() {
                 >
                     {bannerMinimized ? (
                         <button
+                            type="button"
                             onClick={handleBannerMaximize}
-                            className="w-14 h-14 bg-amber-500 text-white rounded-full shadow-e2 flex items-center justify-center transition-colors hover:bg-amber-600"
+                            aria-label="Buka ajakan dukungan"
+                            className="w-14 h-14 bg-amber-700 text-white rounded-full shadow-e2 flex items-center justify-center transition-colors hover:bg-amber-800"
                         >
                             <CoffeeIcon />
                         </button>
                     ) : (
                         <div className="bg-surface rounded-card shadow-e2 overflow-hidden border border-edge">
-                            <div className="bg-amber-500 p-3 flex items-center justify-between">
+                            <div className="bg-amber-700 p-3 flex items-center justify-between">
                                 {/* The only way the modal opens now: the visitor asks for it. */}
                                 <button
                                     type="button"
@@ -229,11 +244,12 @@ const SaweriaSupport = memo(function SaweriaSupport() {
                                     <CoffeeIcon />
                                     <span className="text-white font-bold text-sm">Dukung Kami</span>
                                 </button>
+                                {/* Named, because these two are the only way to get the banner off the page. */}
                                 <div className="flex gap-1">
-                                    <button onClick={handleBannerMinimize} className="w-6 h-6 rounded bg-white/20 text-white flex items-center justify-center">
+                                    <button type="button" onClick={handleBannerMinimize} aria-label="Kecilkan ajakan dukungan" className="w-6 h-6 rounded bg-white/20 text-white flex items-center justify-center">
                                         <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                                     </button>
-                                    <button onClick={handleBannerClose} className="w-6 h-6 rounded bg-white/20 text-white flex items-center justify-center">
+                                    <button type="button" onClick={handleBannerClose} aria-label="Tutup ajakan dukungan" className="w-6 h-6 rounded bg-white/20 text-white flex items-center justify-center">
                                         <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                                     </button>
                                 </div>
@@ -242,7 +258,7 @@ const SaweriaSupport = memo(function SaweriaSupport() {
                                 <p className="text-content-muted text-xs mb-2">Bantu server tetap aktif!</p>
                                 <button
                                     onClick={handleBannerSupport}
-                                    className="w-full bg-amber-500 text-white font-semibold py-2 rounded-control text-xs transition-colors hover:bg-amber-600"
+                                    className="w-full bg-amber-700 text-white font-semibold py-2 rounded-control text-xs transition-colors hover:bg-amber-800"
                                 >
                                     Traktir Kopi
                                 </button>

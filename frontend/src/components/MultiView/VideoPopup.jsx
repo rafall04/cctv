@@ -23,6 +23,7 @@ import { preloadHls, preloadFlv } from '../../utils/preloadManager';
 import { usePauseOnHidden } from '../../hooks/usePauseOnHidden.js';
 import { useFocusTrap } from '../../hooks/useFocusTrap.js';
 import { resolveStreamUrl } from '../../utils/directStreamHelper';
+import { hasPicture, startLivePictureWatch } from '../../utils/livePictureWatch.js';
 import { useStreamTimeout } from '../../hooks/useStreamTimeout';
 import { viewerService } from '../../services/viewerService';
 import { takeSnapshot as takeSnapshotUtil } from '../../utils/snapshotHelper';
@@ -514,12 +515,19 @@ function VideoPopup({
     useEffect(() => {
         // Skip HLS loading if camera is in maintenance or offline
         if (isMaintenance || isOffline || isStreamResolving || !isHlsCamera) return;
-        if (!effectiveUrl || !videoRef.current) return;
+        // No URL = nothing to load. Returning silently here left the spinner up forever with no
+        // timeout armed and no retry, so say it out loud instead (mirrors MultiViewVideoItem).
+        if (!effectiveUrl || !videoRef.current) {
+            setStatus('error');
+            setErrorType('unknown');
+            setLoadingStage(LoadingStage.ERROR);
+            return;
+        }
         const video = videoRef.current;
         let hls = null;
         let HlsClass = null;
         let cancelled = false;
-        let playbackCheckInterval = null;
+        let stopWatch = null;
         let isLive = false; // Flag to prevent setState after live
         const streamRunId = streamRunIdRef.current;
         const isStaleStreamRun = () => cancelled || streamRunId !== streamRunIdRef.current;
@@ -532,12 +540,10 @@ function VideoPopup({
         // Start loading timeout - **Validates: Requirements 1.1**
         startTimeout(LoadingStage.CONNECTING);
 
-        // Only change to 'live' once video starts playing - don't revert on buffering
+        // LIVE only once a frame actually exists — buffered bytes are not a picture.
         const handlePlaying = () => {
-            if (isStaleStreamRun() || isLive) return; // Skip if already live
+            if (isStaleStreamRun() || isLive || !hasPicture(video)) return;
             isLive = true; // Set flag to prevent future setState
-            clearInterval(playbackCheckInterval);
-            playbackCheckInterval = null;
             setStatus('live');
             setLoadingStage(LoadingStage.PLAYING);
             // Clear timeout on success
@@ -556,31 +562,20 @@ function VideoPopup({
 
         const failWithCodec = () => { clearStreamTimeout(); setStatus('error'); setErrorType('codec'); setLoadingStage(LoadingStage.ERROR); };
 
-        // Fallback poll: some browsers never fire 'playing' reliably.
+        // Shared watch: demands a decoded picture before calling this live, and keeps watching
+        // afterwards so a decoder that dies mid-stream cannot leave a black rectangle marked LIVE.
         const startPlaybackCheck = () => {
-            playbackCheckInterval = setInterval(() => {
-                if (isStaleStreamRun() || isLive) {
-                    clearInterval(playbackCheckInterval);
-                    playbackCheckInterval = null;
-                    return;
-                }
-                // Check if video is actually playing (has time progress or buffered data)
-                if (video.readyState >= 3 && video.buffered.length > 0) {
-                    // Video has enough data - consider it playing
-                    if (!video.paused || video.currentTime > 0) {
-                        handlePlaying();
-                    } else {
-                        // Try to play again
-                        requestVideoPlay(video);
-                    }
-                }
-            }, 500);
+            stopWatch = startLivePictureWatch(video, {
+                isStale: isStaleStreamRun,
+                onPicture: handlePlaying,
+                onNoPicture: failWithCodec,
+                requestPlay: requestVideoPlay,
+            });
         };
 
         const handleError = () => {
             if (isStaleStreamRun() || isLive) return; // Don't show error if already playing
-            clearInterval(playbackCheckInterval);
-            playbackCheckInterval = null;
+            stopWatch?.();
             setStatus('error');
             setLoadingStage(LoadingStage.ERROR);
             reportRuntimeFailure('external_hls_runtime_error');
@@ -619,6 +614,7 @@ function VideoPopup({
         const initNative = () => {
             video.src = effectiveUrl;
             video.addEventListener('loadedmetadata', () => requestVideoPlay(video));
+            startPlaybackCheck();
         };
 
         const initHls = async () => {
@@ -832,7 +828,7 @@ function VideoPopup({
 
         return () => {
             cancelled = true;
-            clearInterval(playbackCheckInterval);
+            stopWatch?.();
             video.removeEventListener('playing', handlePlaying);
             video.removeEventListener('loadedmetadata', handleLoadedMetadata);
             video.removeEventListener('error', handleError);

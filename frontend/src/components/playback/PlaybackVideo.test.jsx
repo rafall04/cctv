@@ -227,3 +227,24 @@ describe('PlaybackVideo audio honesty', () => {
         expect(screen.getByTestId('playback-unmute')).toBeTruthy();
     });
 });
+
+/*
+ * The speed row floats over the video, so it is both a thumb target and something covering the
+ * picture. It ran at 24px high — well under the 40px touch floor in docs/frontend-guide.md.
+ * The width must NOT grow with it: the unmute prompt owns the opposite corner and already caps
+ * itself at 55% to avoid this row on a 360px phone.
+ */
+describe('PlaybackVideo speed controls on a phone', () => {
+    it('meets the touch-target floor without widening past the unmute prompt', () => {
+        render(<PlaybackVideo {...baseProps} />);
+
+        const speedButtons = screen.getAllByTitle(/^Kecepatan /);
+        expect(speedButtons).toHaveLength(4);
+        for (const button of speedButtons) {
+            const cls = button.getAttribute('class');
+            expect(cls).toContain('min-h-11');
+            expect(cls).toContain('sm:min-h-0');
+            expect(cls).toContain('px-2');
+        }
+    });
+});

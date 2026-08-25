@@ -58,6 +58,8 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
     // and capable devices are exactly the ones that expand the grid to hundreds of cards.
     const contentVisibilityClass = '[content-visibility:auto] [contain-intrinsic-size:auto_300px]';
     const isFav = isFavorite?.(camera.id);
+    const favLabel = isFav ? `Hapus ${camera.name} dari favorit` : `Tambah ${camera.name} ke favorit`;
+    const multiLabel = inMulti ? `Hapus ${camera.name} dari Multi-View` : `Tambah ${camera.name} ke Multi-View`;
 
     // Only surface a quality chip when it actually distinguishes this camera.
     // `maintenance`/`offline` duplicate the status dot, and the default bucket
@@ -84,13 +86,17 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
     // Keyboard activation for the (div-based) thumbnail "watch" target so it
     // behaves like a button — the primary action on the card.
     const handleOpenKeyDown = (e) => {
+        // Never swallow a nested control's own Enter/Space — that would open the stream instead.
+        if (e.target !== e.currentTarget) return;
         if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
             e.preventDefault();
             onClick?.(e);
         }
     };
 
-    const actionButtonClass = `rounded-control border border-white/15 bg-black/45 p-2 text-white/80 backdrop-blur-sm ${disableAnimations ? '' : 'transition-colors'
+    // 44px on phones, 40px from sm up — the touch-target floor in docs/frontend-guide.md. These float
+    // over a thumbnail whose whole surface starts an HLS stream, so a near-miss costs a visitor data.
+    const actionButtonClass = `inline-flex h-11 w-11 items-center justify-center sm:h-10 sm:w-10 rounded-control border border-white/15 bg-black/45 text-white/80 backdrop-blur-sm ${disableAnimations ? '' : 'transition-colors'
         } hover:border-white/30 hover:bg-black/65 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-primary`;
 
     return (
@@ -141,29 +147,35 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
                         </span>
                     )}
                 </div>
+            </div>
 
-                <div className="absolute right-2 top-2 flex gap-1.5">
-                    {onToggleFavorite && (
-                        <button
-                            onClick={(e) => { e.stopPropagation(); onToggleFavorite(camera.id); }}
-                            className={`${actionButtonClass} ${isFav ? 'border-status-warn/50 text-status-warn' : ''}`}
-                            aria-label={isFav ? 'Hapus dari Favorit' : 'Tambah ke Favorit'}
-                            title={isFav ? 'Hapus dari Favorit' : 'Tambah ke Favorit'}
-                        >
-                            <svg className="h-4 w-4" fill={isFav ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-                            </svg>
-                        </button>
-                    )}
+            {/* Kept OUTSIDE the role="button" thumbnail: ARIA makes a button's descendants
+                presentational, which put both actions out of reach of keyboard/screen readers. */}
+            <div className="absolute right-2 top-2 z-10 flex gap-2.5 sm:gap-2">
+                {onToggleFavorite && (
                     <button
-                        onClick={(e) => { e.stopPropagation(); onAddMulti(); }}
-                        className={`${actionButtonClass} ${inMulti ? 'border-status-live/50 text-status-live' : ''}`}
-                        aria-label={inMulti ? 'Hapus dari Multi-View' : 'Tambah ke Multi-View'}
-                        title={inMulti ? 'Hapus dari Multi-View' : 'Tambah ke Multi-View'}
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); onToggleFavorite(camera.id); }}
+                        className={`${actionButtonClass} ${isFav ? 'border-status-warn/50 text-status-warn' : ''}`}
+                        aria-pressed={!!isFav}
+                        aria-label={favLabel}
+                        title={favLabel}
                     >
-                        {inMulti ? <Icons.Check /> : <Icons.Plus />}
+                        <svg className="h-4 w-4" fill={isFav ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                        </svg>
                     </button>
-                </div>
+                )}
+                <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); onAddMulti(); }}
+                    className={`${actionButtonClass} ${inMulti ? 'border-status-live/50 text-status-live' : ''}`}
+                    aria-pressed={!!inMulti}
+                    aria-label={multiLabel}
+                    title={multiLabel}
+                >
+                    {inMulti ? <Icons.Check /> : <Icons.Plus />}
+                </button>
             </div>
 
             <div className="cursor-pointer p-3" onClick={onClick}>

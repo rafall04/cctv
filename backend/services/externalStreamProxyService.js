@@ -171,12 +171,13 @@ function isCameraProxyable(camera) {
  */
 function denyIfNotViewable(request, reply, cameraId) {
     const info = getAccessInfo(cameraId);
+    // Cache posture rides along with the gate: only a camera we can PROVE is community may enter a
+    // shared/edge cache. And no community short-circuit — a community camera in a voucher-gated
+    // area must still pass the gate below, and canViewLive reports voucherGated so we mark it too.
+    request.streamGated = info?.camera_class !== 'community';
     if (!info) {
         return false;
     }
-    // No community short-circuit: a community camera in a voucher-gated area must still pass the
-    // gate. canViewLive returns voucherGated → flag the request so the onSend hook forces
-    // private/no-store and the (otherwise edge-cacheable) segments never enter a shared cache.
     const access = canViewLive({
         info,
         user: resolveHlsViewerUser(request),
@@ -185,6 +186,7 @@ function denyIfNotViewable(request, reply, cameraId) {
     });
     if (access.voucherGated) {
         request.voucherPrivate = true;
+        request.streamGated = true;
     }
     if (access.allowed) {
         return false;
@@ -397,24 +399,24 @@ const SEGMENT_EDGE_TTL_SECONDS = 60;
 const SEGMENT_CACHE_CONTROL = `public, max-age=${SEGMENT_EDGE_TTL_SECONDS}, s-maxage=${SEGMENT_EDGE_TTL_SECONDS}, immutable`;
 // Playlists rotate every few seconds — keep them per-viewer fresh.
 const PLAYLIST_CACHE_CONTROL = 'no-cache, no-store, must-revalidate';
+// Gated (non-community / voucher-gated) media — segments AND AES key files — never enters a cache.
+const GATED_CACHE_CONTROL = 'private, no-store';
 
-function applyResponseCacheHeaders(reply, contentType) {
+function applyResponseCacheHeaders(reply, contentType, gated = false) {
     reply.header('Content-Type', contentType);
     if (contentType === PLAYLIST_CONTENT_TYPE) {
         reply.header('Cache-Control', PLAYLIST_CACHE_CONTROL);
         reply.header('Pragma', 'no-cache');
         reply.header('Expires', '0');
     } else {
-        // Edge-cacheable: Cloudflare honors `s-maxage` regardless of the
-        // surrounding `no-store`-leaning cache rules we set on auth
-        // endpoints. Browser also caches for the same window so an
-        // individual viewer never refetches the same chunk twice.
-        reply.header('Cache-Control', SEGMENT_CACHE_CONTROL);
+        // Community only: Cloudflare honors `s-maxage` and the browser caches the same window, so
+        // a viewer never refetches a chunk twice. A cached gated chunk/key would skip the gate.
+        reply.header('Cache-Control', gated ? GATED_CACHE_CONTROL : SEGMENT_CACHE_CONTROL);
     }
 }
 
-function sendCachedResponse(reply, cached) {
-    applyResponseCacheHeaders(reply, cached.contentType);
+function sendCachedResponse(reply, cached, gated = false) {
+    applyResponseCacheHeaders(reply, cached.contentType, gated);
     reply.header('X-RAFNET-Proxy-Cache', 'HIT');
     if (Buffer.isBuffer(cached.body)) {
         reply.header('Content-Length', String(cached.byteSize));
@@ -735,7 +737,7 @@ export async function registerExternalStreamProxyRoutes(fastify, options = {}) {
 
         // 1. Fresh enough — serve as-is, never touch the origin.
         if (good && ageMs < MASTER_FRESH_MS) {
-            applyResponseCacheHeaders(reply, good.contentType);
+            applyResponseCacheHeaders(reply, good.contentType, request.streamGated);
             reply.header('X-RAFNET-Proxy-Cache', 'HIT');
             return reply.send(good.body);
         }
@@ -746,7 +748,7 @@ export async function registerExternalStreamProxyRoutes(fastify, options = {}) {
             void refreshMaster(camera).catch((error) => {
                 console.error(`[ExternalStreamProxy] master background refresh camera=${camera.id}:`, error.message);
             });
-            applyResponseCacheHeaders(reply, good.contentType);
+            applyResponseCacheHeaders(reply, good.contentType, request.streamGated);
             reply.header('X-RAFNET-Proxy-Cache', 'STALE-REVALIDATE');
             return reply.send(good.body);
         }
@@ -756,13 +758,13 @@ export async function registerExternalStreamProxyRoutes(fastify, options = {}) {
         //    only a truly cold failure reaches the client.
         try {
             const body = await refreshMaster(camera);
-            applyResponseCacheHeaders(reply, PLAYLIST_CONTENT_TYPE);
+            applyResponseCacheHeaders(reply, PLAYLIST_CONTENT_TYPE, request.streamGated);
             reply.header('X-RAFNET-Proxy-Cache', 'MISS');
             return reply.send(body);
         } catch (error) {
             console.error(`[ExternalStreamProxy] playlist error camera=${camera.id}:`, error.message);
             if (good) {
-                applyResponseCacheHeaders(reply, good.contentType);
+                applyResponseCacheHeaders(reply, good.contentType, request.streamGated);
                 reply.header('X-RAFNET-Proxy-Cache', 'STALE');
                 cameraHealthService.recordRuntimeSignal(camera.id, {
                     targetUrl: camera.external_hls_url,
@@ -818,7 +820,7 @@ export async function registerExternalStreamProxyRoutes(fastify, options = {}) {
             const playlistCacheKey = `${camera.id}|nested|${targetUrl}`;
             const cachedPlaylist = playlistCache.get(playlistCacheKey);
             if (cachedPlaylist) {
-                return sendCachedResponse(reply, cachedPlaylist);
+                return sendCachedResponse(reply, cachedPlaylist, request.streamGated);
             }
 
             try {
@@ -831,7 +833,7 @@ export async function registerExternalStreamProxyRoutes(fastify, options = {}) {
                     // upstreams hurt most (polled every ~2s).
                     const stalePlaylist = playlistCache.getStale(playlistCacheKey);
                     if (stalePlaylist) {
-                        applyResponseCacheHeaders(reply, stalePlaylist.contentType);
+                        applyResponseCacheHeaders(reply, stalePlaylist.contentType, request.streamGated);
                         reply.header('X-RAFNET-Proxy-Cache', 'STALE');
                         cameraHealthService.recordRuntimeSignal(camera.id, {
                             targetUrl,
@@ -845,7 +847,7 @@ export async function registerExternalStreamProxyRoutes(fastify, options = {}) {
                     return reply.code(result.status).send('');
                 }
 
-                applyResponseCacheHeaders(reply, result.contentType);
+                applyResponseCacheHeaders(reply, result.contentType, request.streamGated);
                 reply.header('X-RAFNET-Proxy-Cache', 'MISS');
                 return reply.send(result.body);
             } catch (error) {
@@ -853,7 +855,7 @@ export async function registerExternalStreamProxyRoutes(fastify, options = {}) {
                 // Network / timeout fallback for the child playlist.
                 const stalePlaylist = playlistCache.getStale(playlistCacheKey);
                 if (stalePlaylist) {
-                    applyResponseCacheHeaders(reply, stalePlaylist.contentType);
+                    applyResponseCacheHeaders(reply, stalePlaylist.contentType, request.streamGated);
                     reply.header('X-RAFNET-Proxy-Cache', 'STALE');
                     return reply.send(stalePlaylist.body);
                 }
@@ -864,7 +866,7 @@ export async function registerExternalStreamProxyRoutes(fastify, options = {}) {
         const cacheKey = buildSegmentCacheKey(camera.id, targetUrl, cacheKeyStripParams);
         const cached = segmentCache.get(cacheKey);
         if (cached) {
-            return sendCachedResponse(reply, cached);
+            return sendCachedResponse(reply, cached, request.streamGated);
         }
 
         try {
@@ -880,11 +882,9 @@ export async function registerExternalStreamProxyRoutes(fastify, options = {}) {
                 return reply.code(result.status).send('');
             }
 
-            // Edge-cacheable Cache-Control headers (set in applyResponseCacheHeaders):
-            // the opaque URL is deterministic per upstream segment, so once a
-            // Cloudflare Cache Rule is enabled for /external-segment/* the edge
-            // serves repeat viewers without ever touching this origin.
-            applyResponseCacheHeaders(reply, result.contentType);
+            // Community segments are edge-cacheable (the opaque URL is deterministic per upstream
+            // segment); gated ones get private/no-store so the edge can never replay past the gate.
+            applyResponseCacheHeaders(reply, result.contentType, request.streamGated);
             reply.header('Content-Length', String(result.body.length));
             reply.header('X-RAFNET-Proxy-Cache', 'MISS');
             return reply.send(result.body);

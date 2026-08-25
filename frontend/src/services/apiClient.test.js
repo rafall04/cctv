@@ -165,6 +165,54 @@ function networkError(config) {
 }
 
 /*
+ * skipGlobalErrorNotification is how every public surface asks for silence (publicGrowthService,
+ * requestPolicy, vehicleCountService, CameraContext…). The timeout branch honoured it for the
+ * toast but not for the retry OFFER, so a visitor got an English "Request Timeout" card anyway —
+ * carrying a button that re-hits a server already known to be slow.
+ */
+describe('apiClient timeout notification honours the silence flag', () => {
+    function timeoutError(config) {
+        const err = new Error('timeout of 30000ms exceeded');
+        err.code = 'ECONNABORTED';
+        err.config = config;
+        err.request = {};
+        return err;
+    }
+
+    async function driveTimeout(config) {
+        vi.resetModules();
+        const module = await import('./apiClient.js');
+        const notify = vi.fn();
+        const offerRetry = vi.fn();
+        module.setNotificationCallback(notify);
+        module.setTimeoutRetryCallback(offerRetry);
+
+        const handler = module.default.interceptors.response.handlers.find((h) => h?.rejected);
+        await handler.rejected(timeoutError(config)).catch(() => {});
+        return { notify, offerRetry };
+    }
+
+    it('stays completely silent — no toast AND no retry offer — when the caller asked for it', async () => {
+        const { notify, offerRetry } = await driveTimeout({
+            method: 'get', url: '/api/public/growth', headers: {}, skipGlobalErrorNotification: true,
+        });
+
+        expect(notify).not.toHaveBeenCalled();
+        expect(offerRetry).not.toHaveBeenCalled();
+    });
+
+    it('still reports, in Indonesian, when the caller did not ask for silence', async () => {
+        const { notify, offerRetry } = await driveTimeout({ method: 'get', url: '/api/cameras', headers: {} });
+
+        expect(notify).toHaveBeenCalledTimes(1);
+        const [, title, message] = notify.mock.calls[0];
+        expect(title).toBe('Permintaan Melebihi Batas Waktu');
+        expect(`${title} ${message}`).not.toMatch(/Request|Timeout|Error/);
+        expect(offerRetry).toHaveBeenCalledTimes(1);
+    });
+});
+
+/*
  * A stack of "Session Expired" toasts on the login screen was not one expiry reported three times.
  * It was the page logging ITSELF out: three requests met the same just-expired access token, each
  * POSTed /api/auth/refresh with the same refresh token, the first rotated the pair — which

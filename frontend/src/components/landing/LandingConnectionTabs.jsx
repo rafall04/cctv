@@ -15,6 +15,7 @@ export default function LandingConnectionTabs({
     areaFilteredCameras,
     favorites,
     favoritesInAreaCount,
+    unknown = false,
 }) {
     const stableCount = areaFilteredCameras.filter((camera) => camera.is_tunnel !== 1).length;
     const newestCount = areaFilteredCameras.filter((camera) => camera.created_at).length || areaFilteredCameras.length;
@@ -39,15 +40,17 @@ export default function LandingConnectionTabs({
                         type="button"
                         onClick={() => onChange(tab.key)}
                         aria-pressed={active}
-                        className={`flex items-center gap-1.5 rounded-[calc(var(--radius-control)-0.25rem)] px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary ${
+                        className={`flex min-h-[40px] items-center gap-1.5 rounded-[calc(var(--radius-control)-0.25rem)] px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary sm:min-h-0 ${
                             active
                                 ? 'bg-surface text-content shadow-e1'
                                 : 'text-content-muted hover:text-content'
                         }`}
                     >
-                        {tab.dot && <span className={`h-1.5 w-1.5 rounded-full ${tab.dot}`} aria-hidden="true"></span>}
+                        {/* An unreachable backend is not a network of zero stable cameras: the dot
+                            goes idle and the tally says "belum diketahui", same rule as the board. */}
+                        {tab.dot && <span className={`h-1.5 w-1.5 rounded-full ${unknown ? 'bg-status-idle' : tab.dot}`} aria-hidden="true"></span>}
                         {tab.label}
-                        <span className="font-mono tabular-nums text-content-subtle">({tab.count})</span>
+                        <span className="font-mono tabular-nums text-content-subtle">({unknown ? '…' : tab.count})</span>
                     </button>
                 );
             })}

@@ -211,3 +211,25 @@ describe('CameraReportForm', () => {
         expect(container.querySelector('form').getAttribute('class')).toContain('bg-surface-sunken');
     });
 });
+
+/*
+ * Safari iOS zooms the whole page in whenever a focused input/textarea is under 16px, and this
+ * form lives inside the public video popup — a visitor reporting an incident cannot redo the
+ * moment after pinching back out. Both controls ran at text-xs (12px) until 2026-08.
+ */
+describe('CameraReportForm on a phone', () => {
+    it('keeps every control at the 16px floor, shrinking only from sm up', async () => {
+        await renderOpen();
+        fireEvent.click(screen.getByRole('button', { name: 'Ada kejadian di rekaman' }));
+
+        for (const control of [
+            screen.getByLabelText(/Perkiraan waktu kejadian/),
+            screen.getByLabelText(/Keterangan/),
+        ]) {
+            const cls = control.getAttribute('class');
+            expect(cls).toContain('text-base');
+            expect(cls).toContain('sm:text-sm');
+            expect(cls).not.toMatch(/(^|\s)text-xs(\s|$)/);
+        }
+    });
+});

@@ -253,7 +253,7 @@ export default function PlaybackTokenAccess({
                         value={tokenInput}
                         onChange={(event) => onTokenInputChange(event.target.value)}
                         placeholder="Masukkan token akses"
-                        className="w-full rounded-control border border-edge bg-surface-raised px-3 py-2 text-sm text-content outline-none focus:border-primary"
+                        className="w-full rounded-control border border-edge bg-surface-raised px-3 py-2 text-base text-content outline-none focus:border-primary sm:text-sm"
                     />
                     {/*
                      * The one moment a visitor is being asked for something they may not have, so the

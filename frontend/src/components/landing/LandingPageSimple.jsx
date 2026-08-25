@@ -31,6 +31,10 @@ import { GridSkeleton, CameraCardSkeleton } from '../ui/Skeleton';
 const FeedbackWidget = lazyWithRetry(() => import('../FeedbackWidget'), 'feedback-widget-inline');
 const SaweriaSupport = lazyWithRetry(() => import('../SaweriaSupport'), 'saweria-support-inline');
 
+// Kept word-for-word in sync with LandingStatsBar (Full mode) — both modes must answer the same
+// outage the same way.
+const STATS_UNAVAILABLE_TEXT = 'Kami belum bisa mengambil data kamera saat ini.';
+
 const Icons = {
     Sun: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="4" /><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" /></svg>,
     Moon: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" /></svg>,
@@ -39,12 +43,16 @@ const Icons = {
 
 function SimpleHeader({ branding, layoutMode, onLayoutToggle, disableHeavyEffects = false }) {
     const { isDark, toggleTheme } = useTheme();
-    const { cameras } = useCameras();
+    const { cameras, loading, dataUnavailable } = useCameras();
     // backdrop-blur on a sticky header re-composites the scrolling content behind it on every frame —
     // the worst scroll-jank offender on weak GPUs. Drop it under the lite experience (or low/reduced-motion).
     const disableAnimations = disableHeavyEffects || shouldDisableAnimations();
     // Same canonical tally the Full navbar shows, so the operational pulse reads identically in both modes.
     const onlineCount = useMemo(() => getPublicCameraStats(cameras).online, [cameras]);
+    // Unknown ≠ zero. While loading, and when the initial load failed outright, the pulse must not
+    // assert a count — and it must not stay green, which would paint an outage as a healthy network.
+    const unknown = loading || dataUnavailable;
+    const isLive = !unknown && onlineCount > 0;
     const handleLayoutChange = (nextMode) => {
         if (nextMode !== layoutMode) {
             onLayoutToggle();
@@ -61,7 +69,7 @@ function SimpleHeader({ branding, layoutMode, onLayoutToggle, disableHeavyEffect
                                 <div className="flex h-8 w-8 items-center justify-center rounded-control bg-primary text-white">
                                     <span className="text-sm font-bold">{branding.logo_text}</span>
                                 </div>
-                                {onlineCount > 0 && (
+                                {isLive && (
                                     <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-status-live ring-2 ring-surface" aria-hidden="true"></span>
                                 )}
                             </div>
@@ -69,10 +77,19 @@ function SimpleHeader({ branding, layoutMode, onLayoutToggle, disableHeavyEffect
                         {/* Operational pulse — the command-deck identity, trimmed for the compact simple
                             header: live online count in mono. The clock/tagline that ride the Full navbar
                             are dropped to keep this mode light. */}
-                        <div className="flex min-w-0 items-center gap-1.5 rounded-control border border-edge bg-surface-sunken px-2 py-1" title="Kamera daring sekarang">
-                            <span className={`h-1.5 w-1.5 shrink-0 rounded-full bg-status-live ${disableAnimations ? '' : 'animate-pulse'}`} aria-hidden="true"></span>
-                            <span className="font-mono text-xs font-semibold tabular-nums text-content">{onlineCount}</span>
-                            <span className="hidden font-mono text-[10px] uppercase tracking-[0.12em] text-status-live sm:inline">Online</span>
+                        <div
+                            className="flex min-w-0 items-center gap-1.5 rounded-control border border-edge bg-surface-sunken px-2 py-1"
+                            title={dataUnavailable ? 'Data kamera belum bisa diambil' : 'Kamera daring sekarang'}
+                        >
+                            <span
+                                className={`h-1.5 w-1.5 shrink-0 rounded-full ${isLive ? `bg-status-live ${disableAnimations ? '' : 'animate-pulse'}` : dataUnavailable ? 'bg-status-warn' : 'bg-status-idle'}`}
+                                aria-hidden="true"
+                            ></span>
+                            <span className="font-mono text-xs font-semibold tabular-nums text-content">{unknown ? '…' : onlineCount}</span>
+                            <span className={`hidden font-mono text-[10px] uppercase tracking-[0.12em] sm:inline ${isLive ? 'text-status-live' : 'text-content-muted'}`}>
+                                {loading ? 'Memuat' : dataUnavailable ? 'Tak terhubung' : 'Online'}
+                            </span>
+                            <span className="sr-only">{dataUnavailable ? 'Data kamera belum bisa diambil' : `${unknown ? 'Memuat' : onlineCount} kamera daring`}</span>
                         </div>
                     </div>
 
@@ -115,13 +132,14 @@ function SimpleHeader({ branding, layoutMode, onLayoutToggle, disableHeavyEffect
 }
 
 function SimpleFooter({ branding, saweriaEnabled, saweriaLink }) {
-    const { cameras } = useCameras();
+    const { cameras, loading, dataUnavailable } = useCameras();
     const { online, total } = useMemo(() => getPublicCameraStats(cameras), [cameras]);
     const cityCount = useMemo(() => groupCamerasByCity(cameras).length, [cameras]);
+    const unknown = loading || dataUnavailable;
     const footerStats = [
         { key: 'unit', label: 'Unit', value: total, valueClass: 'text-content' },
         { key: 'kota', label: 'Kota', value: cityCount, valueClass: 'text-content' },
-        { key: 'online', label: 'Online', value: online, valueClass: 'text-status-live' },
+        { key: 'online', label: 'Online', value: online, valueClass: unknown || online === 0 ? 'text-content' : 'text-status-live' },
     ];
 
     return (
@@ -141,7 +159,7 @@ function SimpleFooter({ branding, saweriaEnabled, saweriaLink }) {
                         <div className="inline-flex items-stretch gap-px overflow-hidden rounded-control border border-edge bg-edge">
                             {footerStats.map((stat) => (
                                 <div key={stat.key} className="flex items-baseline gap-1.5 bg-surface px-3 py-1.5">
-                                    <span className={`font-mono text-sm font-bold tabular-nums ${stat.valueClass}`}>{stat.value}</span>
+                                    <span className={`font-mono text-sm font-bold tabular-nums ${stat.valueClass}`}>{unknown ? '…' : stat.value}</span>
                                     <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-content-subtle">{stat.label}</span>
                                 </div>
                             ))}
@@ -186,7 +204,7 @@ function SimpleFooter({ branding, saweriaEnabled, saweriaLink }) {
  * two modes never disagree on how many cameras are online.
  */
 function SimpleStatusOverview({ disableHeavyEffects = false }) {
-    const { cameras, loading } = useCameras();
+    const { cameras, loading, dataUnavailable, refreshData } = useCameras();
 
     const { online, offline, total } = useMemo(() => getPublicCameraStats(cameras), [cameras]);
     // Kota (city) rollup — the public identity is a multi-city network, so cities are a
@@ -203,6 +221,9 @@ function SimpleStatusOverview({ disableHeavyEffects = false }) {
 
     // Motion gate: lite experience OR OS reduce-motion preference (a11y).
     const disableAnimations = disableHeavyEffects || shouldDisableAnimations();
+    // Three states, same as Full mode: memuat / tak terjangkau / ada data. Both unknown states
+    // render '…' — a hard 0 here would report an outage as a network that owns no cameras.
+    const unknown = loading || dataUnavailable;
 
     const metrics = [
         { key: 'online', label: 'Online', value: online, valueClass: 'text-status-live' },
@@ -223,8 +244,8 @@ function SimpleStatusOverview({ disableHeavyEffects = false }) {
                 <div className="grid grid-cols-2 gap-px overflow-hidden rounded-control border border-edge bg-edge sm:grid-cols-4">
                     {metrics.map((metric) => (
                         <div key={metric.key} className="flex flex-col gap-0.5 bg-surface px-3 py-2.5">
-                            <span className={`font-mono text-xl font-bold leading-none tabular-nums ${metric.valueClass}`}>
-                                {loading ? '…' : metric.value}
+                            <span className={`font-mono text-xl font-bold leading-none tabular-nums ${unknown ? 'text-content-subtle' : metric.valueClass}`}>
+                                {unknown ? '…' : metric.value}
                             </span>
                             <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-content-subtle">{metric.label}</span>
                         </div>
@@ -233,11 +254,24 @@ function SimpleStatusOverview({ disableHeavyEffects = false }) {
 
                 <div className="mt-2.5 flex items-center justify-between border-t border-edge pt-2.5">
                     <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-content-subtle">Menonton sekarang</span>
-                    <span className="flex items-center gap-1.5 font-mono text-sm font-semibold tabular-nums text-data">
-                        <span className={`h-1.5 w-1.5 rounded-full bg-data ${disableAnimations ? '' : 'animate-pulse'}`} aria-hidden="true"></span>
-                        {liveViewersNow.toLocaleString('id-ID')}
+                    <span className={`flex items-center gap-1.5 font-mono text-sm font-semibold tabular-nums ${unknown ? 'text-content-subtle' : 'text-data'}`}>
+                        <span className={`h-1.5 w-1.5 rounded-full ${unknown ? 'bg-status-idle' : `bg-data ${disableAnimations ? '' : 'animate-pulse'}`}`} aria-hidden="true"></span>
+                        {unknown ? '…' : liveViewersNow.toLocaleString('id-ID')}
                     </span>
                 </div>
+
+                {dataUnavailable && (
+                    <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-edge pt-2.5">
+                        <p className="text-xs text-content-muted">{STATS_UNAVAILABLE_TEXT}</p>
+                        <button
+                            type="button"
+                            onClick={() => refreshData?.({ mode: 'initial' })}
+                            className="rounded-control border border-edge px-2.5 py-1 text-xs font-medium text-content transition-colors hover:border-edge-strong hover:bg-surface-raised"
+                        >
+                            Coba lagi
+                        </button>
+                    </div>
+                )}
 
                 {cities.length > 0 && (
                     <div className="mt-2.5 flex flex-wrap items-center gap-1.5">

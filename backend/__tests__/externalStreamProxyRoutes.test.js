@@ -1,18 +1,43 @@
 /*
-Purpose: Verify the opaque /api/stream/:cameraId/external.* routes — playlist rewriting, segment validation, cache hits, refusal paths.
+Purpose: Verify the opaque /api/stream/:cameraId/external.* routes — playlist rewriting, segment validation, cache-header posture, refusal paths.
 Caller: Vitest backend suite.
-Deps: vitest, externalStreamProxyRoutes pure helpers.
-MainFuncs: tests for buildOpaqueSegmentUrl, rewriteOpaquePlaylist, resolveSegmentTargetUrl.
-SideEffects: None — these tests exercise the pure helpers; route handlers are integration-tested via the live server in dev.
+Deps: vitest, fastify (real instance for the header assertions), externalStreamProxyRoutes helpers; camera access/health + upstream fetch mocked.
+MainFuncs: tests for buildOpaqueSegmentUrl, rewriteOpaquePlaylist, resolveSegmentTargetUrl, and Cache-Control by camera class.
+SideEffects: None — no DB and no network: the camera row, access decision and upstream fetch are all injected/mocked.
 */
 
-import { describe, expect, it } from 'vitest';
+import Fastify from 'fastify';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
     buildOpaqueSegmentUrl,
     rewriteOpaquePlaylist,
     resolveSegmentTargetUrl,
     buildSegmentCacheKey,
+    registerExternalStreamProxyRoutes,
 } from '../services/externalStreamProxyService.js';
+import { createSegmentCache } from '../services/externalStreamCache.js';
+
+// Access decision for the route tests below — swapped per test, never read from the DB.
+const gate = vi.hoisted(() => ({ info: null, decision: { allowed: true } }));
+
+vi.mock('../services/cameraHealthService.js', () => ({
+    default: { recordRuntimeSignal: vi.fn() },
+}));
+
+vi.mock('../services/cameraAccessService.js', async (importOriginal) => ({
+    ...(await importOriginal()),
+    getAccessInfo: () => gate.info,
+    canViewLive: () => gate.decision,
+}));
+
+vi.mock('../services/hlsProxyService.js', async (importOriginal) => ({
+    ...(await importOriginal()),
+    fetchBufferedBinaryUpstream: async () => ({
+        controller: { abort: () => {} },
+        response: { status: 200 },
+        data: Buffer.from('upstream-bytes'),
+    }),
+}));
 
 describe('externalStreamProxyRoutes — buildOpaqueSegmentUrl', () => {
     const playlistUrl = 'https://cctv.example.gov.id/live/cam7/playlist.m3u8';
@@ -324,5 +349,129 @@ describe('externalStreamProxyRoutes — buildSegmentCacheKey', () => {
         const key = buildSegmentCacheKey(7, 'https://h/seg.ts?session=AAA&q=720p');
         expect(key).toContain('q=720p');
         expect(key).not.toContain('session');
+    });
+});
+
+describe('externalStreamProxyRoutes — Cache-Control follows the camera class, not the content type', () => {
+    /*
+     * This deployment sits behind Cloudflare. A segment (or an AES key file — #EXT-X-KEY URIs are
+     * rewritten onto this same /external-segment endpoint) served as `public, s-maxage=60` is
+     * replayed from the edge for the whole TTL WITHOUT the tenancy/billing gate ever running again.
+     * So only a camera proven to be `community` may carry the edge-cacheable header; everything
+     * else — owner_private, subscriber, and voucher-gated community — must be private/no-store.
+     * The sibling /hls/* proxy already does this (hlsProxyRoutes.js isGatedCamera).
+     */
+    const EDGE_CACHEABLE = 'public, max-age=60, s-maxage=60, immutable';
+    const BASE = 'https://cctv.example.gov.id/live/cam7/';
+
+    const routeState = {
+        getViewerIdentity: () => 'unknown',
+        getOrCreateSession: async () => {},
+        recordSegmentAccess: async () => {},
+        start: () => {},
+        stop: async () => {},
+    };
+
+    async function buildProxy(segmentCache) {
+        const fastify = Fastify();
+        await fastify.register(registerExternalStreamProxyRoutes, {
+            prefix: '/api/stream',
+            allowPrivateHosts: false,
+            allowedHosts: [],
+            httpClient: {},
+            routeState,
+            segmentCache,
+            cameraCache: new Map([['7', {
+                camera: {
+                    id: 7,
+                    stream_source: 'external',
+                    external_hls_url: `${BASE}playlist.m3u8`,
+                    external_use_proxy: 1,
+                    external_tls_mode: 'strict',
+                },
+                expiresAt: Date.now() + 600000,
+            }]]),
+            lastGoodMaster: new Map([[7, {
+                body: '#EXTM3U',
+                contentType: 'application/vnd.apple.mpegurl',
+                storedAt: Date.now(),
+            }]]),
+        });
+        return fastify;
+    }
+
+    async function inject(url, { preCached } = {}) {
+        const segmentCache = createSegmentCache();
+        if (preCached) {
+            segmentCache.set(
+                buildSegmentCacheKey(7, `${BASE}${preCached}`),
+                { statusCode: 200, contentType: 'video/mp2t', body: Buffer.from('cached-bytes') },
+                60000,
+            );
+        }
+        const fastify = await buildProxy(segmentCache);
+        const response = await fastify.inject({ method: 'GET', url });
+        await fastify.close();
+        return response;
+    }
+
+    beforeEach(() => {
+        gate.info = { camera_class: 'community' };
+        gate.decision = { allowed: true };
+    });
+
+    it('lets a community segment stay edge-cacheable (cache hit)', async () => {
+        const response = await inject('/api/stream/7/external-segment/chunk_001.ts', { preCached: 'chunk_001.ts' });
+        expect(response.statusCode).toBe(200);
+        expect(response.headers['x-rafnet-proxy-cache']).toBe('HIT');
+        expect(response.headers['cache-control']).toBe(EDGE_CACHEABLE);
+    });
+
+    it('keeps a subscriber segment out of any shared cache (cache hit)', async () => {
+        gate.info = { camera_class: 'subscriber' };
+        const response = await inject('/api/stream/7/external-segment/chunk_001.ts', { preCached: 'chunk_001.ts' });
+        expect(response.statusCode).toBe(200);
+        expect(response.headers['cache-control']).toBe('private, no-store');
+    });
+
+    it('keeps an owner_private segment out of any shared cache (cache miss → upstream)', async () => {
+        gate.info = { camera_class: 'owner_private' };
+        const response = await inject('/api/stream/7/external-segment/chunk_002.ts');
+        expect(response.statusCode).toBe(200);
+        expect(response.headers['x-rafnet-proxy-cache']).toBe('MISS');
+        expect(response.headers['cache-control']).toBe('private, no-store');
+    });
+
+    it('keeps a gated AES key file out of any shared cache', async () => {
+        // #EXT-X-KEY / #EXT-X-SESSION-KEY URIs are rewritten onto this same endpoint, so the key
+        // bytes travel the segment path — a cached key is the whole stream, handed out gate-free.
+        gate.info = { camera_class: 'subscriber' };
+        const response = await inject('/api/stream/7/external-segment/enc.key');
+        expect(response.statusCode).toBe(200);
+        expect(response.headers['cache-control']).toBe('private, no-store');
+    });
+
+    it('keeps a voucher-gated community segment out of any shared cache', async () => {
+        gate.decision = { allowed: true, voucherGated: true };
+        const response = await inject('/api/stream/7/external-segment/chunk_001.ts', { preCached: 'chunk_001.ts' });
+        expect(response.statusCode).toBe(200);
+        expect(response.headers['cache-control']).toBe('private, no-store');
+    });
+
+    it('never edge-caches the playlist itself, whatever the class', async () => {
+        for (const cameraClass of ['community', 'subscriber']) {
+            gate.info = { camera_class: cameraClass };
+            const response = await inject('/api/stream/7/external.m3u8');
+            expect(response.statusCode).toBe(200);
+            expect(response.headers['cache-control']).toBe('no-cache, no-store, must-revalidate');
+        }
+    });
+
+    it('refuses a denied viewer without caching the refusal', async () => {
+        gate.info = { camera_class: 'subscriber' };
+        gate.decision = { allowed: false, statusCode: 402 };
+        const response = await inject('/api/stream/7/external-segment/chunk_001.ts', { preCached: 'chunk_001.ts' });
+        expect(response.statusCode).toBe(402);
+        expect(response.headers['cache-control']).toBe('no-store');
     });
 });

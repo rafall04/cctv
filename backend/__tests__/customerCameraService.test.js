@@ -202,6 +202,40 @@ describe('customerCameraService', () => {
         expect(sub.status).toBe('active');
     });
 
+    // The leak this guards: the row used to be INSERTed with the column default ('community') and
+    // only reclassed by assignSubscription several I/O steps later. 'community' is the ONE branch of
+    // the public filter that ignores is_public, so during that window the camera was fully public —
+    // permanently so if the process died in the middle.
+    it('asks cameraService to be born subscriber-owned, not community', async () => {
+        await customerCameraService.createOwnCamera(CUSTOMER, {
+            name: 'Kamera Lahir', private_rtsp_url: 'rtsp://192.168.1.10:554/ch1',
+        }, { user: CUSTOMER });
+
+        expect(createCameraMock).toHaveBeenCalledWith(
+            expect.objectContaining({ camera_class: 'subscriber', owner_user_id: 42 }),
+            expect.anything()
+        );
+    });
+
+    it('leaves no public row behind when the process dies before assignSubscription', async () => {
+        // Mock persists exactly what it is told, then dies the way an OOM/restart would.
+        createCameraMock.mockImplementation(async (data) => {
+            db.prepare('INSERT INTO cameras (name, camera_class, owner_user_id) VALUES (?, ?, ?)')
+                .run(data.name, data.camera_class ?? 'community', data.owner_user_id ?? null);
+            throw new Error('proses mati sebelum billing');
+        });
+
+        await expect(customerCameraService.createOwnCamera(CUSTOMER, {
+            name: 'Kamera Nyangkut', private_rtsp_url: 'rtsp://192.168.1.10:554/ch1', is_public: true,
+        }, { user: CUSTOMER })).rejects.toThrow('proses mati sebelum billing');
+
+        const row = db.prepare("SELECT camera_class, owner_user_id, is_public FROM cameras WHERE name = 'Kamera Nyangkut'").get();
+        expect(row.camera_class).not.toBe('community'); // the fail-open default is what leaked
+        expect(row.camera_class).toBe('subscriber');
+        expect(row.owner_user_id).toBe(42);
+        expect(row.is_public).toBe(0);
+    });
+
     it('passes the chosen public area_id through to cameraService on create', async () => {
         await customerCameraService.createOwnCamera(CUSTOMER, {
             name: 'Kamera Dander',

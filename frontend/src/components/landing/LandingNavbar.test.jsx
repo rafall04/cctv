@@ -19,9 +19,17 @@ vi.mock('../../contexts/ThemeContext', () => ({
     }),
 }));
 
+const cameraContextState = {
+    cameras: [{ id: 1, status: 'active', is_online: 1 }],
+    loading: false,
+    dataUnavailable: false,
+};
+
 vi.mock('../../contexts/CameraContext', () => ({
     useCameras: () => ({
-        cameras: [{ id: 1 }],
+        cameras: cameraContextState.cameras,
+        loading: cameraContextState.loading,
+        dataUnavailable: cameraContextState.dataUnavailable,
     }),
 }));
 
@@ -57,5 +65,26 @@ describe('LandingNavbar', () => {
 
         fireEvent.click(screen.getByRole('tab', { name: /simple/i }));
         expect(onLayoutToggle).toHaveBeenCalledTimes(1);
+    });
+
+    // Outage honesty: a green pulse next to "0" told visitors the network was healthy and empty.
+    it('tidak menyatakan angka nol dan tidak menyalakan titik hijau saat data gagal diambil', () => {
+        cameraContextState.cameras = [];
+        cameraContextState.dataUnavailable = true;
+
+        render(
+            <MemoryRouter>
+                <LandingNavbar branding={branding} layoutMode="full" onLayoutToggle={vi.fn()} />
+            </MemoryRouter>
+        );
+
+        expect(screen.queryAllByText('0')).toHaveLength(0);
+        expect(screen.getByText('…')).toBeTruthy();
+        expect(screen.getByText('Tak terhubung')).toBeTruthy();
+        expect(screen.queryByText('Online')).toBeNull();
+        expect([...document.querySelectorAll('[class*="status-live"]')]).toHaveLength(0);
+
+        cameraContextState.cameras = [{ id: 1, status: 'active', is_online: 1 }];
+        cameraContextState.dataUnavailable = false;
     });
 });

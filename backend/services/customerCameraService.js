@@ -120,7 +120,12 @@ class CustomerCameraService {
 
         // cameraService handles stream_key generation, MediaMTX path add, cache busts,
         // area_id storage, and the audit log (request.user = the customer — truthful trail).
+        // camera_class/owner_user_id go in the INSERT: the row is never 'community', not even for
+        // the MediaMTX round-trip before assignSubscription reclasses it. A crash mid-way now
+        // leaves a private orphan, not a permanently public one.
         const created = await cameraService.createCamera({
+            camera_class: 'subscriber',
+            owner_user_id: user.id,
             name,
             private_rtsp_url: rtsp.url,
             description,
@@ -133,22 +138,22 @@ class CustomerCameraService {
             delivery_type: 'internal_hls',
         }, request);
 
-        // Publish flag (subscriber-only column; default private). Shows on the public hub
-        // only while actively paid — enforced by PUBLIC_LIVE_SQL + canViewLive.
-        if (isPublic) {
-            execute('UPDATE cameras SET is_public = 1 WHERE id = ?', [created.id]);
-            invalidateCameraAccessCache(created.id);
-        }
-
-        // Tenancy + billing wiring: subscriber class, owner, plan-priced subscription
-        // (day-one charge / trial handling happens inside assignSubscription).
-        // No explicit price: assignSubscription derives it from the plan and the camera's own
-        // recording flag. Passing price_per_camera here would hard-code the watch-only tariff and
-        // quietly drop the recording surcharge the day customer cameras can record.
+        // Billing wiring: plan-priced subscription, day-one charge / trial handling inside
+        // assignSubscription. No explicit price: passing price_per_camera here would hard-code the
+        // watch-only tariff and quietly drop the recording surcharge the day customer cameras record.
         const subscription = billingService.assignSubscription({
             camera_id: created.id,
             user_id: user.id,
         }, request);
+
+        // Publish flag (subscriber-only column; default private), set AFTER assignSubscription —
+        // that call unpublishes on a handover, and this publish is the owner's own explicit choice.
+        // Shows on the public hub only while actively paid — PUBLIC_LIVE_SQL + canViewLive.
+        if (isPublic) {
+            execute('UPDATE cameras SET is_public = 1 WHERE id = ?', [created.id]);
+            invalidateCameraAccessCache(created.id);
+            cameraService.invalidateCameraCache();
+        }
 
         return {
             id: created.id,

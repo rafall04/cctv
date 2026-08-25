@@ -1,12 +1,11 @@
 /*
  * Purpose: Render public landing camera workspace with capped search, area filters, ranking tabs, grid/map/playback modes, and empty states.
  * Caller: LandingPage and LandingPageSimple.
- * Deps: Camera context, public filter hook, map preloader, landing toolbar/filter/grid/map/playback components.
+ * Deps: Camera context, public filter hook, map preloader, chunk-retry loader, landing toolbar/filter/grid/map/playback components.
  * MainFuncs: CamerasSection, renderSearchDropdown.
  * SideEffects: Invokes camera popup, map focus, multiview, favorite, and mode-change callbacks.
  */
 
-import { lazy } from 'react';
 import { useCameras } from '../../contexts/CameraContext';
 import { useLandingCameraFilters } from '../../hooks/public/useLandingCameraFilters';
 import { GridSkeleton, CameraCardSkeleton } from '../ui/Skeleton';
@@ -20,11 +19,15 @@ import LandingResultsGrid from './LandingResultsGrid';
 import LandingMapPanel from './LandingMapPanel';
 import LandingPlaybackPanel from './LandingPlaybackPanel';
 import { preloadLandingMapView } from '../../utils/preloadLandingMapView';
+import { lazyWithRetry } from '../../utils/lazyWithRetry';
 
-const MapView = lazy(() => preloadLandingMapView());
+// lazyWithRetry, never bare lazy(): map is the default desktop view, and a plain lazy() that once
+// failed keeps throwing the cached rejection forever — one dropped chunk killed the public page for
+// the rest of the visit.
+const MapView = lazyWithRetry(() => preloadLandingMapView(), 'landing-map-view');
 // Lazy so Playback (recordingService + playback tree) stays out of the eager landing bundle; it is only
 // needed when the user switches to playback view mode. LandingPlaybackPanel renders it inside <Suspense>.
-const Playback = lazy(() => import('../../pages/Playback'));
+const Playback = lazyWithRetry(() => import('../../pages/Playback'), 'landing-playback');
 
 export function renderSearchDropdown({
     cameras,
@@ -200,6 +203,7 @@ export default function CamerasSection({
                         areaFilteredCameras={areaFilteredCameras}
                         favorites={favorites}
                         favoritesInAreaCount={favoritesInAreaCount}
+                        unknown={loading || (Boolean(error) && cameras.length === 0)}
                     />
                 )}
             </div>

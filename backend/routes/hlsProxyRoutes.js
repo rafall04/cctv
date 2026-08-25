@@ -90,28 +90,28 @@ export default async function hlsProxyRoutes(fastify, _options) {
         // cached (30s TTL), so suspension propagates to live streams within
         // seconds without a DB hit per segment.
         const accessInfo = resolveHlsAccessInfo(cameraPath);
-        // Always run the gate when we know the camera: community streams may be voucher-gated
-        // (an admin-marked area while the feature is on), which the old `!== community`
-        // short-circuit would have skipped. canViewLive returns voucherGated so we can keep the
-        // stream out of shared/edge caches.
-        let isGatedCamera = false;
-        if (accessInfo) {
-            const access = canViewLive({
-                info: accessInfo,
-                user: resolveHlsViewerUser(request),
-                streamToken: request.streamToken || null,
-                voucherDeviceHash: readVoucherDeviceHash(request),
-            });
-            isGatedCamera = accessInfo.camera_class !== 'community' || access.voucherGated === true;
-            if (access.voucherGated) {
-                request.voucherPrivate = true;
-            }
-            if (!access.allowed) {
-                reply.header('Content-Type', 'text/plain');
-                reply.header('Cache-Control', 'no-store');
-                const code = access.statusCode === 402 ? 402 : 403;
-                return reply.code(code).send('');
-            }
+        // The gate runs on EVERY path, including one with no camera row (accessInfo null).
+        // Fail-CLOSED is the point: MediaMTX keeps serving a path after its camera row is gone,
+        // so skipping the gate on an unknown row turned a deleted owner_private/subscriber
+        // stream fully public. canViewLive refuses null info (camera_not_found), and an
+        // unresolvable path counts as gated so it can never reach a shared/edge cache.
+        // Running it for community rows too matters: they may be voucher-gated (an admin-marked
+        // area while the feature is on), which the old `!== community` short-circuit skipped.
+        const access = canViewLive({
+            info: accessInfo,
+            user: resolveHlsViewerUser(request),
+            streamToken: request.streamToken || null,
+            voucherDeviceHash: readVoucherDeviceHash(request),
+        });
+        const isGatedCamera = accessInfo?.camera_class !== 'community' || access.voucherGated === true;
+        if (access.voucherGated) {
+            request.voucherPrivate = true;
+        }
+        if (!access.allowed) {
+            reply.header('Content-Type', 'text/plain');
+            reply.header('Cache-Control', 'no-store');
+            const code = access.statusCode === 402 ? 402 : 403;
+            return reply.code(code).send('');
         }
 
         // Anti-hotlink gate for COMMUNITY playlists: a community stream is public

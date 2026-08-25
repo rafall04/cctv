@@ -71,3 +71,53 @@ describe('billingService.healOrphanedSubscriberCameras', () => {
         expect(billingService.healOrphanedSubscriberCameras()).toMatchObject({ healed: 0, cameraIds: [] });
     });
 });
+
+/*
+ * Recovery for rows that were born 'community' (the old fail-open INSERT default) and never got
+ * reclassed. Such a row is fully public no matter what is_public says, forever. The sweep must be
+ * PRECISE: a genuine community camera has neither an owner nor a subscription, and must not move.
+ */
+describe('billingService.healMisclassedSubscriberCameras', () => {
+    it('reclasses + unpublishes a rental proven by its subscription row', () => {
+        db.prepare("INSERT INTO cameras (id, name, owner_user_id, camera_class, is_public) VALUES (20, 'Nyangkut', NULL, 'community', 1)").run();
+        db.prepare("INSERT INTO camera_subscriptions (camera_id, user_id, monthly_price, status) VALUES (20, 42, 20000, 'active')").run();
+
+        expect(billingService.healMisclassedSubscriberCameras()).toMatchObject({ healed: 1, cameraIds: [20] });
+
+        const fixed = db.prepare('SELECT camera_class, is_public, billing_status, owner_user_id FROM cameras WHERE id = 20').get();
+        expect(fixed.camera_class).toBe('subscriber');
+        expect(fixed.is_public).toBe(0);
+        expect(fixed.billing_status).toBe('suspended'); // fail closed until billing says otherwise
+        expect(fixed.owner_user_id).toBe(42);           // recovered from the subscription
+    });
+
+    it('reclasses a rental proven by owner_user_id alone (crash before the subscription landed)', () => {
+        db.prepare("INSERT INTO cameras (id, name, owner_user_id, camera_class, is_public) VALUES (21, 'Setengah Jadi', 42, 'community', 1)").run();
+
+        expect(billingService.healMisclassedSubscriberCameras()).toMatchObject({ healed: 1, cameraIds: [21] });
+        const fixed = db.prepare('SELECT camera_class, is_public, owner_user_id FROM cameras WHERE id = 21').get();
+        expect(fixed.camera_class).toBe('subscriber');
+        expect(fixed.is_public).toBe(0);
+        expect(fixed.owner_user_id).toBe(42);
+    });
+
+    it('never touches a genuine community camera, not even a cancelled-subscription one', () => {
+        // id 12 is the plain community camera from the seed. Add one whose subscription was cancelled
+        // and which was then legitimately handed back to the community pool (owner cleared).
+        db.prepare("INSERT INTO cameras (id, name, owner_user_id, camera_class, is_public) VALUES (22, 'Bekas Sewa', NULL, 'community', 0)").run();
+        db.prepare("INSERT INTO camera_subscriptions (camera_id, user_id, monthly_price, status) VALUES (22, 42, 20000, 'cancelled')").run();
+
+        expect(billingService.healMisclassedSubscriberCameras()).toMatchObject({ healed: 0, cameraIds: [] });
+        expect(db.prepare('SELECT camera_class FROM cameras WHERE id = 12').get().camera_class).toBe('community');
+        expect(db.prepare('SELECT camera_class FROM cameras WHERE id = 22').get().camera_class).toBe('community');
+    });
+
+    it('runs as part of the orphan sweep, so the admin endpoint and boot both cover it', () => {
+        db.prepare("INSERT INTO cameras (id, name, owner_user_id, camera_class, is_public) VALUES (23, 'Nyangkut2', 42, 'community', 1)").run();
+
+        const res = billingService.healOrphanedSubscriberCameras();
+        expect(res.cameraIds).toEqual(expect.arrayContaining([23, 10]));
+        expect(db.prepare('SELECT camera_class, is_public FROM cameras WHERE id = 23').get())
+            .toMatchObject({ camera_class: 'subscriber', is_public: 0 });
+    });
+});

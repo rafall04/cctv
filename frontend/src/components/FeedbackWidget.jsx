@@ -102,10 +102,16 @@ export default function FeedbackWidget() {
                  * the screen it widens the page itself — and `100vw` resolves against the
                  * initial containing block, which is exactly what grows once a page starts
                  * overflowing. `left-4 right-4` can only ever be viewport minus its margins.
+                 *
+                 * `invisible` when closed, not just transparent: the panel is never unmounted, so
+                 * without it the three fields and the submit button keep taking Tab — four unseen
+                 * stops at the end of every public page. `visibility` still transitions (it flips
+                 * at the end of the fade), so the animation is unchanged.
                  */
                 className={`fixed bottom-24 left-4 right-4 z-fab transition-all duration-300 sm:bottom-6 sm:left-auto sm:right-6 sm:w-96 ${
-                    isOpen ? 'scale-100 opacity-100' : 'scale-0 opacity-0 pointer-events-none'
+                    isOpen ? 'scale-100 opacity-100' : 'scale-0 opacity-0 pointer-events-none invisible'
                 }`}
+                aria-hidden={isOpen ? undefined : true}
             >
                 <div className="bg-surface rounded-card shadow-e2 border border-edge overflow-hidden">
                     {/* Header */}
@@ -115,11 +121,13 @@ export default function FeedbackWidget() {
                             <span className="font-semibold">Kritik & Saran</span>
                         </div>
                         <button
+                            type="button"
                             onClick={() => {
                                 setIsOpen(false);
                                 setIsSuccess(false);
                                 setError('');
                             }}
+                            aria-label="Tutup kritik & saran"
                             className="p-1 hover:bg-white/20 rounded-lg transition-colors text-white"
                         >
                             <Icons.X />

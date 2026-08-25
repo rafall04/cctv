@@ -72,12 +72,26 @@ test.beforeEach(async ({ page, context }) => {
     await page.emulateMedia({ reducedMotion: 'reduce', colorScheme: 'dark' });
 });
 
-/* [path, minimum text nodes expected] — the floor guards against a page that failed to render at
- * all, which would otherwise let the audit pass by measuring nothing. */
+/* [path, minimum text nodes expected, audits the donation widget] — the floor guards against a
+ * page that failed to render at all, which would otherwise let the audit pass by measuring nothing.
+ *
+ * The donation widget is public chrome that paints its OWN brand colours, and the blanket
+ * empty-success mock above answers "is the ask on?" with NO — so it never rendered here and its
+ * white-on-amber header (2.15) shipped unmeasured for months. A guard that mocks a feature off
+ * cannot guard it, so the simple shell switches the config on and waits for the banner: it arrives
+ * late on purpose (deferred mount, opens at 3s, folds itself away at 12s), and auditing before it
+ * exists is the same blindness as never enabling it.
+ *
+ * `/?mode=full` deliberately does NOT do this yet: its footer still paints `bg-amber-500` under
+ * white text — the identical 2.15 pair, in LandingFooter.jsx. Turn the flag on there in the same
+ * change that fixes that button. Adding the pair to TOLERATED instead would be worse than useless:
+ * TOLERATED keys on the colour PAIR, so excusing it once would re-blind this guard to white on
+ * amber-500 everywhere, including the widget it was just fixed in. */
 /* /sewa/ carries its own stylesheet rather than the app's tokens, so nothing the app-wide dark
  * palette guarantees applies to it. Trailing slash on purpose — it is static HTML in public/sewa/,
  * and only the directory form resolves to it under `vite preview`. */
-const PAGES = [['/', 6], ['/?mode=full', 6], ['/login', 4], ['/playback', 2], ['/sewa/', 20]];
+const BANNER = '[data-testid="saweria-floating-banner"]';
+const PAGES = [['/', 6, true], ['/?mode=full', 6], ['/login', 4], ['/playback', 2], ['/sewa/', 20]];
 
 const AUDIT = () => {
     const rgb = (s) => (s.match(/[\d.]+/g) || []).map(Number);
@@ -127,14 +141,26 @@ const AUDIT = () => {
     return out;
 };
 
-for (const [path, minNodes] of PAGES) {
+for (const [path, minNodes, auditsDonationWidget] of PAGES) {
     test(`no unreadable text on ${path} in dark mode`, async ({ page }) => {
+        if (auditsDonationWidget) {
+            // A page route outranks the blanket context route registered in beforeEach.
+            await page.route('**/api/saweria/config', (route) => route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({ success: true, data: { enabled: true } }),
+            }));
+        }
         await page.goto(path, { waitUntil: 'networkidle' });
         // Dark mode is where an unthemed foreground turns invisible; light mode hides the bug.
         await page.evaluate(() => {
             document.documentElement.classList.remove('light');
             document.documentElement.classList.add('dark');
         });
+        if (auditsDonationWidget) {
+            // Open card, not the folded bubble: the bubble has no text to measure.
+            await page.waitForSelector(`${BANNER} >> text=Dukung Kami`, { timeout: 10_000 });
+        }
         await page.waitForTimeout(1500);
 
         const found = await page.evaluate(AUDIT);

@@ -20,7 +20,7 @@ export default function LandingCitySwitch({ selectedCity, onChange, cityOptions,
             type="button"
             onClick={() => onChange(key)}
             aria-pressed={active}
-            className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 font-mono text-[11px] tracking-tight transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+            className={`flex min-h-[40px] shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 font-mono text-[11px] tracking-tight transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary sm:min-h-0 ${
                 active
                     ? 'border-primary bg-primary/10 text-content'
                     : 'border-edge bg-surface text-content-muted hover:border-edge-strong hover:text-content'
@@ -32,9 +32,12 @@ export default function LandingCitySwitch({ selectedCity, onChange, cityOptions,
     );
 
     return (
-        <div className="flex items-center gap-2.5">
+        <div className="flex max-w-full items-center gap-2.5">
             <span className="shrink-0 font-mono text-[10px] uppercase tracking-[0.12em] text-content-subtle">Kota</span>
-            <div className="no-scrollbar flex gap-2 overflow-x-auto">
+            {/* min-w-0 + max-w-full + [contain:paint] — see LandingDiscoveryStrip for the incident:
+                a horizontal strip's overflow otherwise widens the document itself, and an in-app
+                WebView fits its initial zoom to that width, shrinking the whole page. */}
+            <div className="no-scrollbar -m-1 flex min-w-0 max-w-full gap-2 overflow-x-auto p-1 [contain:paint] [-webkit-overflow-scrolling:touch]">
                 {renderChip('all', 'Semua', totalCount, selectedCity === 'all')}
                 {cityOptions.map((city) => renderChip(city.key, city.label, city.count, selectedCity === city.key))}
             </div>

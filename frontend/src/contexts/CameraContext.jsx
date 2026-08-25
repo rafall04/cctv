@@ -216,6 +216,10 @@ export function CameraProvider({ children, autoRefresh = true }) {
         areas,
         loading,
         error: initialLoadError,
+        // Initial load failed and nothing was ever loaded. Public surfaces must render the
+        // "belum diketahui" placeholder here — a hard 0 reads as a factual "this network has
+        // no cameras", which is exactly what an outage must never claim.
+        dataUnavailable: Boolean(initialLoadError) && cameras.length === 0,
         recoverableError: backgroundRefreshError,
         initialLoadError,
         backgroundRefreshError,

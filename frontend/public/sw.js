@@ -46,6 +46,13 @@ function offlineFallback() {
     );
 }
 
+function isCacheableShell(response, url) {
+    if (!response.ok || url.origin !== self.location.origin) {
+        return false;
+    }
+    return (response.headers.get('content-type') || '').includes('text/html');
+}
+
 self.addEventListener('install', (event) => {
     event.waitUntil(caches.open(RAFNET_CCTV_CACHE).then((cache) => cache.addAll(APP_SHELL_URLS)));
 });
@@ -81,8 +88,15 @@ self.addEventListener('fetch', (event) => {
         event.respondWith(
             fetch(request)
                 .then((response) => {
-                    const copy = response.clone();
-                    caches.open(RAFNET_CCTV_CACHE).then((cache) => cache.put('/', copy));
+                    // Only OUR OWN successful HTML is allowed to become the app shell. A
+                    // Cloudflare/nginx outage page is a perfectly valid HTTP response, so caching
+                    // navigations unconditionally stored the outage as the shell and kept serving
+                    // it after the server recovered. Same guard as the asset branch below, plus a
+                    // content-type check because '/' must be a document.
+                    if (isCacheableShell(response, url)) {
+                        const copy = response.clone();
+                        caches.open(RAFNET_CCTV_CACHE).then((cache) => cache.put('/', copy));
+                    }
                     return response;
                 })
                 .catch(() => caches.match('/').then((cached) => cached || offlineFallback()))

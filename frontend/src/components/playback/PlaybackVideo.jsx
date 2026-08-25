@@ -368,7 +368,7 @@ export default function PlaybackVideo({
                         <button
                             key={speed}
                             onClick={() => onSpeedChange(speed)}
-                            className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all shadow-lg ${
+                            className={`min-h-11 px-2 py-1 sm:min-h-0 sm:px-3 sm:py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all shadow-lg ${
                                 playbackSpeed === speed
                                     ? 'bg-primary-500 text-white scale-110'
                                     : 'bg-black/70 text-white hover:bg-black/90 hover:scale-105'

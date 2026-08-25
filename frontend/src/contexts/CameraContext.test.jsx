@@ -41,6 +41,8 @@ vi.mock('../utils/deviceDetector', () => ({
 function CameraConsumer() {
     const {
         cameras,
+        loading,
+        dataUnavailable,
         initialLoadError,
         backgroundRefreshError,
     } = useCameras();
@@ -48,6 +50,8 @@ function CameraConsumer() {
     return (
         <div>
             <div data-testid="camera-count">{cameras.length}</div>
+            <div data-testid="loading">{loading ? 'yes' : 'no'}</div>
+            <div data-testid="data-unavailable">{dataUnavailable ? 'yes' : 'no'}</div>
             <div data-testid="initial-error">{initialLoadError ? 'yes' : 'no'}</div>
             <div data-testid="background-error">{backgroundRefreshError ? 'yes' : 'no'}</div>
         </div>
@@ -68,6 +72,32 @@ describe('CameraContext', () => {
             configurable: true,
             value: 'visible',
         });
+    });
+
+    /*
+     * The public surfaces need a THIRD state. Before this flag they only had loading/not-loading,
+     * so a failed initial load retired the "…" placeholder and let every counter print a hard 0 —
+     * a total outage rendered as a factual report of a network with zero cameras.
+     */
+    it('menandai data belum bisa diambil saat pemuatan awal gagal total', async () => {
+        const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        getActiveCameras.mockRejectedValue(new Error('network down'));
+        getPublicAreas.mockRejectedValue(new Error('network down'));
+
+        render(
+            <CameraProvider autoRefresh={false}>
+                <CameraConsumer />
+            </CameraProvider>
+        );
+
+        await waitFor(() => {
+            expect(screen.getByTestId('loading').textContent).toBe('no');
+            expect(screen.getByTestId('initial-error').textContent).toBe('yes');
+        }, { timeout: 4000 });
+
+        expect(screen.getByTestId('camera-count').textContent).toBe('0');
+        expect(screen.getByTestId('data-unavailable').textContent).toBe('yes');
+        errorSpy.mockRestore();
     });
 
     it('mempertahankan data lama saat refresh resume gagal', async () => {

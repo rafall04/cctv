@@ -105,6 +105,36 @@ describe('SaweriaSupport floating layout', () => {
     });
 
     /*
+     * Both icon buttons were pure <svg> with no label, and they are the ONLY way to get the
+     * banner off a public page — an unnamed button is an unusable one for a screen reader.
+     */
+    it('names the icon-only controls that dismiss the banner', async () => {
+        await renderAndPeek();
+
+        expect(screen.getByRole('button', { name: 'Tutup ajakan dukungan' })).toBeTruthy();
+        fireEvent.click(screen.getByRole('button', { name: 'Kecilkan ajakan dukungan' }));
+
+        expect(screen.getByRole('button', { name: 'Buka ajakan dukungan' })).toBeTruthy();
+    });
+
+    /* Backdrop click was the only quick exit, so the ask was mouse-only to escape. */
+    it('opens the ask as a real dialog that Escape closes', async () => {
+        await renderAndPeek();
+        fireEvent.click(screen.getByRole('button', { name: 'Selengkapnya tentang dukungan' }));
+
+        const dialog = screen.getByRole('dialog');
+        expect(dialog.getAttribute('aria-modal')).toBe('true');
+        expect(document.getElementById(dialog.getAttribute('aria-labelledby')).textContent)
+            .toBe('Traktir Kopi Dong!');
+
+        await act(async () => {
+            fireEvent.keyDown(document, { key: 'Escape' });
+        });
+
+        expect(screen.queryByRole('dialog')).toBeNull();
+    });
+
+    /*
      * The donation modal used to open itself over the page — on scroll past 100px, or after
      * an 8s fallback for visitors who never scrolled. On a public CCTV page that is an
      * interstitial nobody asked for, and on a phone it covered the whole viewport.

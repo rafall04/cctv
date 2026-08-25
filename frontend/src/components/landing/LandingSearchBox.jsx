@@ -69,13 +69,15 @@ export default function LandingSearchBox({
                     onChange={(event) => onSearchChange(event.target.value)}
                     onFocus={onFocus}
                     placeholder="Cari kamera berdasarkan nama, lokasi, atau area..."
-                    className="w-full rounded-control border border-edge bg-surface py-3 pl-10 pr-20 text-sm text-content outline-none transition-colors placeholder:text-content-subtle focus:border-primary focus:ring-4 focus:ring-primary/10 sm:pr-24 sm:text-base"
+                    /* text-base sm:text-sm, never the reverse: Safari iOS zooms the whole page in
+                       when a focused input is under 16px, and this is the most-tapped control here. */
+                    className="w-full rounded-control border border-edge bg-surface py-3 pl-10 pr-20 text-base text-content outline-none transition-colors placeholder:text-content-subtle focus:border-primary focus:ring-4 focus:ring-primary/10 sm:pr-24 sm:text-sm"
                 />
                 <div className="absolute right-2 flex items-center gap-1.5">
                     {searchQuery && (
                         <button
                             onClick={onClear}
-                            className="p-1.5 text-content-subtle hover:text-content hover:bg-surface-raised rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                            className="inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-control p-1.5 text-content-subtle transition-colors hover:bg-surface-raised hover:text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary sm:min-h-0 sm:min-w-0"
                             aria-label="Hapus pencarian"
                             title="Hapus pencarian (Esc)"
                         >

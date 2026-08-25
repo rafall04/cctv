@@ -73,7 +73,8 @@ beforeEach(() => {
     )`);
     db.exec(`CREATE TABLE cameras (
         id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, enable_recording INTEGER DEFAULT 0,
-        owner_user_id INTEGER, camera_class TEXT, billing_status TEXT, updated_at TEXT
+        owner_user_id INTEGER, camera_class TEXT, billing_status TEXT,
+        is_public INTEGER NOT NULL DEFAULT 0, updated_at TEXT
     )`);
     db.exec(`CREATE TABLE camera_subscriptions (
         id INTEGER PRIMARY KEY AUTOINCREMENT, camera_id INTEGER, user_id INTEGER,

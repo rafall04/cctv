@@ -60,6 +60,29 @@ describe('LandingSearchBox', () => {
         expect(props.onCloseDropdown).toHaveBeenCalledTimes(1);
     });
 
+    /*
+     * Mobile viewport hard rule (docs/frontend-guide.md): a focused input under 16px makes Safari
+     * iOS zoom the whole page in. This box shipped with the rule exactly inverted — 14px on the
+     * phone, 16px on the desktop that never needed it.
+     */
+    it('keeps the input at 16px on phones and only shrinks it from sm', () => {
+        renderSearchBox();
+        const cls = screen.getByPlaceholderText('Cari kamera berdasarkan nama, lokasi, atau area...').className;
+
+        expect(cls, 'phone font must be 16px').toMatch(/\btext-base\b/);
+        expect(cls, 'the shrink belongs behind sm:').toMatch(/\bsm:text-sm\b/);
+        expect(cls, 'a bare text-sm here re-zooms the page on focus').not.toMatch(/(^|\s)text-sm\b/);
+        expect(cls).not.toMatch(/\bsm:text-base\b/);
+    });
+
+    it('gives the clear button a thumb-sized target on narrow screens', () => {
+        renderSearchBox({ searchQuery: 'kamera' });
+        const cls = screen.getByRole('button', { name: 'Hapus pencarian' }).className;
+
+        expect(cls, '28px is not a reliable thumb target').toMatch(/\bmin-h-\[40px\]/);
+        expect(cls, 'desktop density stays unchanged').toMatch(/\bsm:min-h-0\b/);
+    });
+
     it('closes dropdown when the user clicks outside the search container', () => {
         const props = renderSearchBox();
 

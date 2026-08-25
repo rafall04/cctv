@@ -21,13 +21,17 @@ vi.mock('./LandingHeroSpotlight', () => ({
     default: () => <div>spotlight</div>,
 }));
 
+const cameraState = {
+    cameras: [
+        { id: 1, area_name: 'KAB SURABAYA', is_online: true },
+        { id: 2, area_name: 'DI YOGYAKARTA', is_online: true },
+    ],
+    loading: false,
+    dataUnavailable: false,
+};
+
 vi.mock('../../contexts/CameraContext', () => ({
-    useCameras: () => ({
-        cameras: [
-            { id: 1, area_name: 'KAB SURABAYA', is_online: true },
-            { id: 2, area_name: 'DI YOGYAKARTA', is_online: true },
-        ],
-    }),
+    useCameras: () => cameraState,
 }));
 
 vi.mock('../../utils/animationControl', () => ({
@@ -65,6 +69,33 @@ describe('LandingHero', () => {
         expect(screen.queryByText('Multi-View')).toBeNull();
         expect(screen.queryByText('Playback')).toBeNull();
         expect(screen.queryByTestId('landing-event-banner-full')).toBeNull();
+    });
+
+    /*
+     * Backend tak terjangkau BUKAN "jaringan berisi nol kota". Sebelum ini hero menyatakan
+     * "0 kota" dengan titik hijau berdenyut — dibuktikan di browser dengan seluruh /api/**
+     * diputus. Aturannya sama dengan papan metrik: jangan sebut angka yang tidak kita punya.
+     */
+    it('tidak menyatakan jumlah kota maupun titik hidup saat data tidak terambil', () => {
+        cameraState.cameras = [];
+        cameraState.dataUnavailable = true;
+        try {
+            const { container } = render(
+                <LandingHero
+                    branding={baseBranding}
+                    landingSettings={landingSettings}
+                    disableHeavyEffects
+                />
+            );
+
+            expect(screen.queryByText(/^0 kota/)).toBeNull();
+            expect(screen.getByText(/… kota · siaran 24 jam/)).not.toBeNull();
+            expect(container.querySelector('.bg-status-live')).toBeNull();
+            expect(container.querySelector('.bg-status-idle')).not.toBeNull();
+        } finally {
+            cameraState.cameras = [{ id: 1, area_name: 'KAB SURABAYA', is_online: true }];
+            cameraState.dataUnavailable = false;
+        }
     });
 
     it('menyederhanakan copy default hero tanpa mengubah branding custom', () => {

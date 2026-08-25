@@ -45,11 +45,15 @@ function ClockDisplay({ disableAnimations }) {
 
 export default function Navbar({ branding, layoutMode, onLayoutToggle }) {
     const { isDark, toggleTheme } = useTheme();
-    const { cameras } = useCameras();
+    const { cameras, loading, dataUnavailable } = useCameras();
     const disableAnimations = shouldDisableAnimations();
 
     const cameraCount = useMemo(() => cameras?.length || 0, [cameras]);
     const onlineCount = useMemo(() => getPublicCameraStats(cameras).online, [cameras]);
+    // Unknown ≠ zero: while loading, and when the initial load failed, the pulse shows '…' and
+    // drops its green — a green dot next to "0" would present an outage as a healthy network.
+    const unknown = loading || dataUnavailable;
+    const isLive = !unknown && onlineCount > 0;
     const handleLayoutChange = (nextMode) => {
         if (nextMode !== layoutMode) {
             onLayoutToggle();
@@ -67,7 +71,7 @@ export default function Navbar({ branding, layoutMode, onLayoutToggle }) {
                             <div className="w-10 h-10 rounded-control bg-primary flex items-center justify-center text-white">
                                 <span className="text-lg font-bold">{branding.logo_text}</span>
                             </div>
-                            {cameraCount > 0 && (
+                            {!unknown && cameraCount > 0 && (
                                 <span className={`absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-status-live ring-2 ring-surface`}></span>
                             )}
                         </div>
@@ -81,10 +85,12 @@ export default function Navbar({ branding, layoutMode, onLayoutToggle }) {
                         city label lived here — dropped so the public identity reads as a
                         multi-city network, not one town. */}
                     <div className="hidden md:flex items-center gap-3 rounded-control border border-edge bg-surface px-3.5 py-1.5">
-                        <div className="flex items-center gap-2" title="Kamera daring sekarang">
-                            <span className={`h-1.5 w-1.5 rounded-full bg-status-live ${disableAnimations ? '' : 'animate-pulse'}`}></span>
-                            <span className="text-xs font-mono font-semibold tabular-nums text-content">{onlineCount}</span>
-                            <span className="text-[10px] font-mono uppercase tracking-[0.12em] text-status-live">Online</span>
+                        <div className="flex items-center gap-2" title={dataUnavailable ? 'Data kamera belum bisa diambil' : 'Kamera daring sekarang'}>
+                            <span className={`h-1.5 w-1.5 rounded-full ${isLive ? `bg-status-live ${disableAnimations ? '' : 'animate-pulse'}` : dataUnavailable ? 'bg-status-warn' : 'bg-status-idle'}`}></span>
+                            <span className="text-xs font-mono font-semibold tabular-nums text-content">{unknown ? '…' : onlineCount}</span>
+                            <span className={`text-[10px] font-mono uppercase tracking-[0.12em] ${isLive ? 'text-status-live' : 'text-content-muted'}`}>
+                                {loading ? 'Memuat' : dataUnavailable ? 'Tak terhubung' : 'Online'}
+                            </span>
                         </div>
                         <div className="w-px h-4 bg-edge"></div>
                         <ClockDisplay disableAnimations={disableAnimations} />

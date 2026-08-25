@@ -125,6 +125,9 @@ export default function LandingMobileDock({
                             : 'text-content-muted hover:bg-surface-raised hover:text-content'
                     }`;
                     const ariaLabel = item.key === 'quick' && favoriteCount > 0 ? `${item.label} ${favoriteCount}` : item.label;
+                    // Active state was carried by background colour alone; on the only navigation a
+                    // phone user has, a screen reader could not tell which view was open.
+                    const ariaCurrent = active ? 'page' : undefined;
                     const content = (
                         <>
                             <span className="flex h-4 w-4 items-center justify-center">
@@ -149,6 +152,7 @@ export default function LandingMobileDock({
                                 key={item.key}
                                 href={href}
                                 aria-label={ariaLabel}
+                                aria-current={ariaCurrent}
                                 className={className}
                             >
                                 {content}
@@ -162,6 +166,7 @@ export default function LandingMobileDock({
                             type="button"
                             onClick={() => handleClick(item.key)}
                             aria-label={ariaLabel}
+                            aria-current={ariaCurrent}
                             className={className}
                         >
                             {content}

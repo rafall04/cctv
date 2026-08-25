@@ -119,4 +119,63 @@ describe('LandingCameraCard', () => {
 
         expect(preloadPublicVideoPopup).toHaveBeenCalledTimes(1);
     });
+
+    it('keeps the favourite and multi-view actions usable by keyboard, outside the watch target', () => {
+        const onClick = vi.fn();
+        const onToggleFavorite = vi.fn();
+        const { getByRole } = render(
+            <LandingCameraCard
+                camera={{ id: 12, name: 'Simpang Tiga', is_online: 1, status: 'active' }}
+                onClick={onClick}
+                onAddMulti={vi.fn()}
+                inMulti={false}
+                isFavorite={() => false}
+                onToggleFavorite={onToggleFavorite}
+            />
+        );
+
+        const watchTarget = getByRole('button', { name: 'Tonton Simpang Tiga' });
+        const fav = getByRole('button', { name: 'Tambah Simpang Tiga ke favorit' });
+        const multi = getByRole('button', { name: 'Tambah Simpang Tiga ke Multi-View' });
+
+        // ARIA makes the descendants of a role="button" presentational, so nesting these
+        // inside the thumbnail hid them from assistive tech entirely.
+        expect(watchTarget.contains(fav)).toBe(false);
+        expect(watchTarget.contains(multi)).toBe(false);
+        expect(fav.tagName).toBe('BUTTON');
+        expect(multi.tagName).toBe('BUTTON');
+
+        // Enter/Space on an action must never fall through and start an HLS stream.
+        fireEvent.keyDown(fav, { key: 'Enter' });
+        fireEvent.keyDown(multi, { key: ' ' });
+        expect(onClick).not.toHaveBeenCalled();
+
+        fireEvent.click(fav);
+        expect(onToggleFavorite).toHaveBeenCalledWith(12);
+        expect(onClick).not.toHaveBeenCalled();
+    });
+
+    it('sizes the overlay actions to the touch-target floor and spaces them apart', () => {
+        const { getByRole } = render(
+            <LandingCameraCard
+                camera={{ id: 13, name: 'Pasar Baru', is_online: 1, status: 'active' }}
+                onClick={vi.fn()}
+                onAddMulti={vi.fn()}
+                inMulti={false}
+                isFavorite={() => false}
+                onToggleFavorite={vi.fn()}
+            />
+        );
+
+        for (const name of ['Tambah Pasar Baru ke favorit', 'Tambah Pasar Baru ke Multi-View']) {
+            const cls = getByRole('button', { name }).className;
+            // 44px phone / 40px sm+ — never back below the floor in docs/frontend-guide.md.
+            expect(cls).toContain('h-11');
+            expect(cls).toContain('w-11');
+            expect(cls).toContain('sm:h-10');
+            expect(cls).toContain('sm:w-10');
+        }
+
+        expect(getByRole('button', { name: 'Tambah Pasar Baru ke favorit' }).parentElement.className).toContain('gap-2.5');
+    });
 });

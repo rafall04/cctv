@@ -10,7 +10,12 @@ let mapViewPromise = null;
 
 export function preloadLandingMapView() {
     if (!mapViewPromise) {
-        mapViewPromise = import('../components/MapView');
+        // Drop the cache when the fetch fails: a cached REJECTED promise is handed back to every
+        // later caller, so one flaky request would keep map mode broken for the whole visit.
+        mapViewPromise = import('../components/MapView').catch((error) => {
+            mapViewPromise = null;
+            throw error;
+        });
     }
 
     return mapViewPromise;

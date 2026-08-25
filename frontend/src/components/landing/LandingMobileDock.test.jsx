@@ -66,6 +66,19 @@ describe('LandingMobileDock', () => {
         expect(dock.className).not.toMatch(/z-\[\d+\]/);
     });
 
+    /*
+     * The dock is the ONLY navigation a phone user gets, and it announced the open view with
+     * background colour alone — invisible to a screen reader. aria-current is the carrier now,
+     * on both the button form and the link form.
+     */
+    it('marks the open view with aria-current, not colour alone', () => {
+        render(<LandingMobileDock viewMode="grid" onViewModeChange={vi.fn()} />);
+
+        expect(screen.getByRole('button', { name: 'Grid' }).getAttribute('aria-current')).toBe('page');
+        expect(screen.getByRole('button', { name: 'Map' }).getAttribute('aria-current')).toBeNull();
+        expect(screen.getByRole('button', { name: 'Home' }).getAttribute('aria-current')).toBeNull();
+    });
+
     it('renders route links when item hrefs are provided', () => {
         render(
             <LandingMobileDock
@@ -86,5 +99,7 @@ describe('LandingMobileDock', () => {
         expect(screen.getByRole('link', { name: 'Favorit' }).getAttribute('href')).toBe('/?view=grid&mode=full#public-quick-access');
         expect(screen.getByRole('link', { name: 'Playback' }).getAttribute('href')).toBe('/playback?cam=1-lobby&t=1777716000000');
         expect(screen.getByRole('link', { name: 'Playback' }).className).toContain('bg-primary');
+        expect(screen.getByRole('link', { name: 'Playback' }).getAttribute('aria-current')).toBe('page');
+        expect(screen.getByRole('link', { name: 'Map' }).getAttribute('aria-current')).toBeNull();
     });
 });
