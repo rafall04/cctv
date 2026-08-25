@@ -41,13 +41,21 @@ function loadWorker(fetchImpl) {
     return { listeners, cache, caches };
 }
 
-function serverResponse({ status = 200, contentType = 'text/html; charset=utf-8' } = {}) {
+/*
+ * `body` default-nya adalah app shell sungguhan: worker sekarang MEMBACA isinya, karena
+ * same-origin + 200 + text/html juga benar untuk halaman statis /sewa/ dan /t/ yang hidup di
+ * dalam scope-nya. Tanpa isi, fixture ini tidak bisa membedakan keduanya — dan fixture yang
+ * tidak bisa membedakan tidak bisa gagal.
+ */
+function serverResponse({ status = 200, contentType = 'text/html; charset=utf-8',
+    body = '<!doctype html><html><body><div id="root"></div></body></html>' } = {}) {
     const response = {
         ok: status >= 200 && status < 300,
         status,
         headers: { get: (name) => (name.toLowerCase() === 'content-type' ? contentType : null) },
+        text: () => Promise.resolve(body),
     };
-    response.clone = () => ({ ...response, isClone: true });
+    response.clone = () => ({ ...response, isClone: true, text: () => Promise.resolve(body) });
     return response;
 }
 
@@ -109,5 +117,29 @@ describe('service worker app-shell caching', () => {
     it('does not seize a live page — skipWaiting is reachable only from the message handler', () => {
         expect(SW_SOURCE.match(/self\.skipWaiting\(\)/g)).toHaveLength(1);
         expect(SW_SOURCE).toContain("event.data.type === 'SKIP_WAITING'");
+    });
+    /*
+     * REGRESI YANG DICEGAH DI SINI: halaman jualan statis di /sewa/ adalah 200 text/html
+     * same-origin, jadi ketiga syarat isCacheableShell menerimanya dan ia ditulis ke kunci
+     * '/' — MENGGANTIKAN app shell. Kunjungan offline berikutnya menampilkan halaman jualan
+     * alih-alih aplikasi.
+     *
+     * Jalur ini bukan hal langka: tombol "Sewa" di navbar publik menuju ke sana.
+     */
+    it('tidak menjadikan halaman statis /sewa/ sebagai app shell', async () => {
+        const halamanJualan = '<!doctype html><html><body><h1>Sewa CCTV</h1></body></html>';
+        const worker = loadWorker(() => Promise.resolve(serverResponse({ body: halamanJualan })));
+
+        await navigate(worker, `${ORIGIN}/sewa/`);
+
+        expect(worker.cache.put).not.toHaveBeenCalled();
+    });
+
+    it('tetap menyimpan rute SPA sungguhan, yang memasang React ke #root', async () => {
+        const worker = loadWorker(() => Promise.resolve(serverResponse()));
+
+        await navigate(worker, `${ORIGIN}/area/dander`);
+
+        expect(worker.cache.put).toHaveBeenCalledWith('/', expect.anything());
     });
 });

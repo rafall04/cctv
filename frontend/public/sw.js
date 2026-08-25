@@ -53,6 +53,24 @@ function isCacheableShell(response, url) {
     return (response.headers.get('content-type') || '').includes('text/html');
 }
 
+/*
+ * ...tetapi "HTML kita sendiri yang berhasil" belum berarti "app shell".
+ *
+ * Tiga halaman HTML STATIS hidup di dalam scope worker ini dan dilayani nginx lewat
+ * try_files $uri $uri/ SEBELUM fallback SPA: /sewa/ (halaman jualan), /t/<token>.html, dan
+ * berkas verifikasi Google. Ketiganya same-origin, 200, dan text/html — jadi ketiga syarat di
+ * atas menerimanya, dan hasilnya ditulis ke kunci '/'. Halaman jualan MENGGANTIKAN app shell;
+ * kunjungan offline berikutnya menampilkan halaman jualan alih-alih aplikasi, dan berkas
+ * verifikasi Google (satu baris teks) menampilkan halaman putih.
+ *
+ * Dicocokkan pada titik pasang React milik shell, bukan pada daftar jalur: daftar harus dirawat
+ * dan akan basi diam-diam begitu halaman statis keempat ditambahkan. Tidak satu pun dari ketiga
+ * halaman itu memuat #root, dan shell selalu memuatnya — itulah yang membedakan keduanya.
+ */
+function isAppShellDocument(body) {
+    return /<div[^>]+id=["']root["']/.test(body || '');
+}
+
 self.addEventListener('install', (event) => {
     event.waitUntil(caches.open(RAFNET_CCTV_CACHE).then((cache) => cache.addAll(APP_SHELL_URLS)));
 });
@@ -94,8 +112,16 @@ self.addEventListener('fetch', (event) => {
                     // it after the server recovered. Same guard as the asset branch below, plus a
                     // content-type check because '/' must be a document.
                     if (isCacheableShell(response, url)) {
-                        const copy = response.clone();
-                        caches.open(RAFNET_CCTV_CACHE).then((cache) => cache.put('/', copy));
+                        const forCache = response.clone();
+                        // Isinya harus diperiksa, jadi tulis-cache-nya asinkron. Respons untuk
+                        // pengunjung dikembalikan di bawah tanpa menunggu pemeriksaan ini.
+                        response.clone().text()
+                            .then((body) => {
+                                if (!isAppShellDocument(body)) return null;
+                                return caches.open(RAFNET_CCTV_CACHE)
+                                    .then((cache) => cache.put('/', forCache));
+                            })
+                            .catch(() => {});
                     }
                     return response;
                 })
