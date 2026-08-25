@@ -391,8 +391,9 @@ function VideoPopup({
             const nextSessionId = await viewerService.startSession(camera.id);
 
             if (!isActive) {
+                // Popup closed mid-flight: cancel, never a 0s bounce.
                 if (nextSessionId) {
-                    Promise.resolve(viewerService.stopSession(nextSessionId)).catch(() => { });
+                    Promise.resolve(viewerService.stopSession(nextSessionId, { cancelled: true })).catch(() => { });
                 }
                 return;
             }

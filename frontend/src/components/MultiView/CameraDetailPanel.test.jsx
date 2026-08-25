@@ -492,7 +492,7 @@ describe('CameraDetailPanel — the camera states itself first', () => {
         expect(screen.getByText('DS DANDER')).toBeTruthy();
         expect(screen.getByText('Ramai')).toBeTruthy();
         expect(screen.getByText('8 live')).toBeTruthy();
-        expect(screen.getByText('120 views')).toBeTruthy();
+        expect(screen.getByText('120 tontonan')).toBeTruthy();
         expect(screen.getByText('Playback tersedia')).toBeTruthy();
         // The popup header states the name and the description; the panel does not repeat them.
         expect(screen.queryByText('Pantau area publik')).toBeNull();
@@ -511,7 +511,7 @@ describe('CameraDetailPanel — the camera states itself first', () => {
 
         expect(screen.getByText('Sering Dilihat')).toBeTruthy();
         expect(screen.getByText('0 live')).toBeTruthy();
-        expect(screen.getByText('234 views')).toBeTruthy();
+        expect(screen.getByText('234 tontonan')).toBeTruthy();
     });
 });
 

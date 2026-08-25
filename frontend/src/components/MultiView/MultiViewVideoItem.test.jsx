@@ -295,7 +295,8 @@ describe('MultiViewVideoItem runtime stability', () => {
         });
 
         await waitFor(() => {
-            expect(stopSessionMock).toHaveBeenCalledWith('late-session');
+            // Cancelled, not watched: the backend must erase it instead of logging a 0s bounce.
+            expect(stopSessionMock).toHaveBeenCalledWith('late-session', { cancelled: true });
         });
     });
 

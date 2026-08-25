@@ -334,7 +334,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
 
             if (!viewerSessionActiveRef.current || sessionRun !== viewerSessionRunRef.current) {
                 if (nextSessionId) {
-                    Promise.resolve(viewerService.stopSession(nextSessionId)).catch(() => { });
+                    Promise.resolve(viewerService.stopSession(nextSessionId, { cancelled: true })).catch(() => { });
                 }
                 return;
             }

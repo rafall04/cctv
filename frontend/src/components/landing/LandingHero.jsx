@@ -17,10 +17,17 @@ import { groupCamerasByCity } from '../../utils/publicCityMapping';
 import { getCameraAvailabilityState } from '../../utils/cameraAvailability.js';
 import { shouldDisableAnimations } from '../../utils/animationControl';
 
-// Most-watched up camera that actually has a thumbnail — the "on air" spotlight.
+const metric = (camera, key) => Number(camera?.[key] ?? camera?.viewer_stats?.[key] ?? 0);
+
+/*
+ * Busiest up camera that actually has a thumbnail — the "on air" spotlight. Live viewers rank
+ * first, but on this network they are almost always all zero (~20-40 player opens/day across the
+ * whole fleet), and ranking on that alone just picked whichever camera came first in the list.
+ * Total views break that tie; the lowest id breaks a real tie so the pick cannot shuffle between
+ * refreshes.
+ */
 function pickFeaturedCamera(cameras) {
     let best = null;
-    let bestViewers = -1;
     for (const camera of cameras) {
         const state = getCameraAvailabilityState(camera);
         if (state === 'offline' || state === 'maintenance') {
@@ -29,9 +36,11 @@ function pickFeaturedCamera(cameras) {
         if (!(camera.external_snapshot_url || camera.thumbnail_path)) {
             continue;
         }
-        const viewers = Number(camera.live_viewers ?? camera.viewer_stats?.live_viewers ?? 0);
-        if (viewers > bestViewers) {
-            bestViewers = viewers;
+        const rank = !best ? 1
+            : metric(camera, 'live_viewers') - metric(best, 'live_viewers')
+                || metric(camera, 'total_views') - metric(best, 'total_views')
+                || Number(best.id || 0) - Number(camera.id || 0);
+        if (rank > 0) {
             best = camera;
         }
     }

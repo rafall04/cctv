@@ -117,12 +117,15 @@ class ViewerService {
     /**
      * Stop a specific viewer session
      * @param {string} sessionId - Session ID to stop
+     * @param {{ cancelled?: boolean }} options - `cancelled` when the caller's effect was torn
+     *   down while startSession was still in flight: nobody watched, so the backend erases the
+     *   session instead of recording a 0-second bounce.
      */
-    async stopSession(sessionId) {
+    async stopSession(sessionId, { cancelled = false } = {}) {
         if (!sessionId || !this.sessions.has(sessionId)) return;
 
         try {
-            await apiClient.post('/api/viewer/stop', { sessionId });
+            await apiClient.post('/api/viewer/stop', cancelled ? { sessionId, cancelled: true } : { sessionId });
             console.log(`[ViewerService] Session stopped: ${sessionId}`);
         } catch (error) {
             console.error('[ViewerService] Error stopping session:', error);

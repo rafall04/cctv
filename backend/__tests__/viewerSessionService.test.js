@@ -103,6 +103,45 @@ describe('viewerSessionService', () => {
         });
     });
 
+    it('erases a cancelled session instead of writing a 0-second ghost to history', () => {
+        mockActiveSession();
+
+        const ended = viewerSessionService.endSession('session-1', { cancelled: true });
+
+        expect(ended).toBe(true);
+        expect(executeMock).toHaveBeenCalledWith(
+            expect.stringContaining('DELETE FROM viewer_sessions'),
+            ['session-1'],
+        );
+        expect(executeMock).not.toHaveBeenCalledWith(
+            expect.stringContaining('INSERT INTO viewer_session_history'),
+            expect.anything(),
+        );
+        expect(recordCompletedLiveViewMock).not.toHaveBeenCalled();
+    });
+
+    it('still records a genuine short bounce in history when the stop is not a cancellation', () => {
+        mockActiveSession();
+
+        const ended = viewerSessionService.endSession('session-1', {
+            endedAtMs: new Date(2026, 4, 5, 0, 0, 2).getTime(),
+        });
+
+        expect(ended).toBe(true);
+        expect(executeMock).toHaveBeenCalledWith(
+            expect.stringContaining('INSERT INTO viewer_session_history'),
+            expect.arrayContaining([12, '2026-05-05 00:00:00', '2026-05-05 00:00:02', 2]),
+        );
+        expect(executeMock).not.toHaveBeenCalledWith(
+            expect.stringContaining('DELETE FROM viewer_sessions'),
+            expect.anything(),
+        );
+        expect(recordCompletedLiveViewMock).toHaveBeenCalledWith(expect.objectContaining({
+            cameraId: 12,
+            durationSeconds: 2,
+        }));
+    });
+
     it('closes stale sessions at their last heartbeat time instead of cleanup time', () => {
         queryMock.mockReturnValue([
             { session_id: 'session-stale', last_heartbeat: '2026-05-05 00:00:20' },

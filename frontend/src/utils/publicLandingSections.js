@@ -49,7 +49,7 @@ export function buildLandingDiscoverySections(discovery = {}) {
         {
             key: 'top_cameras',
             label: 'Paling Ditonton',
-            metricLabel: 'views',
+            metricLabel: 'tontonan',
             items: getItems(discovery, 'top_cameras'),
             type: 'camera',
             metric: (camera) => camera.total_views,
@@ -57,7 +57,7 @@ export function buildLandingDiscoverySections(discovery = {}) {
         {
             key: 'popular_areas',
             label: 'Area Populer',
-            metricLabel: 'views',
+            metricLabel: 'tontonan',
             items: getItems(discovery, 'popular_areas'),
             type: 'area',
             metric: (area) => area.total_views,
@@ -65,7 +65,7 @@ export function buildLandingDiscoverySections(discovery = {}) {
         {
             key: 'new_cameras',
             label: 'Kamera Terbaru',
-            metricLabel: 'views',
+            metricLabel: 'tontonan',
             items: getItems(discovery, 'new_cameras'),
             type: 'camera',
             metric: (camera) => camera.total_views,

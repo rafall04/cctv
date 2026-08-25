@@ -97,11 +97,12 @@ export async function viewerHeartbeat(request, reply) {
 /**
  * End a viewer session
  * POST /api/viewer/stop
- * Body: { sessionId: string }
+ * Body: { sessionId: string, cancelled?: boolean }
+ * `cancelled` means the viewer never watched (start/teardown race) — the session is erased.
  */
 export async function stopViewerSession(request, reply) {
     try {
-        const { sessionId } = request.body;
+        const { sessionId, cancelled } = request.body;
 
         if (!sessionId) {
             return reply.code(400).send({
@@ -110,11 +111,16 @@ export async function stopViewerSession(request, reply) {
             });
         }
 
-        const success = viewerSessionService.endSession(sessionId);
+        const isCancelled = cancelled === true;
+        const success = viewerSessionService.endSession(sessionId, isCancelled ? { cancelled: true } : {});
+
+        if (!success) {
+            return reply.send({ success, message: 'Session not found or already ended' });
+        }
 
         return reply.send({
             success,
-            message: success ? 'Session ended' : 'Session not found or already ended'
+            message: isCancelled ? 'Session cancelled' : 'Session ended'
         });
     } catch (error) {
         console.error('Stop viewer session error:', error);

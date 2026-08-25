@@ -2,6 +2,7 @@ import Fastify from 'fastify';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const startSessionMock = vi.fn();
+const endSessionMock = vi.fn();
 const getCameraByIdMock = vi.fn();
 const recordRuntimeSignalMock = vi.fn();
 
@@ -9,7 +10,7 @@ vi.mock('../services/viewerSessionService.js', () => ({
     default: {
         startSession: startSessionMock,
         heartbeat: vi.fn(),
-        endSession: vi.fn(),
+        endSession: endSessionMock,
         getActiveSessions: vi.fn(() => []),
         getViewerStats: vi.fn(() => ({})),
         getSessionHistory: vi.fn(() => []),
@@ -31,9 +32,50 @@ vi.mock('../services/cameraHealthService.js', () => ({
 describe('viewerRoutes', () => {
     beforeEach(() => {
         startSessionMock.mockReset();
+        endSessionMock.mockReset();
         getCameraByIdMock.mockReset();
         recordRuntimeSignalMock.mockReset();
         startSessionMock.mockReturnValue('session-123');
+        endSessionMock.mockReturnValue(true);
+    });
+
+    async function buildStopServer() {
+        const { default: viewerRoutes } = await import('../routes/viewerRoutes.js');
+        const fastify = Fastify();
+        await fastify.register(viewerRoutes, { prefix: '/api/viewer' });
+        return fastify;
+    }
+
+    // The /stop body schema strips any property it does not declare, so a `cancelled` flag missing
+    // from the schema would vanish silently: 200 OK, ghost row still written.
+    it('passes the cancelled flag through the stop body schema', async () => {
+        const fastify = await buildStopServer();
+
+        const response = await fastify.inject({
+            method: 'POST',
+            url: '/api/viewer/stop',
+            payload: { sessionId: 'session-123', cancelled: true },
+        });
+
+        expect(response.statusCode).toBe(200);
+        expect(response.json()).toMatchObject({ success: true, message: 'Session cancelled' });
+        expect(endSessionMock).toHaveBeenCalledWith('session-123', { cancelled: true });
+        await fastify.close();
+    });
+
+    it('keeps a plain stop unchanged (no cancellation)', async () => {
+        const fastify = await buildStopServer();
+
+        const response = await fastify.inject({
+            method: 'POST',
+            url: '/api/viewer/stop',
+            payload: { sessionId: 'session-123' },
+        });
+
+        expect(response.statusCode).toBe(200);
+        expect(response.json()).toMatchObject({ success: true, message: 'Session ended' });
+        expect(endSessionMock).toHaveBeenCalledWith('session-123', {});
+        await fastify.close();
     });
 
     it('starts viewer sessions for internal popup cameras', async () => {

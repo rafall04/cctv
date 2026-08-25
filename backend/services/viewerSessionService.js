@@ -2,7 +2,7 @@
  * Purpose: Manage real-time live viewer sessions and historical live-view analytics for CCTV streams.
  * Caller: viewer routes, HLS proxy/session cleanup, backend startup cleanup timer.
  * Deps: connectionPool, uuid, timeService, viewerAnalyticsService, cacheService, cameraViewStatsService.
- * MainFuncs: startSession, heartbeat, endSession, cleanupStaleSessions, getViewerStats, getSessionHistory.
+ * MainFuncs: startSession, heartbeat, endSession (opts.cancelled erases the row), cleanupStaleSessions, getViewerStats, getSessionHistory.
  * SideEffects: Writes viewer session/history rows, updates camera lifetime view counters, and runs cleanup timers.
  * 
  * Features:
@@ -214,6 +214,13 @@ class ViewerSessionService {
             `, [sessionId]);
 
             if (!session) return false;
+
+            // Cancelled = the viewer effect was torn down while /start was still in flight, so
+            // nobody ever watched. Erase the row: no history, no analytics, no 0s ghost.
+            if (options.cancelled === true) {
+                execute('DELETE FROM viewer_sessions WHERE session_id = ?', [sessionId]);
+                return true;
+            }
 
             const rawEndTimestamp = options.endedAtMs ?? options.endedAt ?? new Date();
             const timestamp = resolveLocalSqlTimestamp(rawEndTimestamp);

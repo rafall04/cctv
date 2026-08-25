@@ -18,7 +18,7 @@ vi.mock('./LandingStatsBar', () => ({
 }));
 
 vi.mock('./LandingHeroSpotlight', () => ({
-    default: () => <div>spotlight</div>,
+    default: ({ camera }) => <div data-testid="spotlight">{camera ? camera.name : 'kosong'}</div>,
 }));
 
 const cameraState = {
@@ -109,6 +109,57 @@ describe('LandingHero', () => {
 
         expect(screen.getByText('Pantau CCTV Real-Time')).toBeTruthy();
         expect(screen.getByText('Akses CCTV publik 24 jam dari satu halaman.')).toBeTruthy();
+    });
+
+    /*
+     * Sesi live di produksi praktis selalu nol (~20-40 buka-pemutar per hari untuk 36 kamera),
+     * jadi memeringkat hanya dengan live_viewers menyorot kamera PERTAMA yang punya thumbnail,
+     * bukan yang paling ramai. Total tayangan yang harus memutus seri itu.
+     */
+    it('memilih total tayangan tertinggi, bukan yang pertama, saat live_viewers seri nol', () => {
+        const withSpotlightCameras = (cameras, assert) => {
+            const previous = cameraState.cameras;
+            cameraState.cameras = cameras;
+            try {
+                const { unmount } = render(
+                    <LandingHero
+                        branding={baseBranding}
+                        landingSettings={landingSettings}
+                        disableHeavyEffects
+                    />
+                );
+                assert(screen.getByTestId('spotlight').textContent);
+                unmount();
+            } finally {
+                cameraState.cameras = previous;
+            }
+        };
+        const cam = (id, name, extra) => ({
+            id, name, area_name: 'KAB SURABAYA', is_online: true, thumbnail_path: `c${id}.jpg`, live_viewers: 0, ...extra,
+        });
+
+        withSpotlightCameras(
+            [cam(1, 'Sepi'), cam(2, 'Ramai', { total_views: 980 }), cam(3, 'Sedang', { viewer_stats: { total_views: 400 } })],
+            (name) => expect(name).toBe('Ramai')
+        );
+
+        // Penonton saat ini tetap menang lebih dulu bila memang ada.
+        withSpotlightCameras(
+            [cam(1, 'Arsip', { total_views: 9000 }), cam(2, 'Ditonton', { live_viewers: 3, total_views: 4 })],
+            (name) => expect(name).toBe('Ditonton')
+        );
+
+        // Seri sungguhan: id terkecil, supaya sorotannya tidak berganti tiap refresh.
+        withSpotlightCameras(
+            [cam(7, 'Tujuh', { total_views: 5 }), cam(2, 'Dua', { total_views: 5 })],
+            (name) => expect(name).toBe('Dua')
+        );
+
+        // Offline/maintenance dan yang tanpa thumbnail tetap dilewati.
+        withSpotlightCameras(
+            [cam(1, 'Mati', { total_views: 900, is_online: 0 }), cam(2, 'Perbaikan', { total_views: 800, status: 'maintenance' }), cam(3, 'Buta', { total_views: 700, thumbnail_path: null }), cam(4, 'Layak', { total_views: 6 })],
+            (name) => expect(name).toBe('Layak')
+        );
     });
 
     it('tidak merender powered by saat dinonaktifkan', () => {

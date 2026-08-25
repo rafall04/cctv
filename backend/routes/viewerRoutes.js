@@ -50,14 +50,16 @@ export default async function viewerRoutes(fastify, options) {
         handler: viewerHeartbeat
     });
 
-    // Stop viewing session
+    // Stop viewing session. `cancelled` marks a session the frontend aborted before anyone
+    // watched — it MUST stay in this schema or Fastify strips it and the session becomes a 0s ghost.
     fastify.post('/stop', {
         schema: {
             body: {
                 type: 'object',
                 required: ['sessionId'],
                 properties: {
-                    sessionId: { type: 'string' }
+                    sessionId: { type: 'string' },
+                    cancelled: { type: 'boolean' }
                 }
             }
         },

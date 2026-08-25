@@ -193,7 +193,7 @@ export default function CameraDetailPanel({
                     reads well at 21500 → "21.5k". */}
                 <span className="tabular-nums text-content-muted">{formatCompactCount(liveViewers)} live</span>
                 <span className="text-content-subtle" aria-hidden="true">·</span>
-                <span className="tabular-nums text-content-muted">{formatCompactCount(totalViews)} views</span>
+                <span className="tabular-nums text-content-muted">{formatCompactCount(totalViews)} tontonan</span>
                 {hasPlayback && (
                     <>
                         <span className="text-content-subtle" aria-hidden="true">·</span>

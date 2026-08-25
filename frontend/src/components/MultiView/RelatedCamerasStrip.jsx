@@ -35,7 +35,7 @@ export default function RelatedCamerasStrip({
                 {cameras.slice(0, 3).map((camera) => {
                     const viewersText = metric(camera, 'live_viewers') > 0
                         ? `${metric(camera, 'live_viewers')} live`
-                        : `${metric(camera, 'total_views')} views`;
+                        : `${metric(camera, 'total_views')} tontonan`;
                     const distanceLabel = formatDistanceLabel(camera?._distanceMeters);
 
                     return (

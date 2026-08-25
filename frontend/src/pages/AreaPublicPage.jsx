@@ -264,7 +264,7 @@ function AreaCameraCard({ camera, onClick, thumbnailPriority = false }) {
                         {formatCount(getAreaCameraLiveViewers(camera))} live
                     </span>
                     <span className="rounded-lg border border-edge px-2 py-1 font-mono tabular-nums text-content-muted">
-                        {formatCount(getAreaCameraTotalViews(camera))} views
+                        {formatCount(getAreaCameraTotalViews(camera))} tontonan
                     </span>
                 </div>
             </div>
@@ -549,7 +549,7 @@ export default function AreaPublicPage() {
                     // its own description, instead of leaving an English "Top" on a public page.
                     title={`Paling Sering Dibuka di ${area?.name || ''}`.trim()}
                     description="Kamera yang paling banyak dibuka oleh pengunjung."
-                    metricLabel="views"
+                    metricLabel="tontonan"
                     metricValue={getAreaCameraTotalViews}
                     onCameraClick={handleCameraOpen}
                 />
@@ -559,7 +559,7 @@ export default function AreaPublicPage() {
                 cameras={newestCameras}
                 title={`Kamera Baru ${area?.name || ''}`.trim()}
                 description="Kamera publik terbaru yang sudah tersedia di area ini."
-                metricLabel="views"
+                metricLabel="tontonan"
                 metricValue={getAreaCameraTotalViews}
                 onCameraClick={handleCameraOpen}
             />

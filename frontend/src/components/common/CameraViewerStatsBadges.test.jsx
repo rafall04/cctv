@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { formatCompactCount, getCameraViewerStats } from './CameraViewerStatsBadges.jsx';
+import { render, screen } from '@testing-library/react';
+import CameraViewerStatsBadges, { formatCompactCount, getCameraViewerStats } from './CameraViewerStatsBadges.jsx';
 
 describe('formatCompactCount', () => {
     it('truncates instead of rounding up so it never overstates view counts', () => {
@@ -52,5 +53,52 @@ describe('getCameraViewerStats', () => {
             .toEqual({ liveViewers: 4, totalViews: 1170 });
         expect(getCameraViewerStats({})).toEqual({ liveViewers: 0, totalViews: 0 });
         expect(getCameraViewerStats(null)).toEqual({ liveViewers: 0, totalViews: 0 });
+    });
+});
+
+/*
+ * The counters are sold from a public page, so their meaning has to be retrievable without
+ * guessing. "views" was read as "orang yang melihat kamera ini"; it really means "pemutar dibuka
+ * dan ditonton >= 5 detik", counted at session end — thumbnails never count. The screen text is
+ * kept tiny for phones, so the full explanation lives in the accessible name — but the visible
+ * word still has to say "tontonan" (a player ran), because `title` never opens on a touch screen
+ * and this audience is ~70% phones. If these names are dropped or reworded away from the
+ * 5-second rule, the misreading is back.
+ */
+describe('CameraViewerStatsBadges accessible names', () => {
+    const camera = { viewer_stats: { live_viewers: 3, total_views: 12450 } };
+
+    it('says what the lifetime counter counts, with the exact figure', () => {
+        render(<CameraViewerStatsBadges camera={camera} />);
+        const total = screen.getByRole('img', { name: /^Sudah ditonton 12\.450 kali\./ });
+
+        // Compacted on screen, exact and explained in the name. The visible word is "tontonan",
+        // not "views": `title` never opens on a phone, so the meaning must survive without it.
+        expect(total.textContent).toBe('12.4k tontonan');
+        expect(total.getAttribute('aria-label')).toContain('pemutar dibuka minimal 5 detik');
+        expect(total.getAttribute('aria-label')).toContain('gambar pratinjau tidak dihitung');
+        // Sighted mouse users get the same sentence, not a shorter one.
+        expect(total.getAttribute('title')).toBe(total.getAttribute('aria-label'));
+    });
+
+    it('names the live counter as watching happening right now', () => {
+        render(<CameraViewerStatsBadges camera={camera} />);
+        const live = screen.getByRole('img', { name: '3 tontonan sedang berlangsung sekarang' });
+
+        expect(live.textContent).toBe('3 live');
+        expect(live.getAttribute('title')).toBe('3 tontonan sedang berlangsung sekarang');
+    });
+
+    it('still names both counters when a camera has no stats at all', () => {
+        render(<CameraViewerStatsBadges camera={null} />);
+
+        expect(screen.getByRole('img', { name: '0 tontonan sedang berlangsung sekarang' })).toBeTruthy();
+        expect(screen.getByRole('img', { name: /^Sudah ditonton 0 kali\./ })).toBeTruthy();
+    });
+
+    it('keeps the name on the overlay tone used inside the video popup', () => {
+        render(<CameraViewerStatsBadges camera={camera} tone="overlay" />);
+
+        expect(screen.getByRole('img', { name: /^Sudah ditonton 12\.450 kali\./ })).toBeTruthy();
     });
 });

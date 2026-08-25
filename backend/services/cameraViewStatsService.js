@@ -59,8 +59,10 @@ class CameraViewStatsService {
         const normalizedDuration = toNonNegativeInteger(durationSeconds);
 
         // Sub-threshold sessions are not real views (bots/instant bounce, duration ~0).
-        // viewer_session_history still recorded every session upstream — only this public
-        // lifetime counter is gated, so analytics/bounce-rate stay complete.
+        // A genuine short bounce is still kept in viewer_session_history upstream, so
+        // analytics keep it; only this public lifetime counter is gated. Sessions the viewer
+        // effect cancelled before anyone watched never reach here at all — endSession deletes
+        // those outright (see its `cancelled` branch), so they are absent from history too.
         if (normalizedDuration < MIN_COUNTABLE_VIEW_SECONDS) {
             return false;
         }
