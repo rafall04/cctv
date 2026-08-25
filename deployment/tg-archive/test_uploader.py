@@ -30,6 +30,40 @@ class KlasifikasiKegagalan(unittest.TestCase):
         # Rate limit adalah jawaban paling layak-ulang yang ada.
         self.assertFalse(uploader.is_permanent_failure('429 Too Many Requests'))
 
+    def test_rate_limit_bergaya_400_dari_bot_api_lokal_bukan_permanen(self):
+        """String INI diambil apa adanya dari log produksi, bukan dikarang.
+
+        Bot API resmi mengirim rate limit sebagai 429. Bot API LOKAL yang dipakai instalasi ini
+        mengirimnya sebagai 400. Diukur di produksi 25 Agustus 2026: 520 rate limit dalam 24 jam,
+        SEMUANYA bergaya 400, nol yang 429. Menggolongkannya permanen berarti melangkahi sekitar
+        1 dari 10 rekaman secara diam-diam — dan Telegram satu-satunya salinan yang bertahan
+        lebih lama dari retensi disk.
+        """
+        for err in [
+            '400 Bad Request: too Many Requests: retry after 8',
+            '400 Bad Request: Too Many Requests: retry after 12',
+            '429 Too Many Requests: retry after 3',
+        ]:
+            self.assertFalse(uploader.is_permanent_failure(err), err)
+
+    def test_400_yang_BUKAN_rate_limit_tetap_permanen(self):
+        # Pengaman arah sebaliknya: jangan sampai perbaikan di atas membuat semua 400
+        # ikut ditahan selamanya.
+        for err in ['400 Bad Request: chat not found',
+                    '400 Bad Request: file is too big']:
+            self.assertTrue(uploader.is_permanent_failure(err), err)
+
+
+    def test_galat_server_berbungkus_400_bukan_permanen(self):
+        """Diambil dari log produksi: 5 kejadian per 24 jam.
+
+        Kode statusnya 400 tetapi deskripsinya mengaku galat sisi server. Kode status berbohong
+        tentang siapa yang salah; deskripsinya jujur. Aturan dokumen ini sendiri: 5xx = coba lagi.
+        """
+        for err in ['400 Bad Request: internal Server Error during file upload',
+                    '400 Bad Request: Bad Gateway']:
+            self.assertFalse(uploader.is_permanent_failure(err), err)
+
     def test_5xx_bukan_permanen(self):
         for err in ['500 Internal Server Error', '502 Bad Gateway',
                     '503 Service Unavailable', '504 Gateway Timeout']:
@@ -42,6 +76,24 @@ class KlasifikasiKegagalan(unittest.TestCase):
                     '', None, 'sesuatu yang aneh']:
             self.assertFalse(uploader.is_permanent_failure(err), repr(err))
 
+
+class BacaRetryAfter(unittest.TestCase):
+    """Tahu harus menunggu berapa lama, dari field terstruktur ATAU dari kalimatnya."""
+
+    def test_dari_field_terstruktur(self):
+        self.assertEqual(uploader.retry_after_seconds({'retry_after': 7}, ''), 7)
+
+    def test_dari_deskripsi_gaya_bot_api_lokal(self):
+        self.assertEqual(
+            uploader.retry_after_seconds({}, 'Bad Request: too Many Requests: retry after 8'), 8)
+
+    def test_field_menang_atas_deskripsi(self):
+        self.assertEqual(
+            uploader.retry_after_seconds({'retry_after': 3}, 'retry after 99'), 3)
+
+    def test_tanpa_keduanya_mengembalikan_None(self):
+        for params, desc in [({}, 'chat not found'), ({}, ''), (None, None)]:
+            self.assertIsNone(uploader.retry_after_seconds(params, desc))
 
 class DeteksiMacet(unittest.TestCase):
     def setUp(self):

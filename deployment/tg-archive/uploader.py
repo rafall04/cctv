@@ -436,12 +436,35 @@ def call(cfg, state, method, payload, log):
         retry['chat_id'] = new
         return call(cfg, state, method, retry, log)
 
-    if params.get('retry_after'):
-        wait = int(params['retry_after']) + 1
+    tunggu = retry_after_seconds(params, desc)
+    if tunggu is not None:
+        wait = tunggu + 1
         log.warning('rate limited by Telegram, sleeping %ss', wait)
         time.sleep(wait)
 
     return False, None, '%s %s' % (resp.status_code, desc)
+
+
+RETRY_AFTER_RE = re.compile(r'retry after (\d+)', re.IGNORECASE)
+
+
+def retry_after_seconds(params, description):
+    """Detik yang diminta Telegram, dari field terstruktur ATAU dari teks deskripsi.
+
+    Bot API resmi mengirim 429 dengan `parameters.retry_after`. Bot API LOKAL yang dipakai
+    instalasi ini mengirim rate limit sebagai **400** dengan angkanya hanya di dalam kalimat:
+    `400 Bad Request: too Many Requests: retry after 8`. Membaca field saja berarti tidak tahu
+    harus menunggu berapa lama pada satu-satunya bentuk yang benar-benar muncul di produksi —
+    520 kejadian dalam 24 jam, nol di antaranya bergaya 429.
+    """
+    nilai = (params or {}).get('retry_after')
+    if nilai is None:
+        cocok = RETRY_AFTER_RE.search(description or '')
+        nilai = cocok.group(1) if cocok else None
+    try:
+        return int(nilai)
+    except (TypeError, ValueError):
+        return None
 
 
 def is_permanent_failure(err):
@@ -460,7 +483,21 @@ def is_permanent_failure(err):
     """
     if not err:
         return False
-    code = str(err).split(' ', 1)[0]
+    teks = str(err)
+    # Rate limit tidak pernah permanen, apa pun kode statusnya. Bot API lokal mengirimnya
+    # sebagai 400, bukan 429 — menggolongkannya permanen berarti melangkahi ~1 dari 10
+    # rekaman secara diam-diam, dan Telegram adalah satu-satunya salinan yang lebih tua
+    # dari masa retensi disk.
+    rendah = teks.lower()
+    if RETRY_AFTER_RE.search(teks) or 'too many requests' in rendah:
+        return False
+    # Bot API lokal juga membungkus kegagalan sisi-server dalam amplop 400:
+    # "400 Bad Request: internal Server Error during file upload". Kode statusnya berbohong
+    # tentang siapa yang salah — deskripsinya yang jujur. Terhitung 5 kejadian per 24 jam di
+    # produksi, dan aturan dokumen ini sendiri berkata 5xx adalah definisi coba-lagi.
+    if 'internal server error' in rendah or 'bad gateway' in rendah:
+        return False
+    code = teks.split(' ', 1)[0]
     if not code.isdigit():
         return False
     status = int(code)
