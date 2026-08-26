@@ -178,10 +178,46 @@ export function startLivePictureWatch(video, {
         lastTickAt = sekarang;
         const teramati = Math.min(jeda, intervalMs * 2);
 
+        /*
+         * HALAMANNYA TIDAK TERLIHAT - dan ini berlaku untuk KEDUA cabang di bawah.
+         *
+         * Penjaga ini semula hanya dipasang di cabang PASCA-vonis, dan itu meninggalkan bentuk
+         * keluhan yang sama persis, hanya bergeser ke fase memuat: usePauseOnHidden MENJEDA video
+         * begitu halaman tersembunyi, sementara tenggat noPictureAfterMs di cabang pra-vonis terus
+         * mengumpulkan waktu. Artinya dekodernya dilarang menghasilkan bukti yang dituntut tenggat
+         * itu. Pengunjung yang membuka kamera lalu langsung pindah aplikasi sebelum gambar pertama
+         * muncul akan kembali ke "Codec Tidak Didukung" TANPA tombol coba lagi - vonis kemampuan
+         * perangkat yang dijatuhkan tanpa satu pun kesempatan mendekode.
+         *
+         * Akumulator waktu-teramati tidak menolong di sini: tiap tick tetap menyumbang, jadi 15
+         * tick di latar belakang tetap genap 15 detik. Yang salah bukan lajunya, melainkan
+         * menghitungnya sama sekali saat tidak ada yang bisa diamati.
+         */
+        if (typeof document !== 'undefined' && document.hidden) {
+            dataMs = 0;
+            stalledMs = 0;
+            stillTimeAdvancing = video.currentTime;
+            if (live) framesAtVerdict = countDecodedFrames(video);
+            return;
+        }
+
         if (!live) {
-            if (!hasMediaData(video)) return;
-            if (video.paused && !(video.currentTime > 0)) {
-                requestPlay?.(video);
+            /*
+             * Aliran data putus = percobaan ini mulai dari nol, bukan melanjutkan anggaran lama.
+             * hasMediaData mati pada setiap destroy()+attachMedia (jalur coba-ulang otomatis) dan
+             * saat lompat ke live edge. Tanpa reset ini, tick pertama sesudah data kembali bisa
+             * memvonis dari SATU sampel, karena anggaran 15 detiknya nyaris habis di percobaan
+             * sebelumnya.
+             */
+            if (!hasMediaData(video)) {
+                dataMs = 0;
+                return;
+            }
+            // Dijeda: masih boleh disenggol, tapi waktunya tidak dihitung. Video yang berhenti
+            // tidak bisa membuktikan apa pun - termasuk saat pengunjung sendiri yang menjedanya.
+            if (video.paused) {
+                if (!(video.currentTime > 0)) requestPlay?.(video);
+                dataMs = 0;
                 return;
             }
             if (hasPicture(video)) {
@@ -210,7 +246,7 @@ export function startLivePictureWatch(video, {
          * melompat tetapi dekodernya baru dibangun ulang. Membasiskan ulang di sini membuat tick
          * pertama sesudah kembali menjadi titik nol yang jujur, bukan sisa pengamatan lama.
          */
-        if (video.paused || (typeof document !== 'undefined' && document.hidden)) {
+        if (video.paused) {
             stillTimeAdvancing = video.currentTime;
             stalledMs = 0;
             return;

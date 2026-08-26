@@ -286,14 +286,22 @@ describe('pipeline media dibangun ulang (aplikasi kembali dari latar belakang)',
         startLivePictureWatch(video, { onNoPicture });
         vi.advanceTimersByTime(500);
 
-        majukan(4, () => { video.currentTime += 0.5; });   // 2 detik sepi, masih di bawah ambang
+        /*
+         * Bentuk pertama tes ini TIDAK diskriminatif: ia hanya menjeda beberapa tick, padahal saat
+         * dijeda currentTime memang tidak maju sehingga `!advanced` sudah menahan vonis lebih dulu.
+         * Menghapus penjaga jedanya membuat tes itu tetap hijau. Yang benar-benar dijaganya adalah
+         * RESET jam macetnya - jadi separuh anggaran dihabiskan SEBELUM jeda dan separuh lagi
+         * SESUDAHNYA. Tanpa reset, keduanya berjumlah genap satu tenggat.
+         */
+        majukan(10, () => { video.currentTime += 0.5; });  // 5 dtk sepi: separuh tenggat
+        expect(onNoPicture).not.toHaveBeenCalled();
 
         video.paused = true;                               // usePauseOnHidden menjeda saat tersembunyi
-        majukan(4);
+        majukan(10);
         video.paused = false;
         video.currentTime += 30;                           // kembali: snap ke live edge
 
-        majukan(4, () => { video.currentTime += 0.5; });   // 2 detik sepi lagi - harus dihitung ULANG
+        majukan(11, () => { video.currentTime += 0.5; });  // 5,5 dtk sepi lagi - harus dihitung ULANG
 
         expect(onNoPicture).not.toHaveBeenCalled();
     });
@@ -420,5 +428,128 @@ describe('tick yang lambat terus-menerus (perangkat lemah, bukan latar belakang)
         }
 
         expect(onNoPicture).not.toHaveBeenCalled();
+    });
+});
+
+/*
+ * TEMUAN PEMERIKSAAN ADVERSARIAL 2026-08-26: penjaga halaman-tersembunyi semula hanya dipasang di
+ * cabang PASCA-vonis, sehingga bentuk keluhan yang sama persis masih bisa jatuh - hanya bergeser
+ * ke fase memuat. Buka kamera, langsung pindah aplikasi sebelum gambar pertama muncul, lalu
+ * kembali: "Codec Tidak Didukung" tanpa tombol coba lagi, pada perangkat yang belum pernah diberi
+ * satu pun kesempatan mendekode.
+ */
+describe('halaman tersembunyi SEBELUM gambar pertama muncul', () => {
+    const sembunyikan = (nilai) => {
+        Object.defineProperty(document, 'hidden', { configurable: true, get: () => nilai });
+    };
+    afterEach(() => { sembunyikan(false); });
+
+    it('TIDAK memvonis codec selama halamannya tidak terlihat', () => {
+        const video = videoTiruan();
+        const onNoPicture = vi.fn();
+        video._frames = 0;
+
+        startLivePictureWatch(video, { onNoPicture });
+        sembunyikan(true);
+        video.paused = true;                  // usePauseOnHidden menjeda begitu tab tersembunyi
+
+        majukan(60);                          // 30 detik: dua kali tenggat noPictureAfterMs
+
+        expect(onNoPicture, 'divonis tanpa pernah diberi kesempatan mendekode').not.toHaveBeenCalled();
+    });
+
+    /*
+     * Yang MEMAKU penjaga halaman-tersembunyi, dan bukan penjaga jeda di sebelahnya.
+     *
+     * Audit mutasi menunjukkan tes di atas tetap hijau ketika penjaga tersembunyi dilumpuhkan -
+     * karena di sana videonya juga DIJEDA, dan penjaga jeda menangkapnya duluan. Keduanya harus
+     * ada: usePauseOnHidden hanya menjeda video yang SEDANG memutar, jadi stream yang masih
+     * memuat saat pengguna pindah aplikasi tetap paused=false sambil halamannya tersembunyi -
+     * dan di situ penjaga tersembunyi adalah satu-satunya yang berdiri.
+     */
+    it('menahan vonis saat halaman tersembunyi walau videonya TIDAK dijeda', () => {
+        const video = videoTiruan();
+        const onNoPicture = vi.fn();
+        video._frames = 0;
+        video.paused = false;
+
+        startLivePictureWatch(video, { onNoPicture });
+        sembunyikan(true);
+
+        majukan(60);                          // 30 detik: dua kali tenggat
+
+        expect(onNoPicture, 'hanya penjaga tersembunyi yang berdiri di sini').not.toHaveBeenCalled();
+    });
+
+    it('tidak lumpuh: begitu terlihat lagi, tenggatnya berjalan seperti biasa', () => {
+        const video = videoTiruan();
+        const onNoPicture = vi.fn();
+        video._frames = 0;
+
+        startLivePictureWatch(video, { onNoPicture });
+        sembunyikan(true);
+        video.paused = true;
+        majukan(60);
+        expect(onNoPicture).not.toHaveBeenCalled();
+
+        sembunyikan(false);
+        video.paused = false;
+        majukan(34);                          // 17 detik teramati, di atas tenggat 15 detik
+
+        expect(onNoPicture).toHaveBeenCalledWith({ everHadPicture: false });
+    });
+});
+
+/*
+ * Anggaran tenggat pra-vonis tidak boleh menyeberangi putusnya aliran data. hasMediaData mati pada
+ * setiap destroy()+attachMedia (jalur coba-ulang otomatis) dan saat lompat ke live edge; tanpa
+ * reset, tick pertama sesudah data kembali memvonis dari SATU sampel karena anggaran percobaan
+ * SEBELUMNYA nyaris habis.
+ */
+describe('aliran data terputus lalu kembali', () => {
+    it('memulai tenggat dari nol, bukan melanjutkan anggaran percobaan sebelumnya', () => {
+        const video = videoTiruan();
+        const onNoPicture = vi.fn();
+        video._frames = 0;
+
+        startLivePictureWatch(video, { onNoPicture });
+
+        majukan(28);                          // 14 detik: tepat di bawah tenggat
+        expect(onNoPicture).not.toHaveBeenCalled();
+
+        video.readyState = 1;                 // data putus - hls.js dibangun ulang
+        video.buffered = { length: 0 };
+        majukan(4);
+
+        video.readyState = 4;                 // data kembali: ini percobaan BARU
+        video.buffered = { length: 1 };
+        majukan(4);
+
+        expect(onNoPicture, 'sisa anggaran lama dipakai memvonis percobaan baru').not.toHaveBeenCalled();
+    });
+
+    /*
+     * Bentuk kedua dari anggaran yang menyeberang: videonya DIJEDA di tengah jalan. Di ponsel ini
+     * rutin - kebijakan autoplay menolak, atau usePauseOnHidden menjeda sekejap - dan tanpa reset,
+     * anggaran yang nyaris habis sebelum jeda memvonis percobaan sesudahnya dari satu-dua sampel.
+     */
+    it('juga memulai dari nol sesudah videonya sempat dijeda', () => {
+        const video = videoTiruan();
+        const onNoPicture = vi.fn();
+        video._frames = 0;
+
+        startLivePictureWatch(video, { onNoPicture });
+
+        majukan(28);                          // 14 detik: tepat di bawah tenggat
+        expect(onNoPicture).not.toHaveBeenCalled();
+
+        video.paused = true;                  // autoplay ditolak / dijeda sekejap
+        video.currentTime = 3;
+        majukan(4);
+
+        video.paused = false;
+        majukan(4);
+
+        expect(onNoPicture, 'anggaran menyeberangi jeda').not.toHaveBeenCalled();
     });
 });

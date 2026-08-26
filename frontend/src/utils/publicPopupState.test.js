@@ -192,6 +192,11 @@ describe('gambar yang berhenti bisa dicoba lagi; vonis codec tetap tidak', () =>
     it('tidak meminjam bahasa codec untuk perangkat yang jelas mampu mendekode', () => {
         const state = getPublicPopupOverlayState({ status: 'error', errorType: 'stalled' });
 
+        // Asersi POSITIF lebih dulu: audit mutasi menunjukkan seluruh berkas ini tetap hijau
+        // ketika varian 'stalled' DIHAPUS, karena ERROR_VARIANTS jatuh ke 'unknown' yang juga
+        // canRetry:true dan juga tidak menyebut codec. Yang negatif saja tidak memaku apa pun.
+        expect(state.variant).toBe('stalled');
+        expect(state.title).toBe('Gambar Terhenti');
         expect(state.canRetry).toBe(true);
         expect(state.title).not.toMatch(/codec/i);
         expect(`${state.title} ${state.description}`).not.toMatch(/codec|h\.?265|hevc|safari/i);
