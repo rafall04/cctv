@@ -27,21 +27,48 @@ function sortByNewest(left, right) {
     return Number(right?.id || 0) - Number(left?.id || 0);
 }
 
+/*
+ * Daftar kurasi ("Paling Sering Dibuka", "Kamera Baru") adalah JALAN PINTAS ke dalam grid yang
+ * panjang. Ia berhenti jadi jalan pintas begitu ia mencakup hampir seluruh gridnya.
+ *
+ * Terukur di DS DANDER (8 kamera, 2026-08-26): kedua daftar itu memakan 1.008px dari halaman
+ * setinggi 4.431px — 27% — untuk menampilkan kamera yang SAMA dengan grid di bawahnya, dalam
+ * bentuk kartu teks tanpa thumbnail. Dari 9 kemunculan kamera hanya 7 unik: dua kamera bahkan
+ * muncul dua kali di antara kedua daftar itu sendiri. Grid bergambar baru dimulai di 1.696px,
+ * lebih dari dua layar ke bawah.
+ *
+ * Ambangnya bukan angka cantik: di bawah 12 kamera, gridnya sendiri kurang dari empat layar dan
+ * menggulirnya lebih murah daripada membaca dua daftar teks yang mengulang isinya. Di atas itu,
+ * menyorot 8 dari 12+ benar-benar menghemat gulir.
+ */
+export const CURATED_MIN_CAMERAS = 12;
+
 export function buildAreaPublicRankingLists(cameras = [], trendingCameras = [], selectedCamera = null) {
+    // "Sedang Ramai" TIDAK ikut ambang: ia menjawab pertanyaan yang tidak dijawab grid mana pun —
+    // "ada yang sedang menonton ini SEKARANG" — dan ia menyembunyikan dirinya sendiri saat nol.
     const liveCameras = [...cameras]
         .filter((camera) => getAreaCameraLiveViewers(camera) > 0)
         .sort((left, right) => getAreaCameraLiveViewers(right) - getAreaCameraLiveViewers(left))
         .slice(0, 4);
 
-    const topSource = trendingCameras.length ? trendingCameras : cameras;
-    const topCameras = [...topSource]
-        .sort((left, right) => getAreaCameraTotalViews(right) - getAreaCameraTotalViews(left))
-        .slice(0, 4);
+    const cukupUntukKurasi = cameras.length >= CURATED_MIN_CAMERAS;
 
-    const newestCameras = [...cameras]
-        .filter((camera) => camera.created_at)
-        .sort(sortByNewest)
-        .slice(0, 4);
+    const topSource = trendingCameras.length ? trendingCameras : cameras;
+    const topCameras = cukupUntukKurasi
+        ? [...topSource]
+            .sort((left, right) => getAreaCameraTotalViews(right) - getAreaCameraTotalViews(left))
+            .slice(0, 4)
+        : [];
+
+    // Disaring terhadap topCameras: kamera yang sudah disorot sebagai paling sering dibuka tidak
+    // perlu disorot lagi dua kartu di bawahnya. Keduanya sempat menampilkan kamera yang sama.
+    const sudahDisorot = new Set(topCameras.map((camera) => camera.id));
+    const newestCameras = cukupUntukKurasi
+        ? [...cameras]
+            .filter((camera) => camera.created_at && !sudahDisorot.has(camera.id))
+            .sort(sortByNewest)
+            .slice(0, 4)
+        : [];
 
     // Nearest-first from the playing camera; viewer ranking is the tiebreaker when distance
     // is equal or unavailable (cameras without coordinates fall back to this order).

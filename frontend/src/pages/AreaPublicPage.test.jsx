@@ -125,14 +125,62 @@ describe('AreaPublicPage', () => {
         expect(screen.getByRole('link', { name: /Kembali ke CCTV Publik/i }).getAttribute('href')).toBe('/');
         expect(screen.getByRole('heading', { level: 2, name: /Status Area/i })).toBeTruthy();
         expect(screen.getByRole('heading', { level: 2, name: /Sedang Ramai di KAB SURABAYA/i })).toBeTruthy();
-        expect(screen.getByRole('heading', { level: 2, name: /Paling Sering Dibuka di KAB SURABAYA/i })).toBeTruthy();
-        expect(screen.getByRole('heading', { level: 2, name: /Kamera Baru KAB SURABAYA/i })).toBeTruthy();
         expect(screen.getByRole('heading', { level: 2, name: /Semua CCTV Area/i })).toBeTruthy();
+
+        /*
+         * Dengan DUA kamera, daftar kurasi bukan jalan pintas ke mana pun - ia mengulang seluruh
+         * grid yang ada tepat di bawahnya, dalam bentuk kartu teks tanpa thumbnail. Kontraknya
+         * berubah pada 2026-08-26 dan tes ini ikut berubah bersamanya, bukan dilonggarkan:
+         * ketiadaannya di sini DIASSERT, dan kehadirannya pada area besar diassert di tes
+         * berikutnya.
+         */
+        expect(screen.queryByRole('heading', { name: /Paling Sering Dibuka/i })).toBeNull();
+        expect(screen.queryByRole('heading', { name: /Kamera Baru/i })).toBeNull();
         expect(screen.getAllByText(/2 kamera/i).length).toBeGreaterThan(0);
         expect(screen.getAllByText(/5 live/i).length).toBeGreaterThan(0);
         expect(screen.getAllByText(/CCTV A/i).length).toBeGreaterThan(0);
         expect(screen.getAllByText(/CCTV B/i).length).toBeGreaterThan(0);
         expect(document.title).toBe('CCTV Online KAB SURABAYA - RAF');
+    });
+
+    /*
+     * Sisi sebaliknya, dan ini yang membuat perubahan di atas bukan sekadar penghapusan fitur:
+     * pada area yang gridnya benar-benar panjang, daftar kurasi tetap ada karena di sana ia
+     * memang menghemat gulir. Ambangnya di utils/areaPublicRanking.js (CURATED_MIN_CAMERAS).
+     */
+    it('area besar TETAP mendapat daftar kurasi, dan tidak mengulang kamera yang sama', async () => {
+        const banyak = Array.from({ length: 20 }, (_, i) => ({
+            id: i + 1,
+            name: `CCTV ${i + 1}`,
+            area_name: 'KAB SURABAYA',
+            total_views: 100 - i,
+            live_viewers: 0,
+            created_at: `2026-05-${String(28 - i).padStart(2, '0')} 08:00:00`,
+        }));
+        getAreaMock.mockResolvedValue({
+            success: true,
+            data: { name: 'KAB SURABAYA', slug: 'kab-surabaya', camera_count: 20, online_count: 20, total_views: 999 },
+        });
+        getAreaCamerasMock.mockResolvedValue({ success: true, data: banyak });
+        getTrendingCamerasMock.mockResolvedValue({ success: true, data: banyak.slice(0, 4) });
+
+        renderPage();
+
+        expect(await screen.findByRole('heading', { name: /Paling Sering Dibuka/i })).toBeTruthy();
+        expect(screen.getByRole('heading', { name: /Kamera Baru/i })).toBeTruthy();
+
+        /*
+         * Kedua daftar itu sempat menyorot kamera yang SAMA - terlihat di produksi: dua kamera
+         * muncul dua kali di antara keduanya. "Kamera Baru" kini disaring terhadap yang sudah
+         * disorot sebagai paling sering dibuka.
+         */
+        const kartuKurasi = [...document.querySelectorAll('section')]
+            .filter((sec) => /Paling Sering Dibuka|Kamera Baru/.test(sec.querySelector('h2')?.textContent || ''))
+            .flatMap((sec) => [...sec.querySelectorAll('button')].map((b) => b.textContent.match(/CCTV \d+/)?.[0]))
+            .filter(Boolean);
+
+        expect(kartuKurasi.length).toBeGreaterThan(0);
+        expect(new Set(kartuKurasi).size).toBe(kartuKurasi.length);
     });
 
     it('merender daftar semua CCTV area secara bertahap untuk area besar', async () => {
