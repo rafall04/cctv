@@ -1,0 +1,22 @@
+[Unit]
+# Pemeriksa jam kamera. Dipicu camera-time-check.timer, bukan dijalankan terus-menerus.
+# Sepenuhnya READ-ONLY terhadap kamera; ia hanya membaca ONVIF GetSystemDateAndTime.
+Description=RAF CCTV - periksa jam setiap kamera terhadap jam server
+Documentation=file:///var/www/rafnet-cctv/deployment/camera-time/README.md
+After=network-online.target chrony.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /var/www/rafnet-cctv/deployment/camera-time/check_camera_time.py --quiet
+
+# Keluar dengan kode 1 saat ADA kamera bermasalah - itu keadaan yang dilaporkan, bukan
+# kegagalan skrip. Tanpa baris ini systemd menandai unit-nya `failed` tiap jam selama masalah
+# belum diperbaiki, dan `systemctl --failed` berhenti berarti apa-apa.
+SuccessExitStatus=0 1
+
+TimeoutStartSec=300
+Nice=15
+
+[Install]
+WantedBy=multi-user.target

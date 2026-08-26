@@ -1,0 +1,18 @@
+[Unit]
+Description=RAF CCTV - jalankan pemeriksa jam kamera tiap jam
+
+[Timer]
+# Tiap jam sudah cukup rapat: jam kamera hanyut dalam hitungan menit per hari, bukan detik per
+# menit, dan mode yang kembali ke Manual tidak menghasilkan selisih terukur sampai berjam-jam
+# kemudian. Lebih rapat dari ini hanya menambah trafik ONVIF tanpa menemukan apa pun lebih awal.
+OnCalendar=hourly
+
+# Jangan menembak tepat di menit 0 bersama semua timer lain di box ini.
+RandomizedDelaySec=300
+
+# Kalau box mati saat jadwalnya lewat, jalankan begitu ia hidup - justru saat itulah kamera
+# paling mungkin baru kehilangan jamnya (mati listrik bersama).
+Persistent=true
+
+[Install]
+WantedBy=timers.target
