@@ -55,6 +55,7 @@ const BillingManagement = lazyWithRetry(() => import('./pages/BillingManagement'
 const VoucherManagement = lazyWithRetry(() => import('./pages/VoucherManagement'), 'voucher-management');
 const RondaSettings = lazyWithRetry(() => import('./pages/RondaSettings'), 'ronda-settings');
 const VehicleCountSettings = lazyWithRetry(() => import('./pages/VehicleCountSettings'), 'vehicle-count-settings');
+const CameraTimeStatus = lazyWithRetry(() => import('./pages/CameraTimeStatus'), 'camera-time-status');
 const TelegramArchiveSettings = lazyWithRetry(() => import('./pages/TelegramArchiveSettings'), 'telegram-archive-settings');
 const TelegramArchiveLibrary = lazyWithRetry(() => import('./pages/TelegramArchiveLibrary'), 'telegram-archive-library');
 const CustomerCameraIPs = lazyWithRetry(() => import('./pages/CustomerCameraIPs'), 'customer-camera-ips');
@@ -420,6 +421,17 @@ function App() {
                     element={
                         <AdminPageRoute adminOnly>
                             <VehicleCountSettings />
+                        </AdminPageRoute>
+                    }
+                />
+
+                {/* Keadaan jam tiap kamera. Penyelarasnya berjalan sendiri lewat systemd timer;
+                    halaman ini yang membuat hasilnya terlihat — tanpa itu ia otomatis tapi buta. */}
+                <Route
+                    path="/admin/jam-kamera"
+                    element={
+                        <AdminPageRoute adminOnly>
+                            <CameraTimeStatus />
                         </AdminPageRoute>
                     }
                 />

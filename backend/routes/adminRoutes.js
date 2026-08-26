@@ -19,6 +19,7 @@ import {
 } from '../controllers/adminCameraFeedbackController.js';
 import { authMiddleware, requireAdmin } from '../middleware/authMiddleware.js';
 import vehicleCountAdminRoutes from './vehicleCountAdminRoutes.js';
+import cameraTimeRoutes from './cameraTimeRoutes.js';
 import { createApiKeySchema, apiKeyIdParamSchema } from '../middleware/schemaValidators.js';
 import mediaMtxService from '../services/mediaMtxService.js';
 
@@ -431,4 +432,8 @@ export default async function adminRoutes(fastify, options) {
     // Didaftarkan bersarang di sini, bukan di server.js: berkas itu berada tepat di pagar
     // ukuran 800 baris, dan menambah dua baris di sana menjatuhkan gate untuk semua orang.
     await fastify.register(vehicleCountAdminRoutes, { prefix: '/vehicle-count' });
+
+    // Keadaan jam kamera + kredensial ONVIF daruratnya -> /api/admin/camera-time/*
+    // Bersarang di sini karena alasan yang sama seperti di atas.
+    await fastify.register(cameraTimeRoutes, { prefix: '/camera-time' });
 }

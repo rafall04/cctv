@@ -128,6 +128,36 @@ def kirim_telegram(teks, env_file):
         return "gagal kirim: %s" % exc
 
 
+def simpan_status(con, rekaman):
+    """Tulis keadaan SEKARANG tiap kamera supaya panel admin tidak perlu membaca log.
+
+    Satu baris per kamera, ditimpa tiap siklus. Yang dibutuhkan operator adalah keadaan
+    sekarang, bukan riwayat - dan tabel yang tumbuh selamanya akan jadi beban tanpa pernah
+    dibaca. Kegagalan menulis TIDAK boleh menggagalkan penyelarasan: kamera yang jamnya sudah
+    dibenahi tetap benar meski catatannya gagal tersimpan.
+    """
+    try:
+        con.execute("BEGIN")
+        for r in rekaman:
+            con.execute(
+                "INSERT INTO camera_time_status "
+                "(camera_id, checked_at, reachable, mode, drift_seconds, method, healthy, note) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
+                "ON CONFLICT(camera_id) DO UPDATE SET "
+                "checked_at=excluded.checked_at, reachable=excluded.reachable, "
+                "mode=excluded.mode, drift_seconds=excluded.drift_seconds, "
+                "method=excluded.method, healthy=excluded.healthy, note=excluded.note",
+                r)
+        con.execute("COMMIT")
+        return None
+    except Exception as exc:  # noqa: BLE001
+        try:
+            con.execute("ROLLBACK")
+        except Exception:  # noqa: BLE001
+            pass
+        return str(exc)
+
+
 def catatan_baris(sebab, didorong, mode, perbaiki_aktif, metode=None):
     """Satu kalimat jujur per kamera - termasuk saat sehatnya BUKAN karena dirinya sendiri."""
     if sebab:
@@ -158,12 +188,12 @@ def main():
 
     con = sqlite3.connect(args.db)
     rows = con.execute(
-        "SELECT id, name, private_rtsp_url FROM cameras "
-        "WHERE enabled=1 AND private_rtsp_url LIKE ? ORDER BY id",
+        "SELECT id, name, private_rtsp_url, onvif_username, onvif_password "
+        "FROM cameras WHERE enabled=1 AND private_rtsp_url LIKE ? ORDER BY id",
         ("rtsp://%@192.168.%",)).fetchall()
 
     sekarang = datetime.datetime.utcnow()
-    masalah, baris = [], []
+    masalah, baris, status = [], [], []
 
     # State dimuat SEBELUM loop: ia memuat metode yang berhasil untuk tiap kamera, dan itu
     # dibutuhkan saat memutuskan jalur mana yang dicoba.
@@ -175,7 +205,7 @@ def main():
             state_lama = {}
     metode_dikenal = dict(state_lama.get("metode") or {})
 
-    for cid, nama, url in rows:
+    for cid, nama, url, onvif_user, onvif_pwd in rows:
         host_hit = re.search(r"@([^:/]+)", url or "")
         if not host_hit:
             continue
@@ -184,6 +214,8 @@ def main():
 
         if err and stamp is None and mode is None:
             baris.append((cid, nama, host, "-", "-", err))
+            status.append((cid, sekarang.isoformat(timespec="seconds"), 0,
+                           None, None, None, 0, err))
             # Tidak terjangkau BUKAN bukti jamnya salah - catat, jangan bunyikan alarm.
             continue
 
@@ -205,14 +237,25 @@ def main():
         # bekerja (firmware diperbarui, kamera diganti dengan model lain di IP yang sama),
         # tangga penuh dicoba lagi. Ingatan yang tidak pernah diragukan akan membeku salah.
         metode = None
-        kred = re.match(r"rtsp://([^:]+):([^@]+)@", url or "")
+        # Kredensial: kolom ONVIF khusus HANYA bila diisi. Kosong berarti "pakai yang sama
+        # dengan RTSP" - dan itu benar untuk hampir semua kamera, jadi operator tidak dituntut
+        # mengisi apa pun. Kolom itu ada untuk firmware yang memisahkan akun ONVIF dari akun
+        # utama, atau saat akun RTSP sengaja dibuat read-only dan tidak boleh mengubah
+        # setelan perangkat. Tanpa jalan keluar itu, satu kamera semacam itu gagal selamanya.
+        cocok_rtsp = re.match(r"rtsp://([^:]+):([^@]+)@", url or "")
+        if onvif_user and onvif_pwd:
+            kred = (onvif_user, onvif_pwd)
+        elif cocok_rtsp:
+            kred = (cocok_rtsp.group(1), cocok_rtsp.group(2))
+        else:
+            kred = None
         perlu_dibenahi = mode and mode.lower() != "ntp"
         diingat = metode_dikenal.get(str(cid))
 
         # Kamera yang hanya bisa didorong: cukup tulis ulang jamnya, dan hanya bila perlu.
         if args.perbaiki and perlu_dibenahi and kred and diingat == "dorong":
             if selisih is not None and abs(selisih) > args.ambang_dorong:
-                metode = "dorong" if dorong_waktu(host, kred.group(1), kred.group(2), zona) else None
+                metode = "dorong" if dorong_waktu(host, kred[0], kred[1], zona) else None
                 if metode is None:
                     diingat = None  # jalur yang diingat berhenti bekerja - coba tangga lagi
             else:
@@ -224,7 +267,7 @@ def main():
         # Semua yang bukan "dorong" masuk ke tangga penuh; ONVIF dicoba pertama, jadi kamera
         # yang memang jalurnya itu tetap cepat.
         if args.perbaiki and perlu_dibenahi and kred and diingat != "dorong":
-            berhasil, metode, _ket = pastikan_waktu(host, kred.group(1), kred.group(2))
+            berhasil, metode, _ket = pastikan_waktu(host, kred[0], kred[1])
             if berhasil:
                 metode_dikenal[str(cid)] = metode
                 mode2, stamp2, zona2, err2 = onvif_time(host)
@@ -254,8 +297,17 @@ def main():
         baris.append((cid, nama, host, mode or "?",
                       ("%+ds" % selisih) if selisih is not None else "-",
                       catatan_baris(sebab, didorong, mode, args.perbaiki, metode)))
+        catatan = baris[-1][5]
+        status.append((cid, datetime.datetime.utcnow().isoformat(timespec="seconds"), 1,
+                       mode, selisih, metode_dikenal.get(str(cid)),
+                       0 if sebab else 1, catatan))
+
         if sebab:
             masalah.append("id %s %s: %s" % (cid, nama, "; ".join(sebab)))
+
+    galat_simpan = simpan_status(con, status)
+    if galat_simpan:
+        print("peringatan: status tidak tersimpan: %s" % galat_simpan, file=sys.stderr)
 
     if not args.quiet:
         print("JAM SERVER (UTC): %s   toleransi: %ds\n"
