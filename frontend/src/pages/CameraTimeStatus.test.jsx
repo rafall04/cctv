@@ -132,6 +132,34 @@ describe('halaman jam kamera menolak terlihat sehat tanpa dasar', () => {
         expect(await screen.findByText('Tak terjangkau')).not.toBeNull();
         expect(screen.getByText(/belum tentu jamnya salah/i)).not.toBeNull();
     });
+    /*
+     * Metode hanya tercatat untuk kamera yang PERNAH perlu dibenahi. Yang sejak awal sudah
+     * ber-NTP tidak pernah melewati tangga perbaikan, jadi kolomnya kosong di DB — dan
+     * menampilkan "—" untuk kamera paling sehat di jaringan akan terbaca seperti sesuatu yang
+     * belum diketahui. Terlihat di produksi: 12 dari 14 kamera persis dalam keadaan ini.
+     */
+    it('tetap menjelaskan cara menjaga waktu meski metodenya belum pernah tercatat', async () => {
+        balas({
+            cameras: [{ ...KAMERA_SEHAT, method: null, note: 'ok' }],
+            summary: RINGKASAN_SEHAT,
+        });
+
+        render(<CameraTimeStatus />);
+
+        expect(await screen.findByText('Menarik sendiri dari server')).not.toBeNull();
+    });
+
+    it('tidak mengarang cara menjaga waktu untuk kamera yang tak terjangkau', async () => {
+        balas({
+            cameras: [{ ...KAMERA_SEHAT, reachable: false, healthy: false, mode: null, method: null, note: 'ONVIF tidak menjawab' }],
+            summary: { ...RINGKASAN_SEHAT, healthy: 0, problems: 1, unreachable: 1 },
+        });
+
+        render(<CameraTimeStatus />);
+
+        await screen.findByText('Tak terjangkau');
+        expect(screen.queryByText('Menarik sendiri dari server')).toBeNull();
+    });
 });
 
 describe('kredensial ONVIF darurat', () => {

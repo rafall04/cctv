@@ -59,6 +59,20 @@ const PENJELASAN_METODE = {
     dorong: 'Tanpa klien NTP — jam ditulis server',
 };
 
+/*
+ * Metode hanya TERCATAT untuk kamera yang pernah perlu dibenahi — yang sejak awal sudah
+ * ber-NTP tidak pernah melewati tangga perbaikan, jadi kolomnya kosong. Menampilkan "—" untuk
+ * kamera paling sehat di jaringan akan terbaca seperti sesuatu yang belum diketahui.
+ *
+ * Modenya sendiri sudah menjawab pertanyaannya: NTP berarti kamera menarik waktunya sendiri.
+ */
+function jelaskanCara(kamera) {
+    if (kamera.method) return PENJELASAN_METODE[kamera.method] || kamera.method;
+    if (kamera.stale || !kamera.reachable) return '—';
+    if ((kamera.mode || '').toLowerCase() === 'ntp') return 'Menarik sendiri dari server';
+    return kamera.note || '—';
+}
+
 function LencanaStatus({ kamera }) {
     if (kamera.stale) {
         return (
@@ -234,7 +248,7 @@ export function CameraTimeStatus() {
                                     </TD>
                                     <TD><LencanaStatus kamera={kamera} /></TD>
                                     <TD>{kamera.stale ? '—' : ucapkanSelisih(kamera.driftSeconds)}</TD>
-                                    <TD>{PENJELASAN_METODE[kamera.method] || kamera.note || '—'}</TD>
+                                    <TD>{jelaskanCara(kamera)}</TD>
                                     <TD>{ucapkanUmur(kamera.ageMinutes)}</TD>
                                     <TD align="right">
                                         <Button variant="ghost" size="sm" onClick={() => bukaEditor(kamera)}>
