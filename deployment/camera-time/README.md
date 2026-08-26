@@ -24,7 +24,53 @@ Dan server ini sendiri **tidak pernah bisa melayani NTP**: ia memakai `systemd-t
 klien saja. Tidak ada apa pun yang mendengarkan di UDP 123, jadi kamera yang diarahkan ke sini
 tidak akan pernah mendapat jawaban. Kini digantikan `chrony` yang melayani di **172.17.11.12**.
 
-## Tiga berkas di sini
+## Pemasangan: satu perintah, tanpa satu pun alamat diketik
+
+```bash
+sudo bash deployment/camera-time/setup.sh
+```
+
+Itu saja. Skrip itu memasang chrony, menjadikan server sumber waktu, memasang penjaganya, lalu
+menyelaraskan semua kamera. Pemasang tidak perlu tahu apa pun tentang NTP.
+
+**Yang membuatnya bisa dipasang di jaringan mana pun tanpa disetel:**
+
+- **Alamat NTP untuk tiap kamera ditemukan, bukan ditulis.** `ip route get <kamera>` menjawab
+  alamat sumber yang dipakai server saat menghubungi kamera itu — persis alamat yang harus
+  dituju balik. Benar dengan sendirinya di server satu NIC, banyak NIC, atau di balik gateway.
+- **Subnet kamera diturunkan dari daftar kamera di database**, bukan dari daftar yang dirawat
+  tangan. Jalankan ulang `setup.sh` sesudah menambah kamera di lokasi baru dan blok chrony
+  ditulis ulang lengkap.
+- **Merek dideteksi dari apa yang DIJAWAB perangkat**, bukan dari daftar merek. Daftar akan basi
+  begitu pelanggan memasang model lain.
+
+## Bagaimana ia menyesuaikan diri
+
+Pemeriksa berkala tidak hanya melapor — ia **membenahi**. Untuk tiap kamera yang mode waktunya
+bukan NTP, ia mencoba berurutan dan berhenti pada yang pertama **terbukti** berhasil (terbukti =
+dibaca ulang, bukan sekadar dijawab OK):
+
+| urutan | jalur | untuk |
+|---|---|---|
+| 1 | ONVIF `SetNTP` | jalur standar — Tiandy dan sejenisnya |
+| 2 | Hikvision **ISAPI** | firmware yang ONVIF-nya menolak autentikasi |
+| 3 | **dorongan waktu** | firmware tanpa klien NTP sama sekali (Longse) |
+
+Urutannya bukan selera: yang di atas membuat kamera mandiri, yang di bawah menuntut server terus
+mengurusnya. Jangan pernah menaikkan dorongan ke urutan pertama hanya karena ia paling sering
+berhasil.
+
+Akibatnya:
+
+- **Kamera baru** yang ditambahkan operator terkonfigurasi sendiri pada siklus berikutnya —
+  tanpa ada yang menjalankan apa pun.
+- **Kamera yang kembali ke Manual** sesudah mati listrik atau reset firmware dibenahi lagi tanpa
+  diminta.
+- **Kamera yang tidak akan pernah bisa ber-NTP** tetap dijaga: jamnya ditulis ulang tiap siklus.
+- **Kamera yang tak terjangkau** dilaporkan sebagai tak terjangkau, bukan sebagai alarm —
+  tidak terjangkau BUKAN bukti jamnya salah.
+
+## Berkas di sini
 
 **`check_camera_time.py`** — pemantau. READ-ONLY. Dijalankan `camera-time-check.timer` tiap jam.
 Ia mengawasi dua hal, dan yang kedua lebih penting: **selisih jam** (gejala) dan **mode waktu**
@@ -36,6 +82,7 @@ dalam sehari, dan saat itu ia berhenti berguna.
 ```bash
 python3 check_camera_time.py                 # tabel lengkap
 python3 check_camera_time.py --toleransi 30  # lebih ketat
+python3 check_camera_time.py --perbaiki      # sekalian benahi (dipakai timer)
 ```
 
 **`set_camera_ntp.py`** — konfigurator sekali-jalan lewat ONVIF. Tanpa `--apply` ia hanya

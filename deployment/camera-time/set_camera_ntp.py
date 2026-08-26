@@ -97,6 +97,68 @@ def read_state(host, user, pwd):
     return (mode.group(1) if mode else "?"), (tz.group(1) if tz else ""), servers, None
 
 
+def alamat_server_untuk(host):
+    """Alamat yang HARUS diisikan ke kamera ini — ditemukan, bukan dihardcode.
+
+    `ip route get <kamera>` menjawab dengan alamat sumber yang dipakai server saat menghubungi
+    kamera itu. Itu persis alamat yang harus dituju balik oleh kamera, dan ia benar dengan
+    sendirinya di topologi mana pun: satu NIC, banyak NIC, di balik gateway, atau saat dipasang
+    di jaringan pelanggan yang belum pernah kita lihat.
+
+    Inilah bagian yang membuat semuanya bisa dipasang tanpa penyetelan: tidak ada satu pun
+    alamat yang perlu ditulis tangan.
+    """
+    try:
+        out = subprocess.run(["ip", "route", "get", host],
+                             capture_output=True, text=True, timeout=6).stdout
+    except Exception:  # noqa: BLE001
+        return None
+    hit = re.search(r"\bsrc\s+([0-9.]+)", out)
+    return hit.group(1) if hit else None
+
+
+def apply_isapi(host, user, pwd, server):
+    """Jalur Hikvision. ONVIF-nya menolak autentikasi di firmware ini — diuji, konsisten.
+
+    Zona waktu dibaca lalu dikirim kembali apa adanya, alasan yang sama seperti di jalur ONVIF.
+    """
+    base = "http://%s/ISAPI/System/time" % host
+
+    def isapi(method, url, body=None):
+        cmd = ["curl", "-s", "--max-time", "10", "--digest", "-u", "%s:%s" % (user, pwd)]
+        if method != "GET":
+            cmd += ["-X", method, "-H", "Content-Type: application/xml", "--data-binary", body]
+        cmd.append(url)
+        try:
+            return subprocess.run(cmd, capture_output=True, text=True,
+                                  timeout=15).stdout.replace("\n", "")
+        except Exception as exc:  # noqa: BLE001
+            return "LOCALERR " + str(exc)
+
+    now = isapi("GET", base)
+    if "<timeMode>" not in now:
+        return False, "ISAPI tidak menjawab"
+    tz_hit = re.search(r"<timeZone>([^<]*)</timeZone>", now)
+    tz = tz_hit.group(1) if tz_hit else "CST-7:00:00"
+
+    srv = ("<?xml version='1.0' encoding='UTF-8'?>"
+           "<NTPServer version='2.0' xmlns='http://www.hikvision.com/ver20/XMLSchema'>"
+           "<id>1</id><addressingFormatType>ipaddress</addressingFormatType>"
+           "<ipAddress>%s</ipAddress><portNo>123</portNo>"
+           "<synchronizeInterval>60</synchronizeInterval></NTPServer>" % server)
+    r1 = isapi("PUT", base + "/ntpServers/1", srv)
+    if "<statusString>OK" not in r1.replace(" ", ""):
+        return False, "ISAPI set server: " + fault(r1)
+
+    mode = ("<?xml version='1.0' encoding='UTF-8'?>"
+            "<Time version='2.0' xmlns='http://www.hikvision.com/ver20/XMLSchema'>"
+            "<timeMode>NTP</timeMode><timeZone>%s</timeZone></Time>" % tz)
+    r2 = isapi("PUT", base, mode)
+    if "<statusString>OK" not in r2.replace(" ", ""):
+        return False, "ISAPI set mode: " + fault(r2)
+    return True, "ok"
+
+
 def apply_ntp(host, user, pwd, server, tz):
     """Set server NTP, lalu pindahkan mode ke NTP. Zona dikirim balik apa adanya."""
     body = ('<SetNTP xmlns="%s"><FromDHCP>false</FromDHCP>'
@@ -115,6 +177,72 @@ def apply_ntp(host, user, pwd, server, tz):
     if "SetSystemDateAndTimeResponse" not in second:
         return False, "SetSystemDateAndTime: " + fault(second)
     return True, "ok"
+
+
+def pastikan_waktu(host, user, pwd, server=None, tz=None, dorong_bila_perlu=True):
+    """Usahakan kamera ini menjaga waktunya sendiri. Kembalikan (berhasil, metode, catatan).
+
+    Mencoba berurutan, dan BERHENTI pada yang pertama terbukti berhasil — terbukti artinya
+    dibaca ulang, bukan sekadar dijawab OK:
+
+      1. ONVIF SetNTP           - jalur standar; dipakai Tiandy dan sejenisnya.
+      2. Hikvision ISAPI        - untuk firmware yang ONVIF-nya menolak autentikasi.
+      3. Dorongan waktu         - untuk firmware yang memang tidak punya klien NTP sama sekali
+                                  (Longse). Kamera tidak menarik, server yang menulis.
+
+    Urutannya bukan selera: yang di atas membuat kamera mandiri, yang di bawah menuntut server
+    terus mengurusnya. Jangan pernah menaikkan dorongan ke urutan pertama hanya karena ia paling
+    sering berhasil.
+
+    Tidak ada daftar merek di sini. Merek dideteksi dari APA YANG DIJAWAB perangkat, karena
+    daftar akan basi begitu pelanggan memasang kamera model lain.
+    """
+    if server is None:
+        server = alamat_server_untuk(host)
+    if not server:
+        return False, None, "alamat server tidak bisa ditentukan (rute ke kamera tidak ada?)"
+
+    if tz is None:
+        _mode, tz, _srv, _err = read_state(host, user, pwd)
+
+    ok, msg = apply_ntp(host, user, pwd, server, tz)
+    if ok:
+        mode2, _tz2, srv2, _e2 = read_state(host, user, pwd)
+        if mode2 == "NTP" and server in (srv2 or []):
+            return True, "onvif", "menarik dari %s" % server
+        msg = "ONVIF menjawab OK tetapi tidak berubah"
+
+    ok2, msg2 = apply_isapi(host, user, pwd, server)
+    if ok2:
+        return True, "isapi", "menarik dari %s" % server
+
+    if dorong_bila_perlu and dorong_waktu(host, user, pwd, tz):
+        return True, "dorong", "tanpa klien NTP - jam ditulis server"
+
+    return False, None, "; ".join(filter(None, [msg, msg2]))[:120]
+
+
+def dorong_waktu(host, user, pwd, tz):
+    """Tulis jam server ke kamera (ONVIF SetSystemDateAndTime, mode Manual).
+
+    Untuk firmware tanpa klien NTP. Longse IPC-S41FE/IPC-PS3D di sini menjawab `SetNTP` dengan
+    "This optional method is not implemented" - varian manual MAUPUN FromDHCP - dan
+    `SetSystemDateAndTime` dengan DateTimeType=NTP dijawab OK lalu DIABAIKAN. Perangkat itu juga
+    tidak punya UI web sama sekali. Jadi ini bukan jalan pintas, ini satu-satunya jalur.
+
+    Konsekuensinya jujur: jam kamera itu hanya seakurat jarak antar-siklus pemeriksaan.
+    """
+    now = datetime.datetime.utcnow()
+    tz_xml = ('<TimeZone><TZ xmlns="%s">%s</TZ></TimeZone>' % (NS_SCH, tz)) if tz else ""
+    body = ('<SetSystemDateAndTime xmlns="%s">'
+            '<DateTimeType>Manual</DateTimeType><DaylightSavings>false</DaylightSavings>%s'
+            '<UTCDateTime>'
+            '<Time xmlns="%s"><Hour>%d</Hour><Minute>%d</Minute><Second>%d</Second></Time>'
+            '<Date xmlns="%s"><Year>%d</Year><Month>%d</Month><Day>%d</Day></Date>'
+            '</UTCDateTime></SetSystemDateAndTime>'
+            % (NS_DEV, tz_xml, NS_SCH, now.hour, now.minute, now.second,
+               NS_SCH, now.year, now.month, now.day))
+    return "SetSystemDateAndTimeResponse" in soap(host, user, pwd, body)
 
 
 def main():

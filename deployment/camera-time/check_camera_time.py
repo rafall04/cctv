@@ -42,7 +42,11 @@ STATE_DEFAULT = "/var/lib/camera-time-check.json"
 # Dipinjam dari tetangganya supaya WS-Security tidak ditulis dua kali; salah satunya pasti
 # akan ketinggalan diperbaiki.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from set_camera_ntp import NS_DEV, NS_SCH, soap as soap_auth  # noqa: E402
+from set_camera_ntp import (  # noqa: E402
+    alamat_server_untuk,
+    dorong_waktu,
+    pastikan_waktu,
+)
 
 SOAP_TIME = (
     '<?xml version="1.0" encoding="UTF-8"?>'
@@ -92,35 +96,6 @@ def onvif_time(host, timeout=7):
     return (mode.group(1) if mode else "?"), stamp, zona, None
 
 
-def dorong_waktu(host, user, pwd, tz):
-    """Tulis jam server ke kamera lewat ONVIF SetSystemDateAndTime (mode Manual).
-
-    Untuk kamera yang TIDAK BISA menarik waktu sendiri. Longse IPC-S41FE/IPC-PS3D di sini
-    menjawab `SetNTP` dengan "This optional method is not implemented" - baik varian manual
-    maupun FromDHCP - dan `SetSystemDateAndTime` dengan DateTimeType=NTP dijawab OK lalu
-    DIABAIKAN (dibaca ulang: mode tetap Manual). Firmware-nya memang tidak punya klien NTP.
-
-    Perangkat itu juga tidak punya UI web sama sekali: dari seluruh port TCP, hanya
-    /onvif/device_service yang menjawab HTTP; sisanya protokol proprietary di 37777. Jadi
-    mendorong waktu bukan pilihan yang lebih malas - ini satu-satunya jalur yang ada.
-
-    Konsekuensinya jam kamera itu hanya seakurat jarak antar-siklus timer (satu jam), dan
-    itu sudah jauh lebih baik daripada hanyut tanpa batas.
-    """
-    now = datetime.datetime.utcnow()
-    tz_xml = ('<TimeZone><TZ xmlns="%s">%s</TZ></TimeZone>' % (NS_SCH, tz)) if tz else ""
-    body = ('<SetSystemDateAndTime xmlns="%s">'
-            '<DateTimeType>Manual</DateTimeType><DaylightSavings>false</DaylightSavings>%s'
-            '<UTCDateTime>'
-            '<Time xmlns="%s"><Hour>%d</Hour><Minute>%d</Minute><Second>%d</Second></Time>'
-            '<Date xmlns="%s"><Year>%d</Year><Month>%d</Month><Day>%d</Day></Date>'
-            '</UTCDateTime></SetSystemDateAndTime>'
-            % (NS_DEV, tz_xml, NS_SCH, now.hour, now.minute, now.second,
-               NS_SCH, now.year, now.month, now.day))
-    reply = soap_auth(host, user, pwd, body)
-    return "SetSystemDateAndTimeResponse" in reply
-
-
 def kirim_telegram(teks, env_file):
     """Pakai kredensial uploader arsip yang sudah ada; diam kalau tidak dikonfigurasi."""
     token = os.environ.get("TG_BOT_TOKEN")
@@ -148,13 +123,15 @@ def kirim_telegram(teks, env_file):
         return "gagal kirim: %s" % exc
 
 
-def catatan_baris(sebab, didorong, mode, dorong_aktif):
+def catatan_baris(sebab, didorong, mode, perbaiki_aktif, metode=None):
     """Satu kalimat jujur per kamera - termasuk saat sehatnya BUKAN karena dirinya sendiri."""
     if sebab:
         return ", ".join(sebab) + (" [jam baru didorong]" if didorong else "")
     if didorong:
         return "ok (jam baru didorong dari server)"
-    if dorong_aktif and mode and mode.lower() != "ntp":
+    if metode in ("onvif", "isapi"):
+        return "ok (baru dibenahi lewat %s - kini menarik sendiri)" % metode
+    if perbaiki_aktif and mode and mode.lower() != "ntp":
         return "ok (tanpa klien NTP - dijaga dorongan server)"
     return "ok"
 
@@ -168,10 +145,10 @@ def main():
     parser.add_argument("--env-telegram", default="/opt/tg-archive/.env")
     parser.add_argument("--quiet", action="store_true",
                         help="hanya satu baris ringkasan - dipakai systemd timer")
-    parser.add_argument("--dorong", action="store_true",
-                        help="tulis jam server ke kamera yang tidak bisa ber-NTP sendiri")
+    parser.add_argument("--perbaiki", action="store_true",
+                        help="jangan hanya melapor - benahi kamera yang belum ber-NTP")
     parser.add_argument("--ambang-dorong", type=int, default=3,
-                        help="dorong hanya bila selisihnya melebihi ini (detik)")
+                        help="untuk kamera yang hanya bisa didorong: ambang detik sebelum jamnya ditulis ulang")
     args = parser.parse_args()
 
     con = sqlite3.connect(args.db)
@@ -197,16 +174,32 @@ def main():
 
         selisih = int((stamp - sekarang).total_seconds()) if stamp else None
 
-        # Kamera yang tidak punya klien NTP sama sekali tetap bisa dijaga: server yang
-        # MENULIS jamnya. Hanya untuk yang mode-nya bukan NTP - mendorong ke kamera yang
-        # sedang menarik dari server hanya akan berkelahi dengan sinkronisasinya sendiri.
-        didorong = False
-        if (args.dorong and mode and mode.lower() != "ntp"
-                and selisih is not None and abs(selisih) > args.ambang_dorong):
-            kred = re.match(r"rtsp://([^:]+):([^@]+)@", url or "")
-            if kred:
-                didorong = dorong_waktu(host, kred.group(1), kred.group(2), zona)
+        # MEMBENAHI, bukan sekadar melapor. Inilah yang membuat pemasangan di tempat
+        # pelanggan tidak menuntut siapa pun tahu apa-apa: kamera baru yang ditambahkan
+        # hari ini akan terkonfigurasi sendiri pada siklus berikutnya, dan kamera yang
+        # kembali ke Manual sesudah mati listrik akan dibenahi lagi tanpa diminta.
+        #
+        # Alamat server TIDAK dihardcode - ditentukan dari rute ke kamera itu sendiri,
+        # jadi ia benar di jaringan mana pun tanpa disetel.
+        metode = None
+        kred = re.match(r"rtsp://([^:]+):([^@]+)@", url or "")
+        perlu_dibenahi = mode and mode.lower() != "ntp"
+        if args.perbaiki and perlu_dibenahi and kred:
+            berhasil, metode, _ket = pastikan_waktu(host, kred.group(1), kred.group(2))
+            if berhasil:
+                mode2, stamp2, zona2, err2 = onvif_time(host)
+                if not err2:
+                    mode, stamp, zona = mode2, stamp2, zona2
+                    selisih = int((stamp - sekarang).total_seconds()) if stamp else selisih
+                    perlu_dibenahi = mode and mode.lower() != "ntp"
+            else:
+                metode = None
 
+        # Kamera yang hanya bisa didorong tetap perlu jam ditulis ulang berkala, bukan sekali.
+        didorong = metode == "dorong"
+        if (args.perbaiki and perlu_dibenahi and not didorong and kred
+                and selisih is not None and abs(selisih) > args.ambang_dorong):
+            didorong = dorong_waktu(host, kred.group(1), kred.group(2), zona)
         sebab = []
         if selisih is not None and abs(selisih) > args.toleransi:
             sebab.append("selisih %+ds" % selisih if abs(selisih) < 86400
@@ -218,12 +211,12 @@ def main():
         # dalam toleransi - entah karena didorong atau karena memang belum hanyut -
         # keadaannya sehat, dan itu yang dilaporkan.
         di_luar_toleransi = selisih is not None and abs(selisih) > args.toleransi
-        if mode and mode.lower() != "ntp" and (di_luar_toleransi or not args.dorong):
+        if mode and mode.lower() != "ntp" and (di_luar_toleransi or not args.perbaiki):
             sebab.append("mode=%s" % mode)
 
         baris.append((cid, nama, host, mode or "?",
                       ("%+ds" % selisih) if selisih is not None else "-",
-                      catatan_baris(sebab, didorong, mode, args.dorong)))
+                      catatan_baris(sebab, didorong, mode, args.perbaiki, metode)))
         if sebab:
             masalah.append("id %s %s: %s" % (cid, nama, "; ".join(sebab)))
 

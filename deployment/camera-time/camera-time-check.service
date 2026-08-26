@@ -1,14 +1,16 @@
 [Unit]
 # Pemeriksa jam kamera. Dipicu camera-time-check.timer, bukan dijalankan terus-menerus.
-# Sepenuhnya READ-ONLY terhadap kamera; ia hanya membaca ONVIF GetSystemDateAndTime.
-Description=RAF CCTV - periksa jam setiap kamera terhadap jam server
+# Ia MEMBENAHI, bukan sekadar membaca: kamera yang belum ber-NTP dikonfigurasi, dan yang
+# firmware-nya tak punya klien NTP jamnya ditulis ulang. Itulah yang membuat pemasangan
+# di tempat pelanggan tidak menuntut siapa pun tahu apa-apa.
+Description=RAF CCTV - selaraskan jam setiap kamera dengan jam server
 Documentation=file:///var/www/rafnet-cctv/deployment/camera-time/README.md
 After=network-online.target chrony.service
 Wants=network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/python3 /var/www/rafnet-cctv/deployment/camera-time/check_camera_time.py --quiet --dorong
+ExecStart=/usr/bin/python3 /var/www/rafnet-cctv/deployment/camera-time/check_camera_time.py --quiet --perbaiki
 
 # Keluar dengan kode 1 saat ADA kamera bermasalah - itu keadaan yang dilaporkan, bukan
 # kegagalan skrip. Tanpa baris ini systemd menandai unit-nya `failed` tiap jam selama masalah
