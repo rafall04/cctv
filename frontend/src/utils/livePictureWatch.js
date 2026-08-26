@@ -117,12 +117,13 @@ export function startLivePictureWatch(video, {
     if (!video) return () => {};
 
     let timer = null;
-    let dataSince = null;
     let live = false;
     let framesAtVerdict = null;
     let stillTimeAdvancing = null;
-    let stalledSince = null;
     let lastTickAt = null;
+    // Kedua tenggat di bawah dihitung dalam WAKTU YANG DIAMATI, bukan jam dinding. Lihat tick().
+    let dataMs = 0;
+    let stalledMs = 0;
 
     const stop = () => {
         if (timer !== null) {
@@ -154,29 +155,28 @@ export function startLivePictureWatch(video, {
         }
 
         /*
-         * Interval KAMI SENDIRI sempat dibekukan - jadi kami tidak sedang mengamati apa pun.
+         * BERAPA LAMA KAMI BENAR-BENAR MENGAMATI SEJAK TICK LALU.
          *
-         * Browser meng-throttle lalu membekukan setInterval pada tab yang tersembunyi. Semua
-         * tenggat di bawah diukur dengan Date.now(), yaitu jam DINDING, yang terus berjalan
-         * selama pembekuan itu. Tanpa penjaga ini, satu tick sepi yang kebetulan terjadi tepat
-         * sebelum pengguna pindah aplikasi akan menyisakan stalledSince yang terisi, lalu tick
-         * pertama sesudah ia kembali membandingkannya dengan jam dinding dan menemukan SELURUH
-         * durasi latar belakang sudah lewat - vonis jatuh seketika, dari satu sampel, tanpa
-         * tenggang sedetik pun. Itu menjelaskan kenapa gejalanya terasa acak: ia menuntut satu
-         * tick sepi mendarat tepat sebelum aplikasi ditinggalkan.
+         * Kedua tenggat di bawah dulu diukur dengan Date.now() - jam DINDING - padahal interval
+         * ini dibekukan browser saat tab tersembunyi. TERUKUR di Chromium pada halaman produksi:
+         * interval yang diminta 500 ms benar-benar menembak sekali per 60.000 ms di tab
+         * tersembunyi. Jadi tick pertama sesudah pengguna kembali menemukan 60 detik sudah lewat
+         * - 6x tenggat macet - dan memvonis dari SATU sampel, pada stream yang sehat.
          *
-         * Waktu yang tidak diamati tidak boleh dihitung sebagai bukti. Basiskan ulang semuanya.
+         * Menjawabnya dengan "kalau jedanya tak wajar, buang seluruh tenggatnya" salah ke arah
+         * sebaliknya: perangkat yang tick-nya rutin telat saat pengguna MENONTON tidak akan
+         * pernah mengumpulkan tenggat apa pun, jadi watchdog-nya lumpuh diam-diam dan bug asli
+         * "layar hitam ber-badge LIVE" hidup lagi - tepat kegagalan yang modul ini cegah.
+         *
+         * Jadi waktunya DIAKUMULASI, dengan batas satu tick tidak boleh menyumbang lebih dari
+         * dua interval. Celah 60 detik menyumbang 1 detik; tick normal 500 ms menyumbang 500 ms.
+         * Tidak ada tebing, tidak ada cara melumpuhkannya, dan waktu yang tidak diamati tetap
+         * tidak pernah dihitung sebagai bukti.
          */
         const sekarang = Date.now();
-        const jedaTick = lastTickAt === null ? 0 : sekarang - lastTickAt;
+        const jeda = lastTickAt === null ? intervalMs : sekarang - lastTickAt;
         lastTickAt = sekarang;
-        if (jedaTick > intervalMs * 4) {
-            dataSince = null;
-            stalledSince = null;
-            stillTimeAdvancing = video.currentTime;
-            framesAtVerdict = countDecodedFrames(video);
-            return;
-        }
+        const teramati = Math.min(jeda, intervalMs * 2);
 
         if (!live) {
             if (!hasMediaData(video)) return;
@@ -191,8 +191,8 @@ export function startLivePictureWatch(video, {
                 onPicture?.();
                 return;
             }
-            if (dataSince === null) dataSince = Date.now();
-            if (Date.now() - dataSince >= noPictureAfterMs) giveUp();
+            dataMs += teramati;
+            if (dataMs >= noPictureAfterMs) giveUp();
             return;
         }
 
@@ -212,7 +212,7 @@ export function startLivePictureWatch(video, {
          */
         if (video.paused || (typeof document !== 'undefined' && document.hidden)) {
             stillTimeAdvancing = video.currentTime;
-            stalledSince = null;
+            stalledMs = 0;
             return;
         }
 
@@ -232,19 +232,19 @@ export function startLivePictureWatch(video, {
          * Dengan syarat lama `frames > framesAtVerdict`, penghitung yang baru direset TIDAK AKAN
          * PERNAH melampaui garis dasar lama sampai ribuan bingkai berikutnya ter-decode - sekitar
          * satu menit pada 25 fps, sedangkan tenggat macetnya tiga detik. Jadi vonisnya PASTI
-         * jatuh, pada stream yang memutar dengan sempurna, dan stalledSince tidak pernah
+         * jatuh, pada stream yang memutar dengan sempurna, dan jam macetnya tidak pernah
          * direset karena satu-satunya tempat yang meresetnya ada di dalam cabang ini.
          *
          * Penghitung yang MUNDUR berarti dekoder BARU, bukan dekoder mati. Basiskan ulang.
          */
         if (frames !== framesAtVerdict) {
             framesAtVerdict = frames;
-            stalledSince = null;
+            stalledMs = 0;
             return;
         }
-        // Sepi. Catat KAPAN mulai sepi, lalu beri waktu — lihat stalledGiveUpMs.
-        if (stalledSince === null) stalledSince = Date.now();
-        if (Date.now() - stalledSince >= stalledGiveUpMs) giveUp();
+        // Sepi. Kumpulkan waktu yang DIAMATI saja - lihat stalledGiveUpMs.
+        stalledMs += teramati;
+        if (stalledMs >= stalledGiveUpMs) giveUp();
     };
 
     timer = setInterval(tick, intervalMs);

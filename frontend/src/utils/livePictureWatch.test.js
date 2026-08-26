@@ -372,3 +372,53 @@ describe('interval yang dibekukan browser', () => {
         expect(onNoPicture).toHaveBeenCalledTimes(1);
     });
 });
+
+/*
+ * Sisi SEBALIKNYA dari penjaga waktu-teramati, dan alasan ia berupa AKUMULATOR dan bukan penjaga
+ * biner "kalau jedanya tak wajar, buang tenggatnya".
+ *
+ * Penjaga biner menutup kasus latar-belakang tetapi membuka lubang yang lebih buruk: perangkat
+ * lemah yang tick-nya rutin telat SAAT PENGGUNA MENONTON tidak akan pernah mengumpulkan tenggat
+ * apa pun, jadi watchdog-nya lumpuh diam-diam - dan bug asli "layar hitam ber-badge LIVE" hidup
+ * lagi tanpa satu pun tes memerah. Akumulator tidak punya tebing itu: tiap tick tetap menyumbang,
+ * hanya dibatasi dua interval.
+ */
+describe('tick yang lambat terus-menerus (perangkat lemah, bukan latar belakang)', () => {
+    it('TETAP memvonis dekoder mati walau tiap tick telat jauh di atas intervalnya', () => {
+        const video = videoTiruan();
+        const onNoPicture = vi.fn();
+
+        video._frames = 5;
+        startLivePictureWatch(video, { onNoPicture });
+        vi.advanceTimersByTime(500);
+
+        // 30 tick, masing-masing terlambat ~3,5 detik. Bingkai membeku, waktu media terus maju.
+        for (let i = 0; i < 30; i += 1) {
+            video.currentTime += 0.5;
+            vi.setSystemTime(Date.now() + 3000);
+            vi.advanceTimersByTime(500);
+        }
+
+        expect(onNoPicture, 'watchdog lumpuh oleh tick lambat').toHaveBeenCalledTimes(1);
+    });
+
+    it('satu tick tidak boleh menyumbang lebih dari dua interval ke tenggat', () => {
+        const video = videoTiruan();
+        const onNoPicture = vi.fn();
+
+        video._frames = 5;
+        startLivePictureWatch(video, { onNoPicture });
+        vi.advanceTimersByTime(500);
+
+        // Empat tick, masing-masing menyeberangi 60 detik jam dinding. Kalau jam dinding yang
+        // dipakai, ini 240 detik dan vonisnya jatuh seketika; dengan batas dua interval ini
+        // hanya bernilai 4 detik teramati - di bawah tenggat 10 detik.
+        for (let i = 0; i < 4; i += 1) {
+            video.currentTime += 0.5;
+            vi.setSystemTime(Date.now() + 60000);
+            vi.advanceTimersByTime(500);
+        }
+
+        expect(onNoPicture).not.toHaveBeenCalled();
+    });
+});
