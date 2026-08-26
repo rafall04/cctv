@@ -38,6 +38,12 @@ import sys
 
 DB_DEFAULT = "/var/www/rafnet-cctv/backend/data/cctv.db"
 STATE_DEFAULT = "/var/lib/camera-time-check.json"
+
+# Dipinjam dari tetangganya supaya WS-Security tidak ditulis dua kali; salah satunya pasti
+# akan ketinggalan diperbaiki.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from set_camera_ntp import NS_DEV, NS_SCH, soap as soap_auth  # noqa: E402
+
 SOAP_TIME = (
     '<?xml version="1.0" encoding="UTF-8"?>'
     '<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope">'
@@ -47,7 +53,12 @@ SOAP_TIME = (
 
 
 def onvif_time(host, timeout=7):
-    """Kembalikan (mode, datetime_utc, error). Tanpa autentikasi - GetSystemDateAndTime terbuka."""
+    """Kembalikan (mode, datetime_utc, zona, error).
+
+    Tanpa autentikasi: `GetSystemDateAndTime` terbuka di semua kamera di sini (diverifikasi
+    lewat WS-Discovery ke ke-14 perangkat), sedangkan `GetNTP`/`SetNTP` menuntutnya. Karena
+    itu pemantau bisa memeriksa SEMUA kamera meski hanya sebagian yang bisa dikonfigurasi.
+    """
     try:
         proc = subprocess.run(
             ["curl", "-s", "--max-time", str(timeout), "-X", "POST",
@@ -56,15 +67,17 @@ def onvif_time(host, timeout=7):
             capture_output=True, text=True, timeout=timeout + 5)
         body = proc.stdout.replace("\n", "").replace("\r", "")
     except Exception as exc:  # noqa: BLE001
-        return None, None, "gagal menghubungi: %s" % exc
+        return None, None, None, "gagal menghubungi: %s" % exc
 
     if "SystemDateAndTime" not in body:
-        return None, None, "ONVIF tidak menjawab"
+        return None, None, None, "ONVIF tidak menjawab"
 
     mode = re.search(r"<tt:DateTimeType>([A-Za-z]+)", body)
+    tz = re.search(r"<tt:TZ>([^<]*)", body)
+    zona = tz.group(1) if tz else ""
     block = re.search(r"<tt:UTCDateTime>(.*?)</tt:UTCDateTime>", body)
     if not block:
-        return (mode.group(1) if mode else "?"), None, "jam tidak dilaporkan"
+        return (mode.group(1) if mode else "?"), None, zona, "jam tidak dilaporkan"
 
     def field(name):
         hit = re.search(r"<tt:%s>([0-9]+)" % name, block.group(1))
@@ -74,9 +87,38 @@ def onvif_time(host, timeout=7):
         stamp = datetime.datetime(field("Year"), field("Month"), field("Day"),
                                   field("Hour"), field("Minute"), field("Second"))
     except (TypeError, ValueError):
-        return (mode.group(1) if mode else "?"), None, "jam tidak masuk akal"
+        return (mode.group(1) if mode else "?"), None, zona, "jam tidak masuk akal"
 
-    return (mode.group(1) if mode else "?"), stamp, None
+    return (mode.group(1) if mode else "?"), stamp, zona, None
+
+
+def dorong_waktu(host, user, pwd, tz):
+    """Tulis jam server ke kamera lewat ONVIF SetSystemDateAndTime (mode Manual).
+
+    Untuk kamera yang TIDAK BISA menarik waktu sendiri. Longse IPC-S41FE/IPC-PS3D di sini
+    menjawab `SetNTP` dengan "This optional method is not implemented" - baik varian manual
+    maupun FromDHCP - dan `SetSystemDateAndTime` dengan DateTimeType=NTP dijawab OK lalu
+    DIABAIKAN (dibaca ulang: mode tetap Manual). Firmware-nya memang tidak punya klien NTP.
+
+    Perangkat itu juga tidak punya UI web sama sekali: dari seluruh port TCP, hanya
+    /onvif/device_service yang menjawab HTTP; sisanya protokol proprietary di 37777. Jadi
+    mendorong waktu bukan pilihan yang lebih malas - ini satu-satunya jalur yang ada.
+
+    Konsekuensinya jam kamera itu hanya seakurat jarak antar-siklus timer (satu jam), dan
+    itu sudah jauh lebih baik daripada hanyut tanpa batas.
+    """
+    now = datetime.datetime.utcnow()
+    tz_xml = ('<TimeZone><TZ xmlns="%s">%s</TZ></TimeZone>' % (NS_SCH, tz)) if tz else ""
+    body = ('<SetSystemDateAndTime xmlns="%s">'
+            '<DateTimeType>Manual</DateTimeType><DaylightSavings>false</DaylightSavings>%s'
+            '<UTCDateTime>'
+            '<Time xmlns="%s"><Hour>%d</Hour><Minute>%d</Minute><Second>%d</Second></Time>'
+            '<Date xmlns="%s"><Year>%d</Year><Month>%d</Month><Day>%d</Day></Date>'
+            '</UTCDateTime></SetSystemDateAndTime>'
+            % (NS_DEV, tz_xml, NS_SCH, now.hour, now.minute, now.second,
+               NS_SCH, now.year, now.month, now.day))
+    reply = soap_auth(host, user, pwd, body)
+    return "SetSystemDateAndTimeResponse" in reply
 
 
 def kirim_telegram(teks, env_file):
@@ -106,6 +148,17 @@ def kirim_telegram(teks, env_file):
         return "gagal kirim: %s" % exc
 
 
+def catatan_baris(sebab, didorong, mode, dorong_aktif):
+    """Satu kalimat jujur per kamera - termasuk saat sehatnya BUKAN karena dirinya sendiri."""
+    if sebab:
+        return ", ".join(sebab) + (" [jam baru didorong]" if didorong else "")
+    if didorong:
+        return "ok (jam baru didorong dari server)"
+    if dorong_aktif and mode and mode.lower() != "ntp":
+        return "ok (tanpa klien NTP - dijaga dorongan server)"
+    return "ok"
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--db", default=DB_DEFAULT)
@@ -115,6 +168,10 @@ def main():
     parser.add_argument("--env-telegram", default="/opt/tg-archive/.env")
     parser.add_argument("--quiet", action="store_true",
                         help="hanya satu baris ringkasan - dipakai systemd timer")
+    parser.add_argument("--dorong", action="store_true",
+                        help="tulis jam server ke kamera yang tidak bisa ber-NTP sendiri")
+    parser.add_argument("--ambang-dorong", type=int, default=3,
+                        help="dorong hanya bila selisihnya melebihi ini (detik)")
     args = parser.parse_args()
 
     con = sqlite3.connect(args.db)
@@ -131,7 +188,7 @@ def main():
         if not host_hit:
             continue
         host = host_hit.group(1)
-        mode, stamp, err = onvif_time(host)
+        mode, stamp, zona, err = onvif_time(host)
 
         if err and stamp is None and mode is None:
             baris.append((cid, nama, host, "-", "-", err))
@@ -139,16 +196,34 @@ def main():
             continue
 
         selisih = int((stamp - sekarang).total_seconds()) if stamp else None
+
+        # Kamera yang tidak punya klien NTP sama sekali tetap bisa dijaga: server yang
+        # MENULIS jamnya. Hanya untuk yang mode-nya bukan NTP - mendorong ke kamera yang
+        # sedang menarik dari server hanya akan berkelahi dengan sinkronisasinya sendiri.
+        didorong = False
+        if (args.dorong and mode and mode.lower() != "ntp"
+                and selisih is not None and abs(selisih) > args.ambang_dorong):
+            kred = re.match(r"rtsp://([^:]+):([^@]+)@", url or "")
+            if kred:
+                didorong = dorong_waktu(host, kred.group(1), kred.group(2), zona)
+
         sebab = []
         if selisih is not None and abs(selisih) > args.toleransi:
             sebab.append("selisih %+ds" % selisih if abs(selisih) < 86400
                          else "selisih %+d hari" % (selisih // 86400))
-        if mode and mode.lower() != "ntp":
+        # Mode bukan-NTP itu masalah HANYA bila kita tidak bisa menjaganya. Sebagian
+        # firmware (Longse di sini) memang tidak punya klien NTP sama sekali dan tidak
+        # akan pernah punya; menandainya tiap jam selamanya membuat alarm ini berhenti
+        # dibaca, dan saat itu ia berhenti melindungi apa pun. Selama jamnya masih di
+        # dalam toleransi - entah karena didorong atau karena memang belum hanyut -
+        # keadaannya sehat, dan itu yang dilaporkan.
+        di_luar_toleransi = selisih is not None and abs(selisih) > args.toleransi
+        if mode and mode.lower() != "ntp" and (di_luar_toleransi or not args.dorong):
             sebab.append("mode=%s" % mode)
 
         baris.append((cid, nama, host, mode or "?",
                       ("%+ds" % selisih) if selisih is not None else "-",
-                      ", ".join(sebab) if sebab else "ok"))
+                      catatan_baris(sebab, didorong, mode, args.dorong)))
         if sebab:
             masalah.append("id %s %s: %s" % (cid, nama, "; ".join(sebab)))
 

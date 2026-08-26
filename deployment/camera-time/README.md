@@ -24,7 +24,7 @@ Dan server ini sendiri **tidak pernah bisa melayani NTP**: ia memakai `systemd-t
 klien saja. Tidak ada apa pun yang mendengarkan di UDP 123, jadi kamera yang diarahkan ke sini
 tidak akan pernah mendapat jawaban. Kini digantikan `chrony` yang melayani di **172.17.11.12**.
 
-## Dua berkas di sini
+## Tiga berkas di sini
 
 **`check_camera_time.py`** — pemantau. READ-ONLY. Dijalankan `camera-time-check.timer` tiap jam.
 Ia mengawasi dua hal, dan yang kedua lebih penting: **selisih jam** (gejala) dan **mode waktu**
@@ -48,20 +48,49 @@ python3 set_camera_ntp.py --apply --only 9   # satu kamera
 python3 set_camera_ntp.py --apply            # semua yang API-nya menerima
 ```
 
+**`discover.py`** — tanya tiap kamera di mana layanan ONVIF-nya dan perangkat apa dia,
+lewat WS-Discovery unicast. Dipakai saat sebuah kamera menolak diatur: ia menjawab
+"merek/model apa ini sebenarnya" tanpa menebak dari jalur RTSP.
+
+
 **Zona waktu sengaja tidak disentuh.** Kamera di sini memakai label berbeda untuk offset yang
 sama (`KRAT-07:00`, `CST-7:00:00`, `AltaiStandardTime-7`, `GMT+07:00`) — semuanya UTC+7, jadi
 angkanya sudah benar. Menyeragamkannya berarti menebak konvensi tanda POSIX tiap firmware, dan
 salah tebak menggeser jam berjam-jam. Skrip membaca zona yang ada lalu mengirimkannya kembali.
 
-## Yang tidak bisa dikonfigurasi dari jarak jauh
+## Peta per merek — jalur mana untuk perangkat mana
 
-| kamera | penghalang | jalan keluar |
-|---|---|---|
-| 1443, 1444 (Dahua) | ONVIF `SetNTP` "not implemented"; port 80 menerima TCP tapi tidak menjawab HTTP | panel web kamera lewat browser |
-| 1169 (192.168.12.4) | hanya port 554 terbuka — tidak ada HTTP maupun ONVIF | akses lokal ke perangkatnya |
+Merek dipastikan lewat **WS-Discovery unicast** ke UDP 3702 tiap kamera, bukan ditebak dari
+jalur RTSP-nya. (Tebakan itu sempat menyesatkan: 1443/1444 memakai jalur `/cam/realmonitor`
+gaya Dahua, padahal perangkatnya **Longse**.) Multicast tidak melewati gateway, jadi Probe
+harus dikirim unicast — `discover.py` melakukannya.
 
-Ketiganya jamnya **benar** saat ini; yang salah mode-nya, jadi mereka akan hanyut. Pemantau akan
-terus menandainya sampai diperbaiki — itu memang gunanya.
+| perangkat | kamera | jalur konfigurasi | hasil |
+|---|---|---|---|
+| Tiandy TC-C34QN, T5X-39PHX, H43, H2-52PGX | 1, 2, 5, 7, 8, 9, 1168 | ONVIF `SetNTP` + `SetSystemDateAndTime` | mode NTP, menarik dari 172.17.11.12 |
+| Hikvision IPC-B121HE-UC | 1170, 1435, 1441, 1442 | **ISAPI** (ONVIF-nya menolak autentikasi) | mode NTP, menarik dari 172.17.11.12 |
+| Longse IPC-S41FE, IPC-PS3D-3M0 | 1443, 1444 | ONVIF **dorongan waktu** | server menulis jamnya tiap siklus |
+| Yoosee (192.168.12.4) | 1169 | aplikasi Yoosee — tidak ada jalur jaringan | jamnya benar dari cloud vendor |
+
+### Kenapa Longse tidak bisa menarik, dan kenapa itu bukan kemalasan
+`SetNTP` dijawab `"This optional method is not implemented"` — baik varian manual maupun
+`FromDHCP=true`. Dan `SetSystemDateAndTime` dengan `DateTimeType=NTP` dijawab **OK lalu
+DIABAIKAN**: dibaca ulang, mode-nya tetap `Manual`. Firmware-nya memang tidak punya klien NTP.
+Perangkat itu juga tidak punya UI web: dari seluruh port TCP hanya `/onvif/device_service` yang
+menjawab HTTP, sisanya protokol proprietary di 37777. Jadi mendorong waktu adalah satu-satunya
+jalur yang ada — dan konsekuensinya jujur: jam kedua kamera itu hanya seakurat jarak antar
+siklus timer (satu jam).
+
+⚠️ **Jawaban `OK` dari ONVIF bukan bukti.** Dua kali di sini panggilan dijawab sukses lalu tidak
+melakukan apa-apa. Selalu baca ulang keadaan kameranya sesudah menulis.
+
+### Kenapa 1169 benar-benar buntu
+Pemindaian TCP penuh: hanya 554 (RTSP), 5000, dan 10086 terbuka — dua yang terakhir protokol
+proprietary yang diam terhadap HTTP maupun ONVIF. WS-Discovery tidak menjawab di port mana pun.
+Jalur RTSP-nya `/onvif1` hanya penamaan profil, bukan bukti layanan ONVIF hidup. Kamera Yoosee
+disetel lewat aplikasi ponselnya, dan jamnya disinkronkan dari cloud vendor — karena itu justru
+benar. Pemantau tetap memeriksanya dan akan melaporkannya sebagai tak terjangkau, bukan sebagai
+alarm: tidak terjangkau BUKAN bukti jamnya salah.
 
 ## Kalau harus dikembalikan
 

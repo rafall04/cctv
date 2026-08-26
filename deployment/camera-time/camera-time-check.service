@@ -8,7 +8,7 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/python3 /var/www/rafnet-cctv/deployment/camera-time/check_camera_time.py --quiet
+ExecStart=/usr/bin/python3 /var/www/rafnet-cctv/deployment/camera-time/check_camera_time.py --quiet --dorong
 
 # Keluar dengan kode 1 saat ADA kamera bermasalah - itu keadaan yang dilaporkan, bukan
 # kegagalan skrip. Tanpa baris ini systemd menandai unit-nya `failed` tiap jam selama masalah
