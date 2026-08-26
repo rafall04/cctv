@@ -384,10 +384,10 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
             startViewerSessionAfterPlayback();
         };
 
-        const failWithCodec = () => {
-            stopPictureWatch(); clearStreamTimeout();
-            setStatus('error'); setErrorType('codec'); setLoadingStage(LoadingStage.ERROR);
-            onError?.(camera.id, new Error('Codec tidak didukung browser')); // parent isolation tracking
+        const failWithoutPicture = (amatan) => { // amatan.everHadPicture — alasannya di livePictureWatch.js
+            const macet = amatan?.everHadPicture === true; stopPictureWatch(); clearStreamTimeout();
+            setStatus('error'); setErrorType(macet ? 'stalled' : 'codec'); setLoadingStage(LoadingStage.ERROR);
+            onError?.(camera.id, new Error(macet ? 'Gambar berhenti mengalir' : 'Codec tidak didukung browser'));
         };
 
         // "Live" used to mean bytes were accepted — which a device that cannot DECODE them
@@ -398,7 +398,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
             stopWatch = startLivePictureWatch(video, {
                 isStale: () => cancelled,
                 onPicture: handlePlaying,
-                onNoPicture: failWithCodec,
+                onNoPicture: failWithoutPicture,
                 requestPlay: (el) => el.play().catch(() => { }),
             });
         };
@@ -608,7 +608,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
             } else if (canPlayNativeHls(video)) {
                 // hls.js never runs here, so isCodecFailure cannot either — the verdict lives on
                 // the element instead. See nativeHlsPlayback for what this branch used to swallow.
-                stopNative = startNativeHlsPlayback(video, effectiveUrl, { isStale: () => cancelled, onCodecFailure: failWithCodec, onError: handleError });
+                stopNative = startNativeHlsPlayback(video, effectiveUrl, { isStale: () => cancelled, onCodecFailure: failWithoutPicture, onError: handleError });
                 startPlaybackCheck();
             }
         };
@@ -1131,8 +1131,8 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                             </>
                         ) : (
                             <>
-                                <p className="text-white text-xs font-medium mb-1">{renderMode === 'unsupported' ? 'Format stream tidak didukung' : 'Tidak Terkoneksi'}</p>
-                                <p className="text-gray-400 text-[10px] mb-3">Kamera offline atau jaringan bermasalah</p>
+                                <p className="text-white text-xs font-medium mb-1">{renderMode === 'unsupported' ? 'Format stream tidak didukung' : errorType === 'stalled' ? 'Gambar Terhenti' : 'Tidak Terkoneksi'}</p>
+                                <p className="text-gray-400 text-[10px] mb-3">{errorType === 'stalled' ? 'Aliran gambar berhenti. Coba sambungkan ulang.' : 'Kamera offline atau jaringan bermasalah'}</p>
                             </>
                         )}
                         <div className="flex items-center justify-center gap-2">

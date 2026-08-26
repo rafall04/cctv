@@ -19,6 +19,20 @@ const ERROR_VARIANTS = {
         variant: 'network',
         canRetry: true,
     },
+    /*
+     * Gambar SUDAH pernah mengalir di perangkat ini, lalu berhenti.
+     *
+     * Varian ini ada karena satu-satunya jawaban yang tersedia dulu adalah "codec", dan itu dua
+     * kali salah: perangkatnya jelas mampu mendekode stream ini (ia baru saja melakukannya), dan
+     * vonis codec ber-canRetry:false sehingga pengunjungnya terjebak tanpa jalan keluar. Penyebab
+     * yang terukur adalah pipeline media dibangun ulang saat aplikasi kembali dari latar belakang.
+     */
+    stalled: {
+        title: 'Gambar Terhenti',
+        description: 'Aliran gambar berhenti, biasanya setelah halaman lama berada di latar belakang. Coba sambungkan ulang.',
+        variant: 'stalled',
+        canRetry: true,
+    },
     media: {
         title: 'Error Media',
         description: 'Terjadi kesalahan saat memutar video. Format stream mungkin tidak kompatibel dengan browser.',

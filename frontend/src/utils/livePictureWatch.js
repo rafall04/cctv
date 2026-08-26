@@ -103,8 +103,16 @@ export function startLivePictureWatch(video, {
      * Tiga detik mentoleransi sumber selambat ~0,33 fps namun tetap menangkap dekoder yang
      * benar-benar mati dalam tiga detik — bingkainya membeku SELAMANYA, jadi menunggu sebentar
      * tidak menghilangkan bukti, hanya menghindari menuduh yang lambat.
+     *
+     * DINAIKKAN dari 3000 (2026-08-26). Tiga detik lebih PENDEK daripada angka yang diukur modul
+     * ini sendiri di baris 30-32: bingkai pertama pernah datang 3,6 detik sesudah `playing`. Jadi
+     * setiap dekoder yang dingin - termasuk yang baru dibangun ulang saat aplikasi kembali dari
+     * latar belakang - dijamin melewati tenggatnya sebelum sempat menghasilkan bingkai pertama.
+     * Jalur start-dingin diberi 15 detik untuk masalah yang persis sama (noPictureAfterMs); tidak
+     * ada alasan jalur ini jauh lebih galak. Dekoder yang benar-benar mati membeku SELAMANYA,
+     * jadi menunggu lebih lama tidak menghilangkan bukti - hanya berhenti menuduh yang dingin.
      */
-    stalledGiveUpMs = 3000,
+    stalledGiveUpMs = 10000,
 } = {}) {
     if (!video) return () => {};
 
@@ -114,6 +122,7 @@ export function startLivePictureWatch(video, {
     let framesAtVerdict = null;
     let stillTimeAdvancing = null;
     let stalledSince = null;
+    let lastTickAt = null;
 
     const stop = () => {
         if (timer !== null) {
@@ -122,14 +131,50 @@ export function startLivePictureWatch(video, {
         }
     };
 
+    /*
+     * Melaporkan APA YANG DIAMATI, bukan menyimpulkan penyebabnya.
+     *
+     * `everHadPicture` memisahkan dua situasi yang sebelumnya dijawab dengan vonis yang sama:
+     *   false - bingkai TIDAK PERNAH ada. Perangkat mengambil byte lalu tidak menghasilkan apa
+     *           pun; "codec tidak didukung" masuk akal di sini.
+     *   true  - bingkai SUDAH pernah ada, lalu berhenti. Perangkat ini TERBUKTI bisa mendekode
+     *           stream ini, jadi apa pun penyebabnya, "codec tidak didukung" adalah kebohongan.
+     *
+     * Pemanggilnya yang memutuskan cara bicara; modul ini hanya melapor.
+     */
     const giveUp = () => {
         stop();
-        onNoPicture?.();
+        onNoPicture?.({ everHadPicture: live });
     };
 
     const tick = () => {
         if (isStale()) {
             stop();
+            return;
+        }
+
+        /*
+         * Interval KAMI SENDIRI sempat dibekukan - jadi kami tidak sedang mengamati apa pun.
+         *
+         * Browser meng-throttle lalu membekukan setInterval pada tab yang tersembunyi. Semua
+         * tenggat di bawah diukur dengan Date.now(), yaitu jam DINDING, yang terus berjalan
+         * selama pembekuan itu. Tanpa penjaga ini, satu tick sepi yang kebetulan terjadi tepat
+         * sebelum pengguna pindah aplikasi akan menyisakan stalledSince yang terisi, lalu tick
+         * pertama sesudah ia kembali membandingkannya dengan jam dinding dan menemukan SELURUH
+         * durasi latar belakang sudah lewat - vonis jatuh seketika, dari satu sampel, tanpa
+         * tenggang sedetik pun. Itu menjelaskan kenapa gejalanya terasa acak: ia menuntut satu
+         * tick sepi mendarat tepat sebelum aplikasi ditinggalkan.
+         *
+         * Waktu yang tidak diamati tidak boleh dihitung sebagai bukti. Basiskan ulang semuanya.
+         */
+        const sekarang = Date.now();
+        const jedaTick = lastTickAt === null ? 0 : sekarang - lastTickAt;
+        lastTickAt = sekarang;
+        if (jedaTick > intervalMs * 4) {
+            dataSince = null;
+            stalledSince = null;
+            stillTimeAdvancing = video.currentTime;
+            framesAtVerdict = countDecodedFrames(video);
             return;
         }
 
@@ -156,11 +201,43 @@ export function startLivePictureWatch(video, {
         // and it stays that way — so this waits stalledGiveUpMs before believing it.
         // the one shape that produces a black rectangle nothing else in the app would question.
         const frames = countDecodedFrames(video);
+
+        /*
+         * Dijeda, atau halamannya tidak terlihat: JANGAN menyimpulkan apa pun, dan yang lebih
+         * penting jangan menyisakan jam macet yang sudah berjalan. usePauseOnHidden menjeda
+         * video begitu tab tersembunyi, sementara setInterval di sini ikut di-throttle browser —
+         * jadi tick berikutnya bisa mendarat jauh setelah pemutaran dilanjutkan, saat waktu sudah
+         * melompat tetapi dekodernya baru dibangun ulang. Membasiskan ulang di sini membuat tick
+         * pertama sesudah kembali menjadi titik nol yang jujur, bukan sisa pengamatan lama.
+         */
+        if (video.paused || (typeof document !== 'undefined' && document.hidden)) {
+            stillTimeAdvancing = video.currentTime;
+            stalledSince = null;
+            return;
+        }
+
         const advanced = video.currentTime > stillTimeAdvancing;
         if (!advanced) return;
         stillTimeAdvancing = video.currentTime;
         if (frames === null || framesAtVerdict === null) return;
-        if (frames > framesAtVerdict) {
+        /*
+         * BERUBAH, bukan BERTAMBAH — dan perbedaan itu adalah keseluruhan bug ini.
+         *
+         * totalVideoFrames bersifat kumulatif untuk satu pipeline media, dan ia KEMBALI KE NOL
+         * setiap kali pipeline itu dibangun ulang. Terukur langsung di Chromium pada stream
+         * produksi: 1636 bingkai, pipeline dibangun ulang, lalu 0. Android melakukan persis itu
+         * saat aplikasi kembali dari latar belakang dan dekoder perangkat kerasnya direbut lalu
+         * dibuat lagi; hls.js melakukannya sendiri lewat recoverMediaError().
+         *
+         * Dengan syarat lama `frames > framesAtVerdict`, penghitung yang baru direset TIDAK AKAN
+         * PERNAH melampaui garis dasar lama sampai ribuan bingkai berikutnya ter-decode - sekitar
+         * satu menit pada 25 fps, sedangkan tenggat macetnya tiga detik. Jadi vonisnya PASTI
+         * jatuh, pada stream yang memutar dengan sempurna, dan stalledSince tidak pernah
+         * direset karena satu-satunya tempat yang meresetnya ada di dalam cabang ini.
+         *
+         * Penghitung yang MUNDUR berarti dekoder BARU, bukan dekoder mati. Basiskan ulang.
+         */
+        if (frames !== framesAtVerdict) {
             framesAtVerdict = frames;
             stalledSince = null;
             return;

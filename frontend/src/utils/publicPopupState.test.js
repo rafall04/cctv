@@ -168,3 +168,36 @@ describe('classifyHlsError menerjemahkan enum hls.js jadi tipe error popup', () 
         expect(classifyHlsError(null, { HlsErrorTypes })).toBe('unknown');
     });
 });
+
+/*
+ * DILAPORKAN PEMILIK 2026-08-26. Gejalanya "bug codec melebar kemana mana": live berjalan normal,
+ * pengguna pindah aplikasi lalu kembali, dan panel "Codec Tidak Didukung" muncul TANPA tombol
+ * coba lagi.
+ *
+ * Ketiadaan tombol itu memang disengaja untuk vonis codec, dan benar: browser yang tidak
+ * mendukung sebuah codec tidak akan berubah pikiran kalau tombolnya diklik lagi. Justru karena
+ * itu vonis codec tidak boleh dipinjam untuk keadaan yang PULIH - dan gambar yang berhenti
+ * sesudah aplikasi lama di latar belakang selalu pulih dengan menyambung ulang. Meminjamnya
+ * mengubah gangguan sepuluh detik menjadi jalan buntu.
+ */
+describe('gambar yang berhenti bisa dicoba lagi; vonis codec tetap tidak', () => {
+    it('memberi tombol coba lagi saat gambar berhenti mengalir', () => {
+        expect(shouldShowPublicPopupRetry({ status: 'error', errorType: 'stalled' })).toBe(true);
+    });
+
+    it('TETAP tidak memberi tombol untuk vonis codec sungguhan', () => {
+        expect(shouldShowPublicPopupRetry({ status: 'error', errorType: 'codec' })).toBe(false);
+    });
+
+    it('tidak meminjam bahasa codec untuk perangkat yang jelas mampu mendekode', () => {
+        const state = getPublicPopupOverlayState({ status: 'error', errorType: 'stalled' });
+
+        expect(state.canRetry).toBe(true);
+        expect(state.title).not.toMatch(/codec/i);
+        expect(`${state.title} ${state.description}`).not.toMatch(/codec|h\.?265|hevc|safari/i);
+    });
+
+    it('masih jatuh ke varian unknown untuk errorType yang tak dikenal', () => {
+        expect(getPublicPopupOverlayState({ status: 'error', errorType: 'ngawur' }).variant).toBe('unknown');
+    });
+});

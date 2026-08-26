@@ -26,6 +26,7 @@ const VARIANT_TONE = {
     codec:       'text-status-warn',
     network:     'text-status-warn',
     media:       'text-status-warn',
+    stalled:     'text-status-warn',
     cors:        'text-status-warn',
     unknown:     'text-status-fault',
 };
@@ -40,6 +41,9 @@ function renderIcon(variant) {
             return <Icons.Clock />;
         case 'codec':
             return <Icons.Camera />;
+        // Gambar berhenti mengalir - jam, bukan tengkorak. Ini pulih sendiri lewat 'coba lagi'.
+        case 'stalled':
+            return <Icons.Clock />;
         case 'network':
             return <Icons.Signal />;
         case 'cors':

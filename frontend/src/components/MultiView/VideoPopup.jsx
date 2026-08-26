@@ -562,6 +562,11 @@ function VideoPopup({
         };
 
         const failWithCodec = () => { clearStreamTimeout(); setStatus('error'); setErrorType('codec'); setLoadingStage(LoadingStage.ERROR); };
+        // Sudah pernah ada gambar = perangkat ini TERBUKTI bisa mendekode stream ini, jadi apa pun
+        // yang menghentikannya, menyebutnya "codec tidak didukung" adalah kebohongan - dan vonis
+        // codec tidak punya tombol coba lagi, sehingga pengunjungnya terjebak. Lihat
+        // ERROR_VARIANTS.stalled di publicPopupState.js.
+        const failWithStall = () => { clearStreamTimeout(); setStatus('error'); setErrorType('stalled'); setLoadingStage(LoadingStage.ERROR); };
 
         // Shared watch: demands a decoded picture before calling this live, and keeps watching
         // afterwards so a decoder that dies mid-stream cannot leave a black rectangle marked LIVE.
@@ -569,7 +574,7 @@ function VideoPopup({
             stopWatch = startLivePictureWatch(video, {
                 isStale: isStaleStreamRun,
                 onPicture: handlePlaying,
-                onNoPicture: failWithCodec,
+                onNoPicture: (amatan) => (amatan?.everHadPicture ? failWithStall() : failWithCodec()),
                 requestPlay: requestVideoPlay,
             });
         };

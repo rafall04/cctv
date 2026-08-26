@@ -50,6 +50,17 @@ function majukan(n, perTick) {
     }
 }
 
+/*
+ * Tick 500 ms yang cukup untuk MELEWATI tenggat macet pasca-vonis (stalledGiveUpMs).
+ *
+ * Dulu 12 (6 detik) saat tenggatnya 3 detik. Tenggat itu dinaikkan ke 10 detik pada 2026-08-26
+ * karena 3 detik lebih pendek daripada 3,6 detik yang diukur modul ini sendiri sebagai waktu
+ * kedatangan bingkai pertama - artinya setiap dekoder dingin divonis sebelum sempat bekerja.
+ * Yang dikunci tes-tes di bawah adalah KONTRAKNYA (dekoder yang benar-benar mati tetap
+ * tertangkap), bukan tenggatnya; jadi hanya angka ini yang ikut bergerak.
+ */
+const TICK_LEWAT_TENGGAT = 24;
+
 describe('watchdog gambar-hidup: sesudah vonis', () => {
     it('TIDAK memvonis sumber lambat yang beberapa tick-nya tanpa bingkai baru', () => {
         const video = videoTiruan();
@@ -85,7 +96,7 @@ describe('watchdog gambar-hidup: sesudah vonis', () => {
 
         // Waktu terus berjalan, bingkai tidak pernah bertambah lagi: persis gejala perangkat
         // yang menerima byte H.265 lalu gagal men-decode-nya.
-        majukan(12, () => {
+        majukan(TICK_LEWAT_TENGGAT, () => {
             video.currentTime += 0.5;
         });
 
@@ -210,6 +221,154 @@ describe('vonis hidup menuntut bingkai, bukan sekadar dimensi', () => {
         // Sesudah tenggat noPictureAfterMs, pengunjung HARUS diberi tahu — bukan dibiarkan
         // menatap persegi hitam yang mengaku LIVE.
         majukan(24);
+        expect(onNoPicture).toHaveBeenCalledTimes(1);
+    });
+});
+
+/*
+ * DILAPORKAN PEMILIK 2026-08-26: "bug codec melebar kemana mana". Live berjalan normal, lalu
+ * pengguna pindah ke aplikasi lain dan kembali - panel "Codec Tidak Didukung" muncul, TANPA
+ * tombol coba lagi. Menutup tampilan live lalu membukanya lagi selalu menyembuhkan.
+ *
+ * Vonisnya tidak ada hubungannya dengan codec. totalVideoFrames bersifat kumulatif untuk satu
+ * pipeline media dan KEMBALI KE NOL setiap kali pipeline itu dibangun ulang - terukur langsung
+ * di Chromium pada stream produksi: 1636 bingkai, pipeline dibangun ulang, lalu 0. Android
+ * melakukan persis itu saat aplikasi kembali dari latar belakang.
+ *
+ * Syarat lama `frames > framesAtVerdict` tidak akan pernah terpenuhi lagi sesudah reset sampai
+ * ribuan bingkai berikutnya ter-decode (~1 menit pada 25 fps), sedangkan tenggat macetnya tiga
+ * detik - dan stalledSince hanya direset di dalam cabang yang tak terjangkau itu. Jadi vonisnya
+ * PASTI jatuh pada stream yang memutar dengan sempurna, lalu terkunci.
+ *
+ * Membuka ulang popup menyembuhkannya karena watchdog baru membasiskan penghitungnya dari nol.
+ */
+describe('pipeline media dibangun ulang (aplikasi kembali dari latar belakang)', () => {
+    it('TIDAK memvonis stream sehat ketika penghitung bingkai kembali ke nol', () => {
+        const video = videoTiruan();
+        const onNoPicture = vi.fn();
+
+        video._frames = 5000;
+        startLivePictureWatch(video, { onNoPicture });
+        vi.advanceTimersByTime(500);
+
+        majukan(6, () => { video.currentTime += 0.5; video._frames += 12; });
+        expect(onNoPicture).not.toHaveBeenCalled();
+
+        // Dekodernya direbut lalu dibuat lagi: penghitung ke nol, pemutaran berlanjut 25 fps.
+        video._frames = 0;
+        majukan(20, () => { video.currentTime += 0.5; video._frames += 12; });
+
+        expect(video._frames).toBeGreaterThan(0);
+        expect(video._frames).toBeLessThan(5000);
+        expect(onNoPicture, 'stream yang jelas mendekode divonis mati').not.toHaveBeenCalled();
+    });
+
+    it('MASIH menangkap pipeline yang dibangun ulang lalu benar-benar mati', () => {
+        const video = videoTiruan();
+        const onNoPicture = vi.fn();
+
+        video._frames = 5000;
+        startLivePictureWatch(video, { onNoPicture });
+        vi.advanceTimersByTime(500);
+
+        video._frames = 0;
+        majukan(1, () => { video.currentTime += 0.5; });   // tick yang membasiskan ulang
+        majukan(TICK_LEWAT_TENGGAT, () => { video.currentTime += 0.5; });  // lalu bingkainya membeku selamanya
+
+        expect(onNoPicture).toHaveBeenCalledTimes(1);
+    });
+
+    it('mereset jam macet saat video dijeda, bukan meneruskannya sesudah kembali', () => {
+        const video = videoTiruan();
+        const onNoPicture = vi.fn();
+
+        video._frames = 5;
+        startLivePictureWatch(video, { onNoPicture });
+        vi.advanceTimersByTime(500);
+
+        majukan(4, () => { video.currentTime += 0.5; });   // 2 detik sepi, masih di bawah ambang
+
+        video.paused = true;                               // usePauseOnHidden menjeda saat tersembunyi
+        majukan(4);
+        video.paused = false;
+        video.currentTime += 30;                           // kembali: snap ke live edge
+
+        majukan(4, () => { video.currentTime += 0.5; });   // 2 detik sepi lagi - harus dihitung ULANG
+
+        expect(onNoPicture).not.toHaveBeenCalled();
+    });
+});
+
+/*
+ * Watchdog melaporkan APA YANG DIAMATI; pemanggilnya yang memutuskan cara bicara. Sebelumnya
+ * kedua situasi di bawah dijawab dengan vonis codec yang sama, padahal yang kedua justru bukti
+ * bahwa perangkatnya MAMPU.
+ */
+describe('watchdog memisahkan "tidak pernah ada gambar" dari "gambar berhenti"', () => {
+    it('everHadPicture=false saat bingkai tidak pernah ada sama sekali', () => {
+        const video = videoTiruan();
+        const onNoPicture = vi.fn();
+        video._frames = 0;
+
+        startLivePictureWatch(video, { onNoPicture });
+        majukan(34);
+
+        expect(onNoPicture).toHaveBeenCalledWith({ everHadPicture: false });
+    });
+
+    it('everHadPicture=true saat gambar pernah ada lalu berhenti', () => {
+        const video = videoTiruan();
+        const onNoPicture = vi.fn();
+        video._frames = 5;
+
+        startLivePictureWatch(video, { onNoPicture });
+        vi.advanceTimersByTime(500);
+        majukan(TICK_LEWAT_TENGGAT, () => { video.currentTime += 0.5; });
+
+        expect(onNoPicture).toHaveBeenCalledWith({ everHadPicture: true });
+    });
+});
+
+/*
+ * Jalur KEDUA yang menghasilkan gejala yang sama, dan yang paling menjelaskan kenapa gejalanya
+ * terasa acak: seluruh tenggat di modul ini diukur dengan Date.now() - jam DINDING - sedangkan
+ * setInterval-nya dibekukan browser saat tab tersembunyi. Satu tick sepi yang kebetulan mendarat
+ * tepat sebelum pengguna pindah aplikasi menyisakan stalledSince yang terisi; tick pertama sesudah
+ * ia kembali menemukan SELURUH durasi latar belakang sudah lewat, dan memvonis dari satu sampel.
+ */
+describe('interval yang dibekukan browser', () => {
+    it('tidak menghitung waktu yang TIDAK diamati sebagai bukti macet', () => {
+        const video = videoTiruan();
+        const onNoPicture = vi.fn();
+
+        video._frames = 5;
+        startLivePictureWatch(video, { onNoPicture });
+        vi.advanceTimersByTime(500);
+
+        // Satu tick sepi mendarat tepat sebelum aplikasi ditinggalkan.
+        majukan(1, () => { video.currentTime += 0.5; });
+
+        // Dua menit di latar belakang: jam dinding maju, interval TIDAK berjalan sama sekali.
+        vi.setSystemTime(Date.now() + 120000);
+
+        // Kembali. Dekodernya masih dingin beberapa tick - itu tidak boleh langsung divonis.
+        majukan(4, () => { video.currentTime += 0.5; });
+
+        expect(onNoPicture, 'dua menit yang tak teramati dihitung sebagai macet').not.toHaveBeenCalled();
+    });
+
+    it('tetap memvonis kalau sesudah kembali bingkainya memang tidak pernah datang lagi', () => {
+        const video = videoTiruan();
+        const onNoPicture = vi.fn();
+
+        video._frames = 5;
+        startLivePictureWatch(video, { onNoPicture });
+        vi.advanceTimersByTime(500);
+        vi.setSystemTime(Date.now() + 120000);
+
+        // Penjaga di atas membasiskan ulang, ia tidak melucuti watchdog untuk selamanya.
+        majukan(TICK_LEWAT_TENGGAT + 1, () => { video.currentTime += 0.5; });
+
         expect(onNoPicture).toHaveBeenCalledTimes(1);
     });
 });
