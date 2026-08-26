@@ -1124,6 +1124,8 @@ function Playback({
 
                 <PlaybackSegmentList segments={segments} selectedSegment={selectedSegment} onSegmentClick={handleSegmentClick} isLoading={isWaitingForSegments} />
 
+                {!isAdminPlayback && <AffiliateOfferSlot placement="playback" cameraId={selectedCameraId} className="mt-4" />}
+
                 {showPlaybackNative && (
                     <InlineAdSlot
                         slotKey="playback-native"
@@ -1132,8 +1134,6 @@ function Playback({
                         minHeightClassName="min-h-[120px]"
                     />
                 )}
-
-                {!isAdminPlayback && <AffiliateOfferSlot placement="playback" cameraId={selectedCameraId} className="mt-4" />}
                 {!isAdminPlayback && <PromoBanner placement="playback" cameraId={selectedCameraId} className="mt-4" />}
 
                 <PlaybackOptions playbackPolicy={playbackPolicy} showPublicNotice={!isAdminPlayback} autoPlayEnabled={autoPlayEnabled} onAutoPlayToggle={handleAutoPlayToggle} />

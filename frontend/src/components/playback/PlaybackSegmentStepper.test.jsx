@@ -114,3 +114,34 @@ describe('PlaybackSegmentStepper labelling', () => {
         expect(next().disabled).toBe(true);
     });
 });
+/*
+ * "Segmen 1 dari 1" adalah nol informasi: kedua panah sudah disabled, jadi pengunjung sudah tahu
+ * tidak ada tetangga. Menyebutnya tetap membuat halaman playback mengulang satu fakta yang sama
+ * untuk ketiga kalinya — stepper, timeline, dan daftar semuanya bicara soal klip yang persis sama
+ * saat rentangnya sempit.
+ *
+ * Yang dikunci di bawah bukan cuma penghilangannya, tapi juga bahwa label JAM tetap ada. Itu
+ * satu-satunya tempat yang menyatakan besar dan jelas apa yang sedang diputar, dan menghapusnya
+ * demi kerapian akan menukar pengulangan dengan kebutaan.
+ */
+describe('PlaybackSegmentStepper saat hanya ada satu segmen', () => {
+    const SATU = [SEGMENTS[0]];
+
+    it('tidak menyebut "Segmen 1 dari 1" — itu nol informasi', () => {
+        setup(SATU[0], SATU);
+
+        expect(screen.queryByText(/Segmen 1 dari 1/)).toBeNull();
+    });
+
+    it('tetap menyatakan jam yang sedang diputar', () => {
+        setup(SATU[0], SATU);
+
+        expect(screen.getByText(/09[.:]00/)).not.toBeNull();
+    });
+
+    it('masih menyebut posisi saat segmennya lebih dari satu', () => {
+        setup(SEGMENTS[1], SEGMENTS);
+
+        expect(screen.getByText(/Segmen 2 dari 3/)).not.toBeNull();
+    });
+});

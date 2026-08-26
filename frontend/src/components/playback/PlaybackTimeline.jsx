@@ -191,7 +191,14 @@ function PlaybackTimeline({
 
     return (
         <div className="bg-white dark:bg-gray-900 rounded-lg sm:rounded-xl p-3 sm:p-4 md:p-6 shadow-lg">
-            <h2 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-3 sm:mb-4">Timeline</h2>
+            {/*
+              * "Cari waktu", bukan "Timeline". Kartu ini memuat DUA pekerjaan: memilih hari dan
+              * rentang (CoverageStrip + RangePicker tepat di bawah judul ini) serta menggeser
+              * playhead. Judul "Timeline" hanya menyebut yang kedua, jadi pengunjung yang mencari
+              * "kejadian kemarin sore" tidak punya alasan membuka mata ke kartu ini sama sekali.
+              * Judul menyebut PEKERJAAN pengunjung, bukan nama teknis komponennya.
+              */}
+            <h2 className="text-base sm:text-lg font-semibold text-content mb-3 sm:mb-4">Cari waktu</h2>
 
             {canBrowseDays && (
                 <>

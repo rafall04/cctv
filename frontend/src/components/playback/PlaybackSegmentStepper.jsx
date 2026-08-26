@@ -93,7 +93,16 @@ function PlaybackSegmentStepper({
                         <div className="truncate text-xs text-content-muted">
                             {formatDay(selectedSegment.start_time)}
                             {/* Counted oldest-first here would contradict the list; both say "1" for the newest. */}
-                            {current >= 0 && ` · Segmen ${ordered.length - current} dari ${ordered.length}`}
+                            {/*
+                              * "Segmen 1 dari 1" adalah nol informasi: kedua panah sudah disabled,
+                              * jadi pengunjung sudah tahu tidak ada tetangga. Menyebutnya tetap
+                              * membuat halaman ini mengulang satu fakta yang sama untuk ketiga
+                              * kalinya — stepper, timeline, dan daftar semuanya bicara soal klip
+                              * yang persis sama. Label jamnya di atas TETAP: itu satu-satunya
+                              * tempat yang menyatakan besar dan jelas apa yang sedang diputar.
+                              */}
+                            {current >= 0 && ordered.length > 1
+                                && ` · Segmen ${ordered.length - current} dari ${ordered.length}`}
                         </div>
                     </>
                 ) : (

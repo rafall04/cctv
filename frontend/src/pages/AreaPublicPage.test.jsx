@@ -418,4 +418,50 @@ describe('AreaPublicPage', () => {
             }),
         }));
     });
+    /*
+     * Sebelum ini halaman area adalah PULAU: beranda dan playback sama-sama punya dock bawah,
+     * area satu-satunya yang tidak. Pengunjung yang mendarat dari tautan bagikan kehilangan
+     * seluruh navigasi, dan satu-satunya jalan keluar tombol Kembali di pojok atas.
+     *
+     * Diperiksa lewat tujuannya, bukan lewat nama komponen: yang penting bagi pengunjung adalah
+     * ADA jalan ke beranda, peta, grid, favorit, dan rekaman - bukan komponen mana yang
+     * menyediakannya.
+     */
+    it('menyediakan dock navigasi yang sama dengan beranda dan playback', async () => {
+        getAreaMock.mockResolvedValue({
+            success: true,
+            data: { name: 'KAB SURABAYA', slug: 'kab-surabaya', camera_count: 1, online_count: 1, total_views: 5 },
+        });
+        getAreaCamerasMock.mockResolvedValue({ success: true, data: [] });
+        getTrendingCamerasMock.mockResolvedValue({ success: true, data: [] });
+
+        renderPage();
+
+        expect(await screen.findByText('KAB SURABAYA')).not.toBeNull();
+
+        const tujuan = ['Home', 'Map', 'Grid', 'Favorit', 'Playback'];
+        for (const label of tujuan) {
+            expect(screen.getByRole('link', { name: label }), `tujuan dock hilang: ${label}`).not.toBeNull();
+        }
+    });
+
+    /*
+     * Dock itu `fixed` di bawah layar. Tanpa ruang di bawah, ia menutupi blok terakhir halaman -
+     * yang di sini adalah promo. Padding dan dock harus diputuskan bersama; menguji salah satunya
+     * saja membiarkan yang lain lepas.
+     */
+    it('menyisakan ruang di bawah supaya dock tidak menutupi blok terakhir', async () => {
+        getAreaMock.mockResolvedValue({
+            success: true,
+            data: { name: 'KAB SURABAYA', slug: 'kab-surabaya', camera_count: 0, online_count: 0, total_views: 0 },
+        });
+        getAreaCamerasMock.mockResolvedValue({ success: true, data: [] });
+        getTrendingCamerasMock.mockResolvedValue({ success: true, data: [] });
+
+        const { container } = renderPage();
+
+        expect(await screen.findByText('KAB SURABAYA')).not.toBeNull();
+        const main = container.querySelector('main');
+        expect(main.className).toContain('pb-24');
+    });
 });

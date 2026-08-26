@@ -96,17 +96,38 @@ function PlaybackSegmentList({
         [segments],
     );
 
+    /*
+     * Dilipat HANYA saat tepat satu segmen. Halaman ini punya TIGA pemilih segmen — stepper
+     * melangkah, timeline bisa diklik, daftar ini bisa dipilih — dan saat cuma ada satu, ketiganya
+     * menyatakan fakta yang sama; "Segmen 1 dari 1" di stepper menyebutnya sekali lagi. Empat kali,
+     * satu fakta, di tiga kartu besar.
+     *
+     * Nol tetap terbuka: pesan kosongnya adalah jawabannya. Dua ke atas tetap terbuka: di sana
+     * memilih memang berarti sesuatu. Yang dilipat bukan kemampuan — barisnya tetap ada di dalam,
+     * satu ketukan, lengkap dengan ukuran berkas yang tidak pernah diberitahu timeline.
+     */
+    const tunggal = !isLoading && newestFirst.length === 1;
+
     return (
-        <div className="rounded-card border border-edge bg-surface p-3 sm:p-4 md:p-6">
+        /*
+         * <details> asli, bukan state React: bisa dibuka lewat keyboard, ikut pencarian browser,
+         * dan sudah bekerja sebelum JS hidrasi. `open` hanya menentukan keadaan AWAL — pengunjung
+         * tetap boleh melipat daftar panjang kalau ia mau.
+         */
+        <details open={!tunggal} className="rounded-card border border-edge bg-surface">
             {/*
               * The count is withheld until it is known. "Segmen Rekaman (0)" during the fetch reads
               * as a finished answer — the camera has nothing — when in truth nothing had been asked
               * yet, which is precisely the misleading state this heading used to create.
               */}
-            <h2 className="mb-3 text-base font-semibold text-content sm:mb-4 sm:text-lg">
-                Segmen Rekaman {isLoading ? '' : `(${segments.length})`}
-            </h2>
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-3 sm:px-4 sm:py-4">
+                <h2 className="text-base font-semibold text-content sm:text-lg">
+                    Segmen Rekaman {isLoading ? '' : `(${segments.length})`}
+                </h2>
+                <span className="shrink-0 text-xs text-content-muted">{tunggal ? 'Rincian' : 'Sembunyikan'}</span>
+            </summary>
 
+            <div className="px-3 pb-3 sm:px-4 sm:pb-4 md:px-6 md:pb-6">
             {isLoading ? (
                 <div className="py-8 text-center text-content-muted sm:py-12">
                     <div className="mx-auto mb-3 h-10 w-10 animate-spin rounded-full border-4 border-edge border-t-primary sm:mb-4" />
@@ -132,7 +153,8 @@ function PlaybackSegmentList({
                     <p className="mt-2 text-xs sm:text-sm">Recording akan muncul setelah kamera mulai merekam</p>
                 </div>
             )}
-        </div>
+            </div>
+        </details>
     );
 }
 

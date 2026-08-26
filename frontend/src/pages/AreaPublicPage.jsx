@@ -32,6 +32,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import CameraThumbnail from '../components/CameraThumbnail';
 import AffiliateOfferSlot from '../components/commerce/AffiliateOfferSlot.jsx';
 import PromoBanner from '../components/promo/PromoBanner.jsx';
+import LandingMobileDock from '../components/landing/LandingMobileDock.jsx';
 import { resolvePublicPopupCamera } from '../services/publicCameraResolver';
 import publicGrowthService from '../services/publicGrowthService';
 import { buildAreaShareText, sharePublicText } from '../utils/publicGrowthShare';
@@ -41,6 +42,18 @@ import {
     getAreaCameraTotalViews,
 } from '../utils/areaPublicRanking';
 import { isCameraHardOffline, isCameraDegraded } from '../utils/cameraAvailability.js';
+
+/*
+ * Tujuan dock dari halaman area. Statis: berbeda dengan playback, halaman ini tidak punya
+ * konteks pemutaran yang perlu dibawa serta, jadi tidak ada alasan menghitungnya tiap render.
+ */
+const AREA_DOCK_HREFS = {
+    home: '/',
+    map: '/?view=map&mode=full',
+    grid: '/?view=grid&mode=full',
+    quick: '/?view=grid&mode=full#public-quick-access',
+    playback: '/playback',
+};
 
 const VideoPopup = lazy(() => import('../components/MultiView/VideoPopup'));
 const AREA_INITIAL_VISIBLE_CAMERAS = 12;
@@ -456,8 +469,13 @@ export default function AreaPublicPage() {
         );
     }
 
+    /*
+     * pb-24 di bawah sm menyediakan ruang untuk dock di bawah; di atas sm dock-nya sm:hidden
+     * sehingga ruangnya dikembalikan. Padding dan dock harus diputuskan bersama - salah satunya
+     * sendirian menghasilkan blok terakhir yang tertutup, atau ruang kosong tanpa penjelasan.
+     */
     return (
-        <main className="min-h-screen bg-surface-sunken text-content">
+        <main className="min-h-screen bg-surface-sunken pb-24 text-content sm:pb-0">
             <section className="border-b border-edge bg-surface">
                 <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
                     {/*
@@ -631,6 +649,18 @@ export default function AreaPublicPage() {
                     />
                 </Suspense>
             )}
+
+            {/*
+              * Dock yang sama dengan beranda dan playback. Tanpa ini halaman area jadi pulau:
+              * pengunjung yang mendarat dari tautan bagikan kehilangan seluruh navigasi, dan
+              * satu-satunya jalan keluar adalah tombol Kembali di pojok atas. Terukur di
+              * produksi: beranda dan playback punya dock, area satu-satunya yang tidak.
+              *
+              * viewMode="area" sengaja tidak cocok dengan kunci mana pun di dock, jadi tidak ada
+              * ikon yang menyala aktif - halaman ini memang bukan salah satu dari kelima tujuan
+              * itu, dan menyalakan salah satunya akan berbohong tentang di mana pengunjung berada.
+              */}
+            <LandingMobileDock viewMode="area" itemHrefs={AREA_DOCK_HREFS} />
         </main>
     );
 }

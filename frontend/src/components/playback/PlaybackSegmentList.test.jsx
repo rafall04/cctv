@@ -61,3 +61,52 @@ describe('PlaybackSegmentList once answered', () => {
         expect(onSegmentClick).toHaveBeenCalledWith(SEGMENTS[0]);
     });
 });
+/*
+ * Halaman playback punya TIGA pemilih segmen: stepper melangkah, timeline bisa diklik, daftar ini
+ * bisa dipilih. Saat cuma ada satu segmen ketiganya menyatakan fakta yang sama, dan "Segmen 1 dari
+ * 1" di stepper menyebutnya sekali lagi — empat kali, satu fakta, di tiga kartu besar.
+ *
+ * Yang dikunci di bawah bukan "kartunya lebih pendek", tapi bahwa melipat TIDAK menghilangkan
+ * kemampuan: barisnya tetap ada, tetap bisa dipilih, dan tetap membawa ukuran berkas yang tidak
+ * pernah diberitahu timeline.
+ */
+describe('PlaybackSegmentList melipat daftar berisi satu', () => {
+    const SATU = [SEGMENTS[0]];
+
+    it('melipat saat tepat satu segmen, karena tidak ada yang bisa dipilih', () => {
+        const { container } = render(
+            <PlaybackSegmentList segments={SATU} selectedSegment={null} onSegmentClick={vi.fn()} />,
+        );
+
+        expect(container.querySelector('details').open).toBe(false);
+        expect(screen.getByText(/Segmen Rekaman \(1\)/)).not.toBeNull();
+    });
+
+    it('tetap terbuka saat ada lebih dari satu — di sana memilih berarti sesuatu', () => {
+        const { container } = render(
+            <PlaybackSegmentList segments={SEGMENTS} selectedSegment={null} onSegmentClick={vi.fn()} />,
+        );
+
+        expect(container.querySelector('details').open).toBe(true);
+    });
+
+    it('tetap terbuka saat KOSONG — pesan kosongnya adalah jawabannya', () => {
+        const { container } = render(
+            <PlaybackSegmentList segments={[]} selectedSegment={null} onSegmentClick={vi.fn()} />,
+        );
+
+        expect(container.querySelector('details').open).toBe(true);
+        expect(screen.getByText('Belum ada recording tersedia')).not.toBeNull();
+    });
+
+    it('yang dilipat hanya tampilannya — barisnya tetap ada dan tetap bisa dipilih', () => {
+        const onSegmentClick = vi.fn();
+        render(<PlaybackSegmentList segments={SATU} selectedSegment={null} onSegmentClick={onSegmentClick} />);
+
+        // Ukuran berkas hanya ada di daftar ini, tidak di timeline — ia tidak boleh hilang.
+        expect(screen.getByText(/MB|GB/)).not.toBeNull();
+
+        fireEvent.click(screen.getByText(/MB|GB/));
+        expect(onSegmentClick).toHaveBeenCalledTimes(1);
+    });
+});
