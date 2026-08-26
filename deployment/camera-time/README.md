@@ -60,6 +60,14 @@ Urutannya bukan selera: yang di atas membuat kamera mandiri, yang di bawah menun
 mengurusnya. Jangan pernah menaikkan dorongan ke urutan pertama hanya karena ia paling sering
 berhasil.
 
+**Metode yang berhasil diingat antar-siklus.** Tanpa itu, kamera tanpa klien NTP akan dicoba
+lewat ONVIF lalu ISAPI setiap jam selamanya — dua panggilan yang sudah dipastikan gagal, tiap
+jam, seumur pemasangan. Terukur: putaran pertama 27 detik, putaran berikutnya **1,2 detik**.
+
+Yang diingat hanya PETUNJUK, bukan kebenaran. Kalau jalur yang diingat berhenti bekerja —
+firmware diperbarui, atau kamera diganti model lain di IP yang sama — tangga penuh dicoba lagi
+dan ingatannya mengoreksi diri. Ingatan yang tidak pernah diragukan akan membeku salah.
+
 Akibatnya:
 
 - **Kamera baru** yang ditambahkan operator terkonfigurasi sendiri pada siklus berikutnya —

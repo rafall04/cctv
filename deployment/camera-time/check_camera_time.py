@@ -93,6 +93,11 @@ def onvif_time(host, timeout=7):
     except (TypeError, ValueError):
         return (mode.group(1) if mode else "?"), None, zona, "jam tidak masuk akal"
 
+    # Referensi diambil DI SINI, bukan sekali sebelum loop. Kalau tidak, tiap kamera
+    # dibandingkan dengan jam yang sudah usang sepanjang durasi loop - dan pada 14 kamera
+    # yang dibaca berurutan (dengan timeout dan penulisan di antaranya), kamera terakhir
+    # tampak "maju" 25 detik padahal jamnya tepat. Terpergok justru karena angkanya mustahil:
+    # tidak ada jam yang hanyut 25 detik dalam 39 detik.
     return (mode.group(1) if mode else "?"), stamp, zona, None
 
 
@@ -160,6 +165,16 @@ def main():
     sekarang = datetime.datetime.utcnow()
     masalah, baris = [], []
 
+    # State dimuat SEBELUM loop: ia memuat metode yang berhasil untuk tiap kamera, dan itu
+    # dibutuhkan saat memutuskan jalur mana yang dicoba.
+    state_lama = {}
+    if os.path.exists(args.state):
+        try:
+            state_lama = json.load(open(args.state, encoding="utf-8"))
+        except Exception:  # noqa: BLE001
+            state_lama = {}
+    metode_dikenal = dict(state_lama.get("metode") or {})
+
     for cid, nama, url in rows:
         host_hit = re.search(r"@([^:/]+)", url or "")
         if not host_hit:
@@ -172,7 +187,8 @@ def main():
             # Tidak terjangkau BUKAN bukti jamnya salah - catat, jangan bunyikan alarm.
             continue
 
-        selisih = int((stamp - sekarang).total_seconds()) if stamp else None
+        acuan = datetime.datetime.utcnow()
+        selisih = int((stamp - acuan).total_seconds()) if stamp else None
 
         # MEMBENAHI, bukan sekadar melapor. Inilah yang membuat pemasangan di tempat
         # pelanggan tidak menuntut siapa pun tahu apa-apa: kamera baru yang ditambahkan
@@ -181,25 +197,46 @@ def main():
         #
         # Alamat server TIDAK dihardcode - ditentukan dari rute ke kamera itu sendiri,
         # jadi ia benar di jaringan mana pun tanpa disetel.
+        # Metode yang BERHASIL diingat antar-siklus. Tanpa ini, kamera tanpa klien NTP akan
+        # dicoba lewat ONVIF lalu ISAPI setiap jam selamanya - dua panggilan yang sudah
+        # dipastikan gagal, tiap jam, seumur pemasangan.
+        #
+        # Yang diingat hanya PETUNJUK, bukan kebenaran: kalau jalur yang diingat berhenti
+        # bekerja (firmware diperbarui, kamera diganti dengan model lain di IP yang sama),
+        # tangga penuh dicoba lagi. Ingatan yang tidak pernah diragukan akan membeku salah.
         metode = None
         kred = re.match(r"rtsp://([^:]+):([^@]+)@", url or "")
         perlu_dibenahi = mode and mode.lower() != "ntp"
-        if args.perbaiki and perlu_dibenahi and kred:
+        diingat = metode_dikenal.get(str(cid))
+
+        # Kamera yang hanya bisa didorong: cukup tulis ulang jamnya, dan hanya bila perlu.
+        if args.perbaiki and perlu_dibenahi and kred and diingat == "dorong":
+            if selisih is not None and abs(selisih) > args.ambang_dorong:
+                metode = "dorong" if dorong_waktu(host, kred.group(1), kred.group(2), zona) else None
+                if metode is None:
+                    diingat = None  # jalur yang diingat berhenti bekerja - coba tangga lagi
+            else:
+                metode = "dorong-tidak-perlu"
+
+        # `diingat is None` SAJA tidak cukup: kamera yang dulu berhasil lewat onvif/isapi lalu
+        # kembali ke Manual (reset firmware, mati listrik) akan jatuh di antara dua cabang dan
+        # tidak pernah dibenahi - persis kegagalan diam yang alat ini dibuat untuk mencegah.
+        # Semua yang bukan "dorong" masuk ke tangga penuh; ONVIF dicoba pertama, jadi kamera
+        # yang memang jalurnya itu tetap cepat.
+        if args.perbaiki and perlu_dibenahi and kred and diingat != "dorong":
             berhasil, metode, _ket = pastikan_waktu(host, kred.group(1), kred.group(2))
             if berhasil:
+                metode_dikenal[str(cid)] = metode
                 mode2, stamp2, zona2, err2 = onvif_time(host)
                 if not err2:
                     mode, stamp, zona = mode2, stamp2, zona2
-                    selisih = int((stamp - sekarang).total_seconds()) if stamp else selisih
+                    selisih = (int((stamp - datetime.datetime.utcnow()).total_seconds())
+                               if stamp else selisih)
                     perlu_dibenahi = mode and mode.lower() != "ntp"
             else:
                 metode = None
-
-        # Kamera yang hanya bisa didorong tetap perlu jam ditulis ulang berkala, bukan sekali.
         didorong = metode == "dorong"
-        if (args.perbaiki and perlu_dibenahi and not didorong and kred
-                and selisih is not None and abs(selisih) > args.ambang_dorong):
-            didorong = dorong_waktu(host, kred.group(1), kred.group(2), zona)
+
         sebab = []
         if selisih is not None and abs(selisih) > args.toleransi:
             sebab.append("selisih %+ds" % selisih if abs(selisih) < 86400
@@ -232,12 +269,7 @@ def main():
         print()
 
     # Transisi, bukan keadaan tetap: bandingkan dengan siklus sebelumnya.
-    sebelum = []
-    if os.path.exists(args.state):
-        try:
-            sebelum = json.load(open(args.state, encoding="utf-8")).get("masalah", [])
-        except Exception:  # noqa: BLE001
-            sebelum = []
+    sebelum = state_lama.get("masalah", [])
 
     berubah = sorted(masalah) != sorted(sebelum)
     if berubah:
@@ -253,7 +285,8 @@ def main():
 
     try:
         os.makedirs(os.path.dirname(args.state), exist_ok=True)
-        json.dump({"waktu": sekarang.isoformat(timespec="seconds"), "masalah": masalah},
+        json.dump({"waktu": sekarang.isoformat(timespec="seconds"),
+                   "masalah": masalah, "metode": metode_dikenal},
                   open(args.state, "w", encoding="utf-8"))
     except Exception as exc:  # noqa: BLE001
         print("peringatan: state tidak tersimpan: %s" % exc, file=sys.stderr)
