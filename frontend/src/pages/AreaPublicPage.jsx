@@ -14,9 +14,11 @@
  *     the full label kept in aria-label AND title. Shortening is not hiding: nothing moved behind
  *     a scroll, a menu or a disclosure, and no JS window-width state was introduced.
  *   · Both controls are 44px high — this is the top of a public page, reached by thumb.
- *   · Share went from a filled primary block to the primary TINT (`bg-primary-100`, the
- *     pre-declared token — `bg-primary/10` compiles to nothing against `--primary-color`). It is
- *     still visibly the action of the two; it just no longer out-shouts the title and the cameras.
+ *   · Share TIDAK lagi memakai tint primary. Tint itu alpha tetap 10%, jadi ia lembut di atas
+ *     putih tapi praktis hilang di atas #08090b - menyisakan garis dan teks merah pekat yang
+ *     justru lebih berteriak daripada tombol terisi yang dihindari. Labelnya juga cuma 3,06:1,
+ *     gagal AA. Kini keduanya berbagi chrome yang sama dan hierarkinya dibawa terang-redup teks
+ *     (`text-content` lawan `text-content-muted`). Lihat komentar di HEADER_CONTROL_ACCENT.
  *   · The share result moved out of the row and below it, right-aligned. "Browser tidak mendukung
  *     share otomatis." beside a button is how a row gets wider than a 320px screen.
  *
@@ -88,15 +90,40 @@ function formatCount(value) {
 
 /*
  * The two header controls share ONE shape, declared once so "kembali" and "bagikan" cannot drift
- * apart again: a 44px-high compact control with a bordered idle look, and an accent variant for the
- * one that acts. 44px because these are the first things a thumb meets on the page.
- * `bg-primary-100` is the pre-declared 10% tint in tailwind.config.js — `bg-primary/10` compiles to
- * NOTHING here, because `--primary-color` holds a full colour rather than the channel triplet
- * Tailwind needs to compute alpha from.
+ * apart again: a 44px-high compact control. 44px because these are the first things a thumb meets.
+ *
+ * Catatan yang tetap berlaku meski tint-nya sudah tidak dipakai di sini: `bg-primary/10` compiles
+ * to NOTHING di proyek ini, karena `--primary-color` menyimpan warna utuh, bukan triplet kanal
+ * yang dibutuhkan Tailwind untuk menghitung alpha. Kalau suatu saat butuh tint primary, pakai
+ * token `primary-100` yang sudah dideklarasikan di tailwind.config.js — dan ingat ia alpha TETAP,
+ * jadi ia TIDAK theme-aware.
  */
 const HEADER_CONTROL = 'inline-flex min-h-[44px] min-w-0 items-center gap-1.5 rounded-control border px-3 text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary';
+/*
+ * KENAPA KEDUANYA BERBAGI CHROME YANG SAMA
+ *
+ * Sebelumnya "Bagikan" memakai `border-primary bg-primary-100 text-primary` — perlakuan buatan
+ * sendiri yang tidak dipakai di mana pun lagi di aplikasi ini (sistemnya memakai `bg-primary
+ * text-white` untuk tombol primer). Maksudnya baik: memberi aksen tanpa berteriak. Tapi diukur
+ * di halaman hidup, ia gagal di dua sisi sekaligus:
+ *
+ *   1. TINT-NYA TIDAK THEME-AWARE. `primary-100` adalah alpha TETAP 10% (tailwind.config.js:49),
+ *      jadi kelasnya identik di terang maupun gelap. Di atas putih ia jadi merah muda lembut —
+ *      persis yang dimaksud. Di atas #08090b ia praktis tak terlihat, sehingga yang tersisa
+ *      hanya GARIS dan TEKS merah pekat: hasil akhirnya justru lebih berteriak daripada tombol
+ *      terisi yang sengaja dihindari.
+ *   2. KONTRASNYA GAGAL AA. Label merah #fa3333 di atas tint terang = 3,06:1, di bawah ambang
+ *      4,5:1 untuk teks 14px semibold. Tombol terisi pun tidak menyelamatkan: putih di atas
+ *      #fa3333 = 3,76:1.
+ *
+ * Jadi hierarkinya sekarang dibawa TERANG-REDUP TEKS, bukan warna: bidang, garis, radius, dan
+ * tinggi 44px keduanya identik, dan "Bagikan" memakai `text-content` sementara "Kembali"
+ * `text-content-muted`. Keduanya pasangan yang memang dirancang untuk permukaan ini, jadi
+ * kontrasnya aman di kedua tema — dan pemilik berhenti bertanya kenapa dua tombol bersebelahan
+ * berbicara dalam dua bahasa visual.
+ */
 const HEADER_CONTROL_IDLE = 'border-edge bg-surface-sunken text-content-muted hover:border-edge-strong hover:bg-surface-raised hover:text-content';
-const HEADER_CONTROL_ACCENT = 'border-primary bg-primary-100 text-primary hover:bg-primary-200';
+const HEADER_CONTROL_ACCENT = 'border-edge bg-surface-sunken text-content hover:border-edge-strong hover:bg-surface-raised';
 
 function BackIcon() {
     return (

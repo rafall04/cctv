@@ -389,8 +389,32 @@ describe('AreaPublicPage', () => {
         }
 
         const shareCls = share.getAttribute('class');
-        expect(shareCls, 'the tint, not the fill — it must not out-shout the title').toContain('bg-primary-100');
+        const backCls = back.getAttribute('class');
+
+        /*
+         * KONTRAKNYA BERUBAH 2026-08-26, dan tes ini berubah BERSAMANYA, bukan dilonggarkan.
+         *
+         * Dulu "Bagikan" memakai `border-primary bg-primary-100 text-primary` dan tes ini
+         * menguncinya. Diukur di halaman hidup, perlakuan itu gagal dua kali: tint `primary-100`
+         * adalah alpha TETAP 10% sehingga ia lenyap di atas #08090b dan hanya menyisakan garis
+         * serta teks merah pekat (lebih berteriak daripada tombol terisi yang dihindari), dan
+         * label #fa3333 di atas tint terang cuma 3,06:1 — gagal AA untuk teks 14px.
+         *
+         * Sekarang keduanya berbagi bidang dan garis yang sama; hierarkinya dibawa terang-redup
+         * teks. Yang diassert di bawah adalah KEDUANYA: bahwa chrome-nya sama, DAN bahwa masih
+         * ada pembeda — kalau tidak, "samakan saja" akan pelan-pelan menghapus hierarkinya.
+         */
+        for (const kelas of ['border-edge', 'bg-surface-sunken']) {
+            expect(shareCls, `chrome berbeda: ${kelas}`).toContain(kelas);
+            expect(backCls, `chrome berbeda: ${kelas}`).toContain(kelas);
+        }
+
+        expect(shareCls, 'aksen warna buatan sendiri sudah tidak dipakai').not.toMatch(/border-primary|bg-primary-\d|text-primary(?![-a-z])/);
         expect(shareCls, 'bg-primary/10 compiles to nothing here').not.toMatch(/bg-primary\/\d/);
+
+        // Pembedanya: yang bertindak lebih terang daripada yang sekadar kembali.
+        expect(shareCls).toMatch(/(^|\s)text-content(\s|$)/);
+        expect(backCls).toMatch(/(^|\s)text-content-muted(\s|$)/);
     });
 
     /* The result of the share is a whole sentence; beside a button it is how a row gets wider than a
