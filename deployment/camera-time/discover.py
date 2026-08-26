@@ -6,7 +6,10 @@ Multicast 239.255.255.250 TIDAK melewati gateway, dan kamera di sini ada di subn
 tiap kamera - ONVIF mewajibkan perangkat menjawabnya, dan jawabannya memuat XAddrs: URL
 layanan device yang SEBENARNYA, termasuk port dan jalur yang tidak standar.
 """
-import re, socket, sqlite3, sys, uuid
+import os, re, socket, sqlite3, sys, uuid
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from set_camera_ntp import SCOPE_SQL  # noqa: E402
 
 PROBE = (
     '<?xml version="1.0" encoding="UTF-8"?>'
@@ -39,8 +42,7 @@ def probe(ip, timeout=4.0):
 con = sqlite3.connect("/var/www/rafnet-cctv/backend/data/cctv.db")
 rows = con.execute(
     "SELECT id, name, private_rtsp_url FROM cameras "
-    "WHERE enabled=1 AND private_rtsp_url LIKE ? ORDER BY id",
-    ("rtsp://%@192.168.%",)).fetchall()
+    "WHERE " + SCOPE_SQL + " ORDER BY id").fetchall()
 
 print("%-6s %-30s %-15s %s" % ("ID", "NAMA", "HOST", "XAddrs (URL layanan ONVIF sesungguhnya)"))
 print("-" * 118)

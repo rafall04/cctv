@@ -40,6 +40,30 @@ import sqlite3
 import subprocess
 
 DB_DEFAULT = "/var/www/rafnet-cctv/backend/data/cctv.db"
+# ============================================================================
+# CAKUPAN: kamera mana yang urusan penyelaras ini
+#
+# Hanya kamera di rentang privat RFC1918 - yaitu yang benar-benar ada di jaringan kita,
+# bisa dijangkau, dan boleh dikonfigurasi. Kamera pihak ketiga di IP publik (di pemasangan
+# ini: 394 feed Surabaya di 36.66.x.x) bukan milik kita; jamnya urusan pemiliknya, dan
+# memasukkannya hanya menghasilkan ratusan baris "belum diketahui" yang tidak bisa ditindak.
+#
+# BUKAN dihardcode ke 192.168: pemasangan pelanggan bisa memakai 10.x atau 172.16-31.x, dan
+# kamera mereka akan luput tanpa satu pun tanda bahwa ada yang terlewat.
+#
+# ⚠️ Definisi yang SAMA ada di backend/services/cameraTimeStatusService.js karena panel admin
+# harus menampilkan persis kamera yang diperiksa penyelaras ini. Keduanya dijaga sebuah tes
+# di backend/__tests__/guardrails.test.js - kalau salah satu diubah, tes itu merah.
+# ============================================================================
+SCOPE_SQL = (
+    "enabled = 1 AND ("
+    "private_rtsp_url LIKE 'rtsp://%@10.%' OR "
+    "private_rtsp_url LIKE 'rtsp://%@192.168.%' OR "
+    "private_rtsp_url GLOB 'rtsp://*@172.1[6-9].*' OR "
+    "private_rtsp_url GLOB 'rtsp://*@172.2[0-9].*' OR "
+    "private_rtsp_url GLOB 'rtsp://*@172.3[01].*')"
+)
+
 NS_DEV = "http://www.onvif.org/ver10/device/wsdl"
 NS_SCH = "http://www.onvif.org/ver10/schema"
 
@@ -256,9 +280,9 @@ def main():
     args = parser.parse_args()
 
     con = sqlite3.connect(args.db)
-    query = ("SELECT id, name, private_rtsp_url FROM cameras "
-             "WHERE enabled=1 AND private_rtsp_url LIKE ? ORDER BY id")
-    rows = con.execute(query, ("rtsp://%@192.168.%",)).fetchall()
+    rows = con.execute(
+        "SELECT id, name, private_rtsp_url FROM cameras WHERE " + SCOPE_SQL + " ORDER BY id"
+    ).fetchall()
     if args.only:
         want = {int(x) for x in args.only.split(",")}
         rows = [r for r in rows if r[0] in want]

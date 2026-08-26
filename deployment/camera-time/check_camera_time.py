@@ -43,6 +43,7 @@ STATE_DEFAULT = "/var/lib/camera-time-check.json"
 # akan ketinggalan diperbaiki.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from set_camera_ntp import (  # noqa: E402
+    SCOPE_SQL,
     alamat_server_untuk,
     dorong_waktu,
     pastikan_waktu,
@@ -189,8 +190,7 @@ def main():
     con = sqlite3.connect(args.db)
     rows = con.execute(
         "SELECT id, name, private_rtsp_url, onvif_username, onvif_password "
-        "FROM cameras WHERE enabled=1 AND private_rtsp_url LIKE ? ORDER BY id",
-        ("rtsp://%@192.168.%",)).fetchall()
+        "FROM cameras WHERE " + SCOPE_SQL + " ORDER BY id").fetchall()
 
     sekarang = datetime.datetime.utcnow()
     masalah, baris, status = [], [], []

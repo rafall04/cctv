@@ -527,3 +527,77 @@ describe('guardrail: a light surface always declares its dark counterpart', () =
         ).toBeLessThanOrEqual(SISA);
     });
 });
+/*
+ * Cakupan penyelaras waktu didefinisikan DUA KALI - sekali di Python (yang memeriksa kamera),
+ * sekali di Node (yang menampilkan hasilnya di panel admin). Keduanya HARUS sama persis:
+ * kalau panel menampilkan kamera yang tidak pernah diperiksa penyelaras, ia melaporkan
+ * "belum diketahui" untuk sesuatu yang memang tak pernah jadi urusannya.
+ *
+ * Itu bukan kekhawatiran teoretis. Versi pertama panel memakai `LIKE 'rtsp://%@%'` dan
+ * menampilkan 409 kamera padahal penyelaras hanya memeriksa 14 - 394 feed pihak ketiga di IP
+ * publik ikut terbawa dan panelnya berteriak "396 perlu perhatian". 96% derau.
+ *
+ * Dibandingkan sebagai TEKS, dan karena itu kedua sisi sengaja ditulis tanpa alias tabel:
+ * predikat yang butuh transformasi di salah satu sisi akan mulai berpisah diam-diam.
+ */
+
+describe('guardrail: cakupan jam kamera sama di Python dan Node', () => {
+    /*
+     * Cakupan penyelaras waktu didefinisikan DUA KALI - sekali di Python (yang memeriksa
+     * kamera), sekali di Node (yang menampilkan hasilnya). Keduanya HARUS sama persis: panel
+     * yang menampilkan kamera yang tidak pernah diperiksa penyelaras melaporkan "belum
+     * diketahui" untuk sesuatu yang memang bukan urusannya.
+     *
+     * Bukan kekhawatiran teoretis: versi pertama panel menerima setiap kamera ber-URL RTSP dan
+     * menampilkan 409 padahal penyelaras memeriksa 14 - 394 feed pihak ketiga di IP publik ikut
+     * terbawa, dan panelnya berteriak "396 perlu perhatian". Sembilan puluh enam persen derau.
+     *
+     * Diambil dari PREDIKAT SQL-nya, bukan dari sintaksis pembungkus tiap bahasa. Dua percobaan
+     * sebelumnya memotong pada penutup kurung dan meleset karena kutip di sisi Python, lalu
+     * menelan separuh berkas - persis jenis kegagalan yang membuat orang melonggarkan asersinya
+     * alih-alih memperbaiki alat ukurnya.
+     */
+    const AWAL = 'enabled = 1 AND (';
+    const AKHIR = '172.3[01].*)';
+
+    const ambilPredikat = (teks) => {
+        const bersih = teks
+            .replace(/["']/g, '')
+            .replace(/\s*\+\s*/g, ' ')
+            .replace(/\s+/g, ' ');
+        const i = bersih.indexOf(AWAL);
+        if (i === -1) return null;
+        const j = bersih.indexOf(AKHIR, i);
+        if (j === -1) return null;
+        return bersih.slice(i, j + AKHIR.length).trim();
+    };
+
+    const bacaPy = () => fs.readFileSync(
+        path.join(BACKEND_ROOT, '..', 'deployment', 'camera-time', 'set_camera_ntp.py'), 'utf8');
+    const bacaJs = () => fs.readFileSync(
+        path.join(BACKEND_ROOT, 'services', 'cameraTimeStatusService.js'), 'utf8');
+
+    it('predikat cakupan identik di kedua bahasa', () => {
+        const py = ambilPredikat(bacaPy());
+        const js = ambilPredikat(bacaJs());
+
+        expect(py, 'predikat tidak ditemukan di set_camera_ntp.py').toBeTruthy();
+        expect(js, 'predikat tidak ditemukan di cameraTimeStatusService.js').toBeTruthy();
+        expect(js).toBe(py);
+    });
+
+    it('cakupannya membatasi ke rentang privat, bukan menerima semua', () => {
+        /*
+         * Anti-hampa: predikat yang menerima apa pun akan membuat tes di atas tetap hijau.
+         * Diperiksa pada PREDIKAT hasil ekstraksi, bukan pada berkas mentah - kalau tidak,
+         * komentar yang MENJELASKAN pola lama akan dikira pola lama itu sendiri. Saya kena
+         * jerat itu satu putaran sebelum ini.
+         */
+        const js = ambilPredikat(bacaJs());
+
+        expect(js).toContain('192.168.');
+        expect(js).toContain('172.1[6-9]');
+        expect(js).toContain('rtsp://%@10.');
+        expect(js).not.toContain('LIKE rtsp://%@% OR');
+    });
+});

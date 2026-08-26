@@ -27,6 +27,28 @@
 
 import { execute, query, queryOne } from '../database/connectionPool.js';
 
+/*
+ * CAKUPAN: kamera mana yang urusan penyelaras waktu.
+ *
+ * Hanya rentang privat RFC1918 — yang benar-benar ada di jaringan kita, bisa dijangkau, dan
+ * boleh dikonfigurasi. Percobaan pertama saya memakai `LIKE 'rtsp://%@%'` dan halamannya
+ * menampilkan 409 kamera padahal penyelaras hanya memeriksa 14: 394 feed pihak ketiga di IP
+ * publik ikut terbawa, semuanya "belum diketahui", dan panelnya berteriak "396 perlu",
+ * "perhatian" — 96% derau yang tidak bisa ditindak siapa pun.
+ *
+ * BUKAN dihardcode ke 192.168: pemasangan pelanggan bisa memakai 10.x atau 172.16-31.x.
+ *
+ * ⚠️ Definisi yang SAMA ada di deployment/camera-time/set_camera_ntp.py (SCOPE_SQL), karena
+ * halaman ini HARUS menampilkan persis kamera yang diperiksa penyelaras. Kalau keduanya
+ * berpisah, panelnya berbohong lagi — dan itu dijaga tes di __tests__/guardrails.test.js.
+ */
+const SCOPE_SQL = "enabled = 1 AND ("
+    + "private_rtsp_url LIKE 'rtsp://%@10.%' OR "
+    + "private_rtsp_url LIKE 'rtsp://%@192.168.%' OR "
+    + "private_rtsp_url GLOB 'rtsp://*@172.1[6-9].*' OR "
+    + "private_rtsp_url GLOB 'rtsp://*@172.2[0-9].*' OR "
+    + "private_rtsp_url GLOB 'rtsp://*@172.3[01].*')";
+
 // Timer berjalan tiap jam; tiga jam berarti dua siklus terlewat — itu kegagalan, bukan jitter.
 const STALE_AFTER_MINUTES = 180;
 
@@ -48,11 +70,14 @@ class CameraTimeStatusService {
      * persis yang membuat lima kamera berhenti di tahun 1970 tanpa ada yang tahu.
      */
     getCameraTimeStatus() {
+        // Tanpa alias untuk `cameras`, supaya SCOPE_SQL bisa disisipkan APA ADANYA dan tetap
+        // byte-identik dengan versi Python. Predikat yang harus dicocokkan dua bahasa tidak
+        // boleh butuh transformasi di salah satu sisi — di situlah keduanya mulai berpisah.
         const rows = query(`
             SELECT
-                c.id,
-                c.name,
-                c.onvif_username IS NOT NULL AND c.onvif_username != '' AS has_onvif_credentials,
+                cameras.id,
+                cameras.name,
+                cameras.onvif_username IS NOT NULL AND cameras.onvif_username != '' AS has_onvif_credentials,
                 s.checked_at,
                 s.reachable,
                 s.mode,
@@ -60,11 +85,10 @@ class CameraTimeStatusService {
                 s.method,
                 s.healthy,
                 s.note
-            FROM cameras c
-            LEFT JOIN camera_time_status s ON s.camera_id = c.id
-            WHERE c.enabled = 1
-              AND c.private_rtsp_url LIKE 'rtsp://%@%'
-            ORDER BY c.id
+            FROM cameras
+            LEFT JOIN camera_time_status s ON s.camera_id = cameras.id
+            WHERE ${SCOPE_SQL}
+            ORDER BY cameras.id
         `);
 
         return rows.map((row) => {
