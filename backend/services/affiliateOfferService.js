@@ -250,7 +250,16 @@ const RESOLVE_SELECT = `
            o.whatsapp_number, o.whatsapp_message, o.product_price_rupiah,
            o.image_base, o.image_width, o.image_height, o.active AS offer_active,
            p.store_name, p.store_url,
-           p.active AS partner_active, p.billing_mode, p.start_date, p.end_date
+           p.active AS partner_active, p.billing_mode, p.start_date, p.end_date,
+           /*
+            * Satu skalar urutan, dan HANYA itu: spesifisitas dulu, lalu prioritas. Ia ada
+            * supaya sisi JS bisa mengenali baris-baris yang benar-benar SERI tanpa membaca
+            * target_mode maupun priority satu per satu - dan tanpa melanggar daftar izin di
+            * atas, karena angka ini tidak mengandung apa pun tentang mitra, harga, atau
+            * kontrak, dan buildPublicPayload tetap menyusun muatannya kunci demi kunci.
+            */
+           (CASE o.target_mode WHEN 'camera' THEN 0 WHEN 'area' THEN 1 ELSE 2 END) * 1000000
+               + o.priority AS rank_slot
     FROM affiliate_offers o
     JOIN affiliate_partners p ON p.id = o.partner_id
     WHERE (
@@ -264,10 +273,7 @@ const RESOLVE_SELECT = `
                 WHERE t.offer_id = o.id AND t.target_type = 'area' AND t.target_id = ?
             ))
     )
-    ORDER BY
-        CASE o.target_mode WHEN 'camera' THEN 0 WHEN 'area' THEN 1 ELSE 2 END,
-        o.priority ASC,
-        o.id DESC
+    ORDER BY rank_slot ASC, o.id ASC
 `;
 
 const REDIRECT_SELECT = `
@@ -326,13 +332,40 @@ function decorateOffer(row) {
     };
 }
 
+/*
+ * Benih rotasi harian, dihitung dari string 'YYYY-MM-DD' dan BUKAN dari jam mesin, supaya
+ * dua panggilan pada hari yang sama selalu memilih pemenang yang sama - termasuk di dalam tes.
+ *
+ * KENAPA ROTASI ITU PERLU
+ * Sebelum ini ikatan diputus `o.id DESC`, jadi ketika dua tawaran mengincar kamera yang sama
+ * dengan prioritas yang sama, yang lebih TUA padam selamanya - tidak pernah satu impresi pun,
+ * sementara mitranya tetap ditagih. Tidak ada galat, tidak ada peringatan; hanya satu mitra
+ * yang perlahan menyimpulkan bahwa permukaan ini tidak menghasilkan apa-apa.
+ *
+ * Ini GILIRAN sungguhan, bukan pengocokan: di antara tawaran yang seri, hari ke-n memilih
+ * indeks n % jumlah. Dua tawaran seri berbagi hari persis 50/50, tiga berbagi 1/3.
+ *
+ * Percobaan pertama memakai `(o.id + hari) % 997` sebagai pemutus ikatan di dalam SQL, dan itu
+ * CACAT: untuk id yang berdampingan - 31 dan 32, bentuk yang paling wajar terjadi ketika dua
+ * tawaran dibuat berurutan - selisihnya selalu tetap 1, jadi pemenangnya tidak pernah berganti
+ * kecuali pada satu hari dalam 997 saat nilainya membelit. Praktis sama saja dengan id ASC.
+ * Terbukti merah oleh tes di bawah, bukan oleh pembacaan ulang.
+ */
+function dayRotationSeed(today) {
+    const [tahun, bulan, hari] = String(today).split('-').map(Number);
+    if (!tahun || !bulan || !hari) return 0;
+    return Math.floor(Date.UTC(tahun, bulan - 1, hari) / 86400000);
+}
+
 /* ------------------------------------------------------------------------ service */
 
 class AffiliateOfferService {
     /**
      * Pick the single best live offer for one viewing context.
      * Specificity beats priority: an offer aimed at this camera beats one aimed at its area,
-     * which beats a catch-all; then the lower priority number, then the newest offer.
+     * which beats a catch-all; then the lower priority number. Offers still tied after that
+     * ROTATE by calendar day - see dayRotationSeed above for why, and for what it does and
+     * does not promise.
      *
      * @param {{placement: string, cameraId?: number|string, areaId?: number|string}} context
      * @returns {object|null} the six-key public payload, or null when nothing matches
@@ -355,12 +388,23 @@ class AffiliateOfferService {
             }
         }
 
-        const rows = query(RESOLVE_SELECT, [cameraKey, cameraKey, areaKey, areaKey]);
         const today = getLocalDate();
-        const match = rows.find(
+        const rows = query(RESOLVE_SELECT, [cameraKey, cameraKey, areaKey, areaKey]);
+        const eligible = rows.filter(
             (row) => isOfferRowLive(row, today) && parsePlacements(row.placements).includes(placement)
         );
-        return match ? buildPublicPayload(match) : null;
+        if (eligible.length === 0) return null;
+
+        /*
+         * Hanya baris yang berbagi peringkat TERATAS yang ikut giliran. Peringkat lebih rendah
+         * tidak pernah mendapat hari: tawaran yang mengincar kamera ini secara khusus tidak
+         * boleh kalah bergilir dari tawaran umum, karena kecocokannya itulah yang membuat
+         * permukaan ini bekerja.
+         */
+        const teratas = eligible[0].rank_slot;
+        const seri = eligible.filter((row) => row.rank_slot === teratas);
+        const match = seri[dayRotationSeed(today) % seri.length];
+        return buildPublicPayload(match);
     }
 
     /**
