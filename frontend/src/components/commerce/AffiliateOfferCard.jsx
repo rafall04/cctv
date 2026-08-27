@@ -146,6 +146,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AFFILIATE_LINK, countAffiliateClick } from '../../services/affiliateService';
+import { disclosureFor } from '../../utils/commercialDisclosure.js';
 
 /** Where the WebP renditions are served. Matches backend routes/affiliateMediaRoutes.js. */
 const MEDIA_BASE = '/api/affiliate-media';
@@ -342,7 +343,7 @@ export default function AffiliateOfferCard({ offer, className = '', placement })
             <div className="flex items-center justify-between gap-2 pb-1.5">
                 <span className="inline-flex min-w-0 items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-content-subtle">
                     <ShopIcon />
-                    Toko rekanan
+                    {disclosureFor('affiliate')}
                 </span>
 
                 {storeHref && (

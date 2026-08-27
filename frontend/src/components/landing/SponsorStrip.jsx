@@ -19,6 +19,7 @@ any frontend redeploy.
 
 import { useEffect, useMemo, useState } from 'react';
 import sponsorService from '../../services/sponsorService';
+import { disclosureFor } from '../../utils/commercialDisclosure.js';
 
 const COLOR_TO_LABEL_TIER = {
     yellow: 'Sponsor Utama',
@@ -132,7 +133,7 @@ export default function SponsorStrip() {
             className="mb-8 border-t border-edge pt-8"
         >
             <h4 className="mb-5 text-center text-sm font-semibold uppercase tracking-wide text-content-muted">
-                Sponsor Kami
+                {disclosureFor('sponsor')}
             </h4>
             <div className="space-y-6">
                 {tiers.map((tier) => (

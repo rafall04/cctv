@@ -27,6 +27,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getPublicPromoBanner, trackPromoBannerClick } from '../../services/promoBannerService';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
+import { disclosureFor } from '../../utils/commercialDisclosure.js';
 
 const MEDIA_BASE = '/api/promo-media';
 
@@ -208,7 +209,7 @@ export default function PromoBanner({ placement, cameraId, areaId, className = '
                         rather than font-medium — quiet chrome, but never smaller than
                         text-xs and never below text-content-subtle, because the label IS
                         the disclosure. */}
-                    <span className="block pb-1.5 text-xs uppercase tracking-wide text-content-subtle">Promo</span>
+                    <span className="block pb-1.5 text-xs uppercase tracking-wide text-content-subtle">{disclosureFor('promo')}</span>
 
                     <button
                         type="button"

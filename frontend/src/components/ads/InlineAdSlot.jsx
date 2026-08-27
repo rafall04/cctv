@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { disclosureFor } from '../../utils/commercialDisclosure.js';
 
 function appendMarkup(target, markup) {
     if (!target) {
@@ -64,7 +65,7 @@ export default function InlineAdSlot({
     slotKey,
     script,
     className = '',
-    label = 'Iklan',
+    label = disclosureFor('ads'),
     minHeightClassName = '',
     variant = 'page-inline',
     maxHeight = null,
