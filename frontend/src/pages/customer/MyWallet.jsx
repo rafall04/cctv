@@ -360,13 +360,25 @@ function TopupPanel({ onCompleted, resumable = [] }) {
                 </div>
             )}
 
-            <div className="mt-3 grid grid-cols-3 gap-2">
+            {/*
+              * flex-wrap, BUKAN grid-cols-3 yang dipatok.
+              *
+              * Tiga kolom tetap memberi tiap tombol 64px pada layar 320px, sementara "Rp25.000"
+              * butuh 107px begitu Android disetel "teks besar" (font 1,5x). Tombolnya meluber dari
+              * selnya, mendorong formulir ke 297px di dalam wadah 270px, dan naik sampai halaman
+              * dompet meluber 2px. Kecil di angka, tapi bentuknya persis yang membuat halaman bisa
+              * digeser ke samping di ponsel.
+              *
+              * Membungkus membuat jumlah kolomnya mengikuti lebar yang benar-benar tersedia, jadi ia
+              * tetap benar pada skala font mana pun - termasuk yang belum ada saat ini ditulis.
+              */}
+            <div className="mt-3 flex flex-wrap gap-2">
                 {PRESET_AMOUNTS.map((preset) => (
                     <button
                         type="button"
                         key={preset}
                         onClick={() => { setAmount(preset); setCustomAmount(''); }}
-                        className={`rounded-xl border px-3 py-2 text-sm font-medium transition-colors ${!customAmount && amount === preset
+                        className={`min-w-0 flex-1 basis-24 rounded-xl border px-3 py-2 text-sm font-medium transition-colors ${!customAmount && amount === preset
                             ? 'border-primary bg-primary text-white'
                             : 'border-edge-strong text-content-muted hover:bg-surface-sunken'
                         }`}

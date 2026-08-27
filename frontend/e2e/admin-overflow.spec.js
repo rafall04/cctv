@@ -2014,6 +2014,25 @@ for (const spec of ADMIN_PAGES) {
             // Let lazy admin chunks and deferred mounts settle.
             await page.waitForTimeout(600);
 
+            /*
+             * Tidak ada <a href="">. Tautan semacam itu mengklik dirinya sendiri: halaman sekadar
+             * memuat ulang, dan operator menyimpulkan tombolnya rusak.
+             *
+             * Penjaga ini lahir di rute PUBLIK (overflow.spec.js), tempat ia langsung menemukan
+             * tombol "Hubungi Kami / WhatsApp" beranda produksi yang href-nya kosong karena
+             * helper-nya mengembalikan '' saat nomor belum diatur dan pemanggilnya tidak bercabang.
+             * Bentuk itu — nilai opsional yang langsung dijadikan href — tidak ada hubungannya
+             * dengan publik/admin, jadi 30 halaman admin ini pantas diperiksa dengan ukuran yang
+             * sama. Tes render biasa tidak bisa menangkapnya: tombolnya TETAP dirender.
+             */
+            const hrefKosong = await page.$$eval('a', (as) => as
+                .filter((el) => (el.getAttribute('href') ?? '') === '')
+                .map((el) => (el.textContent || '').trim().slice(0, 40) || '(tanpa teks)'));
+            expect(
+                hrefKosong,
+                `${spec.name}: tautan berhref kosong — mengkliknya hanya memuat ulang halaman`,
+            ).toEqual([]);
+
             const opts = { expectDialog: !!spec.dialog };
             await assertNoAdminOverflow(page, `${spec.name} @${vp.label}`, opts);
 

@@ -38,7 +38,9 @@ const ISIAN = [
 ];
 
 const Kode = ({ children }) => (
-    <code className="rounded border border-edge bg-surface-sunken px-1.5 py-0.5 font-mono text-[0.92em] text-content">
+    /* break-all + max-w-full: isinya IP, port, dan URL - token tanpa titik patah alami.
+       Tanpa ini satu chip meluber 19px di 320px pada font 1,5x Android. */
+    <code className="inline-block max-w-full break-all rounded border border-edge bg-surface-sunken px-1.5 py-0.5 font-mono text-[0.92em] text-content">
         {children}
     </code>
 );

@@ -137,7 +137,11 @@ export default function MyPlan() {
                                     <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">Aktif</span>
                                 )}
                             </div>
-                            <p className="mt-1 text-2xl font-bold text-content">
+                            {/* break-words: harga dan satuannya menempel tanpa spasi
+                                ("Rp10.000/kamera/bulan"), jadi tanpa ini ia satu runtun yang
+                                tak bisa dipatahkan dan meluber 25px di 320px pada font 1,5x
+                                Android. Tidak mengubah tampilan pada ukuran normal. */}
+                            <p className="mt-1 break-words text-2xl font-bold text-content">
                                 {plan.is_trial === 1 ? 'Gratis' : formatRupiah(plan.price_per_camera)}
                                 <span className="text-sm font-normal text-content-muted">
                                     {plan.is_trial === 1 ? ` / ${plan.trial_days} hari` : '/kamera/bulan'}
