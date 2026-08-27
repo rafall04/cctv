@@ -330,7 +330,19 @@ function LandingPageContent({ onRefreshPauseChange }) {
                     {/* Promo sendiri ikut lewat arbiter dan tetap TIDAK digerbangi konfigurasi
                         iklan: ini iklan milik operator dan harus tetap tampil saat jaringan
                         pihak ketiga dimatikan. */}
-                    <CommercialSlot placement="landing" className="mx-auto mt-6 w-full max-w-2xl px-4" />
+                    {/*
+                      * DIAM saat tampilan putar-ulang aktif. Mode itu memasang <Playback> DI DALAM
+                      * beranda, dan Playback membawa slotnya sendiri yang punya cameraId — jadi
+                      * tanpa penjaga ini satu gulungan memuat DUA blok komersial sekaligus, persis
+                      * tumpukan yang arbiter ini dibuat untuk menghapus.
+                      *
+                      * Yang mengalah slot beranda, mengikuti aturan spesifisitas arbiter sendiri:
+                      * kamera mengalahkan area mengalahkan semua. Ditemukan oleh penjaga e2e
+                      * "paling banyak satu blok per halaman", bukan oleh mata.
+                      */}
+                    {viewMode !== 'playback' && (
+                        <CommercialSlot placement="landing" className="mx-auto mt-6 w-full max-w-2xl px-4" />
+                    )}
 
                     {saweriaEnabled && saweriaLeaderboardLink && (
                         <Suspense fallback={<DeferredSurfaceFallback className="mx-auto mt-6 min-h-[140px] max-w-7xl" />}>

@@ -90,3 +90,43 @@ describe('whatsappLink — buildWhatsappLink', () => {
         expect(DEFAULT_WHATSAPP_TEMPLATE).toContain('{{page}}');
     });
 });
+
+/*
+ * NOMOR DINORMALKAN — ditambahkan 2026-08-27.
+ *
+ * Helper ini dulu memakai nomor MENTAH. Operator mengetik `0812…` (bentuk yang tercetak di setiap
+ * etalase di negeri ini) dan wa.me diam-diam gagal padanya: tautannya terbentuk, terlihat benar,
+ * lalu membuka WhatsApp pada nomor yang tidak ada. Bagi pengunjung itu terbaca "WhatsApp-nya
+ * rusak", bukan "setelannya salah" — dan tidak ada satu pun galat yang muncul di mana pun.
+ *
+ * Belum menggigit hanya karena produksi memang belum punya nomor sama sekali. Ia akan menggigit
+ * pada hari nomornya diisi, yaitu hari halaman /dukungan mulai dipakai mencari sponsor.
+ */
+describe('bentuk nomor wa.me', () => {
+    const tautan = (nomor) => buildWhatsappLink({ whatsapp_number: nomor, company_name: 'RAF' });
+
+    it('mengubah bentuk lokal 0812… menjadi 62812…', () => {
+        expect(tautan('081234567890')).toContain('https://wa.me/6281234567890?');
+    });
+
+    it('menerima +62 dengan spasi dan tanda hubung', () => {
+        expect(tautan('+62 812-3456-7890')).toContain('wa.me/6281234567890?');
+    });
+
+    it('tidak menggandakan kode negara yang sudah ada', () => {
+        expect(tautan('6281234567890')).toContain('wa.me/6281234567890?');
+        expect(tautan('6281234567890')).not.toContain('wa.me/626281');
+    });
+
+    it('nomor yang hanya berisi tanda baca dianggap tidak ada', () => {
+        // Kalau ini mengembalikan tautan, pemanggil yang bercabang di truthiness akan merender
+        // tombol menuju wa.me tanpa nomor.
+        expect(tautan('--- ---')).toBe('');
+        expect(tautan('   ')).toBe('');
+    });
+
+    it('tetap mengembalikan string kosong tanpa nomor - kontrak lama tidak berubah', () => {
+        expect(buildWhatsappLink({ company_name: 'RAF' })).toBe('');
+        expect(buildWhatsappLink(null)).toBe('');
+    });
+});

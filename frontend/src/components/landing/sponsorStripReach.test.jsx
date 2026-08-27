@@ -72,7 +72,7 @@ const propsSimple = {
 
 describe('jangkauan strip sponsor', () => {
     it('mode PENUH menampilkan sponsor', async () => {
-        render(<LandingFooter saweriaEnabled={false} saweriaLink="" branding={BRANDING} />);
+        render(<MemoryRouter><LandingFooter saweriaEnabled={false} saweriaLink="" branding={BRANDING} /></MemoryRouter>);
 
         expect(await screen.findByTestId('landing-sponsor-strip')).toBeTruthy();
         expect(screen.getByTitle(SPONSOR.name)).toBeTruthy();

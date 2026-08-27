@@ -83,16 +83,22 @@ export function Toast({ notification, onDismiss }) {
 
     return (
         <div
+            /*
+             * bg-surface-overlay LEBIH DULU, dan ia wajib: tint status hanya 10% alpha, jadi
+             * tanpa latar opak di bawahnya toast ini 90% tembus pandang dan teks halaman di
+             * belakangnya ikut terbaca menumpuk. Tintnya menumpang di div dalam.
+             */
             className={`
                 max-w-sm w-full pointer-events-auto
                 border rounded-control shadow-e2 overflow-hidden
-                ${config.colorClass}
+                bg-surface-overlay
+                ${config.frameClass}
                 ${isExiting ? 'animate-fade-out' : 'animate-slide-in-right'}
             `}
             role="alert"
             aria-live="assertive"
         >
-            <div className="p-4">
+            <div className={`p-4 ${config.tintClass}`}>
                 <div className="flex items-start">
                     {/* Icon */}
                     <div className={`flex-shrink-0 ${config.iconColor}`}>

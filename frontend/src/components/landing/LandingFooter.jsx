@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { useCameras } from '../../contexts/CameraContext';
 import { Icons } from '../ui/Icons';
 import SponsorStrip from './SponsorStrip.jsx';
@@ -66,6 +67,21 @@ export default function Footer({ saweriaEnabled, saweriaLink, branding }) {
                         </div>
                     </div>
 
+                    {/*
+                      * Seluruh kolom kontak menghilang tanpa nomor WhatsApp.
+                      *
+                      * Tombolnya dulu dirender tanpa syarat, dan buildWhatsappLink mengembalikan
+                      * STRING KOSONG ketika nomornya belum diatur — jadi <a href=""> yang
+                      * mengklik dirinya sendiri: halaman sekadar memuat ulang. Di produksi
+                      * branding_settings memang tidak punya whatsapp_number sama sekali, jadi ini
+                      * bukan kemungkinan teoretis: tombol kontak utama beranda publik TIDAK
+                      * BERFUNGSI, di bawah judul "Hubungi Kami". Docstring helper-nya sudah
+                      * memperingatkan pemanggil untuk bercabang di truthiness; pemanggil ini tidak.
+                      *
+                      * Judulnya ikut disembunyikan: mengajak menghubungi tanpa memberi cara
+                      * menghubungi lebih buruk daripada tidak mengajak sama sekali.
+                      */}
+                    {whatsappLink && (
                     <div className="text-center md:text-right">
                         <h4 className="mb-2 font-semibold text-content">Hubungi Kami</h4>
                         <p className="mb-3 text-sm text-content-muted">
@@ -86,6 +102,7 @@ export default function Footer({ saweriaEnabled, saweriaLink, branding }) {
                             <span className="font-medium">WhatsApp</span>
                         </a>
                     </div>
+                    )}
                 </div>
 
                 {saweriaEnabled && (
@@ -111,6 +128,19 @@ export default function Footer({ saweriaEnabled, saweriaLink, branding }) {
                     (footer-banner GlobalAdScript) which carries external
                     network code. */}
                 <SponsorStrip />
+
+                {/*
+                  * Jalan masuk ke halaman jualan. Tanpa baris ini /dukungan hanya bisa dibuka
+                  * oleh orang yang sudah tahu URL-nya — yaitu tidak seorang pun.
+                  */}
+                <div className="mb-4 text-center">
+                    <Link
+                        to="/dukungan"
+                        className="text-sm font-medium text-primary-600 underline-offset-2 hover:underline dark:text-primary-400"
+                    >
+                        Jadi sponsor CCTV publik
+                    </Link>
+                </div>
 
                 <div className="border-t border-edge pt-4">
                     <p className="text-center text-xs text-content-muted">

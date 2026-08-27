@@ -19,12 +19,30 @@ Design notes:
   - Returns '' (not '#') when the branding number is missing, so the
     caller can branch on truthiness without accidentally turning a
     broken link into a self-referential anchor.
+  - The number is NORMALISED to wa.me's shape (digits, country code).
+    Operators type the local `0812…` form — that is the form printed on
+    every shopfront in the country — and wa.me silently fails on it.
+    Handing it through raw produced a link that opened WhatsApp on a
+    number that does not exist, which reads as "WhatsApp is broken"
+    rather than "the setting is wrong". Same rule as the admin-side
+    toWhatsAppDigits(), so a number typed once behaves the same
+    everywhere it is rendered.
 */
 
 export const DEFAULT_WHATSAPP_TEMPLATE =
     'Halo Admin {{company_name}}, saya ingin tanya soal {{page}}.';
 
 const PLACEHOLDER_REGEX = /\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}/g;
+
+/**
+ * `0812…`, `+62 812-…`, `62812…` all mean the same number; wa.me accepts only the last.
+ * Mirrors toWhatsAppDigits() in services/affiliateAdminService.js.
+ */
+export function toWhatsappDigits(value) {
+    const digits = String(value ?? '').replace(/\D/g, '');
+    if (!digits) return '';
+    return digits.startsWith('0') ? `62${digits.slice(1)}` : digits;
+}
 
 /**
  * Apply the template against a context object. Unknown placeholders
@@ -51,7 +69,7 @@ export function applyWhatsappTemplate(template, context = {}) {
  * @returns {string} A `https://wa.me/...?text=...` URL, or '' when no number is configured.
  */
 export function buildWhatsappLink(branding, context = {}) {
-    const number = String(branding?.whatsapp_number || '').trim();
+    const number = toWhatsappDigits(branding?.whatsapp_number);
     if (!number) {
         return '';
     }

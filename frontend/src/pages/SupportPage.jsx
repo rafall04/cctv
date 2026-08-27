@@ -32,22 +32,11 @@ import { useBranding } from '../contexts/BrandingContext';
 import SponsorStrip from '../components/landing/SponsorStrip';
 import { getPublicReach } from '../services/supportService';
 import { disclosureFor } from '../utils/commercialDisclosure.js';
+import { buildWhatsappLink } from '../utils/whatsappLink.js';
 
 /* Angka besar dibaca sekilas; ribuan diberi pemisah lokal supaya 2924 tidak terbaca 292. */
 const angka = (n) => new Intl.NumberFormat('id-ID').format(n);
 
-/**
- * `08…` dan `+62…` sama-sama sah diketik operator; wa.me hanya menerima digit dengan kode negara.
- * Disalin kecil-kecilan ke sini alih-alih mengimpor dari layanan ADMIN, supaya berkas admin tidak
- * ikut terbawa ke bundel publik demi satu fungsi enam baris.
- */
-function digitWhatsApp(nilai) {
-    const digit = String(nilai || '').replace(/\D/g, '');
-    if (!digit) return '';
-    if (digit.startsWith('62')) return digit;
-    if (digit.startsWith('0')) return `62${digit.slice(1)}`;
-    return digit;
-}
 
 const CARA = [
     {
@@ -93,7 +82,12 @@ export default function SupportPage() {
         return () => { hidup = false; };
     }, []);
 
-    const wa = digitWhatsApp(branding?.whatsapp_number);
+    /*
+     * Helper yang sama dengan footer dan playback: satu tempat yang tahu bentuk nomor wa.me, dan
+     * satu templat pesan yang bisa disunting admin. Versi pertama halaman ini menyalin
+     * normalisasinya sendiri — dua salinan aturan yang sama adalah dua tempat untuk salah.
+     */
+    const wa = buildWhatsappLink(branding, { page: 'Dukungan CCTV' });
     const perusahaan = branding?.company_name || 'RAF';
 
     /* Nol berarti "belum ada yang bisa ditunjukkan", bukan "sungguh nol" — jangan tampilkan. */
@@ -181,7 +175,7 @@ export default function SupportPage() {
                             dan tidak ada kontrak minimum.
                         </p>
                         <a
-                            href={`https://wa.me/${wa}?text=${encodeURIComponent(`Halo ${perusahaan}, saya ingin tanya soal dukungan CCTV.`)}`}
+                            href={wa}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="mt-3 inline-block rounded-control bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-700"

@@ -34,25 +34,41 @@ export const NOTIFICATION_CONFIG = {
      * cannot cost readability. `status-*` are channel triplets in index.css, so slash-opacity
      * genuinely compiles here — unlike `primary`, which holds a full colour and needs the
      * pre-declared `primary-100` scale instead.
+     *
+     * TINT AND FRAME ARE SEPARATE, AND THAT IS THE WHOLE POINT
+     * --------------------------------------------------------
+     * These four used to ship a SINGLE `colorClass` whose only background was the 10% tint —
+     * `bg-status-live/10` and, for info, `bg-primary-100`, which is a fixed 10% alpha too. A
+     * 10% background is a 90% TRANSPARENT one: every toast let the page text underneath show
+     * straight through it, and the words collided. Reported 2026-08-27 as "tulisannya tumpuk".
+     *
+     * The tint was never wrong — it was just asked to be the whole background. Toast now paints
+     * an opaque `bg-surface-overlay` first and composites the tint ON TOP, so the tint survives
+     * and the toast is solid. Anything that renders these must keep that order.
      */
     success: {
         duration: 5000,
-        colorClass: 'bg-status-live/10 border-status-live/30 text-content',
+        tintClass: 'bg-status-live/10',
+        frameClass: 'border-status-live/30 text-content',
         iconColor: 'text-status-live',
     },
     error: {
         duration: 8000,
-        colorClass: 'bg-status-fault/10 border-status-fault/30 text-content',
+        tintClass: 'bg-status-fault/10',
+        frameClass: 'border-status-fault/30 text-content',
         iconColor: 'text-status-fault',
     },
     warning: {
         duration: 8000,
-        colorClass: 'bg-status-warn/10 border-status-warn/30 text-content',
+        tintClass: 'bg-status-warn/10',
+        frameClass: 'border-status-warn/30 text-content',
         iconColor: 'text-status-warn',
     },
     info: {
         duration: 5000,
-        colorClass: 'bg-primary-100 border-edge-strong text-content',
+        // bg-primary-100 adalah alpha 10% TETAP, bukan skala warna - jadi ia tint, bukan latar.
+        tintClass: 'bg-primary-100',
+        frameClass: 'border-edge-strong text-content',
         iconColor: 'text-primary',
     },
 };

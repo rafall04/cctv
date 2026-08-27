@@ -184,6 +184,11 @@ function SimpleFooter({ branding, saweriaEnabled, saweriaLink }) {
                         >
                             Feedback
                         </a>
+                        {/* Jalan masuk ke /dukungan, sama seperti mode penuh — halaman jualan
+                            yang tidak ditautkan sama saja dengan tidak ada. */}
+                        <Link to="/dukungan" className="transition-colors hover:text-content">
+                            Jadi sponsor
+                        </Link>
                         {saweriaEnabled && saweriaLink && (
                             <a
                                 href={saweriaLink}

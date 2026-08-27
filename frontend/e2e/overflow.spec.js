@@ -328,6 +328,36 @@ for (const [name, url, options = {}] of PAGES) {
         await page.waitForTimeout(800);
         await scrollThroughPage(page);
 
+        /*
+         * DUA PENJAGA BENTUK, dijalankan di SETIAP halaman publik — bukan hanya yang punya
+         * fixture khusus. Keduanya lahir dari sapuan 2026-08-27 menjelang mencari sponsor.
+         *
+         * (1) Tidak ada <a href="">. Tombol semacam itu mengklik dirinya sendiri: halaman sekadar
+         *     memuat ulang, dan pengunjung menyimpulkan situsnya rusak. Terjadi sungguhan pada
+         *     tombol "Hubungi Kami / WhatsApp" di kaki beranda produksi, karena helper-nya
+         *     mengembalikan string kosong saat nomornya belum diatur dan pemanggilnya tidak
+         *     bercabang. Tes render biasa tidak bisa menangkapnya — tombolnya TETAP dirender.
+         */
+        const hrefKosong = await page.$$eval('a', (as) => as
+            .filter((a) => (a.getAttribute('href') ?? '') === '')
+            .map((a) => (a.textContent || '').trim().slice(0, 40)));
+        expect(
+            hrefKosong,
+            `${name}: tautan berhref kosong — mengkliknya hanya memuat ulang halaman`,
+        ).toEqual([]);
+
+        /*
+         * (2) Paling banyak SATU blok komersial berpenghuni per halaman. Inilah janji yang dijual
+         *     halaman /dukungan ("tidak ada tumpukan") dan alasan CTR-nya 12,6% lawan norma
+         *     display di bawah 1%. Arbiter menegakkannya per-slot; ini menegakkannya per-HALAMAN,
+         *     yang merupakan satuan yang sebenarnya dilihat pengunjung.
+         */
+        const terisi = await page.locator('[data-testid="commercial-slot"][data-kind]').count();
+        expect(
+            terisi,
+            `${name}: ${terisi} blok komersial tampil sekaligus — kelangkaannya itulah produknya`,
+        ).toBeLessThanOrEqual(1);
+
         if (options.expectReach) {
             /*
              * Anti-kehampaan untuk fixture jangkauan. Bloknya menyembunyikan diri ketika

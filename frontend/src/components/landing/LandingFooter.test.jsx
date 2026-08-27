@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import LandingFooter from './LandingFooter';
 
@@ -23,13 +24,12 @@ const branding = {
 
 describe('LandingFooter', () => {
     it('merender footer ringan tanpa mengulang badge Ramadan besar', () => {
-        render(
-            <LandingFooter
+        render(<MemoryRouter><LandingFooter
                 saweriaEnabled={false}
                 saweriaLink=""
                 branding={branding}
             />
-        );
+        </MemoryRouter>);
 
         const stack = screen.getByTestId('landing-footer-brand-stack');
         expect(stack.className).toContain('flex-col');
