@@ -782,7 +782,7 @@ function Playback({
             const mediaError = video.error;
 
             clearBufferingState();
-            setErrorType(classifyPlaybackMediaError(mediaError));
+            setErrorType(classifyPlaybackMediaError(mediaError, video));
             setVideoError(mediaError?.message || 'Gagal memuat video playback');
         };
 
@@ -1098,7 +1098,7 @@ function Playback({
                     playbackSpeed={playbackSpeed} onSpeedChange={handleSpeedChange}
                     onSnapshot={takeSnapshot} onToggleFullscreen={toggleFullscreen}
                     isFullscreen={isFullscreen} isBuffering={isBuffering} isSeeking={isSeeking}
-                    videoError={videoError} errorType={errorType}
+                    videoError={videoError} errorType={errorType} onRetry={() => { setVideoError(null); setErrorType(null); }}
                     currentTime={currentTime} duration={duration}
                     autoPlayNotification={autoPlayNotification}
                     onAutoPlayNotificationClose={() => setAutoPlayNotification(null)}

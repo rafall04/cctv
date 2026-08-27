@@ -1,3 +1,5 @@
+import { countDecodedFrames } from './livePictureWatch.js';
+
 /**
  * Purpose: Translate an HTMLMediaElement error into the playback player's error variant.
  * Caller: pages/Playback.jsx.
@@ -26,9 +28,26 @@ const MEDIA_ERR_NETWORK = 2;
 const MEDIA_ERR_DECODE = 3;
 const MEDIA_ERR_SRC_NOT_SUPPORTED = 4;
 
-export function classifyPlaybackMediaError(mediaError) {
+/*
+ * KODE 3 PADA REKAMAN YANG SUDAH TERBUKTI DIPUTAR BUKAN VONIS CODEC (2026-08-26).
+ *
+ * Ini bentuk yang sama persis dengan bug pemutar live yang baru saja diperbaiki: menyimpulkan
+ * "browser Anda tidak mendukung H.265" dari perangkat yang BARU SAJA mendekode berkas itu.
+ * Kalau penghitung bingkai sudah bergerak, dukungan codec-nya sudah terbukti secara empiris -
+ * apa pun yang menghentikannya sesudah itu (dekoder direbut OS, berkas terpotong, memori habis)
+ * bukan soal dukungan, dan vonis codec menyuruh pengunjung pindah browser tanpa guna.
+ *
+ * Kode 4 tetap 'codec': ia berarti sumbernya DITOLAK mentah-mentah, jadi ia tidak mungkin
+ * datang sesudah ada bingkai yang ter-decode.
+ *
+ * countDecodedFrames dipinjam dari watchdog live, bukan ditulis ulang - ia sudah menangani
+ * browser yang tidak melaporkan penghitung sama sekali (mengembalikan null, yang di sini berarti
+ * "tidak tahu" dan karenanya tidak boleh dipakai membantah vonis).
+ */
+export function classifyPlaybackMediaError(mediaError, video) {
     const code = mediaError?.code;
     if (code === MEDIA_ERR_NETWORK) return 'network';
+    if (code === MEDIA_ERR_DECODE && countDecodedFrames(video) > 0) return 'stalled';
     if (code === MEDIA_ERR_DECODE || code === MEDIA_ERR_SRC_NOT_SUPPORTED) return 'codec';
     return null;
 }

@@ -36,3 +36,34 @@ describe('classifyPlaybackMediaError', () => {
         expect(classifyPlaybackMediaError({ code: 99 })).toBe(null);
     });
 });
+
+/*
+ * Bentuk yang sama persis dengan bug pemutar live 2026-08-26: menyimpulkan "browser Anda tidak
+ * mendukung H.265" dari perangkat yang BARU SAJA mendekode berkas itu. Untuk rekaman, vonis itu
+ * menyuruh pengunjung pindah browser padahal browsernya jelas mampu.
+ */
+describe('kode DECODE sesudah bingkai terbukti ter-decode bukan vonis codec', () => {
+    const videoDengan = (frames) => ({ getVideoPlaybackQuality: () => ({ totalVideoFrames: frames }) });
+
+    it('menjadi "stalled" kalau bingkai sudah pernah ter-decode', () => {
+        expect(classifyPlaybackMediaError({ code: 3 }, videoDengan(240))).toBe('stalled');
+    });
+
+    it('tetap "codec" kalau tidak satu bingkai pun pernah ter-decode', () => {
+        expect(classifyPlaybackMediaError({ code: 3 }, videoDengan(0))).toBe('codec');
+    });
+
+    it('tetap "codec" kalau browsernya tidak melaporkan penghitung sama sekali', () => {
+        // null berarti TIDAK TAHU, dan tidak tahu tidak boleh dipakai membantah vonis.
+        expect(classifyPlaybackMediaError({ code: 3 }, {})).toBe('codec');
+        expect(classifyPlaybackMediaError({ code: 3 }, undefined)).toBe('codec');
+    });
+
+    it('kode SRC_NOT_SUPPORTED tetap codec walau ada bingkai - sumbernya ditolak mentah', () => {
+        expect(classifyPlaybackMediaError({ code: 4 }, videoDengan(240))).toBe('codec');
+    });
+
+    it('network tetap network', () => {
+        expect(classifyPlaybackMediaError({ code: 2 }, videoDengan(240))).toBe('network');
+    });
+});
