@@ -27,6 +27,9 @@ import CustomerRoute from './components/CustomerRoute';
 import lazyWithRetry from './utils/lazyWithRetry';
 
 // Lazy load admin pages for better code splitting
+// Halaman jualan: dimuat malas supaya bundel beranda tidak membesar untuk halaman yang
+// hanya dibuka pengunjung yang mengklik tautan dari proposal.
+const SupportPage = lazyWithRetry(() => import('./pages/SupportPage'), 'support-page');
 const AdminLayout = lazyWithRetry(() => import('./layouts/AdminLayout'), 'admin-layout');
 const CameraManagement = lazyWithRetry(() => import('./pages/CameraManagement'), 'camera-management');
 const ImportExport = lazyWithRetry(() => import('./pages/admin/ImportExport'), 'import-export');
@@ -140,6 +143,9 @@ function App() {
                 } />
                 <Route path="/playback" element={
                     <PublicPageRoute><Playback accessScope="public_preview" /></PublicPageRoute>
+                } />
+                <Route path="/dukungan" element={
+                    <PublicPageRoute><SupportPage /></PublicPageRoute>
                 } />
                 <Route path="/admin/login" element={<LoginPage />} />
                 <Route path="/daftar" element={

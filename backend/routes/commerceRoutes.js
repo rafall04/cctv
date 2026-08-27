@@ -33,10 +33,13 @@ it serves.
 import promoBannerRoutes from './promoBannerRoutes.js';
 import affiliateRoutes from './affiliateRoutes.js';
 import commercialSlotRoutes from './commercialSlotRoutes.js';
+import supportReachRoutes from './supportReachRoutes.js';
 
 export default async function commerceRoutes(fastify, options) {
     await fastify.register(promoBannerRoutes, options);
     await fastify.register(affiliateRoutes, options);
     // Penengah DI ATAS kedua pohon di atas: satu slot, satu penghuni.
     await fastify.register(commercialSlotRoutes, options);
+    // Halaman yang MENJUAL penempatan itu, dengan angkanya sendiri.
+    await fastify.register(supportReachRoutes, options);
 }

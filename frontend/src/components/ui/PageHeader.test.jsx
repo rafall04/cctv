@@ -169,6 +169,7 @@ const HAND_ROLLED = [];
  * migration's scope. Keep the reason attached so the list cannot be padded to silence a failure. */
 const EXEMPT = {
     'pages/AreaPublicPage.jsx': 'public surface, not an admin route',
+    'pages/SupportPage.jsx': 'public surface (/dukungan), not an admin route',
     'pages/LoginPage.jsx': 'public auth screen',
     'pages/RegisterPage.jsx': 'public rental sign-up',
     'pages/customer/MyPanduan.jsx': 'customer portal, CustomerLayout not AdminLayout',

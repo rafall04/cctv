@@ -31,6 +31,9 @@ const PAGES = [
        to the landing page, so this entry has been measuring `/?mode=simple&view=grid` (verified:
        that is the URL it lands on, with zero password inputs) and the login form itself has never
        been measured by this suite or the admin one. */
+    /* Jalur penjualan: satu-satunya halaman yang dibuka calon pendukung dari proposal, dan
+       satu-satunya yang memuat tiga kartu teks panjang berdampingan dengan angka mono. */
+    ['dukungan (support page)', '/dukungan', { expectReach: true }],
     ['login', '/admin/login', {}],
     /* Trailing slash on purpose. /sewa is static HTML in frontend/public/sewa/, and only the
        directory form resolves to it under `vite preview`; without the slash the dev server falls
@@ -156,6 +159,11 @@ const API_FIXTURES = [
        the server picks it, so this is the only route a public surface asks for a commercial
        block — mocking the old per-system endpoint would leave every card unmounted. */
     [/^\/api\/public\/slot$/, { kind: 'affiliate', content: AFFILIATE_OFFER }],
+    /* Angka jangkauan halaman /dukungan, SENGAJA selebar mungkin: tanpa fixture ini endpointnya
+       jatuh ke default kosong, bloknya menyembunyikan diri, dan halaman itu terukur TANPA baris
+       yang paling mampu melebar - tiga angka mono tabular berdampingan di layar 320px. Hijau,
+       dan tidak membuktikan apa pun. Kehampaan yang sama yang meloloskan bug strip 2026-08. */
+    [/^\/api\/public\/support-reach$/, { window_days: 365, sessions: 1234567, cameras: 98765, areas: 4321 }],
     [/^\/api\/recordings\/\d+\/segments$/, { segments: SEGMENTS, playback_policy: null, coverage: null }],
     [/^\/api\/public\/areas\/[^/]+\/cameras$/, CAMERAS],
     [/^\/api\/public\/areas\/[^/]+$/, AREA_DETAIL],
@@ -319,6 +327,19 @@ for (const [name, url, options = {}] of PAGES) {
         // Let deferred mounts (lite-mode staggering, lazy chunks) settle.
         await page.waitForTimeout(800);
         await scrollThroughPage(page);
+
+        if (options.expectReach) {
+            /*
+             * Anti-kehampaan untuk fixture jangkauan. Bloknya menyembunyikan diri ketika
+             * angkanya tidak terbaca - perilaku yang MEMANG diinginkan - jadi tanpa tuntutan
+             * ini sebuah endpoint yang salah nama akan lolos hijau sambil mengukur halaman
+             * tanpa baris terlebarnya.
+             */
+            await expect(
+                page.locator('[aria-label="Jangkauan"]'),
+                `${name}: baris angka tidak dirender, jadi lariannya mengukur halaman tanpa baris terlebarnya`,
+            ).toHaveCount(1);
+        }
 
         if (options.expectAffiliate) {
             await expectAffiliateBlock(page, name, options.expectAffiliate);
