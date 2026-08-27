@@ -113,7 +113,7 @@ const PLANS = [
  *
  * The block landed on four surfaces on 2026-08-23; the three public ones (landing, area, playback)
  * are measured here. Before this fixture existed the endpoint fell through to the empty default,
- * `toPublicOffer` returned null, and the card never mounted — so every assertion below ran against
+ * `sanitizePublicOffer` returned null, and the card never mounted — so every assertion below ran against
  * a page the new block was absent from. Green, and proving nothing about it. Same vacuity that let
  * the 2026-08 strip bug through.
  *
@@ -152,8 +152,10 @@ const AREA_DETAIL = { ...AREAS[0], description: 'AREA DENGAN NAMA DAN DESKRIPSI 
 const API_FIXTURES = [
     [/\/api\/public\/billing\/plans/, PLANS],
     [/\/api\/public\/discovery/, { live_now: CAMERAS, top_cameras: CAMERAS, popular_areas: AREAS, new_cameras: CAMERAS }],
-    // Anchored: `/offers/:id/go` (the click beacon) must NOT be answered with an offer payload.
-    [/^\/api\/public\/affiliate\/offer$/, AFFILIATE_OFFER],
+    /* The arbiter, not the affiliate endpoint. Since 2026-08-27 one slot has ONE occupant and
+       the server picks it, so this is the only route a public surface asks for a commercial
+       block — mocking the old per-system endpoint would leave every card unmounted. */
+    [/^\/api\/public\/slot$/, { kind: 'affiliate', content: AFFILIATE_OFFER }],
     [/^\/api\/recordings\/\d+\/segments$/, { segments: SEGMENTS, playback_policy: null, coverage: null }],
     [/^\/api\/public\/areas\/[^/]+\/cameras$/, CAMERAS],
     [/^\/api\/public\/areas\/[^/]+$/, AREA_DETAIL],
@@ -177,14 +179,14 @@ const PHOTO_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="8
    reads them: the "landing has no camera context" rule is enforced by the CALLER passing no
    cameraId, and nothing else — the mock cannot enforce it, and a browser test is the only place
    that sees what the mount actually asked for. */
-let affiliateResolveQueries = [];
+let slotResolveQueries = [];
 
 test.beforeEach(async ({ page, context }) => {
     // Deterministic and offline-safe: known payloads for the endpoints that feed the strips, empty
     // success for everything else (the UI must degrade cleanly), and every non-local request — ads,
     // map tiles, fonts — blocked. This also proves the page works with ads absent; ad iframes wider
     // than the screen are what the viewport guards exist for.
-    affiliateResolveQueries = [];
+    slotResolveQueries = [];
     await context.route('**/*', (route) => {
         const url = new URL(route.request().url());
         const local = url.hostname === '127.0.0.1' || url.hostname === 'localhost';
@@ -192,8 +194,8 @@ test.beforeEach(async ({ page, context }) => {
         if (url.pathname.startsWith('/api/affiliate-media/')) {
             return route.fulfill({ status: 200, contentType: 'image/svg+xml', body: PHOTO_SVG });
         }
-        if (url.pathname === '/api/public/affiliate/offer') {
-            affiliateResolveQueries.push(url.searchParams);
+        if (url.pathname === '/api/public/slot') {
+            slotResolveQueries.push(url.searchParams);
         }
         if (url.pathname.startsWith('/api/')) {
             const fixture = API_FIXTURES.find(([pattern]) => pattern.test(url.pathname));
@@ -288,18 +290,18 @@ const scrollThroughPage = async (page) => {
 /*
  * Anti-vacuity for the affiliate block, and the reason it asserts on the CARD rather than the slot.
  *
- * `<AffiliateOfferSlot>` renders its wrapper div unconditionally — an empty slot is the normal case
+ * `<CommercialSlot>` renders its wrapper div unconditionally — an empty slot is the normal case
  * on most cameras, and the wrapper is what the IntersectionObserver observes. So
- * `[data-testid="affiliate-offer-slot"]` is present whether or not an offer resolved, and asserting
+ * `[data-testid="commercial-slot"]` is present whether or not an occupant resolved, and asserting
  * on it would be precisely the test that measures nothing while looking green. The card only exists
  * when a payload survived resolution, so that is the thing to demand. The price is asserted too:
  * it is the one element that is `shrink-0` and therefore the one most able to widen the row.
  */
 async function expectAffiliateBlock(page, name, surface) {
-    const slot = page.locator(`[data-testid="affiliate-offer-slot"][data-placement="${surface}"]`);
+    const slot = page.locator(`[data-testid="commercial-slot"][data-placement="${surface}"]`);
     await expect(
         slot,
-        `${name}: no affiliate slot for placement="${surface}" — the mount is gone, or it is naming a different surface`,
+        `${name}: no commercial slot for placement="${surface}" — the mount is gone, or it is naming a different surface`,
     ).toHaveCount(1);
     await expect(
         slot.locator('[data-testid="affiliate-offer-card"]'),
@@ -321,7 +323,7 @@ for (const [name, url, options = {}] of PAGES) {
         if (options.expectAffiliate) {
             await expectAffiliateBlock(page, name, options.expectAffiliate);
 
-            const asked = affiliateResolveQueries.filter((q) => q.get('placement') === options.expectAffiliate);
+            const asked = slotResolveQueries.filter((q) => q.get('placement') === options.expectAffiliate);
             expect(
                 asked.length,
                 `${name}: nothing ever asked the backend for a "${options.expectAffiliate}" offer, so the count `

@@ -65,7 +65,6 @@ export default function InlineAdSlot({
     slotKey,
     script,
     className = '',
-    label = disclosureFor('ads'),
     minHeightClassName = '',
     variant = 'page-inline',
     maxHeight = null,
@@ -180,7 +179,7 @@ export default function InlineAdSlot({
             className={sectionClassName}
         >
             <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500">
-                {label}
+                {disclosureFor('ads')}
             </div>
             <div
                 ref={containerRef}

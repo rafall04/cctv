@@ -23,8 +23,7 @@ import LandingHero from '../components/landing/LandingHero';
 import LandingFooter from '../components/landing/LandingFooter';
 import LandingCamerasSection from '../components/landing/LandingCamerasSection';
 import LandingPublicTopStack from '../components/landing/LandingPublicTopStack';
-import AffiliateOfferSlot from '../components/commerce/AffiliateOfferSlot.jsx';
-import PromoBanner from '../components/promo/PromoBanner.jsx';
+import CommercialSlot from '../components/commerce/CommercialSlot.jsx';
 import LandingDiscoveryStrip from '../components/landing/LandingDiscoveryStrip';
 import LandingQuickAccessStrip from '../components/landing/LandingQuickAccessStrip';
 import LandingMobileDock from '../components/landing/LandingMobileDock';
@@ -318,7 +317,6 @@ function LandingPageContent({ onRefreshPauseChange }) {
                         <DeferUntilVisible minHeight={120}>
                             <InlineAdSlot
                                 slotKey="after-cameras-native"
-                                label="Sponsored"
                                 script={adsConfig.slots.afterCamerasNative.script}
                                 className="mt-2"
                                 minHeightClassName="min-h-[120px]"
@@ -328,13 +326,11 @@ function LandingPageContent({ onRefreshPauseChange }) {
 
                     {/* Partner offer, above the house promo. No camera and no area in context,
                         so only target_mode='all' offers can ever appear here — see the note in
-                        AffiliateOfferSlot; that is the home page's nature, not a miss. */}
-                    <AffiliateOfferSlot placement="landing" className="mx-auto mt-6 w-full max-w-2xl px-4" />
-
-                    {/* House promo. Deliberately NOT gated on the ads config — this is
-                        the operator's own advertising and must keep showing when the
-                        third-party network is switched off. */}
-                    <PromoBanner placement="landing" className="mx-auto mt-6 w-full max-w-2xl px-4" />
+                        commercialSlotService; that is the home page's nature, not a miss. */}
+                    {/* Promo sendiri ikut lewat arbiter dan tetap TIDAK digerbangi konfigurasi
+                        iklan: ini iklan milik operator dan harus tetap tampil saat jaringan
+                        pihak ketiga dimatikan. */}
+                    <CommercialSlot placement="landing" className="mx-auto mt-6 w-full max-w-2xl px-4" />
 
                     {saweriaEnabled && saweriaLeaderboardLink && (
                         <Suspense fallback={<DeferredSurfaceFallback className="mx-auto mt-6 min-h-[140px] max-w-7xl" />}>
@@ -348,7 +344,6 @@ function LandingPageContent({ onRefreshPauseChange }) {
                         <DeferUntilVisible minHeight={120}>
                             <InlineAdSlot
                                 slotKey="footer-banner"
-                                label="Sponsored"
                                 script={adsConfig.slots.footerBanner.script}
                                 className="mt-6"
                                 minHeightClassName="min-h-[120px]"

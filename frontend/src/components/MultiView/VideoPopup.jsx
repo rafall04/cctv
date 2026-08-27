@@ -36,8 +36,7 @@ import InlineAdSlot from '../ads/InlineAdSlot.jsx';
 import CameraDetailPanel from './CameraDetailPanel.jsx';
 import RelatedCamerasStrip from './RelatedCamerasStrip.jsx';
 import SponsorBadge from '../SponsorBadge.jsx';
-import AffiliateOfferSlot from '../commerce/AffiliateOfferSlot.jsx';
-import PromoBanner from '../promo/PromoBanner.jsx';
+import CommercialSlot from '../commerce/CommercialSlot.jsx';
 import { isAdsMobileViewport, shouldRenderAdSlot } from '../ads/adsConfig.js';
 import {
     getPublicPopupBodyStyle,
@@ -1559,8 +1558,8 @@ function VideoPopup({
                             onShare={handleShare}
                             onToggleFavorite={onToggleFavorite}
                         />
-                        <AffiliateOfferSlot placement="popup" cameraId={camera?.id} className="border-t border-edge bg-surface px-3 py-3" />
-                        <PromoBanner placement="popup" cameraId={camera?.id} className="border-t border-edge bg-surface px-3 py-3" />
+                        {/* SATU blok, bukan dua. Arbiter yang memilih penghuninya. */}
+                        <CommercialSlot placement="popup" cameraId={camera?.id} className="border-t border-edge bg-surface px-3 py-3" />
                         <RelatedCamerasStrip
                             cameras={relatedCameras}
                             onCameraClick={onRelatedCameraClick}
@@ -1578,7 +1577,6 @@ function VideoPopup({
                 {showPopupBottomNative && (
                     <InlineAdSlot
                         slotKey="popup-bottom-native"
-                        label="Sponsored"
                         script={adsConfig.slots.popupBottomNative.script}
                         variant="popup-inline"
                         className="border-t border-edge bg-surface/90 px-3 py-3"
@@ -1590,7 +1588,6 @@ function VideoPopup({
                 {showPopupTopBanner && (
                     <InlineAdSlot
                         slotKey="popup-top-banner"
-                        label="Sponsored"
                         script={adsConfig.slots.popupTopBanner.script}
                         variant="popup-inline"
                         className="border-t border-edge bg-surface/90 px-3 py-3"

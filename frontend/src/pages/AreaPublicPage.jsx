@@ -32,8 +32,7 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import CameraThumbnail from '../components/CameraThumbnail';
-import AffiliateOfferSlot from '../components/commerce/AffiliateOfferSlot.jsx';
-import PromoBanner from '../components/promo/PromoBanner.jsx';
+import CommercialSlot from '../components/commerce/CommercialSlot.jsx';
 import LandingMobileDock from '../components/landing/LandingMobileDock.jsx';
 import { resolvePublicPopupCamera } from '../services/publicCameraResolver';
 import publicGrowthService from '../services/publicGrowthService';
@@ -652,14 +651,12 @@ export default function AreaPublicPage() {
                 )}
             </section>
 
-            {/* Partner offer for this area, above the house promo — the same order the popup
-                uses. Area context only: there is no single camera on this page, so a
-                camera-targeted offer cannot match here. */}
-            <AffiliateOfferSlot placement="area" areaId={area?.id} className="mx-auto w-full max-w-2xl px-4 pb-4" />
-
-            {/* House promo for this area. Sits outside the camera grid section so an
-                empty or errored grid still shows it. */}
-            <PromoBanner placement="area" areaId={area?.id} className="mx-auto w-full max-w-2xl px-4 pb-8" />
+            {/* SATU blok komersial untuk halaman ini. Arbiter memilih penghuninya: tawaran
+                mitra lebih dulu, promo sendiri kalau tidak ada, tidak dirender kalau keduanya
+                tidak ada. Konteks area saja - tanpa kamera tunggal, tawaran bertarget kamera
+                memang tidak bisa cocok di sini. Di luar seksi grid supaya grid yang kosong
+                atau bergalat tetap menampilkannya. */}
+            <CommercialSlot placement="area" areaId={area?.id} className="mx-auto w-full max-w-2xl px-4 pb-8" />
 
             {selectedCamera && (
                 <Suspense fallback={null}>

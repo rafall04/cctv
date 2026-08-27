@@ -38,8 +38,7 @@ import PlaybackUsageGuide from '../components/playback/PlaybackUsageGuide';
 import PlaybackTokenAccess from '../components/playback/PlaybackTokenAccess.jsx';
 import PlaybackOptions from '../components/playback/PlaybackOptions.jsx';
 import LandingMobileDock from '../components/landing/LandingMobileDock.jsx';
-import AffiliateOfferSlot from '../components/commerce/AffiliateOfferSlot.jsx';
-import PromoBanner from '../components/promo/PromoBanner.jsx';
+import CommercialSlot from '../components/commerce/CommercialSlot.jsx';
 import { useAdminReconnectRefresh } from '../hooks/admin/useAdminReconnectRefresh';
 import { buildWhatsappLink } from '../utils/whatsappLink.js';
 import { usePlaybackMediaSource } from '../hooks/playback/usePlaybackMediaSource.js';
@@ -1124,17 +1123,15 @@ function Playback({
 
                 <PlaybackSegmentList segments={segments} selectedSegment={selectedSegment} onSegmentClick={handleSegmentClick} isLoading={isWaitingForSegments} />
 
-                {!isAdminPlayback && <AffiliateOfferSlot placement="playback" cameraId={selectedCameraId} className="mt-4" />}
+                {!isAdminPlayback && <CommercialSlot placement="playback" cameraId={selectedCameraId} className="mt-4" />}
 
                 {showPlaybackNative && (
                     <InlineAdSlot
                         slotKey="playback-native"
-                        label="Sponsored"
                         script={adsConfig.slots.playbackNative.script}
                         minHeightClassName="min-h-[120px]"
                     />
                 )}
-                {!isAdminPlayback && <PromoBanner placement="playback" cameraId={selectedCameraId} className="mt-4" />}
 
                 <PlaybackOptions playbackPolicy={playbackPolicy} showPublicNotice={!isAdminPlayback} autoPlayEnabled={autoPlayEnabled} onAutoPlayToggle={handleAutoPlayToggle} />
                 {!isAdminPlayback && (

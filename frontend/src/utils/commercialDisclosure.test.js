@@ -125,6 +125,23 @@ describe('penegakan: tidak ada label yang ditulis langsung di permukaan publik',
         });
     }
 
+    /*
+     * Lubang yang ketahuan saat memasang arbiter: keenam pemasangan InlineAdSlot meng-override
+     * labelnya jadi "Sponsored", sehingga label terpusat itu tidak pernah benar-benar dipakai -
+     * dan kata Inggris itu kurang jelas bagi pembaca yang justru penting di sini, sekaligus
+     * tidak konsisten dengan tiga label lain yang semuanya bahasa Indonesia.
+     *
+     * Propnya kini dicabut: label adalah milik SLOT, bukan pemanggilnya. Tes ini menolak
+     * pengembaliannya.
+     */
+    it('slot iklan tidak menerima label dari pemanggil', () => {
+        const pelanggar = kandidat.filter((p) => /<InlineAdSlot[\s\S]{0,400}?label=/.test(fs.readFileSync(p, 'utf8')));
+        expect(
+            pelanggar.map((p) => path.relative(SRC, p)),
+            'label iklan diputuskan slot, bukan pemanggil - hapus prop label-nya',
+        ).toEqual([]);
+    });
+
     it('keempat permukaan komersial yang ada memang memakai modulnya', () => {
         const wajib = [
             'components/commerce/AffiliateOfferCard.jsx',

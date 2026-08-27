@@ -2,7 +2,7 @@
  * Purpose: Render one affiliate ("Toko rekanan") offer as a labelled card — photo, title,
  *          description, price, and up to five actions: open the product, ask about it on WhatsApp,
  *          visit the shop, copy the link, share it.
- * Caller: AffiliateOfferSlot, on any of the four public surfaces. The slot tells this card which
+ * Caller: CommercialSlot, on any of the public surfaces. The slot tells this card which
  *          surface it is on; the card's only use for that is stamping the click beacons.
  * Deps: affiliateService (countAffiliateClick + AFFILIATE_LINK). The payload arrives fully
  *          resolved and already sanitised by that service; this component builds no URLs of its

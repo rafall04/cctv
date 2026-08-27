@@ -3,8 +3,8 @@
  *          belongs under one public viewing context, sanitise the payload before it becomes an
  *          <a href>, keep a client-side de-duplication guard so an impression is not counted again
  *          just because the viewer reopened the same popup, and count outbound taps.
- * Caller: components/commerce/AffiliateOfferSlot.jsx (resolve) and
- *          components/commerce/AffiliateOfferCard.jsx (click counting). Public surfaces only.
+ * Caller: components/commerce/AffiliateOfferCard.jsx (click counting). Resolusi kini lewat
+ *          arbiter: services/commercialSlotService.js. Public surfaces only.
  * Deps: shared apiClient, requestPolicy (SILENT_PUBLIC).
  * MainFuncs: getPublicAffiliateOffer, resolveAffiliateOfferOnce, clearAffiliateOfferCache,
  *          buildAffiliateBeaconUrl, countAffiliateClick, AFFILIATE_LINK, AFFILIATE_PLACEMENTS.
@@ -198,8 +198,12 @@ function safeDimension(value) {
  *     this side of the wire too.
  *
  * The image trio is all-or-nothing: a width with no picture is worse than no picture.
+ * DIEKSPOR karena arbiter slot komersial (services/commercialSlotService.js) kini mengambil
+ * muatan yang sama lewat endpoint lain. Penyaring ini harus tetap berdiri di JALUR ITU JUGA:
+ * ia satu-satunya yang memvonis nilai sebelum jadi <a href>, dan permukaan publik tidak boleh
+ * kehilangannya hanya karena rutenya berganti.
  */
-function toPublicOffer(data) {
+export function sanitizePublicOffer(data) {
     if (!data || typeof data !== 'object' || Array.isArray(data)) {
         return null;
     }
@@ -295,7 +299,7 @@ function readCachedOffer(key) {
         return null;
     }
     try {
-        return toPublicOffer(JSON.parse(raw));
+        return sanitizePublicOffer(JSON.parse(raw));
     } catch {
         return null;
     }
@@ -342,7 +346,7 @@ export const getPublicAffiliateOffer = async ({ placement, cameraId, areaId } = 
         });
         return {
             success: response.data?.success !== false,
-            data: toPublicOffer(response.data?.data),
+            data: sanitizePublicOffer(response.data?.data),
         };
     } catch (error) {
         // A missing/failed offer must never surface as an error toast on a public page.

@@ -11,8 +11,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useBranding } from '../../contexts/BrandingContext';
 import { useCameras } from '../../contexts/CameraContext';
 import InlineAdSlot from '../ads/InlineAdSlot';
-import AffiliateOfferSlot from '../commerce/AffiliateOfferSlot.jsx';
-import PromoBanner from '../promo/PromoBanner.jsx';
+import CommercialSlot from '../commerce/CommercialSlot.jsx';
 import { isAdsMobileViewport, shouldRenderAdSlot } from '../ads/adsConfig';
 import { shouldDisableAnimations } from '../../utils/animationControl';
 import { setLitePreference } from '../../utils/publicExperienceMode';
@@ -404,17 +403,14 @@ export default function LandingPageSimple({
             {/* Simple mode gets the partner offer too: it is a title, a button and at most one
                 64px thumbnail — lighter than the poster below it. Landing context, so
                 target_mode='all' only. */}
-            <AffiliateOfferSlot placement="landing" className="mx-auto mt-4 w-full max-w-2xl px-4" />
-
-            {/* Simple mode still gets the house promo: it is one lazy image, not a
-                heavy effect, and this is the front page for low-end devices too. */}
-            <PromoBanner placement="landing" className="mx-auto mt-4 w-full max-w-2xl px-4" />
+            {/* Mode ringkas tetap mendapat blok ini: satu gambar malas, bukan efek berat, dan
+                ini beranda untuk perangkat kelas bawah juga. */}
+            <CommercialSlot placement="landing" className="mx-auto mt-4 w-full max-w-2xl px-4" />
 
             {showFooterBanner && (
                 <DeferUntilVisible minHeight={120}>
                     <InlineAdSlot
                         slotKey="footer-banner-simple"
-                        label="Sponsored"
                         script={adsConfig.slots.footerBanner.script}
                         className="mt-2"
                         minHeightClassName="min-h-[120px]"

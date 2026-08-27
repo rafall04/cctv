@@ -128,8 +128,16 @@ function PromoLightbox({ promo, onClose, onCtaClick }) {
  * @param {number} [props.areaId] - area in context, when there is no single camera
  * @param {string} [props.className] - wrapper classes supplied by the host surface
  */
-export default function PromoBanner({ placement, cameraId, areaId, className = '' }) {
-    const [promo, setPromo] = useState(null);
+/*
+ * `promo` boleh DISEDIAKAN pemanggil. Sejak ada arbiter slot, satu permukaan hanya menampilkan
+ * satu penghuni, dan yang memutuskan pemenangnya adalah CommercialSlot - bukan komponen ini.
+ * Ketika disediakan, komponen ini murni tampilan: tidak mengambil data sendiri dan tidak ikut
+ * menghitung impresi, karena arbiter sudah menghitungnya untuk pemenang.
+ *
+ * Tanpa prop itu, perilakunya persis seperti sebelumnya - jalur lama tetap utuh.
+ */
+export default function PromoBanner({ placement, cameraId, areaId, className = '', promo: promoDisediakan = null }) {
+    const [promo, setPromo] = useState(promoDisediakan);
     const [lightboxOpen, setLightboxOpen] = useState(false);
     const wrapperRef = useRef(null);
 
@@ -142,7 +150,9 @@ export default function PromoBanner({ placement, cameraId, areaId, className = '
     useEffect(() => {
         let cancelled = false;
         const node = wrapperRef.current;
-        if (!node || !placement) {
+        // Disediakan pemanggil: tidak ada yang perlu diambil, dan tidak ada impresi yang
+        // perlu dihitung untuk kedua kalinya.
+        if (promoDisediakan || !node || !placement) {
             return undefined;
         }
 
@@ -173,14 +183,14 @@ export default function PromoBanner({ placement, cameraId, areaId, className = '
             cancelled = true;
             observer.disconnect();
         };
-    }, [placement, cameraId, areaId]);
+    }, [placement, cameraId, areaId, promoDisediakan]);
 
     // Reset when the surface switches to a different camera, so an old poster
     // never lingers over a new context while the next fetch is in flight.
     useEffect(() => {
-        setPromo(null);
+        setPromo(promoDisediakan);
         setLightboxOpen(false);
-    }, [cameraId, areaId, placement]);
+    }, [cameraId, areaId, placement, promoDisediakan]);
 
     const handleCtaClick = useCallback(() => {
         if (promo) {
