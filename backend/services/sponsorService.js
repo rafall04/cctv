@@ -6,7 +6,7 @@ MainFuncs: getAllSponsors, getActiveSponsors, getSponsorById, createSponsor, upd
 SideEffects: Reads/writes the sponsors table and sponsor_* columns on cameras.
 */
 
-import { query, queryOne, execute } from '../database/connectionPool.js';
+import { query, queryOne, execute, transaction } from '../database/connectionPool.js';
 
 // Display order is now driven by sponsor_packages.sort_order (admin-editable
 // in the catalog). The LEFT JOIN keeps legacy/orphan sponsor rows visible —
@@ -208,17 +208,59 @@ export function updateSponsor(id, sponsorData) {
     updates.push('updated_at = CURRENT_TIMESTAMP');
     values.push(id);
 
-    return execute(
-        `UPDATE sponsors SET ${updates.join(', ')} WHERE id = ?`,
-        values
-    );
+    /*
+     * Kamera membawa SALINAN nama/logo/url/paket sponsornya, dan salinan itu yang dirender
+     * di permukaan publik. Tanpa penyegaran di sini, sponsor yang mengganti logonya akan
+     * melihat logo lamanya terus tayang di setiap kameranya - dan tidak ada satu pun galat
+     * yang memberi tahu siapa pun.
+     *
+     * Hanya keempat kolom tampilan yang disegarkan, dan hanya yang benar-benar dikirim
+     * pemanggil: `undefined` berarti "tidak disentuh", bukan "kosongkan".
+     */
+    const tampilan = [];
+    const nilaiTampilan = [];
+    if (name !== undefined) { tampilan.push('sponsor_name = ?'); nilaiTampilan.push(name); }
+    if (logo !== undefined) { tampilan.push('sponsor_logo = ?'); nilaiTampilan.push(logo); }
+    if (url !== undefined) { tampilan.push('sponsor_url = ?'); nilaiTampilan.push(url); }
+    if (pkg !== undefined) { tampilan.push('sponsor_package = ?'); nilaiTampilan.push(pkg); }
+
+    return transaction(() => {
+        const hasil = execute(
+            `UPDATE sponsors SET ${updates.join(', ')} WHERE id = ?`,
+            values
+        );
+        if (tampilan.length > 0) {
+            execute(
+                `UPDATE cameras SET ${tampilan.join(', ')}, updated_at = CURRENT_TIMESTAMP
+                 WHERE sponsor_id = ?`,
+                [...nilaiTampilan, id]
+            );
+        }
+        return hasil;
+    });
 }
 
 /**
- * Delete sponsor
+ * Hapus sponsor, DAN lepaskan tiap kamera yang membawanya, dalam satu transaksi.
+ *
+ * Tanpa pembersihan itu kamera menyimpan nama, logo, dan URL sponsor yang sudah tidak ada -
+ * dan tetap MENAMPILKANNYA di permukaan publik. Sponsor yang kontraknya habis lalu dihapus
+ * akan terus diiklankan gratis sampai ada yang kebetulan menyadarinya.
  */
 export function deleteSponsor(id) {
-    return execute('DELETE FROM sponsors WHERE id = ?', [id]);
+    return transaction(() => {
+        execute(`
+            UPDATE cameras
+            SET sponsor_id = NULL,
+                sponsor_name = NULL,
+                sponsor_logo = NULL,
+                sponsor_url = NULL,
+                sponsor_package = NULL,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE sponsor_id = ?
+        `, [id]);
+        return execute('DELETE FROM sponsors WHERE id = ?', [id]);
+    });
 }
 
 /**
@@ -276,19 +318,45 @@ export function getExpiringSponsorships() {
  * being freed and reused).
  */
 export function assignSponsorToCamera(cameraId, sponsorData) {
-    const { sponsor_name, sponsor_logo, sponsor_url, sponsor_package } = sponsorData;
+    const { sponsor_id, sponsor_name, sponsor_logo, sponsor_url, sponsor_package } = sponsorData;
 
-    if (sponsor_name) {
-        const sponsorRow = queryOne(
-            'SELECT id, camera_limit FROM sponsors WHERE name = ?',
-            [sponsor_name]
-        );
-        if (sponsorRow && sponsorRow.camera_limit !== null && sponsorRow.camera_limit !== undefined) {
+    /*
+     * Baris sponsor dicari lewat KUNCI kalau pemanggil memberikannya, dan lewat nama hanya
+     * sebagai jalan mundur untuk pemanggil lama. Nama yang cocok dengan lebih dari satu baris
+     * DITOLAK, bukan ditebak: menebak akan menaruh kamera pada sponsor yang keliru dan memakai
+     * jatah batas kamera milik orang lain.
+     */
+    let sponsorRow = null;
+    if (sponsor_id) {
+        sponsorRow = queryOne('SELECT id, camera_limit FROM sponsors WHERE id = ?', [sponsor_id]);
+        if (!sponsorRow) {
+            const err = new Error('Sponsor tidak ditemukan');
+            err.statusCode = 404;
+            throw err;
+        }
+    } else if (sponsor_name) {
+        const cocok = query('SELECT id, camera_limit FROM sponsors WHERE name = ?', [sponsor_name]);
+        if (cocok.length > 1) {
+            const err = new Error(
+                `Ada ${cocok.length} sponsor bernama "${sponsor_name}". Pilih sponsornya lewat id.`
+            );
+            err.statusCode = 409;
+            throw err;
+        }
+        sponsorRow = cocok[0] || null;
+    }
+
+    if (sponsorRow) {
+        if (sponsorRow.camera_limit !== null && sponsorRow.camera_limit !== undefined) {
             const limit = Number(sponsorRow.camera_limit);
+            /*
+             * Dihitung lewat sponsor_id. Dulu lewat sponsor_name, sehingga sponsor yang baru
+             * berganti nama membaca hitungan NOL dan batasnya berhenti berlaku sepenuhnya.
+             */
             const currentRow = queryOne(
                 `SELECT COUNT(*) AS n FROM cameras
-                 WHERE sponsor_name = ? AND id != ?`,
-                [sponsor_name, cameraId]
+                 WHERE sponsor_id = ? AND id != ?`,
+                [sponsorRow.id, cameraId]
             );
             const occupiedExcludingThis = Number(currentRow?.n || 0);
             if (occupiedExcludingThis + 1 > limit) {
@@ -304,13 +372,14 @@ export function assignSponsorToCamera(cameraId, sponsorData) {
 
     return execute(`
         UPDATE cameras
-        SET sponsor_name = ?,
+        SET sponsor_id = ?,
+            sponsor_name = ?,
             sponsor_logo = ?,
             sponsor_url = ?,
             sponsor_package = ?,
             updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
-    `, [sponsor_name, sponsor_logo, sponsor_url, sponsor_package, cameraId]);
+    `, [sponsorRow?.id ?? null, sponsor_name, sponsor_logo, sponsor_url, sponsor_package, cameraId]);
 }
 
 /**
@@ -319,7 +388,8 @@ export function assignSponsorToCamera(cameraId, sponsorData) {
 export function removeSponsorFromCamera(cameraId) {
     return execute(`
         UPDATE cameras 
-        SET sponsor_name = NULL,
+        SET sponsor_id = NULL,
+            sponsor_name = NULL,
             sponsor_logo = NULL,
             sponsor_url = NULL,
             sponsor_package = NULL,
@@ -367,22 +437,24 @@ export function getCamerasWithSponsors() {
 }
 
 /**
- * Count cameras currently linked to each sponsor (matched by sponsor name
- * because cameras carry denormalized sponsor_* columns). Returns a map
- * { [sponsorName]: cameraCount } that the controller folds into the
- * sponsor list response so the admin sees coverage at a glance.
+ * Berapa kamera yang saat ini tertaut ke tiap sponsor. Peta { [sponsorId]: jumlah }, dilipat
+ * controller ke daftar sponsor supaya admin melihat cakupannya sekilas.
+ *
+ * Dikunci lewat sponsor_id. Sebelumnya lewat sponsor_name, yang berarti sponsor yang berganti
+ * nama tampil dengan 0 kamera padahal kameranya masih membawa logonya - angka salah yang
+ * justru muncul di saat operator paling percaya pada panelnya.
  */
 export function countCamerasPerSponsor() {
     const rows = query(`
-        SELECT sponsor_name AS name, COUNT(*) AS camera_count
+        SELECT sponsor_id, COUNT(*) AS camera_count
         FROM cameras
-        WHERE sponsor_name IS NOT NULL AND enabled = 1
-        GROUP BY sponsor_name
+        WHERE sponsor_id IS NOT NULL AND enabled = 1
+        GROUP BY sponsor_id
     `);
     const counts = {};
     for (const row of rows) {
-        if (row?.name) {
-            counts[row.name] = row.camera_count;
+        if (row?.sponsor_id) {
+            counts[row.sponsor_id] = row.camera_count;
         }
     }
     return counts;

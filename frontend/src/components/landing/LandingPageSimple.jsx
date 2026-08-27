@@ -24,6 +24,7 @@ import LandingPublicTopStack from './LandingPublicTopStack';
 import LandingDiscoveryStrip from './LandingDiscoveryStrip';
 import LandingQuickAccessStrip from './LandingQuickAccessStrip';
 import DeferUntilVisible from './DeferUntilVisible';
+import SponsorStrip from './SponsorStrip';
 import useDeferredMount from '../../hooks/public/useDeferredMount';
 import { GridSkeleton, CameraCardSkeleton } from '../ui/Skeleton';
 
@@ -164,6 +165,12 @@ function SimpleFooter({ branding, saweriaEnabled, saweriaLink }) {
                             ))}
                         </div>
                     </div>
+
+                    {/* Strip sponsor — menyembunyikan diri saat tidak ada sponsor aktif, jadi tata
+                        letak footer tidak berubah sama sekali sampai ada yang tanda tangan. Sebelum
+                        ini ia HANYA ada di mode penuh, sehingga sponsor yang dijanjikan "tampil di
+                        beranda" tidak terlihat oleh pengunjung mode ringan. */}
+                    <SponsorStrip />
 
                     <div className="flex flex-wrap items-center justify-center gap-2 text-xs text-content-subtle">
                         <span>&copy; {new Date().getFullYear()} {branding.company_name}</span>

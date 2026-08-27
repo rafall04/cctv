@@ -150,9 +150,11 @@ function SponsorManagement() {
             end_date: sponsor.end_date || '',
             notes: sponsor.notes || '',
         });
-        // Pre-select cameras that currently carry this sponsor's name.
+        // Kamera yang saat ini membawa sponsor ini, dipilih lewat KUNCI. Lewat nama, sponsor
+        // yang baru berganti nama membuka formulirnya dengan nol kamera tercentang - lalu
+        // menyimpan akan MELEPAS semuanya tanpa ada yang memintanya.
         const assigned = new Set(
-            cameras.filter((c) => c.sponsor_name === sponsor.name).map((c) => c.id)
+            cameras.filter((c) => c.sponsor_id === sponsor.id).map((c) => c.id)
         );
         setSelectedCameraIds(new Set(assigned));
         setOriginalCameraIds(new Set(assigned));
@@ -212,7 +214,12 @@ function SponsorManagement() {
         // add. We send adds first so the cap check sees the freed slots
         // from removes BEFORE judging whether the new ones fit.
         const sponsorName = form.name.trim();
+        // Pada penyuntingan kuncinya sudah dipegang; pada pembuatan ia baru saja kembali dari
+        // server. Keduanya harus terkirim - tanpa kunci, penugasannya jatuh kembali ke
+        // pencocokan nama di server.
+        const sponsorId = editingId || result.data?.id || null;
         const sponsorMeta = {
+            sponsor_id: sponsorId,
             sponsor_name: sponsorName,
             sponsor_logo: form.logo || null,
             sponsor_url: form.url || null,
@@ -274,6 +281,7 @@ function SponsorManagement() {
             return;
         }
         const result = await sponsorService.assignSponsorToCamera(cameraId, {
+            sponsor_id: sponsor.id,
             sponsor_name: sponsor.name,
             sponsor_logo: sponsor.logo || null,
             sponsor_url: sponsor.url || null,

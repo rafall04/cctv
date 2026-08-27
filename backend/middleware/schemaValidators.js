@@ -173,10 +173,7 @@ export const createCameraSchema = {
                 anyOf: [{ type: 'string', maxLength: 500 }, { type: 'null' }]
             },
             sponsor_package: {
-                anyOf: [
-                    { type: 'string', enum: ['bronze', 'silver', 'gold'] },
-                    { type: 'null' }
-                ]
+                anyOf: [{ type: 'string', enum: ['bronze', 'silver', 'gold'] }, { type: 'null' }]
             },
             enable_recording: {
                 anyOf: [{ type: 'boolean' }, { type: 'integer', enum: [0, 1] }]
@@ -299,10 +296,7 @@ export const updateCameraSchema = {
                 anyOf: [{ type: 'string', maxLength: 500 }, { type: 'null' }]
             },
             sponsor_package: {
-                anyOf: [
-                    { type: 'string', enum: ['bronze', 'silver', 'gold'] },
-                    { type: 'null' }
-                ]
+                anyOf: [{ type: 'string', enum: ['bronze', 'silver', 'gold'] }, { type: 'null' }]
             },
             enable_recording: {
                 anyOf: [{ type: 'boolean' }, { type: 'integer', enum: [0, 1] }]
@@ -896,6 +890,9 @@ export const assignSponsorToCameraSchema = {
         type: 'object',
         required: ['sponsor_name'],
         properties: {
+            // Kunci baris sponsors. Opsional supaya pemanggil lama tetap jalan, tapi INILAH
+            // yang menjadi tautan sesungguhnya - nama hanya salinan tampilan yang bisa berubah.
+            sponsor_id: { anyOf: [{ type: 'integer', minimum: 1 }, { type: 'null' }] },
             sponsor_name: { type: 'string', minLength: 1, maxLength: 100 },
             sponsor_logo: { anyOf: [{ type: 'string', maxLength: 1000 }, { type: 'null' }] },
             sponsor_url: { anyOf: [{ type: 'string', maxLength: 1000 }, { type: 'null' }] },

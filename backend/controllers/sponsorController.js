@@ -9,8 +9,8 @@ import { logAdminAction } from '../services/securityAuditLogger.js';
 /**
  * Get all sponsors (admin only). Each row is enriched with `camera_count`
  * so the admin list shows how many cameras a sponsor is currently linked
- * to — the link is denormalized via `sponsor_name` on the cameras table,
- * matched by name. Done in one extra grouped query, not N+1.
+ * to — the link is `cameras.sponsor_id`, a key, so a sponsor that renames
+ * itself keeps every camera it covers. Done in one extra grouped query, not N+1.
  */
 export async function getAllSponsors(request, reply) {
     try {
@@ -18,7 +18,7 @@ export async function getAllSponsors(request, reply) {
         const cameraCounts = sponsorService.countCamerasPerSponsor();
         const enriched = sponsors.map((sponsor) => ({
             ...sponsor,
-            camera_count: cameraCounts[sponsor.name] || 0,
+            camera_count: cameraCounts[sponsor.id] || 0,
         }));
 
         return reply.send({

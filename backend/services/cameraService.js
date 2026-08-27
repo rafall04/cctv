@@ -223,6 +223,8 @@ const ADMIN_CAMERA_LIST_PROJECTION = `
     c.public_playback_preview_minutes,
     c.thumbnail_path,
     c.thumbnail_updated_at,
+    c.sponsor_id,
+    c.sponsor_name,
     c.created_at,
     c.updated_at,
     a.name as area_name,
