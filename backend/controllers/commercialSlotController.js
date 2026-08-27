@@ -34,6 +34,17 @@ function parseId(value) {
 }
 
 /**
+ * Apakah klien menyatakan konteks ini sudah dihitung hari ini.
+ *
+ * Hanya '1' / 1 / 'true' yang diterima. Sengaja tidak memakai truthiness mentah: `counted=0`
+ * dan `counted=false` datang dari klien yang bermaksud "belum", dan keduanya truthy sebagai
+ * string - membacanya terbalik akan MENGHENTIKAN penghitungan sepenuhnya, diam-diam.
+ */
+function sudahDihitungKlien(nilai) {
+    return nilai === '1' || nilai === 1 || nilai === 'true';
+}
+
+/**
  * Tulis impresi untuk pemenang. Best-effort: penghitung tidak pernah boleh membuat pengunjung
  * kehilangan blok yang seharusnya ia lihat — tapi kegagalannya ditelan dengan BERISIK, karena
  * kedua layanan memang dispesifikasikan menjaga UPSERT-nya sendiri dan seharusnya tidak melempar.
@@ -63,7 +74,7 @@ function catatImpresi(request, hasil, placement) {
 export async function getCommercialSlot(request, reply) {
     reply.header('Cache-Control', 'no-store');
     try {
-        const { placement, cameraId, areaId } = request.query || {};
+        const { placement, cameraId, areaId, counted } = request.query || {};
         const surface = typeof placement === 'string' ? placement : '';
 
         const hasil = resolveCommercialSlot({
@@ -72,7 +83,18 @@ export async function getCommercialSlot(request, reply) {
             areaId: parseId(areaId),
         });
 
-        if (hasil) {
+        /*
+         * `counted=1` berarti klien sudah punya penanda "konteks ini dihitung hari ini".
+         *
+         * Penjaga hariannya HARUS tinggal di klien, bukan di sini: penjaga di server berkunci IP,
+         * dan di balik CGNAT satu IP adalah banyak orang - menjadikannya harian akan menghitung
+         * satu impresi untuk sekampung. Penanda per-sesi-peramban identitas yang jauh lebih baik.
+         *
+         * Klien nakal bisa selalu mengirimnya dan membuat angkanya KURANG. Itu pertukaran yang
+         * disengaja: arah sebaliknya - menggelembungkan impresi mitra yang membayar - jauh lebih
+         * mahal, dan itu tetap dijaga throttle 10 detik di bawah.
+         */
+        if (hasil && !sudahDihitungKlien(counted)) {
             catatImpresi(request, hasil, surface);
         }
 

@@ -67,15 +67,12 @@ describe('muatan afiliasi disaring di jalur baru juga', () => {
         expect(JSON.stringify(sessionStorage)).not.toContain('partner_fee_rupiah');
     });
 
-    it('menyimpan versi yang SUDAH bersih, bukan yang mentah', async () => {
+    it('menyaring lagi pada tiap pengambilan, bukan sekali lalu dipercaya', async () => {
         balas({ kind: 'affiliate', content: { ...BERSIH, store_url: 'javascript:alert(1)' } });
-        await resolveCommercialSlotOnce(KTX);
-        get.mockReset();
 
-        // Panggilan kedua dilayani cache; kalau yang tersimpan mentah, ia lolos di sini.
+        await resolveCommercialSlotOnce(KTX);
         const kedua = await resolveCommercialSlotOnce(KTX);
 
-        expect(get).not.toHaveBeenCalled();
         expect(kedua.content.store_url).toBeNull();
     });
 
@@ -87,40 +84,88 @@ describe('muatan afiliasi disaring di jalur baru juga', () => {
     });
 });
 
-describe('satu impresi per konteks per hari', () => {
-    it('panggilan kedua untuk konteks yang sama tidak menyentuh jaringan', async () => {
-        balas({ kind: 'affiliate', content: BERSIH });
-        await resolveCommercialSlotOnce(KTX);
-        await resolveCommercialSlotOnce(KTX);
+/*
+ * INI BLOK YANG BERUBAH ARTINYA, DAN KENAPA.
+ *
+ * Versi pertama menyinggahkan MUATANNYA seharian. Hitungannya benar, tapi operator yang menyunting
+ * judul tawaran di panel admin tidak pernah melihat hasilnya di halaman publik sampai tabnya
+ * ditutup - terjadi sungguhan pada 'CCTV Imou PS3D 3MP', 2026-08-27. Bentuk kegagalan yang jahat:
+ * satu-satunya cara memeriksa suntingan Anda berhasil adalah melihat halaman publik, dan justru
+ * itu yang berbohong.
+ *
+ * Sekarang isinya SELALU diambil segar; yang dijaga sekali per hari adalah IMPRESINYA.
+ */
+describe('isinya selalu segar, impresinya tetap sekali per hari', () => {
+    it('SUNTINGAN OPERATOR LANGSUNG TERLIHAT pada pemasangan berikutnya', async () => {
+        balas({ kind: 'affiliate', content: { ...BERSIH, product_title: 'CCTV Imou PS3D' } });
+        const sebelum = await resolveCommercialSlotOnce(KTX);
 
-        expect(get).toHaveBeenCalledTimes(1);
+        // Operator menambahkan '3MP' di panel admin.
+        balas({ kind: 'affiliate', content: { ...BERSIH, product_title: 'CCTV Imou PS3D 3MP' } });
+        const sesudah = await resolveCommercialSlotOnce(KTX);
+
+        expect(sebelum.content.product_title).toBe('CCTV Imou PS3D');
+        expect(sesudah.content.product_title, 'halaman publik masih menyajikan judul lama').toBe('CCTV Imou PS3D 3MP');
     });
 
-    it('kamera lain adalah konteks lain, dan memang impresi lain', async () => {
+    it('permintaan PERTAMA tidak membawa penanda - ia yang dihitung', async () => {
+        balas({ kind: 'affiliate', content: BERSIH });
+
+        await resolveCommercialSlotOnce(KTX);
+
+        expect(get.mock.calls[0][1].params.counted).toBeUndefined();
+    });
+
+    it('permintaan BERIKUTNYA membawa counted=1 supaya server tidak menghitung dua kali', async () => {
         balas({ kind: 'affiliate', content: BERSIH });
         await resolveCommercialSlotOnce(KTX);
-        await resolveCommercialSlotOnce({ placement: 'popup', cameraId: 1445 });
+
+        await resolveCommercialSlotOnce(KTX);
 
         expect(get).toHaveBeenCalledTimes(2);
+        expect(get.mock.calls[1][1].params.counted).toBe(1);
+    });
+
+    it('kamera lain adalah konteks lain - penandanya belum ada, jadi ia dihitung', async () => {
+        balas({ kind: 'affiliate', content: BERSIH });
+        await resolveCommercialSlotOnce(KTX);
+
+        await resolveCommercialSlotOnce({ placement: 'popup', cameraId: 1445 });
+
+        expect(get.mock.calls[1][1].params.counted).toBeUndefined();
     });
 
     it('permukaan lain adalah konteks lain - beranda lalu popup itu dua impresi yang sah', async () => {
         balas({ kind: 'affiliate', content: BERSIH });
         await resolveCommercialSlotOnce({ placement: 'landing' });
+
         await resolveCommercialSlotOnce({ placement: 'popup' });
 
-        expect(get).toHaveBeenCalledTimes(2);
+        expect(get.mock.calls[1][1].params.counted).toBeUndefined();
     });
 
-    it('"tidak ada penghuni" TIDAK di-cache - operator yang baru menerbitkan tawaran terlihat', async () => {
+    it('konteks TANPA penghuni tidak ditandai - tawaran yang baru terbit tetap terhitung', async () => {
         balas(null);
         await resolveCommercialSlotOnce(KTX);
+
+        balas({ kind: 'affiliate', content: BERSIH });
         await resolveCommercialSlotOnce(KTX);
 
-        expect(get).toHaveBeenCalledTimes(2);
+        expect(get.mock.calls[1][1].params.counted).toBeUndefined();
+    });
+
+    it('membuang singgahan MUATAN versi lama yang masih menggantung di tab terbuka', async () => {
+        // Tab yang sudah terbuka sejak sebelum perbaikan menyimpan judul lama sampai ditutup - dan
+        // pengunjung paling setia justru yang tabnya paling lama terbuka.
+        const kunciLama = `raf:slot:2026-08-27:popup:c1444:a0`;
+        sessionStorage.setItem(kunciLama, JSON.stringify({ kind: 'affiliate', content: BERSIH }));
+        balas({ kind: 'affiliate', content: BERSIH });
+
+        await resolveCommercialSlotOnce(KTX);
+
+        expect(sessionStorage.getItem(kunciLama), 'muatan basi versi lama masih tersimpan').toBeNull();
     });
 });
-
 describe('gagal itu senyap, tidak pernah galat di halaman', () => {
     it('jaringan mati mengembalikan null, bukan melempar', async () => {
         get.mockRejectedValue(new Error('Network Error'));
