@@ -553,3 +553,46 @@ describe('aliran data terputus lalu kembali', () => {
         expect(onNoPicture, 'anggaran menyeberangi jeda').not.toHaveBeenCalled();
     });
 });
+
+/*
+ * totalVideoFrames menghitung bingkai yang dibuat DAN yang dijatuhkan. Memakai total saja berarti
+ * dekoder yang menghasilkan bingkai lalu membuang semuanya - ponsel kepanasan, GPU kehabisan -
+ * terbaca sehat, padahal yang dilihat pengunjung persegi beku. Itu persis bentuk kegagalan yang
+ * modul ini ditulis untuk menangkap, dan ia melewatinya selama ini.
+ */
+describe('bingkai yang dijatuhkan tidak dihitung sebagai gambar', () => {
+    const dgn = (total, dropped) => ({
+        videoWidth: 1280, videoHeight: 720, readyState: 4, paused: false, currentTime: 0,
+        buffered: { length: 1 },
+        getVideoPlaybackQuality: () => ({ totalVideoFrames: total, droppedVideoFrames: dropped }),
+    });
+
+    it('menolak menyebut hidup saat SEMUA bingkai dijatuhkan', () => {
+        expect(hasPicture(dgn(500, 500))).toBe(false);
+    });
+
+    it('menyebut hidup saat sebagian bingkai benar-benar tampil', () => {
+        expect(hasPicture(dgn(500, 480))).toBe(true);
+    });
+
+    it('memvonis dekoder yang membuat bingkai tapi membuang semuanya', () => {
+        const video = dgn(100, 100);
+        const onNoPicture = vi.fn();
+        video._t = 100;
+        startLivePictureWatch(video, { onNoPicture });
+        vi.advanceTimersByTime(500);
+
+        // total dan dropped naik bersama: nol yang tampil.
+        let n = 100;
+        video.getVideoPlaybackQuality = () => ({ totalVideoFrames: n, droppedVideoFrames: n });
+        majukan(40, () => { video.currentTime += 0.5; n += 12; });
+
+        expect(onNoPicture).toHaveBeenCalled();
+    });
+
+    it('droppedVideoFrames yang tidak ada diperlakukan nol, bukan menolak angkanya', () => {
+        const video = { videoWidth: 1280, videoHeight: 720,
+            getVideoPlaybackQuality: () => ({ totalVideoFrames: 7 }) };
+        expect(hasPicture(video)).toBe(true);
+    });
+});

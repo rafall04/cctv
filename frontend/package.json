@@ -16,7 +16,7 @@
     "dependencies": {
         "axios": "^1.16.1",
         "flv.js": "^1.6.2",
-        "hls.js": "^1.5.15",
+        "hls.js": "^1.6.16",
         "leaflet": "^1.9.4",
         "lucide-react": "^0.263.1",
         "qrcode.react": "^4.2.0",

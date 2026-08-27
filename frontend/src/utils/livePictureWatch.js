@@ -49,16 +49,28 @@ export function hasPicture(video) {
 }
 
 /**
- * Frames the decoder has produced, or `null` where the browser will not say.
+ * Bingkai yang benar-benar SAMPAI KE LAYAR, atau `null` bila browsernya menolak menjawab.
  *
- * `null` is a real answer and must not be read as zero: Safari exposes neither counter on some
- * versions, and treating "unknown" as "no frames" would tear down streams that are playing fine.
+ * `null` adalah jawaban sungguhan dan tidak boleh dibaca sebagai nol: sebagian versi Safari tidak
+ * mengekspos penghitung mana pun, dan memperlakukan "tidak tahu" sebagai "tidak ada bingkai" akan
+ * mematikan stream yang jalan normal.
+ *
+ * DIKURANGI droppedVideoFrames (2026-08-26). Spesifikasinya jelas: totalVideoFrames menghitung
+ * bingkai yang dibuat DAN yang dijatuhkan, sedangkan droppedVideoFrames adalah bagian yang tidak
+ * pernah dirender. Memakai total saja berarti dekoder yang menghasilkan bingkai lalu membuang
+ * semuanya - ponsel kepanasan, GPU kehabisan, jalur terlalu lambat - terbaca sehat oleh setiap
+ * pemakai fungsi ini, padahal yang dilihat pengunjung persegi beku. Itu persis bentuk kegagalan
+ * yang modul ini ditulis untuk menangkap.
+ *
+ * droppedVideoFrames yang tidak ada diperlakukan nol: ketiadaannya bukan alasan menolak angka
+ * total yang memang tersedia.
  */
 export function countDecodedFrames(video) {
     if (!video) return null;
     const quality = video.getVideoPlaybackQuality?.();
     if (quality && typeof quality.totalVideoFrames === 'number') {
-        return quality.totalVideoFrames;
+        const dijatuhkan = typeof quality.droppedVideoFrames === 'number' ? quality.droppedVideoFrames : 0;
+        return Math.max(0, quality.totalVideoFrames - dijatuhkan);
     }
     if (typeof video.webkitDecodedFrameCount === 'number') {
         return video.webkitDecodedFrameCount;
