@@ -8,7 +8,7 @@
  * SideEffects: Mocks browser media APIs and viewer service calls.
  */
 
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import VideoPopup from './VideoPopup.jsx';
 
@@ -847,5 +847,111 @@ describe('VideoPopup non-live states', () => {
     });
 });
 
+/*
+ * BUG YANG DIPERBAIKI 2026-08-26: gerbang `|| isLive` menelan SETIAP galat fatal hls.js sesudah
+ * stream terbukti hidup. Karena hls.js sudah memanggil stopLoad() sendiri lebih dulu, gerbang itu
+ * bukan cuma membuang laporan - ia membuang satu-satunya kesempatan tersisa memanggil startLoad().
+ * Hasilnya bingkai beku di bawah lencana LIVE hijau, tanpa satu pun tombol, selamanya.
+ *
+ * Tidak ada satu pun tes tingkat komponen untuk mesin ini sebelumnya; tes di bawah menjadikan
+ * "sesudah live" keadaan yang benar-benar dicapai, bukan diasumsikan.
+ */
+describe('galat fatal SESUDAH stream terbukti hidup', () => {
+    const bingkai = { get: () => 100 };
 
+    beforeEach(() => {
+        hlsInstances.length = 0;
+        flvPlayers.length = 0;
+        vi.useRealTimers();
+        vi.spyOn(HTMLMediaElement.prototype, 'play').mockImplementation(() => Promise.resolve());
+        vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
+        vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {});
+    });
 
+    const jadikanBisaDidekode = () => {
+        Object.defineProperty(HTMLVideoElement.prototype, 'videoWidth', { configurable: true, get: () => 1280 });
+        Object.defineProperty(HTMLVideoElement.prototype, 'videoHeight', { configurable: true, get: () => 720 });
+        HTMLVideoElement.prototype.getVideoPlaybackQuality = () => ({ totalVideoFrames: bingkai.get() });
+    };
+
+    afterEach(() => {
+        cleanup();
+        vi.restoreAllMocks();
+        delete HTMLVideoElement.prototype.getVideoPlaybackQuality;
+        Object.defineProperty(HTMLVideoElement.prototype, 'videoWidth', { configurable: true, get: () => 0 });
+        Object.defineProperty(HTMLVideoElement.prototype, 'videoHeight', { configurable: true, get: () => 0 });
+    });
+
+    const sampaiHidup = async (idKamera) => {
+        jadikanBisaDidekode();
+        render(<VideoPopup camera={{ ...baseCamera, id: idKamera }} onClose={vi.fn()} />);
+        await waitFor(() => { expect(hlsInstances).toHaveLength(1); });
+        await act(async () => { hlsInstances[0].emit('fragBuffered', {}, {}); });
+        await waitFor(() => { expect(screen.getByText('LIVE')).toBeTruthy(); });
+        return hlsInstances[0];
+    };
+
+    it('melanjutkan di live edge, TANPA menampilkan panel apa pun', async () => {
+        const hls = await sampaiHidup(9001);
+        hls.liveSyncPosition = 123.5;
+
+        await act(async () => {
+            hls.emit('error', {}, { fatal: true, type: 'networkError', details: 'fragLoadError' });
+        });
+
+        expect(hls.startLoad).toHaveBeenCalledWith(123.5);
+        expect(screen.queryByText('Codec Tidak Didukung')).toBeNull();
+        expect(screen.queryByText('Gambar Terhenti')).toBeNull();
+    });
+
+    it('menyerah dengan "Gambar Terhenti" - BUKAN vonis codec - saat live edge tak diketahui', async () => {
+        const hls = await sampaiHidup(9002);
+
+        await act(async () => {
+            hls.emit('error', {}, { fatal: true, type: 'networkError', details: 'fragLoadError' });
+        });
+
+        await waitFor(() => { expect(screen.getByText('Gambar Terhenti')).toBeTruthy(); });
+        expect(screen.queryByText('Codec Tidak Didukung'), 'perangkat ini baru saja mendekode').toBeNull();
+    });
+
+    /*
+     * Jalur KEDUA yang juga digerbang: listener 'error' pada elemen <video> itu sendiri. MediaError
+     * tingkat-elemen selalu kematian keras, dan sesudah live ia dibuang - sehingga stopWatch tak
+     * pernah dipanggil dan telemetri kegagalannya hilang tanpa jejak.
+     */
+    it('galat elemen <video> sesudah live memberi "Gambar Terhenti", bukan diam', async () => {
+        await sampaiHidup(9005);
+        const el = document.querySelector('video');
+
+        await act(async () => { fireEvent.error(el); });
+
+        await waitFor(() => { expect(screen.getByText('Gambar Terhenti')).toBeTruthy(); });
+        expect(screen.queryByText('Codec Tidak Didukung')).toBeNull();
+    });
+
+    it('playlist yang hilang langsung divonis, tanpa membuang percobaan', async () => {
+        const hls = await sampaiHidup(9003);
+        hls.liveSyncPosition = 123.5;
+
+        await act(async () => {
+            hls.emit('error', {}, { fatal: true, type: 'networkError', details: 'levelLoadError' });
+        });
+
+        expect(hls.startLoad).not.toHaveBeenCalled();
+        await waitFor(() => { expect(screen.getByText('Gambar Terhenti')).toBeTruthy(); });
+    });
+
+    it('galat NON-fatal sesudah live tidak menyentuh apa pun', async () => {
+        const hls = await sampaiHidup(9004);
+        hls.liveSyncPosition = 123.5;
+
+        await act(async () => {
+            hls.emit('error', {}, { fatal: false, type: 'mediaError', details: 'bufferNudgeOnStall' });
+        });
+
+        expect(hls.startLoad).not.toHaveBeenCalled();
+        expect(hls.recoverMediaError).not.toHaveBeenCalled();
+        expect(screen.getByText('LIVE')).toBeTruthy();
+    });
+});

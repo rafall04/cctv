@@ -206,6 +206,65 @@ describe('MultiViewVideoItem runtime stability', () => {
         vi.restoreAllMocks();
     });
 
+    /*
+     * BUG YANG DIPERBAIKI 2026-08-26: gerbang `|| isLive` menelan SETIAP galat fatal sesudah ubin
+     * terbukti hidup. hls.js sudah memanggil stopLoad() sendiri lebih dulu, jadi gerbang itu
+     * membuang satu-satunya kesempatan tersisa memanggil startLoad() - ubinnya membeku di bawah
+     * lencana LIVE, dan `onError` isolasi grid tidak pernah dipanggil sehingga induknya buta.
+     */
+    describe('galat fatal SESUDAH ubin terbukti hidup', () => {
+        const hidupkan = async (onError = vi.fn()) => {
+            render(
+                <MultiViewVideoItem camera={baseCamera} onRemove={vi.fn()} onError={onError} onStatusChange={vi.fn()} />
+            );
+            await waitForInitialHls();
+            await act(async () => { hlsInstances[0].emit('fragBuffered', {}, {}); });
+            return { hls: hlsInstances[0], onError };
+        };
+
+        it('melanjutkan di live edge alih-alih membeku diam-diam', async () => {
+            const { hls, onError } = await hidupkan();
+            hls.liveSyncPosition = 77.25;
+
+            await act(async () => {
+                hls.emit('error', {}, { fatal: true, type: 'networkError', details: 'fragLoadError' });
+            });
+
+            expect(hls.startLoad).toHaveBeenCalledWith(77.25);
+            expect(onError).not.toHaveBeenCalled();
+        });
+
+        it('menyerah dengan memberi tahu induknya, bukan diam', async () => {
+            const { hls, onError } = await hidupkan();
+
+            await act(async () => {
+                hls.emit('error', {}, { fatal: true, type: 'networkError', details: 'levelLoadError' });
+            });
+
+            expect(onError, 'isolasi kegagalan grid buta').toHaveBeenCalled();
+        });
+
+        it('galat elemen <video> sesudah live juga dilaporkan', async () => {
+            const { onError } = await hidupkan();
+
+            await act(async () => { fireEvent.error(screen.getByTestId('multi-view-video')); });
+
+            expect(onError).toHaveBeenCalled();
+        });
+
+        it('galat NON-fatal sesudah live tidak menyentuh apa pun', async () => {
+            const { hls, onError } = await hidupkan();
+            hls.liveSyncPosition = 77.25;
+
+            await act(async () => {
+                hls.emit('error', {}, { fatal: false, type: 'mediaError', details: 'bufferNudgeOnStall' });
+            });
+
+            expect(hls.startLoad).not.toHaveBeenCalled();
+            expect(onError).not.toHaveBeenCalled();
+        });
+    });
+
     it('renders and initializes an HLS tile without crashing after page reload', async () => {
         render(
             <MultiViewVideoItem

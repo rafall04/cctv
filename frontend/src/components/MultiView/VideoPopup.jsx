@@ -24,6 +24,7 @@ import { usePauseOnHidden } from '../../hooks/usePauseOnHidden.js';
 import { useFocusTrap } from '../../hooks/useFocusTrap.js';
 import { resolveStreamUrl } from '../../utils/directStreamHelper';
 import { hasPicture, startLivePictureWatch } from '../../utils/livePictureWatch.js';
+import { resumeAtLiveEdgeOrFail } from '../../utils/liveEdgeRecovery.js';
 import { useStreamTimeout } from '../../hooks/useStreamTimeout';
 import { viewerService } from '../../services/viewerService';
 import { takeSnapshot as takeSnapshotUtil } from '../../utils/snapshotHelper';
@@ -584,9 +585,9 @@ function VideoPopup({
         };
 
         const handleError = () => {
-            if (isStaleStreamRun() || isLive) return; // Don't show error if already playing
+            if (isStaleStreamRun()) return;
             stopWatch?.();
-            setStatus('error');
+            setStatus('error'); if (isLive) setErrorType('stalled'); // sudah terbukti mendekode
             setLoadingStage(LoadingStage.ERROR);
             reportRuntimeFailure('external_hls_runtime_error');
         };
@@ -679,7 +680,7 @@ function VideoPopup({
             });
 
             hls.on(HlsClass.Events.ERROR, (_, d) => {
-                if (isStaleStreamRun() || isLive) return; // Don't handle errors if already playing
+                if (isStaleStreamRun()) return; if (isLive) return void resumeAtLiveEdgeOrFail(d, { hls, video, HlsErrorTypes: HlsClass.ErrorTypes, requestPlay: requestVideoPlay, onGiveUp: () => { stopWatch?.(); failWithStall(); } });
                 // BEFORE the fatal guard: hls.js reports a codec refusal non-fatally, drops the
                 // level, then never emits MANIFEST_PARSED. Ignoring it left the UI loading forever.
                 if (isCodecFailure(d)) { failWithCodec(); hls.destroy(); return; }

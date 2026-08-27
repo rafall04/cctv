@@ -25,11 +25,14 @@ const ERROR_VARIANTS = {
      * Varian ini ada karena satu-satunya jawaban yang tersedia dulu adalah "codec", dan itu dua
      * kali salah: perangkatnya jelas mampu mendekode stream ini (ia baru saja melakukannya), dan
      * vonis codec ber-canRetry:false sehingga pengunjungnya terjebak tanpa jalan keluar. Penyebab
-     * yang terukur adalah pipeline media dibangun ulang saat aplikasi kembali dari latar belakang.
+     * DUA jalur menghasilkan varian ini, jadi deskripsinya tidak boleh menyebut salah satunya:
+     * pipeline media dibangun ulang saat aplikasi kembali dari latar belakang, DAN galat fatal
+     * hls.js sesudah stream hidup yang anggaran pemulihannya habis (lihat liveEdgeRecovery.js).
+     * Menyebut satu sebab sebagai fakta adalah tebakan yang disajikan sebagai diagnosis.
      */
     stalled: {
         title: 'Gambar Terhenti',
-        description: 'Aliran gambar berhenti, biasanya setelah halaman lama berada di latar belakang. Coba sambungkan ulang.',
+        description: 'Aliran gambar berhenti. Biasanya sementara - coba sambungkan ulang.',
         variant: 'stalled',
         canRetry: true,
     },

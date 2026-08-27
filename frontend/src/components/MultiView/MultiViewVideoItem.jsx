@@ -20,6 +20,7 @@ import { getDeviceHLSConfig } from '../../utils/hlsConfig';
 import { isCodecFailure } from '../../utils/publicPopupState.js';
 import { canPlayNativeHls, startNativeHlsPlayback } from '../../utils/nativeHlsPlayback.js';
 import { startLivePictureWatch } from '../../utils/livePictureWatch.js';
+import { resumeAtLiveEdgeOrFail } from '../../utils/liveEdgeRecovery.js';
 import { shouldUseQueuedInit, getGlobalStreamInitQueue } from '../../utils/streamInitQueue';
 import { viewerService } from '../../services/viewerService';
 import { takeSnapshot as takeSnapshotUtil } from '../../utils/snapshotHelper';
@@ -404,7 +405,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
         };
 
         const handleError = () => {
-            if (cancelled || isLive) return; // Don't show error if already playing
+            if (cancelled) return; if (isLive) return failWithoutPicture({ everHadPicture: true }); // sudah terbukti mendekode
             stopPictureWatch();
             setStatus('error'); setLoadingStage(LoadingStage.ERROR);
             onError?.(camera.id, new Error('Video playback error')); // parent isolation tracking
@@ -493,7 +494,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                 });
 
                 hls.on(Hls.Events.ERROR, (_, d) => {
-                    if (cancelled || isLive) return; // Don't handle errors if already playing
+                    if (cancelled) return; if (isLive) return void resumeAtLiveEdgeOrFail(d, { hls, video, HlsErrorTypes: Hls.ErrorTypes, requestPlay: (el) => el.play().catch(() => { }), onGiveUp: () => failWithoutPicture({ everHadPicture: true }) });
                     // BEFORE the fatal guard, and matching every codec detail rather than one:
                     // hls.js reports a codec refusal NON-fatally, drops the level, and then never
                     // emits MANIFEST_PARSED, so this tile would load forever. Same bug as VideoPopup.
