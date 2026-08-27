@@ -596,3 +596,145 @@ describe('bingkai yang dijatuhkan tidak dihitung sebagai gambar', () => {
         expect(hasPicture(video)).toBe(true);
     });
 });
+
+/*
+ * BENTUK KEGAGALAN KETIGA, dan yang paling parah: waktu media ITU SENDIRI berhenti.
+ *
+ * Dulu `if (!advanced) return` memulangkan tick tanpa menyimpulkan apa pun - dengan alasan yang
+ * benar, karena waktu yang tidak maju memang bukan bukti. Tapi ia juga bentuk yang TIDAK
+ * dipertanyakan oleh apa pun di aplikasi ini: lencana tetap LIVE, hls.js diam, gambarnya beku
+ * selamanya. Terjadi tanpa satu pun galat saat sumber berhenti menerbitkan sementara playlist-nya
+ * tetap sah, atau saat buffer habis tanpa galat fatal.
+ *
+ * Tenggatnya 20 detik karena fragLoadingTimeOut 30 detik: pada jalur lemah hls.js bisa SAH sedang
+ * menunggu satu fragmen setengah menit dengan playhead beku. Yang membuatnya tetap aman adalah
+ * JAWABANNYA - pemulihan, bukan panel.
+ */
+const TICK_20_DETIK = 40;
+
+describe('playhead beku (waktu media berhenti, bukan bingkainya)', () => {
+    const sembunyi = (v) => Object.defineProperty(document, 'hidden', { configurable: true, get: () => v });
+    afterEach(() => sembunyi(false));
+
+    const hidupkan = (video, onFrozen) => {
+        video._frames = 5;
+        startLivePictureWatch(video, { onFrozen });
+        vi.advanceTimersByTime(500);
+    };
+
+    it('melapor sesudah 20 detik beku sambil memutar', () => {
+        const video = videoTiruan();
+        const onFrozen = vi.fn();
+        hidupkan(video, onFrozen);
+
+        majukan(TICK_20_DETIK);          // currentTime TIDAK digerakkan sama sekali
+
+        expect(onFrozen).toHaveBeenCalledTimes(1);
+    });
+
+    it('TIDAK melapor untuk rebuffer biasa yang pulih sebelum tenggat', () => {
+        const video = videoTiruan();
+        const onFrozen = vi.fn();
+        hidupkan(video, onFrozen);
+
+        majukan(30);                     // 15 detik beku - di bawah tenggat
+        expect(onFrozen).not.toHaveBeenCalled();
+
+        majukan(1, () => { video.currentTime += 0.5; });   // playhead bergerak lagi
+        majukan(30);                     // 15 detik beku lagi - harus dihitung ULANG
+
+        expect(onFrozen, 'jam beku diteruskan melewati pemulihan').not.toHaveBeenCalled();
+    });
+
+    it('tidak melapor saat videonya dijeda', () => {
+        const video = videoTiruan();
+        const onFrozen = vi.fn();
+        hidupkan(video, onFrozen);
+        video.paused = true;
+
+        majukan(TICK_20_DETIK * 2);
+
+        expect(onFrozen).not.toHaveBeenCalled();
+    });
+
+    /*
+     * Bentuk pertama tes jeda di bawah TIDAK diskriminatif: saat dijeda, cabang jedanya sudah
+     * memulangkan tick sebelum akumulator beku disentuh, jadi menghapus resetnya tetap hijau. Yang
+     * benar-benar dijaga reset itu adalah SISA jam dari sebelum jeda - separuh anggaran dihabiskan
+     * dulu, lalu dijeda, lalu separuh lagi sesudahnya.
+     */
+    it('membuang sisa jam beku dari SEBELUM jeda, bukan meneruskannya', () => {
+        const video = videoTiruan();
+        const onFrozen = vi.fn();
+        hidupkan(video, onFrozen);
+
+        majukan(30);                     // 15 detik beku: tiga perempat tenggat
+        expect(onFrozen).not.toHaveBeenCalled();
+
+        video.paused = true;             // usePauseOnHidden / pengunjung menjeda
+        majukan(10);
+        video.paused = false;
+
+        majukan(30);                     // 15 detik beku lagi - harus dihitung ULANG dari nol
+
+        expect(onFrozen, 'sisa jam menyeberangi jeda').not.toHaveBeenCalled();
+    });
+
+    it('tidak melapor saat halamannya tidak terlihat', () => {
+        const video = videoTiruan();
+        const onFrozen = vi.fn();
+        hidupkan(video, onFrozen);
+        sembunyi(true);
+
+        majukan(TICK_20_DETIK * 2);
+
+        expect(onFrozen).not.toHaveBeenCalled();
+    });
+
+    it('tidak melapor saat elemennya sedang seek', () => {
+        const video = videoTiruan();
+        const onFrozen = vi.fn();
+        hidupkan(video, onFrozen);
+        video.seeking = true;
+
+        majukan(TICK_20_DETIK * 2);
+
+        expect(onFrozen).not.toHaveBeenCalled();
+    });
+
+    it('TETAP berjaga sesudah melapor - ini pemulihan, bukan vonis', () => {
+        const video = videoTiruan();
+        const onFrozen = vi.fn();
+        hidupkan(video, onFrozen);
+
+        majukan(TICK_20_DETIK);
+        expect(onFrozen).toHaveBeenCalledTimes(1);
+
+        majukan(TICK_20_DETIK);          // masih beku sesudah pemulihan gagal
+        expect(onFrozen, 'watchdog berhenti sesudah laporan pertama').toHaveBeenCalledTimes(2);
+    });
+
+    it('tidak melapor dua kali beruntun sesudah jamnya dibasiskan ulang', () => {
+        const video = videoTiruan();
+        const onFrozen = vi.fn();
+        hidupkan(video, onFrozen);
+
+        majukan(TICK_20_DETIK + 3);      // beberapa tick melewati tenggat
+
+        expect(onFrozen).toHaveBeenCalledTimes(1);
+    });
+
+    it('tidak mengganggu vonis macet: bingkai berhenti sementara waktu MAJU tetap divonis', () => {
+        const video = videoTiruan();
+        const onFrozen = vi.fn();
+        const onNoPicture = vi.fn();
+        video._frames = 5;
+        startLivePictureWatch(video, { onFrozen, onNoPicture });
+        vi.advanceTimersByTime(500);
+
+        majukan(TICK_LEWAT_TENGGAT, () => { video.currentTime += 0.5; });
+
+        expect(onNoPicture).toHaveBeenCalledTimes(1);
+        expect(onFrozen).not.toHaveBeenCalled();
+    });
+});

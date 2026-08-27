@@ -876,7 +876,11 @@ describe('galat fatal SESUDAH stream terbukti hidup', () => {
 
     afterEach(() => {
         cleanup();
+        vi.useRealTimers();
         vi.restoreAllMocks();
+        delete HTMLMediaElement.prototype.paused;
+        delete HTMLMediaElement.prototype.readyState;
+        delete HTMLMediaElement.prototype.buffered;
         delete HTMLVideoElement.prototype.getVideoPlaybackQuality;
         Object.defineProperty(HTMLVideoElement.prototype, 'videoWidth', { configurable: true, get: () => 0 });
         Object.defineProperty(HTMLVideoElement.prototype, 'videoHeight', { configurable: true, get: () => 0 });
@@ -940,6 +944,31 @@ describe('galat fatal SESUDAH stream terbukti hidup', () => {
 
         expect(hls.startLoad).not.toHaveBeenCalled();
         await waitFor(() => { expect(screen.getByText('Gambar Terhenti')).toBeTruthy(); });
+    });
+
+    /*
+     * Playhead beku TANPA satu pun galat hls.js - bentuk yang tidak dipertanyakan apa pun sebelum
+     * ini. Diuji lewat perilaku, bukan teks sumber: waktu dimajukan 21 detik dengan playhead yang
+     * memang tidak pernah bergerak di jsdom, lalu pemulihannya harus terpicu sendiri.
+     */
+    it('playhead beku 20 detik memicu pemulihan, tanpa galat apa pun', async () => {
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        /*
+         * jsdom memberi readyState 0 dan buffered kosong, jadi watchdog-nya tidak pernah sampai ke
+         * vonis hidup dan cabang bekunya tak terjangkau. Elemen yang benar-benar memutar harus
+         * ditiru, bukan diasumsikan.
+         */
+        Object.defineProperty(HTMLMediaElement.prototype, 'paused', { configurable: true, get: () => false });
+        Object.defineProperty(HTMLMediaElement.prototype, 'readyState', { configurable: true, get: () => 4 });
+        Object.defineProperty(HTMLMediaElement.prototype, 'buffered', { configurable: true, get: () => ({ length: 1, start: () => 0, end: () => 0 }) });
+
+        const hls = await sampaiHidup(9006);
+        hls.liveSyncPosition = 55;
+
+        await act(async () => { await vi.advanceTimersByTimeAsync(21000); });
+
+        expect(hls.startLoad, 'wiring onFrozen tidak tersambung').toHaveBeenCalledWith(55);
+        vi.useRealTimers();
     });
 
     it('galat NON-fatal sesudah live tidak menyentuh apa pun', async () => {

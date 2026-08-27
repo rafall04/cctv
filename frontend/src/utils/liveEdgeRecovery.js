@@ -10,8 +10,9 @@
  * hls.js memanggil stopLoad() SENDIRI pada setiap galat fatal, dan ia TIDAK PERNAH me-retry 4xx
  * ("Do not retry on status 4xx" di utils/error-helper.ts). Jadi SATU segmen live yang kedaluwarsa
  * (404/410) mematikan pemuatan secara permanen. Sesudah itu tidak ada yang menghidupkannya lagi:
- * tenggat pemuatan sudah dilucuti saat go-live, dan livePictureWatch keluar lebih dulu di
- * `if (!advanced) return` karena currentTime memang BERHENTI - bukan macet, berhenti.
+ * tenggat pemuatan sudah dilucuti saat go-live. Watchdog gambar-hidup kini MELIHAT bentuk ini
+ * (playhead beku, bukan bingkai macet) dan melaporkannya ke sini lewat onFrozen - tetapi ia
+ * hanya melapor sesudah 20 detik, sedangkan jalur galat di bawah menjawab seketika.
  *
  * Dulu kedua pemutar membuang galat itu lewat `if (... || isLive) return;`. Karena stopLoad()
  * berjalan LEBIH DULU, gerbang itu bukan cuma membuang laporan - ia membuang satu-satunya
@@ -42,6 +43,27 @@ const SOURCE_GONE = [
     'manifestLoadError', 'manifestParsingError', 'manifestIncompatibleCodecsError',
     'levelLoadError', 'levelEmptyError', 'levelParsingError',
 ];
+
+/**
+ * Berapa detik data yang sudah tersedia DI DEPAN playhead.
+ *
+ * Ini yang memisahkan dua bentuk playhead beku yang butuh obat berbeda: kalau datanya SUDAH ADA
+ * dan playhead tetap tidak bergerak, yang macet dekodernya - memuat ulang segmen tidak menolong,
+ * dekodernya yang harus dibangun ulang. Kalau tidak ada data di depan, itu kelaparan: pemuatannya
+ * yang harus dihidupkan lagi.
+ */
+function detikDiDepan(video) {
+    const b = video?.buffered;
+    if (!b?.length) return 0;
+    const t = video.currentTime;
+    for (let i = 0; i < b.length; i += 1) {
+        if (t >= b.start(i) - 0.1 && t <= b.end(i)) return b.end(i) - t;
+    }
+    return 0;
+}
+
+/** Playhead beku dilaporkan watchdog gambar-hidup; bukan galat hls.js, jadi detailnya kita sendiri. */
+export const PLAYHEAD_FROZEN = 'playheadFrozen';
 
 /** Berapa kali boleh melanjutkan sebelum bukti kemajuan baru dituntut. */
 export const MAX_RESUMES_PER_EPISODE = 3;
@@ -90,7 +112,11 @@ export function resumeAtLiveEdgeOrFail(d, { hls, video, HlsErrorTypes, requestPl
     }
     hls._liveEdgeFrames = frames;
 
-    if (HlsErrorTypes && d.type === HlsErrorTypes.MEDIA_ERROR) {
+    // Playhead beku sementara datanya SUDAH ada di depan: dekodernya yang macet, bukan
+    // segmennya yang hilang. Ambang 1 detik supaya sisa buffer sekejap tidak terbaca sebagai
+    // "ada data" pada stream yang sebenarnya kelaparan.
+    const dekoderMacet = d.details === PLAYHEAD_FROZEN && detikDiDepan(video) > 1;
+    if (dekoderMacet || (HlsErrorTypes && d.type === HlsErrorTypes.MEDIA_ERROR)) {
         /*
          * Buffer BERISI tapi dekodernya macet. startLoad tidak membangun ulang dekoder;
          * recoverMediaError ya. Mengarahkan kasus ini ke startLoad berarti galat yang sama

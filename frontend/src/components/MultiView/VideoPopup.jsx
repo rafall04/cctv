@@ -24,7 +24,7 @@ import { usePauseOnHidden } from '../../hooks/usePauseOnHidden.js';
 import { useFocusTrap } from '../../hooks/useFocusTrap.js';
 import { resolveStreamUrl } from '../../utils/directStreamHelper';
 import { hasPicture, startLivePictureWatch } from '../../utils/livePictureWatch.js';
-import { resumeAtLiveEdgeOrFail } from '../../utils/liveEdgeRecovery.js';
+import { PLAYHEAD_FROZEN, resumeAtLiveEdgeOrFail } from '../../utils/liveEdgeRecovery.js';
 import { useStreamTimeout } from '../../hooks/useStreamTimeout';
 import { viewerService } from '../../services/viewerService';
 import { takeSnapshot as takeSnapshotUtil } from '../../utils/snapshotHelper';
@@ -580,6 +580,7 @@ function VideoPopup({
                 isStale: isStaleStreamRun,
                 onPicture: handlePlaying,
                 onNoPicture: (amatan) => (amatan?.everHadPicture ? failWithStall() : failWithCodec()),
+                onFrozen: () => resumeAtLiveEdgeOrFail({ fatal: true, details: PLAYHEAD_FROZEN }, { hls, video, HlsErrorTypes: HlsClass?.ErrorTypes, requestPlay: requestVideoPlay, onGiveUp: () => { stopWatch?.(); failWithStall(); } }),
                 requestPlay: requestVideoPlay,
             });
         };

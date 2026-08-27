@@ -98,6 +98,7 @@ export function startLivePictureWatch(video, {
     onPicture,
     onNoPicture,
     requestPlay,
+    onFrozen,
     intervalMs = 500,
     // Generous on purpose. This deadline only starts counting once data is flowing, and a slow
     // phone decoding a 2560x1440 stream can legitimately take several seconds to show frame one.
@@ -125,6 +126,22 @@ export function startLivePictureWatch(video, {
      * jadi menunggu lebih lama tidak menghilangkan bukti - hanya berhenti menuduh yang dingin.
      */
     stalledGiveUpMs = 10000,
+    /*
+     * PLAYHEAD BEKU: waktu media itu sendiri berhenti, bukan cuma bingkainya.
+     *
+     * Bentuk ini dulu sengaja tidak dijawab - `if (!advanced) return` memulangkan tick tanpa
+     * menyimpulkan apa pun, dengan alasan yang benar: waktu yang tidak maju memang bukan bukti.
+     * Tapi ia JUGA bentuk kegagalan paling parah yang ada, karena tidak ada apa pun di aplikasi
+     * ini yang mempertanyakannya: lencana tetap LIVE, tidak ada galat, gambarnya beku selamanya.
+     *
+     * 20 detik, dan angka itu punya alasan: fragLoadingTimeOut = 30 dtk, jadi pada jalur lemah
+     * hls.js bisa SAH sedang menunggu satu fragmen selama setengah menit dengan playhead beku.
+     * Tenggat pendek akan menghukum stream yang sedang dipulihkan. Yang membuat 20 detik tetap
+     * aman adalah JAWABANNYA: bukan panel, melainkan pemulihan yang sama seperti galat fatal -
+     * lompat ke live edge dan hidupkan pemuatan lagi. Untuk siaran LANGSUNG itu memang tindakan
+     * yang benar meski tebakannya meleset, dan anggarannya dibatasi di liveEdgeRecovery.
+     */
+    frozenGiveUpMs = 20000,
 } = {}) {
     if (!video) return () => {};
 
@@ -133,9 +150,10 @@ export function startLivePictureWatch(video, {
     let framesAtVerdict = null;
     let stillTimeAdvancing = null;
     let lastTickAt = null;
-    // Kedua tenggat di bawah dihitung dalam WAKTU YANG DIAMATI, bukan jam dinding. Lihat tick().
-    let dataMs = 0;
-    let stalledMs = 0;
+    // Ketiga tenggat di bawah dihitung dalam WAKTU YANG DIAMATI, bukan jam dinding. Lihat tick().
+    let dataMs = 0;      // byte mengalir, bingkai tak pernah datang
+    let stalledMs = 0;   // waktu MAJU, bingkai berhenti bertambah
+    let frozenMs = 0;    // waktu ITU SENDIRI berhenti
 
     const stop = () => {
         if (timer !== null) {
@@ -258,15 +276,34 @@ export function startLivePictureWatch(video, {
          * melompat tetapi dekodernya baru dibangun ulang. Membasiskan ulang di sini membuat tick
          * pertama sesudah kembali menjadi titik nol yang jujur, bukan sisa pengamatan lama.
          */
-        if (video.paused) {
+        if (video.paused || video.seeking) {
             stillTimeAdvancing = video.currentTime;
             stalledMs = 0;
+            frozenMs = 0;
             return;
         }
 
         const advanced = video.currentTime > stillTimeAdvancing;
-        if (!advanced) return;
+        if (!advanced) {
+            /*
+             * WAKTUNYA SENDIRI BERHENTI - dan ini satu-satunya bentuk kegagalan yang tidak
+             * dipertanyakan oleh apa pun di aplikasi ini. Lencana tetap LIVE, hls.js diam,
+             * gambarnya beku. Terjadi tanpa satu pun galat saat sumber berhenti menerbitkan
+             * sementara playlist-nya tetap sah, atau saat buffer habis tanpa galat fatal.
+             *
+             * onFrozen bukan vonis: pemanggilnya menjawabnya dengan PEMULIHAN, bukan panel.
+             * Karena itu watch TIDAK dihentikan di sini dan jamnya dibasiskan ulang - kalau
+             * pemulihannya berhasil, penjaga ini harus tetap berdiri untuk kali berikutnya.
+             */
+            frozenMs += teramati;
+            if (frozenMs >= frozenGiveUpMs) {
+                frozenMs = 0;
+                onFrozen?.();
+            }
+            return;
+        }
         stillTimeAdvancing = video.currentTime;
+        frozenMs = 0;
         if (frames === null || framesAtVerdict === null) return;
         /*
          * BERUBAH, bukan BERTAMBAH — dan perbedaan itu adalah keseluruhan bug ini.

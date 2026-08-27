@@ -20,7 +20,7 @@ import { getDeviceHLSConfig } from '../../utils/hlsConfig';
 import { isCodecFailure } from '../../utils/publicPopupState.js';
 import { canPlayNativeHls, startNativeHlsPlayback } from '../../utils/nativeHlsPlayback.js';
 import { startLivePictureWatch } from '../../utils/livePictureWatch.js';
-import { resumeAtLiveEdgeOrFail } from '../../utils/liveEdgeRecovery.js';
+import { PLAYHEAD_FROZEN, resumeAtLiveEdgeOrFail } from '../../utils/liveEdgeRecovery.js';
 import { shouldUseQueuedInit, getGlobalStreamInitQueue } from '../../utils/streamInitQueue';
 import { viewerService } from '../../services/viewerService';
 import { takeSnapshot as takeSnapshotUtil } from '../../utils/snapshotHelper';
@@ -400,6 +400,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                 isStale: () => cancelled,
                 onPicture: handlePlaying,
                 onNoPicture: failWithoutPicture,
+                onFrozen: () => resumeAtLiveEdgeOrFail({ fatal: true, details: PLAYHEAD_FROZEN }, { hls, video, HlsErrorTypes: Hls?.ErrorTypes, requestPlay: (el) => el.play().catch(() => { }), onGiveUp: () => failWithoutPicture({ everHadPicture: true }) }),
                 requestPlay: (el) => el.play().catch(() => { }),
             });
         };

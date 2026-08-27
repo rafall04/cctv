@@ -13,7 +13,7 @@
  */
 
 import { describe, expect, it, vi } from 'vitest';
-import { resumeAtLiveEdgeOrFail, MAX_RESUMES_PER_EPISODE } from './liveEdgeRecovery.js';
+import { resumeAtLiveEdgeOrFail, MAX_RESUMES_PER_EPISODE, PLAYHEAD_FROZEN } from './liveEdgeRecovery.js';
 
 const TIPE = { MEDIA_ERROR: 'mediaError', NETWORK_ERROR: 'networkError' };
 
@@ -193,6 +193,70 @@ describe('tidak ada galat fatal yang dibuang diam-diam', () => {
         const onGiveUp = vi.fn();
         expect(() => resumeAtLiveEdgeOrFail(fatal('fragLoadError'), { hls: null, video: null, onGiveUp }))
             .not.toThrow();
+        expect(onGiveUp).toHaveBeenCalledTimes(1);
+    });
+});
+
+/*
+ * Playhead beku dilaporkan watchdog gambar-hidup, bukan hls.js - dan ia punya DUA bentuk yang
+ * butuh obat berbeda. Kalau datanya sudah ada di depan dan playhead tetap diam, yang macet
+ * dekodernya: memuat ulang segmen tidak menolong sama sekali, dekodernya yang harus dibangun
+ * ulang. Kalau tidak ada data di depan, itu kelaparan: pemuatannya yang harus dihidupkan.
+ */
+describe('playhead beku dibedakan: dekoder macet lawan kelaparan data', () => {
+    const dgnBuffer = (mulai, akhir) => ({
+        currentTime: 10,
+        buffered: { length: 1, start: () => mulai, end: () => akhir },
+        getVideoPlaybackQuality: () => ({ totalVideoFrames: 100, droppedVideoFrames: 0 }),
+    });
+
+    it('data ADA di depan -> bangun ulang dekoder, jangan geser playhead', () => {
+        const hls = { liveSyncPosition: 42, startLoad: vi.fn(), recoverMediaError: vi.fn() };
+        const video = dgnBuffer(0, 25);          // 15 detik di depan playhead
+        resumeAtLiveEdgeOrFail({ fatal: true, details: PLAYHEAD_FROZEN }, { hls, video });
+
+        expect(hls.recoverMediaError).toHaveBeenCalledTimes(1);
+        expect(hls.startLoad).not.toHaveBeenCalled();
+        expect(video.currentTime).toBe(10);
+    });
+
+    it('TIDAK ada data di depan -> hidupkan pemuatan di live edge', () => {
+        const hls = { liveSyncPosition: 42, startLoad: vi.fn(), recoverMediaError: vi.fn() };
+        const video = dgnBuffer(0, 10);          // playhead persis di ujung buffer
+        resumeAtLiveEdgeOrFail({ fatal: true, details: PLAYHEAD_FROZEN }, { hls, video });
+
+        expect(hls.startLoad).toHaveBeenCalledWith(42);
+        expect(hls.recoverMediaError).not.toHaveBeenCalled();
+        expect(video.currentTime).toBe(42);
+    });
+
+    it('sisa buffer sekejap (<1 dtk) tetap dibaca sebagai kelaparan', () => {
+        const hls = { liveSyncPosition: 42, startLoad: vi.fn(), recoverMediaError: vi.fn() };
+        const video = dgnBuffer(0, 10.6);        // 0,6 detik: bukan bukti dekoder macet
+        resumeAtLiveEdgeOrFail({ fatal: true, details: PLAYHEAD_FROZEN }, { hls, video });
+
+        expect(hls.startLoad).toHaveBeenCalledWith(42);
+        expect(hls.recoverMediaError).not.toHaveBeenCalled();
+    });
+
+    it('tanpa buffer sama sekali tidak melempar', () => {
+        const hls = { liveSyncPosition: 42, startLoad: vi.fn(), recoverMediaError: vi.fn() };
+        const video = { currentTime: 10, buffered: { length: 0 },
+            getVideoPlaybackQuality: () => ({ totalVideoFrames: 100, droppedVideoFrames: 0 }) };
+
+        expect(() => resumeAtLiveEdgeOrFail({ fatal: true, details: PLAYHEAD_FROZEN }, { hls, video })).not.toThrow();
+        expect(hls.startLoad).toHaveBeenCalledWith(42);
+    });
+
+    it('anggaran yang sama berlaku: beku berulang akhirnya divonis', () => {
+        const hls = { liveSyncPosition: 42, startLoad: vi.fn(), recoverMediaError: vi.fn() };
+        const onGiveUp = vi.fn();
+        const video = dgnBuffer(0, 10);
+        for (let i = 0; i < MAX_RESUMES_PER_EPISODE + 1; i += 1) {
+            video.currentTime = 10;
+            resumeAtLiveEdgeOrFail({ fatal: true, details: PLAYHEAD_FROZEN }, { hls, video, onGiveUp });
+        }
+
         expect(onGiveUp).toHaveBeenCalledTimes(1);
     });
 });

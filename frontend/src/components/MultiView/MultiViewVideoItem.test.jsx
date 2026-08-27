@@ -252,6 +252,36 @@ describe('MultiViewVideoItem runtime stability', () => {
             expect(onError).toHaveBeenCalled();
         });
 
+        /*
+         * Playhead beku TANPA satu pun galat hls.js. jsdom memberi readyState 0 dan buffered
+         * kosong, jadi watchdog-nya tidak pernah sampai ke vonis hidup dan cabang bekunya tak
+         * terjangkau - elemen yang benar-benar memutar harus ditiru, bukan diasumsikan.
+         */
+        it('playhead beku 20 detik memicu pemulihan, tanpa galat apa pun', async () => {
+            vi.useFakeTimers({ shouldAdvanceTime: true });
+            Object.defineProperty(HTMLMediaElement.prototype, 'paused', { configurable: true, get: () => false });
+            Object.defineProperty(HTMLMediaElement.prototype, 'readyState', { configurable: true, get: () => 4 });
+            Object.defineProperty(HTMLMediaElement.prototype, 'buffered', { configurable: true, get: () => ({ length: 1, start: () => 0, end: () => 0 }) });
+            Object.defineProperty(HTMLVideoElement.prototype, 'videoWidth', { configurable: true, get: () => 1280 });
+            Object.defineProperty(HTMLVideoElement.prototype, 'videoHeight', { configurable: true, get: () => 720 });
+            HTMLVideoElement.prototype.getVideoPlaybackQuality = () => ({ totalVideoFrames: 100, droppedVideoFrames: 0 });
+
+            const { hls } = await hidupkan();
+            hls.liveSyncPosition = 55;
+
+            await act(async () => { await vi.advanceTimersByTimeAsync(21000); });
+
+            expect(hls.startLoad, 'wiring onFrozen tidak tersambung').toHaveBeenCalledWith(55);
+
+            vi.useRealTimers();
+            delete HTMLMediaElement.prototype.paused;
+            delete HTMLMediaElement.prototype.readyState;
+            delete HTMLMediaElement.prototype.buffered;
+            delete HTMLVideoElement.prototype.getVideoPlaybackQuality;
+            Object.defineProperty(HTMLVideoElement.prototype, 'videoWidth', { configurable: true, get: () => 0 });
+            Object.defineProperty(HTMLVideoElement.prototype, 'videoHeight', { configurable: true, get: () => 0 });
+        });
+
         it('galat NON-fatal sesudah live tidak menyentuh apa pun', async () => {
             const { hls, onError } = await hidupkan();
             hls.liveSyncPosition = 77.25;
