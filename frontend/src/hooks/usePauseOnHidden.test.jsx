@@ -67,3 +67,49 @@ describe('usePauseOnHidden', () => {
         removeSpy.mockRestore();
     });
 });
+
+/*
+ * Kembali dari latar belakang adalah tempat kebijakan autoplay paling sering menolak, dan
+ * penolakannya datang sebagai promise yang ditolak - bukan galat. Dengan video.play() mentah,
+ * penolakan itu hanya di-catch dan dibuang, jadi pengunjung kembali ke bingkai beku tanpa satu
+ * pun petunjuk. VideoPopup punya requestVideoPlay yang mengenali NotAllowedError dan memunculkan
+ * prompt ketuk-untuk-memutar; hook ini harus memakainya, bukan memutar sendiri.
+ */
+describe('melanjutkan lewat cara-memutar milik pemanggil', () => {
+    it('memakai resumePlay dan TIDAK memanggil video.play() sendiri', () => {
+        const video = { paused: false, pause: vi.fn(function () { this.paused = true; }), play: vi.fn() };
+        const resumePlay = vi.fn();
+        const videoRef = { current: video };
+
+        renderHook(() => usePauseOnHidden(videoRef, resumePlay));
+
+        setHidden(true);
+        expect(video.pause).toHaveBeenCalledTimes(1);
+
+        setHidden(false);
+        expect(resumePlay, 'penolakan autoplay akan hilang tanpa suara').toHaveBeenCalledWith(video);
+        expect(video.play, 'play() mentah melewati prompt ketuk-untuk-memutar').not.toHaveBeenCalled();
+    });
+
+    it('tetap memutar sendiri bila pemanggil tidak memberi cara-memutar', () => {
+        const video = { paused: false, pause: vi.fn(function () { this.paused = true; }), play: vi.fn(() => Promise.resolve()) };
+        renderHook(() => usePauseOnHidden({ current: video }));
+
+        setHidden(true);
+        setHidden(false);
+
+        expect(video.play).toHaveBeenCalledTimes(1);
+    });
+
+    it('tidak melanjutkan video yang dijeda PENGGUNA, walau ada resumePlay', () => {
+        const video = { paused: true, pause: vi.fn(), play: vi.fn() };
+        const resumePlay = vi.fn();
+        renderHook(() => usePauseOnHidden({ current: video }, resumePlay));
+
+        setHidden(true);
+        setHidden(false);
+
+        expect(video.pause).not.toHaveBeenCalled();
+        expect(resumePlay).not.toHaveBeenCalled();
+    });
+});

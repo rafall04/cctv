@@ -16,7 +16,7 @@ import { detectDeviceTier } from '../../utils/deviceDetector';
 import { shouldDisableAnimations } from '../../utils/animationControl';
 import { LoadingStage, getStageMessage, createStreamError } from '../../utils/streamLoaderTypes';
 import { createFallbackHandler } from '../../utils/fallbackHandler';
-import { getHLSConfig } from '../../utils/hlsConfig';
+import { getDeviceHLSConfig } from '../../utils/hlsConfig';
 import { isCodecFailure } from '../../utils/publicPopupState.js';
 import { canPlayNativeHls, startNativeHlsPlayback } from '../../utils/nativeHlsPlayback.js';
 import { startLivePictureWatch } from '../../utils/livePictureWatch.js';
@@ -449,11 +449,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
             }
 
             if (Hls.isSupported()) {
-                const deviceTier = detectDeviceTier();
-                const hlsConfig = getHLSConfig(deviceTier, {
-                    isMobile: false,
-                    mobileDeviceType: null,
-                });
+                const hlsConfig = getDeviceHLSConfig();
                 hls = new Hls(hlsConfig);
                 hlsRef.current = hls;
 

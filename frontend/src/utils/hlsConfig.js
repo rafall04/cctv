@@ -15,6 +15,8 @@
  * HLS configuration presets for each device tier
  * STANDARD HLS MODE: Prioritizing stability and smooth playback
  */
+import { getDeviceCapabilities } from './deviceDetector.js';
+
 const HLS_CONFIGS = {
     low: {
         // Worker ENABLED for all tiers (offload parsing to background thread)
@@ -107,6 +109,21 @@ const MOBILE_OVERRIDES = {
 /**
  * Mobile phone config - BALANCED for stability
  */
+/*
+ * Timeout pemuatan SENGAJA tidak di-override di sini, dan itu perubahan 2026-08-26.
+ *
+ * Preset ponsel ini TIDAK PERNAH AKTIF sejak ditulis - ketiga pemanggilnya meneruskan
+ * `isMobile: false` yang di-hardcode, jadi seluruh blok ini kode mati. Artinya nilai 10 dtk
+ * yang dulu ada di sini tidak pernah teruji di lapangan sama sekali, sedangkan 30 dtk milik
+ * tier-nya sudah berjalan di produksi bertahun-tahun. Menyalakan preset ini SEKALIGUS
+ * memangkas timeout jadi sepertiganya berarti mengirim dua perubahan sebagai satu, ke armada
+ * yang justru paling rentan: pengguna seluler Indonesia, yang jalur Cloudflare-nya ke SIN
+ * sudah terukur menambah latensi.
+ *
+ * Yang jelas menguntungkan ponsel adalah buffer yang lebih kecil (RAM, baterai, data), dan
+ * itu yang dipertahankan. Timeout-nya mewarisi tier - kalau nanti mau diperpendek, kirim
+ * sebagai perubahan tersendiri dengan pengukurannya.
+ */
 const MOBILE_PHONE_CONFIG = {
     maxBufferLength: 10,
     maxMaxBufferLength: 15,
@@ -114,10 +131,6 @@ const MOBILE_PHONE_CONFIG = {
     startLevel: -1,
     liveSyncDurationCount: 3,
     liveMaxLatencyDurationCount: 9,
-    fragLoadingTimeOut: 10000,
-    fragLoadingRetryDelay: 1000,
-    levelLoadingTimeOut: 10000,
-    manifestLoadingTimeOut: 10000,
 };
 
 /**
@@ -130,10 +143,6 @@ const MOBILE_TABLET_CONFIG = {
     startLevel: -1,
     liveSyncDurationCount: 3,
     liveMaxLatencyDurationCount: 9,
-    fragLoadingTimeOut: 10000,
-    fragLoadingRetryDelay: 1000,
-    levelLoadingTimeOut: 10000,
-    manifestLoadingTimeOut: 10000,
 };
 
 /**
@@ -164,6 +173,23 @@ export const getHLSConfig = (tier, options = {}) => {
     
     // Apply custom overrides
     return { ...baseConfig, ...overrides };
+};
+
+/**
+ * Konfigurasi HLS untuk perangkat YANG SEDANG DIPAKAI - satu-satunya bentuk yang sebaiknya
+ * dipanggil komponen pemutar.
+ *
+ * Sebelum ini setiap pemutar menyusun opsinya sendiri, dan ketiganya meneruskan
+ * `isMobile: false` yang di-hardcode - sehingga seluruh preset ponsel di atas tidak pernah
+ * jalan satu kali pun. Membiarkan pemanggil mendeklarasikan sendiri perangkatnya berarti
+ * cacat itu bisa kembali kapan saja; di sini ia tidak bisa.
+ *
+ * @param {Object} overrides - override khusus pemanggil (opsional)
+ * @returns {Object} konfigurasi hls.js
+ */
+export const getDeviceHLSConfig = (overrides = {}) => {
+    const { tier, isMobile, mobileDeviceType } = getDeviceCapabilities();
+    return getHLSConfig(tier, { isMobile, mobileDeviceType, overrides });
 };
 
 /**

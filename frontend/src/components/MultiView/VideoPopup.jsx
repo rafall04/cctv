@@ -17,7 +17,7 @@ import { detectDeviceTier } from '../../utils/deviceDetector';
 import { shouldDisableAnimations } from '../../utils/animationControl';
 import { LoadingStage, createStreamError } from '../../utils/streamLoaderTypes';
 import { createFallbackHandler } from '../../utils/fallbackHandler';
-import { getHLSConfig } from '../../utils/hlsConfig';
+import { getDeviceHLSConfig } from '../../utils/hlsConfig';
 import { cleanupMediaResources } from '../../utils/mediaResourceCleanup';
 import { preloadHls, preloadFlv } from '../../utils/preloadManager';
 import { usePauseOnHidden } from '../../hooks/usePauseOnHidden.js';
@@ -79,7 +79,6 @@ function VideoPopup({
 }) {
     const [searchParams] = useSearchParams();
     const videoRef = useRef(null);
-    usePauseOnHidden(videoRef);
     const wrapperRef = useRef(null);
     const modalRef = useRef(null);
     const outerWrapperRef = useRef(null); // Add ref for outer wrapper
@@ -346,6 +345,11 @@ function VideoPopup({
             // Ignore autoplay/runtime failures; popup state machine handles recoverable errors separately.
         }
     }, []);
+
+    // Di BAWAH requestVideoPlay dengan sengaja: hook ini memakainya untuk melanjutkan, supaya
+    // penolakan autoplay saat kembali dari latar belakang memunculkan prompt ketuk-untuk-memutar
+    // dan bukan bingkai beku yang diam.
+    usePauseOnHidden(videoRef, requestVideoPlay);
 
     // Track fullscreen state to disable animations and unlock orientation on exit
     useEffect(() => {
@@ -627,11 +631,7 @@ function VideoPopup({
             // initializePlayback already awaited preloadHls and assigned HlsClass.
             if (isStaleStreamRun() || !HlsClass) return;
 
-            const deviceTier = detectDeviceTier();
-            const hlsConfig = getHLSConfig(deviceTier, {
-                isMobile: false,
-                mobileDeviceType: null,
-            });
+            const hlsConfig = getDeviceHLSConfig();
             hls = new HlsClass(hlsConfig);
             hlsRef.current = hls;
 
@@ -770,10 +770,7 @@ function VideoPopup({
                             // Re-arm the net the handler above disarmed, or a stalled retry never ends.
                             startTimeout(LoadingStage.CONNECTING);
                             hls.destroy();
-                            const newHlsConfig = getHLSConfig(deviceTier, {
-                                isMobile: false,
-                                mobileDeviceType: null,
-                            });
+                            const newHlsConfig = getDeviceHLSConfig();
                             const newHls = new HlsClass(newHlsConfig);
                             hlsRef.current = newHls;
                             newHls.loadSource(effectiveUrl);

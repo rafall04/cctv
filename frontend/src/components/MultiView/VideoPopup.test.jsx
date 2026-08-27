@@ -121,6 +121,7 @@ vi.mock('../../utils/fallbackHandler', () => ({
 
 vi.mock('../../utils/hlsConfig', () => ({
     getHLSConfig: () => ({}),
+    getDeviceHLSConfig: () => ({}),
 }));
 
 vi.mock('../../hooks/useStreamTimeout', () => ({

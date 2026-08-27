@@ -191,6 +191,7 @@ vi.mock('../utils/deviceDetector', () => ({
 
 vi.mock('../utils/hlsConfig', () => ({
     getHLSConfig: () => ({}),
+    getDeviceHLSConfig: () => ({}),
 }));
 
 vi.mock('../utils/rafThrottle', () => ({
