@@ -13,7 +13,7 @@
  */
 
 import { describe, expect, it, vi } from 'vitest';
-import { resumeAtLiveEdgeOrFail, MAX_RESUMES_PER_EPISODE, PLAYHEAD_FROZEN } from './liveEdgeRecovery.js';
+import { resumeAtLiveEdge, resumeAtLiveEdgeOrFail, LIVE_SNAP_TOLERANCE_S, MAX_RESUMES_PER_EPISODE, PLAYHEAD_FROZEN } from './liveEdgeRecovery.js';
 
 const TIPE = { MEDIA_ERROR: 'mediaError', NETWORK_ERROR: 'networkError' };
 
@@ -258,5 +258,93 @@ describe('playhead beku dibedakan: dekoder macet lawan kelaparan data', () => {
         }
 
         expect(onGiveUp).toHaveBeenCalledTimes(1);
+    });
+});
+
+/*
+ * MELANJUTKAN DI TEPI-LIVE — akar keluhan 2026-08-28 ("keluar 5-10 menit, kembali, beku").
+ *
+ * usePauseOnHidden menjeda video saat tab tersembunyi dan memanggil play() saat kembali. Untuk
+ * siaran LANGSUNG itu tidak cukup: sesudah sepuluh menit di latar belakang, playhead tertinggal
+ * sepuluh menit dan segmen di posisi itu sudah lama keluar dari jendela playlist. play()
+ * melanjutkan ke tempat yang datanya SUDAH TIDAK ADA, dan hasilnya bingkai beku.
+ *
+ * Komentar di dalam usePauseOnHidden sendiri sudah mencatat bahwa tidak ada yang menarik kamera
+ * internal ke tepi-live. Catatan itu benar selama berbulan-bulan; ini isinya.
+ */
+describe('melanjutkan di tepi-live sesudah kembali dari latar belakang', () => {
+    it('MELOMPAT ke tepi-live ketika playhead tertinggal jauh', () => {
+        const t = buat({ liveSyncPosition: 600 });
+        t.video.currentTime = 12;      // ditinggalkan sepuluh menit lalu
+
+        resumeAtLiveEdge(t.video, t.hls, t.requestPlay);
+
+        expect(t.video.currentTime, 'melanjutkan di posisi basi yang segmennya sudah hilang').toBe(600);
+        expect(t.requestPlay).toHaveBeenCalledWith(t.video);
+    });
+
+    it('memanggil startLoad, bukan hanya seek', () => {
+        // hls.js memanggil stopLoad() pada SETIAP galat fatal, dan galat itu bisa saja sudah
+        // terjadi selagi tab tersembunyi. Tanpa startLoad, seek-nya berhasil dan tidak ada yang
+        // pernah mengambil segmennya.
+        const t = buat({ liveSyncPosition: 600 });
+        t.video.currentTime = 12;
+
+        resumeAtLiveEdge(t.video, t.hls, t.requestPlay);
+
+        expect(t.hls.startLoad).toHaveBeenCalledWith(600);
+    });
+
+    it('TIDAK melompat ketika masih di tepi - tab tersembunyi sekejap', () => {
+        // Melompat di sini akan membuang buffer yang masih sah dan menimbulkan kedipan percuma.
+        const t = buat({ liveSyncPosition: 600 });
+        t.video.currentTime = 600 - (LIVE_SNAP_TOLERANCE_S - 1);
+
+        resumeAtLiveEdge(t.video, t.hls, t.requestPlay);
+
+        expect(t.video.currentTime).not.toBe(600);
+        expect(t.hls.startLoad).not.toHaveBeenCalled();
+        expect(t.requestPlay, 'tetap harus diputar').toHaveBeenCalled();
+    });
+
+    it('TETAP memutar walaupun tidak ada instans hls (MJPEG / embed / native HLS)', () => {
+        const t = buat();
+
+        resumeAtLiveEdge(t.video, null, t.requestPlay);
+
+        expect(t.requestPlay).toHaveBeenCalledWith(t.video);
+    });
+
+    it('tidak menyentuh playhead ketika tepi-live tidak diketahui', () => {
+        for (const buruk of [undefined, null, NaN, Infinity]) {
+            const t = buat();
+            t.hls.liveSyncPosition = buruk;
+            t.video.currentTime = 12;
+
+            resumeAtLiveEdge(t.video, t.hls, t.requestPlay);
+
+            expect(t.video.currentTime, `liveSyncPosition=${String(buruk)}`).toBe(12);
+            expect(t.requestPlay).toHaveBeenCalled();
+        }
+    });
+
+    it('seek yang DITOLAK tetap tidak menghalangi pemutaran', () => {
+        // Sebagian peramban melempar saat currentTime diset pada keadaan tertentu. Kalau itu
+        // menghentikan play(), perbaikan ini justru menciptakan bingkai beku yang baru.
+        const t = buat({ liveSyncPosition: 600 });
+        Object.defineProperty(t.video, 'currentTime', {
+            get: () => 12,
+            set: () => { throw new Error('InvalidStateError'); },
+        });
+
+        expect(() => resumeAtLiveEdge(t.video, t.hls, t.requestPlay)).not.toThrow();
+        expect(t.requestPlay).toHaveBeenCalled();
+    });
+
+    it('tanpa elemen video tidak melakukan apa-apa dan tidak melempar', () => {
+        const t = buat();
+
+        expect(() => resumeAtLiveEdge(null, t.hls, t.requestPlay)).not.toThrow();
+        expect(t.requestPlay).not.toHaveBeenCalled();
     });
 });

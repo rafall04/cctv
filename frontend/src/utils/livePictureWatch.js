@@ -142,6 +142,23 @@ export function startLivePictureWatch(video, {
      * yang benar meski tebakannya meleset, dan anggarannya dibatasi di liveEdgeRecovery.
      */
     frozenGiveUpMs = 20000,
+    /*
+     * DIJEDA SEMENTARA HALAMANNYA TERLIHAT - lubang yang membuat keluhan 2026-08-28 tidak
+     * berbunyi sama sekali.
+     *
+     * Cabang paused di bawah semula langsung keluar tanpa mengumpulkan apa pun, dengan alasan
+     * yang benar: video yang berhenti tidak bisa membuktikan apa pun, dan jangan melawan jeda
+     * yang dilakukan penonton sendiri. Akibatnya, ketika play() saat kembali dari latar
+     * belakang gagal DIAM-DIAM - penolakan promise yang bukan NotAllowedError hanya
+     * ditelan - pengunjung tinggal di bingkai beku selamanya dan tidak ada satu pun jalur di
+     * aplikasi ini yang akan bicara.
+     *
+     * Menyenggol di sini AMAN karena kedua permukaan yang memakai watchdog ini - popup live
+     * dan ubin multi-view - tidak merender kontrol jeda sama sekali. Sesudah vonis live,
+     * "paused" tidak pernah kehendak penonton di sana.
+     */
+    pausedNudgeMs = 3000,
+    pausedGiveUpMs = 25000,
 } = {}) {
     if (!video) return () => {};
 
@@ -154,6 +171,8 @@ export function startLivePictureWatch(video, {
     let dataMs = 0;      // byte mengalir, bingkai tak pernah datang
     let stalledMs = 0;   // waktu MAJU, bingkai berhenti bertambah
     let frozenMs = 0;    // waktu ITU SENDIRI berhenti
+    let pausedMs = 0;    // dijeda padahal halamannya terlihat
+    let nudges = 0;      // berapa kali sudah disenggol dalam episode jeda ini
 
     const stop = () => {
         if (timer !== null) {
@@ -226,6 +245,9 @@ export function startLivePictureWatch(video, {
         if (typeof document !== 'undefined' && document.hidden) {
             dataMs = 0;
             stalledMs = 0;
+            // Dijeda SENGAJA oleh usePauseOnHidden selagi tersembunyi; itu bukan macet.
+            pausedMs = 0;
+            nudges = 0;
             stillTimeAdvancing = video.currentTime;
             if (live) framesAtVerdict = countDecodedFrames(video);
             return;
@@ -276,12 +298,43 @@ export function startLivePictureWatch(video, {
          * melompat tetapi dekodernya baru dibangun ulang. Membasiskan ulang di sini membuat tick
          * pertama sesudah kembali menjadi titik nol yang jujur, bukan sisa pengamatan lama.
          */
-        if (video.paused || video.seeking) {
+        if (video.seeking) {
             stillTimeAdvancing = video.currentTime;
             stalledMs = 0;
             frozenMs = 0;
+            pausedMs = 0;
+            nudges = 0;
             return;
         }
+
+        if (video.paused) {
+            stillTimeAdvancing = video.currentTime;
+            stalledMs = 0;
+            frozenMs = 0;
+
+            /*
+             * Waktunya tetap TIDAK dihitung sebagai bukti apa pun - jam macet dan beku
+             * dibasiskan ulang di atas. Yang dikumpulkan hanya lamanya berhenti itu sendiri,
+             * supaya jeda yang tidak seorang pun minta tidak bisa berlangsung selamanya.
+             */
+            pausedMs += teramati;
+
+            // Satu senggolan per pausedNudgeMs, bukan tiap tick: play() dua kali sedetik hanya
+            // menumpuk promise yang saling membatalkan.
+            if (pausedMs >= (nudges + 1) * pausedNudgeMs) {
+                nudges += 1;
+                requestPlay?.(video);
+            }
+
+            // Masih berhenti sesudah sekian lama disenggol: ini bukan jeda, ini macet.
+            // giveUp() memvonis 'stalled' karena live sudah true - vonis yang PUNYA tombol
+            // coba lagi, bukan 'codec' yang menjebak pengunjungnya.
+            if (pausedMs >= pausedGiveUpMs) giveUp();
+            return;
+        }
+
+        pausedMs = 0;
+        nudges = 0;
 
         const advanced = video.currentTime > stillTimeAdvancing;
         if (!advanced) {

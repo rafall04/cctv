@@ -49,10 +49,11 @@ const LIVE_EDGE_LATENCY_SNAP_S = 10;
 // ============================================
 function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDelay = 0 }) {
     const videoRef = useRef(null);
-    usePauseOnHidden(videoRef);
     const wrapperRef = useRef(null);
     const containerRef = useRef(null);
     const hlsRef = useRef(null);
+    // Di BAWAH hlsRef: hook-nya melompat ke tepi-live lewat ref itu sebelum memutar.
+    usePauseOnHidden(videoRef, undefined, hlsRef);
     const flvRef = useRef(null);
     const fallbackHandlerRef = useRef(null);
     const abortControllerRef = useRef(null);

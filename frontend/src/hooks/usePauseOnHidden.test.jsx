@@ -112,4 +112,73 @@ describe('melanjutkan lewat cara-memutar milik pemanggil', () => {
         expect(video.pause).not.toHaveBeenCalled();
         expect(resumePlay).not.toHaveBeenCalled();
     });
+
+    /*
+     * MELANJUTKAN DI TEPI-LIVE — keluhan 2026-08-28: keluar 5-10 menit, kembali, gambarnya beku,
+     * tanpa satu pun pesan.
+     *
+     * Menjeda saat tersembunyi itu benar; melanjutkan DI TEMPAT YANG SAMA tidak. Playhead
+     * tertinggal sepuluh menit dan segmen di posisi itu sudah keluar dari jendela playlist, jadi
+     * play() melanjutkan ke tempat yang datanya sudah tidak ada. Diamnya pun bukan kebetulan:
+     * livePictureWatch sengaja tidak memvonis video yang PAUSED.
+     */
+    const videoHidup = () => ({
+        paused: false,
+        currentTime: 12,
+        pause: vi.fn(function () { this.paused = true; }),
+        play: vi.fn(() => Promise.resolve()),
+    });
+
+    it('MELOMPAT ke tepi-live saat kembali, bukan melanjutkan di posisi basi', () => {
+        const video = videoHidup();
+        const hls = { liveSyncPosition: 600, startLoad: vi.fn() };
+        renderHook(() => usePauseOnHidden({ current: video }, undefined, { current: hls }));
+
+        setHidden(true);
+        setHidden(false);
+
+        expect(video.currentTime, 'melanjutkan di posisi yang segmennya sudah hilang').toBe(600);
+        expect(hls.startLoad, 'seek saja tidak cukup: hls stopLoad() pada tiap galat fatal').toHaveBeenCalledWith(600);
+        expect(video.play).toHaveBeenCalled();
+    });
+
+    it('TIDAK melompat ketika masih di tepi - tersembunyi sekejap', () => {
+        const video = videoHidup();
+        video.currentTime = 599;
+        const hls = { liveSyncPosition: 600, startLoad: vi.fn() };
+        renderHook(() => usePauseOnHidden({ current: video }, undefined, { current: hls }));
+
+        setHidden(true);
+        setHidden(false);
+
+        expect(video.currentTime, 'membuang buffer sah dan berkedip percuma').toBe(599);
+        expect(hls.startLoad).not.toHaveBeenCalled();
+        expect(video.play).toHaveBeenCalled();
+    });
+
+    it('tanpa hlsRef tetap bekerja seperti sebelumnya (MJPEG / embed / HLS native)', () => {
+        const video = videoHidup();
+        renderHook(() => usePauseOnHidden({ current: video }));
+
+        setHidden(true);
+        setHidden(false);
+
+        expect(video.currentTime).toBe(12);
+        expect(video.play).toHaveBeenCalled();
+    });
+
+    it('lompatannya memakai resumePlay pemanggil, bukan play() mentah', () => {
+        // Supaya penolakan autoplay tetap memunculkan prompt ketuk-untuk-memutar dan bukan diam.
+        const video = videoHidup();
+        const hls = { liveSyncPosition: 600, startLoad: vi.fn() };
+        const resumePlay = vi.fn();
+        renderHook(() => usePauseOnHidden({ current: video }, resumePlay, { current: hls }));
+
+        setHidden(true);
+        setHidden(false);
+
+        expect(video.currentTime).toBe(600);
+        expect(resumePlay).toHaveBeenCalledWith(video);
+        expect(video.play).not.toHaveBeenCalled();
+    });
 });

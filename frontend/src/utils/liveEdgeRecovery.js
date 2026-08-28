@@ -65,6 +65,62 @@ function detikDiDepan(video) {
 /** Playhead beku dilaporkan watchdog gambar-hidup; bukan galat hls.js, jadi detailnya kita sendiri. */
 export const PLAYHEAD_FROZEN = 'playheadFrozen';
 
+/**
+ * Sejauh mana di belakang tepi-live masih dianggap "di tepi" dan tidak perlu dilompati.
+ *
+ * hls.js sendiri menargetkan sekitar tiga durasi segmen di belakang tepi, jadi ambang yang terlalu
+ * ketat akan melompat-lompat pada stream yang sehat. Enam detik lebih longgar dari itu dan jauh
+ * lebih pendek daripada jendela live mana pun, sehingga hanya keterlambatan yang SUNGGUHAN yang
+ * memicunya.
+ */
+export const LIVE_SNAP_TOLERANCE_S = 6;
+
+/**
+ * Lanjutkan pemutaran DI TEPI LIVE, bukan di tempat playhead ditinggalkan.
+ *
+ * KENAPA INI ADA - CACAT YANG DILAPORKAN 2026-08-28
+ * -------------------------------------------------
+ * `usePauseOnHidden` MENJEDA video saat tab disembunyikan (hemat kuota dan baterai; benar), lalu
+ * memanggil play() saat kembali. Untuk siaran LANGSUNG itu tidak cukup: setelah 5-10 menit di
+ * latar belakang, playhead tertinggal sepuluh menit dan segmen di posisi itu sudah lama keluar
+ * dari jendela playlist. play() melanjutkan ke tempat yang datanya SUDAH TIDAK ADA.
+ *
+ * Yang dilihat pengunjung: bingkai beku, tanpa satu pun pesan. Dan diamnya bukan kebetulan -
+ * livePictureWatch sengaja tidak memvonis video yang PAUSED (video yang berhenti tidak bisa
+ * membuktikan apa pun), jadi kalau play() gagal diam-diam tidak ada apa pun yang akan bicara.
+ * Komentar di dalam usePauseOnHidden sendiri sudah mencatat bahwa tidak ada yang menarik kamera
+ * internal ke tepi-live; catatan itu benar, dan ini isinya.
+ *
+ * @param {HTMLVideoElement} video
+ * @param {Object} [hls] - instans hls.js yang sedang berjalan, bila ada
+ * @param {(el: HTMLVideoElement) => void} [requestPlay] - cara memutar milik pemanggil
+ */
+export function resumeAtLiveEdge(video, hls, requestPlay) {
+    if (!video) return;
+
+    const target = hls?.liveSyncPosition;
+    /*
+     * Hanya melompat ketika benar-benar tertinggal. Pada kamera yang tetap di tepi - tab
+     * disembunyikan sekejap - melompat akan membuang buffer yang masih sah dan menimbulkan
+     * kedipan yang tidak perlu.
+     */
+    if (Number.isFinite(target) && video.currentTime < target - LIVE_SNAP_TOLERANCE_S) {
+        try {
+            video.currentTime = target;
+            /*
+             * startLoad WAJIB, bukan hanya seek: hls.js memanggil stopLoad() pada SETIAP galat
+             * fatal, dan galat itu bisa saja sudah terjadi selagi tab tersembunyi. Tanpa ini,
+             * seek-nya berhasil dan tidak ada yang pernah mengambil segmennya.
+             */
+            hls.startLoad(target);
+        } catch {
+            /* seek/startLoad ditolak: play() di bawah tetap dicoba, dan penjaga beku yang menilai */
+        }
+    }
+
+    requestPlay?.(video);
+}
+
 /** Berapa kali boleh melanjutkan sebelum bukti kemajuan baru dituntut. */
 export const MAX_RESUMES_PER_EPISODE = 3;
 /** Batas keras seumur satu instans hls, supaya stream yang bolak-balik tidak melanjut selamanya. */

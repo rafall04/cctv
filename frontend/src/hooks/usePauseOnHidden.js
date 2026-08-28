@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { resumeAtLiveEdge } from '../utils/liveEdgeRecovery.js';
 
 /**
  * Pause a <video> element while the browser tab is hidden, and resume it when the tab becomes
@@ -24,10 +25,24 @@ import { useEffect } from 'react';
  * requestVideoPlay yang mengenali NotAllowedError dan memunculkan prompt ketuk-untuk-memutar;
  * itulah yang seharusnya dipakai di sini.
  *
+ * MELANJUTKAN DI TEPI-LIVE, BUKAN DI TEMPAT IA DITINGGALKAN
+ * ---------------------------------------------------------
+ * Untuk siaran LANGSUNG, play() saja tidak cukup. Sesudah 5-10 menit di latar belakang playhead
+ * tertinggal sepuluh menit, dan segmen di posisi itu sudah lama keluar dari jendela playlist —
+ * jadi pemutaran dilanjutkan ke tempat yang datanya SUDAH TIDAK ADA. Yang dilihat pengunjung:
+ * bingkai beku tanpa satu pun pesan, karena livePictureWatch sengaja tidak memvonis video yang
+ * PAUSED. Dilaporkan 2026-08-28.
+ *
+ * Komentar di bawah sudah lama mencatat bahwa tidak ada yang menarik kamera internal ke tepi-live.
+ * Catatan itu benar berbulan-bulan; sekarang hook inilah yang melakukannya, lewat `hlsRef`.
+ * Ditaruh DI SINI dan bukan di tiap pemanggil supaya kedua permukaan live tidak bisa lagi
+ * berbeda perilaku — MultiViewVideoItem dulu memanggil hook ini tanpa jalur lanjut sama sekali.
+ *
  * @param {{ current: HTMLVideoElement | null }} videoRef - ref to the <video> element to manage
  * @param {(video: HTMLVideoElement) => void} [resumePlay] - cara memutar milik pemanggil
+ * @param {{ current: object | null }} [hlsRef] - instans hls.js yang sedang berjalan, bila ada
  */
-export function usePauseOnHidden(videoRef, resumePlay) {
+export function usePauseOnHidden(videoRef, resumePlay, hlsRef) {
     useEffect(() => {
         if (typeof document === 'undefined') return undefined;
 
@@ -53,14 +68,11 @@ export function usePauseOnHidden(videoRef, resumePlay) {
                  * internal - mayoritas armada ini - tidak ada yang menariknya ke live edge.
                  */
                 pausedByUs = false;
-                if (resumePlay) {
-                    resumePlay(video);
-                    return;
-                }
-                const playPromise = video.play();
-                if (playPromise && typeof playPromise.catch === 'function') {
-                    playPromise.catch(() => { /* autoplay/resume race — harmless */ });
-                }
+                const play = resumePlay || ((el) => {
+                    const p = el.play();
+                    if (p && typeof p.catch === 'function') p.catch(() => { /* race — harmless */ });
+                });
+                resumeAtLiveEdge(video, hlsRef?.current, play);
             }
         };
 
@@ -68,7 +80,7 @@ export function usePauseOnHidden(videoRef, resumePlay) {
         return () => {
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
-    }, [videoRef, resumePlay]);
+    }, [videoRef, resumePlay, hlsRef]);
 }
 
 export default usePauseOnHidden;

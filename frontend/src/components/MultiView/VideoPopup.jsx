@@ -346,10 +346,10 @@ function VideoPopup({
         }
     }, []);
 
-    // Di BAWAH requestVideoPlay dengan sengaja: hook ini memakainya untuk melanjutkan, supaya
-    // penolakan autoplay saat kembali dari latar belakang memunculkan prompt ketuk-untuk-memutar
-    // dan bukan bingkai beku yang diam.
-    usePauseOnHidden(videoRef, requestVideoPlay);
+    // hlsRef dioper supaya hook-nya melompat ke TEPI-LIVE sebelum memutar: play() saja
+    // melanjutkan di posisi basi yang segmennya sudah keluar dari playlist. requestVideoPlay
+    // tetap yang memutar, jadi penolakan autoplay tetap memunculkan prompt ketuk-untuk-memutar.
+    usePauseOnHidden(videoRef, requestVideoPlay, hlsRef);
 
     // Track fullscreen state to disable animations and unlock orientation on exit
     useEffect(() => {

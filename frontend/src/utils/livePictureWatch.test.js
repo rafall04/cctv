@@ -738,3 +738,136 @@ describe('playhead beku (waktu media berhenti, bukan bingkainya)', () => {
         expect(onFrozen).not.toHaveBeenCalled();
     });
 });
+
+/*
+ * DIJEDA SEMENTARA HALAMANNYA TERLIHAT — keluhan 2026-08-28, dan bentuk kegagalan yang paling
+ * jahat dari semuanya: TIDAK ADA PESAN SAMA SEKALI.
+ *
+ * Yang dilaporkan: keluar dari web 5-10 menit, kembali, gambarnya beku, dan tidak ada apa pun
+ * yang muncul. Rantainya: usePauseOnHidden menjeda video saat tab tersembunyi (benar), memanggil
+ * play() saat kembali, play() gagal diam-diam karena penolakan yang bukan NotAllowedError hanya
+ * ditelan — dan cabang `paused` di sini langsung keluar tanpa mengumpulkan apa pun. Jadi tidak
+ * ada satu jalur pun di aplikasi ini yang akan bicara. Selamanya.
+ *
+ * Alasan cabang itu diam dulunya BENAR: video yang berhenti tidak bisa membuktikan apa pun, dan
+ * jangan melawan jeda yang dilakukan penonton. Yang salah adalah kesimpulannya — "jangan
+ * menyimpulkan" tidak sama dengan "jangan berbuat apa-apa".
+ */
+describe('dijeda padahal halamannya terlihat', () => {
+    /** Bawa watchdog sampai vonis live, lalu kembalikan alat kendalinya. */
+    function sampaiLive() {
+        const video = videoTiruan();
+        const onPicture = vi.fn();
+        const onNoPicture = vi.fn();
+        const requestPlay = vi.fn();
+        const stop = startLivePictureWatch(video, { onPicture, onNoPicture, requestPlay });
+
+        video._frames = 10;
+        majukan(2, () => { video.currentTime += 0.5; video._frames += 5; });
+        expect(onPicture, 'prasyarat: belum divonis live').toHaveBeenCalled();
+
+        requestPlay.mockClear();
+        return { video, onNoPicture, requestPlay, stop };
+    }
+
+    it('MENYENGGOL video yang berhenti padahal halamannya terlihat', () => {
+        const { video, requestPlay, stop } = sampaiLive();
+
+        video.paused = true;
+        majukan(10);   // 5 detik
+
+        expect(requestPlay, 'tidak ada yang mencoba memutarnya lagi').toHaveBeenCalled();
+        stop();
+    });
+
+    it('menyenggol sekali per jendela, bukan tiap tick', () => {
+        // play() dua kali sedetik hanya menumpuk promise yang saling membatalkan.
+        const { video, requestPlay, stop } = sampaiLive();
+
+        video.paused = true;
+        majukan(14);   // 7 detik -> dua jendela 3 detik terlewati
+
+        expect(requestPlay.mock.calls.length).toBeLessThanOrEqual(3);
+        expect(requestPlay.mock.calls.length).toBeGreaterThanOrEqual(1);
+        stop();
+    });
+
+    it('akhirnya MEMVONIS - dan vonisnya yang punya tombol coba lagi', () => {
+        const { video, onNoPicture, stop } = sampaiLive();
+
+        video.paused = true;
+        majukan(60);   // 30 detik, melewati pausedGiveUpMs
+
+        expect(onNoPicture, 'diam selamanya: pengunjung terjebak di bingkai beku').toHaveBeenCalled();
+        // everHadPicture: true -> pemanggilnya memvonis 'stalled' (bisa dicoba lagi), bukan 'codec'.
+        expect(onNoPicture.mock.calls[0][0]).toMatchObject({ everHadPicture: true });
+        stop();
+    });
+
+    it('TIDAK menghitung jeda selagi halamannya tersembunyi', () => {
+        // usePauseOnHidden memang menjeda di sana. Itu bukan macet, dan menghukumnya akan
+        // memunculkan panel galat untuk setiap orang yang membuka aplikasi lain sebentar.
+        const { video, onNoPicture, requestPlay, stop } = sampaiLive();
+        const asli = Object.getOwnPropertyDescriptor(document, 'hidden');
+        Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
+
+        video.paused = true;
+        majukan(120);   // satu menit penuh tersembunyi
+
+        expect(onNoPicture, 'tersembunyi dihukum seperti macet').not.toHaveBeenCalled();
+        expect(requestPlay, 'menyenggol video yang sengaja dijeda di latar belakang').not.toHaveBeenCalled();
+
+        if (asli) Object.defineProperty(document, 'hidden', asli);
+        else delete document.hidden;
+        stop();
+    });
+
+    it('jam jedanya dibasiskan ulang begitu pemutaran benar-benar jalan lagi', () => {
+        const { video, onNoPicture, stop } = sampaiLive();
+
+        video.paused = true;
+        majukan(40);                    // 20 detik - hampir memvonis
+        video.paused = false;
+        majukan(4, () => { video.currentTime += 0.5; video._frames += 5; });
+        video.paused = true;
+        majukan(40);                    // 20 detik lagi, dari nol
+
+        expect(onNoPicture, 'jam jedanya tidak dibasiskan ulang').not.toHaveBeenCalled();
+        stop();
+    });
+
+    it('jam jedanya DIBASISKAN ULANG oleh perjalanan ke latar belakang', () => {
+        /*
+         * Berhenti sebentar selagi terlihat, lalu pengunjung membuka aplikasi lain sepuluh menit,
+         * lalu kembali. Tanpa pembasisan ulang, sisa jam dari SEBELUM ia pergi ikut terbawa dan
+         * vonis bisa jatuh beberapa detik sesudah ia kembali - sebelum tab barunya sempat
+         * membuktikan apa pun. Filosofi yang sama sudah dipakai jam macet dan jam beku.
+         */
+        const { video, onNoPicture, stop } = sampaiLive();
+        const asli = Object.getOwnPropertyDescriptor(document, 'hidden');
+
+        video.paused = true;
+        majukan(40);                  // 20 detik terlihat - hampir memvonis
+
+        Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
+        majukan(20);                  // pergi ke latar belakang
+        if (asli) Object.defineProperty(document, 'hidden', asli);
+        else delete document.hidden;
+
+        majukan(16);                  // 8 detik sesudah kembali, masih berhenti
+
+        expect(onNoPicture, 'sisa jam dari sebelum pergi ikut terbawa').not.toHaveBeenCalled();
+        stop();
+    });
+
+    it('mencari posisi (seeking) tidak dihitung sebagai jeda', () => {
+        // Seek itu sekejap dan sah - pemulihan tepi-live sendiri melakukannya.
+        const { video, onNoPicture, stop } = sampaiLive();
+
+        video.seeking = true;
+        majukan(60);
+
+        expect(onNoPicture).not.toHaveBeenCalled();
+        stop();
+    });
+});
