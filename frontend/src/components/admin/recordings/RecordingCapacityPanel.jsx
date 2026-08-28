@@ -33,8 +33,19 @@ export default function RecordingCapacityPanel() {
         let alive = true;
         adminService.getRecordingCapacity().then((res) => {
             if (!alive || !res?.success) return;
-            setData(res.data);
-            setHoursInput(String(res.data.retention.currentHours ?? 4));
+            /*
+             * Bentuk yang tidak lengkap diperlakukan seperti "belum ada data".
+             *
+             * Sebelumnya baris berikutnya membaca res.data.retention.currentHours tanpa
+             * penjaga, jadi satu respons yang SAH tapi berbentuk lain melempar TypeError,
+             * ErrorBoundary menangkapnya, dan SELURUH halaman /admin/recordings berubah jadi
+             * layar galat. Satu panel yang kehilangan satu field tidak boleh menjatuhkan
+             * halamannya. Tertangkap saat memperluas contrast.spec ke rute admin.
+             */
+            const d = res.data;
+            if (!d?.rate || !d?.disk || !d?.retention) return;
+            setData(d);
+            setHoursInput(String(d.retention.currentHours ?? 4));
         });
         return () => { alive = false; };
     }, []);

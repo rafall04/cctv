@@ -169,7 +169,10 @@ class ErrorBoundary extends Component {
                                 </button>
                                 <button
                                     onClick={this.handleReload}
-                                    className="flex-1 px-4 py-2.5 bg-red-500 hover:bg-red-600 text-white font-medium rounded-lg transition-colors"
+                                    /* red-600, bukan -500: putih di atas red-500 terukur 3,76 -
+                                       di bawah 4,5 yang diminta WCAG AA. red-600 mencapai 4,83 dan
+                                       masih terbaca sebagai tombol merah. Tertangkap contrast.spec. */
+                                    className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition-colors"
                                 >
                                     Reload Halaman
                                 </button>

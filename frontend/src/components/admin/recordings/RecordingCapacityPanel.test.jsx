@@ -120,3 +120,48 @@ describe('RecordingCapacityPanel', () => {
         expect(container.innerHTML).toBe('');
     });
 });
+
+/*
+ * BENTUK RESPONS YANG TIDAK LENGKAP TIDAK BOLEH MENJATUHKAN HALAMANNYA.
+ *
+ * Panel ini dulu membaca `res.data.retention.currentHours` tanpa penjaga, tepat setelah hanya
+ * memeriksa `res.success`. Satu respons yang SAH tapi berbentuk lain — misalnya `data: []` dari
+ * sebuah default, atau sebuah field yang hilang setelah perubahan backend — melempar TypeError,
+ * ErrorBoundary menangkapnya, dan SELURUH halaman /admin/recordings berubah menjadi layar galat
+ * dengan tombol "Reload Halaman". Satu panel yang kehilangan satu field menjatuhkan halamannya.
+ *
+ * Ditemukan 2026-08-28 saat memperluas audit kontras ke rute admin: yang gagal di sana ternyata
+ * tombol layar galat, dan layar galat itu tidak seharusnya ada.
+ */
+describe('bentuk respons yang tidak lengkap', () => {
+    const BENTUK_BURUK = [
+        ['array kosong', []],
+        ['objek kosong', {}],
+        ['null', null],
+        ['tanpa retention', { cameras: 2, rate: CAPACITY.rate, disk: CAPACITY.disk }],
+        ['tanpa rate', { cameras: 2, retention: CAPACITY.retention, disk: CAPACITY.disk }],
+        ['tanpa disk', { cameras: 2, retention: CAPACITY.retention, rate: CAPACITY.rate }],
+        ['retention bukan objek', { cameras: 2, retention: 4, rate: CAPACITY.rate, disk: CAPACITY.disk }],
+    ];
+
+    for (const [nama, data] of BENTUK_BURUK) {
+        it(`TIDAK melempar untuk ${nama}`, async () => {
+            adminService.getRecordingCapacity.mockResolvedValue({ success: true, data });
+
+            const { container } = render(<RecordingCapacityPanel />);
+
+            await waitFor(() => expect(adminService.getRecordingCapacity).toHaveBeenCalled());
+            // Diam adalah jawaban yang benar: panelnya tidak punya yang bisa ditampilkan, dan
+            // halaman di sekelilingnya tetap hidup.
+            expect(container.textContent).toBe('');
+        });
+    }
+
+    it('bentuk yang LENGKAP tetap dirender - penjaganya tidak membungkam yang sehat', async () => {
+        adminService.getRecordingCapacity.mockResolvedValue({ success: true, data: CAPACITY });
+
+        render(<RecordingCapacityPanel />);
+
+        await waitFor(() => expect(screen.getByText(/kamera sedang merekam/i)).toBeTruthy());
+    });
+});

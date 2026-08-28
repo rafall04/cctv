@@ -1,5 +1,6 @@
 /*
- * Purpose: Catch unreadable text on the public surfaces by measuring REAL rendered contrast.
+ * Purpose: Catch unreadable text on EVERY surface — public, admin, and the customer portal —
+ *          by measuring REAL rendered contrast.
  * Caller: `npm run test:e2e` locally and the e2e job in CI.
  * Deps: @playwright/test, a completed `npm run build`.
  *
@@ -91,7 +92,61 @@ test.beforeEach(async ({ page, context }) => {
  * palette guarantees applies to it. Trailing slash on purpose — it is static HTML in public/sewa/,
  * and only the directory form resolves to it under `vite preview`. */
 const BANNER = '[data-testid="saweria-floating-banner"]';
-const PAGES = [['/', 6, true], ['/?mode=full', 6], ['/login', 4], ['/playback', 2], ['/sewa/', 20]];
+
+/*
+ * Sesi palsu, bentuk yang sama dengan admin-overflow.spec.js: aplikasi hanya membaca kunci
+ * `user` di localStorage untuk memutuskan apa yang boleh dirender.
+ */
+const ADMIN_USER = { id: 1, username: 'e2e-admin', email: 'admin@example.invalid', role: 'admin', full_name: 'Operator Uji' };
+const CUSTOMER_USER = { id: 42, username: 'e2e-pelanggan', email: 'pelanggan@example.invalid', role: 'customer', full_name: 'Pelanggan Uji' };
+
+/*
+ * KENAPA ADMIN DAN PELANGGAN AKHIRNYA MASUK
+ * -----------------------------------------
+ * Penjaga ini lahir untuk permukaan publik dan berhenti di situ selama berbulan-bulan, jadi
+ * dua permukaan terbesar yang dipakai MANUSIA setiap hari — 30 halaman admin yang dipakai
+ * operator dan 7 halaman portal yang dipakai 11 pelanggan berbayar — tidak pernah sekali pun
+ * diukur kontrasnya. Padahal justru di sanalah polanya paling berisiko: tabel padat, lencana
+ * status, dan teks kecil di atas tint 10% — kombinasi yang SUDAH pernah gagal di repo ini
+ * (toast yang latarnya cuma tint 10%, 2026-08-27).
+ *
+ * API tetap dijawab kosong-berhasil, jadi yang terukur adalah CHROME-nya, bukan datanya. Itu
+ * memang sasarannya: warna yang dipatok hidup di chrome, bukan di baris data.
+ */
+const PAGES = [
+    { path: '/', minNodes: 6, donation: true },
+    { path: '/?mode=full', minNodes: 6 },
+    { path: '/login', minNodes: 4 },
+    { path: '/playback', minNodes: 2 },
+    { path: '/dukungan', minNodes: 20 },
+    { path: '/sewa/', minNodes: 20 },
+
+    // Portal pelanggan — 11 akun nyata, nol pengukuran kontras sampai hari ini.
+    { path: '/my', minNodes: 4, user: CUSTOMER_USER },
+    { path: '/my/paket', minNodes: 4, user: CUSTOMER_USER },
+    { path: '/my/wallet', minNodes: 4, user: CUSTOMER_USER },
+    { path: '/my/akun', minNodes: 4, user: CUSTOMER_USER },
+    { path: '/my/panduan', minNodes: 10, user: CUSTOMER_USER },
+    { path: '/my/rekaman', minNodes: 4, user: CUSTOMER_USER },
+
+    /*
+     * Admin: bukan ketiga puluh rutenya, melainkan yang chrome-nya BERBEDA satu sama lain.
+     * Kontras adalah sifat chrome — shell, tabel, lencana, tombol — dan tiga puluh halaman
+     * yang memakai shell yang sama akan mengukur pasangan warna yang sama tiga puluh kali.
+     * Yang dipilih di bawah menutup shell, tabel padat, papan angka, formulir, editor, dan
+     * halaman berlencana status.
+     */
+    { path: '/admin/dashboard', minNodes: 8, user: ADMIN_USER },
+    { path: '/admin/cameras', minNodes: 6, user: ADMIN_USER },
+    { path: '/admin/analytics', minNodes: 6, user: ADMIN_USER },
+    { path: '/admin/settings', minNodes: 6, user: ADMIN_USER },
+    { path: '/admin/security', minNodes: 6, user: ADMIN_USER },
+    { path: '/admin/billing', minNodes: 6, user: ADMIN_USER },
+    { path: '/admin/affiliate', minNodes: 6, user: ADMIN_USER },
+    { path: '/admin/sponsors', minNodes: 6, user: ADMIN_USER },
+    { path: '/admin/recordings', minNodes: 6, user: ADMIN_USER },
+    { path: '/admin/users', minNodes: 6, user: ADMIN_USER },
+];
 
 const AUDIT = () => {
     const rgb = (s) => (s.match(/[\d.]+/g) || []).map(Number);
@@ -141,8 +196,13 @@ const AUDIT = () => {
     return out;
 };
 
-for (const [path, minNodes, auditsDonationWidget] of PAGES) {
+for (const { path, minNodes, donation: auditsDonationWidget, user } of PAGES) {
     test(`no unreadable text on ${path} in dark mode`, async ({ page }) => {
+        if (user) {
+            await page.addInitScript((u) => {
+                window.localStorage.setItem('user', JSON.stringify(u));
+            }, user);
+        }
         if (auditsDonationWidget) {
             // A page route outranks the blanket context route registered in beforeEach.
             await page.route('**/api/saweria/config', (route) => route.fulfill({

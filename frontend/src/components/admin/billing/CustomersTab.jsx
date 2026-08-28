@@ -135,7 +135,7 @@ export default function CustomersTab({ customers, plans, run, busy }) {
                     <input type="number" min="1" step="1000" value={adjustForm.amount} onChange={(e) => setAdjustForm({ ...adjustForm, amount: e.target.value })} required className={inputClasses()} placeholder="Nominal" />
                 </div>
                 <input type="text" value={adjustForm.reason} onChange={(e) => setAdjustForm({ ...adjustForm, reason: e.target.value })} required maxLength={200} className={inputClasses()} placeholder="Alasan (wajib) — mis. refund kelebihan bayar" />
-                <button type="submit" disabled={busy || !adjustForm.reason.trim()} className={`w-full rounded-xl px-4 py-2 text-sm font-medium text-white transition-colors disabled:opacity-50 ${adjustForm.direction === 'debit' ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}>
+                <button type="submit" disabled={busy || !adjustForm.reason.trim()} className={`w-full rounded-xl px-4 py-2 text-sm font-medium text-white transition-colors disabled:opacity-50 ${adjustForm.direction === 'debit' ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-700 hover:bg-emerald-800'}`}>
                     {adjustForm.direction === 'debit' ? 'Kurangi Saldo' : 'Tambah Saldo'}
                 </button>
             </div>
