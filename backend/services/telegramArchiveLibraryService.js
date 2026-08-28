@@ -375,6 +375,50 @@ export async function openSegmentStream(segmentId, range = null) {
         err.statusCode = 409;
         throw err;
     }
+
+    /*
+     * JALUR MTPROTO — unduh SEBAGIAN, bukan seluruh 238 MB.
+     *
+     * Bot API getFile (di bawah) tidak punya Range: ia memateriaisasi seluruh berkas sebelum satu
+     * byte sampai ke penonton, bahkan untuk lompatan 2 detik. Service Python di sebelah sidecar
+     * (login sebagai BOT, token yang sudah ada - bukan akun) memakai MTProto upload.getFile yang
+     * PUNYA offset/limit, lalu memotong tepat byte yang diminta. Terbukti byte-exact terhadap
+     * salinan disk, dan bekerja pada segmen tertua (32 hari) maupun terbaru.
+     *
+     * Digerbang env TG_ARCHIVE_MTPROTO_URL. Kalau service mati atau menolak, JATUH ke Bot API di
+     * bawah - jadi menyalakannya tidak pernah bisa membuat arsip yang tadinya bisa diputar jadi
+     * tidak bisa. Service hanya mendengar di 127.0.0.1; otorisasi admin tetap di Node.
+     */
+    const mtprotoUrl = process.env.TG_ARCHIVE_MTPROTO_URL;
+    if (mtprotoUrl) {
+        try {
+            const wanted = range && row.file_size && range.end < row.file_size
+                ? range
+                : (range && row.file_size ? { start: range.start, end: row.file_size - 1 } : null);
+            const resp = await fetch(`${mtprotoUrl.replace(/\/$/, '')}/segment/${segmentId}`, {
+                headers: wanted ? { Range: `bytes=${wanted.start}-${wanted.end}` } : {},
+            });
+            if (resp.ok && resp.body) {
+                // Percayai Content-Range service sebagai kebenaran: ia yang benar-benar memotong.
+                const cr = resp.headers.get('content-range');
+                const m = cr && /bytes (\d+)-(\d+)\/(\d+)/.exec(cr);
+                const totalSize = m ? Number(m[3]) : (row.file_size || 0);
+                const clen = Number(resp.headers.get('content-length')) || 0;
+                return {
+                    stream: resp.body,
+                    size: clen || totalSize,
+                    filename: row.filename,
+                    range: m ? { start: Number(m[1]), end: Number(m[2]) } : null,
+                    totalSize,
+                };
+            }
+            // Bukan 2xx: catat sekali, lalu jatuh ke Bot API - jangan gantung pemutaran.
+            console.warn(`[arsip] MTProto menolak segmen ${segmentId} (${resp.status}), jatuh ke Bot API`);
+        } catch (err) {
+            console.warn(`[arsip] MTProto tidak terjangkau (${err.message}), jatuh ke Bot API`);
+        }
+    }
+
     const { apiBase, token } = telegramConfig();
     if (!token) {
         const err = new Error(`Token bot Telegram tidak ditemukan di ${ENV_FILE}`);

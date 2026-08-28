@@ -1,0 +1,22 @@
+[Unit]
+Description=RAF CCTV — MTProto range-fetch untuk arsip Telegram (bot, 127.0.0.1)
+Documentation=file:/opt/tg-archive/README.md
+After=network-online.target tg-archive.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/tg-archive
+ExecStart=/opt/tg-mtproto-venv/bin/python /opt/tg-archive/mtproto_server.py
+Restart=always
+RestartSec=10
+# Menarik arsip lama tidak boleh mengalahkan streaming/rekaman live.
+Nice=15
+IOSchedulingClass=idle
+CPUQuota=50%
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=tg-mtproto
+
+[Install]
+WantedBy=multi-user.target
