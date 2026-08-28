@@ -16,8 +16,10 @@ export function createExpiredDbSegmentCleanup({
     batchSize = RECORDING_CLEANUP_BATCH_SIZE,
     // Penjaga jangan-hapus-yang-belum-terarsip. Null = fitur mati (perilaku lama persis).
     archiveHold = null,
-    // { getFreeBytes, getUsedBytes, recordingsBasePath, maxStorageBytes, safetyFloorBytes, activeWindowMs }
-    hold = null,
+    // Akses disk (tetap) + pembaca setelan SEGAR. Dipisah supaya angka batas bisa diubah admin
+    // di UI dan langsung berlaku siklus berikutnya tanpa restart.
+    disk = null,   // { getFreeBytes, getUsedBytes, recordingsBasePath }
+    resolveHold = null,   // () => { enabled, maxStorageBytes, safetyFloorBytes, activeWindowMs }
 } = {}) {
     return async function cleanupExpiredDbSegments({ cameraId, retentionWindow, result, nowMs = Date.now() }) {
         const segments = repository.findExpiredSegments({
@@ -45,21 +47,22 @@ export function createExpiredDbSegmentCleanup({
          * mengira kamera itu tak mengarsip lalu menghapus rekamannya. Justru lubang yang diperbaiki.
          */
         let holdCamera = false;
-        if (archiveHold && hold) {
+        const holdCfg = resolveHold ? resolveHold() : null;
+        if (archiveHold && disk && holdCfg && holdCfg.enabled) {
             let storagePermits = true;
-            if (hold.safetyFloorBytes > 0) {
+            if (holdCfg.safetyFloorBytes > 0) {
                 // getFreeBytes bisa gagal (df tak ada / timeout); null = tak terukur -> jangan
                 // memblokir penahanan atas dasar lantai yang tak bisa dibaca.
                 let free = null;
-                try { free = await hold.getFreeBytes(hold.recordingsBasePath); } catch { free = null; }
-                if (Number.isFinite(free) && free < hold.safetyFloorBytes) storagePermits = false;
+                try { free = await disk.getFreeBytes(disk.recordingsBasePath); } catch { free = null; }
+                if (Number.isFinite(free) && free < holdCfg.safetyFloorBytes) storagePermits = false;
             }
-            if (storagePermits && hold.maxStorageBytes > 0) {
-                const used = hold.getUsedBytes();
-                if (Number.isFinite(used) && used >= hold.maxStorageBytes) storagePermits = false;
+            if (storagePermits && holdCfg.maxStorageBytes > 0) {
+                const used = disk.getUsedBytes();
+                if (Number.isFinite(used) && used >= holdCfg.maxStorageBytes) storagePermits = false;
             }
             if (storagePermits) {
-                const sinceUtc = toSqliteUtc(nowMs - hold.activeWindowMs);
+                const sinceUtc = toSqliteUtc(nowMs - holdCfg.activeWindowMs);
                 holdCamera = archiveHold.cameraArchivingActive(cameraId, sinceUtc);
             }
         }

@@ -14,6 +14,7 @@ import { createEmptyResult } from './recordingCleanupShared.js';
 import { createExpiredDbSegmentCleanup } from './recordingExpiredDbSegmentCleanup.js';
 import { createArchiveHoldPolicy } from './recordingArchiveHoldPolicy.js';
 import diskSpaceService from './recordingDiskSpaceService.js';
+import { createStorageSettingsReader } from './recordingStorageSettings.js';
 import { createFilesystemOrphanCleanup } from './recordingFilesystemOrphanCleanup.js';
 import { createPendingPartialCleanup } from './recordingPendingPartialCleanup.js';
 import { createEmergencyCleanup } from './recordingEmergencyCleanup.js';
@@ -35,32 +36,21 @@ export function createRecordingCleanupService({
         recoveryService?.isFileOwned?.(cameraId, filename) === true;
 
     /*
-     * Penahanan arsip DIBATASI PENYIMPANAN, bukan waktu. Satu setelan operator:
-     *   RECORDING_MAX_STORAGE_GB - maksimal ruang yang boleh dipakai rekaman (0/kosong = tanpa
-     *   batas, hanya dibatasi lantai keamanan disk). Retensi per-kamera tetap seperti biasa.
-     * Lantai keamanan (default 5 GB sisa) melindungi tulisan rekaman LIVE dan tidak dianggap
-     * setelan biasa. Jendela 'kamera aktif' 30 hari supaya outage panjang tak salah divonis.
-     * Dinonaktifkan penuh dengan RECORDING_ARCHIVE_HOLD_DISABLED=true (kembali perilaku lama).
+     * Penahanan arsip DIBATASI PENYIMPANAN, bukan waktu, dan setelannya dibaca dari tabel settings
+     * (bisa diubah admin di UI: recording_max_storage_gb, recording_archive_hold_enabled). Dibaca
+     * SEGAR tiap siklus lewat resolveHold(), jadi perubahan berlaku tanpa restart. Env tetap jadi
+     * cadangan; lantai keamanan 5 GB & jendela 30 hari tetap env/advanced.
      */
-    const holdDisabled = String(process.env.RECORDING_ARCHIVE_HOLD_DISABLED || '').toLowerCase() === 'true';
-    const gib = 1024 * 1024 * 1024;
-    const maxStorageGb = Number(process.env.RECORDING_MAX_STORAGE_GB);
-    const maxStorageBytes = Number.isFinite(maxStorageGb) && maxStorageGb > 0 ? Math.round(maxStorageGb * gib) : 0;
-    const floorGb = Number(process.env.RECORDING_ARCHIVE_HOLD_SAFETY_FLOOR_GB);
-    const safetyFloorBytes = Math.round((Number.isFinite(floorGb) && floorGb >= 0 ? floorGb : 5) * gib);
-    const windowDays = Number(process.env.RECORDING_ARCHIVE_ACTIVE_WINDOW_DAYS);
-    const activeWindowMs = (Number.isFinite(windowDays) && windowDays > 0 ? windowDays : 30) * 24 * 3600 * 1000;
+    const resolveHold = createStorageSettingsReader();
     const cleanupExpiredDbSegments = createExpiredDbSegmentCleanup({
         repository, fs, safeDelete, isFileBeingProcessed,
-        archiveHold: holdDisabled ? null : createArchiveHoldPolicy(),
-        hold: holdDisabled ? null : {
+        archiveHold: createArchiveHoldPolicy(),
+        disk: {
             getFreeBytes: (basePath) => diskSpace.getFreeBytes(basePath),
             getUsedBytes: () => repository.totalStoredBytes(),
             recordingsBasePath,
-            maxStorageBytes,
-            safetyFloorBytes,
-            activeWindowMs,
         },
+        resolveHold,
     });
     const cleanupFilesystemOrphans = createFilesystemOrphanCleanup({
         repository, fs, recordingsBasePath, safeDelete, isFileBeingProcessed, onRecoverOrphan, logger,
