@@ -18,6 +18,7 @@ export function createEmptyResult() {
         processingSkipped: 0,
         failed: 0,
         orphanDeleted: 0,
+        archiveHeld: 0,
         skippedReason: null,
     };
 }

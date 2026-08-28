@@ -12,6 +12,7 @@ import { computeRetentionWindow } from './recordingRetentionPolicy.js';
 import { RECORDING_CLEANUP_MIN_INTERVAL_MS } from './recordingIntervalsPolicy.js';
 import { createEmptyResult } from './recordingCleanupShared.js';
 import { createExpiredDbSegmentCleanup } from './recordingExpiredDbSegmentCleanup.js';
+import { createArchiveHoldPolicy } from './recordingArchiveHoldPolicy.js';
 import { createFilesystemOrphanCleanup } from './recordingFilesystemOrphanCleanup.js';
 import { createPendingPartialCleanup } from './recordingPendingPartialCleanup.js';
 import { createEmergencyCleanup } from './recordingEmergencyCleanup.js';
@@ -31,8 +32,14 @@ export function createRecordingCleanupService({
     const isFileBeingProcessed = (cameraId, filename) =>
         recoveryService?.isFileOwned?.(cameraId, filename) === true;
 
+    // Jam penahanan arsip: default 12 (selaras MAX_LATE_HOURS). 0 = mati (perilaku lama).
+    const archiveHoldHours = Number.isFinite(Number(process.env.RECORDING_ARCHIVE_HOLD_HOURS))
+        ? Math.max(0, Number(process.env.RECORDING_ARCHIVE_HOLD_HOURS))
+        : 12;
     const cleanupExpiredDbSegments = createExpiredDbSegmentCleanup({
         repository, fs, safeDelete, isFileBeingProcessed,
+        archiveHold: archiveHoldHours > 0 ? createArchiveHoldPolicy() : null,
+        holdHours: archiveHoldHours,
     });
     const cleanupFilesystemOrphans = createFilesystemOrphanCleanup({
         repository, fs, recordingsBasePath, safeDelete, isFileBeingProcessed, onRecoverOrphan, logger,
@@ -66,7 +73,7 @@ export function createRecordingCleanupService({
                 nowMs,
             });
 
-            await cleanupExpiredDbSegments({ cameraId, retentionWindow, result });
+            await cleanupExpiredDbSegments({ cameraId, retentionWindow, result, nowMs });
             await cleanupFilesystemOrphans({ cameraId, retentionWindow, nowMs, result });
             await cleanupPendingPartials({ cameraId, retentionWindow, nowMs, result });
 
