@@ -255,9 +255,22 @@ export function getSummary(filters = {}) {
     };
 }
 
+/*
+ * LEFT JOIN ke recording_segments: barisnya HILANG begitu segmen dipangkas dari disk lokal, jadi
+ * `local_path` yang terisi adalah bukti bahwa rekaman aslinya masih ada di sini.
+ *
+ * Terukur di produksi 2026-08-28: 476 dari 54.621 arsip masih punya barisnya (retensi lokal ~12
+ * jam lawan 32 hari di Telegram). Sedikit, tapi justru itu yang paling sering diminta - operator
+ * memeriksa kejadian yang BARU terjadi - dan untuk yang itu Telegram tidak perlu disentuh sama
+ * sekali.
+ */
 export function getUpload(segmentId) {
     const row = queryOne(
-        'SELECT segment_id, camera_id, filename, file_size, file_id FROM telegram_archive_uploads WHERE segment_id = ?',
+        `SELECT u.segment_id, u.camera_id, u.filename, u.file_size, u.file_id,
+                s.file_path AS local_path
+         FROM telegram_archive_uploads u
+         LEFT JOIN recording_segments s ON s.id = u.segment_id
+         WHERE u.segment_id = ?`,
         [segmentId],
     );
     if (!row) {
@@ -305,8 +318,56 @@ export function parseRange(header, size) {
  * @param {{start:number,end:number}|null} [range]
  * @returns {Promise<{stream, size: number, filename: string, range: object|null, totalSize: number}>}
  */
+/**
+ * Path rekaman asli di disk ini, kalau memang masih ada. Null berarti "harus lewat Telegram".
+ *
+ * Dipisah supaya rute bisa memutuskan MENYERAHKAN pengiriman ke nginx tanpa pernah membuka
+ * stream yang mungkin tidak jadi dipakai - fd yang dibuka lalu ditinggalkan adalah kebocoran.
+ *
+ * @returns {{path: string, size: number, filename: string}|null}
+ */
+export function localSegmentFile(segmentId) {
+    const row = getUpload(segmentId);
+    if (!row.local_path) return null;
+    try {
+        const stat = fs.statSync(row.local_path);
+        if (!stat.isFile()) return null;
+        return { path: row.local_path, size: stat.size, filename: row.filename };
+    } catch {
+        // Barisnya ada tapi berkasnya sudah tidak - pemangkas berjalan di antara dua langkah ini.
+        return null;
+    }
+}
+
 export async function openSegmentStream(segmentId, range = null) {
     const row = getUpload(segmentId);
+
+    /*
+     * Rekaman aslinya masih di disk: sajikan langsung.
+     *
+     * Sebelumnya jalur ini TETAP memanggil getFile lebih dulu, dan getFile inilah yang menyuruh
+     * server Bot API mengunduh. Untuk berkas yang masih ada ia memang hanya menunjuk balik ke
+     * folder rekaman kita sendiri, jadi tidak ada byte yang tertarik - tapi ia tetap satu
+     * perjalanan bolak-balik yang tidak diperlukan, dan ia menggantungkan pemutaran rekaman yang
+     * ADA DI SINI pada sebuah layanan luar yang bisa sedang mati.
+     */
+    const lokal = row.local_path ? localSegmentFile(segmentId) : null;
+    if (lokal) {
+        const wantedLokal = range && range.end < lokal.size
+            ? range
+            : (range ? { start: range.start, end: lokal.size - 1 } : null);
+        const stream = wantedLokal
+            ? fs.createReadStream(lokal.path, { start: wantedLokal.start, end: wantedLokal.end })
+            : fs.createReadStream(lokal.path);
+        return {
+            stream,
+            size: wantedLokal ? wantedLokal.end - wantedLokal.start + 1 : lokal.size,
+            filename: lokal.filename,
+            range: wantedLokal,
+            totalSize: lokal.size,
+        };
+    }
+
     if (!row.file_id) {
         // Segments uploaded before the sidecar recorded file_id cannot be fetched back: Telegram
         // offers no way to ask for the file_id of an already-sent message.
@@ -431,4 +492,5 @@ function safeTargets(raw) {
 // is invisible to them and fails only at runtime, on the live page.
 export default {
     listUploads, countUploads, locateUpload, getSummary, getUpload, openSegmentStream, parseRange,
+    localSegmentFile,
 };

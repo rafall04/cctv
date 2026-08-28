@@ -159,6 +159,41 @@ export default async function telegramArchiveRoutes(fastify) {
             const meta = archiveLibrary.getUpload(segmentId);
             const requested = archiveLibrary.parseRange(request.headers.range, meta.file_size);
 
+            /*
+             * SERAHKAN KE NGINX kalau rekaman aslinya masih ada di disk ini.
+             *
+             * Node membaca dari disk lalu menulis ke soket berarti setiap byte disalin lewat
+             * ruang-pengguna dan melewati event loop - untuk segmen 238 MB, berkali-kali,
+             * bersamaan. X-Accel-Redirect menyerahkannya ke sendfile() nginx: nol byte lewat
+             * Node, dan Range ditangani nginx yang memang sudah benar sejak lama.
+             *
+             * MATI SECARA BAWAAN dan hanya menyala lewat TG_ARCHIVE_XACCEL_PREFIX. Kalau
+             * lokasi `internal` di nginx belum ada, header ini menghasilkan 404 - jadi ia
+             * TIDAK BOLEH menyala sebelum nginx-nya siap. Menyalakannya adalah dua langkah
+             * yang disengaja, bukan satu deploy yang diam-diam mengubah jalur byte.
+             *
+             * Hanya untuk berkas yang benar-benar lokal: cache server Bot API ada di
+             * /var/lib/telegram-bot-api dengan mode 750 root:root, dan nginx berjalan sebagai
+             * www-data - ia tidak bisa membacanya, jadi jalur itu tetap lewat Node.
+             */
+            const accelPrefix = process.env.TG_ARCHIVE_XACCEL_PREFIX;
+            const accelRoot = process.env.TG_ARCHIVE_XACCEL_ROOT;
+            if (accelPrefix && accelRoot) {
+                const lokal = archiveLibrary.localSegmentFile(segmentId);
+                if (lokal && lokal.path.startsWith(accelRoot)) {
+                    const relatif = lokal.path.slice(accelRoot.length).replace(/^\/+/, '');
+                    reply.header('Content-Type', 'video/mp4');
+                    reply.header('Cache-Control', 'private, max-age=3600');
+                    reply.header('Content-Disposition', `inline; filename="${lokal.filename.replace(/"/g, '')}"`);
+                    // Tiap ruas di-encode terpisah: nama berkas boleh memuat spasi, tapi
+                    // pemisah jalurnya tidak boleh ikut ter-encode atau nginx kehilangan jejaknya.
+                    reply.header('X-Accel-Redirect', accelPrefix + relatif.split('/').map(encodeURIComponent).join('/'));
+                    // Content-Length dan Accept-Ranges SENGAJA tidak diset: nginx yang tahu
+                    // berapa byte yang benar-benar dikirimnya sesudah Range diterapkan.
+                    return reply.send();
+                }
+            }
+
             const { stream, size, filename, range, totalSize } =
                 await archiveLibrary.openSegmentStream(segmentId, requested);
 
