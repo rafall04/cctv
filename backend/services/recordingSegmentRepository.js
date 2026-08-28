@@ -81,6 +81,12 @@ class RecordingSegmentRepository {
         );
     }
 
+    /** Total byte yang dipakai SELURUH rekaman terdaftar. Untuk gerbang batas penyimpanan. */
+    totalStoredBytes() {
+        const row = queryOne('SELECT COALESCE(SUM(file_size), 0) AS n FROM recording_segments');
+        return Number(row?.n || 0);
+    }
+
     findMissingFileCandidates({ cameraId, olderThanIso, limit }) {
         return query(
             `SELECT ${SEGMENT_SELECT_FIELDS}

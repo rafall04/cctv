@@ -32,6 +32,7 @@ const recordingsBasePath = join(process.cwd(), '..', 'recordings');
 function createService() {
     return createRecordingCleanupService({
         repository: repositoryMock,
+        diskSpace: { getFreeBytes: async () => 500 * 1024 * 1024 * 1024 },
         fs: fsMock,
         recordingsBasePath,
         safeDelete: safeDeleteMock,
@@ -481,6 +482,7 @@ describe('recordingCleanupService', () => {
 
         const service = createRecordingCleanupService({
             repository: repositoryMock,
+        diskSpace: { getFreeBytes: async () => 500 * 1024 * 1024 * 1024 },
             fs: fsMock,
             recordingsBasePath,
             safeDelete: safeDeleteMock,

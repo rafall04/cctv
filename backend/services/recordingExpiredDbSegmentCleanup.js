@@ -16,7 +16,8 @@ export function createExpiredDbSegmentCleanup({
     batchSize = RECORDING_CLEANUP_BATCH_SIZE,
     // Penjaga jangan-hapus-yang-belum-terarsip. Null = fitur mati (perilaku lama persis).
     archiveHold = null,
-    holdHours = 0,
+    // { getFreeBytes, getUsedBytes, recordingsBasePath, maxStorageBytes, safetyFloorBytes, activeWindowMs }
+    hold = null,
 } = {}) {
     return async function cleanupExpiredDbSegments({ cameraId, retentionWindow, result, nowMs = Date.now() }) {
         const segments = repository.findExpiredSegments({
@@ -25,15 +26,42 @@ export function createExpiredDbSegmentCleanup({
             limit: batchSize,
         });
 
-        // Penahanan dihitung SEKALI per kamera: cleanup ini per-kamera, status 'sedang mengarsip'
-        // sama untuk semua segmennya. holdCutoffIso dihitung langsung (tanpa grace/klamp) sebagai
-        // ambang umur yang dibandingkan string dengan start_time (ISO-Z, format sama).
-        let holdActive = false;
-        let holdCutoffIso = null;
-        if (archiveHold && holdHours > 0) {
-            holdCutoffIso = new Date(nowMs - holdHours * 3600 * 1000).toISOString();
-            const sinceUtc = toSqliteUtc(nowMs - holdHours * 3600 * 1000);
-            holdActive = archiveHold.cameraArchivingActive(cameraId, sinceUtc);
+        /*
+         * Penahanan dibatasi PENYIMPANAN, bukan waktu. Tidak ada tenggat jam: segmen yang belum
+         * terarsip ditahan selama disk masih muat, jadi outage sepanjang apa pun tidak kehilangan
+         * rekaman selama masih ada ruang. Retensi per-kamera (waktu) tetap menghapus segmen yang
+         * SUDAH terarsip seperti biasa.
+         *
+         * Dua gerbang, dihitung SEKALI per kamera:
+         *   1. LANTAI KEAMANAN: kalau sisa disk turun di bawah safetyFloor, berhenti menahan -
+         *      rekaman LIVE harus selalu bisa menulis. Ini invarian, bukan setelan yang boleh nol.
+         *   2. BATAS PENYIMPANAN: kalau total rekaman sudah mencapai maxStorageBytes (setelan
+         *      operator; 0 = tanpa batas), berhenti menahan.
+         * Saat berhenti menahan, retensi normal menghapus yang tertua lebih dulu (findExpiredSegments
+         * urut ASC), jadi ruang direbut dari rekaman paling lama - persis yang diinginkan.
+         *
+         * 'Kamera aktif mengarsip' dipakai jendela PANJANG (activeWindowMs, default 30 hari), BUKAN
+         * jam: saat outage 3 hari, 'ok' terakhir kamera itu 3 hari lalu - jendela pendek akan salah
+         * mengira kamera itu tak mengarsip lalu menghapus rekamannya. Justru lubang yang diperbaiki.
+         */
+        let holdCamera = false;
+        if (archiveHold && hold) {
+            let storagePermits = true;
+            if (hold.safetyFloorBytes > 0) {
+                // getFreeBytes bisa gagal (df tak ada / timeout); null = tak terukur -> jangan
+                // memblokir penahanan atas dasar lantai yang tak bisa dibaca.
+                let free = null;
+                try { free = await hold.getFreeBytes(hold.recordingsBasePath); } catch { free = null; }
+                if (Number.isFinite(free) && free < hold.safetyFloorBytes) storagePermits = false;
+            }
+            if (storagePermits && hold.maxStorageBytes > 0) {
+                const used = hold.getUsedBytes();
+                if (Number.isFinite(used) && used >= hold.maxStorageBytes) storagePermits = false;
+            }
+            if (storagePermits) {
+                const sinceUtc = toSqliteUtc(nowMs - hold.activeWindowMs);
+                holdCamera = archiveHold.cameraArchivingActive(cameraId, sinceUtc);
+            }
         }
 
         for (const segment of segments) {
@@ -42,12 +70,10 @@ export function createExpiredDbSegmentCleanup({
                 continue;
             }
 
-            // TAHAN: belum diputuskan uploader (tak ada baris arsip), kamera aktif mengarsip, dan
-            // masih dalam jendela. Beri kesempatan terunggah alih-alih dihapus permanen saat outage.
-            // Backstop disk darurat (jalur lain) tetap bisa menghapus kalau disk kritis.
-            if (holdActive
-                && segment.start_time >= holdCutoffIso
-                && !archiveHold.hasArchiveVerdict(segment.id)) {
+            // TAHAN: kamera ini aktif mengarsip, penyimpanan masih mengizinkan, dan uploader belum
+            // memutuskan segmen ini (tak ada baris arsip = masih menunggu). Beri kesempatan terunggah
+            // alih-alih dihapus permanen saat outage.
+            if (holdCamera && !archiveHold.hasArchiveVerdict(segment.id)) {
                 result.archiveHeld++;
                 continue;
             }
