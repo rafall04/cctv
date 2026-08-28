@@ -336,7 +336,11 @@ export default function TelegramArchiveLibrary() {
                 </div>
             )}
 
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            {/* flex-wrap: dua Field w-40 shrink-0 plus formulir "Lompat ke jam" sebaris di sm.
+                Pada font 1,5x isinya melebar sementara shrink-0 melarang menciut, dan tombol
+                "Cari" berakhir di 801px pada layar 768px. Membungkus memindahkannya ke baris
+                berikutnya alih-alih keluar layar. */}
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
                 {/*
                   * Not a native <select>. Android renders one as a full-screen radio list where
                   * 30-character camera names wrap to three ragged lines — 31 of them, with no way

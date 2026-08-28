@@ -32,7 +32,17 @@ export function ToastContainer() {
         <div
             aria-live="polite"
             aria-label="Notifications"
-            className="fixed top-20 lg:top-4 right-4 z-toast flex flex-col gap-3 pointer-events-none"
+            /*
+             * left-4 WAJIB, bukan hanya right-4.
+             *
+             * Dengan patokan kanan saja, wadah ini lebarnya shrink-to-fit: pada font 1,5x
+             * (setelan "teks besar" Android) isinya melebar, dan karena ia dipaku di kanan,
+             * ia tumbuh ke KIRI menembus tepi layar. Terukur: mulai di -146px pada layar
+             * 320px dan -73px pada 393px - separuh toast di luar layar, judulnya tak terbaca.
+             * Membatasi kedua sisi membuat lebarnya tidak pernah bisa melewati layar, dan
+             * items-end menjaga tampilannya tetap menempel kanan seperti sebelumnya.
+             */
+            className="fixed top-20 lg:top-4 left-4 right-4 z-toast flex flex-col items-end gap-3 pointer-events-none"
         >
             {notifications.map((notification) => (
                 <Toast

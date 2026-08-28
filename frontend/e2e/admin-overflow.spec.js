@@ -1990,6 +1990,12 @@ const ADMIN_PAGES = [
 const VIEWPORTS = [
     { label: '393px', width: 393, height: 851 },
     { label: '320px', width: 320, height: 640 },
+    /*
+     * Tablet. "Tidak pecah di ponsel" tidak berarti "benar di mana-mana": tata letak admin ini
+     * penuh breakpoint, dan sebagian besar tabel serta panelnya BARU menampilkan kolom keduanya
+     * di md/lg. Lebar yang belum pernah diukur adalah lebar yang belum pernah dijaga.
+     */
+    { label: '768px', width: 768, height: 1024 },
 ];
 
 for (const spec of ADMIN_PAGES) {

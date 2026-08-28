@@ -142,8 +142,19 @@ const PAGES = [
     { name: 'my/rekaman', url: '/my/rekaman', ready: /Rekaman/i },
 ];
 
-/* Ponsel kecil: 320px masih dipakai, dan ia yang pertama pecah. */
-const VIEWPORT = { width: 320, height: 720 };
+/*
+ * Tiga lebar, bukan satu.
+ *
+ * 320px yang pertama pecah, jadi ia wajib. Tapi "tidak pecah di 320" tidak berarti "benar di
+ * mana-mana": tata letak yang memakai breakpoint bisa BARU rusak begitu kolom keduanya muncul,
+ * dan itu justru terjadi di lebar yang lebih besar. 768px adalah tablet - perangkat yang
+ * sungguhan dipakai orang membuka dompet dan rekamannya.
+ */
+const VIEWPORTS = [
+    { label: '320px', width: 320, height: 720 },
+    { label: '393px', width: 393, height: 851 },
+    { label: '768px', width: 768, height: 1024 },
+];
 
 test.beforeEach(async ({ page, context }) => {
     await page.addInitScript((user) => {
@@ -207,8 +218,9 @@ async function periksaLuberan(page, label) {
 }
 
 for (const spec of PAGES) {
-    test(`portal pelanggan sehat: ${spec.name}`, async ({ page }) => {
-        await page.setViewportSize(VIEWPORT);
+  for (const vp of VIEWPORTS) {
+    test(`portal pelanggan sehat: ${spec.name} @${vp.label}`, async ({ page }) => {
+        await page.setViewportSize({ width: vp.width, height: vp.height });
         await page.goto(spec.url, { waitUntil: 'networkidle' });
         await page.waitForTimeout(600);
 
@@ -233,10 +245,11 @@ for (const spec of PAGES) {
         ).toEqual([]);
 
         // (3) Tidak meluber, pada ukuran normal DAN pada "teks besar" Android.
-        await periksaLuberan(page, `${spec.name} @320px`);
+        await periksaLuberan(page, `${spec.name} @${vp.label}`);
 
         await page.evaluate(() => { document.documentElement.style.fontSize = '24px'; });
         await page.waitForTimeout(300);
-        await periksaLuberan(page, `${spec.name} @320px @1,5x font`);
+        await periksaLuberan(page, `${spec.name} @${vp.label} @1,5x font`);
     });
+  }
 }

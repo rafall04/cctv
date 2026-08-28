@@ -203,13 +203,17 @@ export default function SecurityActivity() {
             {/* Filters */}
             <form
                 onSubmit={applySearch}
-                className="flex flex-col gap-3 rounded-2xl border border-edge bg-surface p-4 shadow-sm sm:flex-row sm:items-center"
+                /* flex-wrap: di bawah sm baris ini menumpuk dan aman, tapi begitu masuk sm ia
+                   jadi satu baris yang TIDAK BISA membungkus - dan pada font 1,5x tombol "Cari"
+                   mendorong wadahnya ke 815px di layar 768px. Lebar <select> ditentukan opsi
+                   terpanjangnya, jadi ia ikut melebar dan tidak mau menciut. */
+                className="flex flex-col gap-3 rounded-2xl border border-edge bg-surface p-4 shadow-sm sm:flex-row sm:flex-wrap sm:items-center"
             >
                 <select
                     aria-label="Filter tipe event"
                     value={eventType}
                     onChange={(event) => { setEventType(event.target.value); setPage(1); }}
-                    className="rounded-xl border border-edge-strong bg-surface px-3 py-2 text-sm text-content"
+                    className="min-w-0 rounded-xl border border-edge-strong bg-surface px-3 py-2 text-sm text-content"
                 >
                     <option value="">Semua Event</option>
                     {ALL_EVENT_TYPES.map((type) => (
@@ -221,7 +225,7 @@ export default function SecurityActivity() {
                     value={search}
                     onChange={(event) => setSearch(event.target.value)}
                     placeholder="Cari IP, user, endpoint, detail..."
-                    className="flex-1 rounded-xl border border-edge-strong bg-surface px-3 py-2 text-sm text-content"
+                    className="min-w-0 flex-1 rounded-xl border border-edge-strong bg-surface px-3 py-2 text-sm text-content"
                 />
                 <button
                     type="submit"

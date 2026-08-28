@@ -106,12 +106,19 @@ export function Toast({ notification, onDismiss }) {
                     </div>
 
                     {/* Content */}
-                    <div className="ml-3 flex-1">
-                        <p className="text-sm font-medium">
+                    {/* min-w-0: tanpa ini flex item TIDAK BISA menciut di bawah lebar
+                        min-content-nya, dan break-words di dalamnya tidak berpengaruh sama
+                        sekali - pesan galat bertoken panjang tetap memaksa lebar. Terukur:
+                        isinya 152px lebih lebar dari toast-nya pada font 1,5x di layar
+                        320px. Jerat yang sama sudah pernah memakan <fieldset> di repo ini. */}
+                    <div className="ml-3 min-w-0 flex-1">
+                        {/* break-words: pesan galat nyata penuh token tanpa spasi - nama
+                            berkas, URL, kode server - dan tanpa ini ia memaksa lebar toast. */}
+                        <p className="break-words text-sm font-medium">
                             {notification.title}
                         </p>
                         {notification.message && (
-                            <p className="mt-1 text-sm opacity-90">
+                            <p className="mt-1 break-words text-sm opacity-90">
                                 {notification.message}
                             </p>
                         )}
@@ -133,7 +140,12 @@ export function Toast({ notification, onDismiss }) {
                         <div className="ml-4 flex-shrink-0">
                             <button
                                 onClick={handleDismiss}
-                                className="inline-flex rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 opacity-70 hover:opacity-100 transition-opacity"
+                                /* min 24x24: WCAG 2.5.8. Ikonnya 16px, dan tanpa padding
+                                   sasarannya ikut 16px - di bawah ambang. Toast menutupi sudut
+                                   layar dan hilang sendiri dalam 5-8 detik, jadi ketukan yang
+                                   meleset menekan apa pun yang ada DI BAWAHNYA. -m-1 menjaga
+                                   posisi visualnya tidak bergeser. */
+                                className="-m-1 inline-flex min-h-[24px] min-w-[24px] items-center justify-center rounded-md p-1 focus:outline-none focus:ring-2 focus:ring-offset-2 opacity-70 hover:opacity-100 transition-opacity"
                                 aria-label="Dismiss notification"
                             >
                                 <CloseIcon />
