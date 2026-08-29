@@ -213,6 +213,51 @@ describe('CameraHealthService runtime reset', () => {
         // the next few seconds.
         expect(state.nextCheckAt - before).toBeGreaterThan(60_000);
     });
+
+    // Recovery latency: a confidently-offline INTERNAL camera (our own device) must be re-probed on
+    // warm (90s), not cold (5 min), so a customer's modem coming back is noticed within ~90s. External
+    // feeds stay cold to avoid hammering third-party providers.
+    it('keeps an offline INTERNAL camera on warm cadence for prompt recovery', () => {
+        const service = new CameraHealthService();
+        const camera = { id: 20, delivery_type: 'internal_hls', private_rtsp_url: 'rtsp://10.0.0.5/live', stream_key: 'camera20' };
+        const state = service.ensureCameraState(camera.id, 0);
+        state.stableFailureCount = 10; // confidently offline
+
+        expect(service.resolveTier(camera, state, { online: false, reason: 'EHOSTUNREACH' })).toBe('warm');
+    });
+
+    it('keeps an offline EXTERNAL camera on cold cadence to spare the provider', () => {
+        const service = new CameraHealthService();
+        const camera = { id: 21, stream_source: 'external', delivery_type: 'external_hls', external_hls_url: 'https://cctv.example.gov.id/live.m3u8' };
+        const state = service.ensureCameraState(camera.id, 0);
+        state.stableFailureCount = 10;
+
+        expect(service.resolveTier(camera, state, { online: false, reason: 'http_502' })).toBe('cold');
+    });
+
+    // Strict-on-demand internal cameras (private-RTSP live-only) were parked on the 10-min passive
+    // cadence even while failing — the reason a dead one stayed "online" for hours. Failing/offline
+    // now probes hot (20s), healthy-idle warm (90s).
+    it('probes a FAILING idle strict-on-demand internal camera fast (hot), not 10-min passive', () => {
+        const service = new CameraHealthService();
+        const camera = { id: 22, delivery_type: 'internal_hls', private_rtsp_url: 'rtsp://10.0.0.6/live', source_profile: 'surabaya_private_rtsp' };
+        const state = service.ensureCameraState(camera.id, 0);
+        state.effectiveOnline = false;
+
+        const cadence = service.getNextCadenceMs(camera, state, { online: false, reason: 'EHOSTUNREACH', details: { real_viewer_count: 0 } });
+        expect(cadence).toBe(20 * 1000);
+    });
+
+    it('probes a HEALTHY idle strict-on-demand internal camera on warm (90s), not 10-min passive', () => {
+        const service = new CameraHealthService();
+        const camera = { id: 23, delivery_type: 'internal_hls', private_rtsp_url: 'rtsp://10.0.0.7/live', source_profile: 'surabaya_private_rtsp' };
+        const state = service.ensureCameraState(camera.id, 1);
+        state.effectiveOnline = true;
+        state.stableSuccessCount = 5;
+
+        const cadence = service.getNextCadenceMs(camera, state, { online: true, reason: 'rtsp_auth_ok', details: { real_viewer_count: 0 } });
+        expect(cadence).toBe(90 * 1000);
+    });
 });
 
 function createReadableStream() {

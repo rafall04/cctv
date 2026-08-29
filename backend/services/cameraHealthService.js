@@ -9,6 +9,12 @@ SideEffects: Updates camera online state/runtime state, repairs MediaMTX paths, 
 import axios from 'axios';
 import https from 'https';
 import { probeRtspSource } from './rtspProbe.js';
+import {
+    SCORE_DECAY_ON_SUCCESS,
+    OFFLINE_SCORE_THRESHOLD,
+    FAILURE_WEIGHTS,
+    HARD_OFFLINE_REASONS,
+} from './cameraHealthScoringPolicy.js';
 import { config } from '../config/config.js';
 import { query, queryOne, execute, transaction } from '../database/connectionPool.js';
 import {
@@ -75,60 +81,6 @@ const PROBE_CACHE_TTLS_MS = {
     external_embed_primary: 45 * 1000,
     passive_external: 30 * 1000,
 };
-
-const SCORE_DECAY_ON_SUCCESS = 0.5;
-const OFFLINE_SCORE_THRESHOLD = 3.0;
-
-const FAILURE_WEIGHTS = {
-    'ECONNREFUSED':             1.0,
-    // "No route to host / network is down" — what a camera behind a DEAD MODEM produces on every
-    // RTSP probe. These raw socket errnos pass straight through rtspProbe.js as the reason, and were
-    // NOT in this map, so they scored the 0.3 default: ~10 consecutive checks to even reach the
-    // offline threshold, reset to 0 on every backend restart, so a genuinely-dead camera stayed green
-    // for hours (CCTV GG SOMODIHARJO, modem died ~09:20, still "online" at 11:45). They are at least
-    // as definitive as ECONNREFUSED, so they carry the same 1.0 weight — offline in ~3 checks.
-    'EHOSTUNREACH':             1.0,
-    'ENETUNREACH':              1.0,
-    'EHOSTDOWN':                1.0,
-    'ENETDOWN':                 1.0,
-    'http_404':                 1.0,
-    'http_403':                 0.8,
-    'tls_verification_failed':  0.8,
-    'invalid_rtsp_url':         1.0,
-    'rtsp_auth_failed':         1.0,
-    'rtsp_stream_not_found':    1.0,
-    'missing_external_hls_url': 1.0,
-    'master_has_no_variant':    0.7,
-    'media_playlist_has_no_segments': 0.6,
-    'internal_stream_unreachable': 0.8,
-    'stream_ended':             1.0,
-    'stale_program_date_time':  0.4,
-    'stale_media_sequence':     0.5,
-    'snapshot_unreachable':     0.15,
-    'mjpeg_invalid_content_type': 0.4,
-    'probe_target_mismatch':    0.4,
-    'ECONNABORTED':             0.2,  // Timeout
-    'ETIMEDOUT':                0.2,
-    'ENOTFOUND':                0.15,
-    'request_error':            0.3
-};
-
-const HARD_OFFLINE_REASONS = new Set([
-    'missing_external_source_metadata',
-    'missing_external_hls_url',
-    'missing_external_probe_target',
-    'invalid_rtsp_url',
-    'rtsp_auth_failed',
-    'rtsp_stream_not_found',
-    'http_401',
-    'http_403',
-    'http_404',
-    'mjpeg_invalid_content_type',
-    'invalid_m3u8',
-    'master_has_no_variant',
-    'nested_master_without_media',
-    'media_playlist_has_no_segments',
-]);
 
 const BATCH_CONCURRENCY_PER_DOMAIN = 2;
 const BATCH_DELAY_MS = 1500;
@@ -1220,7 +1172,15 @@ class CameraHealthService {
         }
 
         if (rawResult && !rawResult.online) {
-            return state.stableFailureCount >= 5 ? 'cold' : 'hot';
+            // First few failures: hot (20s) to confirm DOWN quickly. Once confidently offline, an
+            // EXTERNAL feed goes cold (5 min) to spare the third-party provider — but our OWN INTERNAL
+            // cameras stay warm (90s) so a RECOVERED one (a customer's modem coming back) is caught in
+            // ~90s, not up to 5 min. The offline→online flip itself is instant on the first success;
+            // this only sets how often we re-probe an offline camera to find that success.
+            if (state.stableFailureCount >= 5) {
+                return deliveryProfile.effectiveDeliveryType === 'internal_hls' ? 'warm' : 'cold';
+            }
+            return 'hot';
         }
 
         if (state.stableSuccessCount >= 3) {
@@ -1247,7 +1207,19 @@ class CameraHealthService {
             && internalPolicy.isStrictOnDemandProfile
             && Number(lastDetails.real_viewer_count || 0) === 0
         ) {
-            return PASSIVE_ONLY_CADENCE_MS;
+            // These are our OWN cameras on our OWN network (a customer's IP camera behind their
+            // modem) — cheap to probe, and exactly the feeds an operator most needs accurate status
+            // for. The old flat 10-min passive cadence here is why a dead one stayed "online" for
+            // hours: its failure was not even re-probed for up to 10 minutes. Give them PROMPT cadence
+            // in BOTH directions instead — hot (20s) whenever the camera is failing, awaiting
+            // confirmation, or currently offline, so DOWN confirms in ~1 min and RECOVERY is caught
+            // within seconds; warm (90s) while healthy-idle so the FIRST failure is noticed fast. A
+            // brief periodic DESCRIBE is nothing like MediaMTX's continuous pull, so this does not
+            // hammer the camera. EXTERNAL third-party feeds keep the protective passive cadence below.
+            const failingOrUnsettled = (rawResult && !rawResult.online)
+                || state?.needsConfirmation
+                || state?.effectiveOnline === false;
+            return failingOrUnsettled ? HOT_CADENCE_MS : WARM_CADENCE_MS;
         }
 
         if ((deliveryProfile.classification === 'external_jsmpeg' || deliveryProfile.classification === 'external_custom_ws')
