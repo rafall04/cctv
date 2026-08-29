@@ -757,6 +757,8 @@ const MapView = memo(({
     }, [viewportState.currentBounds, viewportState.currentZoom]);
 
     const camerasWithCoords = useMemo(() => cameras.filter(hasValidCoords), [cameras]);
+    const cameraSetSignature = useMemo(() => camerasWithCoords.map((cam) => cam.id).sort().join(','), [camerasWithCoords]);
+    const previousCameraSetSignatureRef = useRef(cameraSetSignature);
 
     // Summary shown after locating: how many cameras sit within NEARBY_RADIUS_METERS of the user,
     // plus the single nearest one. Straight-line (haversine); honest "garis lurus" wording.
@@ -976,6 +978,18 @@ const MapView = memo(({
             previousSelectedAreaRef.current = selectedAreaValue;
         }
     }, [buildAreaViewportCommand, enqueueViewportCommand, selectedAreaValue]);
+
+    // The KOTA chip narrows `cameras` without touching selectedArea; refit so a distant kabupaten's cameras aren't left off-screen.
+    useEffect(() => {
+        if (!initialViewportAppliedRef.current || previousCameraSetSignatureRef.current === cameraSetSignature) {
+            return;
+        }
+        previousCameraSetSignatureRef.current = cameraSetSignature;
+        const bounds = camerasWithCoords.length ? buildBoundsFromCameras(camerasWithCoords) : null;
+        if (bounds) {
+            enqueueViewportCommand({ type: 'focus_filtered', bounds, maxZoom: 15 });
+        }
+    }, [cameraSetSignature, camerasWithCoords, enqueueViewportCommand]);
 
     const openModal = useCallback((camera) => {
         if (typeof onCameraOpen === 'function') {
