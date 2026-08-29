@@ -30,23 +30,25 @@ import net from 'node:net';
 dns.setDefaultResultOrder('ipv4first');
 net.setDefaultAutoSelectFamily(false);
 
-// Capture the operator's REAL choice before we touch the variable. This is the single-owner
-// gate: recording must be owned by EXACTLY ONE process. When worker mode is NOT enabled the API
-// process still owns recording (server.js:600), so this worker must record NOTHING — a second
-// ffmpeg per camera on the same directory corrupts every segment. On a fresh install the flag is
-// unset, yet `pm2 start ecosystem.config.cjs` launches this app anyway (README §5), so the guard
-// at the bottom of this file is what keeps a brand-new deployment from double-recording out of
-// the box. Enforced in code, not docs: comments elsewhere assert the invariant; this makes it true.
-const WORKER_MODE = String(process.env.RECORDING_WORKER_ENABLED || '').trim().toLowerCase() === 'true';
+// Import config FIRST: config.js runs dotenv.config(), which is what loads backend/.env into
+// process.env. pm2 does NOT put backend/.env into the environment, so the operator's flag is only
+// visible AFTER this import — reading process.env.RECORDING_WORKER_ENABLED any earlier sees pm2's
+// bare env (flag absent) and would make a correctly-configured prod worker idle by mistake.
+const { config } = await import('./config/config.js');
 
-// Declare the role BEFORE anything reads config, so any shared module that branches on worker
-// mode sees the worker's own answer — but ONLY when we are actually going to own recording.
-// Leaving the real (falsey) value in place otherwise keeps the idle path honestly non-owning.
+// Single-owner gate: recording must be owned by EXACTLY ONE process. Worker mode is the operator's
+// flag (RECORDING_WORKER_ENABLED=true in backend/.env), NOT forced on. When it is not enabled the
+// API owns recording (server.js:600), so this worker must record NOTHING — a second ffmpeg per
+// camera on the same directory corrupts every segment. On a fresh install the flag is unset and
+// `pm2 start ecosystem.config.cjs` launches this app anyway (README §5), so the idle branch at the
+// bottom of this file is what stops a brand-new deployment from double-recording. Enforced in code.
+const WORKER_MODE = config.recording.workerEnabled === true;
+
+// Normalize the raw env var to 'true' for any shared module (imported below) that reads it directly
+// rather than via config — only when we are actually the recording owner.
 if (WORKER_MODE) {
     process.env.RECORDING_WORKER_ENABLED = 'true';
 }
-
-const { config } = await import('./config/config.js');
 const { recordingService } = await import('./services/recordingService.js');
 const { default: recordingScheduler } = await import('./services/recordingScheduler.js');
 const { default: recordingHealthDashboardService } = await import('./services/recordingHealthDashboardService.js');
