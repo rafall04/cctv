@@ -42,7 +42,8 @@ export const RATE_LIMIT_CONFIG = {
         '/health',
         '/api/stream',
         '/api/viewer/heartbeat',  // Viewer heartbeat needs frequent calls (every 10s)
-        '/hls'                    // HLS proxy - high frequency segment requests
+        '/hls',                   // HLS proxy - high frequency segment requests
+        '/api/internal'           // MediaMTX push hooks - bursty on restart; self-bounded (debounce + in-flight cap)
     ],
     // Auth endpoint prefixes
     authPrefixes: [

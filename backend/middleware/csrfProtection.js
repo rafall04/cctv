@@ -50,7 +50,8 @@ export const CSRF_SKIP_ENDPOINTS = [
     '/hls',                             // HLS proxy - public streaming endpoint
     '/api/billing/webhook',             // Payment gateway webhooks - authenticated by gateway signature
     '/api/voucher/webhook',             // Voucher payment webhook - re-verified against the gateway API
-    '/api/playback-access/webhook'      // Playback access webhook - re-verified against the gateway API
+    '/api/playback-access/webhook',     // Playback access webhook - re-verified against the gateway API
+    '/api/internal'                     // MediaMTX push hooks - loopback + shared-secret gated in the controller
 ];
 
 /**

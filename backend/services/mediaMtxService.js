@@ -11,6 +11,7 @@ import { config } from '../config/config.js';
 import { query, queryOne } from '../database/connectionPool.js';
 import { resolveInternalIngestPolicy, shouldParkInternalIngest, isIngestParkEnabled } from '../utils/internalIngestPolicy.js';
 import { resolveInternalRtspTransport, toMediaMtxSourceProtocol } from '../utils/internalRtspTransportPolicy.js';
+import { buildPushHookFields } from './mediaMtxHookConfig.js';
 
 // Centralized Axios instance for MediaMTX API to avoid repetition and enforce standard timeouts
 const mtxApi = axios.create({
@@ -118,6 +119,11 @@ class MediaMtxService {
             sourceOnDemand: parked || resolvedPolicy.mode !== 'always_on',
             sourceOnDemandStartTimeout: '10s',
             sourceOnDemandCloseAfter: `${resolvedPolicy.closeAfterSeconds || 30}s`,
+            // Phase 3 push hooks. Emitted ONLY for always_on paths (an on-demand path's not-ready just
+            // means the last viewer left, not a source failure). Fields are ALWAYS present (empty when
+            // off) so a PATCH actively clears a stale hook when the feature is disabled or a camera
+            // changes class. Empty when INTERNAL_HOOK_SECRET is unset — a dormant, no-op deploy.
+            ...buildPushHookFields(resolvedPolicy.mode === 'always_on'),
         };
     }
 
@@ -223,11 +229,18 @@ class MediaMtxService {
         const currentTransport = currentConfig.rtspTransport ?? currentConfig.sourceProtocol;
         const desiredTransport = desiredConfig.rtspTransport ?? desiredConfig.sourceProtocol;
 
+        // Phase 3 hook fields: compare with empty-string normalisation (MediaMTX returns "" for an
+        // unset runOn command, our disabled state also emits ""). Including them here lets a normal sync
+        // roll the hook onto existing always_on paths one-at-a-time (sequential loop => staggered,
+        // live-HLS-only bounce; recording is a separate ffmpeg pull) and clear it again when disabled.
         return currentConfig.source !== desiredConfig.source
             || currentTransport !== desiredTransport
             || Boolean(currentConfig.sourceOnDemand) !== Boolean(desiredConfig.sourceOnDemand)
             || currentConfig.sourceOnDemandStartTimeout !== desiredConfig.sourceOnDemandStartTimeout
-            || currentConfig.sourceOnDemandCloseAfter !== desiredConfig.sourceOnDemandCloseAfter;
+            || currentConfig.sourceOnDemandCloseAfter !== desiredConfig.sourceOnDemandCloseAfter
+            || (currentConfig.runOnReady || '') !== (desiredConfig.runOnReady || '')
+            || (currentConfig.runOnNotReady || '') !== (desiredConfig.runOnNotReady || '')
+            || Boolean(currentConfig.runOnReadyRestart) !== Boolean(desiredConfig.runOnReadyRestart);
     }
 
     /**

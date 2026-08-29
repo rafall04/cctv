@@ -128,6 +128,14 @@ export const config = {
     csrfSecret: process.env.CSRF_SECRET || '',
     csrfEnabled: process.env.CSRF_ENABLED !== 'false',
 
+    // Shared secret for the loopback-only MediaMTX push-hook endpoint (Phase 3 push health).
+    // OPT-IN: when empty, push hooks are disabled entirely — the endpoint rejects every call AND
+    // mediaMtxService adds no runOnReady/runOnNotReady to any path. Polling remains the source of
+    // truth either way, so a missing/leaked secret can never produce a wrong camera status (a hook
+    // only TRIGGERS a real re-check); the secret exists to stop a local process from spamming
+    // re-checks (DoS), not to gate correctness.
+    internalHookSecret: process.env.INTERNAL_HOOK_SECRET || '',
+
     rateLimitEnabled: process.env.RATE_LIMIT_ENABLED !== 'false',
     rateLimitPublic: parseInt(process.env.RATE_LIMIT_PUBLIC || '100', 10),
     rateLimitAuth: parseInt(process.env.RATE_LIMIT_AUTH || '30', 10),
@@ -306,6 +314,14 @@ export function assertSecureConfig() {
     } else if (looksLikePlaceholderSecret(config.security.apiKeySecret)) {
       errors.push('API_KEY_SECRET still looks like a committed template/placeholder value. Set a unique random API_KEY_SECRET.');
     }
+  }
+
+  // Phase 3 push hooks are opt-in and fail safe (polling is the source of truth), so a missing secret
+  // is not an error. But a secret with characters that would break the quoted curl arg MediaMTX runs
+  // silently disables hooks — warn so the misconfiguration is visible instead of mysteriously inert.
+  const hookSecret = config.security.internalHookSecret;
+  if (hookSecret && !/^[A-Za-z0-9_-]+$/.test(hookSecret)) {
+    warnings.push('INTERNAL_HOOK_SECRET contains characters outside [A-Za-z0-9_-]; MediaMTX push hooks will stay DISABLED. Use a hex/base64url secret.');
   }
 
   for (const warning of warnings) {

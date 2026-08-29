@@ -89,6 +89,7 @@ import publicCameraFeedbackRoutes from './routes/publicCameraFeedbackRoutes.js';
 import customerRoutes from './routes/customerRoutes.js';
 import billingAdminRoutes from './routes/billingAdminRoutes.js';
 import billingWebhookRoutes from './routes/billingWebhookRoutes.js';
+import internalHookRoutes from './routes/internalHookRoutes.js';
 import billingService from './services/billingService.js';
 // thumbnailRoutes removed - @fastify/static handles thumbnails
 import mediaMtxService from './services/mediaMtxService.js';
@@ -383,10 +384,9 @@ await fastify.register(authRoutes, { prefix: '/api/auth' });
 await fastify.register(cameraRoutes, { prefix: '/api/cameras' });
 await fastify.register(areaRoutes, { prefix: '/api/areas' });
 await fastify.register(streamRoutes, { prefix: '/api/stream' });
-// New opaque proxy endpoints — /api/stream/:id/external.m3u8 and
-// /api/stream/:id/external-segment/:filename. Sits at the same prefix as
-// streamRoutes; Fastify allows multiple plugins to share a prefix as long
-// as path patterns don't collide.
+// Opaque proxy endpoints (/api/stream/:id/external.m3u8, .../external-segment/:filename) share the
+// streamRoutes prefix — Fastify allows multiple plugins on one prefix as long as path patterns
+// don't collide.
 await fastify.register(externalStreamProxyRoutes, { prefix: '/api/stream' });
 await fastify.register(adminRoutes, { prefix: '/api/admin' });
 await fastify.register(userRoutes, { prefix: '/api/users' });
@@ -418,6 +418,7 @@ await fastify.register(telegramArchiveRoutes, { prefix: '/api/admin/telegram-arc
 await fastify.register(backupTelegramRoutes, { prefix: '/api/admin/backup' });
 await fastify.register(securitySettingsRoutes, { prefix: '/api/admin/settings' });
 await fastify.register(billingWebhookRoutes, { prefix: '/api/billing' });
+await fastify.register(internalHookRoutes, { prefix: '/api/internal' }); // loopback MediaMTX push hooks (self-gated)
 // thumbnailRoutes removed - @fastify/static handles /api/thumbnails/* automatically
 
 // ============================================

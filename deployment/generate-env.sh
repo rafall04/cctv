@@ -108,6 +108,11 @@ API_KEY_SECRET=${API_KEY_SECRET}
 CSRF_ENABLED=true
 CSRF_SECRET=${CSRF_SECRET}
 
+# MediaMTX push hooks (Phase 3 fast health). OPTIONAL — empty = reliable polling-only (the feature is
+# additive, polling stays the source of truth). Set a [A-Za-z0-9_-] secret (e.g. openssl rand -hex 24)
+# to have MediaMTX notify the backend the instant an always_on camera connects/drops (~seconds vs a poll).
+INTERNAL_HOOK_SECRET=${INTERNAL_HOOK_SECRET:-}
+
 RATE_LIMIT_ENABLED=true
 RATE_LIMIT_PUBLIC=100
 RATE_LIMIT_AUTH=30
