@@ -7,6 +7,7 @@ SideEffects: Mocks network, database, MediaMTX, recording, and thumbnail interac
 */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import fc from 'fast-check';
 import axios from 'axios';
 import net from 'net';
 import { PassThrough } from 'stream';
@@ -428,6 +429,43 @@ describe('cameraHealthService weighted scoring', () => {
             expect(state.failureScore).toBe(3);
         },
     );
+
+    // THE REGRESSION GUARD for the 2026-03 weighted-scoring refactor (8e8ce63). That refactor
+    // replaced reason-AGNOSTIC failure-streak counting (any N failures -> offline) with reason-
+    // WEIGHTED scoring, where an UNRECOGNISED reason scored the near-zero 0.3 default and was
+    // effectively ignored — so a dead-modem camera (EHOSTUNREACH, never mapped) stayed green for
+    // hours. This property re-establishes the old guarantee: a camera whose every probe FAILS must
+    // be flagged for offline within a bounded number of checks, for ANY reason string. If a future
+    // edit reintroduces a near-zero weight or a fail-open branch, this fails.
+    it('FAIL-SAFE INVARIANT: no failure reason — known or unknown — keeps a camera online forever', () => {
+        fc.assert(
+            fc.property(fc.string({ minLength: 1, maxLength: 40 }), (reason) => {
+                const service = new CameraHealthService();
+                const camera = { id: 1, is_online: 1 };
+                service.ensureCameraState(camera.id, 1);
+                for (let i = 0; i < 20; i += 1) {
+                    service.applyWeightedScoring(camera, { online: false, reason });
+                }
+                const state = service.healthState.get(camera.id);
+                // Either flagged for confirmation (about to flip) or already forced offline — never
+                // still confidently online after 20 straight failures.
+                return state.needsConfirmation === true || state.effectiveOnline === false;
+            }),
+            { numRuns: 250 },
+        );
+    });
+
+    it('an UNRECOGNISED failure reason reaches offline within ~5 checks (fail-safe default weight, not 0.3)', () => {
+        const service = new CameraHealthService();
+        const camera = { id: 99, is_online: 1 };
+        service.ensureCameraState(camera.id, 1);
+        // A reason no weight maps — the exact shape of the EHOSTUNREACH gap. At the old 0.3 default
+        // this needed ~10 checks; the fail-safe default flags it within 5.
+        for (let i = 0; i < 5; i += 1) {
+            service.applyWeightedScoring(camera, { online: false, reason: 'SOME_UNSEEN_ERRNO_XYZ' });
+        }
+        expect(service.healthState.get(camera.id).needsConfirmation).toBe(true);
+    });
 
     it('flags needsConfirmation after 15 timeouts (weight=0.2)', () => {
         const service = new CameraHealthService();

@@ -12,6 +12,7 @@ import { probeRtspSource } from './rtspProbe.js';
 import {
     SCORE_DECAY_ON_SUCCESS,
     OFFLINE_SCORE_THRESHOLD,
+    DEFAULT_FAILURE_WEIGHT,
     FAILURE_WEIGHTS,
     HARD_OFFLINE_REASONS,
 } from './cameraHealthScoringPolicy.js';
@@ -2332,7 +2333,8 @@ class CameraHealthService {
                 )
                 : (runtimeAssisted ? Math.max(0.65, state.confidence || 0.5) : 0.98);
         } else {
-            const weight = FAILURE_WEIGHTS[rawResult.reason] ?? 0.3;
+            // Fail-safe: an UNRECOGNISED failure counts toward offline, it is not shrugged off.
+            const weight = FAILURE_WEIGHTS[rawResult.reason] ?? DEFAULT_FAILURE_WEIGHT;
             state.failureScore += weight;
             state.stableFailureCount += 1;
             state.stableSuccessCount = 0;

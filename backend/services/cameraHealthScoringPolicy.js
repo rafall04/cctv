@@ -13,6 +13,16 @@
 export const SCORE_DECAY_ON_SUCCESS = 0.5;
 export const OFFLINE_SCORE_THRESHOLD = 3.0;
 
+// Weight for a probe that FAILED (online:false) with a reason not listed below. FAIL-SAFE, and that
+// is the whole point: the old default was 0.3, which meant "an unrecognised failure is almost
+// ignored" — a camera whose every probe failed with an errno nobody had mapped (EHOSTUNREACH from a
+// dead modem) needed ~10 checks to even reach the threshold and stayed green for hours. A status
+// customers rely on must fail toward OFFLINE when it does not understand a failure, not toward
+// online. 0.7 -> ~5 sustained failures to go offline: serious, but slightly more forgiving than a
+// KNOWN-definitive error (1.0 / 3 checks) since we cannot be sure an unknown reason is not transient.
+// Genuinely-transient reasons (timeout, DNS) stay explicitly LOW-weighted in FAILURE_WEIGHTS.
+export const DEFAULT_FAILURE_WEIGHT = 0.7;
+
 export const FAILURE_WEIGHTS = {
     'ECONNREFUSED':             1.0,
     // "No route to host / network is down" — what a camera behind a DEAD MODEM produces on every
