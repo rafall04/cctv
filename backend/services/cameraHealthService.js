@@ -15,6 +15,7 @@ import {
     DEFAULT_FAILURE_WEIGHT,
     FAILURE_WEIGHTS,
     HARD_OFFLINE_REASONS,
+    resolveErrorClass,
 } from './cameraHealthScoringPolicy.js';
 import { config } from '../config/config.js';
 import { query, queryOne, execute, transaction } from '../database/connectionPool.js';
@@ -73,6 +74,17 @@ const DOMAIN_BACKOFF_BASE_MS = 60 * 1000;
 const DOMAIN_BACKOFF_MAX_MS = 10 * 60 * 1000;
 const HEALTH_LOOP_FLOOR_MS = 5 * 1000;
 const HEALTH_LOOP_CEIL_MS = 30 * 1000;
+// Fast-lane cadence for INTERNAL (MediaMTX-pulled) cameras — our own devices, cheap to check because
+// a healthy one is answered from MediaMTX's already-fetched path state, not a per-camera probe. Kept
+// separate from the slow external sweep so a customer's modem dying is caught in seconds, not the
+// ~2.4-min shared sweep meant to spare ~700 third-party public feeds.
+const HEALTH_INTERNAL_FAST_MS = 15 * 1000;
+// Minimum elapsed time before the MediaMTX byte-delta baseline (prevPathBytes) is ADVANCED. With
+// two lanes now calling getActivePaths concurrently, a wholesale "prev = current each call" made the
+// lane that ran a few ms later compare against a microseconds-old sample → ~0 delta → a live idle
+// source wrongly read as not-progressing → false offline. Advancing the baseline at most this often,
+// and reusing the last verdict in between, keeps the delta window meaningful regardless of lane order.
+const BYTE_DELTA_MIN_WINDOW_MS = 10 * 1000;
 const INTERNAL_PATH_REPAIR_BACKOFF_MS = 2 * 60 * 1000;
 
 const PROBE_CACHE_TTLS_MS = {
@@ -274,82 +286,6 @@ function extractProviderDomain(url) {
     }
 }
 
-function resolveErrorClass(reason) {
-    if (!reason) {
-        return 'unknown';
-    }
-
-    if ([
-        'missing_external_source_metadata',
-        'missing_external_hls_url',
-        'missing_external_probe_target',
-        'invalid_rtsp_url',
-        'rtsp_stream_not_found',
-    ].includes(reason)) {
-        return 'config';
-    }
-
-    if (reason === 'tls_verification_failed') {
-        return 'tls';
-    }
-
-    if ([
-        'http_401',
-        'http_403',
-        'rtsp_auth_failed',
-    ].includes(reason)) {
-        return 'auth_policy';
-    }
-
-    if ([
-        'invalid_m3u8',
-        'master_has_no_variant',
-        'nested_master_without_media',
-        'media_playlist_has_no_segments',
-        'mjpeg_invalid_content_type',
-    ].includes(reason)) {
-        return 'format_protocol';
-    }
-
-    if ([
-        'stream_ended',
-        'stale_program_date_time',
-        'stale_media_sequence',
-    ].includes(reason)) {
-        return 'stale';
-    }
-
-    if ([
-        'probe_target_mismatch',
-        'runtime_probe_tls_mismatch',
-    ].includes(reason)) {
-        return 'runtime_probe_mismatch';
-    }
-
-    if (
-        reason.startsWith('http_')
-        || [
-            'ECONNREFUSED',
-            'ECONNABORTED',
-            'ETIMEDOUT',
-            'ENOTFOUND',
-            // Network-down errnos (dead modem/router): classify with the other network failures so
-            // domain-health and runtime-assist logic treat them consistently, not as 'unknown'.
-            'EHOSTUNREACH',
-            'ENETUNREACH',
-            'EHOSTDOWN',
-            'ENETDOWN',
-            'request_error',
-            'internal_stream_unreachable',
-            'provider_backoff_active',
-        ].includes(reason)
-    ) {
-        return 'network_transient';
-    }
-
-    return 'unknown';
-}
-
 function resolveHealthProbeTarget(camera) {
     const deliveryProfile = getCameraDeliveryProfile(camera);
     const deliveryClassification = deliveryProfile.classification;
@@ -500,9 +436,15 @@ class CameraHealthService {
     constructor() {
         this.checkInterval = null;
         this.isRunning = false;
-        this.isChecking = false;
+        // A guard PER lane (scope), not one global flag: the internal fast lane and the external
+        // sweep run concurrently over DISJOINT camera sets, so each only skips its own overlapping run.
+        this.checkingScopes = new Set();
+        this.fastCheckTimer = null;
         this.lastCheck = null;
-        this.lastCheckpointWriteAt = 0;
+        // Per-LANE checkpoint clock: the 15s internal lane and the ~2.4-min external sweep write
+        // DISJOINT camera sets, so a single shared clock let the fast lane win every 5-min boundary and
+        // reset it after checkpointing only internal cameras — freezing external cameras' last_online_check.
+        this.lastCheckpointWriteAt = new Map();
         this.offlineSince = new Map();
         this.telegramAlertState = new Map();
         this.telegramAlertConfirmationMs = {
@@ -678,23 +620,39 @@ class CameraHealthService {
 
         this.isRunning = true;
         this.baseIntervalMs = Math.min(intervalMs, HEALTH_LOOP_CEIL_MS);
-        console.log(`[CameraHealth] Starting health check service (interval: ${intervalMs / 1000}s)`);
+        console.log(`[CameraHealth] Starting health check service (external ~sweep, internal fast lane ${HEALTH_INTERNAL_FAST_MS / 1000}s)`);
 
         setTimeout(() => {
             const startTime = Date.now();
-            this.checkAllCameras()
+            // Boot sweep is 'external' ONLY, not 'all': a full 'all' sweep runs for ~2 min over ~750
+            // cameras, which would OVERLAP the 15s internal fast tick and let both lanes probe the same
+            // internal camera at once (separate guard keys). 'external' keeps the lanes disjoint from
+            // boot — and the flagging loop inside checkAllCameras still stamps every camera's
+            // cameraScope, so the fast lane owns internal cameras from its very first tick.
+            this.checkAllCameras('external')
                 .catch((error) => console.error('[CameraHealth] Initial check failed:', error.message))
                 .finally(() => {
                     this.lastCheckDuration = Date.now() - startTime;
                     if (this.isRunning) this.scheduleNextCheck();
                 });
         }, 10000);
+
+        // Fast lane: internal (MediaMTX-pulled) cameras every ~15s, decoupled from the slow external
+        // sweep. Cheap — a healthy internal camera is answered from MediaMTX path state, not a probe.
+        this.fastCheckTimer = setInterval(() => {
+            this.checkAllCameras('internal')
+                .catch((error) => console.error('[CameraHealth] Fast internal check failed:', error.message));
+        }, HEALTH_INTERNAL_FAST_MS);
+        this.fastCheckTimer.unref?.();
     }
 
     scheduleNextCheck() {
         const now = Date.now();
         let nextDueAt = now + this.baseIntervalMs;
         for (const state of this.healthState.values()) {
+            // Internal cameras are owned by the fast lane; the external self-scheduler must not wake
+            // for their (short) nextCheckAt, or it would spin every ~15s doing nothing external.
+            if (state?.cameraScope === 'internal') continue;
             if (state?.nextCheckAt && state.nextCheckAt < nextDueAt) {
                 nextDueAt = state.nextCheckAt;
             }
@@ -711,7 +669,7 @@ class CameraHealthService {
             
         this.checkTimeout = setTimeout(() => {
             const startTime = Date.now();
-            this.checkAllCameras()
+            this.checkAllCameras('external')
                 .catch((error) => console.error('[CameraHealth] Interval check failed:', error.message))
                 .finally(() => {
                     this.lastCheckDuration = Date.now() - startTime;
@@ -729,8 +687,12 @@ class CameraHealthService {
             clearInterval(this.checkInterval);
             this.checkInterval = null;
         }
+        if (this.fastCheckTimer) {
+            clearInterval(this.fastCheckTimer);
+            this.fastCheckTimer = null;
+        }
         this.isRunning = false;
-        this.isChecking = false;
+        this.checkingScopes.clear();
         console.log('[CameraHealth] Service stopped');
     }
 
@@ -841,7 +803,7 @@ class CameraHealthService {
 
     getEnabledCameraCandidates() {
         return query(`
-            SELECT c.id, c.is_online, crs.monitoring_state
+            SELECT c.id, c.is_online, c.delivery_type, crs.monitoring_state
             FROM cameras c
             LEFT JOIN camera_runtime_state crs ON crs.camera_id = c.id
             WHERE c.enabled = 1
@@ -1833,7 +1795,7 @@ class CameraHealthService {
             return pathMap;
         }
 
-        const currentPathBytes = new Map();
+        const sampleNow = Date.now();
         try {
             const activeItems = await this.fetchAllMediaMtxItems('/paths/list');
 
@@ -1858,14 +1820,21 @@ class CameraHealthService {
 
                 const bytesReceived = Number.isFinite(item.bytesReceived) ? item.bytesReceived : 0;
                 existing.bytesReceived = bytesReceived;
-                currentPathBytes.set(item.name, bytesReceived);
-                // "Progressing" = MediaMTX is actually pulling media right now.
-                // First sighting (no prior sample) trusts any positive byte
-                // count; subsequent ticks require growth so a stalled UDP
-                // source (bytes frozen) correctly falls through to a probe.
-                const priorBytes = this.prevPathBytes.get(item.name);
-                existing.sourceProgressing = bytesReceived > 0
-                    && (priorBytes === undefined ? true : bytesReceived > priorBytes);
+                // "Progressing" = MediaMTX is actually pulling media right now. First sighting (no prior
+                // sample) trusts any positive byte count; otherwise require growth over a REAL window so
+                // a stalled UDP source (bytes frozen) falls through to a probe. The baseline is advanced
+                // at most every BYTE_DELTA_MIN_WINDOW_MS: a second lane sampling ms later reuses the last
+                // verdict instead of comparing against a just-written sample (which would read ~0 delta).
+                const prior = this.prevPathBytes.get(item.name);
+                if (!prior) {
+                    existing.sourceProgressing = bytesReceived > 0;
+                    this.prevPathBytes.set(item.name, { bytes: bytesReceived, at: sampleNow, progressing: existing.sourceProgressing });
+                } else if (sampleNow - prior.at >= BYTE_DELTA_MIN_WINDOW_MS) {
+                    existing.sourceProgressing = bytesReceived > 0 && bytesReceived > prior.bytes;
+                    this.prevPathBytes.set(item.name, { bytes: bytesReceived, at: sampleNow, progressing: existing.sourceProgressing });
+                } else {
+                    existing.sourceProgressing = prior.progressing;
+                }
 
                 pathMap.set(item.name, existing);
             }
@@ -1873,7 +1842,6 @@ class CameraHealthService {
             console.warn('[CameraHealth] Failed to get active paths:', error.message);
         }
 
-        this.prevPathBytes = currentPathBytes;
         this.lastActivePathMap = pathMap;
         return pathMap;
     }
@@ -2334,7 +2302,13 @@ class CameraHealthService {
                 : (runtimeAssisted ? Math.max(0.65, state.confidence || 0.5) : 0.98);
         } else {
             // Fail-safe: an UNRECOGNISED failure counts toward offline, it is not shrugged off.
-            const weight = FAILURE_WEIGHTS[rawResult.reason] ?? DEFAULT_FAILURE_WEIGHT;
+            // Object.hasOwn, not `[reason] ?? default`: a reason like "toString"/"constructor" would
+            // otherwise resolve to an INHERITED Object.prototype function, dodge the ?? guard, and add
+            // a function to the score (NaN → never offline). The FAIL-SAFE INVARIANT property test
+            // found exactly this.
+            const weight = Object.hasOwn(FAILURE_WEIGHTS, rawResult.reason)
+                ? FAILURE_WEIGHTS[rawResult.reason]
+                : DEFAULT_FAILURE_WEIGHT;
             state.failureScore += weight;
             state.stableFailureCount += 1;
             state.stableSuccessCount = 0;
@@ -2471,13 +2445,23 @@ class CameraHealthService {
         };
     }
 
-    async checkAllCameras() {
-        if (this.isChecking) {
-            console.log('[CameraHealth] Previous check still running, skipping this tick');
-            return;
+    /**
+     * @param {'all'|'internal'|'external'} scope Which lane to check. 'internal' = the fast lane (our
+     *   own MediaMTX-pulled cameras, all of them each tick); 'external' = the slow throttled sweep
+     *   (per-camera cadence); 'all' = both. In production the boot sweep uses 'external' and the fast
+     *   timer uses 'internal', so the two run CONCURRENTLY over DISJOINT camera sets. 'all' overlaps
+     *   both lanes, so the guard below treats it as mutually exclusive with them (it is only used by
+     *   tests / a hypothetical manual full recheck, never concurrently with the live timers).
+     */
+    async checkAllCameras(scope = 'all') {
+        // Overlap = same scope, or either side is 'all' (which touches every camera). This keeps the
+        // disjoint-set invariant the lanes depend on true even if 'all' is ever called while a lane runs.
+        const overlaps = (active) => active === scope || active === 'all' || scope === 'all';
+        for (const active of this.checkingScopes) {
+            if (overlaps(active)) return; // an overlapping run is still going — skip this tick
         }
 
-        this.isChecking = true;
+        this.checkingScopes.add(scope);
 
         try {
             this.cleanupProbeCache();
@@ -2491,10 +2475,23 @@ class CameraHealthService {
             const candidateCameras = this.getEnabledCameraCandidates();
 
             const timestamp = getTimestamp();
+            // activeCameraIds stays UNSCOPED (all enabled cameras): it drives stale-state cleanup, so
+            // a scoped run must never treat the other lane's cameras as "gone".
             const activeCameraIds = new Set(candidateCameras.map((camera) => camera.id));
             const now = Date.now();
+            // Flag every camera's lane so the external self-scheduler skips internal cameras (the fast
+            // lane owns them) — done for all candidates, independent of the scope running now.
+            for (const camera of candidateCameras) {
+                this.ensureCameraState(camera.id, camera.is_online).cameraScope =
+                    camera.delivery_type === 'internal_hls' ? 'internal' : 'external';
+            }
             const dueCameraIds = candidateCameras.filter((camera) => {
-                const state = this.ensureCameraState(camera.id, camera.is_online);
+                const laneScope = camera.delivery_type === 'internal_hls' ? 'internal' : 'external';
+                if (scope !== 'all' && laneScope !== scope) return false;
+                // The internal fast lane probes ALL its cameras every ~15s tick (a healthy one costs
+                // only a MediaMTX state read); the external sweep honours per-camera nextCheckAt.
+                if (scope === 'internal') return true;
+                const state = this.healthState.get(camera.id);
                 return !state.nextCheckAt || state.nextCheckAt <= now;
             }).map((camera) => camera.id);
             const dueCameras = this.getDetailedEnabledCamerasByIds(dueCameraIds);
@@ -2521,7 +2518,7 @@ class CameraHealthService {
                 finalResultsById.set(finalResult.cameraId, finalResult);
             }
 
-            const shouldCheckpoint = now - this.lastCheckpointWriteAt >= CHECKPOINT_DB_WRITE_MS;
+            const shouldCheckpoint = now - (this.lastCheckpointWriteAt.get(scope) || 0) >= CHECKPOINT_DB_WRITE_MS;
             const batchUpdate = transaction((results) => {
                 for (const res of results) {
                     execute('UPDATE cameras SET is_online = ?, last_online_check = ? WHERE id = ? AND (is_online != ? OR last_online_check IS NULL OR ? = 1)',
@@ -2537,7 +2534,7 @@ class CameraHealthService {
             });
             batchUpdate(finalResults);
             if (shouldCheckpoint) {
-                this.lastCheckpointWriteAt = now;
+                this.lastCheckpointWriteAt.set(scope, now);
             }
 
             let onlineCount = 0;
@@ -2631,8 +2628,15 @@ class CameraHealthService {
             // in-flight DOWN/UP debounce instead of re-seeding from scratch.
             cameraTelegramAlertStateRepository.upsertStates(alertStatePersistQueue);
 
+            // Census of NOT-probed cameras, scoped to THIS lane: a scoped run must not fold ~700 other-
+            // lane cameras' stale state into its own online/offline totals (that logged a false full
+            // census every 15s from the fast lane). For 'internal' every in-scope camera was probed, so
+            // this adds nothing; for 'external' it counts the not-yet-due external cameras from state.
             for (const camera of candidateCameras) {
                 if (processedIds.has(camera.id)) {
+                    continue;
+                }
+                if (scope !== 'all' && (camera.delivery_type === 'internal_hls' ? 'internal' : 'external') !== scope) {
                     continue;
                 }
 
@@ -2718,11 +2722,11 @@ class CameraHealthService {
             }
 
             this.lastCheck = new Date();
-            console.log(`[CameraHealth] Check complete: ${onlineCount} online, ${offlineCount} offline (${changedCount} changed, ${dueCameras.length}/${candidateCameras.length} probed)`);
+            console.log(`[CameraHealth] Check complete [${scope}]: ${onlineCount} online, ${offlineCount} offline (${changedCount} changed, ${dueCameras.length} probed)`);
         } catch (error) {
-            console.error('[CameraHealth] Check failed:', error.message);
+            console.error(`[CameraHealth] Check failed [${scope}]:`, error.message);
         } finally {
-            this.isChecking = false;
+            this.checkingScopes.delete(scope);
         }
     }
 

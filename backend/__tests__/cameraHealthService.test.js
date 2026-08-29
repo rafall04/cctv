@@ -1164,6 +1164,37 @@ describe('cameraHealthService external TLS policy', () => {
         axios.get.mockReset();
     });
 
+    it('does not collapse a live source to not-progressing when getActivePaths is called twice in quick succession (two-lane race)', async () => {
+        // Regression for the two-lane split: the internal fast lane and the external sweep both call
+        // getActivePaths concurrently. A wholesale "prev = current each call" made the second call read
+        // a microseconds-old byte sample as its baseline (~0 delta) and mark a healthy live source as
+        // not-progressing → false offline. The baseline now advances at most every BYTE_DELTA_MIN_WINDOW_MS.
+        const service = new CameraHealthService();
+        const reply = (url) => {
+            const isConfig = url.includes('/config/paths/list');
+            return Promise.resolve({
+                data: {
+                    pageCount: 1,
+                    items: [isConfig ? { name: 'p1' } : { name: 'p1', ready: true, sourceReady: true, readers: [], bytesReceived: 1000 }],
+                },
+            });
+        };
+        axios.get.mockImplementation(reply);
+
+        // First sighting: positive bytes → progressing.
+        expect((await service.getActivePaths()).get('p1').sourceProgressing).toBe(true);
+        // Second call ms later, identical bytes (both lanes see the same MediaMTX snapshot): must REUSE
+        // the prior verdict, NOT read a 0-byte delta as "not progressing".
+        expect((await service.getActivePaths()).get('p1').sourceProgressing).toBe(true);
+
+        // Once the delta window has genuinely elapsed and bytes are still flat, it recomputes to false
+        // so a truly stalled source still falls through to a probe.
+        service.prevPathBytes.get('p1').at = Date.now() - 20000;
+        expect((await service.getActivePaths()).get('p1').sourceProgressing).toBe(false);
+
+        axios.get.mockReset();
+    });
+
     it('reuses the per-camera RTSP probe cache within the TTL window', async () => {
         // Probe is expensive; verify the cache works so we don't hammer
         // a dead source every tick.
@@ -1880,6 +1911,47 @@ describe('cameraHealthService check loop', () => {
             monitoring_state: 'offline',
             monitoring_reason: 'rtsp_stream_not_found',
         }));
+    });
+
+    // Two-lane partition: the internal fast lane and the external sweep must probe DISJOINT sets so
+    // internal cameras (our own, cheap) get prompt status without dragging in the slow external sweep.
+    async function runScopeAndCaptureProbedIds(scope) {
+        const service = new CameraHealthService();
+        const internal = { id: 61, name: 'Int', enabled: 1, is_online: 1, delivery_type: 'internal_hls', private_rtsp_url: 'rtsp://10.0.0.61/s', stream_key: 'c61' };
+        const external = { id: 70, name: 'Ext', enabled: 1, is_online: 1, delivery_type: 'external_hls', external_hls_url: 'https://cctv.example.gov.id/live.m3u8' };
+
+        vi.spyOn(service, 'getActivePaths').mockResolvedValue(new Map());
+        const evalSpy = vi.spyOn(service, 'evaluateCameraStatus').mockImplementation(async (cam) => ({ camera: cam, isOnline: 1, rawReason: 'ok', rawDetails: null }));
+        vi.spyOn(service, 'evaluateCameraMonitoringStatus').mockResolvedValue({ isOnline: 1, monitoring_state: 'online', monitoring_reason: 'ok' });
+
+        queryMock
+            // getEnabledCameraCandidates: both lanes present, WITH delivery_type
+            .mockReturnValueOnce([
+                { id: 61, is_online: 1, delivery_type: 'internal_hls' },
+                { id: 70, is_online: 1, delivery_type: 'external_hls' },
+            ])
+            // getDetailedEnabledCamerasByIds: only the in-scope camera is due/probed
+            .mockReturnValueOnce(scope === 'internal' ? [internal] : [external]);
+        executeMock.mockReturnValue({ changes: 1 });
+        upsertRuntimeStateMock.mockImplementation(() => {});
+
+        await service.checkAllCameras(scope);
+        return { service, probedIds: evalSpy.mock.calls.map(([c]) => c.id) };
+    }
+
+    it('the internal fast lane probes ONLY internal cameras (not external)', async () => {
+        const { service, probedIds } = await runScopeAndCaptureProbedIds('internal');
+        expect(probedIds).toContain(61);
+        expect(probedIds).not.toContain(70);
+        // The camera's lane is flagged so the external self-scheduler will skip it.
+        expect(service.healthState.get(61).cameraScope).toBe('internal');
+        expect(service.healthState.get(70).cameraScope).toBe('external');
+    });
+
+    it('the external sweep probes ONLY external cameras (not internal)', async () => {
+        const { probedIds } = await runScopeAndCaptureProbedIds('external');
+        expect(probedIds).toContain(70);
+        expect(probedIds).not.toContain(61);
     });
 
     it('does not send Telegram when monitoring state has not crossed online/offline boundary', async () => {

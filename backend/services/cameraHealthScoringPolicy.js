@@ -73,3 +73,84 @@ export const HARD_OFFLINE_REASONS = new Set([
     'nested_master_without_media',
     'media_playlist_has_no_segments',
 ]);
+
+/**
+ * Coarse class for a probe reason — used by domain-health backoff and runtime-assist to treat a
+ * whole family of failures consistently (a transient network blip vs a permanent config/auth error).
+ * Pure string mapping; unknown reasons fall to 'unknown'.
+ */
+export function resolveErrorClass(reason) {
+    if (!reason) {
+        return 'unknown';
+    }
+
+    if ([
+        'missing_external_source_metadata',
+        'missing_external_hls_url',
+        'missing_external_probe_target',
+        'invalid_rtsp_url',
+        'rtsp_stream_not_found',
+    ].includes(reason)) {
+        return 'config';
+    }
+
+    if (reason === 'tls_verification_failed') {
+        return 'tls';
+    }
+
+    if ([
+        'http_401',
+        'http_403',
+        'rtsp_auth_failed',
+    ].includes(reason)) {
+        return 'auth_policy';
+    }
+
+    if ([
+        'invalid_m3u8',
+        'master_has_no_variant',
+        'nested_master_without_media',
+        'media_playlist_has_no_segments',
+        'mjpeg_invalid_content_type',
+    ].includes(reason)) {
+        return 'format_protocol';
+    }
+
+    if ([
+        'stream_ended',
+        'stale_program_date_time',
+        'stale_media_sequence',
+    ].includes(reason)) {
+        return 'stale';
+    }
+
+    if ([
+        'probe_target_mismatch',
+        'runtime_probe_tls_mismatch',
+    ].includes(reason)) {
+        return 'runtime_probe_mismatch';
+    }
+
+    if (
+        reason.startsWith('http_')
+        || [
+            'ECONNREFUSED',
+            'ECONNABORTED',
+            'ETIMEDOUT',
+            'ENOTFOUND',
+            // Network-down errnos (dead modem/router): classify with the other network failures so
+            // domain-health and runtime-assist logic treat them consistently, not as 'unknown'.
+            'EHOSTUNREACH',
+            'ENETUNREACH',
+            'EHOSTDOWN',
+            'ENETDOWN',
+            'request_error',
+            'internal_stream_unreachable',
+            'provider_backoff_active',
+        ].includes(reason)
+    ) {
+        return 'network_transient';
+    }
+
+    return 'unknown';
+}
