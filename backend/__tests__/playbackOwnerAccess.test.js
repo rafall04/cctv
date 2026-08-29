@@ -93,6 +93,16 @@ describe('pemilik boleh memutar ulang kameranya sendiri', () => {
         expect(akses.deniedReason).toBe('langganan_tidak_aktif');
     });
 
+    it('billing_status NULL (tak pernah/belum ditagih) juga ditolak — TIDAK dianggap lunas', () => {
+        // Bug lama: `!billing_status` menganggap NULL = lunas. Filter LIVE wajib 'active' (NULL keluar),
+        // jadi kamera ini tersembunyi dari live tapi dulu masih bisa diputar ulang pemiliknya. Kini
+        // konsisten: hanya 'active' yang lunas.
+        const tanpaStatus = { ...KAMERA_SEWA, billing_status: null };
+        const akses = service.resolvePlaybackAccess(tanpaStatus, minta('owner', { id: 42, role: 'customer' }));
+        expect(akses.accessMode).toBe('public_denied');
+        expect(akses.deniedReason).toBe('langganan_tidak_aktif');
+    });
+
     it('peran admin tidak bisa memakai scope=owner untuk kamera orang lain', () => {
         // Admin punya scope=admin sendiri; jalur pemilik memeriksa kepemilikan, bukan peran.
         expect(() => service.resolvePlaybackAccess(KAMERA_SEWA, minta('owner', { id: 1, role: 'admin' })))
@@ -129,6 +139,15 @@ describe('tautan yang diterbitkan pemilik untuk kameranya sendiri', () => {
 
         expect(akses.accessMode).toBe('token_full');
         expect(akses.tokenId).toBe(5);
+    });
+
+    it('tautan pemilik TIDAK membuka kamera sewa yang billing_status-nya NULL (tak lunas)', () => {
+        // Kebocoran yang diperbaiki: NULL dianggap lunas -> rekaman privat kamera sewa tersaji ANONIM
+        // lewat share link terbitan pemilik, padahal kamera itu tak lunas dan tersembunyi dari live.
+        validateForCameraMock.mockReturnValue(token());
+        const tanpaStatus = { ...KAMERA_SEWA, billing_status: null };
+        expect(service.resolvePlaybackAccess(tanpaStatus, minta(null, undefined)).accessMode)
+            .toBe('public_denied');
     });
 
     it("token bercakupan 'all' TIDAK membuka kamera sewa", () => {

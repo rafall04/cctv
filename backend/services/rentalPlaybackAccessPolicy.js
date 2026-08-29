@@ -34,7 +34,12 @@ function unauthorized() {
     throw err;
 }
 
-const masihDibayar = (camera) => !camera.billing_status || camera.billing_status === 'active';
+// A SUBSCRIBER (rental) camera counts as paid ONLY when billing_status is literally 'active' — the same
+// rule the public LIVE filter uses (utils/cameraVisibility.js). Treating NULL/'' as paid (the old
+// `!billing_status` fallback) let a legacy/never-billed subscriber camera — hidden from live because it
+// is not 'active' — still have its private recordings served via an owner-issued share link. Non-rental
+// classes (community/owner_private) are not billed, so billing never gates them here.
+const masihDibayar = (camera) => camera.camera_class !== 'subscriber' || camera.billing_status === 'active';
 
 /**
  * "Did the person who owns THIS camera mint THIS token?" — the single condition that lets a share

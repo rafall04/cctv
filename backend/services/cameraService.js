@@ -933,13 +933,15 @@ class CameraService {
     invalidateCameraCache() {
         invalidateCache('/api/cameras');
         invalidateCache('/api/stream');
+        // Public growth lists + area counts (cached ~30s): a suspended/unpublished camera must drop off now.
+        invalidateCache('/api/public');
+        invalidateCache('/api/areas');
         cacheInvalidate(`${CacheNamespace.CAMERAS}:`);
         cacheInvalidate(`${CacheNamespace.STATS}:camera-`);
         // Tenancy gate cache: class/owner/billing changes must hit live streams fast.
         invalidateCameraAccessCache();
-        // Any camera mutation (create/update/delete/bulk/source-change/enable) funnels through here,
-        // so this is the single chokepoint that keeps the always_on warm set in sync without a
-        // restart. Debounced + no-op until the provider is wired at startup, so it is test-safe.
+        // Single chokepoint for every camera mutation, so it also keeps the always_on warm set in sync
+        // (debounced + no-op until the provider is wired at startup, so it is test-safe).
         streamWarmer.scheduleReconcile();
         console.log('[Cache] Camera cache invalidated');
     }
