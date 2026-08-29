@@ -1,9 +1,9 @@
 #!/bin/bash
-# Download MediaMTX v1.9.0 for Linux AMD64
+# Download MediaMTX v1.15.6 for Linux AMD64 (matches the version running in production)
 
 set -e
 
-MEDIAMTX_VERSION="v1.9.0"
+MEDIAMTX_VERSION="v1.15.6"
 MEDIAMTX_URL="https://github.com/bluenviron/mediamtx/releases/download/${MEDIAMTX_VERSION}/mediamtx_${MEDIAMTX_VERSION}_linux_amd64.tar.gz"
 
 echo "📥 Downloading MediaMTX ${MEDIAMTX_VERSION} for Linux..."

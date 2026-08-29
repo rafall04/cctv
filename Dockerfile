@@ -22,8 +22,8 @@ RUN npm run build
 FROM alpine:latest AS mediamtx-downloader
 RUN apk add --no-cache wget tar
 WORKDIR /tmp
-RUN wget https://github.com/bluenviron/mediamtx/releases/download/v1.9.0/mediamtx_v1.9.0_linux_amd64.tar.gz && \
-    tar -xzf mediamtx_v1.9.0_linux_amd64.tar.gz && \
+RUN wget https://github.com/bluenviron/mediamtx/releases/download/v1.15.6/mediamtx_v1.15.6_linux_amd64.tar.gz && \
+    tar -xzf mediamtx_v1.15.6_linux_amd64.tar.gz && \
     chmod +x mediamtx
 
 # Final production image

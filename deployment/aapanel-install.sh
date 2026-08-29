@@ -463,9 +463,9 @@ print_info "Setting up MediaMTX..."
 cd "$APP_DIR/mediamtx"
 
 if [ ! -f mediamtx ]; then
-    wget -q https://github.com/bluenviron/mediamtx/releases/download/v1.9.0/mediamtx_v1.9.0_linux_amd64.tar.gz
-    tar -xzf mediamtx_v1.9.0_linux_amd64.tar.gz
-    rm mediamtx_v1.9.0_linux_amd64.tar.gz
+    wget -q https://github.com/bluenviron/mediamtx/releases/download/v1.15.6/mediamtx_v1.15.6_linux_amd64.tar.gz
+    tar -xzf mediamtx_v1.15.6_linux_amd64.tar.gz
+    rm mediamtx_v1.15.6_linux_amd64.tar.gz
     chmod +x mediamtx
 fi
 

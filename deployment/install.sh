@@ -418,7 +418,7 @@ cd "$APP_DIR"
 mkdir -p mediamtx
 cd mediamtx
 
-MEDIAMTX_VERSION="v1.9.0"
+MEDIAMTX_VERSION="v1.15.6"
 wget -q https://github.com/bluenviron/mediamtx/releases/download/${MEDIAMTX_VERSION}/mediamtx_${MEDIAMTX_VERSION}_linux_amd64.tar.gz
 tar -xzf mediamtx_${MEDIAMTX_VERSION}_linux_amd64.tar.gz
 rm mediamtx_${MEDIAMTX_VERSION}_linux_amd64.tar.gz

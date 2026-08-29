@@ -43,7 +43,7 @@ Recording → FFmpeg → MP4 Segments → Playback API (`public_preview` / `admi
 
 **Backend:**
 - Node.js 20+ with ES modules
-- Fastify 4.28.1 (REST API)
+- Fastify 5.x (^5.11.0) (REST API)
 - SQLite with better-sqlite3 (database)
 - JWT authentication
 - FFmpeg (recording)
@@ -52,11 +52,11 @@ Recording → FFmpeg → MP4 Segments → Playback API (`public_preview` / `admi
 - React 18.3.1
 - Vite 5.3.1 (build tool)
 - Tailwind CSS 3.4.4 (styling)
-- HLS.js 1.5.15 (video streaming)
+- HLS.js ^1.6.16 (video streaming)
 - Leaflet 1.9.4 (maps)
 
 **Streaming:**
-- MediaMTX v1.9.0 (RTSP to HLS)
+- MediaMTX v1.15.6 (RTSP to HLS)
 - HLS streaming (HTTP Live Streaming)
 - WebRTC support (optional)
 
@@ -128,8 +128,8 @@ npm run build
 
 ```bash
 cd mediamtx
-wget https://github.com/bluenviron/mediamtx/releases/download/v1.9.0/mediamtx_v1.9.0_linux_amd64.tar.gz
-tar -xzf mediamtx_v1.9.0_linux_amd64.tar.gz
+wget https://github.com/bluenviron/mediamtx/releases/download/v1.15.6/mediamtx_v1.15.6_linux_amd64.tar.gz
+tar -xzf mediamtx_v1.15.6_linux_amd64.tar.gz
 chmod +x mediamtx
 ```
 
@@ -369,7 +369,7 @@ paths:
 
 - JWT-based authentication (short-lived ~1h access token via `JWT_EXPIRATION`, plus 7d refresh-token rotation)
 - Password hashing with bcrypt
-- Brute force protection (max 5 attempts, 15min lockout)
+- Brute force protection (max 5 attempts, 30min lockout default)
 - CSRF protection
 - Rate limiting
 - Input sanitization
@@ -460,16 +460,16 @@ cd /var/www/cctv
 ### View Logs
 
 ```bash
-pm2 logs cctv-backend
-pm2 logs cctv-mediamtx
-tail -f /var/log/nginx/cctv-backend.error.log
+pm2 logs rafnet-cctv-backend
+pm2 logs rafnet-mediamtx
+tail -f /var/log/nginx/rafnet-cctv-backend.error.log
 ```
 
 ### Restart Services
 
 ```bash
-pm2 restart cctv-backend
-pm2 restart cctv-mediamtx
+pm2 restart rafnet-cctv-backend
+pm2 restart rafnet-mediamtx
 systemctl reload nginx
 ```
 
@@ -509,7 +509,7 @@ cp /var/www/cctv/backend/data/cctv.db /backup/cctv_$(date +%Y%m%d).db
 ### Backend not starting
 
 ```bash
-pm2 logs cctv-backend --lines 100
+pm2 logs rafnet-cctv-backend --lines 100
 # Check for errors in .env or database
 ```
 
@@ -527,7 +527,7 @@ npm run build
 # Check backend .env
 cat /var/www/cctv/backend/.env | grep ALLOWED_ORIGINS
 # Should include: https://cctv.raf.my.id
-pm2 restart cctv-backend
+pm2 restart rafnet-cctv-backend
 ```
 
 ### Stream not loading
@@ -535,7 +535,7 @@ pm2 restart cctv-backend
 ```bash
 # Check MediaMTX
 curl http://localhost:9997/v3/paths/list
-pm2 logs cctv-mediamtx
+pm2 logs rafnet-mediamtx
 
 # Check HLS proxy
 curl http://localhost:8888/camera1/index.m3u8

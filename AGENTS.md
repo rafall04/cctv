@@ -22,8 +22,8 @@ Read the matching guide **only when your task touches that area** — don't load
 
 ## Navigation & read discipline (keeps token cost low)
 
-Several files are huge — `cameraHealthService.js` (~3.7k lines / ~38k tokens) and `cameraService.js`
-(~3.2k lines / ~34k tokens), plus ~800–1.6k-line `MapView.jsx`, `Playback.jsx`, `AreaManagement.jsx`,
+Several files are huge — `cameraHealthService.js` (~3.2k lines / ~33k tokens) and `cameraService.js`
+(~2.8k lines / ~30k tokens), plus ~800–1.6k-line `MapView.jsx`, `Playback.jsx`, `AreaManagement.jsx`,
 `VideoPopup.jsx`, `hlsProxyService.js`, `playbackTokenService.js`. **One full read of a giant file can
 cost more than this entire rulebook**, so:
 
@@ -41,8 +41,8 @@ cost more than this entire rulebook**, so:
 RAF NET Secure CCTV Hub — a secure, high-performance video streaming system that isolates private IP
 cameras from public exposure while providing public web access to camera streams.
 
-**Tech Stack:** Backend = Node.js 20+, Fastify 4.28.1, SQLite (better-sqlite3), JWT, ES modules.
-Frontend = React 18.3.1, Vite 5.3.1, Tailwind CSS 3.4.4, HLS.js, Leaflet. Streaming = MediaMTX v1.9.0
+**Tech Stack:** Backend = Node.js 20+, Fastify 5.x (^5.11.0), SQLite (better-sqlite3), JWT, ES modules.
+Frontend = React 18.3.1, Vite 5.3.1, Tailwind CSS 3.4.4, HLS.js, Leaflet. Streaming = MediaMTX v1.15.6
 (RTSP→HLS). Exact versions live in `backend/package.json` / `frontend/package.json`.
 
 ---
@@ -52,11 +52,15 @@ Frontend = React 18.3.1, Vite 5.3.1, Tailwind CSS 3.4.4, HLS.js, Leaflet. Stream
 These prevent expensive, hard-to-undo mistakes (data loss, privacy leaks, billing errors). They are
 small on purpose so they stay loaded every session — the *how* behind them is in the on-demand guides.
 
-- **Public surface is community-only.** Every public query filters `camera_class = 'community'`;
-  non-community (`owner_private`, `subscriber`) cameras must NEVER appear on any public surface
-  (landing/map/stream list/area/trending/discovery/public playback/thumbnails). Per-camera endpoints
-  (`/api/stream/:id`, `/hls/*`, proxies) gate through `cameraAccessService.canViewLive`. Detail:
-  [docs/billing-rental.md](docs/billing-rental.md).
+- **Public LIVE = community + published-paid subscriber; public ARCHIVE = community-only.** Public
+  LIVE surfaces (landing/map/stream list/area/trending/discovery/thumbnails) filter via
+  `utils/cameraVisibility.js`: `camera_class='community' OR (camera_class='subscriber' AND is_public=1
+  AND billing_status='active')` — `owner_private` NEVER appears, and a suspended subscriber camera
+  drops off public automatically. Public **playback/archive** is STRICTER: community-only
+  (`publicArchiveAccessService.js` refuses any non-community camera; subscriber footage stays private
+  even when its live feed is published — see the "Subscriber footage is private" invariant below).
+  Per-camera endpoints (`/api/stream/:id`, `/hls/*`, proxies) gate through
+  `cameraAccessService.canViewLive`. Detail: [docs/billing-rental.md](docs/billing-rental.md).
 - **Never expose RTSP URLs to the frontend** — only HLS stream URLs.
 - **Money is INTEGER rupiah, never float.**
 - **`customer` role is denied-by-default** on every auth-required endpoint except the whitelist in

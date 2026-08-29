@@ -15,9 +15,14 @@ Deps: AGENTS.md (critical invariants stay there), SYSTEM_MAP.md (runtime flows +
 ## Subscriber Rental / Billing Workflow
 
 - Camera classes: `community` (public hub, default), `owner_private`, `subscriber` (rented, live-only).
-  Non-community cameras must NEVER appear on any public surface (landing/map/stream list/area pages/
-  trending/discovery/public playback/thumbnails) — all public queries filter `camera_class = 'community'`
-  and `cameraAccessService.canViewLive` gates per-camera endpoints (`/api/stream/:id`, `/hls/*`, proxies).
+  Public **LIVE** surfaces (landing/map/stream list/area pages/trending/discovery/thumbnails) show
+  `community` cameras PLUS a subscriber camera the owner published AND is paying for — the exact filter
+  in `utils/cameraVisibility.js` is `camera_class='community' OR (camera_class='subscriber' AND
+  is_public=1 AND billing_status='active')` (a suspended subscriber camera drops off public
+  automatically; `owner_private` never appears). Public **playback/archive** is STRICTER: community-only
+  (`publicArchiveAccessService.js` refuses any non-community camera — subscriber footage is private even
+  when the live feed is published). `cameraAccessService.canViewLive` gates per-camera endpoints
+  (`/api/stream/:id`, `/hls/*`, proxies).
 - Role `customer` logs in at the shared login and lands on `/my` (portal: Kamera Saya + Saldo & Tagihan).
   Customers are denied-by-default on every other auth-required endpoint (`customerAccessPolicy`).
 - Billing is prepaid: wallet balance, daily prorated charge (`monthly_price/30`, local date, idempotent by

@@ -143,7 +143,7 @@ Tokens are defined in `frontend/src/index.css` (light + dark values) and mapped 
 | Status | `status-live` `status-warn` `status-fault` `status-idle` | **meaning, never decoration** |
 | Radius | `rounded-control` (inputs/buttons), `rounded-card` (cards), `rounded-full` (true pills) | the whole scale |
 | Elevation | `shadow-e1`, `shadow-e2` | two steps total; in dark mode depth comes from the surface step + edge, not shadow |
-| Layering | `z-raised` `z-sticky` `z-dock` `z-scrim` `z-shell` `z-modal` `z-toast` `z-map-chrome` `z-popup` `z-dialog` | the whole scale — **never write a bare `z-[…]`** |
+| Layering | `z-raised` `z-sticky` `z-dock` `z-scrim` `z-shell` `z-map-chrome` `z-fab` `z-modal` `z-toast` `z-popup` `z-dialog` (ascending) | the whole scale — **never write a bare `z-[…]`** |
 | Text size | `text-xs` (meta/labels) · `text-sm` (body/controls) · `text-base` (section titles) · `text-xl` (page title) · `text-2xl`/`text-3xl` (headline metric) | five steps; nothing below `text-xs` |
 
 ```jsx
@@ -156,7 +156,7 @@ Tokens are defined in `frontend/src/index.css` (light + dark values) and mapped 
 - `dark-*` / `light-*` in tailwind.config.js are **deprecated legacy ramps** (kept only for ~200 old usages; `light-700/800/900` are byte-identical to `dark-700/800/900`). Do not use them or raw `gray-*` in new work; migrate touched code to roles as you go.
 - No brand gradients or colored drop shadows (`shadow-primary/30` etc.) — flat `bg-primary` reads better at UI sizes.
 - Numbers that update in place get `tabular-nums`.
-- **Layering is a scale, not a bidding war.** The named tiers above ARE the previous effective numbers, so ordering is unchanged; what changes is that a new surface picks a tier by intent instead of guessing a bigger integer. Dialogs sit at `z-modal` (60) — above `z-shell` (50), which the old shared `z-50` left to DOM order. The four-digit tiers exist only because Leaflet paints its controls at 1000.
+- **Layering is a scale, not a bidding war.** A new surface picks a tier by intent instead of guessing a bigger integer. Values (see `tailwind.config.js`): `raised` 10 · `sticky` 20 · `dock` 30 · `scrim` 40 · `shell` 50 · `map-chrome` 1100 · `fab` 1200 · `modal` 1300 · `toast` 1400 · `popup` 1000000 · `dialog` 1000010. The four-digit tiers exist because Leaflet paints its controls at 1000, so anything floating over a map must clear that. Dialogs (`z-modal` 1300) were deliberately **raised above** the floating-widget tiers (`map-chrome`, `fab`) — they used to sit at 60/70, under the donation banner and feedback bubble, which punched through open dialogs and stole taps.
 
 **Status semantics (the anti-"AI slop" rules):**
 - One status = **one dot**; a text label appears **only when the state is abnormal**. ~89% of cameras are healthy, so a "LIVE" pill on every tile is a label carrying no information that buries the real faults.

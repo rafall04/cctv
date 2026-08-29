@@ -16,10 +16,12 @@ di [Dari mana angkanya](#dari-mana-angkanya).
 ⚠️ **Kolom vCPU di tabel di bawah adalah ruang lega, bukan kebutuhan terukur.** Dari angka di atas,
 64 kamera hanya butuh ±0,3 inti untuk merekam — jauh di bawah 8 vCPU yang direkomendasikan. Selisih
 itu disediakan untuk melayani penonton, membuat thumbnail, health-check, dan **mengemas ulang RTSP
-lewat MediaMTX**. Bagian terakhir itu **belum pernah terukur**: pada 12 Agustus 2026 MediaMTX di
-produksi melaporkan `itemCount: 0` — nol path aktif, karena seluruh 36 kamera di sana adalah HLS
-eksternal, bukan RTSP milik sendiri. Padahal RTSP justru jalur yang dipakai pembeli yang memasang
-kamera sendiri. Jangan menurunkan angka vCPU di tabel sebelum jalur itu diukur pada skala nyata.
+lewat MediaMTX**. Bagian terakhir kini **sudah berjalan pada skala produksi**: per Agustus 2026 fleet
+tumbuh ke ~754 kamera (~410 di antaranya path RTSP internal via MediaMTX, ~344 HLS eksternal) — snapshot
+lama "`itemCount: 0` / RTSP belum teruji" (36 kamera, semuanya HLS eksternal) sudah usang. Perekaman
+tetap *stream-copy* sehingga CPU tetap bukan penghambat; yang tumbuh bersama jumlah path adalah **RAM
+MediaMTX** (lihat catatan RAM), bukan CPU perekam. Tetap ukur di perangkat sendiri sebelum menurunkan
+angka vCPU.
 
 ---
 
@@ -35,8 +37,9 @@ Tanpa deteksi gerakan (perekaman + tayang langsung saja):
 | sampai 64 | 8 | 16 GB | lihat tabel disk |
 | sampai 128 | 16 | 16 GB | lihat tabel disk |
 
-Sistem aplikasinya sendiri ringan: backend 135 MB, perekam 444 MB, MediaMTX 7 MB — total di bawah
-700 MB RAM apa pun jumlah kameranya. RAM di tabel itu untuk *page cache* disk, yang membuat
+Sistem aplikasinya sendiri ringan: backend ~135 MB, perekam ~444 MB, MediaMTX ~68 MB (dengan ratusan
+path RTSP; **naik seiring jumlah path aktif** — snapshot 0-path lama menyebut 7 MB) — total masih
+jauh di bawah RAM yang direkomendasikan. RAM di tabel itu untuk *page cache* disk, yang membuat
 penulisan rekaman tidak tersendat.
 
 **Disk selalu jadi penentu.** Tentukan retensinya dulu, baru hitung disknya.
@@ -75,8 +78,8 @@ Patokan dari instalasi berkamera sungguhan:
 bila ada, dan mentranskodenya ke AAC 32 kbps — mikrofon CCTV berbicara G.711 yang tidak bisa masuk
 kontainer MP4 apa adanya. Biayanya **+14,4 MB per kamera per jam (±0,014 GB)**, terukur di produksi:
 244.550 byte untuk 60 detik. Relatif terhadap tabel di atas itu +1,8% pada H.265, +1,0% pada H.264,
-dan **+4,2% pada feed HLS publik** yang bitrate videonya paling rendah. Di produksi 9 dari 12 kamera
-perekam punya mikrofon, jadi dampak nyatanya di bawah angka itu. Untuk mematikannya sepenuhnya,
+dan **+4,2% pada feed HLS publik** yang bitrate videonya paling rendah. Di produksi mayoritas (bukan
+semua) kamera perekam punya mikrofon, jadi dampak nyatanya di bawah angka itu. Untuk mematikannya sepenuhnya,
 setel `RECORDING_AUDIO=off` di `backend/.env` lalu restart perekam.
 
 Batas bawah tabel di bawah = H.265, batas atas = H.264. Baris `4 jam` ada karena itu retensi yang
@@ -120,13 +123,18 @@ seluruh tabel di atas.
 
 ## Jaringan
 
-- **Masuk (ingest):** ±0,7 Mbps per kamera. 32 kamera ≈ 23 Mbps yang harus stabil 24 jam.
-- **Keluar (penonton):** ±0,7 Mbps per penonton per kamera yang sedang dibuka. Sepuluh orang
-  menonton bersamaan ≈ 7 Mbps.
+> ⚠️ Angka `0,7 Mbps/kamera` versi lama itu dari **feed HLS publik yang mutunya sudah diturunkan** —
+> kesalahan yang sama dengan disk `0,3`. Kamera 1080p sungguhan jauh lebih boros. Pakai angka codec.
 
-Ingest tidak boleh putus-putus. Koneksi 100 Mbps simetris nyaman sampai sekitar 64 kamera; yang
-lebih penting daripada angka besarnya adalah **kestabilan** — kamera yang feed-nya tersendat akan
-memicu perekam mengulang terus.
+- **Masuk (ingest):** ±1,9 Mbps (H.265) – ±3,2 Mbps (H.264) per kamera 1080p sungguhan. 32 kamera ≈
+  61–102 Mbps yang harus stabil 24 jam.
+- **Keluar (penonton):** setara bitrate kamera per penonton per kamera yang sedang dibuka (±1,9–3,2
+  Mbps kamera nyata; ±0,7 hanya untuk feed komunitas yang sudah diturunkan). Sepuluh orang menonton
+  kamera nyata ≈ 19–32 Mbps.
+
+Ingest tidak boleh putus-putus. Koneksi 100 Mbps simetris nyaman sampai sekitar **30–50 kamera 1080p**
+(bukan 64); yang lebih penting daripada angka besarnya adalah **kestabilan** — kamera yang feed-nya
+tersendat akan memicu perekam mengulang terus.
 
 ---
 
@@ -178,20 +186,28 @@ Dua hal yang perlu diluruskan sebelum belanja perangkat:
 
 ## Contoh pemilihan
 
+> Disk pakai angka codec yang SUDAH dikoreksi (0,8 GB/jam H.265 – 1,4 GB/jam H.264), bukan 0,3 lama.
+> Ambil batas atas untuk aman.
+
 **Toko / rumah — 4 kamera, rekaman 3 hari, tanpa deteksi**
-2 vCPU · 4 GB RAM · 120 GB SSD. (4 × 72 × 0,3 × 1,15 = 99 GB + OS.)
+2 vCPU · 4 GB RAM · ~500 GB SSD. (4 × 72 × 0,8–1,4 × 1,15 = 265–463 GB + OS.)
 
 **Kantor / ruko — 16 kamera, rekaman 24 jam, 4 kamera dideteksi**
-4 vCPU (2 untuk sistem + 2 untuk detektor) · 8 GB RAM · 200 GB SSD.
+4 vCPU (2 untuk sistem + 2 untuk detektor) · 8 GB RAM · ~700 GB SSD. (16 × 24 × 0,8–1,4 × 1,15 = 353–618 GB + OS.)
 
 **Operator layanan — 64 kamera, rekaman 24 jam, tanpa deteksi**
-8 vCPU · 16 GB RAM · 640 GB SSD, koneksi 100 Mbps simetris.
+8 vCPU · 16 GB RAM · ~2,7 TB SSD (64 × 24 × 0,8–1,4 × 1,15 = 1,4–2,5 TB + OS). Ingest 64 kamera 1080p ≈ 122–205 Mbps, jadi **butuh koneksi ~250 Mbps+ simetris**, bukan 100 Mbps.
 
 ---
 
 ## Dari mana angkanya
 
 Diukur langsung di server produksi pada **12 Agustus 2026**:
+
+> ⚠️ Ini **snapshot lama**: 36 kamera, semuanya HLS eksternal, 0 path RTSP. Sejak itu fleet tumbuh ke
+> ~754 kamera dengan ~410 path RTSP internal aktif. Jadi turunan `0,3 GB/kamera/jam` (dan `0,63 Mbps`)
+> di bawah adalah dari feed HLS yang mutunya diturunkan — **sudah digantikan tabel codec yang
+> dikoreksi** (0,8–1,4 GB/jam; 1,9–3,2 Mbps), dan premis "RTSP belum teruji" tidak lagi berlaku.
 
 | | |
 |---|---|
