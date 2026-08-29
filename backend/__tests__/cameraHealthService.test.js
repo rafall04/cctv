@@ -363,6 +363,27 @@ describe('cameraHealthService weighted scoring', () => {
         expect(state.effectiveOnline).toBe(true);
     });
 
+    // Regression: a camera behind a dead modem probes EHOSTUNREACH/ENETUNREACH on every check. Those
+    // raw errnos used to be absent from FAILURE_WEIGHTS and scored the 0.3 default, so a genuinely
+    // offline camera needed ~10 checks (and never got there across restarts) — it stayed green for
+    // hours. They now weigh 1.0, like ECONNREFUSED: offline in 3 checks.
+    it.each(['EHOSTUNREACH', 'ENETUNREACH', 'EHOSTDOWN', 'ENETDOWN'])(
+        'flags needsConfirmation after 3 %s (network-down errno, weight=1.0)',
+        (reason) => {
+            const service = new CameraHealthService();
+            const camera = { id: 1, is_online: 1 };
+            service.ensureCameraState(camera.id, camera.is_online);
+
+            expect(service.applyWeightedScoring(camera, { online: false, reason })).toBe(1);
+            expect(service.applyWeightedScoring(camera, { online: false, reason })).toBe(1);
+            expect(service.applyWeightedScoring(camera, { online: false, reason })).toBe(1);
+
+            const state = service.healthState.get(camera.id);
+            expect(state.needsConfirmation).toBe(true);
+            expect(state.failureScore).toBe(3);
+        },
+    );
+
     it('flags needsConfirmation after 15 timeouts (weight=0.2)', () => {
         const service = new CameraHealthService();
         const camera = { id: 2, is_online: 1 };

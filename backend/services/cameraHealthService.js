@@ -81,6 +81,16 @@ const OFFLINE_SCORE_THRESHOLD = 3.0;
 
 const FAILURE_WEIGHTS = {
     'ECONNREFUSED':             1.0,
+    // "No route to host / network is down" — what a camera behind a DEAD MODEM produces on every
+    // RTSP probe. These raw socket errnos pass straight through rtspProbe.js as the reason, and were
+    // NOT in this map, so they scored the 0.3 default: ~10 consecutive checks to even reach the
+    // offline threshold, reset to 0 on every backend restart, so a genuinely-dead camera stayed green
+    // for hours (CCTV GG SOMODIHARJO, modem died ~09:20, still "online" at 11:45). They are at least
+    // as definitive as ECONNREFUSED, so they carry the same 1.0 weight — offline in ~3 checks.
+    'EHOSTUNREACH':             1.0,
+    'ENETUNREACH':              1.0,
+    'EHOSTDOWN':                1.0,
+    'ENETDOWN':                 1.0,
     'http_404':                 1.0,
     'http_403':                 0.8,
     'tls_verification_failed':  0.8,
@@ -370,6 +380,12 @@ function resolveErrorClass(reason) {
             'ECONNABORTED',
             'ETIMEDOUT',
             'ENOTFOUND',
+            // Network-down errnos (dead modem/router): classify with the other network failures so
+            // domain-health and runtime-assist logic treat them consistently, not as 'unknown'.
+            'EHOSTUNREACH',
+            'ENETUNREACH',
+            'EHOSTDOWN',
+            'ENETDOWN',
             'request_error',
             'internal_stream_unreachable',
             'provider_backoff_active',
