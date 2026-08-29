@@ -13,6 +13,13 @@ import {
     writeRecordingMutePreference,
 } from '../../utils/recordingAudio';
 
+/*
+ * Cycle order starts at normal speed and walks UP before offering slow motion: speeding through a
+ * quiet stretch is the common reason to touch this at all, and 0.5x is the rare one, so it sits last
+ * rather than first (a plain ascending 0.5→2 would make every tap from 1x go slower first).
+ */
+const SPEED_STEPS = [1, 1.5, 2, 0.5];
+
 export default function PlaybackVideo({
     videoRef,
     containerRef,
@@ -382,21 +389,31 @@ export default function PlaybackVideo({
                     </button>
                 )}
 
-                <div className="flex absolute top-2 sm:top-4 right-2 sm:right-4 gap-1 sm:gap-2 z-30">
-                    {[0.5, 1, 1.5, 2].map(speed => (
-                        <button
-                            key={speed}
-                            onClick={() => onSpeedChange(speed)}
-                            className={`min-h-11 px-2 py-1 sm:min-h-0 sm:px-3 sm:py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all shadow-lg ${
-                                playbackSpeed === speed
-                                    ? 'bg-primary-500 text-white scale-110'
-                                    : 'bg-black/70 text-white hover:bg-black/90 hover:scale-105'
-                            }`}
-                            title={`Kecepatan ${speed}x`}
-                        >
-                            {speed}x
-                        </button>
-                    ))}
+                {/*
+                  * ONE control, not a row of four.
+                  *
+                  * Four always-on buttons spanned the whole top-right of the picture — measured on a
+                  * 393px phone the player is only 345x194, and the speed row alone covered ~9% of it,
+                  * landing exactly where cameras burn in their date/time stamp (the operator's
+                  * screenshot shows "26-08-25 23:50:16" sitting behind these buttons). The <video>
+                  * also carries `controls`, so the browser draws its own bar in the same box: seven
+                  * product-drawn buttons plus a native control surface over one small picture is the
+                  * "UI looks off" this fixes. Cycling one button keeps every speed reachable, keeps
+                  * the 44px touch target, and gives the picture its corner back.
+                  */}
+                <div className="absolute top-2 sm:top-4 right-2 sm:right-4 z-30">
+                    <button
+                        onClick={() => onSpeedChange(SPEED_STEPS[(SPEED_STEPS.indexOf(playbackSpeed) + 1) % SPEED_STEPS.length] ?? 1)}
+                        className={`min-h-11 min-w-11 px-2 py-1 sm:min-h-0 sm:min-w-0 sm:px-3 sm:py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all shadow-lg ${
+                            playbackSpeed === 1
+                                ? 'bg-black/70 text-white hover:bg-black/90'
+                                : 'bg-primary-500 text-white'
+                        }`}
+                        title={`Kecepatan ${playbackSpeed}x — ketuk untuk ganti`}
+                        aria-label={`Kecepatan pemutaran ${playbackSpeed}x, ketuk untuk mengganti`}
+                    >
+                        {playbackSpeed}x
+                    </button>
                 </div>
 
                 {!isFullscreen && (

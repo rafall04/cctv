@@ -25,7 +25,13 @@ export default function PlaybackHeader({
     return (
         <div className="space-y-3 rounded-card border border-edge bg-surface p-3 sm:p-4">
             <div className="flex items-center justify-between gap-3">
-                <h1 className="text-lg font-semibold text-content sm:text-xl">Playback Recording</h1>
+                {/* Indonesian, and the SAME words the nav uses to get here ("Putar Ulang"). The
+                    heading read "Playback Recording" while every label around it — "Cari waktu",
+                    "Gunakan dengan bijak", the sidebar entry — was Indonesian; adminNavigation.jsx
+                    already states the rule (one language, Indonesian), and this page was the
+                    exception. A destination that renames itself on arrival is the small kind of
+                    inconsistency that makes a screen feel unfinished. */}
+                <h1 className="text-lg font-semibold text-content sm:text-xl">Putar Ulang Rekaman</h1>
                 {onShare && (
                     <button
                         onClick={onShare}

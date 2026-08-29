@@ -157,10 +157,18 @@ export const NAV_GROUPS = [
 ];
 
 /** Mobile dock: the five destinations an operator actually reaches for on a phone. */
+/*
+ * Dock labels are SHORT ON PURPOSE — five columns on a phone leave about 45px of text per item, and
+ * a label wider than that renders clipped, which is what shipped: measured on a real device the dock
+ * read "Dashbo…" and "Diagnos…" (needing 59px and 58px in a 55px box at 393px, worse at 360 and 320).
+ * A truncated label the product owns is not a shortage of space, it is a label that was never
+ * measured — so these two say the same thing in words that fit. The sidebar, which has room, keeps
+ * the full "Dashboard" and "Diagnostik Kamera". e2e/admin-polish.spec.js holds the line at 320px.
+ */
 export const DOCK_ACTIONS = (isAdmin) => [
-    { label: 'Dashboard', path: '/admin/dashboard', icon: AdminIcons.Dashboard },
+    { label: 'Dasbor', path: '/admin/dashboard', icon: AdminIcons.Dashboard },
     { label: 'Kamera', path: '/admin/cameras', icon: AdminIcons.Camera },
-    { label: 'Diagnostik', path: '/admin/health-debug', icon: AdminIcons.Pulse },
+    { label: 'Sehat', path: '/admin/health-debug', icon: AdminIcons.Pulse },
     isAdmin
         ? { label: 'Token', path: '/admin/playback-tokens', icon: AdminIcons.Key }
         : { label: 'Rekaman', path: '/admin/recordings', icon: AdminIcons.Recording },

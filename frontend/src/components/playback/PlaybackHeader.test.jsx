@@ -22,7 +22,7 @@ describe('PlaybackHeader', () => {
     it('renders the title and mounts the picker on the selected camera', () => {
         render(<PlaybackHeader cameras={CAMERAS} selectedCamera={CAMERAS[1]} onCameraChange={vi.fn()} />);
 
-        expect(screen.getByRole('heading', { name: 'Playback Recording' })).toBeTruthy();
+        expect(screen.getByRole('heading', { name: 'Putar Ulang Rekaman' })).toBeTruthy();
         expect(screen.getByRole('button', { expanded: false }).textContent).toContain('SIMPANG 4 BUNDARAN JETAK');
     });
 

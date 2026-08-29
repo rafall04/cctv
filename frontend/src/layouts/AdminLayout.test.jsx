@@ -157,7 +157,9 @@ describe('AdminLayout shell', () => {
 
         const quickActions = within(dock);
         expect(quickActions.getByRole('link', { name: /Kamera/i }).getAttribute('href')).toBe('/admin/cameras');
-        expect(quickActions.getByRole('link', { name: /Diagnostik/i }).getAttribute('href')).toBe('/admin/health-debug');
+        // "Sehat", not "Diagnostik": five columns on a phone leave ~45px per label, and the longer
+        // word rendered clipped ("Diagnos…") on a real device. See DOCK_ACTIONS in adminNavigation.
+        expect(quickActions.getByRole('link', { name: /Sehat/i }).getAttribute('href')).toBe('/admin/health-debug');
         expect(quickActions.getByRole('link', { name: /Token/i }).getAttribute('href')).toBe('/admin/playback-tokens');
         expect(quickActions.getByRole('link', { name: /Publik/i }).getAttribute('href')).toBe('/');
     });

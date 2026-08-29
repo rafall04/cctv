@@ -37,7 +37,11 @@ function AdminMobileDock({ activePath, isAdmin }) {
                             key={action.path}
                             to={action.path}
                             aria-current={active ? 'page' : undefined}
-                            className={`flex min-h-[3.25rem] min-w-0 flex-col items-center justify-center gap-1 rounded-control px-1.5 py-2 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary ${
+                            /* px-1, not px-1.5: at 320px each of the five columns is ~53px wide, and
+                               the extra 4px of padding was the difference between a label fitting
+                               and rendering clipped. Labels themselves are kept short in
+                               adminNavigation.jsx — see the note on DOCK_ACTIONS. */
+                            className={`flex min-h-[3.25rem] min-w-0 flex-col items-center justify-center gap-1 rounded-control px-1 py-2 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary ${
                                 active ? 'bg-primary text-white' : 'text-content-muted hover:bg-surface-raised hover:text-content'
                             }`}
                         >

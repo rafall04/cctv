@@ -229,22 +229,36 @@ describe('PlaybackVideo audio honesty', () => {
 });
 
 /*
- * The speed row floats over the video, so it is both a thumb target and something covering the
- * picture. It ran at 24px high — well under the 40px touch floor in docs/frontend-guide.md.
- * The width must NOT grow with it: the unmute prompt owns the opposite corner and already caps
- * itself at 55% to avoid this row on a 360px phone.
+ * The speed control floats over the video, so it is both a thumb target and something covering the
+ * picture. It ran at 24px high — well under the 40px touch floor in docs/frontend-guide.md — and as
+ * a row of FOUR buttons it covered ~9% of a 345x194 player on a 393px phone, right where cameras
+ * burn in their timestamp. It is now ONE cycling button: same reach, a quarter of the footprint.
  */
-describe('PlaybackVideo speed controls on a phone', () => {
-    it('meets the touch-target floor without widening past the unmute prompt', () => {
+describe('PlaybackVideo speed control on a phone', () => {
+    it('is a single control that meets the touch-target floor', () => {
         render(<PlaybackVideo {...baseProps} />);
 
         const speedButtons = screen.getAllByTitle(/^Kecepatan /);
-        expect(speedButtons).toHaveLength(4);
-        for (const button of speedButtons) {
-            const cls = button.getAttribute('class');
-            expect(cls).toContain('min-h-11');
-            expect(cls).toContain('sm:min-h-0');
-            expect(cls).toContain('px-2');
-        }
+        expect(speedButtons).toHaveLength(1);
+        const cls = speedButtons[0].getAttribute('class');
+        expect(cls).toContain('min-h-11');
+        expect(cls).toContain('sm:min-h-0');
+        expect(cls).toContain('px-2');
+    });
+
+    it('shows the current speed and cycles to the next one when tapped', () => {
+        const onSpeedChange = vi.fn();
+        const { rerender } = render(
+            <PlaybackVideo {...baseProps} playbackSpeed={1} onSpeedChange={onSpeedChange} />,
+        );
+
+        expect(screen.getByTitle(/^Kecepatan /).textContent).toBe('1x');
+        fireEvent.click(screen.getByTitle(/^Kecepatan /));
+        expect(onSpeedChange).toHaveBeenLastCalledWith(1.5);
+
+        // …and wraps around from the last step back to normal speed, so every value stays reachable.
+        rerender(<PlaybackVideo {...baseProps} playbackSpeed={0.5} onSpeedChange={onSpeedChange} />);
+        fireEvent.click(screen.getByTitle(/^Kecepatan /));
+        expect(onSpeedChange).toHaveBeenLastCalledWith(1);
     });
 });
