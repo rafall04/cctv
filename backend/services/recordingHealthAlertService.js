@@ -2,14 +2,30 @@
 //          level changes (ok ⇄ warning ⇄ critical). One message per transition —
 //          a level that stays critical for hours does not re-spam.
 // Caller: server.js registers checkAndAlert as a recordingScheduler task.
-// Deps: recordingHealthDashboardService (snapshot), telegramService (monitoring
-//        chat), config.telegram.healthAlertsEnabled. All injectable for tests.
+// Deps: recordingHealthDashboardService (snapshot), telegramService (monitoring chat),
+//        settingsService + config (the master on/off, now settable from the admin panel).
+//        All injectable for tests.
 // MainFuncs: createRecordingHealthAlertService → checkAndAlert.
 // SideEffects: Sends a Telegram message to the monitoring chat on a level change.
 
 import { config } from '../config/config.js';
 import recordingHealthDashboardService from './recordingHealthDashboardService.js';
+import settingsService from './settingsService.js';
 import { sendHealthAlertMessage, isTelegramConfigured } from './telegramService.js';
+
+/**
+ * Master on/off for recording-pipeline health alerts — the switch that used to be the env var
+ * RECORDING_HEALTH_ALERTS_ENABLED. Precedence DB -> env -> default(on): the admin toggle
+ * (`recording_health_alerts_enabled`, set from the Rekaman dashboard) wins, the env var stays a
+ * working fallback, and an untouched install keeps alerting. Read fresh each tick, never throws.
+ */
+function recordingHealthAlertsEnabled() {
+    const stored = settingsService.getSettingValue('recording_health_alerts_enabled');
+    if (stored === true || stored === false) return stored;
+    if (stored === 'true' || stored === 1 || stored === '1' || stored === 'on') return true;
+    if (stored === 'false' || stored === 0 || stored === '0' || stored === 'off') return false;
+    return config.telegram?.healthAlertsEnabled !== false;
+}
 
 const LEVEL_LABEL = {
     ok: 'Sehat',
@@ -33,7 +49,7 @@ export function createRecordingHealthAlertService({
     healthService = recordingHealthDashboardService,
     sendMessage = sendHealthAlertMessage,
     telegramConfigured = isTelegramConfigured,
-    isEnabled = () => config.telegram?.healthAlertsEnabled !== false,
+    isEnabled = recordingHealthAlertsEnabled,
     logger = console,
 } = {}) {
     // Start at 'ok' so booting into a healthy state stays silent, but booting

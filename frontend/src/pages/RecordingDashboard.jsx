@@ -16,6 +16,8 @@ import RecordingSummaryCards from '../components/admin/recordings/RecordingSumma
 import RecordingHealthPanel from '../components/admin/recordings/RecordingHealthPanel';
 import RecordingCapacityPanel from '../components/admin/recordings/RecordingCapacityPanel';
 import RecordingStorageSettings from '../components/admin/recordings/RecordingStorageSettings';
+import RecordingAudioSetting from '../components/admin/recordings/RecordingAudioSetting';
+import RecordingHealthAlertSetting from '../components/admin/recordings/RecordingHealthAlertSetting';
 import RecordingAssuranceSummary from '../components/admin/recordings/RecordingAssuranceSummary';
 import RecordingAssuranceTable from '../components/admin/recordings/RecordingAssuranceTable';
 import RecordingCameraGrid from '../components/admin/recordings/RecordingCameraGrid';
@@ -169,6 +171,8 @@ export default function RecordingDashboard() {
             <RecordingCapacityPanel />
 
             <RecordingStorageSettings />
+            <RecordingAudioSetting />
+            <RecordingHealthAlertSetting />
             <RecordingHealthPanel />
             <RecordingAssuranceSummary summary={assurance?.summary} />
             <RecordingAssuranceTable cameras={assurance?.cameras || []} />

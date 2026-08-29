@@ -5,8 +5,9 @@
  * MainFuncs: checkAndAlert.
  * SideEffects: None — Telegram send is a stub.
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createRecordingHealthAlertService } from '../services/recordingHealthAlertService.js';
+import settingsService from '../services/settingsService.js';
 
 function snapshot(level, reasons = []) {
     return {
@@ -92,5 +93,40 @@ describe('recordingHealthAlertService.checkAndAlert', () => {
         const result = await service.checkAndAlert();
         expect(result).toEqual({ skipped: 'telegram_not_configured' });
         expect(sendMessage).not.toHaveBeenCalled();
+    });
+});
+
+describe('recordingHealthAlertService default on/off reads the admin setting', () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    // Build WITHOUT injecting isEnabled, so the module's own default reader runs — the one that
+    // consults `recording_health_alerts_enabled` (settable from the Rekaman dashboard).
+    function buildDefault() {
+        const sendMessage = vi.fn().mockResolvedValue(true);
+        let current = snapshot('ok');
+        const service = createRecordingHealthAlertService({
+            healthService: { getSnapshot: () => current },
+            sendMessage,
+            telegramConfigured: () => true,
+            logger: { error: () => {} },
+        });
+        return { service, sendMessage, setSnapshot: (lvl, reasons) => { current = snapshot(lvl, reasons); } };
+    }
+
+    it('the setting = false silences alerts (skipped: disabled)', async () => {
+        vi.spyOn(settingsService, 'getSettingValue').mockReturnValue(false);
+        const { service, sendMessage, setSnapshot } = buildDefault();
+        setSnapshot('critical', ['scheduler is not running']);
+        expect(await service.checkAndAlert()).toEqual({ skipped: 'disabled' });
+        expect(sendMessage).not.toHaveBeenCalled();
+    });
+
+    it('the setting = true lets the alert through', async () => {
+        vi.spyOn(settingsService, 'getSettingValue').mockReturnValue(true);
+        const { service, sendMessage, setSnapshot } = buildDefault();
+        setSnapshot('critical', ['scheduler is not running']);
+        const result = await service.checkAndAlert();
+        expect(result).toMatchObject({ changed: true, level: 'critical', sent: true });
+        expect(sendMessage).toHaveBeenCalledTimes(1);
     });
 });

@@ -9,11 +9,12 @@
 // `security_logs`, `login_attempts` and `playback_token_audit_logs` already have
 // owners that prune them. These two did not:
 //
-//   audit_logs    AUDIT_LOG_RETENTION_DAYS was read into config.auditLogRetentionDays
-//                 and then used by nothing at all — a setting that has been in the
-//                 production .env, and in every deployment template, doing nothing.
-//   restart_logs  Recorder restart diagnostics. Production writes ~140/day
-//                 (261 process_crashed + 88 stream_frozen in 2.5 days).
+//   audit_logs    AUDIT_LOG_RETENTION_DAYS (default 90). Now settable from the admin panel
+//                 (Keamanan tab) via securitySettingsService — DB over env over default — so an
+//                 operator can change the window without SSH-ing in to edit .env.
+//   restart_logs  Recorder restart diagnostics (default 30). Production writes ~140/day
+//                 (261 process_crashed + 88 stream_frozen in 2.5 days). Same panel, same
+//                 precedence (RESTART_LOG_RETENTION_DAYS remains the env fallback).
 //
 // `telegram_archive_uploads` is deliberately NOT pruned, and must not be added here.
 // It looks like a log — it grows by ~4,800 rows/day and is named like an upload
@@ -26,7 +27,7 @@
 // with an index (idx_tg_archive_camera_recorded), not with a DELETE.
 
 import { execute } from '../database/connectionPool.js';
-import { config } from '../config/config.js';
+import { getSecuritySettings } from './securitySettingsService.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -40,16 +41,19 @@ function parseDays(value, fallback) {
  * window per table stays visible and independently tunable.
  */
 function getRetentionTargets() {
+    // Read fresh each pass (settings are cached ~30s) so a change in the panel takes effect on the
+    // next daily prune without a restart. parseDays keeps the >0 floor even if a value slips through.
+    const s = getSecuritySettings();
     return [
         {
             table: 'audit_logs',
             column: 'created_at',
-            days: parseDays(config.auditLogRetentionDays, 90),
+            days: parseDays(s.auditLogRetentionDays, 90),
         },
         {
             table: 'restart_logs',
             column: 'created_at',
-            days: parseDays(process.env.RESTART_LOG_RETENTION_DAYS, 30),
+            days: parseDays(s.restartLogRetentionDays, 30),
         },
     ];
 }

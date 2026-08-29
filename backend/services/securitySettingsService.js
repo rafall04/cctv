@@ -52,6 +52,9 @@ export const SECURITY_DEFAULTS = Object.freeze({
     sessionAbsoluteTimeoutHours: 24,
     accessTokenExpiry: '1h',
     refreshTokenExpiry: '7d',
+
+    auditLogRetentionDays: 90,
+    restartLogRetentionDays: 30,
 });
 
 /** Bounds are refusals, not clamps — a silently corrected value is a setting that lies. */
@@ -76,6 +79,12 @@ const FIELD_RULES = {
     sessionAbsoluteTimeoutHours: { type: 'int', min: 1, max: 8760 },
     accessTokenExpiry: { type: 'duration' },
     refreshTokenExpiry: { type: 'duration' },
+
+    // Retention windows for operational log tables (pruned daily by operationalRetentionService).
+    // Floor of 1 day: a 0 here would be read as "delete everything", which is never what an
+    // operator means by a retention setting.
+    auditLogRetentionDays: { type: 'int', min: 1, max: 3650 },
+    restartLogRetentionDays: { type: 'int', min: 1, max: 3650 },
 };
 
 const DURATION_PATTERN = /^\d+[smhd]$/;
@@ -111,6 +120,8 @@ function envLayer() {
         sessionAbsoluteTimeoutHours: present('SESSION_ABSOLUTE_TIMEOUT_HOURS', s.sessionAbsoluteTimeoutHours),
         accessTokenExpiry: present('JWT_EXPIRATION', j.expiration),
         refreshTokenExpiry: present('JWT_REFRESH_EXPIRATION', j.refreshExpiration),
+        auditLogRetentionDays: present('AUDIT_LOG_RETENTION_DAYS', s.auditLogRetentionDays),
+        restartLogRetentionDays: present('RESTART_LOG_RETENTION_DAYS', s.restartLogRetentionDays),
     };
 }
 

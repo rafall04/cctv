@@ -21,7 +21,7 @@ import {
     isConfirmed,
     deadHours,
     describeReason,
-    CONFIRM_AFTER_HOURS,
+    getConfirmAfterHours,
 } from './cameraSourceDeadPolicy.js';
 
 class CameraSourceHealthService {
@@ -33,6 +33,9 @@ class CameraSourceHealthService {
      * badge lit forever and train people to ignore it.
      */
     getDeadSources({ now = Date.now() } = {}) {
+        // Resolve the confirm window ONCE per pass — not per camera — so the loop below reads the
+        // setting a single time even across a fleet of hundreds.
+        const confirmAfterHours = getConfirmAfterHours();
         let rows = [];
         try {
             rows = query(`
@@ -52,11 +55,11 @@ class CameraSourceHealthService {
             `);
         } catch {
             // Migration has not run yet. An empty list is the honest answer, not a 500.
-            return { confirmAfterHours: CONFIRM_AFTER_HOURS, cameras: [], total: 0, stillPublic: 0 };
+            return { confirmAfterHours, cameras: [], total: 0, stillPublic: 0 };
         }
 
         const cameras = rows
-            .filter((row) => isConfirmed(row.source_dead_since, now))
+            .filter((row) => isConfirmed(row.source_dead_since, now, confirmAfterHours))
             .map((row) => ({
                 id: row.id,
                 name: row.name,
@@ -70,7 +73,7 @@ class CameraSourceHealthService {
             }));
 
         return {
-            confirmAfterHours: CONFIRM_AFTER_HOURS,
+            confirmAfterHours,
             cameras,
             total: cameras.length,
             stillPublic: cameras.filter((camera) => camera.enabled).length,

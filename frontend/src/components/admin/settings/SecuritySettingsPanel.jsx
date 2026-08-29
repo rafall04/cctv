@@ -52,6 +52,14 @@ const GROUPS = [
             { key: 'sessionAbsoluteTimeoutHours', label: 'Batas mutlak sesi', suffix: 'jam', hint: 'Setelah ini wajib login ulang, seaktif apa pun.' },
         ],
     },
+    {
+        title: 'Retensi Log',
+        hint: 'Berapa lama baris log operasional disimpan sebelum dibersihkan otomatis setiap hari.',
+        fields: [
+            { key: 'auditLogRetentionDays', label: 'Log audit admin', suffix: 'hari', hint: 'Jejak aktivitas admin. Minimal 1 hari.' },
+            { key: 'restartLogRetentionDays', label: 'Log restart perekam', suffix: 'hari', hint: 'Diagnostik restart perekam. Minimal 1 hari.' },
+        ],
+    },
 ];
 
 const SOURCE_LABEL = {

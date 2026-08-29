@@ -49,6 +49,8 @@ vi.mock('../config/config.js', () => ({
                 passwordMaxAgeDays: Number(h.env.PASSWORD_MAX_AGE_DAYS),
                 passwordHistoryCount: Number(h.env.PASSWORD_HISTORY_COUNT),
                 sessionAbsoluteTimeoutHours: Number(h.env.SESSION_ABSOLUTE_TIMEOUT_HOURS),
+                auditLogRetentionDays: Number(h.env.AUDIT_LOG_RETENTION_DAYS),
+                restartLogRetentionDays: Number(h.env.RESTART_LOG_RETENTION_DAYS),
             };
         },
         get jwt() {
@@ -65,6 +67,7 @@ function setEnv(vars = {}) {
         'LOCKOUT_DURATION_MINUTES', 'IP_BLOCK_DURATION_MINUTES',
         'PASSWORD_MIN_LENGTH', 'PASSWORD_MAX_AGE_DAYS', 'PASSWORD_HISTORY_COUNT',
         'SESSION_ABSOLUTE_TIMEOUT_HOURS', 'JWT_EXPIRATION', 'JWT_REFRESH_EXPIRATION',
+        'AUDIT_LOG_RETENTION_DAYS', 'RESTART_LOG_RETENTION_DAYS',
     ];
     for (const key of KEYS) delete process.env[key];
     h.env = {};
@@ -93,6 +96,24 @@ describe('securitySettingsService precedence', () => {
         expect(s.passwordMinLength).toBe(12);
         expect(s.sessionAbsoluteTimeoutHours).toBe(24);
         expect(s.accessTokenExpiry).toBe('1h');
+        // Log-retention windows joined the batch — same DB->env->default machinery.
+        expect(s.auditLogRetentionDays).toBe(90);
+        expect(s.restartLogRetentionDays).toBe(30);
+    });
+
+    it('lets .env override the log-retention windows', async () => {
+        setEnv({ AUDIT_LOG_RETENTION_DAYS: 45, RESTART_LOG_RETENTION_DAYS: 14 });
+        vi.resetModules();
+        const fresh = await import('../services/securitySettingsService.js');
+        const s = fresh.getSecuritySettings({ fresh: true });
+        expect(s.auditLogRetentionDays).toBe(45);
+        expect(s.restartLogRetentionDays).toBe(14);
+    });
+
+    it('refuses a retention window below 1 day (0 would read as "delete everything")', () => {
+        const { valid, errors } = svc.validateSecurityPatch({ auditLogRetentionDays: 0 });
+        expect(valid).toBe(false);
+        expect(errors.join(' ')).toMatch(/auditLogRetentionDays/);
     });
 
     it('lets .env override a default (so existing deployments keep working)', async () => {

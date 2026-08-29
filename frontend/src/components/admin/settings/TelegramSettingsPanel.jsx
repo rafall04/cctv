@@ -455,7 +455,7 @@ export default function TelegramSettingsPanel() {
                             <div className="border border-edge rounded-xl p-4 space-y-3">
                                 <div>
                                     <h3 className="font-semibold text-content">Alert Kesehatan Recording</h3>
-                                    <p className="text-sm text-content-muted">Grup tujuan alert pipeline recording (scheduler / recovery). Sinyal ini global, bukan per-area.</p>
+                                    <p className="text-sm text-content-muted">Grup tujuan alert pipeline recording (scheduler / recovery). Sinyal ini global, bukan per-area. Sakelar nyala/mati alertnya ada di dasbor Rekaman.</p>
                                 </div>
                                 <select
                                     aria-label="Grup Alert Kesehatan Recording"

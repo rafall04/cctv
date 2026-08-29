@@ -146,6 +146,7 @@ export const config = {
     passwordHistoryCount: parseInt(process.env.PASSWORD_HISTORY_COUNT || '5', 10),
 
     auditLogRetentionDays: parseInt(process.env.AUDIT_LOG_RETENTION_DAYS || '90', 10),
+    restartLogRetentionDays: parseInt(process.env.RESTART_LOG_RETENTION_DAYS || '30', 10),
 
     allowedOrigins: parseAllowedOrigins(),
     ads: {

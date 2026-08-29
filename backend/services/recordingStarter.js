@@ -22,6 +22,7 @@ import {
 import { RECORDING_RTSP_SOCKET_TIMEOUT_MICROS } from './recordingIntervalsPolicy.js';
 import { getFfmpegLogPath } from './recordingFfmpegLog.js';
 import { shouldSkipRecordingAudio } from './recordingAudioFallback.js';
+import settingsService from './settingsService.js';
 
 const EXTERNAL_RECORDING_PROTOCOL_WHITELIST = 'file,http,https,tcp,tls,crypto';
 
@@ -65,9 +66,17 @@ const RECORDING_AUDIO_CODEC_ARGS = ['-c:a', 'aac', '-b:a', '32k'];
 
 // Escape hatch. A wrong argument here does not degrade one camera, it stops EVERY
 // recorder on the next restart, and this file's history is a list of exactly that kind of
-// incident. `RECORDING_AUDIO=off` restores the previous video-only behaviour without a
-// deploy. Read lazily so the knob is honoured per call rather than frozen at import.
+// incident. Restores the previous video-only behaviour without a deploy.
+//
+// Precedence DB -> env -> default(on), read lazily so the knob is honoured per call rather
+// than frozen at import: the admin toggle (`recording_audio_enabled` in the settings table)
+// wins, `RECORDING_AUDIO=off` stays a working fallback for installs that never opened the UI,
+// and an untouched install records audio exactly as before.
 export function isRecordingAudioEnabled() {
+    const stored = settingsService.getSettingValue('recording_audio_enabled');
+    if (stored === true || stored === false) return stored;
+    if (stored === 'true' || stored === 1 || stored === '1' || stored === 'on') return true;
+    if (stored === 'false' || stored === 0 || stored === '0' || stored === 'off') return false;
     return String(process.env.RECORDING_AUDIO || '').trim().toLowerCase() !== 'off';
 }
 

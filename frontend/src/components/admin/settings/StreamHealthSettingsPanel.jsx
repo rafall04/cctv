@@ -42,7 +42,11 @@ const HEALTH_MODE_OPTIONS = [
     { value: 'disabled', label: 'Disabled' },
 ];
 
-const DEFAULT_FORM = Object.fromEntries(HEALTH_SETTING_FIELDS.map((field) => [field.key, 'passive_first']));
+const DEFAULT_FORM = {
+    ...Object.fromEntries(HEALTH_SETTING_FIELDS.map((field) => [field.key, 'passive_first'])),
+    // Dead-at-source detection — separate concern from the probe-mode defaults above.
+    camera_source_dead_confirm_hours: 6,
+};
 
 export default function StreamHealthSettingsPanel() {
     const { success, error: showError } = useNotification();
@@ -62,6 +66,8 @@ export default function StreamHealthSettingsPanel() {
                     external_embed_health_default: result.data.external_embed_health_default || 'passive_first',
                     external_jsmpeg_health_default: result.data.external_jsmpeg_health_default || 'disabled',
                     external_custom_ws_health_default: result.data.external_custom_ws_health_default || 'disabled',
+                    // Number(...) || 6: a stored 0/blank is not a valid confirm window, so fall to the default.
+                    camera_source_dead_confirm_hours: Number(result.data.camera_source_dead_confirm_hours) || 6,
                 });
             }
         } catch (error) {
@@ -80,13 +86,27 @@ export default function StreamHealthSettingsPanel() {
         event.preventDefault();
         try {
             setSaving(true);
-            const results = await Promise.all(HEALTH_SETTING_FIELDS.map((field) => (
+            // A confirm window of 0/blank/NaN would read as "call everything dead immediately" —
+            // refuse it here rather than silently persist a value that turns the panel into noise.
+            const hours = Number(form.camera_source_dead_confirm_hours);
+            if (!Number.isFinite(hours) || hours <= 0) {
+                showError('Nilai tidak valid', 'Jam konfirmasi "sumber mati" harus angka lebih dari 0.');
+                return;
+            }
+            const results = await Promise.all([
+                ...HEALTH_SETTING_FIELDS.map((field) => (
+                    settingsService.updateSetting(
+                        field.key,
+                        form[field.key],
+                        `Stream health default for ${field.label.toLowerCase()}`
+                    )
+                )),
                 settingsService.updateSetting(
-                    field.key,
-                    form[field.key],
-                    `Stream health default for ${field.label.toLowerCase()}`
-                )
-            )));
+                    'camera_source_dead_confirm_hours',
+                    hours,
+                    'Jam sebuah gejala harus bertahan sebelum kamera ditandai mati di sumber'
+                ),
+            ]);
             const failed = results.find((result) => !result.success);
             if (failed) {
                 showError('Gagal Menyimpan', failed.message || 'Tidak bisa menyimpan default health monitoring.');
@@ -143,6 +163,37 @@ export default function StreamHealthSettingsPanel() {
                             <p className="mt-2 text-xs text-content-muted">{field.description}</p>
                         </div>
                     ))}
+                </div>
+
+                <div className="rounded-2xl border border-edge bg-surface-sunken p-4 space-y-4">
+                    <div>
+                        <h4 className="text-sm font-semibold text-content">Deteksi Sumber Mati</h4>
+                        <p className="mt-1 text-xs text-content-muted">
+                            Kapan sebuah kamera dianggap benar-benar hilang di sisi penyedia (bukan sekadar
+                            offline sesaat).
+                        </p>
+                    </div>
+                    <label className="block max-w-xs">
+                        <span className="mb-1 block text-sm font-medium text-content">Konfirmasi &ldquo;sumber mati&rdquo; setelah</span>
+                        <span className="flex items-center gap-2">
+                            <input
+                                type="number"
+                                min="1"
+                                step="1"
+                                value={form.camera_source_dead_confirm_hours}
+                                onChange={(event) => setForm((current) => ({
+                                    ...current,
+                                    camera_source_dead_confirm_hours: event.target.value,
+                                }))}
+                                className="w-full rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-content transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
+                            />
+                            <span className="shrink-0 text-xs text-content-muted">jam</span>
+                        </span>
+                        <p className="mt-2 text-xs text-content-muted">
+                            Gejala (playlist ditutup / 404) harus bertahan selama ini sebelum kamera ditandai
+                            mati di sumber. Feed yang restart tiap malam butuh jendela lebih panjang. Default 6 jam.
+                        </p>
+                    </label>
                 </div>
 
                 <div className="rounded-2xl border border-primary-300 bg-primary-100 px-4 py-3 text-sm text-primary border-primary-300 dark:bg-primary/10 text-primary">

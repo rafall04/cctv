@@ -129,7 +129,14 @@ export const INGEST_PARK_AFTER_MS = 30 * 60 * 1000;
 // churn produced by the very mechanism meant to stop churn.
 export const INGEST_PARK_HEALTH_FRESH_MS = 30 * 60 * 1000;
 
-/** `MEDIAMTX_PARK_DEAD_INGEST=off` disables parking entirely, without a deploy. */
+/**
+ * `MEDIAMTX_PARK_DEAD_INGEST=off` disables parking entirely, without a deploy.
+ *
+ * Deliberately stays an ENV read, not a settings-table read: this module is imported by
+ * streamWarmer.js precisely because it is DB-free (see streamWarmer's own note — it avoids the DB
+ * layer to sidestep an import cycle with mediaMtxService). Pulling settingsService in here would
+ * break that. This is a debug kill-switch, not a daily operator knob, so env is the right home.
+ */
 export function isIngestParkEnabled() {
     return String(process.env.MEDIAMTX_PARK_DEAD_INGEST || '').trim().toLowerCase() !== 'off';
 }

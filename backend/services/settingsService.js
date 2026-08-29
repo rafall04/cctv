@@ -298,6 +298,19 @@ class SettingsService {
         };
     }
 
+    /**
+     * Non-throwing read for runtime config: the parsed value, or `undefined` when the row is
+     * absent or unreadable. `getSetting` throws 404 by design (admin API contract); hot paths
+     * that fall back to env/defaults must never crash on a missing row, so they use this instead.
+     */
+    getSettingValue(key) {
+        try {
+            return this.getSetting(key).value;
+        } catch {
+            return undefined;
+        }
+    }
+
     updateSetting(key, value, description) {
         const existing = queryOne('SELECT * FROM settings WHERE key = ?', [key]);
 

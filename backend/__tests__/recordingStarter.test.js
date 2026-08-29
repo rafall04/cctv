@@ -354,6 +354,38 @@ describe('recordingStarter.buildRecordingFfmpegArgs', () => {
             }
         }
     });
+
+    it('lets the admin setting win over the env knob, and falls back to env when unset', async () => {
+        const settingsService = (await import('../services/settingsService.js')).default;
+        const { isRecordingAudioEnabled } = await import('../services/recordingStarter.js');
+        const spy = vi.spyOn(settingsService, 'getSettingValue');
+        const previous = process.env.RECORDING_AUDIO;
+        try {
+            // env says OFF but the panel says ON -> the panel wins.
+            process.env.RECORDING_AUDIO = 'off';
+            spy.mockReturnValue(true);
+            expect(isRecordingAudioEnabled()).toBe(true);
+            spy.mockReturnValue('on');
+            expect(isRecordingAudioEnabled()).toBe(true);
+
+            // panel says OFF (env unset) -> off.
+            delete process.env.RECORDING_AUDIO;
+            spy.mockReturnValue(false);
+            expect(isRecordingAudioEnabled()).toBe(false);
+
+            // panel unset (row missing) -> falls back to the env knob.
+            spy.mockReturnValue(undefined);
+            process.env.RECORDING_AUDIO = 'off';
+            expect(isRecordingAudioEnabled()).toBe(false);
+        } finally {
+            spy.mockRestore();
+            if (previous === undefined) {
+                delete process.env.RECORDING_AUDIO;
+            } else {
+                process.env.RECORDING_AUDIO = previous;
+            }
+        }
+    });
 });
 
 describe('recordingStarter.prepareRecordingStart', () => {

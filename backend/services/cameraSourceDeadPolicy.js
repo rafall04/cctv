@@ -2,8 +2,8 @@
  * Purpose: Decide when a camera has stopped being "offline" and started being GONE — dead at the
  *          upstream source, where only the stream provider can fix it.
  * Caller: cameraRuntimeStateService (maintains the streak), cameraSourceHealthService (reads it).
- * Deps: none — pure.
- * MainFuncs: isDeadAtSourceReason, nextDeadStreak, isConfirmed, describeReason.
+ * Deps: settingsService — only for the live confirm-window read; the streak logic stays pure.
+ * MainFuncs: isDeadAtSourceReason, nextDeadStreak, isConfirmed, describeReason, getConfirmAfterHours.
  * SideEffects: None.
  *
  * WHY THIS DISTINCTION EARNS ITS OWN MODULE
@@ -28,6 +28,8 @@
  * is worth an operator's attention, or the panel becomes noise and stops being read.
  */
 
+import settingsService from './settingsService.js';
+
 /** Reasons the health checker produces that mean "the source is gone", not "the link is bad". */
 export const DEAD_AT_SOURCE_REASONS = Object.freeze([
     'stream_ended',
@@ -37,16 +39,23 @@ export const DEAD_AT_SOURCE_REASONS = Object.freeze([
 
 const DEAD_SET = new Set(DEAD_AT_SOURCE_REASONS);
 
+const MS_PER_HOUR = 60 * 60 * 1000;
+
 /**
- * Hours a symptom must hold before it is presented as dead. Env-overridable because a fleet of
+ * Hours a symptom must hold before it is presented as dead. Configurable because a fleet of
  * municipal feeds that restart nightly wants a longer window than a fleet of owned cameras.
+ *
+ * Precedence DB -> env -> default(6): the admin field (`camera_source_dead_confirm_hours` in the
+ * settings table) wins, `CAMERA_SOURCE_DEAD_CONFIRM_HOURS` stays a working fallback, and an
+ * untouched install confirms after 6h as before. Read lazily so a change in the panel takes effect
+ * on the next health pass without a restart; callers in a loop resolve it ONCE and pass it down.
  */
-export const CONFIRM_AFTER_HOURS = (() => {
+export function getConfirmAfterHours() {
+    const stored = Number(settingsService.getSettingValue('camera_source_dead_confirm_hours'));
+    if (Number.isFinite(stored) && stored > 0) return stored;
     const raw = Number(process.env.CAMERA_SOURCE_DEAD_CONFIRM_HOURS);
     return Number.isFinite(raw) && raw > 0 ? raw : 6;
-})();
-
-const MS_PER_HOUR = 60 * 60 * 1000;
+}
 
 export function isDeadAtSourceReason(reason) {
     return DEAD_SET.has(String(reason || ''));
@@ -78,11 +87,15 @@ export function nextDeadStreak({ isOnline, reason, currentSince, currentReason, 
     return { since: timestamp, reason };
 }
 
-/** Has the streak lasted long enough to be worth telling anyone about? */
-export function isConfirmed(since, now = Date.now()) {
+/**
+ * Has the streak lasted long enough to be worth telling anyone about?
+ * `confirmAfterHours` defaults to a fresh read; a caller filtering many rows should resolve it
+ * once and pass it in so one health pass reads the setting once, not per camera.
+ */
+export function isConfirmed(since, now = Date.now(), confirmAfterHours = getConfirmAfterHours()) {
     const startedAt = since ? Date.parse(since) : NaN;
     if (!Number.isFinite(startedAt)) return false;
-    return now - startedAt >= CONFIRM_AFTER_HOURS * MS_PER_HOUR;
+    return now - startedAt >= confirmAfterHours * MS_PER_HOUR;
 }
 
 /** Whole hours the streak has run, or null when there is no streak. */
@@ -105,7 +118,7 @@ export function describeReason(reason) {
 
 export default {
     DEAD_AT_SOURCE_REASONS,
-    CONFIRM_AFTER_HOURS,
+    getConfirmAfterHours,
     isDeadAtSourceReason,
     nextDeadStreak,
     isConfirmed,

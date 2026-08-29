@@ -27,6 +27,7 @@ vi.mock('../database/connectionPool.js', () => ({
 
 const policy = await import('../services/cameraSourceDeadPolicy.js');
 const { default: sourceHealth } = await import('../services/cameraSourceHealthService.js');
+const { default: settingsService } = await import('../services/settingsService.js');
 
 const NOW = Date.parse('2026-08-02T12:00:00.000Z');
 const hoursAgo = (h) => new Date(NOW - h * 60 * 60 * 1000).toISOString();
@@ -95,13 +96,40 @@ describe('dead-at-source policy — the streak', () => {
 
 describe('dead-at-source policy — confirmation window', () => {
     it('waits out the window before calling anything dead', () => {
-        expect(policy.isConfirmed(hoursAgo(1), NOW)).toBe(false);
-        expect(policy.isConfirmed(hoursAgo(policy.CONFIRM_AFTER_HOURS), NOW)).toBe(true);
+        // Resolve the window once and use it for both the fixture and the assertion, so the test
+        // holds whatever the effective confirm-hours is (setting / env / default).
+        const confirmHours = policy.getConfirmAfterHours();
+        expect(policy.isConfirmed(hoursAgo(1), NOW, confirmHours)).toBe(false);
+        expect(policy.isConfirmed(hoursAgo(confirmHours), NOW, confirmHours)).toBe(true);
     });
 
     it('reports whole hours, and nothing at all without a streak', () => {
         expect(policy.deadHours(hoursAgo(49), NOW)).toBe(49);
         expect(policy.deadHours(null, NOW)).toBeNull();
+    });
+
+    it('confirm window follows the admin setting, then env, then the 6h default', () => {
+        const spy = vi.spyOn(settingsService, 'getSettingValue');
+        const previous = process.env.CAMERA_SOURCE_DEAD_CONFIRM_HOURS;
+        try {
+            // Setting present -> it wins (even over env).
+            process.env.CAMERA_SOURCE_DEAD_CONFIRM_HOURS = '10';
+            spy.mockReturnValue(3);
+            expect(policy.getConfirmAfterHours()).toBe(3);
+
+            // Setting absent -> env.
+            spy.mockReturnValue(undefined);
+            expect(policy.getConfirmAfterHours()).toBe(10);
+
+            // Neither -> default 6. A zero/negative setting is ignored, not obeyed.
+            delete process.env.CAMERA_SOURCE_DEAD_CONFIRM_HOURS;
+            spy.mockReturnValue(0);
+            expect(policy.getConfirmAfterHours()).toBe(6);
+        } finally {
+            spy.mockRestore();
+            if (previous === undefined) delete process.env.CAMERA_SOURCE_DEAD_CONFIRM_HOURS;
+            else process.env.CAMERA_SOURCE_DEAD_CONFIRM_HOURS = previous;
+        }
     });
 });
 
