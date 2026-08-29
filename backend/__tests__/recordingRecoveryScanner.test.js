@@ -124,6 +124,44 @@ describe('recordingRecoveryScanner', () => {
         expect(result.queuedSegments).toBe(0);
     });
 
+    it('never finalizes the live recorder\'s current (newest) partial while that camera is recording', async () => {
+        // Two aged partials: an older rolled-past one and the newest (the file ffmpeg holds open
+        // during a stall). Camera 7 is actively recording.
+        fsMock.readdir.mockImplementation(async (targetPath) => {
+            if (targetPath === base) return ['camera7'];
+            if (targetPath === join(base, 'camera7')) return [];
+            if (targetPath === join(base, 'camera7', 'pending')) {
+                return ['20260517_010000.mp4.partial', '20260517_011000.mp4.partial'];
+            }
+            return [];
+        });
+        const scanner = createScanner({ getActiveRecordingCameraIds: () => [7] });
+
+        const result = await scanner.scanOnce();
+
+        // Older partial recovered; newest (open) partial left untouched — no finalize, no delete.
+        expect(onSegmentCreated).toHaveBeenCalledTimes(1);
+        expect(onSegmentCreated).toHaveBeenCalledWith(7, '20260517_010000.mp4.partial');
+        expect(onSegmentCreated).not.toHaveBeenCalledWith(7, '20260517_011000.mp4.partial');
+        expect(deleteFileSafely).not.toHaveBeenCalledWith(expect.objectContaining({ filename: '20260517_011000.mp4.partial' }));
+        expect(result.queuedSegments).toBe(1);
+    });
+
+    it('DOES finalize the newest partial when the camera is not recording (genuine crash orphan)', async () => {
+        fsMock.readdir.mockImplementation(async (targetPath) => {
+            if (targetPath === base) return ['camera7'];
+            if (targetPath === join(base, 'camera7')) return [];
+            if (targetPath === join(base, 'camera7', 'pending')) return ['20260517_011000.mp4.partial'];
+            return [];
+        });
+        const scanner = createScanner({ getActiveRecordingCameraIds: () => [] });
+
+        const result = await scanner.scanOnce();
+
+        expect(onSegmentCreated).toHaveBeenCalledWith(7, '20260517_011000.mp4.partial');
+        expect(result.queuedSegments).toBe(1);
+    });
+
     it('queues unregistered final segments for recovery instead of deletion', async () => {
         fsMock.readdir.mockImplementation(async (targetPath) => {
             if (targetPath === base) return ['camera7'];

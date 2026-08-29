@@ -23,9 +23,22 @@ import { sendHealthAlertMessage } from './telegramService.js';
 const execFileAsync = promisify(execFile);
 const PROBE_TIMEOUT_MS = 10_000;
 
+// The pm2 apps are named `<CLIENT_CODE>-cctv-*` (deployment/ecosystem.config.cjs, CLIENT_CODE from
+// client.config.sh). Hardcoding 'rafnet-*' meant a rebranded install — which source-code buyers are
+// explicitly invited to do — would watch app names that DO NOT EXIST, so its recorder could die and
+// crash-loop silently with no "Worker MATI" alert. Derive the prefix from THIS process's own pm2 app
+// name (pm2 sets process.env.name to '<CLIENT_CODE>-cctv-backend'); fall back to an explicit
+// CLIENT_CODE env, then 'rafnet' off pm2 (tests/dev) so the default install is unchanged.
+const CLIENT_CODE = (() => {
+    const own = String(process.env.name || '').match(/^(.+)-cctv-backend$/);
+    if (own) return own[1];
+    return process.env.CLIENT_CODE || 'rafnet';
+})();
+
 export const WATCHED_WORKERS = [
-    { name: 'rafnet-cctv-backend', supervisor: 'pm2', label: 'API + kesehatan kamera' },
-    { name: 'rafnet-cctv-recorder', supervisor: 'pm2', label: 'perekam CCTV' },
+    { name: `${CLIENT_CODE}-cctv-backend`, supervisor: 'pm2', label: 'API + kesehatan kamera' },
+    { name: `${CLIENT_CODE}-cctv-recorder`, supervisor: 'pm2', label: 'perekam CCTV' },
+    // mediamtx is registered unprefixed in production, so it stays literal here.
     { name: 'mediamtx', supervisor: 'pm2', label: 'muxer RTSP→HLS' },
     { name: 'tg-archive.service', supervisor: 'systemd', label: 'pengunggah arsip Telegram' },
     { name: 'tg-archive-api', supervisor: 'docker', label: 'server Bot API lokal' },

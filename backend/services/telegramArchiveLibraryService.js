@@ -490,11 +490,16 @@ export async function openSegmentStream(segmentId, range = null) {
             headers: wanted ? { Range: `bytes=${wanted.start}-${wanted.end}` } : {},
         });
         if (viaHttp.ok && viaHttp.body) {
+            // Only trust the slice length when the upstream actually honoured the Range (206). If it
+            // ignored it and sent a 200 full body, `size` MUST be the whole file — otherwise the
+            // route sets Content-Length to the slice length while piping the full body, and the
+            // player reads slice-length bytes from byte 0 instead of from the seek offset (garbage).
+            const served206 = viaHttp.status === 206;
             return {
                 stream: viaHttp.body,
-                size: wanted ? wanted.end - wanted.start + 1 : size,
+                size: served206 && wanted ? wanted.end - wanted.start + 1 : size,
                 filename: row.filename,
-                range: viaHttp.status === 206 ? wanted : null,
+                range: served206 ? wanted : null,
                 totalSize: size,
             };
         }
@@ -514,11 +519,14 @@ export async function openSegmentStream(segmentId, range = null) {
         err.statusCode = 502;
         throw err;
     }
+    // Same 206-vs-200 rule as the local-server branch above: a 200 full body must report the full
+    // size, or a seek serves start-of-file bytes truncated to the slice length.
+    const served206 = download.status === 206;
     return {
         stream: download.body,
-        size: wanted ? wanted.end - wanted.start + 1 : size,
+        size: served206 && wanted ? wanted.end - wanted.start + 1 : size,
         filename: row.filename,
-        range: download.status === 206 ? wanted : null,
+        range: served206 ? wanted : null,
         totalSize: size,
     };
 }

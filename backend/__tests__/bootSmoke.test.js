@@ -207,9 +207,11 @@ describe('boot smoke', () => {
         expect(existsSync(SOURCE_DB), `${SOURCE_DB} missing — run npm run setup-db first`).toBe(true);
 
         const { dir, dbPath } = makeThrowawayDb();
-        // recorder.js sets RECORDING_WORKER_ENABLED itself; it has no HTTP surface, so
-        // readiness is its own log line.
-        const { child, out } = launch('recorder.js', baseEnv(dbPath));
+        // Boot the worker in its production role (RECORDING_WORKER_ENABLED=true). Without the flag
+        // it now deliberately IDLES and records nothing, so the API can own recording alone — the
+        // single-owner guard that stops a fresh install from double-recording. It has no HTTP
+        // surface, so readiness is its own log line.
+        const { child, out } = launch('recorder.js', baseEnv(dbPath, { RECORDING_WORKER_ENABLED: 'true' }));
         spawned.push({ child, dir });
 
         const ready = await waitFor(
@@ -227,6 +229,31 @@ describe('boot smoke', () => {
 
         // With every camera disabled it must not have started any recorder.
         expect(out.stdout).toContain('Auto-start complete: 0 started');
+    }, READY_TIMEOUT_MS + STAY_ALIVE_MS + 30_000);
+
+    it('recorder.js IDLES (records nothing, stays alive) when RECORDING_WORKER_ENABLED is not "true" — fresh-install single-owner guard', async () => {
+        expect(existsSync(SOURCE_DB), `${SOURCE_DB} missing — run npm run setup-db first`).toBe(true);
+
+        const { dir, dbPath } = makeThrowawayDb();
+        // The fresh-install default: flag unset (pinned to '' so a CI env cannot leak a value in).
+        // The API owns recording here; this worker must NOT also spawn ffmpeg, or every camera gets
+        // two recorders on the same directory — the corruption this guard exists to prevent.
+        const { child, out } = launch('recorder.js', baseEnv(dbPath, { RECORDING_WORKER_ENABLED: '' }));
+        spawned.push({ child, dir });
+
+        const idled = await waitFor(
+            async () => out.stdout.includes('will NOT record'),
+            out,
+            READY_TIMEOUT_MS,
+        );
+        expect(idled, report('recorder.js did not idle when worker mode was off', out)).toBe(true);
+
+        await new Promise((r) => setTimeout(r, STAY_ALIVE_MS));
+
+        // Alive (no pm2 restart-loop), and it never touched the recording pipeline.
+        expect(out.exited, report('recorder.js idle did not stay alive', out)).toBeNull();
+        expect(out.stdout, report('recorder.js idle reached worker-ready', out)).not.toContain(RECORDER_BOOT_COMPLETE);
+        expect(out.stdout, report('recorder.js idle started recording', out)).not.toContain('Auto-start complete');
     }, READY_TIMEOUT_MS + STAY_ALIVE_MS + 30_000);
 });
 
@@ -274,7 +301,8 @@ describeShutdown('shutdown smoke (POSIX only)', () => {
 
     it('recorder.js detaches its recorders AND closes its database on SIGTERM', async () => {
         const { dir, dbPath } = makeThrowawayDb();
-        const { child, out } = launch('recorder.js', baseEnv(dbPath));
+        // Worker role so it actually owns recorders to detach (see the readiness test above).
+        const { child, out } = launch('recorder.js', baseEnv(dbPath, { RECORDING_WORKER_ENABLED: 'true' }));
         spawned.push({ child, dir });
 
         const ready = await waitFor(

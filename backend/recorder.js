@@ -30,9 +30,21 @@ import net from 'node:net';
 dns.setDefaultResultOrder('ipv4first');
 net.setDefaultAutoSelectFamily(false);
 
-// Declare the role BEFORE anything reads config, so any shared module that branches on
-// worker mode sees the worker's own answer rather than the API's .env value.
-process.env.RECORDING_WORKER_ENABLED = 'true';
+// Capture the operator's REAL choice before we touch the variable. This is the single-owner
+// gate: recording must be owned by EXACTLY ONE process. When worker mode is NOT enabled the API
+// process still owns recording (server.js:600), so this worker must record NOTHING — a second
+// ffmpeg per camera on the same directory corrupts every segment. On a fresh install the flag is
+// unset, yet `pm2 start ecosystem.config.cjs` launches this app anyway (README §5), so the guard
+// at the bottom of this file is what keeps a brand-new deployment from double-recording out of
+// the box. Enforced in code, not docs: comments elsewhere assert the invariant; this makes it true.
+const WORKER_MODE = String(process.env.RECORDING_WORKER_ENABLED || '').trim().toLowerCase() === 'true';
+
+// Declare the role BEFORE anything reads config, so any shared module that branches on worker
+// mode sees the worker's own answer — but ONLY when we are actually going to own recording.
+// Leaving the real (falsey) value in place otherwise keeps the idle path honestly non-owning.
+if (WORKER_MODE) {
+    process.env.RECORDING_WORKER_ENABLED = 'true';
+}
 
 const { config } = await import('./config/config.js');
 const { recordingService } = await import('./services/recordingService.js');
@@ -246,11 +258,24 @@ process.on('unhandledRejection', (reason) => {
     console.error('[Recorder][UnhandledRejection] non-fatal, logged (worker stays up):', reason);
 });
 
-try {
-    await start();
-} catch (error) {
+if (!WORKER_MODE) {
+    // Worker mode not enabled -> the API owns recording. Idle: own nothing, record nothing.
+    // Stay ALIVE rather than exit(0) — pm2 autorestart would otherwise restart-loop us — and
+    // send 'ready' so pm2 wait_ready does not kill us at listen_timeout. The setInterval keeps
+    // the event loop alive without spinning; it never meaningfully fires.
+    // stdout, not stderr: not owning recording is a deliberate configuration (the API owns it),
+    // not a fault the operator must fix — see the logging policy in AGENTS.md.
+    console.log('[Recorder] RECORDING_WORKER_ENABLED is not "true" — this worker will NOT record.');
+    console.log('[Recorder] The API process owns recording. Set RECORDING_WORKER_ENABLED=true in backend/.env and restart this worker to hand recording over.');
+    process.send?.('ready');
+    setInterval(() => {}, 1 << 30);
+} else {
     try {
-        fs.writeSync(2, `[Recorder][Fatal] Startup failed: ${error?.stack || error}\n`);
-    } catch { /* stderr unavailable */ }
-    process.exit(1);
+        await start();
+    } catch (error) {
+        try {
+            fs.writeSync(2, `[Recorder][Fatal] Startup failed: ${error?.stack || error}\n`);
+        } catch { /* stderr unavailable */ }
+        process.exit(1);
+    }
 }

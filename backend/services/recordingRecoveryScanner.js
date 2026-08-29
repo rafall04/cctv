@@ -32,6 +32,11 @@ export function createRecordingRecoveryScanner({
     querySingle = queryOne,
     fileOperations = recordingFileOperationService,
     recoveryService = recordingRecoveryService,
+    // Cameras whose live recorder is CURRENTLY writing. Their newest partial is the open file and
+    // must never be finalized/deleted by the scanner. Injected by the maintenance coordinator from
+    // the recording process-manager singleton; defaults to none so a directly-constructed scanner
+    // (tests) protects nothing and behaves exactly as before.
+    getActiveRecordingCameraIds = () => [],
     onSegmentCreated,
     nowMs = () => Date.now(),
     logger = console,
@@ -59,7 +64,27 @@ export function createRecordingRecoveryScanner({
     async function scanPendingPartials({ cameraId, existingFilesSet, result }) {
         const { pendingDir, files } = await readPendingPartials(cameraId);
 
+        // Never touch the partial the live recorder is CURRENTLY writing. During a sustained
+        // upstream stall an external ffmpeg (started with -reconnect) keeps its segment file OPEN
+        // while the file's mtime goes stale — so the age gate below would misread the active
+        // partial as an orphan, finalize a TRUNCATED copy, and unlink the inode ffmpeg still holds,
+        // losing every frame written after the stall recovers. The open segment is the newest-named
+        // partial (`%Y%m%d_%H%M%S`, lexicographically sortable), and only for a camera that is
+        // actually recording; older partials are genuine rolled-past orphans that recovery salvages.
+        let protectedPartial = null;
+        if (files.length) {
+            let activeIds = [];
+            try { activeIds = getActiveRecordingCameraIds() || []; } catch { activeIds = []; }
+            if (new Set(activeIds.map(Number)).has(Number(cameraId))) {
+                protectedPartial = files.reduce((newest, f) => (f > newest ? f : newest));
+            }
+        }
+
         for (const filename of files) {
+            if (filename === protectedPartial) {
+                continue;
+            }
+
             const finalFilename = toFinalSegmentFilename(filename);
             if (!finalFilename) {
                 continue;

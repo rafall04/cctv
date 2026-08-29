@@ -9,6 +9,7 @@
 //             drainAll }.
 // SideEffects: Owns lazy sub-service singletons; never spawns processes directly.
 
+import recordingProcessManager from './recordingProcessManager.js';
 import { createRecordingRecoveryScanner } from './recordingRecoveryScanner.js';
 import { createRecordingBackgroundCleanupService } from './recordingBackgroundCleanupService.js';
 import { createRecordingEmergencyDiskService } from './recordingEmergencyDiskService.js';
@@ -55,6 +56,10 @@ export function createRecordingMaintenanceCoordinator({
             recoveryScanner = createRecordingRecoveryScanner({
                 recordingsBasePath,
                 onSegmentCreated,
+                // Same process-manager singleton the recorders use, so the scanner can tell which
+                // partial each live recorder is currently writing and never finalize it out from
+                // under a stalled-but-open external ffmpeg.
+                getActiveRecordingCameraIds: () => recordingProcessManager.getActiveCameraIds(),
                 logger,
             });
         }
