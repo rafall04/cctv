@@ -236,20 +236,23 @@ describe('CameraHealthService runtime reset', () => {
         expect(service.resolveTier(camera, state, { online: false, reason: 'http_502' })).toBe('cold');
     });
 
-    // Strict-on-demand internal cameras (private-RTSP live-only) were parked on the 10-min passive
-    // cadence even while failing — the reason a dead one stayed "online" for hours. Failing/offline
-    // now probes hot (20s), healthy-idle warm (90s).
-    it('probes a FAILING idle strict-on-demand internal camera fast (hot), not 10-min passive', () => {
+    // Two-speed internal cadence (Phase 2). always_on / actively-viewed cameras are read cheaply from
+    // MediaMTX path state → HOT (20s) both ways. on-demand-idle cameras (Surabaya at rest) need a real
+    // RTSP DESCRIBE each check → probed, but LESS actively than always_on: WARM (90s) while
+    // failing/recovering, a relaxed 2-min idle cadence while healthy. Long-dead cameras back off in
+    // both classes so the health probe never defeats ingest-parking.
+    it('probes a HEALTHY always_on internal camera HOT (20s) — cheap MediaMTX path read', () => {
         const service = new CameraHealthService();
-        const camera = { id: 22, delivery_type: 'internal_hls', private_rtsp_url: 'rtsp://10.0.0.6/live', source_profile: 'surabaya_private_rtsp' };
-        const state = service.ensureCameraState(camera.id, 0);
-        state.effectiveOnline = false;
+        const camera = { id: 22, delivery_type: 'internal_hls', private_rtsp_url: 'rtsp://10.0.0.6/live' }; // no source_profile/override → always_on
+        const state = service.ensureCameraState(camera.id, 1);
+        state.effectiveOnline = true;
+        state.stableSuccessCount = 5;
 
-        const cadence = service.getNextCadenceMs(camera, state, { online: false, reason: 'EHOSTUNREACH', details: { real_viewer_count: 0 } });
+        const cadence = service.getNextCadenceMs(camera, state, { online: true, reason: 'mediamtx_path_ready', details: { real_viewer_count: 0 } });
         expect(cadence).toBe(20 * 1000);
     });
 
-    it('probes a HEALTHY idle strict-on-demand internal camera on warm (90s), not 10-min passive', () => {
+    it('probes a HEALTHY idle on-demand (Surabaya) camera on a relaxed 2-min idle cadence, not as active as always_on', () => {
         const service = new CameraHealthService();
         const camera = { id: 23, delivery_type: 'internal_hls', private_rtsp_url: 'rtsp://10.0.0.7/live', source_profile: 'surabaya_private_rtsp' };
         const state = service.ensureCameraState(camera.id, 1);
@@ -257,7 +260,53 @@ describe('CameraHealthService runtime reset', () => {
         state.stableSuccessCount = 5;
 
         const cadence = service.getNextCadenceMs(camera, state, { online: true, reason: 'rtsp_auth_ok', details: { real_viewer_count: 0 } });
+        expect(cadence).toBe(2 * 60 * 1000);
+    });
+
+    it('probes an on-demand (Surabaya) camera WITH a live viewer HOT (20s) — MediaMTX is pulling it now', () => {
+        const service = new CameraHealthService();
+        const camera = { id: 24, delivery_type: 'internal_hls', private_rtsp_url: 'rtsp://10.0.0.8/live', source_profile: 'surabaya_private_rtsp' };
+        const state = service.ensureCameraState(camera.id, 1);
+        state.effectiveOnline = true;
+        state.stableSuccessCount = 5;
+
+        const cadence = service.getNextCadenceMs(camera, state, { online: true, reason: 'rtsp_auth_ok', details: { real_viewer_count: 2 } });
+        expect(cadence).toBe(20 * 1000);
+    });
+
+    it('probes a FAILING idle on-demand camera on WARM (90s) — responsive but less active than always_on', () => {
+        const service = new CameraHealthService();
+        const camera = { id: 25, delivery_type: 'internal_hls', private_rtsp_url: 'rtsp://10.0.0.9/live', source_profile: 'surabaya_private_rtsp' };
+        const state = service.ensureCameraState(camera.id, 0);
+        state.effectiveOnline = false;
+
+        const cadence = service.getNextCadenceMs(camera, state, { online: false, reason: 'EHOSTUNREACH', details: { real_viewer_count: 0 } });
         expect(cadence).toBe(90 * 1000);
+    });
+
+    it('backs a LONG-DEAD on-demand camera off to COLD (5m) so it never defeats ingest-parking', () => {
+        const service = new CameraHealthService();
+        const camera = { id: 26, delivery_type: 'internal_hls', private_rtsp_url: 'rtsp://10.0.0.10/live', source_profile: 'surabaya_private_rtsp' };
+        const state = service.ensureCameraState(camera.id, 0);
+        state.effectiveOnline = false;
+        state.stableFailureCount = 8; // confidently dead
+
+        const cadence = service.getNextCadenceMs(camera, state, { online: false, reason: 'EHOSTUNREACH', details: { real_viewer_count: 0 } });
+        expect(cadence).toBe(5 * 60 * 1000);
+    });
+
+    // A parked always_on camera keeps mode='always_on' (parking never touches the DB policy column), but its
+    // path is DOWN so each check is a real RTSP DESCRIBE — WARM (90s) here would be ~40 DESCRIBE/h and defeat the
+    // ingest-parking silence that rescues wedge-prone firmware. Long-dead backs off to COLD in BOTH classes.
+    it('backs a LONG-DEAD always_on camera off to COLD (5m) so it never defeats ingest-parking', () => {
+        const service = new CameraHealthService();
+        const camera = { id: 27, delivery_type: 'internal_hls', private_rtsp_url: 'rtsp://10.0.0.11/live' }; // always_on
+        const state = service.ensureCameraState(camera.id, 0);
+        state.effectiveOnline = false;
+        state.stableFailureCount = 8;
+
+        const cadence = service.getNextCadenceMs(camera, state, { online: false, reason: 'EHOSTUNREACH', details: { real_viewer_count: 0 } });
+        expect(cadence).toBe(5 * 60 * 1000);
     });
 });
 

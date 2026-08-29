@@ -69,6 +69,9 @@ const HOT_CADENCE_MS = 20 * 1000;
 const WARM_CADENCE_MS = 90 * 1000;
 const COLD_CADENCE_MS = 5 * 60 * 1000;
 const PASSIVE_ONLY_CADENCE_MS = 10 * 60 * 1000;
+// Healthy idle on-demand INTERNAL camera (Surabaya at rest): a real RTSP DESCRIBE each check → probed
+// far LESS actively than always_on (HOT). The "jangan se-aktif always_on" tier: WARM < this < COLD.
+const INTERNAL_ONDEMAND_IDLE_CADENCE_MS = 2 * 60 * 1000;
 const CHECKPOINT_DB_WRITE_MS = 5 * 60 * 1000;
 const DOMAIN_BACKOFF_BASE_MS = 60 * 1000;
 const DOMAIN_BACKOFF_MAX_MS = 10 * 60 * 1000;
@@ -1167,24 +1170,21 @@ class CameraHealthService {
             return COLD_CADENCE_MS;
         }
 
-        if (
-            deliveryProfile.effectiveDeliveryType === 'internal_hls'
-            && internalPolicy.isStrictOnDemandProfile
-            && Number(lastDetails.real_viewer_count || 0) === 0
-        ) {
-            // These are our OWN cameras on our OWN network (a customer's IP camera behind their
-            // modem) — cheap to probe, and exactly the feeds an operator most needs accurate status
-            // for. The old flat 10-min passive cadence here is why a dead one stayed "online" for
-            // hours: its failure was not even re-probed for up to 10 minutes. Give them PROMPT cadence
-            // in BOTH directions instead — hot (20s) whenever the camera is failing, awaiting
-            // confirmation, or currently offline, so DOWN confirms in ~1 min and RECOVERY is caught
-            // within seconds; warm (90s) while healthy-idle so the FIRST failure is noticed fast. A
-            // brief periodic DESCRIBE is nothing like MediaMTX's continuous pull, so this does not
-            // hammer the camera. EXTERNAL third-party feeds keep the protective passive cadence below.
-            const failingOrUnsettled = (rawResult && !rawResult.online)
-                || state?.needsConfirmation
-                || state?.effectiveOnline === false;
-            return failingOrUnsettled ? HOT_CADENCE_MS : WARM_CADENCE_MS;
+        if (deliveryProfile.effectiveDeliveryType === 'internal_hls') {
+            // Two-speed cadence for our own cameras — fixes "green for hours" AND "don't hammer 400 idle feeds".
+            // mediaMtxPulling (always_on OR actively-viewed) = a HEALTHY one reads cheaply from path state → HOT; else
+            // (on-demand idle) each check is a real DESCRIBE → WARM failing / relaxed idle. Long-dead (>=5) → COLD BOTH
+            // classes: a dead path is no cheap read (a parked always_on gets a real DESCRIBE too), honoring parking.
+            const mediaMtxPulling = internalPolicy.mode === 'always_on'
+                || Number(lastDetails.real_viewer_count || 0) > 0 || this.hasRecentRuntimeSuccess(state);
+            const isFailing = Boolean(rawResult && !rawResult.online);
+            const longDead = isFailing && (state.stableFailureCount || 0) >= 5;
+            const unsettled = state?.needsConfirmation || state?.effectiveOnline === false;
+            const cadence = longDead ? COLD_CADENCE_MS
+                : (isFailing || unsettled) ? (mediaMtxPulling ? HOT_CADENCE_MS : WARM_CADENCE_MS)
+                    : (mediaMtxPulling ? HOT_CADENCE_MS : INTERNAL_ONDEMAND_IDLE_CADENCE_MS);
+            state.tier = cadence === HOT_CADENCE_MS ? 'hot' : cadence === WARM_CADENCE_MS ? 'warm' : cadence === INTERNAL_ONDEMAND_IDLE_CADENCE_MS ? 'idle' : 'cold';
+            return cadence;
         }
 
         if ((deliveryProfile.classification === 'external_jsmpeg' || deliveryProfile.classification === 'external_custom_ws')
