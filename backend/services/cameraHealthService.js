@@ -74,10 +74,12 @@ const DOMAIN_BACKOFF_BASE_MS = 60 * 1000;
 const DOMAIN_BACKOFF_MAX_MS = 10 * 60 * 1000;
 const HEALTH_LOOP_FLOOR_MS = 5 * 1000;
 const HEALTH_LOOP_CEIL_MS = 30 * 1000;
-// Fast-lane cadence for INTERNAL (MediaMTX-pulled) cameras — our own devices, cheap to check because
-// a healthy one is answered from MediaMTX's already-fetched path state, not a per-camera probe. Kept
-// separate from the slow external sweep so a customer's modem dying is caught in seconds, not the
-// ~2.4-min shared sweep meant to spare ~700 third-party public feeds.
+// Fast-lane TICK for INTERNAL (delivery_type='internal_hls') cameras — our own devices. This is how
+// OFTEN the lane wakes, NOT how often each camera is probed: it honours per-camera nextCheckAt (a
+// MediaMTX-backed healthy camera resolves from path state; an ordinary internal RTSP feed rides its
+// normal cadence, so hundreds are not hammered). Decoupled from the slow external sweep so a failing
+// internal camera is picked up within ~15s of becoming due instead of waiting out the ~2.4-min sweep
+// that is deliberately throttled to spare ~700 third-party public feeds.
 const HEALTH_INTERNAL_FAST_MS = 15 * 1000;
 // Minimum elapsed time before the MediaMTX byte-delta baseline (prevPathBytes) is ADVANCED. With
 // two lanes now calling getActivePaths concurrently, a wholesale "prev = current each call" made the
@@ -2488,9 +2490,11 @@ class CameraHealthService {
             const dueCameraIds = candidateCameras.filter((camera) => {
                 const laneScope = camera.delivery_type === 'internal_hls' ? 'internal' : 'external';
                 if (scope !== 'all' && laneScope !== scope) return false;
-                // The internal fast lane probes ALL its cameras every ~15s tick (a healthy one costs
-                // only a MediaMTX state read); the external sweep honours per-camera nextCheckAt.
-                if (scope === 'internal') return true;
+                // BOTH lanes honour per-camera nextCheckAt — the fast lane is a fast TICK (15s), not a
+                // "probe everything each tick": most internal cameras are ordinary RTSP feeds that a
+                // 15s re-probe would HAMMER (there are hundreds, not a handful of MediaMTX paths). The
+                // 15s tick just picks up whatever is DUE quickly, so a failing internal camera (hot 20s
+                // cadence) is caught within ~20s while a healthy one rides its normal warm cadence.
                 const state = this.healthState.get(camera.id);
                 return !state.nextCheckAt || state.nextCheckAt <= now;
             }).map((camera) => camera.id);
