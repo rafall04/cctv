@@ -8,6 +8,12 @@
 
 import { describe, expect, it, vi } from 'vitest';
 import { join } from 'path';
+// Import the thresholds from the service (source of truth) so this test never goes stale again when
+// the emergency-disk limits change — they were raised 2→8GB (trigger) / 2→12GB (target) in 4d2ba7c.
+import {
+    EMERGENCY_DISK_THRESHOLD_BYTES,
+    EMERGENCY_DISK_TARGET_BYTES,
+} from '../services/recordingEmergencyDiskService.js';
 
 function createService(overrides = {}) {
     const cleanupService = {
@@ -55,7 +61,8 @@ function createService(overrides = {}) {
 describe('recordingEmergencyDiskService', () => {
     it('skips cleanup when disk space is above threshold', async () => {
         const { createRecordingEmergencyDiskService } = await import('../services/recordingEmergencyDiskService.js');
-        const diskSpaceService = { getFreeBytes: vi.fn(async () => 3 * 1024 * 1024 * 1024) };
+        // 1 GB ABOVE the trigger, whatever the trigger is → guaranteed to skip.
+        const diskSpaceService = { getFreeBytes: vi.fn(async () => EMERGENCY_DISK_THRESHOLD_BYTES + 1024 * 1024 * 1024) };
         const { serviceOptions, cleanupService } = createService({ diskSpaceService });
         const service = createRecordingEmergencyDiskService(serviceOptions);
 
@@ -75,7 +82,7 @@ describe('recordingEmergencyDiskService', () => {
 
         expect(cleanupService.emergencyCleanup).toHaveBeenCalledWith(expect.objectContaining({
             freeBytes: 100,
-            targetFreeBytes: 2 * 1024 * 1024 * 1024,
+            targetFreeBytes: EMERGENCY_DISK_TARGET_BYTES,
             batchLimit: 200,
             allowRetentionBypass: true,
         }));
