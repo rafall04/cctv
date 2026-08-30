@@ -22,6 +22,24 @@ const PARTIAL_RETRY_REASONS = new Set([
     'finalize_failed',
 ]);
 
+// A final-orphan is quarantined (moved to .quarantine/, hidden from playback/archive/retention
+// forever) ONLY when the failure reason is genuine file corruption — i.e. the probe RAN and judged
+// the file bad: a validation verdict ('*invalid_duration'), ffmpeg's 'Invalid data found', or a
+// non-writable 'moov atom not found' corpse. When the probe COULD NOT RUN — an ffprobe/exec TIMEOUT
+// under load (its message is "Command failed" without a corruption line), spawn EAGAIN, an ENOENT
+// race — the reason matches none of these and is treated as TRANSIENT: a valid segment must not be
+// buried after 3 unlucky attempts.
+const GENUINE_CORRUPTION_REASONS = new Set([
+    'invalid_duration',
+    'remux_invalid_duration',
+    'final_invalid_duration',
+]);
+const GENUINE_CORRUPTION_PATTERN = /moov atom not found|invalid data found/i;
+function isGenuineCorruption(reason) {
+    const text = String(reason || '');
+    return GENUINE_CORRUPTION_REASONS.has(text) || GENUINE_CORRUPTION_PATTERN.test(text);
+}
+
 export function computeRetryDelayMs(attemptCount = 0) {
     const normalizedAttempt = Math.max(0, Number(attemptCount) || 0);
     const exponent = Math.min(normalizedAttempt, 5);
@@ -91,10 +109,21 @@ export function decideRecoveryRetry({
     }
 
     if (Number(attemptCount || 0) >= maxAttempts) {
+        // Quarantine ONLY genuine corruption. A transient failure (timeout/EAGAIN/ENOENT) goes dormant
+        // instead — file untouched in place, stops re-enqueuing — so a valid segment is never silently
+        // buried in .quarantine after 3 unlucky attempts, and a later/manual recovery can still find it.
+        if (isGenuineCorruption(reason)) {
+            return {
+                action: 'terminal_quarantine',
+                shouldCountAttempt: true,
+                shouldQuarantine: true,
+                nextRetryAtMs: null,
+            };
+        }
         return {
-            action: 'terminal_quarantine',
-            shouldCountAttempt: true,
-            shouldQuarantine: true,
+            action: 'retain_dormant',
+            shouldCountAttempt: false,
+            shouldQuarantine: false,
             nextRetryAtMs: null,
         };
     }

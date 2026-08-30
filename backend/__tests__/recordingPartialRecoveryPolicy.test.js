@@ -93,6 +93,27 @@ describe('recordingPartialRecoveryPolicy', () => {
             shouldQuarantine: true,
         });
     });
+
+    it('does NOT quarantine a non-partial on a TRANSIENT reason (probe timeout) — dormant, keeps file', () => {
+        // The bug: an ffprobe/exec TIMEOUT under load was counted as corruption, burying a VALID final
+        // orphan in .quarantine after 3 unlucky attempts. A transient reason (probe could not run) must
+        // retain the file dormant, never quarantine.
+        const decision = decideRecoveryRetry({
+            sourceType: 'final_orphan',
+            reason: 'Command failed: ffprobe -v error -show_entries format=duration ... (timed out)',
+            attemptCount: 3, maxAttempts: 3, nowMs,
+        });
+        expect(decision.action).toBe('retain_dormant');
+        expect(decision.shouldQuarantine).toBe(false); // valid footage MUST survive
+        expect(decision.nextRetryAtMs).toBeNull();
+    });
+
+    it('still quarantines a non-partial on GENUINE corruption (moov atom / Invalid data)', () => {
+        for (const reason of ['moov atom not found', 'ffprobe: Invalid data found when processing input']) {
+            const d = decideRecoveryRetry({ sourceType: 'final_orphan', reason, attemptCount: 3, maxAttempts: 3, nowMs });
+            expect(d.shouldQuarantine, reason).toBe(true);
+        }
+    });
 });
 
 describe('decideRecoveryRetry — dormancy cap for partials', () => {
