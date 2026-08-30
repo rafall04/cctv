@@ -52,9 +52,15 @@ export function storedLocalDate(stored) {
     return s.slice(0, 10);
 }
 
-/** Idempotency key for one subscription's charge on one local day. */
-export function chargeReference(subscriptionId, dateString) {
-    return `charge:${subscriptionId}:${dateString}`;
+/**
+ * Idempotency key for one owner's charge on one subscription on one local day. The owner id is part
+ * of the key so that a camera reassigned to a NEW owner on the same day (the subscription row — and
+ * its id — is reused, because camera_subscriptions is UNIQUE per camera) does not collide with the
+ * previous holder's same-day charge and hand the new owner a silent free first day. Per-day
+ * idempotency for a stable owner is unchanged: same owner + sub + day → same key.
+ */
+export function chargeReference(subscriptionId, dateString, userId) {
+    return `charge:${subscriptionId}:${userId}:${dateString}`;
 }
 
 /**

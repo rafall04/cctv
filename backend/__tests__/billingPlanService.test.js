@@ -407,8 +407,8 @@ describe('billingPlanService', () => {
             db.prepare(`INSERT INTO camera_subscriptions (id, camera_id, user_id, monthly_price, status, last_charged_date)
                         VALUES (55, 7, 42, 25000, 'active', ?)`).run(today);
             walletService.credit({ userId: 42, amount: 25000 }); // ~1 month of hemat (gate)
-            // Today's real charge already taken at the old price (reference = charge:{subId}:{date}).
-            walletService.chargeOnce({ userId: 42, amount: 833, reference: `charge:55:${today}`, note: 'old price' });
+            // Today's real charge already taken at the old price (ref = charge:{subId}:{ownerId}:{date}).
+            walletService.chargeOnce({ userId: 42, amount: 833, reference: `charge:55:42:${today}`, note: 'old price' });
             expect(walletService.getBalance(42)).toBe(25000 - 833);
 
             billingPlanService.changeUserPlan(42, 'hemat'); // 20000

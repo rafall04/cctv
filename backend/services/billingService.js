@@ -18,8 +18,8 @@
  *   subscription.status 'cancelled' → admin termination; never auto-resumes. Camera stays
  *                                     billing-suspended until the admin re-assigns or reclasses.
  *
- * Idempotency: charges are keyed `charge:{subscriptionId}:{YYYY-MM-DD}` (server-local date,
- * Asia/Jakarta by default) and the DB has a partial UNIQUE index on that reference, so the
+ * Idempotency: charges are keyed `charge:{subscriptionId}:{ownerId}:{YYYY-MM-DD}` (server-local
+ * date, Asia/Jakarta by default) and the DB has a partial UNIQUE index on that reference, so the
  * hourly tick, restarts, and topup-triggered resume can never double-charge a day.
  */
 
@@ -181,13 +181,20 @@ class BillingService {
         const existing = queryOne('SELECT * FROM camera_subscriptions WHERE camera_id = ?', [cameraId]);
         let subscriptionId;
         if (existing) {
+            // Handover to a DIFFERENT owner clears last_charged_date so the new owner's day-one
+            // charge is not short-circuited by the prior holder's "already charged today". Combined
+            // with the per-owner chargeReference, the new owner actually pays their first day instead
+            // of riding a free day billed to whoever held the camera earlier. Same-owner re-assign
+            // keeps last_charged_date (no free day, no double charge).
+            const handover = existing.user_id !== userId;
             execute(
                 `UPDATE camera_subscriptions
                  SET user_id = ?, monthly_price = ?, status = 'active',
-                     activated_at = CURRENT_TIMESTAMP, suspended_at = NULL,
-                     suspend_reason = NULL, updated_at = CURRENT_TIMESTAMP
+                     activated_at = CURRENT_TIMESTAMP, suspended_at = NULL, suspend_reason = NULL,
+                     last_charged_date = CASE WHEN ? = 1 THEN NULL ELSE last_charged_date END,
+                     updated_at = CURRENT_TIMESTAMP
                  WHERE id = ?`,
-                [userId, price, existing.id]
+                [userId, price, handover ? 1 : 0, existing.id]
             );
             subscriptionId = existing.id;
         } else {
@@ -458,7 +465,7 @@ class BillingService {
             const result = walletService.chargeOnce({
                 userId: subscription.user_id,
                 amount: daily,
-                reference: chargeReference(subscription.id, today),
+                reference: chargeReference(subscription.id, today, subscription.user_id),
                 note: `Biaya harian kamera #${subscription.camera_id}`,
             });
 
@@ -605,7 +612,7 @@ class BillingService {
      * switching onto a paid plan cannot ride a trial/already-marked day for free: a
      * 0-balance account is suspended on the spot (stream → 402), not next tick.
      *
-     * Idempotent per local day: chargeOnce keys on `charge:{subId}:{date}`, so a day
+     * Idempotent per local day: chargeOnce keys on `charge:{subId}:{ownerId}:{date}`, so a day
      * already genuinely paid is a no-op (the sub stays active, no double charge); only a
      * day that was free/unbilled (trial day) actually deducts on the switch to a paid plan.
      */
@@ -788,6 +795,17 @@ class BillingService {
         }
         this._running = true;
         try {
+            // Integrity sweep EVERY tick, not only at boot: a customer deleted while the server is
+            // up leaves an orphaned subscriber camera public and billing a ghost wallet until the
+            // next reboot. Heal BEFORE charging so that camera is unpublished/suspended, not billed.
+            try {
+                const healed = this.healOrphanedSubscriberCameras();
+                if (healed.healed > 0) {
+                    console.warn(`[Billing] Tick integrity: healed ${healed.healed} orphaned subscriber camera(s): ${healed.cameraIds.join(', ')}`);
+                }
+            } catch (error) {
+                console.error('[Billing] Tick orphan heal failed:', error.message);
+            }
             this.runDailyCharges();
         } catch (error) {
             console.error('[Billing] Scheduler tick failed:', error.message);

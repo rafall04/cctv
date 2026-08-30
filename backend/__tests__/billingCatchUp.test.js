@@ -35,6 +35,7 @@ vi.mock('../services/timezoneService.js', () => ({ getTimezone: () => 'Asia/Jaka
 vi.mock('../services/securityAuditLogger.js', () => ({ logAdminAction: vi.fn() }));
 
 const { default: billingService, localDateString, billableDaysThrough } = await import('../services/billingService.js');
+const { chargeReference } = await import('../services/billingCalc.js');
 
 const HARI_INI = localDateString();
 const daysAgo = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return localDateString(d); };
@@ -61,7 +62,7 @@ beforeEach(() => {
     db.exec('CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT)');
 
     db.exec("INSERT INTO billing_plans (id, key, name, is_trial) VALUES (1, 'hemat', 'Hemat', 0)");
-    db.exec("INSERT INTO users (id, username, role, plan_id) VALUES (1, 'budi', 'customer', 1)");
+    db.exec("INSERT INTO users (id, username, role, plan_id) VALUES (1, 'budi', 'customer', 1), (2, 'siti', 'customer', 1)");
     db.exec("INSERT INTO cameras (id, name, billing_status) VALUES (10, 'Kamera Budi', 'active')");
     db.exec("INSERT INTO settings (key, value) VALUES ('billing_skip_offline_days', 'true')");
     // Camera online today → online on/after every gap day, so the whole gap is billable.
@@ -115,5 +116,39 @@ describe('runDailyCharges menagih hari yang terlewat', () => {
         expect(chargeOnceMock).not.toHaveBeenCalled();
         expect(sub().status).toBe('active');        // outage bukan alasan suspend
         expect(sub().last_charged_date).toBe(HARI_INI); // hari ditandai supaya tak dicoba tiap menit
+    });
+});
+
+describe('chargeReference per-owner (#9/#15)', () => {
+    it('kunci menyertakan owner: owner beda pada sub id yang sama TIDAK tabrakan', () => {
+        expect(chargeReference(1, '2026-08-30', 1)).toBe('charge:1:1:2026-08-30');
+        expect(chargeReference(1, '2026-08-30', 2)).not.toBe(chargeReference(1, '2026-08-30', 1));
+        // Idempotensi owner stabil: hari sama → kunci sama.
+        expect(chargeReference(1, '2026-08-30', 1)).toBe(chargeReference(1, '2026-08-30', 1));
+    });
+
+    it('handover hari-sama menagih owner BARU (tak tabrakan dgn ref owner lama)', () => {
+        // Owner lama (user 1) sudah ditagih hari ini pada sub id 1.
+        db.prepare("UPDATE camera_subscriptions SET last_charged_date = ? WHERE id = 1").run(HARI_INI);
+        chargeOnceMock({ reference: chargeReference(1, HARI_INI, 1) }); // rekam ref owner lama di `seen`
+        chargeOnceMock.mockClear();
+
+        // Handover: sub id 1 dipakai ulang untuk owner baru (user 2), last_charged_date dibersihkan.
+        const s = db.prepare('SELECT * FROM camera_subscriptions WHERE id = 1').get();
+        const outcome = billingService._chargeAndSync({ ...s, user_id: 2, last_charged_date: null }, HARI_INI);
+
+        expect(outcome.charged).toBe(true); // ref charge:1:2:today BEDA → benar-benar menagih
+        expect(chargeOnceMock).toHaveBeenCalledTimes(1);
+        expect(chargeOnceMock.mock.calls[0][0].reference).toBe(`charge:1:2:${HARI_INI}`);
+    });
+});
+
+describe('orphan heal tiap tick (#7)', () => {
+    it('_safeTick menjalankan healOrphanedSubscriberCameras, bukan cuma saat boot', () => {
+        const spy = vi.spyOn(billingService, 'healOrphanedSubscriberCameras')
+            .mockReturnValue({ healed: 0, cameraIds: [] });
+        billingService._safeTick();
+        expect(spy).toHaveBeenCalledTimes(1);
+        spy.mockRestore();
     });
 });
