@@ -334,5 +334,29 @@ describe('recordingHealthDashboardService.getSnapshot — real SQLite', () => {
         expect(snap.status.level).toBe('ok');
         expect(snap.status.reasons).toEqual([]);
         expect(snap.integrity.liveButNoRecentSegments).toBe(0);
+        expect(snap.integrity.restartingButNoSegments).toBe(0); // has a segment → not a silent loop
+    });
+
+    it('flags a SLOW restart-loop with zero segments even when last_recording_start is always fresh (fix #8)', () => {
+        const db = makeDb();
+        // Camera restarting within the hour: last_recording_start is only 5 min old (FRESH < 1h), so
+        // the stale detector (last_recording_start <= now-1h) NEVER fires — the exact blind spot. But
+        // it restarted inside the window and produced ZERO completed segments → silent footage loss.
+        db.exec(`
+            INSERT INTO cameras (id, enabled, enable_recording, is_online, recording_status, last_recording_start) VALUES
+                (7, 1, 1, 1, 'recording', '${iso(5 * 60 * 1000)}');
+            INSERT INTO recording_process_state (camera_id, status, pid) VALUES (7, 'recording', 777);
+        `);
+        const ins = db.prepare('INSERT INTO restart_logs (camera_id, reason, restart_time, success) VALUES (?, ?, ?, ?)');
+        ins.run(7, 'stream_frozen', iso(5 * 60 * 1000), 1);   // restarted 5 min ago (in window)
+        ins.run(7, 'stream_frozen', iso(45 * 60 * 1000), 1);  // and 45 min ago (in window)
+        // NO recording_segments for camera 7 → the silent loop.
+
+        const snap = serviceFor(db).getSnapshot(NOW_MS);
+
+        expect(snap.integrity.liveButNoRecentSegments).toBe(0);  // stale detector MISSES it (fresh start)
+        expect(snap.integrity.restartingButNoSegments).toBe(1);  // new detector CATCHES it
+        expect(snap.status.level).toBe('warning');
+        expect(snap.status.reasons.join(' ')).toContain('restart-loop');
     });
 });

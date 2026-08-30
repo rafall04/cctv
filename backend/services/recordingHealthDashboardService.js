@@ -218,9 +218,29 @@ export function createRecordingHealthDashboardService({
                )`,
             [cutoffIso, cutoffIso]
         ) || { count: 0 };
+        // Companion detector for the SLOW restart-loop that the stale query above cannot see:
+        // startRecording rewrites last_recording_start=now on every (re)start, so a camera restarting
+        // more often than hourly keeps last_recording_start perpetually fresh (< cutoff), never trips
+        // `last_recording_start <= cutoff`, and stays green while losing footage for hours. Gate on
+        // RESTART ACTIVITY (restart_logs, which last_recording_start cannot mask) + zero completed
+        // segments in the same window. restart_time is an ISO string, so bind the same ISO cutoff.
+        const restartLoopRow = queryOneFn(
+            `SELECT COUNT(*) AS count FROM cameras c
+             WHERE c.enabled = 1 AND c.enable_recording = 1 AND c.is_online = 1
+               AND EXISTS (
+                   SELECT 1 FROM restart_logs r
+                   WHERE r.camera_id = c.id AND r.restart_time >= ?
+               )
+               AND NOT EXISTS (
+                   SELECT 1 FROM recording_segments s
+                   WHERE s.camera_id = c.id AND s.start_time >= ?
+               )`,
+            [cutoffIso, cutoffIso]
+        ) || { count: 0 };
         return {
             expectedRecording: expectedRow.count || 0,
             liveButNoRecentSegments: staleRow.count || 0,
+            restartingButNoSegments: restartLoopRow.count || 0,
             windowMinutes: Math.round(RECORDING_STALE_SEGMENT_WINDOW_MS / 60000),
         };
     }
@@ -298,6 +318,14 @@ export function createRecordingHealthDashboardService({
         if (liveButSilent > 0) {
             if (level === 'ok') level = 'warning';
             reasons.push(`${liveButSilent} live camera(s) enabled for recording but producing no segments (last ${integritySection.windowMinutes}m)`);
+        }
+
+        // Slow restart-loop producing nothing — invisible to liveButSilent because each restart keeps
+        // last_recording_start fresh. Caught here via restart activity + zero completed segments.
+        const restartingButSilent = integritySection?.restartingButNoSegments || 0;
+        if (restartingButSilent > 0) {
+            if (level === 'ok') level = 'warning';
+            reasons.push(`${restartingButSilent} camera(s) restarting but producing no segments (restart-loop, last ${integritySection.windowMinutes}m)`);
         }
 
         return { level, reasons };
