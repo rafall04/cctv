@@ -29,9 +29,9 @@ import cameraService from './cameraService.js';
 import { invalidateCameraAccessCache } from './cameraAccessService.js';
 import settingsService from './settingsService.js';
 import { logAdminAction } from './securityAuditLogger.js';
-import { dailyCostOf, localDateString, storedLocalDate, chargeReference } from './billingCalc.js';
+import { dailyCostOf, localDateString, storedLocalDate, chargeReference, billableDaysThrough } from './billingCalc.js';
 // Re-exported so existing `import { … } from './billingService.js'` call sites keep working.
-export { dailyCostOf, localDateString, storedLocalDate };
+export { dailyCostOf, localDateString, storedLocalDate, billableDaysThrough };
 
 const HOURLY_TICK_MS = 60 * 60 * 1000;
 const INITIAL_TICK_DELAY_MS = 20 * 1000;
@@ -376,17 +376,21 @@ class BillingService {
     // ------------------------------------------------------------------
 
     /**
-     * Did this camera work at all on the billing day?
+     * Was this camera online on `day` OR LATER? (i.e. did it deliver the service on/after that day.)
      *
      * Answered from camera_runtime_state.last_online_at, which is stamped only while the camera is
      * actually up. Deliberately NOT from `is_online`: the daily charge runs at one arbitrary
      * moment, so a snapshot would give a free day to a camera that was up for 23 hours and blinked
      * at the wrong second, and bill one that has been dead since morning but answered once just now.
      *
-     * A camera with no record at all has never been seen online, and never delivered the service —
-     * so it counts as not working, not as working-by-default.
+     * `>=`, not `==`: identical for the current day (no online-in-the-future), but for a CATCH-UP
+     * day in a missed gap it charges every gap day up to the last-online date and skips only the
+     * dark tail — the closest honest answer with a single last_online_at, not a per-day log.
+     *
+     * A camera with no record has never been seen online, so it counts as not working, not as
+     * working-by-default.
      */
-    _bekerjaHariIni(cameraId, today) {
+    _bekerjaHariIni(cameraId, day) {
         let row;
         try {
             row = queryOne(
@@ -394,20 +398,16 @@ class BillingService {
                 [cameraId]
             );
         } catch {
-            /*
-             * No health table or column at all (a fresh DB, or migrations not yet run). Then
-             * "did this camera work today" is not merely false, it is UNKNOWABLE — and answering
-             * "it did not" would make every subscription free for as long as the schema stayed
-             * behind, silently. Unknown therefore falls back to charging, which an operator
-             * notices and can refund; the opposite failure hides itself.
-             */
+            // No health table/column (fresh DB, migrations behind). "Did it work" is UNKNOWABLE, not
+            // false — answering "no" would silently free every sub. Unknown falls back to charging
+            // (an operator notices and refunds); the opposite failure hides itself.
             return true;
         }
         if (!row?.last_online_at) return false;
-        // Both sides are compared as local calendar days, the same unit last_charged_date uses.
-        // storedLocalDate reads last_online_at's local date WITHOUT an OS-tz round-trip (the stored
-        // value is already a local wall-clock), so this no longer skips the charge on a non-WIB host.
-        return storedLocalDate(row.last_online_at) === today;
+        // Compared as local calendar days (the unit last_charged_date uses). storedLocalDate reads
+        // last_online_at's local date WITHOUT an OS-tz round-trip (it is already a local wall-clock),
+        // so this no longer skips the charge on a non-WIB host. Lexicographic >= == chronological.
+        return storedLocalDate(row.last_online_at) >= day;
     }
 
     /** Charge `subscription` for `today` if unbilled, then sync subscription + camera to the outcome. */
@@ -424,9 +424,8 @@ class BillingService {
             return { status: 'active', charged: false };
         }
 
-        // Trial gate: while the owner's trial is running, the day is free; once it
-        // has expired the subscription suspends until the user picks a paid plan
-        // (plan switch reprices and resumes through this same path).
+        // Trial gate: a running trial is free; an expired trial suspends until the user picks a paid
+        // plan (the plan switch reprices and resumes through this same path).
         const trial = this._getOwnerTrialState(subscription.user_id);
         if (trial.onTrialPlan) {
             if (trial.active) {
@@ -444,14 +443,11 @@ class BillingService {
         }
 
         /*
-         * A camera that never came up today delivered nothing, so the day is not charged. The
-         * subscription stays ACTIVE — the outage is usually the customer's internet, not a reason
-         * to suspend them — it simply costs nothing.
-         *
-         * Switchable from the panel because it is a commercial choice, not a technical one: some
-         * operators sell availability (you pay for the slot being reserved) rather than delivery.
-         * The default is not to charge, because billing for a service that produced no video is
-         * exactly what a customer would call being cheated.
+         * A camera that never came up on `today` delivered nothing, so the day is not charged; the
+         * subscription stays ACTIVE (an outage is usually the customer's internet, not grounds to
+         * suspend). Panel-switchable because it is a commercial choice — some operators sell the
+         * reserved slot rather than delivery — but the default is not to charge, since billing for a
+         * service that produced no video is exactly what a customer would call being cheated.
          */
         if (settingsService.getBillingSkipOfflineDays() && !this._bekerjaHariIni(subscription.camera_id, today)) {
             this._markActiveWithoutCharge(subscription, today);
@@ -553,13 +549,19 @@ class BillingService {
             [today]
         );
 
-        const summary = { date: today, processed: 0, charged: 0, suspended: 0, errors: 0 };
+        const summary = { date: today, processed: 0, charged: 0, suspended: 0, errors: 0, caughtUp: 0 };
         for (const subscription of due) {
             summary.processed += 1;
             try {
-                const outcome = this._chargeAndSync(subscription, today);
-                if (outcome.charged) summary.charged += 1;
-                if (outcome.status === 'suspended') summary.suspended += 1;
+                // Bill EVERY day missed since last_charged_date, not just today — a process down
+                // across a midnight used to leave that day permanently free. Bounded + idempotent.
+                const days = billableDaysThrough(subscription.last_charged_date, today);
+                if (days.length > 1) summary.caughtUp += 1;
+                for (const day of days) {
+                    const outcome = this._chargeAndSync(subscription, day);
+                    if (outcome.charged) summary.charged += 1;
+                    if (outcome.status === 'suspended') { summary.suspended += 1; break; } // broke mid-gap → resume later
+                }
             } catch (error) {
                 summary.errors += 1;
                 console.error(`[Billing] Charge failed for subscription ${subscription.id}:`, error.message);
@@ -567,7 +569,8 @@ class BillingService {
         }
 
         if (summary.processed > 0) {
-            console.log(`[Billing] Daily charges ${today}: processed=${summary.processed} charged=${summary.charged} suspended=${summary.suspended} errors=${summary.errors}`);
+            const gap = summary.caughtUp > 0 ? ` caughtUp=${summary.caughtUp}` : '';
+            console.log(`[Billing] Daily charges ${today}: processed=${summary.processed} charged=${summary.charged} suspended=${summary.suspended} errors=${summary.errors}${gap}`);
         }
         return summary;
     }
