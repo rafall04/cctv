@@ -43,7 +43,7 @@ vi.mock('../services/cameraAccessService.js', () => ({ invalidateCameraAccessCac
 vi.mock('../services/timezoneService.js', () => ({ getTimezone: () => 'Asia/Jakarta' }));
 vi.mock('../services/securityAuditLogger.js', () => ({ logAdminAction: vi.fn() }));
 
-const { default: billingService, localDateString } = await import('../services/billingService.js');
+const { default: billingService, localDateString, storedLocalDate } = await import('../services/billingService.js');
 
 const HARI_INI = localDateString();
 const kemarin = () => {
@@ -68,8 +68,8 @@ beforeEach(() => {
     db.exec("CREATE TABLE billing_plans (id INTEGER PRIMARY KEY, key TEXT, name TEXT, is_trial INTEGER DEFAULT 0, trial_days INTEGER)");
     db.exec('CREATE TABLE cameras (id INTEGER PRIMARY KEY, name TEXT, billing_status TEXT, updated_at TEXT)');
     db.exec(`CREATE TABLE camera_subscriptions (id INTEGER PRIMARY KEY AUTOINCREMENT, camera_id INTEGER,
-             user_id INTEGER, monthly_price INTEGER, status TEXT, activated_at TEXT, suspended_at TEXT,
-             last_charged_date TEXT, updated_at TEXT)`);
+             user_id INTEGER, monthly_price INTEGER, status TEXT, suspend_reason TEXT, activated_at TEXT,
+             suspended_at TEXT, last_charged_date TEXT, updated_at TEXT)`);
     db.exec('CREATE TABLE camera_runtime_state (camera_id INTEGER PRIMARY KEY, is_online INTEGER, last_online_at TEXT)');
     db.exec('CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT)');
 
@@ -89,6 +89,23 @@ describe('hari yang kameranya tidak pernah hidup tidak ditagih', () => {
         expect(hasil.charged).toBe(true);
         expect(chargeOnceMock).toHaveBeenCalledTimes(1);
         expect(chargeOnceMock.mock.calls[0][0].amount).toBe(1000); // 30.000 / 30
+    });
+
+    it('FORMAT PROD wall-clock WIB (sore hari ini) → tetap ditagih — bug host non-WIB tertutup', () => {
+        // getTimestamp() menyimpan wall-clock WIB offset-less 'YYYY-MM-DD HH:MM:SS'. Dulu new Date() atas
+        // string ini di-parse sebagai OS-local (UTC di cloud) lalu di-reproyeksi ke WIB (+7 jam) → hari
+        // GESER → offline-skip → charge dilewati diam-diam. Kini tanggalnya diambil dari string apa adanya.
+        setOnlineAt(`${HARI_INI} 20:30:00`);
+        const hasil = billingService._chargeAndSync(langganan(), HARI_INI);
+        expect(hasil.charged).toBe(true);
+        expect(chargeOnceMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('storedLocalDate: wall-clock offset-less dibaca apa adanya (tanpa OS-tz), ISO diproyeksi ke tz', () => {
+        expect(storedLocalDate('2026-08-29 20:30:00')).toBe('2026-08-29'); // wall-clock WIB → slice
+        expect(storedLocalDate('')).toBe('');
+        // ISO-Z = instant UTC → diproyeksi ke Asia/Jakarta: 23:30Z = 06:30 WIB keesokan hari.
+        expect(storedLocalDate('2026-08-29T23:30:00.000Z')).toBe('2026-08-30');
     });
 
     it('kamera terakhir hidup kemarin → hari ini tidak ditagih, langganan TETAP aktif', () => {

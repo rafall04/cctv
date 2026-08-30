@@ -345,12 +345,23 @@ class BillingPlanService {
             [plan.id, trialEndsAt, plan.is_trial ? 1 : 0, userId]
         );
 
-        // Reprice every live subscription to the new plan's per-camera price.
+        // Reprice every live subscription to the new plan's per-camera price — recording cameras
+        // KEEP their surcharge. A flat `SET monthly_price = price_per_camera` here silently wipes
+        // the recording surcharge off every recording camera on a plan switch while the catalog
+        // still advertises (and the daily charge still expects) it — the exact undercharge
+        // `repriceSubscriptionsForPlan()` was written to kill. Mirror its CASE, scoped to this user.
         execute(
             `UPDATE camera_subscriptions
-             SET monthly_price = ?, updated_at = CURRENT_TIMESTAMP
+             SET monthly_price = (
+                     SELECT p.price_per_camera
+                            + CASE WHEN COALESCE(c.enable_recording, 0) = 1
+                                   THEN COALESCE(p.recording_price_per_camera, 0) ELSE 0 END
+                     FROM cameras c, billing_plans p
+                     WHERE c.id = camera_subscriptions.camera_id AND p.id = ?
+                 ),
+                 updated_at = CURRENT_TIMESTAMP
              WHERE user_id = ? AND status != 'cancelled'`,
-            [plan.price_per_camera, userId]
+            [plan.id, userId]
         );
 
         // Re-bill TODAY at the new price so "active" always means "paid for today":

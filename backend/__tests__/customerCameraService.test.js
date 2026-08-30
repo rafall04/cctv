@@ -123,6 +123,7 @@ function seedSchema() {
             user_id INTEGER NOT NULL,
             monthly_price INTEGER NOT NULL,
             status TEXT NOT NULL DEFAULT 'active',
+            suspend_reason TEXT,
             activated_at TEXT, suspended_at TEXT, last_charged_date TEXT,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP, updated_at TEXT DEFAULT CURRENT_TIMESTAMP
         );

@@ -78,7 +78,7 @@ beforeEach(() => {
     )`);
     db.exec(`CREATE TABLE camera_subscriptions (
         id INTEGER PRIMARY KEY AUTOINCREMENT, camera_id INTEGER, user_id INTEGER,
-        monthly_price INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'active',
+        monthly_price INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'active', suspend_reason TEXT,
         activated_at TEXT, suspended_at TEXT, last_charged_date TEXT,
         created_at TEXT, updated_at TEXT
     )`);

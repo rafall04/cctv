@@ -9,8 +9,12 @@
  *
  * State model:
  *   subscription.status 'active'    → charged daily, camera.billing_status 'active'.
- *   subscription.status 'suspended' → balance ran out (or admin paused); auto-resumes (with an
- *                                     immediate charge) as soon as the wallet covers a day.
+ *   subscription.status 'suspended' → suspend_reason tells the two apart:
+ *       · 'balance' (or NULL/legacy) → balance ran out (or trial expired); auto-resumes with an
+ *                                       immediate charge as soon as the wallet covers a day.
+ *       · 'admin'                    → operator hold (Suspend button). NEVER auto-resumes on a
+ *                                       tick, top-up, or plan switch; only an explicit admin
+ *                                       re-activation lifts it (see _chargeAndSync `force`).
  *   subscription.status 'cancelled' → admin termination; never auto-resumes. Camera stays
  *                                     billing-suspended until the admin re-assigns or reclasses.
  *
@@ -23,38 +27,14 @@ import { query, queryOne, execute } from '../database/connectionPool.js';
 import walletService from './walletService.js';
 import cameraService from './cameraService.js';
 import { invalidateCameraAccessCache } from './cameraAccessService.js';
-import { getTimezone } from './timezoneService.js';
 import settingsService from './settingsService.js';
 import { logAdminAction } from './securityAuditLogger.js';
+import { dailyCostOf, localDateString, storedLocalDate, chargeReference } from './billingCalc.js';
+// Re-exported so existing `import { … } from './billingService.js'` call sites keep working.
+export { dailyCostOf, localDateString, storedLocalDate };
 
 const HOURLY_TICK_MS = 60 * 60 * 1000;
 const INITIAL_TICK_DELAY_MS = 20 * 1000;
-
-export function dailyCostOf(monthlyPrice) {
-    if (!monthlyPrice || monthlyPrice <= 0) {
-        return 0; // free (trial/admin-free) subscriptions never touch the wallet
-    }
-    return Math.max(1, Math.round(monthlyPrice / 30));
-}
-
-export function localDateString(now = new Date()) {
-    let timeZone;
-    try {
-        timeZone = getTimezone() || 'Asia/Jakarta';
-    } catch {
-        timeZone = 'Asia/Jakarta';
-    }
-    try {
-        // en-CA renders as YYYY-MM-DD.
-        return now.toLocaleDateString('en-CA', { timeZone });
-    } catch {
-        return now.toISOString().slice(0, 10);
-    }
-}
-
-function chargeReference(subscriptionId, dateString) {
-    return `charge:${subscriptionId}:${dateString}`;
-}
 
 class BillingService {
     constructor() {
@@ -205,7 +185,7 @@ class BillingService {
                 `UPDATE camera_subscriptions
                  SET user_id = ?, monthly_price = ?, status = 'active',
                      activated_at = CURRENT_TIMESTAMP, suspended_at = NULL,
-                     updated_at = CURRENT_TIMESTAMP
+                     suspend_reason = NULL, updated_at = CURRENT_TIMESTAMP
                  WHERE id = ?`,
                 [userId, price, existing.id]
             );
@@ -281,16 +261,22 @@ class BillingService {
                 throw err;
             }
             if (status === 'active') {
-                // Reactivation runs through the charge path so "active" always
-                // means "paid for today" (or instantly re-suspends when broke).
+                // Reactivation runs through the charge path so "active" always means "paid for
+                // today" (or instantly re-suspends when broke). force:true is the ONLY thing that
+                // lifts an operator's admin hold — this explicit admin action is exactly that.
                 const fresh = queryOne('SELECT * FROM camera_subscriptions WHERE id = ?', [id]);
-                this._chargeAndSync({ ...fresh, status: 'suspended' }, localDateString());
+                this._chargeAndSync({ ...fresh, status: 'suspended' }, localDateString(), { force: true });
             } else {
+                // An operator Suspend is an admin HOLD: it must survive the hourly tick, top-ups and
+                // plan switches, and only lift on an explicit re-activation above. 'cancelled' is
+                // terminal (queries already exclude it), so it needs no reason marker.
+                const reason = status === 'suspended' ? 'admin' : null;
                 execute(
                     `UPDATE camera_subscriptions
-                     SET status = ?, suspended_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                     SET status = ?, suspend_reason = ?, suspended_at = CURRENT_TIMESTAMP,
+                         updated_at = CURRENT_TIMESTAMP
                      WHERE id = ?`,
-                    [status, id]
+                    [status, reason, id]
                 );
                 execute(
                     "UPDATE cameras SET billing_status = 'suspended', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
@@ -419,12 +405,20 @@ class BillingService {
         }
         if (!row?.last_online_at) return false;
         // Both sides are compared as local calendar days, the same unit last_charged_date uses.
-        return localDateString(new Date(row.last_online_at)) === today;
+        // storedLocalDate reads last_online_at's local date WITHOUT an OS-tz round-trip (the stored
+        // value is already a local wall-clock), so this no longer skips the charge on a non-WIB host.
+        return storedLocalDate(row.last_online_at) === today;
     }
 
     /** Charge `subscription` for `today` if unbilled, then sync subscription + camera to the outcome. */
-    _chargeAndSync(subscription, today) {
+    _chargeAndSync(subscription, today, { force = false } = {}) {
         const daily = dailyCostOf(subscription.monthly_price);
+
+        // Admin hold ('suspend_reason'='admin'): only an explicit admin re-activation (force:true)
+        // lifts it; every background path leaves it held and uncharged. See the state-model doc.
+        if (!force && subscription.status === 'suspended' && subscription.suspend_reason === 'admin') {
+            return { status: 'suspended', charged: false, reason: 'admin_hold' };
+        }
 
         if (subscription.last_charged_date === today && subscription.status === 'active') {
             return { status: 'active', charged: false };
@@ -474,7 +468,8 @@ class BillingService {
 
             execute(
                 `UPDATE camera_subscriptions
-                 SET status = 'active', last_charged_date = ?, suspended_at = NULL, updated_at = CURRENT_TIMESTAMP
+                 SET status = 'active', last_charged_date = ?, suspended_at = NULL,
+                     suspend_reason = NULL, updated_at = CURRENT_TIMESTAMP
                  WHERE id = ?`,
                 [today, subscription.id]
             );
@@ -496,7 +491,8 @@ class BillingService {
     _markActiveWithoutCharge(subscription, today) {
         execute(
             `UPDATE camera_subscriptions
-             SET status = 'active', last_charged_date = ?, suspended_at = NULL, updated_at = CURRENT_TIMESTAMP
+             SET status = 'active', last_charged_date = ?, suspended_at = NULL,
+                 suspend_reason = NULL, updated_at = CURRENT_TIMESTAMP
              WHERE id = ?`,
             [today, subscription.id]
         );
@@ -509,9 +505,12 @@ class BillingService {
 
     _suspend(subscription) {
         if (subscription.status !== 'suspended') {
+            // Balance-out (or trial-expired) suspend: auto-resumes once the wallet is funded. Marked
+            // 'balance' so it is NEVER confused with an operator hold ('admin'), which must not resume.
             execute(
                 `UPDATE camera_subscriptions
-                 SET status = 'suspended', suspended_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                 SET status = 'suspended', suspend_reason = 'balance',
+                     suspended_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
                  WHERE id = ?`,
                 [subscription.id]
             );
@@ -549,6 +548,7 @@ class BillingService {
         const due = query(
             `SELECT cs.* FROM camera_subscriptions cs
              WHERE cs.status IN ('active', 'suspended')
+               AND NOT (cs.status = 'suspended' AND cs.suspend_reason = 'admin')
                AND (cs.last_charged_date IS NULL OR cs.last_charged_date < ?)`,
             [today]
         );
@@ -576,7 +576,9 @@ class BillingService {
     tryResumeForUser(userId, now = new Date()) {
         const today = localDateString(now);
         const suspended = query(
-            "SELECT * FROM camera_subscriptions WHERE user_id = ? AND status = 'suspended'",
+            `SELECT * FROM camera_subscriptions
+             WHERE user_id = ? AND status = 'suspended'
+               AND COALESCE(suspend_reason, 'balance') != 'admin'`,
             [userId]
         );
         const resumed = [];

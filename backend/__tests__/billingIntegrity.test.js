@@ -34,7 +34,7 @@ beforeEach(() => {
         DROP TABLE IF EXISTS users;
         CREATE TABLE users (id INTEGER PRIMARY KEY, username TEXT);
         CREATE TABLE cameras (id INTEGER PRIMARY KEY, name TEXT, owner_user_id INTEGER, camera_class TEXT, is_public INTEGER DEFAULT 0, billing_status TEXT, updated_at TEXT);
-        CREATE TABLE camera_subscriptions (id INTEGER PRIMARY KEY AUTOINCREMENT, camera_id INTEGER, user_id INTEGER, monthly_price INTEGER, status TEXT, suspended_at TEXT, updated_at TEXT);
+        CREATE TABLE camera_subscriptions (id INTEGER PRIMARY KEY AUTOINCREMENT, camera_id INTEGER, user_id INTEGER, monthly_price INTEGER, status TEXT, suspend_reason TEXT, suspended_at TEXT, updated_at TEXT);
         INSERT INTO users (id, username) VALUES (42, 'budi');
         -- orphan: owner 999 does NOT exist, but published + active
         INSERT INTO cameras (id, name, owner_user_id, camera_class, is_public, billing_status) VALUES (10, 'Orphan', 999, 'subscriber', 1, 'active');

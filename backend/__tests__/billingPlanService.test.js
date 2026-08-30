@@ -118,6 +118,7 @@ function seedSchema() {
             user_id INTEGER NOT NULL,
             monthly_price INTEGER NOT NULL,
             status TEXT NOT NULL DEFAULT 'active',
+            suspend_reason TEXT,
             activated_at TEXT,
             suspended_at TEXT,
             last_charged_date TEXT,
@@ -319,6 +320,22 @@ describe('billingPlanService', () => {
             expect(sub.status).toBe('active');
             // Day charged at the NEW price (20000/30 ≈ 667).
             expect(walletService.getBalance(42)).toBe(25000 - 667);
+        });
+
+        it('KEEPS the recording surcharge on a plan switch (recording cam pays base + surcharge)', () => {
+            // A plan switch must NOT flatten a recording camera back to base price — the catalog and
+            // the daily charge still expect the surcharge, so a flat reprice silently undercharges
+            // every recording camera. Regression for the flat `SET monthly_price = price_per_camera`.
+            db.prepare('UPDATE billing_plans SET recording_price_per_camera = 9000 WHERE id = 3').run(); // hemat
+            db.prepare("UPDATE cameras SET owner_user_id = 42, camera_class = 'subscriber', billing_status = 'active', enable_recording = 1 WHERE id = 7").run();
+            db.prepare(`INSERT INTO camera_subscriptions (camera_id, user_id, monthly_price, status)
+                        VALUES (7, 42, 0, 'active')`).run();
+            walletService.credit({ userId: 42, amount: 40000 }); // covers ~1 month of 20000 + 9000
+
+            billingPlanService.changeUserPlan(42, 'hemat');
+
+            const sub = db.prepare('SELECT monthly_price FROM camera_subscriptions WHERE camera_id = 7').get();
+            expect(sub.monthly_price).toBe(29000); // 20000 base + 9000 surcharge, NOT 20000
         });
 
         // --- Balance gate (self-service) + charge-on-switch (admin path) ---
