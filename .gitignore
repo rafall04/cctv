@@ -43,6 +43,9 @@ pnpm-lock.yaml
 .env.*
 *.env
 
+# safe-deploy marker: last-deployed RECORDING_WORKER_ENABLED value (per-box runtime state)
+.last-recording-worker-mode
+
 # Database
 backend/data/*.db
 backend/data/*.db-journal

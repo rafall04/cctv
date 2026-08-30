@@ -91,13 +91,18 @@ export const RECORDING_RTSP_SOCKET_TIMEOUT_MICROS = 20 * 1000 * 1000;
 export const RECORDING_NO_MEDIA_MAX_COOLDOWN_MS = 60 * 1000;
 
 // === Emergency disk ===
+// Bulk-delete backstop (retention-bypass). Defaults MUST sit ABOVE the archive-hold safety floor
+// (5 GB, recordingStorageSettings.js) so this aggressive guard engages BEFORE the normal per-batch
+// path is the only thing between 5 GB and empty — with the old 1 GB/2 GB defaults (and prod leaves
+// these env vars unset) the guard fired only ~13 min of headroom from a full disk, risking failed
+// ffmpeg writes = lost LIVE footage. 8 GB trigger / 12 GB free target matches docs/spek-server.md.
 export const RECORDING_EMERGENCY_DISK_THRESHOLD_BYTES = readPositiveIntEnv(
     'RECORDING_EMERGENCY_DISK_THRESHOLD_BYTES',
-    1 * 1024 * 1024 * 1024
+    8 * 1024 * 1024 * 1024
 );
 export const RECORDING_EMERGENCY_DISK_TARGET_BYTES = readPositiveIntEnv(
     'RECORDING_EMERGENCY_DISK_TARGET_BYTES',
-    2 * 1024 * 1024 * 1024
+    12 * 1024 * 1024 * 1024
 );
 export const RECORDING_EMERGENCY_DISK_BATCH_LIMIT = 200;
 

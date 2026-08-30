@@ -331,9 +331,23 @@ if command -v pm2 >/dev/null 2>&1; then
             RECORDING_CHANGED="unknown"
         fi
 
+        # The recorder must AGREE with the backend on WHO owns recording. The backend ALWAYS restarts
+        # above (re-reading RECORDING_WORKER_ENABLED); the recorder is otherwise restarted only on a
+        # recording-CODE diff. But that flag lives in the gitignored .env — invisible to the diff — so
+        # flipping it left the two disagreeing: BOTH recording (double ffmpeg into one pending/ dir →
+        # corrupt segments) or NEITHER (silent recording outage). Detect a flag change via a marker and
+        # force the recorder to re-read it. Fail-safe: any read trouble treats it as changed (restart).
+        CURRENT_WORKER="$(grep -E '^RECORDING_WORKER_ENABLED=' "$BACKEND_ENV" 2>/dev/null | tail -1 | cut -d= -f2- | tr -d '[:space:]')"
+        WORKER_MARKER="$APP_DIR/.last-recording-worker-mode"
+        LAST_WORKER="$(cat "$WORKER_MARKER" 2>/dev/null || echo '__unset__')"
+        if [ "$CURRENT_WORKER" != "$LAST_WORKER" ]; then
+            RECORDING_CHANGED="${RECORDING_CHANGED:+$RECORDING_CHANGED }worker-flag-changed"
+        fi
+        printf '%s' "$CURRENT_WORKER" > "$WORKER_MARKER" 2>/dev/null || true
+
         if [ -n "$RECORDING_CHANGED" ]; then
             pm2 restart "$RECORDER_PM2" --update-env >/dev/null 2>&1 \
-                && ok "PM2 restarted ${RECORDER_PM2} (recording code changed)" \
+                && ok "PM2 restarted ${RECORDER_PM2} (recording code or worker flag changed)" \
                 || warn "pm2 restart ${RECORDER_PM2} failed — check 'pm2 logs ${RECORDER_PM2}'"
             echo "  Recorders detach on shutdown and are re-adopted on boot, so segments continue."
         else
