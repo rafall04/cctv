@@ -1,7 +1,7 @@
 /*
 Purpose: Provide pointer/wheel/pinch zoom and pan behavior for multi-view video elements.
-Caller: MultiViewVideoItem.
-Deps: React refs/callbacks/effects/forwardRef/imperativeHandle, device tier detection, RAF transform throttle.
+Caller: MultiViewVideoItem, VideoPopup.
+Deps: React refs/callbacks/effects/forwardRef/imperativeHandle, device tier detection, RAF transform throttle, zoomFit geometry.
 MainFuncs: ZoomableVideo.
 SideEffects: Mutates wrapper/video DOM style and exposes zoom controls via imperative ref.
 */
@@ -9,6 +9,7 @@ SideEffects: Mutates wrapper/video DOM style and exposes zoom controls via imper
 import { useRef, useCallback, useEffect, useState, memo, forwardRef, useImperativeHandle } from 'react';
 import { detectDeviceTier } from '../../utils/deviceDetector.js';
 import { createTransformThrottle } from '../../utils/rafThrottle.js';
+import { computeFitFractions, fillScaleFrom, appliedScale, maxPanPercent } from '../../utils/zoomFit.js';
 
 // ZOOMABLE VIDEO COMPONENT - Optimized for low-end devices
 // Disables heavy features (willChange, RAF throttle) on low-end
@@ -35,8 +36,59 @@ const ZoomableVideo = memo(forwardRef(function ZoomableVideo(
     const [currentZoom, setCurrentZoom] = useState(1);
     const isLowEnd = detectDeviceTier() === 'low';
 
-    const getMaxPan = (z) => z <= 1 ? 0 : ((z - 1) / (2 * z)) * 100;
+    // Latest isFullscreen, readable from the dep-less transform helpers below
+    // without threading it through every gesture callback's dependency list.
+    const isFullscreenRef = useRef(isFullscreen);
+    isFullscreenRef.current = isFullscreen;
+
+    // Aspect-fit metrics for the FULLSCREEN fill-on-zoom behaviour (refreshFit()):
+    //   fw/fh     = fraction of the viewport the object-contain'd frame fills per axis at 1x
+    //               (the short axis < 1 is where the black bars sit).
+    //   fillScale = scale that makes the short axis reach the viewport edge (bars gone).
+    const fitRef = useRef({ fw: 1, fh: 1, fillScale: 1 });
+
     const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+
+    // Recompute fit metrics from the live <video> intrinsic size vs the wrapper (= viewport
+    // in fullscreen). Cheap: one layout read, called at the START of each gesture, not per
+    // frame. Falls back to neutral {1,1,1} until metadata/layout is available.
+    const refreshFit = useCallback(() => {
+        const video = videoRef.current;
+        const el = wrapperRef.current;
+        let fractions = { fw: 1, fh: 1 };
+        if (video && el) {
+            const vw = Number(video.videoWidth) || 0;
+            const vh = Number(video.videoHeight) || 0;
+            const ew = el.clientWidth || 0;
+            const eh = el.clientHeight || 0;
+            if (vw && vh && ew && eh) {
+                fractions = computeFitFractions(vw / vh, ew / eh);
+            }
+        }
+        fitRef.current = { ...fractions, fillScale: fillScaleFrom(fractions) };
+    }, [videoRef]);
+
+    // Applied CSS scale. WINDOWED (or fullscreen at 1x) → raw zoom, honest letterbox. FULLSCREEN
+    // + zoomed → boosted by fillScale so the first zoom already fills the viewport width (no
+    // pillarbox), while object-contain keeps the whole frame present for pan to reach.
+    const scaleFor = useCallback((zoom) => (
+        appliedScale(zoom, fitRef.current.fillScale, isFullscreenRef.current)
+    ), []);
+
+    // Per-axis pan limits. Fullscreen uses the aspect-aware geometry so pan reaches the
+    // overflow (incl. the top/bottom that fill pushes off-screen); windowed keeps the legacy
+    // symmetric formula (there the body is already sized to the camera ratio, no bars).
+    const legacyMaxPan = (zoom) => (zoom <= 1 ? 0 : ((zoom - 1) / (2 * zoom)) * 100);
+    const getMaxPanX = useCallback((zoom) => (
+        isFullscreenRef.current
+            ? maxPanPercent(zoom, fitRef.current.fw, fitRef.current.fillScale, true)
+            : legacyMaxPan(zoom)
+    ), []);
+    const getMaxPanY = useCallback((zoom) => (
+        isFullscreenRef.current
+            ? maxPanPercent(zoom, fitRef.current.fh, fitRef.current.fillScale, true)
+            : legacyMaxPan(zoom)
+    ), []);
 
     // Initialize RAF throttle on mount - skip on low-end
     useEffect(() => {
@@ -51,36 +103,39 @@ const ZoomableVideo = memo(forwardRef(function ZoomableVideo(
     const applyTransform = useCallback((animate = false) => {
         if (!wrapperRef.current) return;
         const { zoom, panX, panY } = stateRef.current;
+        const s = scaleFor(zoom);
 
         if (animate && !isLowEnd) {
             wrapperRef.current.style.transition = 'transform 0.2s ease-out';
-            wrapperRef.current.style.transform = `scale(${zoom}) translate(${panX}%, ${panY}%)`;
+            wrapperRef.current.style.transform = `scale(${s}) translate(${panX}%, ${panY}%)`;
         } else {
             wrapperRef.current.style.transition = 'none';
             // On low-end, apply directly without RAF throttle
             if (transformThrottleRef.current && !isLowEnd) {
-                transformThrottleRef.current.update(zoom, panX, panY);
+                transformThrottleRef.current.update(s, panX, panY);
             } else {
-                wrapperRef.current.style.transform = `scale(${zoom}) translate(${panX}%, ${panY}%)`;
+                wrapperRef.current.style.transform = `scale(${s}) translate(${panX}%, ${panY}%)`;
             }
         }
         // Push zoom into React state once per change so `touch-action` re-
         // renders. The hot pan-update path stays in the ref world.
         setCurrentZoom(zoom);
         onZoomChange?.(zoom);
-    }, [onZoomChange, isLowEnd]);
+    }, [onZoomChange, isLowEnd, scaleFor]);
 
     const handleZoom = useCallback((delta, animate = true) => {
+        refreshFit();
         const s = stateRef.current;
         s.zoom = clamp(s.zoom + delta, 1, maxZoom);
         if (s.zoom <= 1) { s.panX = 0; s.panY = 0; }
         else {
-            const max = getMaxPan(s.zoom);
-            s.panX = clamp(s.panX, -max, max);
-            s.panY = clamp(s.panY, -max, max);
+            const maxX = getMaxPanX(s.zoom);
+            const maxY = getMaxPanY(s.zoom);
+            s.panX = clamp(s.panX, -maxX, maxX);
+            s.panY = clamp(s.panY, -maxY, maxY);
         }
         applyTransform(animate);
-    }, [maxZoom, applyTransform]);
+    }, [maxZoom, applyTransform, refreshFit, getMaxPanX, getMaxPanY]);
 
     const handleWheel = useCallback((e) => {
         e.preventDefault();
@@ -96,12 +151,14 @@ const ZoomableVideo = memo(forwardRef(function ZoomableVideo(
             // Two pointers down → start pinch. Capture initial distance and
             // zoom level so we can scale relative to the user's natural
             // pinch gesture.
+            refreshFit();
             const [p1, p2] = Array.from(pointersRef.current.values());
             s.pinchStartDist = Math.hypot(p2.x - p1.x, p2.y - p1.y) || 1;
             s.pinchStartZoom = s.zoom;
             s.dragging = false; // Pan and pinch are mutually exclusive.
         } else if (pointersRef.current.size === 1 && s.zoom > 1) {
             // Single pointer down at zoom > 1 → start pan.
+            refreshFit();
             s.dragging = true;
             s.startX = e.clientX;
             s.startY = e.clientY;
@@ -114,7 +171,7 @@ const ZoomableVideo = memo(forwardRef(function ZoomableVideo(
         } catch {
             // Some elements refuse capture (e.g., during fullscreen transitions).
         }
-    }, []);
+    }, [refreshFit]);
 
     const handlePointerMove = useCallback((e) => {
         const s = stateRef.current;
@@ -131,15 +188,17 @@ const ZoomableVideo = memo(forwardRef(function ZoomableVideo(
                 s.panX = 0;
                 s.panY = 0;
             } else {
-                const max = getMaxPan(s.zoom);
-                s.panX = clamp(s.panX, -max, max);
-                s.panY = clamp(s.panY, -max, max);
+                const maxX = getMaxPanX(s.zoom);
+                const maxY = getMaxPanY(s.zoom);
+                s.panX = clamp(s.panX, -maxX, maxX);
+                s.panY = clamp(s.panY, -maxY, maxY);
             }
             // Pinch updates are continuous — skip the animated transition.
+            const sc = scaleFor(s.zoom);
             if (transformThrottleRef.current && !isLowEnd) {
-                transformThrottleRef.current.update(s.zoom, s.panX, s.panY);
+                transformThrottleRef.current.update(sc, s.panX, s.panY);
             } else if (wrapperRef.current) {
-                wrapperRef.current.style.transform = `scale(${s.zoom}) translate(${s.panX}%, ${s.panY}%)`;
+                wrapperRef.current.style.transform = `scale(${sc}) translate(${s.panX}%, ${s.panY}%)`;
             }
             // Sync React state at ~60fps cap so touchAction stays correct
             // even while pinching down past 1x.
@@ -152,20 +211,22 @@ const ZoomableVideo = memo(forwardRef(function ZoomableVideo(
 
         const dx = e.clientX - s.startX;
         const dy = e.clientY - s.startY;
-        const max = getMaxPan(s.zoom);
+        const maxX = getMaxPanX(s.zoom);
+        const maxY = getMaxPanY(s.zoom);
 
         // Direct 1:1 mapping with container size factor
         const factor = 0.15; // Adjust for natural feel
-        s.panX = clamp(s.startPanX + dx * factor, -max, max);
-        s.panY = clamp(s.startPanY + dy * factor, -max, max);
+        s.panX = clamp(s.startPanX + dx * factor, -maxX, maxX);
+        s.panY = clamp(s.startPanY + dy * factor, -maxY, maxY);
 
         // On low-end, apply directly without RAF throttle
+        const sc = scaleFor(s.zoom);
         if (transformThrottleRef.current && !isLowEnd) {
-            transformThrottleRef.current.update(s.zoom, s.panX, s.panY);
+            transformThrottleRef.current.update(sc, s.panX, s.panY);
         } else if (wrapperRef.current) {
-            wrapperRef.current.style.transform = `scale(${s.zoom}) translate(${s.panX}%, ${s.panY}%)`;
+            wrapperRef.current.style.transform = `scale(${sc}) translate(${s.panX}%, ${s.panY}%)`;
         }
-    }, [isLowEnd, maxZoom, onZoomChange]);
+    }, [isLowEnd, maxZoom, onZoomChange, getMaxPanX, getMaxPanY, scaleFor]);
 
     const handlePointerUp = useCallback((e) => {
         const s = stateRef.current;
@@ -204,8 +265,8 @@ const ZoomableVideo = memo(forwardRef(function ZoomableVideo(
     }), [handleZoom, reset]);
 
     // Backwards-compat shim for any caller still relying on the old
-    // wrapperRef.current._zoomIn pattern. Safe to remove once nothing else
-    // reaches into the DOM for these.
+    // wrapperRef.current._zoomIn pattern (VideoPopup toggles fullscreen zoom
+    // reset through here). Safe to remove once nothing else reaches into the DOM.
     useEffect(() => {
         if (wrapperRef.current) {
             wrapperRef.current._zoomIn = () => handleZoom(0.5);
@@ -214,6 +275,17 @@ const ZoomableVideo = memo(forwardRef(function ZoomableVideo(
             wrapperRef.current._getZoom = () => stateRef.current.zoom;
         }
     }, [handleZoom, reset]);
+
+    // Entering/leaving fullscreen changes the viewport aspect → the applied scale for the
+    // current zoom changes too. Re-apply so a zoomed-in frame doesn't linger at a stale
+    // scale. Only when actually zoomed (at 1x scaleFor is 1 regardless, and this avoids a
+    // spurious onZoomChange on every fullscreen toggle).
+    useEffect(() => {
+        if (stateRef.current.zoom > 1) {
+            refreshFit();
+            applyTransform(false);
+        }
+    }, [isFullscreen, refreshFit, applyTransform]);
 
     return (
         <div
@@ -238,16 +310,11 @@ const ZoomableVideo = memo(forwardRef(function ZoomableVideo(
         >
             <video
                 ref={videoRef}
-                // object-fit rule (fixes "zoom in fullscreen still shows black bars on the sides"):
-                //   • FULLSCREEN + ZOOMED (zoom > 1) → object-COVER: the operator is inspecting, so the
-                //     view fills the screen edge-to-edge, auto-cropping the overflow to the camera's
-                //     shape. No pillarbox bars while zoomed — the point of zooming is a filled close-up.
-                //   • Otherwise (windowed, OR fullscreen at 1×) → object-CONTAIN: the WHOLE frame stays
-                //     visible. Windowed has no bars anyway (the body is sized to the camera's ratio,
-                //     getPublicPopupBodyStyle); fullscreen at 1× keeps the honest full-frame overview,
-                //     with the natural letterbox that a 4:3 camera on a 16:9 screen inevitably has.
-                // So: full frame when surveying, edge-to-edge fill the moment you zoom in.
-                className={`w-full h-full pointer-events-none ${isFullscreen && currentZoom > 1 ? 'object-cover' : 'object-contain'}`}
+                // object-CONTAIN always — the WHOLE frame stays present, so pan reaches every
+                // edge. The fullscreen fill comes from scaleFor() boosting the scale on zoom,
+                // NOT from cropping the source (object-cover would throw the overflow away for
+                // good, so panning could never bring the top/bottom back — the bug we fixed).
+                className="w-full h-full pointer-events-none object-contain"
                 muted
                 playsInline
                 autoPlay

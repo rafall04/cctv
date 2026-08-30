@@ -1,7 +1,8 @@
 /*
-Purpose: Lock the fullscreen ZOOM fill fix — while fullscreen AND zoomed in, the video fills the screen
-         (object-cover) so no black pillarbox bars surround the zoomed close-up; at 1× (and windowed) it
-         stays object-contain so the WHOLE frame is visible.
+Purpose: Guard ZoomableVideo's render contract for the fullscreen fill-on-zoom fix — the <video> stays
+         object-CONTAIN (so the whole frame is always present and pan can reach every edge; the fill
+         comes from the scale boost in zoomFit, NOT from cropping the source). The fill/pan geometry
+         itself is covered exhaustively in utils/zoomFit.test.js.
 Caller: Vitest frontend suite.
 Deps: @testing-library/react; deviceDetector + rafThrottle stubbed so jsdom render is deterministic.
 */
@@ -16,30 +17,37 @@ vi.mock('../../utils/rafThrottle.js', () => ({
 
 import ZoomableVideo from './ZoomableVideo';
 
-describe('ZoomableVideo — fullscreen zoom fill (pillarbox fix)', () => {
-    it('fills with object-cover ONCE ZOOMED IN in fullscreen (no black bars while zooming)', () => {
+describe('ZoomableVideo — object-fit contract', () => {
+    it('keeps object-contain in fullscreen (whole frame present; cover would crop the overflow away)', () => {
+        const { container } = render(<ZoomableVideo videoRef={createRef()} isFullscreen />);
+        const video = container.querySelector('video');
+        expect(video.className).toContain('object-contain');
+        expect(video.className).not.toContain('object-cover');
+    });
+
+    it('keeps object-contain in fullscreen even when zoomed in', () => {
         const api = createRef();
         const { container } = render(<ZoomableVideo ref={api} videoRef={createRef()} isFullscreen />);
-        const video = container.querySelector('video');
-        // At 1× fullscreen: whole frame (contain); a 4:3-on-16:9 letterbox here is acceptable.
-        expect(video.className).toContain('object-contain');
-        // Zoom in → fills edge-to-edge (cover), bars gone.
-        act(() => { api.current.zoomIn(); });
-        expect(video.className).toContain('object-cover');
-        expect(video.className).not.toContain('object-contain');
-    });
-
-    it('stays object-contain at 1× fullscreen (whole frame visible for overview)', () => {
-        const { container } = render(<ZoomableVideo videoRef={createRef()} isFullscreen />);
-        expect(container.querySelector('video').className).toContain('object-contain');
-    });
-
-    it('never uses cover when windowed, even zoomed (body is already aspect-shaped → no bars)', () => {
-        const api = createRef();
-        const { container } = render(<ZoomableVideo ref={api} videoRef={createRef()} isFullscreen={false} />);
         act(() => { api.current.zoomIn(); });
         const video = container.querySelector('video');
         expect(video.className).toContain('object-contain');
         expect(video.className).not.toContain('object-cover');
+    });
+
+    it('keeps object-contain windowed', () => {
+        const { container } = render(<ZoomableVideo videoRef={createRef()} isFullscreen={false} />);
+        expect(container.querySelector('video').className).toContain('object-contain');
+    });
+
+    it('exposes the imperative zoom API and tracks zoom (touch-action toggles off 1x)', () => {
+        const api = createRef();
+        const { container } = render(<ZoomableVideo ref={api} videoRef={createRef()} isFullscreen />);
+        const wrapper = container.querySelector('div');
+        expect(wrapper.style.touchAction).toBe('pan-x pan-y'); // 1x → page still scrollable
+        act(() => { api.current.zoomIn(); });
+        expect(api.current.getZoom()).toBeGreaterThan(1);
+        expect(wrapper.style.touchAction).toBe('none'); // zoomed → capture gestures
+        act(() => { api.current.reset(); });
+        expect(api.current.getZoom()).toBe(1);
     });
 });
