@@ -9,9 +9,15 @@
  * Playback goes through OUR backend, never a Telegram link: a Telegram file URL embeds the bot
  * token and is fetchable by anyone holding the string.
  *
- * Segments archived before the uploader recorded `file_id` cannot be fetched back — Telegram offers
- * no way to ask for the file_id of an already-sent message. Those rows say "Hanya di Telegram"
- * rather than showing a play button that would fail.
+ * Segments archived before the uploader recorded `file_id` cannot be fetched back — the archive
+ * backend offers no way to ask for the file_id of an already-sent message. Those rows show an
+ * "Arsip lama" badge rather than a play button that would fail.
+ *
+ * USER-FACING COPY IS DELIBERATELY APP-NAME-NEUTRAL. The archive backend is Telegram, but that is
+ * an implementation detail an operator (and anyone who sees a screenshot) does not need — every
+ * VISIBLE string here says "arsip cloud" / "arsip lama", never the product name. Keep it that way:
+ * do not put the vendor name back into any rendered text. (Code identifiers, comments, the route,
+ * and the service name may keep it — they never reach the screen and are stripped from the build.)
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -94,7 +100,7 @@ function SegmentRow({ row, win, highlighted, showCamera, onPlay }) {
                         Putar
                     </Button>
                 ) : (
-                    <Badge tone="neutral">Telegram</Badge>
+                    <Badge tone="neutral">Arsip lama</Badge>
                 )}
             </div>
         </li>
@@ -299,7 +305,7 @@ export default function TelegramArchiveLibrary() {
         <div className="space-y-4">
             <PageHeader
                 title="Arsip Rekaman"
-                description="Tersimpan di Telegram, diputar dari sini."
+                description="Tersimpan di arsip cloud, diputar dari sini."
                 actions={<Button onClick={load} disabled={busy}>Muat ulang</Button>}
             />
 
@@ -326,12 +332,12 @@ export default function TelegramArchiveLibrary() {
             {notPlayable > 0 && (
                 <div className="rounded-card border border-status-warn/30 bg-status-warn/10 p-4">
                     <p className="text-sm font-semibold text-status-warn">
-                        {notPlayable} segmen hanya bisa dibuka di Telegram
+                        {notPlayable} segmen lama belum bisa diputar dari sini
                     </p>
                     <p className="mt-1 text-sm text-content-muted">
-                        Segmen itu terarsip sebelum sistem mencatat penanda berkasnya. Telegram tidak
-                        menyediakan cara menanyakan penanda untuk pesan yang sudah terkirim, jadi data
-                        lama tidak bisa disusulkan. Segmen baru tercatat otomatis.
+                        Segmen itu terarsip sebelum sistem mencatat penanda berkasnya, jadi data lama
+                        tidak bisa disusulkan untuk diputar dari sini. Segmen baru tercatat otomatis
+                        dan bisa langsung diputar.
                     </p>
                 </div>
             )}
