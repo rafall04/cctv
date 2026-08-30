@@ -238,14 +238,16 @@ const ZoomableVideo = memo(forwardRef(function ZoomableVideo(
         >
             <video
                 ref={videoRef}
-                // FULLSCREEN fills the screen (object-cover): the screen's aspect ratio is fixed, so a
-                // camera whose ratio differs (4:3 on a 16:9 screen, or 16:9 on a 16:10/ultrawide one)
-                // would object-CONTAIN into black pillarbox bars on the sides. Cover crops the overflow
-                // instead so the image fills edge-to-edge — the zoom/pan below still lets the operator
-                // reach any cropped area. WINDOWED keeps object-contain: there the body is already sized
-                // to the camera's exact ratio (getPublicPopupBodyStyle), so contain fills with no bars
-                // AND shows the whole frame. (This is what the previously-ignored isFullscreen prop was for.)
-                className={`w-full h-full pointer-events-none ${isFullscreen ? 'object-cover' : 'object-contain'}`}
+                // object-fit rule (fixes "zoom in fullscreen still shows black bars on the sides"):
+                //   • FULLSCREEN + ZOOMED (zoom > 1) → object-COVER: the operator is inspecting, so the
+                //     view fills the screen edge-to-edge, auto-cropping the overflow to the camera's
+                //     shape. No pillarbox bars while zoomed — the point of zooming is a filled close-up.
+                //   • Otherwise (windowed, OR fullscreen at 1×) → object-CONTAIN: the WHOLE frame stays
+                //     visible. Windowed has no bars anyway (the body is sized to the camera's ratio,
+                //     getPublicPopupBodyStyle); fullscreen at 1× keeps the honest full-frame overview,
+                //     with the natural letterbox that a 4:3 camera on a 16:9 screen inevitably has.
+                // So: full frame when surveying, edge-to-edge fill the moment you zoom in.
+                className={`w-full h-full pointer-events-none ${isFullscreen && currentZoom > 1 ? 'object-cover' : 'object-contain'}`}
                 muted
                 playsInline
                 autoPlay
