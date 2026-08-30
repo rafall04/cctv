@@ -74,7 +74,7 @@ export async function getRecordingsOverview(request, reply) {
 // Get recording assurance snapshot for operational monitoring
 export async function getRecordingAssurance(request, reply) {
     try {
-        const snapshot = recordingAssuranceService.getSnapshot();
+        const snapshot = await recordingAssuranceService.getSnapshot();
         return reply.send({ success: true, data: snapshot });
     } catch (error) {
         console.error('Get recording assurance error:', error);

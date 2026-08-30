@@ -10,7 +10,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFile } from 'fs/promises';
 
 const queryMock = vi.fn();
-const getRecordingStatusMock = vi.fn();
+const getRuntimeStatusMock = vi.fn();
 const existsSyncMock = vi.fn();
 const statSyncMock = vi.fn();
 const summarizeActiveMock = vi.fn();
@@ -21,9 +21,11 @@ vi.mock('../database/connectionPool.js', () => ({
     query: queryMock,
 }));
 
-vi.mock('../services/recordingService.js', () => ({
-    recordingService: {
-        getRecordingStatus: getRecordingStatusMock,
+// Worker-aware runtime status lives in recordingControlService (getRuntimeStatus), NOT the
+// in-process recordingService.getRecordingStatus — the whole point of fix #9.
+vi.mock('../services/recordingControlService.js', () => ({
+    default: {
+        getRuntimeStatus: getRuntimeStatusMock,
     },
 }));
 
@@ -45,6 +47,7 @@ const { default: recordingAssuranceService } = await import('../services/recordi
 describe('recordingAssuranceService', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        getRuntimeStatusMock.mockResolvedValue({ isRecording: true, status: 'recording' });
         existsSyncMock.mockReturnValue(true);
         statSyncMock.mockReturnValue({ size: 1048576 });
         summarizeActiveMock.mockReturnValue({});
@@ -56,7 +59,7 @@ describe('recordingAssuranceService', () => {
         });
     });
 
-    it('classifies enabled recording cameras from batched latest segment and gap queries', () => {
+    it('classifies enabled recording cameras from batched latest segment and gap queries', async () => {
         queryMock
             .mockReturnValueOnce([
                 {
@@ -102,11 +105,11 @@ describe('recordingAssuranceService', () => {
                 },
             ]);
 
-        getRecordingStatusMock
-            .mockReturnValueOnce({ isRecording: true, status: 'recording' })
-            .mockReturnValueOnce({ isRecording: true, status: 'recording' });
+        getRuntimeStatusMock
+            .mockResolvedValueOnce({ isRecording: true, status: 'recording' })
+            .mockResolvedValueOnce({ isRecording: true, status: 'recording' });
 
-        const result = recordingAssuranceService.getSnapshot({
+        const result = await recordingAssuranceService.getSnapshot({
             now: new Date('2026-05-02T01:52:00.000Z'),
             staleAfterMs: 15 * 60 * 1000,
             gapToleranceSeconds: 180,
@@ -136,7 +139,7 @@ describe('recordingAssuranceService', () => {
         }));
     });
 
-    it('flags recording process down and missing first segment without failing the whole snapshot', () => {
+    it('flags recording process down and missing first segment without failing the whole snapshot', async () => {
         queryMock
             .mockReturnValueOnce([
                 {
@@ -150,9 +153,9 @@ describe('recordingAssuranceService', () => {
             .mockReturnValueOnce([])
             .mockReturnValueOnce([]);
 
-        getRecordingStatusMock.mockReturnValue({ isRecording: false, status: 'stopped' });
+        getRuntimeStatusMock.mockResolvedValue({ isRecording: false, status: 'stopped' });
 
-        const result = recordingAssuranceService.getSnapshot({
+        const result = await recordingAssuranceService.getSnapshot({
             now: new Date('2026-05-02T01:30:00.000Z'),
             staleAfterMs: 15 * 60 * 1000,
         });
@@ -166,6 +169,44 @@ describe('recordingAssuranceService', () => {
         ]));
     });
 
+    it('WORKER MODE: a stale worker heartbeat does NOT mark the whole fleet critical (fix #9)', async () => {
+        // Before the fix, getSnapshot read the in-process recording map (empty in worker mode) so
+        // EVERY camera reported not-recording -> recording_process_down -> critical. getRuntimeStatus
+        // now returns status:'unknown'/workerStale when the recorder cannot be seen: that must be a
+        // non-critical 'recording_status_unknown', not a fleet-wide false 'recording_process_down'.
+        queryMock
+            .mockReturnValueOnce([
+                { id: 1, name: 'A', stream_source: 'internal', recording_status: 'recording', last_recording_start: '2026-05-02T01:45:00.000Z' },
+                { id: 2, name: 'B', stream_source: 'internal', recording_status: 'recording', last_recording_start: '2026-05-02T01:45:00.000Z' },
+            ])
+            .mockReturnValueOnce([]) // latest segments
+            .mockReturnValueOnce([]); // gaps
+        getRuntimeStatusMock.mockResolvedValue({ isRecording: false, status: 'unknown', workerStale: true });
+
+        const result = await recordingAssuranceService.getSnapshot({
+            now: new Date('2026-05-02T01:50:00.000Z'),
+            staleAfterMs: 15 * 60 * 1000,
+        });
+
+        expect(result.summary.recording_down).toBe(0);   // NOT flagged down
+        expect(result.summary.critical).toBe(0);         // NOT fleet-wide critical
+        expect(result.cameras[0].reasons).toContain('recording_status_unknown');
+        expect(result.cameras[0].reasons).not.toContain('recording_process_down');
+    });
+
+    it('WORKER MODE: reads runtime status via recordingControlService.getRuntimeStatus per camera', async () => {
+        queryMock
+            .mockReturnValueOnce([
+                { id: 5, name: 'C', stream_source: 'internal', recording_status: 'recording', last_recording_start: '2026-05-02T01:45:00.000Z' },
+            ])
+            .mockReturnValueOnce([]).mockReturnValueOnce([]);
+        getRuntimeStatusMock.mockResolvedValue({ isRecording: true, status: 'recording' });
+
+        await recordingAssuranceService.getSnapshot({ now: new Date('2026-05-02T01:50:00.000Z') });
+
+        expect(getRuntimeStatusMock).toHaveBeenCalledWith(5);
+    });
+
     it('uses connectionPool query helpers instead of legacy database.js helpers', async () => {
         const source = await readFile(new URL('../services/recordingAssuranceService.js', import.meta.url), 'utf8');
 
@@ -173,11 +214,11 @@ describe('recordingAssuranceService', () => {
         expect(source).not.toContain("../database/database.js");
     });
 
-    it('includes recovery diagnostic summary in assurance snapshot', () => {
+    it('includes recovery diagnostic summary in assurance snapshot', async () => {
         summarizeActiveMock.mockReturnValue({ pending: 2, retryable_failed: 1, unrecoverable: 1 });
         queryMock.mockReturnValueOnce([]);
 
-        const snapshot = recordingAssuranceService.getSnapshot();
+        const snapshot = await recordingAssuranceService.getSnapshot();
 
         expect(snapshot.recoveryDiagnostics).toEqual({
             pending: 2,
@@ -186,7 +227,7 @@ describe('recordingAssuranceService', () => {
         });
     });
 
-    it('includes recovery health metadata in assurance snapshot', () => {
+    it('includes recovery health metadata in assurance snapshot', async () => {
         summarizeActiveMock.mockReturnValue({ pending: 2, retryable_failed: 1 });
         getActiveHealthSummaryMock.mockReturnValue({
             oldest_active_seen_at: '2026-05-17T00:00:00.000Z',
@@ -195,7 +236,7 @@ describe('recordingAssuranceService', () => {
         });
         queryMock.mockReturnValueOnce([]);
 
-        const snapshot = recordingAssuranceService.getSnapshot();
+        const snapshot = await recordingAssuranceService.getSnapshot();
 
         expect(snapshot.recoveryHealth).toEqual({
             oldest_active_seen_at: '2026-05-17T00:00:00.000Z',
@@ -204,7 +245,7 @@ describe('recordingAssuranceService', () => {
         });
     });
 
-    it('includes active partial recovery diagnostics in camera assurance', () => {
+    it('includes active partial recovery diagnostics in camera assurance', async () => {
         queryMock.mockImplementation((sql) => {
             if (sql.includes('FROM cameras c')) {
                 return [{
@@ -223,7 +264,7 @@ describe('recordingAssuranceService', () => {
             }
             return [];
         });
-        getRecordingStatusMock.mockReturnValue({ isRecording: true, status: 'recording' });
+        getRuntimeStatusMock.mockResolvedValue({ isRecording: true, status: 'recording' });
         listActiveByCameraMock.mockReturnValue([{
             camera_id: 7,
             filename: '20260517_211000.mp4',
@@ -234,7 +275,7 @@ describe('recordingAssuranceService', () => {
             last_seen_at: '2026-05-17T21:15:00.000Z',
         }]);
 
-        const snapshot = recordingAssuranceService.getSnapshot({
+        const snapshot = await recordingAssuranceService.getSnapshot({
             now: new Date('2026-05-17T21:20:00.000Z'),
         });
 

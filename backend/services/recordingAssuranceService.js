@@ -8,7 +8,7 @@
 
 import { existsSync, statSync } from 'fs';
 import { query } from '../database/connectionPool.js';
-import { recordingService } from './recordingService.js';
+import recordingControlService from './recordingControlService.js';
 import recordingRecoveryDiagnosticsRepository from './recordingRecoveryDiagnosticsRepository.js';
 import {
     RECORDING_ASSURANCE_GAP_TOLERANCE_S as DEFAULT_GAP_TOLERANCE_SECONDS,
@@ -65,7 +65,7 @@ function readLatestSegmentFileState(segment) {
 }
 
 class RecordingAssuranceService {
-    getSnapshot(options = {}) {
+    async getSnapshot(options = {}) {
         const now = options.now || new Date();
         const staleAfterMs = options.staleAfterMs ?? DEFAULT_STALE_AFTER_MS;
         const gapToleranceSeconds = options.gapToleranceSeconds ?? DEFAULT_GAP_TOLERANCE_SECONDS;
@@ -152,11 +152,23 @@ class RecordingAssuranceService {
 
         const latestByCamera = new Map(latestSegments.map((segment) => [segment.camera_id, segment]));
         const gapByCamera = new Map(recentGaps.map((gap) => [gap.camera_id, gap]));
+
+        // In worker mode the recorders run in ANOTHER process, so the in-process recording map is
+        // empty here — the old recordingService.getRecordingStatus reported EVERY camera as
+        // not-recording => 'recording_process_down' => the whole fleet 'critical' (a false alarm that
+        // buries real ones). getRuntimeStatus is worker-aware (reads what the recorder published).
+        // Collected FIRST in a sequential await loop (no shared state), so the summary counters below
+        // are only ever mutated inside the synchronous map() — never across an await, so no race.
+        const runtimeByCamera = new Map();
+        for (const camera of cameras) {
+            runtimeByCamera.set(camera.id, await recordingControlService.getRuntimeStatus(camera.id));
+        }
+
         const snapshot = makeEmptySnapshot(now);
         snapshot.summary.total_monitored = cameras.length;
 
         snapshot.cameras = cameras.map((camera) => {
-            const runtimeStatus = recordingService.getRecordingStatus(camera.id);
+            const runtimeStatus = runtimeByCamera.get(camera.id) || null;
             const latestSegment = latestByCamera.get(camera.id) || null;
             const recentGap = gapByCamera.get(camera.id) || null;
             const reasons = [];
@@ -165,7 +177,12 @@ class RecordingAssuranceService {
                 reasons.push('recording_recovery_attention');
             }
 
-            if (!runtimeStatus?.isRecording) {
+            // 'unknown' = the worker heartbeat is stale/absent (worker mode): we genuinely cannot see
+            // the recorder, which is NOT the same as "not recording". Report it as a non-critical
+            // unknown instead of a fleet-wide false 'recording_process_down' the moment a heartbeat lapses.
+            if (runtimeStatus?.status === 'unknown' || runtimeStatus?.workerStale) {
+                reasons.push('recording_status_unknown');
+            } else if (!runtimeStatus?.isRecording) {
                 reasons.push('recording_process_down');
                 snapshot.summary.recording_down += 1;
             }
