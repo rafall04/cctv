@@ -29,7 +29,7 @@
  */
 
 import crypto from 'crypto';
-import { query, queryOne, execute } from '../database/connectionPool.js';
+import { query, queryOne, execute, transaction } from '../database/connectionPool.js';
 import walletService from './walletService.js';
 import billingService from './billingService.js';
 import paymentSettingsService from './paymentSettingsService.js';
@@ -372,9 +372,14 @@ class PaymentService {
             );
         }
         if (!payment && referenceId) {
+            // referenceId is attacker-controlled webhook input. Strip quotes (so it cannot escape the
+            // JSON-string context) AND escape LIKE wildcards \ % _ with an explicit ESCAPE clause —
+            // otherwise a reference_id of "%" would match ANY pending payment's qris_payload and let a
+            // forged webhook target someone else's transaction.
+            const needle = String(referenceId).replace(/"/g, '').replace(/[\\%_]/g, (c) => `\\${c}`);
             payment = queryOne(
-                "SELECT * FROM payments WHERE gateway = 'ipaymu' AND qris_payload LIKE ?",
-                [`%"reference_id":"${String(referenceId).replace(/"/g, '')}"%`]
+                "SELECT * FROM payments WHERE gateway = 'ipaymu' AND qris_payload LIKE ? ESCAPE '\\'",
+                [`%"reference_id":"${needle}"%`]
             );
         }
         if (!payment) {
@@ -561,35 +566,42 @@ class PaymentService {
     }
 
     _confirmPayment(payment) {
-        // Guarded flip — only ONE caller can move pending→paid.
-        const flip = execute(
-            "UPDATE payments SET status = 'paid', paid_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'pending'",
-            [payment.id]
-        );
-        if (flip.changes === 0) {
-            return this._present(queryOne('SELECT * FROM payments WHERE id = ?', [payment.id]));
-        }
-
-        walletService.credit({
-            userId: payment.user_id,
-            amount: payment.amount,
-            type: 'topup',
-            reference: `payment:${payment.id}`,
-            note: `Top-up via ${payment.gateway}`,
+        // Flip pending→paid AND credit the wallet in ONE transaction. Previously these were two
+        // separate auto-committed writes: a crash between them left the payment 'paid' with the
+        // money never credited and NO recovery (the guarded flip cannot fire again). The guarded
+        // WHERE status='pending' still lets only ONE caller win the race, so a redelivered webhook
+        // after a successful confirm makes flip.changes=0 and credits nothing. walletService.credit
+        // nests as a SAVEPOINT (better-sqlite3), so the whole thing commits or rolls back together.
+        const runConfirm = transaction(() => {
+            const flip = execute(
+                "UPDATE payments SET status = 'paid', paid_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'pending'",
+                [payment.id]
+            );
+            if (flip.changes === 0) return false; // already confirmed/settled by another delivery
+            walletService.credit({
+                userId: payment.user_id,
+                amount: payment.amount,
+                type: 'topup',
+                reference: `payment:${payment.id}`,
+                note: `Top-up via ${payment.gateway}`,
+            });
+            return true;
         });
+        const credited = runConfirm();
 
-        // Promo top-up bonus — credited exactly once (idempotent + capped in promoService).
-        try {
-            promoService.applyTopupBonus(payment);
-        } catch (error) {
-            console.error('[Payment] Promo bonus failed:', error.message);
-        }
-
-        // Re-activate any suspended cameras this balance now covers.
-        try {
-            billingService.tryResumeForUser(payment.user_id);
-        } catch (error) {
-            console.error('[Payment] Post-topup resume failed:', error.message);
+        // Secondary effects run AFTER the money is safely committed — both are best-effort and
+        // idempotent, so a failure here never rolls back (or blocks) the confirmed top-up.
+        if (credited) {
+            try {
+                promoService.applyTopupBonus(payment); // idempotent + capped in promoService
+            } catch (error) {
+                console.error('[Payment] Promo bonus failed:', error.message);
+            }
+            try {
+                billingService.tryResumeForUser(payment.user_id); // resume cameras this balance covers
+            } catch (error) {
+                console.error('[Payment] Post-topup resume failed:', error.message);
+            }
         }
 
         return this._present(queryOne('SELECT * FROM payments WHERE id = ?', [payment.id]));

@@ -155,6 +155,25 @@ describe('paymentService', () => {
         expect(walletService.getBalance(42)).toBe(25000);
     });
 
+    it('ATOMIC: a credit failure rolls the pending→paid flip back (no paid-but-uncredited money)', async () => {
+        const payment = await paymentService.createTopup(42, 25000);
+        // Simulate a crash/failure at the wallet-credit step, INSIDE the confirm transaction.
+        const spy = vi.spyOn(walletService, 'credit').mockImplementationOnce(() => {
+            throw new Error('boom mid-credit');
+        });
+        expect(() => paymentService.markPaid(payment.id)).toThrow('boom mid-credit');
+
+        // The flip must have rolled back with the failed credit — NOT stranded as paid-but-broke.
+        expect(db.prepare('SELECT status FROM payments WHERE id = ?').get(payment.id).status).toBe('pending');
+        expect(walletService.getBalance(42)).toBe(0);
+
+        // Retry (gateway redelivers) now succeeds cleanly and credits exactly once.
+        spy.mockRestore();
+        const confirmed = paymentService.markPaid(payment.id);
+        expect(confirmed.status).toBe('paid');
+        expect(walletService.getBalance(42)).toBe(25000);
+    });
+
     it('verifyMidtransSignature accepts the documented SHA-512 and rejects tampering', () => {
         const valid = {
             order_id: 'topup-42-1',
@@ -274,6 +293,17 @@ describe('paymentService ipaymu driver', () => {
         delete process.env.IPAYMU_VA;
         delete process.env.IPAYMU_API_KEY;
         vi.restoreAllMocks();
+    });
+
+    it('SECURITY: a wildcard reference_id "%" cannot match another pending payment (LIKE escaped)', async () => {
+        seedIpaymuPending({ trxId: '777900' }); // qris_payload has reference_id "topup-42-1"
+        const fetchSpy = vi.spyOn(globalThis, 'fetch');
+
+        // No trx_id → falls to the reference_id lookup. "%" must be a LITERAL, not a wildcard.
+        const result = await paymentService.handleIpaymuWebhook({ reference_id: '%' });
+
+        expect(result).toEqual({ handled: false, reason: 'unknown_transaction' });
+        expect(fetchSpy).not.toHaveBeenCalled(); // never re-synced anyone else's transaction
     });
 
     it('builds the documented v2 signature (HMAC over METHOD:VA:sha256(body):apiKey)', () => {
