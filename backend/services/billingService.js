@@ -285,6 +285,12 @@ class BillingService {
                      WHERE id = ?`,
                     [status, reason, id]
                 );
+                // is_public (the owner's publish CONSENT) is deliberately NOT touched: the
+                // billing_status gate already hides a suspended camera on every public/live surface
+                // (cameraVisibility.PUBLIC_LIVE_SQL + cameraAccessService.canViewLive), and resume
+                // has no is_public restore — zeroing it here would silently un-publish the customer,
+                // who cannot re-publish via admin (subscriberCameraPublishService is unpublish-only).
+                // Only healOrphanedSubscriberCameras forces is_public=0, because there the owner is gone.
                 execute(
                     "UPDATE cameras SET billing_status = 'suspended', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
                     [subscription.camera_id]
@@ -518,6 +524,10 @@ class BillingService {
                 [subscription.id]
             );
         }
+        // is_public (owner consent) left as-is on purpose: the billing_status gate hides a suspended
+        // camera everywhere, and a top-up runs the resume path which restores billing_status='active'
+        // WITHOUT touching is_public — so a transient balance-out auto-republishes instead of forcing
+        // the customer to re-publish. (See the fuller note on the admin-suspend path.)
         execute(
             "UPDATE cameras SET billing_status = 'suspended', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
             [subscription.camera_id]
@@ -675,6 +685,9 @@ class BillingService {
               AND owner_user_id NOT IN (SELECT id FROM users)
         `);
         for (const cam of orphans) {
+            // is_public=0 HERE (unlike the transient balance/admin suspends) because the owner is
+            // GONE: there is no consent left to preserve and no one to re-publish, so unpublishing
+            // is the safe permanent state — defense-in-depth on top of billing_status='suspended'.
             execute(
                 "UPDATE cameras SET is_public = 0, billing_status = 'suspended', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
                 [cam.id]

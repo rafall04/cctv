@@ -43,8 +43,9 @@ describe('guardrail: file-size ratchet (anti-penumpukan)', () => {
         'services/telegramBotService.js': 890,
         // Central billing engine. Pure date/money helpers already live in billingCalc.js; the
         // remainder is the charge/suspend/heal state machine, kept in one file on purpose. Frozen
-        // here (visible decision) after the timezone/admin-hold/catch-up/atomicity correctness pass.
-        'services/billingService.js': 818,
+        // here (visible decision) after the timezone/admin-hold/catch-up/atomicity correctness pass;
+        // bumped 818→831 for the is_public consent-preservation notes on the suspend/heal paths.
+        'services/billingService.js': 831,
     };
 
     const files = walk(BACKEND_ROOT, ['.js']);
