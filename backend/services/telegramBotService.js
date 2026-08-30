@@ -730,13 +730,13 @@ class TelegramBotService {
             return this.answerCallback(cq.id, 'Nominal tidak valid.', { alert: true });
         }
         try {
-            const credit = walletService.credit({
+            const credit = walletService.creditOnce({ // deterministic ref → double-tap credits once
                 userId,
                 amount,
-                type: 'topup',
-                reference: `manual-telegram:${actor.id}:${Date.now()}`,
+                reference: `manual-telegram:${userId}:${amount}:${messageId}`,
                 note: `Top-up via Telegram oleh ${actor.name}`,
             });
+            if (credit.alreadyCredited) return this.answerCallback(cq.id, '✅ Saldo sudah ditambahkan sebelumnya', { alert: true });
             const resume = billingService.tryResumeForUser(userId);
             logAdminAction({
                 action: 'billing_manual_topup',

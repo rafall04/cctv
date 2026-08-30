@@ -23,6 +23,7 @@ const h = vi.hoisted(() => ({
     tryResumeForUser: vi.fn(),
     updateSubscription: vi.fn(),
     credit: vi.fn(),
+    creditOnce: vi.fn(),
     logAdminAction: vi.fn(),
     query: vi.fn(),
     queryOne: vi.fn(),
@@ -51,7 +52,7 @@ vi.mock('../services/billingService.js', () => ({
     },
     dailyCostOf: (monthly) => Math.ceil(monthly / 30),
 }));
-vi.mock('../services/walletService.js', () => ({ default: { credit: h.credit } }));
+vi.mock('../services/walletService.js', () => ({ default: { credit: h.credit, creditOnce: h.creditOnce } }));
 vi.mock('../services/securityAuditLogger.js', () => ({ logAdminAction: h.logAdminAction }));
 vi.mock('../services/timezoneService.js', () => ({ formatDateTime: () => '2026-06-13 10:00' }));
 vi.mock('../database/connectionPool.js', () => ({ query: h.query, queryOne: h.queryOne }));
@@ -132,17 +133,30 @@ describe('top-up execution', () => {
     it('credits the wallet, resumes, audits, and reports the new balance', async () => {
         h.queryOne.mockReturnValue({ id: 42, username: 'budi', phone: '0812', email: null, account_status: 'approved', plan_id: null });
         h.getCustomerBillingSummary.mockReturnValue({ balance: 10000, daily_cost: 0, estimated_days_left: null, low_balance: false, subscriptions: [] });
-        h.credit.mockReturnValue({ balance_after: 60000 });
+        h.creditOnce.mockReturnValue({ balance_after: 60000, alreadyCredited: false });
         h.tryResumeForUser.mockReturnValue({ resumedCameraIds: [3] });
 
         await bot.handleCallback({ id: 'cb', data: encodeCallback(ACTIONS.TOPUP_EXEC, 42, 50000), message: { chat: { id: '-100' }, message_id: 9 }, from: { id: 7, username: 'admin' } });
 
-        expect(h.credit).toHaveBeenCalledWith(expect.objectContaining({ userId: 42, amount: 50000, type: 'topup' }));
+        // Idempotent, deterministic reference (user:amount:message) — not a Date.now() that differs per tap.
+        expect(h.creditOnce).toHaveBeenCalledWith(expect.objectContaining({ userId: 42, amount: 50000, reference: 'manual-telegram:42:50000:9' }));
         expect(h.tryResumeForUser).toHaveBeenCalledWith(42);
         expect(h.logAdminAction).toHaveBeenCalledWith(expect.objectContaining({ action: 'billing_manual_topup', via: 'telegram', amount: 50000 }), expect.any(Object));
         const edit = apiCalls('editMessageText')[0];
         expect(edit.text).toContain('Rp60.000');
         expect(edit.text).toContain('1 kamera diaktifkan');
+    });
+
+    it('double-tap / redelivery does NOT credit twice — no second resume or audit', async () => {
+        h.queryOne.mockReturnValue({ id: 42, username: 'budi', phone: '0812', email: null, account_status: 'approved', plan_id: null });
+        h.getCustomerBillingSummary.mockReturnValue({ balance: 60000, daily_cost: 0, estimated_days_left: null, low_balance: false, subscriptions: [] });
+        h.creditOnce.mockReturnValue({ alreadyCredited: true, balance_after: 60000 });
+
+        await bot.handleCallback({ id: 'cb2', data: encodeCallback(ACTIONS.TOPUP_EXEC, 42, 50000), message: { chat: { id: '-100' }, message_id: 9 }, from: { id: 7, username: 'admin' } });
+
+        expect(h.tryResumeForUser).not.toHaveBeenCalled();
+        expect(h.logAdminAction).not.toHaveBeenCalled();
+        expect(apiCalls('answerCallbackQuery')[0].text).toContain('sudah ditambahkan');
     });
 
     it('rejects an over-limit amount before crediting', async () => {

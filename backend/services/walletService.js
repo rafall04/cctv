@@ -3,7 +3,7 @@
  *          auditable wallet_transactions trail (the source of truth for all money movement).
  * Caller: billingService (daily charges), paymentService (top-up credit), customer/admin routes.
  * Deps: connectionPool (queryOne/execute/transaction).
- * MainFuncs: ensureWallet, getWallet, credit, debit, getTransactions.
+ * MainFuncs: ensureWallet, getWallet, credit, creditOnce, debit, chargeOnce, getTransactions.
  * SideEffects: Writes wallets + wallet_transactions rows inside a single DB transaction.
  */
 
@@ -90,6 +90,29 @@ class WalletService {
         assertValidAmount(amount);
         assertValidType(type);
         return this._apply({ userId, type, signedAmount: amount, reference, note });
+    }
+
+    /**
+     * Idempotent credit keyed on (type, reference): if a matching ledger row already exists the
+     * credit is a no-op returning {alreadyCredited:true}, so a redelivered or double-tapped manual
+     * top-up (e.g. the Telegram confirm button pressed twice with a deterministic reference) credits
+     * exactly once. The existence check and the credit run in ONE transaction so they cannot race.
+     * A null reference cannot be deduped, so it falls back to a plain credit.
+     */
+    creditOnce({ userId, amount, type = 'topup', reference = null, note = null }) {
+        assertValidAmount(amount);
+        assertValidType(type);
+        if (!reference) return { ...this.credit({ userId, amount, type, reference, note }), alreadyCredited: false };
+        this.ensureWallet(userId);
+        const run = transaction(() => {
+            const existing = queryOne(
+                'SELECT 1 FROM wallet_transactions WHERE type = ? AND reference = ? LIMIT 1',
+                [type, reference]
+            );
+            if (existing) return { alreadyCredited: true, balance_after: this.getBalance(userId), reference };
+            return { ...this._apply({ userId, type, signedAmount: amount, reference, note }), alreadyCredited: false };
+        });
+        return run();
     }
 
     debit({ userId, amount, type = 'charge', reference = null, note = null, allowNegative = false }) {
