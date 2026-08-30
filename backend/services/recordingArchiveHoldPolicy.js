@@ -32,6 +32,22 @@ export function toSqliteUtc(ms) {
     return new Date(ms).toISOString().slice(0, 19).replace('T', ' ');
 }
 
+// Baca DB di sini BERPACU dengan sidecar yang menulis tabel yang sama. "Tabel tak ada" (instalasi
+// tanpa fitur arsip) = tak ada yang diarsip → retensi normal boleh jalan. TAPI error TRANSIEN
+// (SQLITE_BUSY / 'database is locked' / IO saat sidecar menulis) BUKAN itu, dan WAJIB gagal ke arah
+// MENAHAN — jangan pernah menghapus footage yang tak bisa kita buktikan sudah terarsip.
+function isMissingTable(err) {
+    return /no such table/i.test(err?.message || '');
+}
+
+// Verdict TERMINAL yang benar-benar berarti "aman, salinan lokal tak lagi diperlukan": 'ok' (terunggah,
+// punya file_id yang dipakai read-back), 'no_route' (kamera tak punya tujuan Telegram), 'before_cutoff'
+// (sebelum fitur arsip), 'stale_salvage' (sudah direkonsiliasi). 'failed'/'too_big'/'missing' berarti
+// kita SUDAH mencoba dan segmen TIDAK ada di Telegram — menghapus atas dasar itu adalah bug kehilangan
+// permanen yang justru modul ini cegah, jadi status itu TIDAK dihitung sebagai verdict aman di sini.
+const SAFE_VERDICT_CLAUSE =
+    "((status = 'ok' AND file_id IS NOT NULL) OR status IN ('no_route', 'before_cutoff', 'stale_salvage'))";
+
 export function createArchiveHoldPolicy({ query = defaultQuery } = {}) {
     return {
         /**
@@ -46,9 +62,10 @@ export function createArchiveHoldPolicy({ query = defaultQuery } = {}) {
                     [cameraId, sinceUtc],
                 );
                 return rows.length > 0;
-            } catch {
-                // Tabel belum ada (instalasi tanpa arsip) = tidak ada yang diarsipkan = jangan tahan.
-                return false;
+            } catch (err) {
+                // Tabel belum ada = tak ada arsip = jangan tahan. Error transien = fail-CLOSED: tahan
+                // satu siklus, jangan berhenti mengarsip lalu menghapus hanya karena baca gagal sesaat.
+                return isMissingTable(err) ? false : true;
             }
         },
 
@@ -59,13 +76,14 @@ export function createArchiveHoldPolicy({ query = defaultQuery } = {}) {
         hasArchiveVerdict(segmentId) {
             try {
                 const rows = query(
-                    'SELECT 1 FROM telegram_archive_uploads WHERE segment_id = ? LIMIT 1',
+                    `SELECT 1 FROM telegram_archive_uploads WHERE segment_id = ? AND ${SAFE_VERDICT_CLAUSE} LIMIT 1`,
                     [segmentId],
                 );
                 return rows.length > 0;
-            } catch {
-                // Tidak bisa membaca = jangan sampai menahan selamanya; anggap sudah diputuskan.
-                return true;
+            } catch (err) {
+                // Tabel belum ada = tak ada arsip = aman dihapus normal. Error transien = fail-CLOSED:
+                // anggap BELUM ada verdict aman → tahan (jangan hapus footage yang mungkin belum terarsip).
+                return isMissingTable(err) ? true : false;
             }
         },
     };

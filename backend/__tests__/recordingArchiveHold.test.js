@@ -33,14 +33,26 @@ describe('createArchiveHoldPolicy', () => {
         expect(p.cameraArchivingActive(9, '2026-07-30 00:00:00')).toBe(true);
         expect(query.mock.calls[0][0]).toMatch(/status = 'ok'/);
     });
-    it('false saat tak ada ok baru; false saat tabel tak ada', () => {
+    it('cameraArchivingActive: false saat tak ada ok baru & TABEL TAK ADA; TAHAN (true) saat error transien', () => {
         expect(createArchiveHoldPolicy({ query: () => [] }).cameraArchivingActive(9, 'x')).toBe(false);
-        expect(createArchiveHoldPolicy({ query: () => { throw new Error('no table'); } }).cameraArchivingActive(9, 'x')).toBe(false);
+        // Tabel tak ada (instalasi tanpa arsip) → tak ada yang diarsip → jangan tahan.
+        expect(createArchiveHoldPolicy({ query: () => { throw new Error('no such table: telegram_archive_uploads'); } }).cameraArchivingActive(9, 'x')).toBe(false);
+        // Error transien (lock saat sidecar menulis bersamaan) → fail-CLOSED: tahan, jangan menghapus.
+        expect(createArchiveHoldPolicy({ query: () => { throw new Error('database is locked'); } }).cameraArchivingActive(9, 'x')).toBe(true);
     });
-    it('hasArchiveVerdict: true saat ada baris/melempar, false saat kosong', () => {
-        expect(createArchiveHoldPolicy({ query: () => [{ 1: 1 }] }).hasArchiveVerdict(5)).toBe(true);
-        expect(createArchiveHoldPolicy({ query: () => [] }).hasArchiveVerdict(5)).toBe(false);
-        expect(createArchiveHoldPolicy({ query: () => { throw new Error('locked'); } }).hasArchiveVerdict(5)).toBe(true);
+    it('hasArchiveVerdict: hanya verdict AMAN dihitung; failed/too_big TIDAK; error transien = fail-CLOSED', () => {
+        const p = (query) => createArchiveHoldPolicy({ query });
+        // Query WAJIB memfilter ke status aman (ok+file_id / no_route / before_cutoff / stale_salvage),
+        // supaya baris 'failed'/'too_big'/'missing' tidak dianggap "sudah diarsip" lalu dihapus.
+        const spy = vi.fn(() => [{ 1: 1 }]);
+        expect(p(spy).hasArchiveVerdict(5)).toBe(true);
+        expect(spy.mock.calls[0][0]).toMatch(/status\s*=\s*'ok'\s*AND\s*file_id\s*IS\s*NOT\s*NULL/i);
+        expect(spy.mock.calls[0][0]).toMatch(/no_route/);
+        expect(p(() => []).hasArchiveVerdict(5)).toBe(false); // tak ada baris aman → TAHAN, bukan hapus
+        // Tabel tak ada → aman dihapus normal.
+        expect(p(() => { throw new Error('no such table: telegram_archive_uploads'); }).hasArchiveVerdict(5)).toBe(true);
+        // Error transien → fail-CLOSED: anggap belum ada verdict aman → tahan.
+        expect(p(() => { throw new Error('database is locked'); }).hasArchiveVerdict(5)).toBe(false);
     });
     it('toSqliteUtc: format datetime(now), tanpa T/Z/ms', () => {
         expect(toSqliteUtc(Date.UTC(2026, 7, 28, 14, 5, 9, 123))).toBe('2026-08-28 14:05:09');
