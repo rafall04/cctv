@@ -2,7 +2,7 @@
 //          process or in the separate recorder worker.
 // Caller: cameraService, cameraHealthService, recordingPlaybackService.
 // Deps: config.recording, recordingWorkerStateRepository, recordingService (in-process mode).
-// MainFuncs: isWorkerMode, reconcile, start, stop, restart, getRuntimeStatus.
+// MainFuncs: isWorkerMode, reconcile, start, stop, restart, restartAllActive, getRuntimeStatus.
 // SideEffects: In worker mode, queues rows in recording_reconcile_requests; otherwise
 //              calls recordingService directly.
 //
@@ -92,6 +92,36 @@ export async function restart(cameraId, reason = 'api_restart') {
 }
 
 /**
+ * Restart every camera that is ACTIVELY recording, so a fresh ffmpeg picks up a process-level
+ * setting that a running (or adopted) process cannot — notably the timezone ffmpeg bakes into segment
+ * FILENAMES at spawn. Enumerated per mode: worker mode reads what the recorder published; in-process
+ * mode asks the recorder directly. Best-effort per camera — one enqueue/restart failure never aborts
+ * the rest. Returns the camera ids acted on. NOTE: each restart shifts one segment boundary (~3s gap,
+ * detach/adopt keeps the footage), so this is for rare admin actions, not a routine path.
+ */
+export async function restartAllActive(reason = 'api_restart_all') {
+    let cameraIds;
+    if (isWorkerMode()) {
+        cameraIds = workerState.readAllProcessState()
+            .filter((row) => row.status === 'recording')
+            .map((row) => row.camera_id);
+    } else {
+        const service = await getRecordingService();
+        cameraIds = service.getActiveRecordingCameraIds();
+    }
+    const restarted = [];
+    for (const cameraId of cameraIds) {
+        try {
+            await restart(cameraId, reason);
+            restarted.push(cameraId);
+        } catch {
+            // best-effort: one camera's failure must not stop the others
+        }
+    }
+    return { restarted };
+}
+
+/**
  * Runtime status for one camera.
  *
  * In worker mode the recorder's in-memory map is in another process, so this reads
@@ -132,5 +162,6 @@ export default {
     start,
     stop,
     restart,
+    restartAllActive,
     getRuntimeStatus,
 };

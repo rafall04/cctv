@@ -23,6 +23,7 @@ import backupService from '../services/backupService.js';
 import cameraHealthService from '../services/cameraHealthService.js';
 import notificationDiagnosticsService from '../services/notificationDiagnosticsService.js';
 import recordingHealthDashboardService from '../services/recordingHealthDashboardService.js';
+import recordingControlService from '../services/recordingControlService.js';
 import workerState from '../services/recordingWorkerStateRepository.js';
 import { config } from '../config/config.js';
 import securityAuditLogger from '../services/securityAuditLogger.js';
@@ -496,16 +497,32 @@ export async function updateTimezoneConfig(request, reply) {
 
         setTimezone(timezone);
 
+        // The recorder bakes the timezone into ffmpeg's env at SPAWN, and names each segment file with
+        // it; a running (or restart-adopted) ffmpeg cannot pick up the change. Without a respawn, the
+        // segment FINALIZER would parse new-tz filenames against the OLD-tz ffmpeg output, shifting the
+        // stored start_time by the tz offset — and with it retention/expiry. So respawn active recorders
+        // through the in-band restart queue (NOT pm2/SIGHUP, which only detach+adopt the same old-tz
+        // ffmpeg). Best-effort: a recorder hiccup must never fail the timezone change itself.
+        let recordersRestarted = [];
+        try {
+            ({ restarted: recordersRestarted } = await recordingControlService.restartAllActive('timezone_changed'));
+            if (recordersRestarted.length > 0) {
+                console.log(`[Timezone] Requested restart of ${recordersRestarted.length} active recorder(s) to apply timezone ${timezone}: ${recordersRestarted.join(', ')}`);
+            }
+        } catch (error) {
+            console.error('[Timezone] Recorder restart request after timezone change failed:', error.message);
+        }
+
         logAdminAction({
             action: 'timezone_updated',
-            details: { timezone },
+            details: { timezone, recordersRestarted: recordersRestarted.length },
             userId: request.user?.id
         }, request);
 
         return reply.send({
             success: true,
             message: 'Timezone berhasil diupdate',
-            data: { timezone }
+            data: { timezone, recorders_restarted: recordersRestarted.length }
         });
     } catch (error) {
         console.error('Update timezone config error:', error);

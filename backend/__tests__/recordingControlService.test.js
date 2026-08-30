@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const requestReconcileMock = vi.fn(() => true);
 const readProcessStateMock = vi.fn();
+const readAllProcessStateMock = vi.fn(() => []);
 const readHealthSnapshotMock = vi.fn();
 
 const startRecordingMock = vi.fn(async () => ({ success: true }));
@@ -16,6 +17,7 @@ const stopRecordingMock = vi.fn(async () => ({ success: true }));
 const restartRecordingMock = vi.fn(async () => ({ success: true }));
 const reconcileLifecycleMock = vi.fn(async () => ({ success: true }));
 const getRecordingStatusMock = vi.fn(() => ({ isRecording: true, status: 'recording' }));
+const getActiveRecordingCameraIdsMock = vi.fn(() => []);
 
 let workerEnabled = false;
 
@@ -31,6 +33,7 @@ vi.mock('../services/recordingWorkerStateRepository.js', () => ({
     default: {
         requestReconcile: requestReconcileMock,
         readProcessState: readProcessStateMock,
+        readAllProcessState: readAllProcessStateMock,
         readHealthSnapshot: readHealthSnapshotMock,
     },
 }));
@@ -42,6 +45,7 @@ vi.mock('../services/recordingService.js', () => ({
         restartRecording: restartRecordingMock,
         reconcileRecordingLifecycle: reconcileLifecycleMock,
         getRecordingStatus: getRecordingStatusMock,
+        getActiveRecordingCameraIds: getActiveRecordingCameraIdsMock,
     },
 }));
 
@@ -78,6 +82,29 @@ describe('recordingControlService — single-process mode', () => {
 
         await expect(control.getRuntimeStatus(7)).resolves.toEqual({ isRecording: true, status: 'recording' });
         expect(getRecordingStatusMock).toHaveBeenCalledWith(7);
+    });
+
+    it('restartAllActive restarts every actively-recording camera (in-process, fix #7)', async () => {
+        getActiveRecordingCameraIdsMock.mockReturnValue([1, 2, 3]);
+        const control = await loadControl();
+
+        const result = await control.restartAllActive('timezone_changed');
+
+        expect(restartRecordingMock).toHaveBeenCalledWith(1, 'timezone_changed');
+        expect(restartRecordingMock).toHaveBeenCalledWith(2, 'timezone_changed');
+        expect(restartRecordingMock).toHaveBeenCalledWith(3, 'timezone_changed');
+        expect(result.restarted).toEqual([1, 2, 3]);
+    });
+
+    it('restartAllActive is best-effort: one camera failing does not abort the rest', async () => {
+        getActiveRecordingCameraIdsMock.mockReturnValue([1, 2, 3]);
+        restartRecordingMock.mockRejectedValueOnce(new Error('boom on camera 1'));
+        const control = await loadControl();
+
+        const result = await control.restartAllActive('timezone_changed');
+
+        expect(result.restarted).toEqual([2, 3]); // 1 failed, 2 & 3 still restarted
+        expect(restartRecordingMock).toHaveBeenCalledTimes(3);
     });
 });
 
@@ -145,5 +172,22 @@ describe('recordingControlService — worker mode', () => {
         const control = await loadControl();
 
         await expect(control.getRuntimeStatus(9)).resolves.toEqual({ isRecording: false, status: 'stopped' });
+    });
+
+    it('restartAllActive queues a restart ONLY for cameras the worker is recording (fix #7)', async () => {
+        readAllProcessStateMock.mockReturnValue([
+            { camera_id: 1, status: 'recording' },
+            { camera_id: 2, status: 'stopped' },   // not recording → skip
+            { camera_id: 3, status: 'recording' },
+        ]);
+        const control = await loadControl();
+
+        const result = await control.restartAllActive('timezone_changed');
+
+        expect(requestReconcileMock).toHaveBeenCalledWith(1, 'timezone_changed', 'restart');
+        expect(requestReconcileMock).toHaveBeenCalledWith(3, 'timezone_changed', 'restart');
+        expect(requestReconcileMock).not.toHaveBeenCalledWith(2, 'timezone_changed', 'restart');
+        expect(result.restarted).toEqual([1, 3]);
+        expect(restartRecordingMock).not.toHaveBeenCalled(); // worker mode → queued, not direct
     });
 });
