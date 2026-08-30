@@ -22,6 +22,7 @@ import {
     getStreamCapabilities,
 } from '../utils/cameraDelivery.js';
 import { SHARED_CAMERA_STREAM_PROJECTION, SHARED_CAMERA_STREAM_WITH_AREA_PROJECTION } from '../utils/cameraProjection.js';
+import { stripUrlCredentials } from '../utils/logRedaction.js';
 
 function resolveViewerStats(statsByCamera, cameraId) {
     return statsByCamera[cameraId] || cameraViewStatsService.emptyStats;
@@ -136,10 +137,13 @@ class StreamService {
             stream_capabilities: capabilities,
             streams,
             stream_source: camera.stream_source || (deliveryType === 'internal_hls' ? 'internal' : 'external'),
-            external_hls_url: extHlsUrl,
-            external_stream_url: extStreamUrl,
-            external_embed_url: camera.external_embed_url || null,
-            external_snapshot_url: camera.external_snapshot_url || null,
+            // Credential-strip: these four ship straight from camera.* here (bypassing the projection
+            // strip that ran on `rest`), so userinfo an admin embedded in any external URL never
+            // reaches an anonymous client. Credential-free URLs are returned unchanged.
+            external_hls_url: stripUrlCredentials(extHlsUrl),
+            external_stream_url: stripUrlCredentials(extStreamUrl),
+            external_embed_url: stripUrlCredentials(camera.external_embed_url) || null,
+            external_snapshot_url: stripUrlCredentials(camera.external_snapshot_url) || null,
             external_origin_mode: camera.external_origin_mode || 'direct',
         };
     }

@@ -8,6 +8,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+    CREDENTIALED_EXTERNAL_URL_FIELDS,
     PROXIED_ORIGIN_URL_FIELDS,
     PUBLIC_LANDING_INTERNAL_FIELDS,
     stripInternalLandingFields,
@@ -154,5 +155,73 @@ describe('public growth payload (/api/public/*)', () => {
         expect(result).not.toHaveProperty('external_stream_url');
         expect(result).not.toHaveProperty('external_hls_url');
         expect(result.name).toBe('SIMPANG 4 TEUKU UMAR');
+    });
+});
+
+/*
+ * THEME C: an admin who pastes credentials into ANY external URL (https://user:pass@host/…) must not
+ * leak them to anonymous clients. The proxy-strip above only nulls stream/hls WHEN proxied; embed and
+ * snapshot are never nulled, and a non-proxied stream/hls ships raw — so the userinfo is stripped from
+ * ALL of them, unconditionally, while the URL stays functional.
+ */
+describe('stripProxiedOriginUrls — credential stripping (THEME C)', () => {
+    it('strips user:pass@ from embed & snapshot even on a NON-proxied camera (early-return path)', () => {
+        const row = {
+            id: 9,
+            name: 'PASAR',
+            stream_source: 'external',
+            delivery_type: 'external_embed', // not external_hls → proxy-strip does NOT fire
+            external_use_proxy: 0,
+            external_embed_url: 'https://user:secret@embed.example/player?token=keep',
+            external_snapshot_url: 'https://admin:pw@snap.example/still.jpg',
+        };
+
+        const result = stripProxiedOriginUrls(row);
+
+        expect(result.external_embed_url).toBe('https://embed.example/player?token=keep'); // token kept
+        expect(result.external_snapshot_url).toBe('https://snap.example/still.jpg');
+        expect(result.name).toBe('PASAR');
+    });
+
+    it('strips user:pass@ from a NON-proxied stream/hls URL that still ships raw', () => {
+        const row = {
+            id: 10,
+            stream_source: 'external',
+            delivery_type: 'external_hls',
+            external_use_proxy: 0, // not proxied → URL is emitted, so it must be credential-clean
+            external_stream_url: 'https://u:p@origin.example/live.m3u8',
+            external_hls_url: 'https://u:p@origin.example/live.m3u8',
+        };
+
+        const result = stripProxiedOriginUrls(row);
+
+        expect(result.external_stream_url).toBe('https://origin.example/live.m3u8');
+        expect(result.external_hls_url).toBe('https://origin.example/live.m3u8');
+    });
+
+    it('returns a credential-free row BYTE-IDENTICAL (same object reference, no needless copy)', () => {
+        const row = {
+            id: 11,
+            stream_source: 'external',
+            delivery_type: 'external_embed',
+            external_use_proxy: 0,
+            external_embed_url: 'https://embed.example/player',
+            external_snapshot_url: 'https://snap.example/still.jpg',
+        };
+        expect(stripProxiedOriginUrls(row)).toBe(row); // no copy → nothing to strip
+    });
+
+    it('the four credentialed fields are exactly the external URL set', () => {
+        expect(CREDENTIALED_EXTERNAL_URL_FIELDS).toEqual([
+            'external_stream_url', 'external_hls_url', 'external_embed_url', 'external_snapshot_url',
+        ]);
+    });
+
+    it('end-to-end via stripInternalLandingFields (surface /api/cameras/active) also strips creds', () => {
+        const result = stripInternalLandingFields({
+            id: 12, stream_source: 'external', delivery_type: 'external_embed', external_use_proxy: 0,
+            external_snapshot_url: 'https://user:pass@snap.example/x.jpg',
+        });
+        expect(result.external_snapshot_url).toBe('https://snap.example/x.jpg');
     });
 });

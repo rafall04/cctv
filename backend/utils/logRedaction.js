@@ -1,7 +1,9 @@
-// Purpose: Strip embedded credentials out of free-text log lines before they are printed.
-// Caller: recordingService (FFmpeg output), any log path that echoes third-party text.
+// Purpose: Strip embedded credentials out of free-text log lines before they are printed, and
+//          strip them out of URLs before they are handed to a client.
+// Caller: recordingService (FFmpeg output) + any log path that echoes third-party text
+//         (redactUrlCredentials); public camera projections (stripUrlCredentials).
 // Deps: None.
-// MainFuncs: redactUrlCredentials.
+// MainFuncs: redactUrlCredentials, stripUrlCredentials.
 // SideEffects: None; pure string transform.
 //
 // WHY THIS EXISTS SEPARATELY FROM maskRecordingSourceForLog
@@ -60,4 +62,21 @@ export function redactUrlCredentials(value) {
         .replace(URL_QUERY_SECRET_RE, '$1****');
 }
 
-export default { redactUrlCredentials };
+/**
+ * REMOVE the userinfo credentials from `value` so a URL is safe to hand a client: `scheme://user:pass@`
+ * becomes `scheme://`, leaving a still-functional `scheme://host/path?query#frag`. Unlike
+ * redactUrlCredentials — which MASKS to `****` to keep a log line legible — this yields a clean, usable
+ * URL, so an admin who pasted `https://user:pass@host/snapshot.jpg` no longer leaks the credentials to
+ * anonymous public clients while the image/embed keeps loading (browsers ignore userinfo on img/iframe
+ * subresources anyway). Query/fragment are left untouched so signed/tokenised URLs still work. Global,
+ * so a credential in a nested URL (an embed link whose fragment carries the real origin) is stripped
+ * too. Non-strings and credential-free URLs are returned unchanged, so it is safe to run over any field.
+ */
+export function stripUrlCredentials(value) {
+    if (typeof value !== 'string' || value === '') {
+        return value;
+    }
+    return value.replace(URL_USERINFO_RE, '$1');
+}
+
+export default { redactUrlCredentials, stripUrlCredentials };

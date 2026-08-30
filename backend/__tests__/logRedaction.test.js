@@ -2,11 +2,11 @@
  * Purpose: Validate that free-text log redaction removes URL credentials without eating context.
  * Caller: Vitest backend suite.
  * Deps: utils/logRedaction.
- * MainFuncs: redactUrlCredentials.
+ * MainFuncs: redactUrlCredentials, stripUrlCredentials.
  * SideEffects: None.
  */
 import { describe, expect, it } from 'vitest';
-import { redactUrlCredentials } from '../utils/logRedaction.js';
+import { redactUrlCredentials, stripUrlCredentials } from '../utils/logRedaction.js';
 
 describe('redactUrlCredentials', () => {
     it('masks user and password inside an FFmpeg error line', () => {
@@ -93,5 +93,51 @@ describe('rahasia di query string', () => {
     it('kedua aturan berlaku pada baris yang sama', () => {
         expect(redactUrlCredentials('rtsp://admin:hunter2@10.0.0.4:554/s?token=abc: timed out'))
             .toBe('rtsp://****:****@10.0.0.4:554/s?token=****: timed out');
+    });
+});
+
+/*
+ * stripUrlCredentials MENGHAPUS userinfo (bukan memasker) supaya URL tetap bisa dipakai klien, TAPI
+ * TIDAK menyentuh query string — beda dengan redactUrlCredentials — karena token di query kadang
+ * memang bagian dari URL yang harus tetap berfungsi (snapshot/embed bertanda-tangan).
+ */
+describe('stripUrlCredentials', () => {
+    it('menghapus user:pass@ dan menyisakan URL yang masih fungsional', () => {
+        expect(stripUrlCredentials('https://user:pass@host.example/snapshot.jpg'))
+            .toBe('https://host.example/snapshot.jpg');
+    });
+
+    it('menghapus username tanpa password', () => {
+        expect(stripUrlCredentials('rtsp://operator@10.0.0.9/live')).toBe('rtsp://10.0.0.9/live');
+    });
+
+    it('MEMPERTAHANKAN query & fragment apa adanya (URL bertanda-tangan tetap jalan)', () => {
+        expect(stripUrlCredentials('https://user:pass@cam.example/snap.jpg?token=abc&x=1'))
+            .toBe('https://cam.example/snap.jpg?token=abc&x=1');
+        // Beda tegas dengan redactUrlCredentials yang justru menyamarkan token=****:
+        expect(redactUrlCredentials('https://cam.example/snap.jpg?token=abc'))
+            .toBe('https://cam.example/snap.jpg?token=****');
+    });
+
+    it('URL tanpa kredensial dikembalikan BYTE-IDENTIK', () => {
+        const url = 'https://cam.example/live.m3u8?session=AbC#frag';
+        expect(stripUrlCredentials(url)).toBe(url);
+    });
+
+    it('menghapus kredensial di URL BERSARANG (fragment pembawa origin, mis. flv-player)', () => {
+        expect(stripUrlCredentials('https://player.example/flv#https://user:pass@origin.example/stream.flv'))
+            .toBe('https://player.example/flv#https://origin.example/stream.flv');
+    });
+
+    it('tidak cocok dengan @ di dalam path', () => {
+        expect(stripUrlCredentials('https://cdn.example/assets/logo@2x.png'))
+            .toBe('https://cdn.example/assets/logo@2x.png');
+    });
+
+    it('meneruskan non-string & nilai kosong apa adanya', () => {
+        expect(stripUrlCredentials('')).toBe('');
+        expect(stripUrlCredentials(null)).toBe(null);
+        expect(stripUrlCredentials(undefined)).toBe(undefined);
+        expect(stripUrlCredentials(42)).toBe(42);
     });
 });

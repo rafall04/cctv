@@ -3,7 +3,7 @@
  *          AFTER availability enrichment, so GET /api/cameras/active stays lean and never
  *          leaks internal monitoring/health state to the public surface.
  * Caller: cameraService.getPublicLandingCameraList (final .map in the read-model pipeline).
- * Deps: none.
+ * Deps: logRedaction (stripUrlCredentials).
  * MainFuncs: stripInternalLandingFields.
  * SideEffects: none (returns a shallow copy; never mutates the input).
  *
@@ -14,6 +14,8 @@
  * BEFORE this strip, so removing them here does not affect availability computation.
  * `stream_key` is already omitted from PUBLIC_LANDING_CAMERA_PROJECTION, so it is not listed.
  */
+
+import { stripUrlCredentials } from '../utils/logRedaction.js';
 
 export const PUBLIC_LANDING_INTERNAL_FIELDS = [
     'monitoring_state',
@@ -65,6 +67,20 @@ export const PROXIED_ORIGIN_URL_FIELDS = [
     'external_hls_url',
 ];
 
+/*
+ * Every external URL an anonymous client can be handed. Proxied external_hls cameras drop
+ * stream/hls entirely (above); the rest — non-proxied streams, and the embed/snapshot URLs that are
+ * NEVER dropped because the public UI needs them — still ship raw. An admin who typed credentials
+ * into any of these (https://user:pass@host/…) would leak them to the whole internet, so the
+ * userinfo is stripped from ALL of them unconditionally, leaving a still-functional URL.
+ */
+export const CREDENTIALED_EXTERNAL_URL_FIELDS = [
+    'external_stream_url',
+    'external_hls_url',
+    'external_embed_url',
+    'external_snapshot_url',
+];
+
 /**
  * Shared so /api/cameras/active and /api/public/* cannot drift apart. Closing the leak on
  * one public endpoint while the next one over still publishes the same URL is not hardening,
@@ -83,15 +99,27 @@ export function stripProxiedOriginUrls(camera, { assumeProxied = false } = {}) {
         return camera;
     }
 
-    const subject = assumeProxied && camera.external_use_proxy === undefined
-        ? { ...camera, external_use_proxy: 1 }
-        : camera;
-
-    if (!shouldHideOriginUrls(subject)) {
-        return camera;
+    // Credential-strip runs for EVERY camera — a non-proxied stream/hls URL and the embed/snapshot
+    // URLs (never dropped below) all ship raw, and any of them may carry userinfo. Copy-on-write, so
+    // a credential-free row is returned byte-identical.
+    let publicCamera = camera;
+    for (const field of CREDENTIALED_EXTERNAL_URL_FIELDS) {
+        const cleaned = stripUrlCredentials(camera[field]);
+        if (cleaned !== camera[field]) {
+            if (publicCamera === camera) publicCamera = { ...camera };
+            publicCamera[field] = cleaned;
+        }
     }
 
-    const publicCamera = { ...camera };
+    const subject = assumeProxied && publicCamera.external_use_proxy === undefined
+        ? { ...publicCamera, external_use_proxy: 1 }
+        : publicCamera;
+
+    if (!shouldHideOriginUrls(subject)) {
+        return publicCamera;
+    }
+
+    if (publicCamera === camera) publicCamera = { ...camera };
     for (const field of PROXIED_ORIGIN_URL_FIELDS) {
         delete publicCamera[field];
     }

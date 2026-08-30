@@ -227,6 +227,37 @@ describe('streamService camera response routing', () => {
         expect(response.external_snapshot_url).toBe('https://example.com/snap/13.jpg');
     });
 
+    it('THEME C: strips embedded credentials from embed & snapshot URLs, keeping the URL functional', () => {
+        const response = streamService.buildCameraResponse({
+            id: 14,
+            stream_key: 'camera14',
+            stream_source: 'external',
+            delivery_type: 'external_embed',
+            external_use_proxy: 0,
+            external_embed_url: 'https://user:secret@embed.example/player?token=keep',
+            external_snapshot_url: 'https://admin:pw@snap.example/still.jpg',
+        });
+
+        expect(response.external_embed_url).toBe('https://embed.example/player?token=keep'); // token kept
+        expect(response.external_snapshot_url).toBe('https://snap.example/still.jpg');
+        expect(JSON.stringify(response)).not.toContain('user:secret');
+        expect(JSON.stringify(response)).not.toContain('admin:pw');
+    });
+
+    it('THEME C: strips credentials from a direct-stream (non-proxied) external URL still shipped raw', () => {
+        const response = streamService.buildCameraResponse({
+            id: 15,
+            stream_key: 'camera15',
+            stream_source: 'external',
+            external_stream_url: 'https://u:p@origin.example/live.m3u8',
+            external_hls_url: 'https://u:p@origin.example/live.m3u8',
+            external_use_proxy: 0,
+        });
+
+        expect(response.external_stream_url).toBe('https://origin.example/live.m3u8');
+        expect(response.external_hls_url).toBe('https://origin.example/live.m3u8');
+    });
+
     it('never builds internal hls urls for non-hls external cameras', () => {
         const response = streamService.buildCameraResponse({
             id: 12,
