@@ -124,6 +124,7 @@ ok "Preflight: tooling and project layout OK"
 
 # Resolve the PM2 process names (optional — only needed for the deploy mode).
 CLIENT_CODE=""
+DEPLOY_CHANNEL=""
 if [ -f "$SCRIPT_DIR/client.config.sh" ]; then
     # shellcheck disable=SC1091
     source "$SCRIPT_DIR/client.config.sh"
@@ -131,6 +132,14 @@ fi
 BACKEND_PM2="${CLIENT_CODE:+${CLIENT_CODE}-}cctv-backend"
 MEDIAMTX_PM2="${CLIENT_CODE:+${CLIENT_CODE}-}mediamtx"
 RECORDER_PM2="${CLIENT_CODE:+${CLIENT_CODE}-}cctv-recorder"
+
+# Release channel this box tracks (from client.config.sh; empty on legacy boxes → "main").
+#   main            → latest origin/main (legacy behaviour; NO change for existing clients)
+#   stable | canary → the tag deployment/release-channels.json points that channel at, read from
+#                     origin/main. This is the fleet valve: a regression pushed to main (or shipped
+#                     on a canary tag) never reaches a 'stable' client until the manifest is promoted.
+#   v1.4.0 / <sha>  → pinned to exactly that tag/commit.
+DEPLOY_CHANNEL="${DEPLOY_CHANNEL:-main}"
 
 # ===========================================================================
 # PHASE 2 — Repair backend/.env
@@ -214,7 +223,7 @@ fi
 # ===========================================================================
 hr
 echo "About to deploy to PRODUCTION:"
-echo "  • git fast-forward to origin/main"
+echo "  • release channel: ${DEPLOY_CHANNEL}  (main = latest origin/main; a channel/tag = pinned)"
 echo "  • npm install (backend + frontend)"
 echo "  • run database migrations"
 echo "  • build frontend"
@@ -247,14 +256,39 @@ fi
 # PHASE 6 — Pull + install + migrate + build
 # ===========================================================================
 hr
-info "Updating code"
+info "Updating code (channel: ${DEPLOY_CHANNEL})"
 if [ -n "$(git -C "$APP_DIR" status --porcelain --untracked-files=no)" ]; then
     fatal "Working tree has uncommitted tracked changes. Resolve them, then re-run."
 fi
-git -C "$APP_DIR" fetch origin main
-git -C "$APP_DIR" checkout main
-git -C "$APP_DIR" merge --ff-only origin/main
-ok "Code fast-forwarded to origin/main"
+# Fetch main AND tags: channels resolve to a tag, and the manifest is read from origin/main.
+git -C "$APP_DIR" fetch --tags --prune origin main
+
+case "$DEPLOY_CHANNEL" in
+    main | "")
+        # LEGACY PATH — byte-for-byte the old behaviour, so existing clients deploy exactly as before.
+        git -C "$APP_DIR" checkout main
+        git -C "$APP_DIR" merge --ff-only origin/main
+        ok "Code fast-forwarded to origin/main ($(git -C "$APP_DIR" rev-parse --short HEAD))"
+        ;;
+    stable | canary)
+        # Channel → tag, read from the manifest on origin/main (the ONE control point). Promoting a
+        # release = editing deployment/release-channels.json on main; nothing on this box decides it.
+        CH_TAG="$(git -C "$APP_DIR" show origin/main:deployment/release-channels.json 2>/dev/null \
+            | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{const m=JSON.parse(s);const c=(m.channels&&m.channels['$DEPLOY_CHANNEL'])||m['$DEPLOY_CHANNEL']||'';process.stdout.write(String(c))}catch(e){process.stdout.write('')}})")"
+        [ -n "$CH_TAG" ] || fatal "Channel '${DEPLOY_CHANNEL}' has no tag in deployment/release-channels.json on origin/main."
+        git -C "$APP_DIR" rev-parse -q --verify "refs/tags/${CH_TAG}^{commit}" >/dev/null 2>&1 \
+            || fatal "Channel '${DEPLOY_CHANNEL}' points at tag '${CH_TAG}', which is not present. Push it: git push origin ${CH_TAG}"
+        git -C "$APP_DIR" checkout --detach "refs/tags/${CH_TAG}"
+        ok "Code pinned to channel '${DEPLOY_CHANNEL}' → ${CH_TAG} ($(git -C "$APP_DIR" rev-parse --short HEAD))"
+        ;;
+    *)
+        # Explicit pin: an exact tag or commit for this one client.
+        git -C "$APP_DIR" rev-parse -q --verify "${DEPLOY_CHANNEL}^{commit}" >/dev/null 2>&1 \
+            || fatal "DEPLOY_CHANNEL='${DEPLOY_CHANNEL}' is not a known channel, tag, or commit."
+        git -C "$APP_DIR" checkout --detach "$DEPLOY_CHANNEL"
+        ok "Code pinned to ${DEPLOY_CHANNEL} ($(git -C "$APP_DIR" rev-parse --short HEAD))"
+        ;;
+esac
 
 info "Installing backend dependencies"
 ( cd "$BACKEND_DIR" && npm install --omit=dev --no-audit --no-fund )

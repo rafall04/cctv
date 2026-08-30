@@ -236,6 +236,13 @@ cat > "${TMP_CONFIG}" << EOF
 CLIENT_NAME="$CLIENT_NAME"
 CLIENT_CODE="$CLIENT_CODE"
 
+# Release channel this box deploys (read by safe-deploy.sh). See docs/release-channels.md.
+#   main            = latest origin/main (default; what every box did before channels existed)
+#   stable | canary = the pinned tag deployment/release-channels.json points that channel at
+#   v1.4.0 / <sha>  = pin to exactly that tag/commit
+# Recommended once you run more than one box: put ONE box on "canary", the rest on "stable".
+DEPLOY_CHANNEL="main"
+
 # Domain Configuration
 FRONTEND_DOMAIN="$FRONTEND_DOMAIN"
 BACKEND_DOMAIN="$BACKEND_DOMAIN"
