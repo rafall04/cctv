@@ -28,6 +28,7 @@ vi.mock('../services/cameraService.js', () => ({
 
 vi.mock('../services/timezoneService.js', () => ({
     getTimezone: () => 'Asia/Jakarta',
+    getBillingTimezone: () => 'Asia/Jakarta',
 }));
 
 vi.mock('../services/securityAuditLogger.js', () => ({
@@ -161,8 +162,19 @@ describe('billingPlanService', () => {
             });
             expect(plan.key).toBe('pro');
             expect(() => billingPlanService.createPlan({
-                key: 'pro', name: 'Dup', price_per_camera: 1, max_cameras: 1,
+                key: 'pro', name: 'Dup', price_per_camera: 18000, max_cameras: 1,
             })).toThrowError(expect.objectContaining({ statusCode: 400 }));
+        });
+
+        it('rejects a paid plan priced below the daily-proration floor, but allows 0 (free) (#13)', () => {
+            // A positive price under MIN_PAID_PLAN_PRICE would make the Rp1/day floor overcharge
+            // (a Rp10/mo plan bills Rp30/mo). Blocked at the source; free (0) still allowed.
+            expect(() => billingPlanService.createPlan({
+                key: 'tiny', name: 'Tiny', price_per_camera: 10, max_cameras: 1,
+            })).toThrowError(expect.objectContaining({ statusCode: 400 }));
+            // 0 = free plan, exempt.
+            const free = billingPlanService.createPlan({ key: 'gratis', name: 'Gratis', price_per_camera: 0, max_cameras: 1 });
+            expect(free.price_per_camera).toBe(0);
         });
 
         it('refuses trial plans without a duration', () => {

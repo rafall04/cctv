@@ -1,14 +1,14 @@
 /**
  * Purpose: Pure date/money helpers for the billing engine — no DB, no state, no side effects.
  * Caller: billingService (re-exports these), and anything importing the date/money helpers.
- * Deps: timezoneService (read-only getTimezone).
+ * Deps: timezoneService (read-only getBillingTimezone).
  * SideEffects: none.
  *
  * Split out of billingService.js so the engine file stays under the size budget and these
  * timezone/rounding rules — the part most worth unit-testing in isolation — sit on their own.
  */
 
-import { getTimezone } from './timezoneService.js';
+import { getBillingTimezone } from './timezoneService.js';
 
 /** Prorated daily cost of a monthly price. INTEGER rupiah, min 1 for any priced sub, 0 = free. */
 export function dailyCostOf(monthlyPrice) {
@@ -18,11 +18,15 @@ export function dailyCostOf(monthlyPrice) {
     return Math.max(1, Math.round(monthlyPrice / 30));
 }
 
-/** Today's calendar date in the configured billing timezone (Asia/Jakarta by default), YYYY-MM-DD. */
+/**
+ * Today's calendar date in the pinned BILLING timezone (Asia/Jakarta by default), YYYY-MM-DD.
+ * Uses getBillingTimezone (NOT the mutable display tz) so an admin toggling the display timezone
+ * never shifts the billing day boundary and double-charges across it — see getBillingTimezone.
+ */
 export function localDateString(now = new Date()) {
     let timeZone;
     try {
-        timeZone = getTimezone() || 'Asia/Jakarta';
+        timeZone = getBillingTimezone() || 'Asia/Jakarta';
     } catch {
         timeZone = 'Asia/Jakarta';
     }

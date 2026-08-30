@@ -44,7 +44,7 @@ vi.mock('../services/walletService.js', () => ({
     },
 }));
 vi.mock('../services/cameraAccessService.js', () => ({ invalidateCameraAccessCache: vi.fn() }));
-vi.mock('../services/timezoneService.js', () => ({ getTimezone: () => 'Asia/Jakarta' }));
+vi.mock('../services/timezoneService.js', () => ({ getTimezone: () => 'Asia/Jakarta', getBillingTimezone: () => 'Asia/Jakarta' }));
 vi.mock('../services/securityAuditLogger.js', () => ({
     logAdminAction: vi.fn(), logSecurityEvent: vi.fn(), SECURITY_EVENTS: {},
 }));

@@ -14,6 +14,23 @@ export function getTimezone() {
     return setting?.setting_value || 'Asia/Jakarta';
 }
 
+/**
+ * Timezone for BILLING day-labels — pinned SEPARATELY from the display timezone above.
+ *
+ * A display-tz toggle (WIB↔WITA↔WIT) must NOT move the billing day boundary. Near midnight it would
+ * relabel "today" (e.g. 22:30 WIB → 00:30 WIT the next date), making a subscription already charged
+ * for the old label look due again and double-charging it within minutes. Seeded once from the
+ * display tz by migration and never touched by setTimezone(), so billing days stay stable regardless
+ * of what an operator sets the display tz to. Falls back to the display tz until the seed exists.
+ */
+export function getBillingTimezone() {
+    const setting = queryOne(
+        'SELECT setting_value FROM system_settings WHERE setting_key = ?',
+        ['billing_timezone']
+    );
+    return setting?.setting_value || getTimezone();
+}
+
 export function setTimezone(timezone) {
     const validTimezone = TIMEZONE_MAP[timezone] || timezone;
     execute(

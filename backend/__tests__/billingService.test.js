@@ -27,6 +27,7 @@ vi.mock('../services/cameraService.js', () => ({
 
 vi.mock('../services/timezoneService.js', () => ({
     getTimezone: () => 'Asia/Jakarta',
+    getBillingTimezone: () => 'Asia/Jakarta',
 }));
 
 vi.mock('../services/securityAuditLogger.js', () => ({

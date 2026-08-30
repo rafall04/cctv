@@ -56,6 +56,12 @@ function notFound(message) {
     return err;
 }
 
+// Below this, a positive monthly price cannot be represented as an integer daily charge without the
+// Rp1/day floor (dailyCostOf) overcharging — e.g. a Rp10/mo plan bills Rp30/mo (3×). No real plan is
+// priced this low; the floor blocks the pathological case at the source rather than distorting the
+// daily proration for realistic plans. 0 (free/trial) is exempt. (#13)
+const MIN_PAID_PLAN_PRICE = 1000;
+
 function normalizePlanPayload(data, { partial = false } = {}) {
     const out = {};
     const has = (k) => data[k] !== undefined;
@@ -73,6 +79,9 @@ function normalizePlanPayload(data, { partial = false } = {}) {
         const price = Number(data.price_per_camera);
         if (!Number.isInteger(price) || price < 0) {
             throw badRequest('Harga per kamera harus bilangan bulat >= 0 (rupiah)');
+        }
+        if (price > 0 && price < MIN_PAID_PLAN_PRICE) {
+            throw badRequest(`Harga paket berbayar minimal Rp${MIN_PAID_PLAN_PRICE.toLocaleString('id-ID')} per kamera/bulan (atau 0 untuk gratis)`);
         }
         out.price_per_camera = price;
     }
