@@ -14,7 +14,7 @@ import { createTransformThrottle } from '../../utils/rafThrottle.js';
 // Disables heavy features (willChange, RAF throttle) on low-end
 // ============================================
 const ZoomableVideo = memo(forwardRef(function ZoomableVideo(
-    { videoRef, maxZoom = 4, onZoomChange },
+    { videoRef, maxZoom = 4, onZoomChange, isFullscreen = false },
     ref,
 ) {
     const wrapperRef = useRef(null);
@@ -238,7 +238,14 @@ const ZoomableVideo = memo(forwardRef(function ZoomableVideo(
         >
             <video
                 ref={videoRef}
-                className="w-full h-full pointer-events-none object-contain"
+                // FULLSCREEN fills the screen (object-cover): the screen's aspect ratio is fixed, so a
+                // camera whose ratio differs (4:3 on a 16:9 screen, or 16:9 on a 16:10/ultrawide one)
+                // would object-CONTAIN into black pillarbox bars on the sides. Cover crops the overflow
+                // instead so the image fills edge-to-edge — the zoom/pan below still lets the operator
+                // reach any cropped area. WINDOWED keeps object-contain: there the body is already sized
+                // to the camera's exact ratio (getPublicPopupBodyStyle), so contain fills with no bars
+                // AND shows the whole frame. (This is what the previously-ignored isFullscreen prop was for.)
+                className={`w-full h-full pointer-events-none ${isFullscreen ? 'object-cover' : 'object-contain'}`}
                 muted
                 playsInline
                 autoPlay
