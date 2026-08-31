@@ -12,6 +12,7 @@ import playbackTokenService from '../../services/playbackTokenService.js';
 import { useConfirm } from '../../contexts/ConfirmContext';
 import { useNotification } from '../../contexts/NotificationContext';
 import { TIMESTAMP_STORAGE, useTimezone } from '../../contexts/TimezoneContext';
+import { friendlyToHours, hoursToFriendly } from '../../utils/durationUnits.js';
 
 export const DEFAULT_PLAYBACK_TOKEN_TEMPLATE = `Halo, berikut token akses playback RAF CCTV.
 
@@ -27,6 +28,22 @@ export const PLAYBACK_TOKEN_PRESETS = [
     { value: 'lifetime', label: 'Lifetime' },
     { value: 'custom', label: 'Custom' },
 ];
+
+// Presets are QUICK-FILLS now, not locks: picking one pre-fills the depth + expiry fields (both still
+// editable). null = unlimited/forever. 'custom' is absent → it leaves whatever you already typed.
+const PRESET_FILL = {
+    trial_1d: { windowHours: 24, expiresInHours: 24 },
+    trial_3d: { windowHours: 72, expiresInHours: 72 },
+    client_30d: { windowHours: 24 * 30, expiresInHours: 24 * 30 },
+    lifetime: { windowHours: null, expiresInHours: null },
+};
+
+// A timestamp → a `<input type="datetime-local">` value in LOCAL time ("YYYY-MM-DDTHH:mm").
+function toDateTimeLocalInput(ms) {
+    const d = new Date(ms);
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
 
 export const PLAYBACK_TOKEN_SESSION_LIMIT_MODES = [
     { value: '', label: 'Ikuti preset' },
@@ -136,6 +153,9 @@ export function buildTokenCameraRulesPayload(ruleMap) {
 }
 
 function createDefaultForm() {
+    // Start pre-filled from the default preset so the live preview is honest from the first render.
+    const fill = PRESET_FILL.trial_3d;
+    const wf = hoursToFriendly(fill.windowHours);
     return {
         label: '',
         preset: 'trial_3d',
@@ -145,8 +165,9 @@ function createDefaultForm() {
         // what makes a camera added to the area later covered by a token issued earlier.
         area_ids: [],
         camera_rules: {},
-        playback_window_hours: '',
-        expires_at: '',
+        playback_window_value: wf.value,
+        playback_window_unit: wf.unit,
+        expires_at: toDateTimeLocalInput(Date.now() + fill.expiresInHours * 60 * 60 * 1000),
         access_code_mode: 'auto',
         access_code_length: 8,
         custom_access_code: '',
@@ -204,7 +225,8 @@ export function usePlaybackTokenManagementPage() {
         // what makes a camera added to the area later covered by a token issued earlier.
         area_ids: [],
         camera_rules: {},
-        playback_window_hours: '',
+        playback_window_value: '',
+        playback_window_unit: 'day',
         expires_at: '',
         max_active_sessions: '',
         session_limit_mode: 'unlimited',
@@ -277,6 +299,24 @@ export function usePlaybackTokenManagementPage() {
 
     const updateForm = (key, value) => {
         setForm((current) => ({ ...current, [key]: value }));
+    };
+
+    // Preset = quick-fill: pre-fill depth + expiry (still editable). 'custom' keeps whatever's typed.
+    const handlePresetChange = (preset) => {
+        setForm((current) => {
+            const fill = PRESET_FILL[preset];
+            if (!fill) return { ...current, preset };
+            const wf = hoursToFriendly(fill.windowHours);
+            return {
+                ...current,
+                preset,
+                playback_window_value: fill.windowHours ? wf.value : '',
+                playback_window_unit: fill.windowHours ? wf.unit : 'day',
+                expires_at: fill.expiresInHours
+                    ? toDateTimeLocalInput(Date.now() + fill.expiresInHours * 60 * 60 * 1000)
+                    : '',
+            };
+        });
     };
 
     const updateEditForm = (key, value) => {
@@ -416,7 +456,8 @@ export function usePlaybackTokenManagementPage() {
             area_ids: Array.isArray(token.area_ids) ? [...token.area_ids] : [],
             camera_ids: fallbackIds,
             camera_rules: buildInitialRuleMap(token.camera_rules || [], fallbackIds),
-            playback_window_hours: token.playback_window_hours || '',
+            playback_window_value: hoursToFriendly(token.playback_window_hours).value,
+            playback_window_unit: hoursToFriendly(token.playback_window_hours).unit,
             expires_at: token.expires_at || '',
             max_active_sessions: token.max_active_sessions ?? '',
             session_limit_mode: token.session_limit_mode || 'unlimited',
@@ -441,7 +482,7 @@ export function usePlaybackTokenManagementPage() {
                 ...form,
                 camera_ids: cameraRules.map((rule) => rule.camera_id),
                 camera_rules: cameraRules,
-                playback_window_hours: form.playback_window_hours || null,
+                playback_window_hours: friendlyToHours(form.playback_window_value, form.playback_window_unit),
                 expires_at: form.expires_at || null,
             };
             const response = await playbackTokenService.createToken(payload);
@@ -540,7 +581,7 @@ export function usePlaybackTokenManagementPage() {
                 area_ids: editForm.area_ids || [],
                 camera_ids: cameraRules.map((rule) => rule.camera_id),
                 camera_rules: cameraRules,
-                playback_window_hours: editForm.playback_window_hours || null,
+                playback_window_hours: friendlyToHours(editForm.playback_window_value, editForm.playback_window_unit),
                 expires_at: editForm.expires_at || null,
                 max_active_sessions: editForm.max_active_sessions === '' ? null : editForm.max_active_sessions,
                 session_limit_mode: editForm.session_limit_mode,
@@ -645,6 +686,7 @@ export function usePlaybackTokenManagementPage() {
         setCameraSearch,
         setEditCameraSearch,
         updateForm,
+        handlePresetChange,
         updateEditForm,
         toggleCameraRule,
         updateCameraRule,

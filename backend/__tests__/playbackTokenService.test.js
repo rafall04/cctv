@@ -99,6 +99,29 @@ describe('playbackTokenService', () => {
         expect(connectionPool.execute.mock.calls[0][1][9]).toBe(72);
     });
 
+    // Preset is a QUICK-FILL, not a lock: an explicit expiry wins on any preset (else preset lifetime).
+    // INSERT param index 10 = expires_at (right after playback_window_hours at 9). Noon UTC so no TZ flip.
+    it('honors an explicit expiry on a NON-custom preset (trial_3d + a date → that date, not now+72h)', async () => {
+        vi.spyOn(connectionPool, 'execute').mockReturnValue({ lastInsertRowid: 93, changes: 1 });
+        vi.spyOn(connectionPool, 'queryOne')
+            .mockReturnValueOnce(null)
+            .mockReturnValueOnce({
+                id: 93, label: 'Expiry Override', token_prefix: 'rafpb_exp', preset: 'trial_3d',
+                scope_type: 'all', camera_ids_json: '[]', playback_window_hours: 72,
+                expires_at: '2027-06-15 12:00:00', revoked_at: null, last_used_at: null, use_count: 0,
+                share_template: null, created_by: 1, created_at: '2026-05-05 12:00:00', updated_at: '2026-05-05 12:00:00',
+            })
+            .mockReturnValue(undefined);
+        const { default: playbackTokenService } = await import('../services/playbackTokenService.js');
+
+        playbackTokenService.createToken(
+            { label: 'Expiry Override', preset: 'trial_3d', scope_type: 'all', expires_at: '2027-06-15T12:00:00Z' },
+            { user: { id: 1 }, headers: { origin: 'https://cctv.raf.my.id' } }
+        );
+
+        expect(String(connectionPool.execute.mock.calls[0][1][10])).toContain('2027-06-15');
+    });
+
     it('stores per-token session policy overrides at creation', async () => {
         vi.spyOn(connectionPool, 'execute').mockReturnValue({ lastInsertRowid: 31, changes: 1 });
         vi.spyOn(connectionPool, 'queryOne')

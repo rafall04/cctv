@@ -342,14 +342,55 @@ describe('usePlaybackTokenManagementPage area scope editing', () => {
         await waitFor(() => expect(result.current.loading).toBe(false));
 
         act(() => result.current.beginEditToken(result.current.tokens[0]));
-        expect(result.current.editForm.playback_window_hours).toBe(24);
+        // 24h stored → surfaced in the friendly unit picker as "1 hari".
+        expect(result.current.editForm.playback_window_value).toBe(1);
+        expect(result.current.editForm.playback_window_unit).toBe('day');
 
-        act(() => result.current.updateEditForm('playback_window_hours', '48'));
+        // Change to 2 hari (= 48 jam); the payload still speaks hours.
+        act(() => result.current.updateEditForm('playback_window_value', '2'));
         await act(async () => { await result.current.handleUpdateToken(15); });
 
         expect(playbackTokenService.updateToken).toHaveBeenCalledWith(15, expect.objectContaining({
-            playback_window_hours: '48',
+            playback_window_hours: 48,
             expires_at: '2026-08-04 10:02:00',
+        }));
+    });
+});
+
+describe('usePlaybackTokenManagementPage preset quick-fill + friendly units', () => {
+    beforeEach(async () => {
+        const { cameraService } = await import('../../services/cameraService');
+        playbackTokenService.listTokens.mockResolvedValue({ success: true, data: [] });
+        playbackTokenService.listAuditLogs.mockResolvedValue({ success: true, data: [] });
+        playbackTokenService.createToken.mockResolvedValue({ success: true, share_text: 'x' });
+        cameraService.getAllCameras.mockResolvedValue({ data: [] });
+    });
+
+    it('a preset pre-fills depth + expiry (quick-fill, still editable); lifetime clears both', async () => {
+        const { result } = renderHook(() => usePlaybackTokenManagementPage());
+        await waitFor(() => expect(result.current.loading).toBe(false));
+
+        act(() => result.current.handlePresetChange('trial_1d'));
+        expect(result.current.form.preset).toBe('trial_1d');
+        expect(result.current.form.playback_window_value).toBe(1); // 24h → 1 hari
+        expect(result.current.form.playback_window_unit).toBe('day');
+        expect(result.current.form.expires_at).toBeTruthy();
+
+        act(() => result.current.handlePresetChange('lifetime'));
+        expect(result.current.form.playback_window_value).toBe('');
+        expect(result.current.form.expires_at).toBe('');
+    });
+
+    it('create payload converts the friendly value+unit to hours', async () => {
+        const { result } = renderHook(() => usePlaybackTokenManagementPage());
+        await waitFor(() => expect(result.current.loading).toBe(false));
+
+        act(() => result.current.updateForm('playback_window_value', '2'));
+        act(() => result.current.updateForm('playback_window_unit', 'week'));
+        await act(async () => { await result.current.handleCreate(submitEvent()); });
+
+        expect(playbackTokenService.createToken).toHaveBeenCalledWith(expect.objectContaining({
+            playback_window_hours: 336, // 2 minggu = 336 jam
         }));
     });
 });

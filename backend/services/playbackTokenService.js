@@ -610,9 +610,9 @@ class PlaybackTokenService {
 
         const now = new Date();
         const customExpiresAt = parseDate(payload.expires_at);
-        const expiresAt = preset.expiresInHours === null
-            ? customExpiresAt
-            : new Date(now.getTime() + preset.expiresInHours * 60 * 60 * 1000);
+        // Expiry honored on ANY preset when explicitly set (preset = quick-fill); else preset lifetime.
+        const expiresAt = customExpiresAt
+            ?? (preset.expiresInHours === null ? null : new Date(now.getTime() + preset.expiresInHours * 60 * 60 * 1000));
         // Window decoupled from preset: an explicit "Maksimal mundur (jam)" wins on ANY preset
         // (matches the edit path); empty falls back to the preset's own window. Expiry stays preset-led.
         const playbackWindowHours = normalizePositiveInteger(payload.playback_window_hours) ?? preset.playbackWindowHours;

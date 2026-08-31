@@ -34,6 +34,7 @@ export default function PlaybackTokenManagement() {
                 totalCameraCount={page.cameras.length}
                 visibleCameraCount={page.visibleCreateCameras.length}
                 onUpdateForm={page.updateForm}
+                onPresetChange={page.handlePresetChange}
                 onUpdateCameraSearch={page.setCameraSearch}
                 onToggleCameraRule={page.toggleCameraRule}
                 onUpdateCameraRule={page.updateCameraRule}

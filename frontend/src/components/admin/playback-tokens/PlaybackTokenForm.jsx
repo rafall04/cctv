@@ -7,6 +7,8 @@
  */
 
 import { PLAYBACK_TOKEN_PRESETS, PLAYBACK_TOKEN_SESSION_LIMIT_MODES } from '../../../hooks/admin/usePlaybackTokenManagementPage.js';
+import { DURATION_UNITS, friendlyToHours } from '../../../utils/durationUnits.js';
+import { describeTokenLimits } from '../../../utils/playbackTokenSummary.js';
 
 export default function PlaybackTokenForm({
     form,
@@ -19,11 +21,19 @@ export default function PlaybackTokenForm({
     totalCameraCount = cameras.length,
     visibleCameraCount = cameras.length,
     onUpdateForm,
+    onPresetChange,
     onUpdateCameraSearch,
     onToggleCameraRule,
     onUpdateCameraRule,
     onSubmit,
 }) {
+    const limitSummary = describeTokenLimits({
+        windowHours: friendlyToHours(form.playback_window_value, form.playback_window_unit),
+        expiresAt: form.expires_at || null,
+        scopeType: form.scope_type,
+        cameraCount: selectedCameraIds.size,
+        areaCount: (form.area_ids || []).length,
+    });
     return (
         <form onSubmit={onSubmit} className="rounded-lg border border-edge bg-surface p-5 shadow-sm">
             <div className="grid gap-4 md:grid-cols-2">
@@ -32,8 +42,8 @@ export default function PlaybackTokenForm({
                     <input value={form.label} onChange={(event) => onUpdateForm('label', event.target.value)} className="w-full rounded-lg border border-edge-strong px-3 py-2 text-sm dark:bg-gray-950 dark:text-white" />
                 </label>
                 <label className="block">
-                    <span className="mb-1 block text-sm font-medium text-content-muted">Preset</span>
-                    <select value={form.preset} onChange={(event) => onUpdateForm('preset', event.target.value)} className="w-full rounded-lg border border-edge-strong px-3 py-2 text-sm dark:bg-gray-950 dark:text-white">
+                    <span className="mb-1 block text-sm font-medium text-content-muted">Preset (isi cepat)</span>
+                    <select value={form.preset} onChange={(event) => onPresetChange(event.target.value)} className="w-full rounded-lg border border-edge-strong px-3 py-2 text-sm dark:bg-gray-950 dark:text-white">
                         {PLAYBACK_TOKEN_PRESETS.map((preset) => <option key={preset.value} value={preset.value}>{preset.label}</option>)}
                     </select>
                 </label>
@@ -52,9 +62,14 @@ export default function PlaybackTokenForm({
                           * read as a time window to schedule, not as how far back the footage may
                           * be reached. Same field, same behaviour; it just says what it does now.
                           */}
-                        <span className="mb-1 block text-sm font-medium text-content-muted">Maksimal mundur (jam)</span>
-                        <input type="number" min="1" value={form.playback_window_hours} onChange={(event) => onUpdateForm('playback_window_hours', event.target.value)} placeholder="Kosong = ikut preset" className="w-full rounded-lg border border-edge-strong px-3 py-2 text-sm dark:bg-gray-950 dark:text-white" />
-                        <span className="mt-1 block text-xs text-content-subtle">Mis. 24 = hanya rekaman 24 jam terakhir. Berlaku di preset apa pun (mengganti bawaan preset).</span>
+                        <span className="mb-1 block text-sm font-medium text-content-muted">Maksimal mundur</span>
+                        <div className="flex gap-2">
+                            <input type="number" min="1" value={form.playback_window_value} onChange={(event) => onUpdateForm('playback_window_value', event.target.value)} placeholder="Kosong = semua" className="w-full rounded-lg border border-edge-strong px-3 py-2 text-sm dark:bg-gray-950 dark:text-white" />
+                            <select value={form.playback_window_unit} onChange={(event) => onUpdateForm('playback_window_unit', event.target.value)} className="rounded-lg border border-edge-strong px-2 py-2 text-sm dark:bg-gray-950 dark:text-white">
+                                {DURATION_UNITS.map((unit) => <option key={unit.value} value={unit.value}>{unit.label}</option>)}
+                            </select>
+                        </div>
+                        <span className="mt-1 block text-xs text-content-subtle">Mis. 7 hari = hanya rekaman 7 hari terakhir. Kosong = semua rekaman.</span>
                     </label>
                     <label className="block">
                         <span className="mb-1 block text-sm font-medium text-content-muted">Expired</span>
@@ -156,6 +171,13 @@ export default function PlaybackTokenForm({
                 <span className="mb-1 block text-sm font-medium text-content-muted">Template Share</span>
                 <textarea rows={5} value={form.share_template} onChange={(event) => onUpdateForm('share_template', event.target.value)} className="w-full rounded-lg border border-edge-strong px-3 py-2 text-sm dark:bg-gray-950 dark:text-white" />
             </label>
+
+            {/* Live preview of the EFFECTIVE limit — so the operator reads what the token grants in
+                plain language instead of decoding preset + window + expiry in their head. */}
+            <div className="mt-4 rounded-lg border border-edge bg-surface-sunken px-4 py-3 text-sm text-content" data-testid="playback-token-limit-preview">
+                <span className="mr-1 font-semibold text-content-muted">Ringkasan:</span>
+                {limitSummary}
+            </div>
 
             <div className="mt-4 flex justify-end">
                 <button type="submit" disabled={saving || (form.scope_type === 'selected' && selectedCameraIds.size === 0) || (form.scope_type === 'area' && form.area_ids.length === 0)} className="rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-white hover:bg-primary-600 disabled:cursor-not-allowed disabled:opacity-60">

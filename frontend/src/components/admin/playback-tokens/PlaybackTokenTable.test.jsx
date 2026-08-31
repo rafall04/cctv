@@ -226,7 +226,8 @@ describe('PlaybackTokenTable editor completeness', () => {
                 scope_type: 'area',
                 area_ids: [3],
                 camera_rules: {},
-                playback_window_hours: 24,
+                playback_window_value: 24,
+                playback_window_unit: 'hour',
                 expires_at: '2026-08-04 10:02:00',
                 client_note: 'Pak Budi',
                 max_active_sessions: '',
@@ -266,7 +267,7 @@ describe('PlaybackTokenTable editor completeness', () => {
         const input = screen.getByDisplayValue('24');
         fireEvent.change(input, { target: { value: '48' } });
 
-        expect(onUpdateEditForm).toHaveBeenCalledWith('playback_window_hours', '48');
+        expect(onUpdateEditForm).toHaveBeenCalledWith('playback_window_value', '48');
     });
 
     it('renders the stored expiry in the shape datetime-local needs, not blank', () => {
