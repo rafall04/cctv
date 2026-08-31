@@ -22,16 +22,20 @@
  */
 
 import { memo, useMemo } from 'react';
+import { useTimezone } from '../../contexts/TimezoneContext.jsx';
 
-const formatRange = (segment) => {
-    const time = (value) => new Date(value).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+// `timeZone` is the app's CONFIGURED timezone (passed by the caller), not the browser's, so a
+// non-WIB viewer sees the same wall-clock as the video overlay and share text.
+const formatRange = (segment, timeZone) => {
+    const time = (value) => new Date(value).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone });
     return `${time(segment.start_time)} - ${time(segment.end_time)}`;
 };
 
-const formatDay = (value) => new Date(value).toLocaleDateString('id-ID', {
+const formatDay = (value, timeZone) => new Date(value).toLocaleDateString('id-ID', {
     weekday: 'short',
     day: '2-digit',
     month: 'short',
+    timeZone,
 });
 
 /** Chevron only on a phone, where the labels would squeeze the timestamp out of the row. */
@@ -56,6 +60,8 @@ function PlaybackSegmentStepper({
     selectedSegment,
     onSegmentClick,
 }) {
+    const { timezone } = useTimezone();
+
     // Oldest first, so "previous" is simply one step back. Before the early return: every hook has
     // to run on every render (React error #310).
     const ordered = useMemo(
@@ -88,10 +94,10 @@ function PlaybackSegmentStepper({
                 {selectedSegment ? (
                     <>
                         <div className="truncate text-sm font-semibold tabular-nums text-content">
-                            {formatRange(selectedSegment)}
+                            {formatRange(selectedSegment, timezone)}
                         </div>
                         <div className="truncate text-xs text-content-muted">
-                            {formatDay(selectedSegment.start_time)}
+                            {formatDay(selectedSegment.start_time, timezone)}
                             {/* Counted oldest-first here would contradict the list; both say "1" for the newest. */}
                             {/*
                               * "Segmen 1 dari 1" adalah nol informasi: kedua panah sudah disabled,

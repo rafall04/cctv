@@ -21,6 +21,7 @@ import { Button } from '../../ui';
 import { PLAYBACK_TOKEN_SESSION_LIMIT_MODES, formatPlaybackTokenSessionPolicy } from '../../../hooks/admin/usePlaybackTokenManagementPage.js';
 import { DURATION_UNITS, friendlyToHours, formatHoursHuman, snapTo10Min } from '../../../utils/durationUnits.js';
 import { describeTokenLimits, formatStoredDateTime } from '../../../utils/playbackTokenSummary.js';
+import { useTimezone } from '../../../contexts/TimezoneContext.jsx';
 
 function scopeLabel(token) {
     const count = token.allowed_camera_ids?.length || token.camera_ids?.length || token.camera_rules?.filter((rule) => rule.enabled !== false).length || 0;
@@ -232,6 +233,7 @@ function TokenCard({
     onEdit, onCancelEdit, onUpdateToken, onRepeatShare, onClearSessions, onRevoke, onDelete,
     editFieldProps,
 }) {
+    const { timezone } = useTimezone();
     const sessions = token.active_session_count || 0;
 
     // The card's `min-w-0` is load-bearing: it is a GRID item (see the `ul` below) and a grid
@@ -268,7 +270,7 @@ function TokenCard({
                             know a token was capped to 1 hour was to open the edit form. */}
                         <Detail label="Kedalaman">
                             {(token.playback_from || token.playback_to)
-                                ? `${formatStoredDateTime(token.playback_from) || 'awal'} – ${formatStoredDateTime(token.playback_to) || 'sekarang'}`
+                                ? `${formatStoredDateTime(token.playback_from, timezone) || 'awal'} – ${formatStoredDateTime(token.playback_to, timezone) || 'sekarang'}`
                                 : token.playback_window_hours ? `${formatHoursHuman(token.playback_window_hours)} terakhir` : 'Semua rekaman'}
                         </Detail>
                         <Detail label="Berlaku">{formatTokenDate(token.expires_at)}</Detail>

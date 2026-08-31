@@ -2,15 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { describeTokenLimits, formatStoredDate, formatStoredDateTime } from './playbackTokenSummary.js';
 
 describe('playbackTokenSummary stored-date formatters (UTC SQL → local)', () => {
-    it('formats a UTC SQL value to a non-empty local date/datetime', () => {
-        expect(formatStoredDate('2026-09-05 16:05:00')).toMatch(/2026/);
-        expect(formatStoredDateTime('2026-09-05 16:05:00')).toMatch(/2026/);
-        expect(formatStoredDateTime('2026-09-05 16:05:00')).toMatch(/\d\d[.:]\d\d/); // has a time
+    it('formats a UTC SQL value to a non-empty configured-tz date/datetime', () => {
+        expect(formatStoredDate('2026-09-05 16:05:00', 'Asia/Jakarta')).toMatch(/2026/);
+        expect(formatStoredDateTime('2026-09-05 16:05:00', 'Asia/Jakarta')).toMatch(/2026/);
+        expect(formatStoredDateTime('2026-09-05 16:05:00', 'Asia/Jakarta')).toMatch(/\d\d[.:]\d\d/); // has a time
     });
     it('empty for missing/unparseable', () => {
-        expect(formatStoredDate('')).toBe('');
-        expect(formatStoredDate(null)).toBe('');
-        expect(formatStoredDateTime('not-a-date')).toBe('');
+        expect(formatStoredDate('', 'Asia/Jakarta')).toBe('');
+        expect(formatStoredDate(null, 'Asia/Jakarta')).toBe('');
+        expect(formatStoredDateTime('not-a-date', 'Asia/Jakarta')).toBe('');
     });
 });
 

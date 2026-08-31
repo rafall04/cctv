@@ -135,6 +135,40 @@ describe('PlaybackTimeline', () => {
         expect(screen.getByText('31 Agu 00.10')).toBeTruthy();
     });
 
+    it('keeps the segment tooltip time-only when the whole range is one day', () => {
+        render(
+            <PlaybackTimeline
+                segments={[segment(1, '01:00', '01:10')]}
+                selectedSegment={null}
+                onSegmentClick={vi.fn()}
+                onTimelineClick={vi.fn()}
+                formatTimestamp={() => '01.00'}
+            />,
+        );
+
+        // No date prefix — a same-day tooltip is unambiguous on its own.
+        expect(screen.getByTitle('01.00 - 01.00')).toBeTruthy();
+    });
+
+    it('names the day in the segment tooltip once the slice crosses midnight', () => {
+        // Without the date, "02.10 - 02.20" on a multi-day slice cannot tell you which day it means.
+        render(
+            <PlaybackTimeline
+                segments={[
+                    { id: 1, start_time: '2026-08-26T02:10:00', end_time: '2026-08-26T02:20:00', duration: 600 },
+                    { id: 2, start_time: '2026-08-31T00:00:00', end_time: '2026-08-31T00:10:00', duration: 600 },
+                ]}
+                selectedSegment={null}
+                onSegmentClick={vi.fn()}
+                onTimelineClick={vi.fn()}
+                formatTimestamp={() => '02.10'}
+            />,
+        );
+
+        expect(screen.getByTitle('26 Agu 02.10 - 26 Agu 02.10')).toBeTruthy();
+        expect(screen.getByTitle('31 Agu 02.10 - 31 Agu 02.10')).toBeTruthy();
+    });
+
     /*
      * THE PUBLIC SURFACE MUST NOT LEARN HOW DEEP THE ARCHIVE GOES.
      *

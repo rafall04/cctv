@@ -62,6 +62,36 @@ function assertTopupAmount(amount) {
 const IPAYMU_EXPIRY_MINUTES = 30;
 const IPAYMU_RECHECK_THROTTLE_MS = 15000;
 
+/**
+ * iPaymu's Data.Expired → a UTC ISO string. iPaymu is an Indonesian gateway and returns a ZONELESS
+ * wall-clock in WIB (Asia/Jakarta, UTC+7, no DST); on the UTC prod process `new Date()` read that ~7h
+ * early, expiring the QR/VA before the gateway does. Every plausible shape is handled safely: a Unix
+ * epoch (s or ms) and a zone-carrying ISO string are already absolute; a zoneless string is pinned to
+ * WIB. Returns null on anything unparseable so the caller falls back to IPAYMU_EXPIRY_MINUTES. Low
+ * stakes — payment recheck re-queries the gateway — but keeps the stored expiry honest.
+ */
+export function parseIpaymuExpiryIso(value) {
+    if (value == null || value === '') return null;
+    if (typeof value === 'number' || /^\d+$/.test(String(value).trim())) {
+        const n = Number(value);
+        const ms = n > 1e12 ? n : n * 1000;
+        return Number.isFinite(ms) ? new Date(ms).toISOString() : null;
+    }
+    const text = String(value).trim();
+    if (/(Z|[+-]\d\d:?\d\d)$/.test(text)) {
+        const d = new Date(text);
+        return Number.isNaN(d.getTime()) ? null : d.toISOString();
+    }
+    const m = text.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?/);
+    if (m) {
+        const [, y, mo, d, h, mi, s] = m.map((part) => Number(part));
+        const ms = Date.UTC(y, mo - 1, d, h, mi, s || 0) - 7 * 3600 * 1000; // WIB (UTC+7, no DST)
+        return Number.isFinite(ms) ? new Date(ms).toISOString() : null;
+    }
+    const d = new Date(text);
+    return Number.isNaN(d.getTime()) ? null : d.toISOString();
+}
+
 function getIpaymuConfig() {
     const { ipaymu } = paymentSettingsService.getGatewayConfig();
     return { va: ipaymu.va, apiKey: ipaymu.apiKey, baseUrl: ipaymu.baseUrl };
@@ -282,9 +312,8 @@ class PaymentService {
             throw err;
         }
 
-        const expiresAt = data.Expired
-            ? new Date(data.Expired).toISOString()
-            : new Date(Date.now() + IPAYMU_EXPIRY_MINUTES * 60 * 1000).toISOString();
+        const expiresAt = parseIpaymuExpiryIso(data.Expired)
+            || new Date(Date.now() + IPAYMU_EXPIRY_MINUTES * 60 * 1000).toISOString();
         const result = execute(
             `INSERT INTO payments (user_id, gateway, gateway_ref, amount, status, qris_payload, expires_at)
              VALUES (?, 'ipaymu', ?, ?, 'pending', ?, ?)`,

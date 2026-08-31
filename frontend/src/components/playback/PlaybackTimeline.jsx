@@ -19,6 +19,7 @@ import { memo, useMemo, useRef, useState } from 'react';
 import PlaybackCoverageStrip from './PlaybackCoverageStrip';
 import PlaybackRangePicker from './PlaybackRangePicker';
 import { boundsSpanDays, formatBoundLabel } from '../../utils/playbackTimeLabel';
+import { useTimezone } from '../../contexts/TimezoneContext.jsx';
 
 /** Below this, a seam between two clips is timer rounding, not a hole worth marking. */
 const GAP_THRESHOLD_SECONDS = 30;
@@ -98,7 +99,19 @@ export function buildTimelineGeometry(segments) {
  * The bands themselves. Behind `memo` because they depend only on the footage and the selection —
  * not on the playhead, which is what actually ticks.
  */
-const TimelineBands = memo(function TimelineBands({ bands, gaps, selectedSegmentId, onSegmentClick, formatTimestamp }) {
+const TimelineBands = memo(function TimelineBands({ bands, gaps, selectedSegmentId, onSegmentClick, formatTimestamp, spansDays, bandDateFmt }) {
+    // On a multi-day slice a time-only tooltip is ambiguous ("02.10 - 02.20" could be any day), so
+    // prepend the calendar day in the configured tz. `bandDateFmt` is stable (memoised on timezone in
+    // the parent) so it doesn't defeat this memo. Single-day slices stay time-only.
+    const bandTitle = (segment) => {
+        const start = formatTimestamp(segment.start_time);
+        const end = formatTimestamp(segment.end_time);
+        if (!spansDays) return `${start} - ${end}`;
+        const startDate = bandDateFmt.format(new Date(segment.start_time));
+        const endDate = segment.end_time ? bandDateFmt.format(new Date(segment.end_time)) : startDate;
+        return `${startDate} ${start} - ${endDate} ${end}`;
+    };
+
     return (
         <>
             {bands.map((band) => (
@@ -111,7 +124,7 @@ const TimelineBands = memo(function TimelineBands({ bands, gaps, selectedSegment
                             : 'bg-emerald-500 hover:bg-emerald-600'
                     }`}
                     style={{ left: `${band.left}%`, width: `${band.width}%` }}
-                    title={`${formatTimestamp(band.segment.start_time)} - ${formatTimestamp(band.segment.end_time)}`}
+                    title={bandTitle(band.segment)}
                 />
             ))}
 
@@ -141,6 +154,16 @@ function PlaybackTimeline({
     const timelineRef = useRef(null);
     const [hoverPercent, setHoverPercent] = useState(null);
     const [hoverLabel, setHoverLabel] = useState('');
+
+    // Configured (app) timezone, NOT the browser's — so a non-WIB viewer reads the same wall-clock as
+    // the video overlay and share text.
+    const { timezone } = useTimezone();
+    // Built once per timezone and passed into the memoised bands so per-row tooltips reuse one
+    // formatter instead of rebuilding it (the band list re-renders as the playhead ticks).
+    const bandDateFmt = useMemo(
+        () => new Intl.DateTimeFormat('id-ID', { day: '2-digit', month: 'short', timeZone: timezone }),
+        [timezone],
+    );
 
     const timelineData = useMemo(() => buildTimelineGeometry(segments), [segments]);
 
@@ -178,7 +201,7 @@ function PlaybackTimeline({
         const pct = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
         const absMs = timelineData.start + pct * timelineData.duration * 1000;
         setHoverPercent(pct * 100);
-        setHoverLabel(formatBoundLabel(absMs, boundsSpanDays(timelineData.start, timelineData.end)));
+        setHoverLabel(formatBoundLabel(absMs, boundsSpanDays(timelineData.start, timelineData.end, timezone), timezone));
     };
 
     const handleTimelineLeave = () => {
@@ -187,7 +210,7 @@ function PlaybackTimeline({
     };
 
     const canBrowseDays = Boolean(dayScope?.coverage?.runs?.length);
-    const spansDays = timelineData.start !== null && boundsSpanDays(timelineData.start, timelineData.end);
+    const spansDays = timelineData.start !== null && boundsSpanDays(timelineData.start, timelineData.end, timezone);
     // Nothing to place AND nothing to navigate with: the card would be an empty box.
     if (timelineData.start === null && !canBrowseDays) return null;
 
@@ -228,9 +251,9 @@ function PlaybackTimeline({
             ) : (
             <div className="mb-4 sm:mb-6">
                 <div className="flex justify-between text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2">
-                    <span>{formatBoundLabel(timelineData.start, spansDays)}</span>
+                    <span>{formatBoundLabel(timelineData.start, spansDays, timezone)}</span>
                     {hoverLabel && <span className="font-semibold text-gray-900 dark:text-white">{hoverLabel}</span>}
-                    <span>{formatBoundLabel(timelineData.end, spansDays)}</span>
+                    <span>{formatBoundLabel(timelineData.end, spansDays, timezone)}</span>
                 </div>
 
                 <div
@@ -246,6 +269,8 @@ function PlaybackTimeline({
                         selectedSegmentId={selectedSegment?.id}
                         onSegmentClick={onSegmentClick}
                         formatTimestamp={formatTimestamp}
+                        spansDays={spansDays}
+                        bandDateFmt={bandDateFmt}
                     />
 
                     {playheadOffset !== null && (

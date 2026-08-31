@@ -31,24 +31,24 @@ function parseStoredMs(value) {
     return Date.parse(s.includes('T') ? s : `${s.replace(' ', 'T')}Z`);
 }
 
-/** UTC-stored date → local "5 Sep 2026". Empty on unparseable. */
-export function formatStoredDate(value) {
+/** UTC-stored date → configured-tz "5 Sep 2026". `timeZone` is the app's IANA name. Empty on unparseable. */
+export function formatStoredDate(value, timeZone) {
     const ms = parseStoredMs(value);
     if (!Number.isFinite(ms)) return '';
     try {
-        return new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(ms));
+        return new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric', timeZone }).format(new Date(ms));
     } catch {
         return new Date(ms).toISOString().slice(0, 10);
     }
 }
 
-/** UTC-stored datetime → local "5 Sep 2026, 23.05". Empty on unparseable. */
-export function formatStoredDateTime(value) {
+/** UTC-stored datetime → configured-tz "5 Sep 2026, 23.05". `timeZone` is the app's IANA name. Empty on unparseable. */
+export function formatStoredDateTime(value, timeZone) {
     const ms = parseStoredMs(value);
     if (!Number.isFinite(ms)) return '';
     try {
         return new Intl.DateTimeFormat('id-ID', {
-            day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+            day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone,
         }).format(new Date(ms));
     } catch {
         return new Date(ms).toISOString().slice(0, 16).replace('T', ' ');

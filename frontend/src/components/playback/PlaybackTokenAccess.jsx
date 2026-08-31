@@ -23,6 +23,7 @@ import PlaybackAccessPanel from './PlaybackAccessPanel.jsx';
 import usePlaybackAccessOffer from '../../hooks/playback/usePlaybackAccessOffer';
 import { formatHoursHuman } from '../../utils/durationUnits.js';
 import { formatStoredDate, formatStoredDateTime } from '../../utils/playbackTokenSummary.js';
+import { useTimezone } from '../../contexts/TimezoneContext.jsx';
 
 /** One labelled fact. Stacking these beats a run-on sentence: each value is findable at a glance. */
 function Fact({ label, value, onToggle, isOpen }) {
@@ -66,6 +67,7 @@ export default function PlaybackTokenAccess({
     // A device-limit rejection is NOT a scope problem: show one clear, actionable notice for it and
     // suppress the "camera not covered" line, which contradicted it in the field.
     const isDeviceLimit = denialReason === 'device_limit';
+    const { timezone } = useTimezone();
     const [showAccess, setShowAccess] = useState(false);
     /** Set by "Ganti token": the only way the form returns while access is still held. */
     const [isSwapping, setIsSwapping] = useState(false);
@@ -143,7 +145,7 @@ export default function PlaybackTokenAccess({
     const rangeTo = tokenStatus?.playback_to || null;
     const hasRange = Boolean(rangeFrom || rangeTo);
     const reachValue = hasRange
-        ? `${formatStoredDate(rangeFrom) || 'awal'} – ${formatStoredDate(rangeTo) || 'sekarang'}`
+        ? `${formatStoredDate(rangeFrom, timezone) || 'awal'} – ${formatStoredDate(rangeTo, timezone) || 'sekarang'}`
         : (windowHours ? `${formatHoursHuman(windowHours)} terakhir` : 'Semua rekaman');
     const facts = [{
         label: 'Jangkauan',
@@ -169,7 +171,7 @@ export default function PlaybackTokenAccess({
         });
         facts.push({
             label: 'Berlaku',
-            value: tokenStatus.expires_at ? `Sampai ${formatStoredDateTime(tokenStatus.expires_at)}` : 'Selamanya',
+            value: tokenStatus.expires_at ? `Sampai ${formatStoredDateTime(tokenStatus.expires_at, timezone)}` : 'Selamanya',
         });
     }
 
@@ -215,7 +217,7 @@ export default function PlaybackTokenAccess({
 
                 <p className="mt-3 text-xs leading-5 text-content-muted">
                     {hasRange
-                        ? `Hanya rekaman ${formatStoredDateTime(rangeFrom) || 'sejak awal'} – ${formatStoredDateTime(rangeTo) || 'sekarang'} yang bisa diputar.`
+                        ? `Hanya rekaman ${formatStoredDateTime(rangeFrom, timezone) || 'sejak awal'} – ${formatStoredDateTime(rangeTo, timezone) || 'sekarang'} yang bisa diputar.`
                         : windowHours
                             ? `Rekaman yang lebih lama dari ${formatHoursHuman(windowHours)} ke belakang tidak ditampilkan.`
                             : 'Seluruh rekaman yang masih tersimpan bisa diputar.'}

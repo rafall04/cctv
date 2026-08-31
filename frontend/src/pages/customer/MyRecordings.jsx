@@ -25,14 +25,15 @@ import PlaybackCoverageStrip from '../../components/playback/PlaybackCoverageStr
 import PlaybackRangePicker from '../../components/playback/PlaybackRangePicker';
 import { rollingRange } from '../../utils/playbackDayRange';
 import { readRecordingMutePreference, writeRecordingMutePreference } from '../../utils/recordingAudio';
+import { useTimezone } from '../../contexts/TimezoneContext.jsx';
 
 const SCOPE = 'owner_full';
 
-function formatWaktu(iso) {
+function formatWaktu(iso, timeZone) {
     if (!iso) return '—';
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return '—';
-    return d.toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
+    return d.toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short', timeZone });
 }
 
 function formatUkuran(bytes) {
@@ -59,6 +60,7 @@ function namaUnduhan(camera, segment) {
 }
 
 export default function MyRecordings() {
+    const { timezone } = useTimezone();
     const [cameras, setCameras] = useState([]);
     const [aktif, setAktif] = useState(null);
     const [segments, setSegments] = useState([]);
@@ -248,7 +250,7 @@ export default function MyRecordings() {
                         className="max-h-[60vh] w-full"
                     />
                     <p className="bg-surface px-4 py-2 text-xs text-content-muted">
-                        {formatWaktu(diputar.start_time || diputar.created_at)}
+                        {formatWaktu(diputar.start_time || diputar.created_at, timezone)}
                     </p>
                 </div>
             )}
@@ -337,7 +339,7 @@ export default function MyRecordings() {
                             >
                                 <span className="min-w-0">
                                     <span className="block truncate text-sm text-content">
-                                        {formatWaktu(s.start_time || s.created_at)}
+                                        {formatWaktu(s.start_time || s.created_at, timezone)}
                                     </span>
                                     <span className="block text-xs text-content-subtle">
                                         {formatUkuran(s.file_size)}

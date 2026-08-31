@@ -13,9 +13,10 @@
 
 import { useMemo } from 'react';
 import usePlaybackAccessOffer from '../../hooks/playback/usePlaybackAccessOffer';
+import { useTimezone } from '../../contexts/TimezoneContext.jsx';
 
-const momentText = (ms) => new Date(ms).toLocaleString('id-ID', {
-    day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
+const momentText = (ms, timeZone) => new Date(ms).toLocaleString('id-ID', {
+    year: 'numeric', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', timeZone,
 });
 
 /**
@@ -57,6 +58,7 @@ export default function PlaybackOptions({
 }) {
     /** The notice still explains the limit when nothing is on sale; only the sales pitch goes. */
     const { offered: accessOffered } = usePlaybackAccessOffer();
+    const { timezone } = useTimezone();
     const unreachableMoment = useUnreachableSharedMoment(playbackPolicy);
 
     return (
@@ -70,7 +72,7 @@ export default function PlaybackOptions({
                 <div className="rounded-control border border-edge border-l-2 border-l-status-warn bg-surface-raised px-4 py-3 text-sm text-content">
                     <p className="font-semibold">Momen yang dibagikan belum bisa dibuka</p>
                     <p className="mt-1 text-xs leading-5 text-content-muted sm:text-sm">
-                        Tautan ini menunjuk ke {momentText(unreachableMoment.at)}, di luar preview{' '}
+                        Tautan ini menunjuk ke {momentText(unreachableMoment.at, timezone)}, di luar preview{' '}
                         {unreachableMoment.previewMinutes} menit yang terbuka untuk umum. Yang tampil
                         sekarang rekaman terbaru, bukan momen tersebut.
                     </p>

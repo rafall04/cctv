@@ -37,6 +37,7 @@ import paymentService, {
     buildIpaymuSignature,
     interpretIpaymuTransaction,
     normalizeIpaymuChannels,
+    parseIpaymuExpiryIso,
 } from '../services/paymentService.js';
 import walletService from '../services/walletService.js';
 
@@ -324,6 +325,20 @@ describe('paymentService ipaymu driver', () => {
         expect(interpretIpaymuTransaction({ StatusDesc: 'Pending', Status: 0 }))
             .toMatchObject({ paid: false, expired: false });
         expect(interpretIpaymuTransaction(null).paid).toBe(false);
+    });
+
+    it('parses iPaymu Data.Expired safely across shapes (zoneless=WIB, ISO/offset/epoch as-is)', () => {
+        // iPaymu returns a zoneless Jakarta wall-clock; 12:00 WIB = 05:00 UTC (not 12:00 UTC).
+        expect(parseIpaymuExpiryIso('2026-09-01 12:00:00')).toBe('2026-09-01T05:00:00.000Z');
+        // Anything already carrying a zone is absolute.
+        expect(parseIpaymuExpiryIso('2026-09-01T05:00:00Z')).toBe('2026-09-01T05:00:00.000Z');
+        expect(parseIpaymuExpiryIso('2026-09-01T12:00:00+07:00')).toBe('2026-09-01T05:00:00.000Z');
+        // Unix epoch, seconds or ms.
+        const ms = Date.UTC(2026, 8, 1, 5, 0, 0);
+        expect(parseIpaymuExpiryIso(Math.floor(ms / 1000))).toBe('2026-09-01T05:00:00.000Z');
+        expect(parseIpaymuExpiryIso(String(ms))).toBe('2026-09-01T05:00:00.000Z');
+        // Unparseable → null so the caller falls back to its own default.
+        for (const bad of [null, '', 'bukan-tanggal']) expect(parseIpaymuExpiryIso(bad)).toBeNull();
     });
 
     it('webhook re-queries the gateway and credits exactly once on berhasil', async () => {

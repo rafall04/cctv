@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { recordingDurationOptions } from '../../../utils/admin/cameraFormAdapter';
+import { useTimezone } from '../../../contexts/TimezoneContext.jsx';
 
 function formatFileSize(bytes) {
     if (bytes === 0) {
@@ -11,13 +12,14 @@ function formatFileSize(bytes) {
     return `${Math.round((bytes / Math.pow(k, index)) * 100) / 100} ${sizes[index]}`;
 }
 
-function formatTimestamp(timestamp) {
+function formatTimestamp(timestamp, timeZone) {
     return new Date(timestamp).toLocaleString('id-ID', {
         year: 'numeric',
         month: 'short',
         day: 'numeric',
         hour: '2-digit',
         minute: '2-digit',
+        timeZone,
     });
 }
 
@@ -28,6 +30,7 @@ function RecordingQuickEditCard({
     onUpdateSettings,
     updatingCameraId,
 }) {
+    const { timezone } = useTimezone();
     const cameraId = recording.id || recording.camera_id;
     // Only the live process counts (runtime_status ← recording_process_state). Falling back to the
     // recording_status column showed a red "Recording" badge on cameras that had no ffmpeg and were
@@ -134,13 +137,13 @@ function RecordingQuickEditCard({
                 {oldestSegment && (
                     <div className="flex justify-between text-sm">
                         <span className="font-medium text-content">Oldest:</span>
-                        <span className="text-content">{formatTimestamp(oldestSegment)}</span>
+                        <span className="text-content">{formatTimestamp(oldestSegment, timezone)}</span>
                     </div>
                 )}
                 {newestSegment && (
                     <div className="flex justify-between text-sm">
                         <span className="font-medium text-content">Newest:</span>
-                        <span className="text-content">{formatTimestamp(newestSegment)}</span>
+                        <span className="text-content">{formatTimestamp(newestSegment, timezone)}</span>
                     </div>
                 )}
             </div>

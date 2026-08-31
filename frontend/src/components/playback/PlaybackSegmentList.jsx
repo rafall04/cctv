@@ -10,24 +10,16 @@
  * list depends on none of that, but it used to re-sort the whole array (≈21,000 `new Date()`
  * allocations at admin scope) and rebuild every row on each of those renders. `toLocaleDateString`
  * and `toLocaleTimeString` each construct a fresh `Intl.DateTimeFormat` internally, so ~1,065 rows
- * cost ~3,200 formatter constructions per render. Both formatters are now built once at module
- * scope, the sort is memoised on `segments`, and each row is behind `memo` so changing the
- * selection repaints two rows instead of the whole list.
+ * cost ~3,200 formatter constructions per render. Both formatters are now built once per configured
+ * timezone (useMemo keyed on it) and passed down as props, the sort is memoised on `segments`, and
+ * each row is behind `memo` so changing the selection repaints two rows instead of the whole list.
+ *
+ * The formatters carry the app's CONFIGURED timezone (not the browser's) so a non-WIB viewer sees
+ * the same wall-clock as the video overlay and share text.
  */
 
 import { memo, useMemo } from 'react';
-
-const DATE_FORMAT = new Intl.DateTimeFormat('id-ID', {
-    weekday: 'short',
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-});
-
-const TIME_FORMAT = new Intl.DateTimeFormat('id-ID', {
-    hour: '2-digit',
-    minute: '2-digit',
-});
+import { useTimezone } from '../../contexts/TimezoneContext.jsx';
 
 const SIZE_UNITS = ['B', 'KB', 'MB', 'GB'];
 
@@ -37,7 +29,7 @@ function formatFileSize(bytes) {
     return `${Math.round((bytes / 1024 ** i) * 100) / 100} ${SIZE_UNITS[i]}`;
 }
 
-const SegmentRow = memo(function SegmentRow({ segment, isSelected, onSegmentClick }) {
+const SegmentRow = memo(function SegmentRow({ segment, isSelected, onSegmentClick, dateFmt, timeFmt }) {
     const isLikelyCompatible = segment.duration >= 60;
 
     return (
@@ -58,10 +50,10 @@ const SegmentRow = memo(function SegmentRow({ segment, isSelected, onSegmentClic
                 <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                         <span className="truncate text-sm font-medium text-content">
-                            {DATE_FORMAT.format(new Date(segment.start_time))}
+                            {dateFmt.format(new Date(segment.start_time))}
                         </span>
                         <span className="text-xs tabular-nums text-content-muted sm:text-sm">
-                            {TIME_FORMAT.format(new Date(segment.start_time))} - {TIME_FORMAT.format(new Date(segment.end_time))}
+                            {timeFmt.format(new Date(segment.start_time))} - {timeFmt.format(new Date(segment.end_time))}
                         </span>
                         {!isLikelyCompatible && (
                             <span className="shrink-0 text-xs font-medium text-status-warn">
@@ -91,6 +83,22 @@ function PlaybackSegmentList({
     onSegmentClick,
     isLoading = false,
 }) {
+    const { timezone } = useTimezone();
+
+    const dateFmt = useMemo(() => new Intl.DateTimeFormat('id-ID', {
+        weekday: 'short',
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        timeZone: timezone,
+    }), [timezone]);
+
+    const timeFmt = useMemo(() => new Intl.DateTimeFormat('id-ID', {
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: timezone,
+    }), [timezone]);
+
     const newestFirst = useMemo(
         () => [...segments].sort((a, b) => new Date(b.start_time) - new Date(a.start_time)),
         [segments],
@@ -141,6 +149,8 @@ function PlaybackSegmentList({
                             segment={segment}
                             isSelected={selectedSegment?.id === segment.id}
                             onSegmentClick={onSegmentClick}
+                            dateFmt={dateFmt}
+                            timeFmt={timeFmt}
                         />
                     ))}
                 </div>
