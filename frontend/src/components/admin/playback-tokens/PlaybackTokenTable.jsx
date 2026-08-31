@@ -153,13 +153,15 @@ function TokenEditFields({
                         <button type="button" onClick={() => onUpdateEditForm('depth_mode', 'range')} className={modeBtn(isRange)}>Rentang tanggal</button>
                     </div>
                     {isRange ? (
-                        <div className="flex gap-2">
+                        // Stacked, not side-by-side: a native datetime-local control needs ~230px, so two
+                        // in one narrow column overflowed the card (the "Sampai" field spilled off-screen).
+                        <div className="flex flex-col gap-2">
                             <label className="block w-full">
-                                <span className="mb-0.5 block text-[10px] text-content-subtle">Dari</span>
+                                <span className="mb-0.5 block text-xs text-content-subtle">Dari</span>
                                 <input type="datetime-local" value={toDateTimeLocal(editForm.playback_from)} onChange={(event) => onUpdateEditForm('playback_from', snapTo10Min(event.target.value))} className={FIELD} />
                             </label>
                             <label className="block w-full">
-                                <span className="mb-0.5 block text-[10px] text-content-subtle">Sampai</span>
+                                <span className="mb-0.5 block text-xs text-content-subtle">Sampai</span>
                                 <input type="datetime-local" value={toDateTimeLocal(editForm.playback_to)} onChange={(event) => onUpdateEditForm('playback_to', snapTo10Min(event.target.value))} className={FIELD} />
                             </label>
                         </div>

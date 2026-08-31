@@ -59,7 +59,7 @@ export default function PlaybackTokenForm({
                         <option value="selected">Kamera tertentu</option>
                     </select>
                 </label>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-3 sm:grid-cols-2">
                     <label className="block">
                         {/*
                           * "Window Jam" meant nothing to the operator who owns this form — it was
@@ -72,7 +72,8 @@ export default function PlaybackTokenForm({
                             <button type="button" onClick={() => onUpdateForm('depth_mode', 'range')} className={modeBtn(isRange)}>Rentang tanggal</button>
                         </div>
                         {isRange ? (
-                            <div className="flex gap-2">
+                            // Stacked: two native datetime-local controls (~230px each) overflow one narrow column.
+                            <div className="flex flex-col gap-2">
                                 <label className="block w-full">
                                     <span className="mb-1 block text-xs text-content-subtle">Dari</span>
                                     <input type="datetime-local" value={form.playback_from} onChange={(event) => onUpdateForm('playback_from', snapTo10Min(event.target.value))} className="w-full rounded-lg border border-edge-strong px-2 py-2 text-sm dark:bg-gray-950 dark:text-white" />
