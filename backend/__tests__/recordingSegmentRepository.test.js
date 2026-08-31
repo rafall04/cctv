@@ -60,6 +60,28 @@ describe('recordingSegmentRepository', () => {
         expect(result.map((segment) => segment.id)).toEqual([1, 2]);
     });
 
+    it('scopes the deep playback query to [fromIso, toIso] and keeps the NEWEST rows in-window (not oldest)', () => {
+        // REGRESSION: the deep path used ORDER BY ASC LIMIT 1000 with NO date bound, so it kept the
+        // oldest 1000 rows and dropped the newest — a recent range on a high-retention camera then
+        // listed/streamed nothing that exists on disk. The window must be in the SQL WHERE.
+        queryMock.mockReturnValueOnce([]);
+
+        recordingSegmentRepository.findPlaybackSegments({
+            cameraId: 9,
+            order: 'latest',
+            limit: 1000,
+            returnAscending: true,
+            fromIso: '2026-08-25T19:10:00.000Z',
+            toIso: '2026-08-30T18:20:00.000Z',
+        });
+
+        const [sql, params] = queryMock.mock.calls[0];
+        expect(sql).toContain('start_time >= ?');
+        expect(sql).toContain('start_time <= ?');
+        expect(sql).toContain('ORDER BY start_time DESC');
+        expect(params).toEqual([9, '2026-08-25T19:10:00.000Z', '2026-08-30T18:20:00.000Z', 1000]);
+    });
+
     it('checks only the current filesystem batch when looking up known filenames', () => {
         queryMock.mockReturnValueOnce([
             { filename: '20260502_100000.mp4' },

@@ -123,15 +123,25 @@ class RecordingSegmentRepository {
         return execute('DELETE FROM recording_segments WHERE id = ?', [id]);
     }
 
-    findPlaybackSegments({ cameraId, order = 'oldest', limit = 500, returnAscending = false }) {
+    findPlaybackSegments({ cameraId, order = 'oldest', limit = 500, returnAscending = false, fromIso = null, toIso = null }) {
         const direction = order === 'latest' ? 'DESC' : 'ASC';
+        // Optional [fromIso, toIso] scope the LIMIT to the entitled window. Without it, a plain
+        // ORDER BY start_time ASC LIMIT keeps the OLDEST rows and silently drops the NEWEST — so a
+        // recent range on a high-retention camera returned nothing on disk (the deep-playback path).
+        // Both bounds string-compare against the ISO-8601 UTC start_time, same convention as the range policy.
+        const clauses = ['camera_id = ?'];
+        const params = [cameraId];
+        if (fromIso) { clauses.push('start_time >= ?'); params.push(fromIso); }
+        if (toIso) { clauses.push('start_time <= ?'); params.push(toIso); }
+        params.push(limit);
+
         const rows = query(
             `SELECT ${SEGMENT_SELECT_FIELDS}
             FROM recording_segments
-            WHERE camera_id = ?
+            WHERE ${clauses.join(' AND ')}
             ORDER BY start_time ${direction}
             LIMIT ?`,
-            [cameraId, limit]
+            params
         );
 
         if (returnAscending && direction === 'DESC') {

@@ -37,7 +37,14 @@ function httpError(message, statusCode) {
 
 function parseTimestampMs(value) {
     if (!value) return null;
-    const ms = new Date(String(value).replace(' ', 'T')).getTime();
+    const text = String(value).trim();
+    // recorded_at and the resolved bounds are UTC. A zoneless "YYYY-MM-DD HH:MM:SS" would otherwise be
+    // read as process-local, drifting the archive gate by the tz offset on a non-UTC host (the same
+    // defect toIso had). Pin a zoneless value to UTC; leave anything already carrying a zone untouched.
+    const normalized = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?(\.\d+)?$/.test(text)
+        ? `${text.replace(' ', 'T')}Z`
+        : text;
+    const ms = Date.parse(normalized);
     return Number.isFinite(ms) ? ms : null;
 }
 

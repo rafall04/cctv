@@ -17,6 +17,7 @@
 import { query, queryOne, execute, transaction } from '../database/connectionPool.js';
 import walletService from './walletService.js';
 import { logAdminAction } from './securityAuditLogger.js';
+import { getLocalDate } from './timeService.js';
 
 export const PROMO_TYPES = ['percent', 'flat', 'gift'];
 
@@ -60,7 +61,10 @@ class PromoService {
         if (!promo.active) {
             throw badRequest('Kode promo tidak aktif');
         }
-        if (promo.expires_at && new Date(promo.expires_at).getTime() < Date.now()) {
+        // expires_at is a date-only 'YYYY-MM-DD' the admin picked in the display tz. Compare CONFIGURED-tz
+        // days so the code stays redeemable through the whole of that day, not until 07:00 WIB — `new
+        // Date('2026-09-01')` is UTC midnight, i.e. 07:00 WIB, expiring it ~7h into its last valid day.
+        if (promo.expires_at && String(promo.expires_at).slice(0, 10) < getLocalDate()) {
             throw badRequest('Kode promo sudah kedaluwarsa');
         }
         const fresh = queryOne('SELECT used_count FROM promo_codes WHERE id = ?', [promo.id]);

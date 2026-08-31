@@ -19,6 +19,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Badge, Button, Card, CardHeader } from '../../ui';
 import { adminService } from '../../../services/adminService';
 import { buildPlaybackMomentPath } from '../../../utils/playbackUrlState';
+import { useTimezone, TIMESTAMP_STORAGE } from '../../../contexts/TimezoneContext.jsx';
 
 const MAX_COMPLAINED_ROWS = 5;
 const MAX_REPORT_ROWS = 5;
@@ -30,13 +31,13 @@ const momentPath = (report) => buildPlaybackMomentPath({
     basePath: '/admin/playback',
 });
 
-const when = (value) => {
-    const at = new Date(String(value || '').replace(' ', 'T'));
-    if (Number.isNaN(at.getTime())) return value || '';
-    return at.toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
-};
-
 export default function CameraFeedbackPanel() {
+    const { formatDateTime } = useTimezone();
+    // createdAt is a UTC SQL datetime('now') column — render in the CONFIGURED tz, not the browser's
+    // (a naive new Date() read it 7h early even for a WIB admin).
+    const when = (value) => (value
+        ? formatDateTime(value, { storage: TIMESTAMP_STORAGE.UTC_SQL, day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+        : '');
     const [reports, setReports] = useState([]);
     const [complained, setComplained] = useState([]);
     const [closingId, setClosingId] = useState(null);

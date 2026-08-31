@@ -481,11 +481,18 @@ class RecordingPlaybackService {
          * A public preview is defined by its own minute limit, never by dates. Honouring a range
          * there could answer with an EMPTY preview for a camera that simply has not recorded today.
          */
-        const range = DEEP_PLAYBACK_MODES.has(access.accessMode) ? requestedRange : null;
+        const isDeep = DEEP_PLAYBACK_MODES.has(access.accessMode);
+        const range = isDeep ? requestedRange : null;
         const previewLimit = getPreviewSegmentLimit(access.previewMinutes);
         // owner_full sees the same full history as staff — for their own camera only.
-        const queryOptions = DEEP_PLAYBACK_MODES.has(access.accessMode)
-            ? { cameraId, order: 'oldest', limit: 1000, returnAscending: true }
+        //
+        // Scope the LOCAL query to the entitled window (request ∩ entitlement) and take the NEWEST rows
+        // within it. The old `order:'oldest' LIMIT 1000` (unscoped) kept the oldest 1000 rows overall and
+        // dropped the newest — so a recent range on a camera with >1000 local segments (retention >~7d)
+        // listed and streamed NOTHING that exists on disk, while the coverage bar drew it green.
+        const deepBounds = isDeep ? intersectWithAccessWindow(range, access) : null;
+        const queryOptions = isDeep
+            ? { cameraId, order: 'latest', limit: 1000, returnAscending: true, fromIso: deepBounds?.from ?? null, toIso: deepBounds?.to ?? null }
             : { cameraId, order: 'latest', limit: previewLimit, returnAscending: true };
         const segmentsAscending = this.applyPlaybackWindow(
             this.mergeArchivedSegments(

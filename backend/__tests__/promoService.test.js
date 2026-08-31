@@ -45,6 +45,9 @@ function seed() {
         CREATE TABLE promo_redemptions (id INTEGER PRIMARY KEY AUTOINCREMENT, promo_id INTEGER, user_id INTEGER, payment_id INTEGER, bonus_amount INTEGER, created_at TEXT DEFAULT CURRENT_TIMESTAMP);
         DROP TABLE IF EXISTS payments;
         CREATE TABLE payments (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, promo_code TEXT, status TEXT);
+        DROP TABLE IF EXISTS system_settings;
+        CREATE TABLE system_settings (setting_key TEXT PRIMARY KEY, setting_value TEXT);
+        INSERT INTO system_settings (setting_key, setting_value) VALUES ('timezone', 'Asia/Jakarta');
         INSERT INTO users (id, username) VALUES (42, 'budi'), (99, 'siti');
     `);
 }
@@ -75,6 +78,14 @@ describe('promoService.validateForTopup', () => {
         expect(() => promoService.validateForTopup('GIFT5K', 42, 50000)).toThrowError(/Tukar Kode/);
         expect(() => promoService.validateForTopup('MIN50', 42, 25000)).toThrowError(/minimal/);
         expect(() => promoService.validateForTopup('EXPIRED', 42, 50000)).toThrowError(/kedaluwarsa/);
+    });
+
+    it('a code expiring TODAY (display tz) stays redeemable through the whole day, not until 07:00 WIB', () => {
+        // The old `new Date('2026-08-31') < Date.now()` expired a same-day code at UTC midnight = 07:00 WIB,
+        // ~7h into its last valid day. Comparing configured-tz DAYS keeps it valid all day.
+        const todayWib = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date());
+        promoService.createPromo({ code: 'todayonly', type: 'flat', value: 1000, expires_at: todayWib });
+        expect(promoService.validateForTopup('TODAYONLY', 42, 50000)).toMatchObject({ code: 'TODAYONLY', bonus: 1000 });
     });
 
     it('rejects when an unpaid top-up already reserved the per-user limit', () => {

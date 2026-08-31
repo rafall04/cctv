@@ -74,6 +74,26 @@ describe('shouldParkInternalIngest', () => {
         }, NOW)).toBe(true);
     });
 
+    /*
+     * REGRESSION: camera_runtime_state writes last_online_at / last_health_check_at as ZONELESS
+     * wall-clock in the DISPLAY tz (WIB), not UTC. On the UTC prod process a naive parse read them ~7h
+     * in the future, so `now - lastOnline` went negative and a dead camera NEVER parked. With the tz
+     * supplied, the zoneless value resolves to the right instant regardless of the test process tz.
+     * NOW = 12:00Z = 19:00 WIB, so 18:00 WIB = 11:00Z = 1h ago (dead long enough), 18:59 WIB = 1min ago (health fresh).
+     */
+    it('menafsirkan health timestamp zoneless sbg wall-clock tz yang diberikan (bukan UTC proses)', () => {
+        const wibCamera = {
+            ...deadCamera,
+            last_online_at: '2026-08-19 18:00:00',
+            last_health_check_at: '2026-08-19 18:59:00',
+        };
+        expect(shouldParkInternalIngest(wibCamera, NOW, { timeZone: 'Asia/Jakarta' })).toBe(true);
+        // A different tz resolves the SAME wall-clock to a different instant — proof the tz is applied,
+        // not ignored. In WIT (+9) 18:00 = 09:00Z = 3h ago; still dead, but health 18:59 WIT = 09:59Z is
+        // ~2h stale (> freshness window) → must NOT park (stale-health guard), unlike the WIB reading.
+        expect(shouldParkInternalIngest(wibCamera, NOW, { timeZone: 'Asia/Jayapura' })).toBe(false);
+    });
+
     it('is_online null/undefined dianggap belum diketahui, bukan mati', () => {
         expect(shouldParkInternalIngest({ ...deadCamera, is_online: null }, NOW)).toBe(false);
         expect(shouldParkInternalIngest({ ...deadCamera, is_online: undefined }, NOW)).toBe(false);

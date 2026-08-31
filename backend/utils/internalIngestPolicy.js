@@ -141,9 +141,42 @@ export function isIngestParkEnabled() {
     return String(process.env.MEDIAMTX_PARK_DEAD_INGEST || '').trim().toLowerCase() !== 'off';
 }
 
-function toMillis(value) {
+/**
+ * A configured-tz wall-clock "YYYY-MM-DD HH:MM:SS" → the true UTC epoch ms, given the tz name.
+ * camera_runtime_state writes last_online_at / last_health_check_at in the DISPLAY tz (WIB), not UTC;
+ * parsing them naively on the UTC prod process read them ~7h in the FUTURE, so a dead camera was
+ * never parked and MediaMTX kept dialling a dead RTSP source. Asia/Jakarta has no DST, so one offset
+ * probe is exact (and it stays correct for any fixed-offset tz).
+ */
+function localWallClockToUtcMs(value, timeZone) {
+    const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/);
+    if (!match) return null;
+    const [, y, mo, d, h, mi, s] = match.map(Number);
+    const guessUtc = Date.UTC(y, mo - 1, d, h, mi, s);
+    if (!Number.isFinite(guessUtc)) return null;
+    const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone, year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+    }).formatToParts(new Date(guessUtc));
+    const p = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+    const asZonedUtc = Date.UTC(Number(p.year), Number(p.month) - 1, Number(p.day),
+        p.hour === '24' ? 0 : Number(p.hour), Number(p.minute), Number(p.second));
+    return guessUtc - (asZonedUtc - guessUtc);
+}
+
+function toMillis(value, timeZone = null) {
     if (!value) return null;
-    const parsed = value instanceof Date ? value.getTime() : Date.parse(String(value).replace(' ', 'T'));
+    if (value instanceof Date) return Number.isFinite(value.getTime()) ? value.getTime() : null;
+    const text = String(value).trim();
+    // An explicit zone (ISO '...Z' or '+hh:mm') is an absolute instant — parse as-is.
+    if (/(Z|[+-]\d\d:?\d\d)$/.test(text)) {
+        const parsed = Date.parse(text);
+        return Number.isFinite(parsed) ? parsed : null;
+    }
+    // Zoneless SQL wall-clock: resolve against the configured tz when the caller supplies it; without
+    // one, fall back to the legacy naive parse (correct only when the process tz == the value's tz).
+    if (timeZone) return localWallClockToUtcMs(text, timeZone);
+    const parsed = Date.parse(text.replace(' ', 'T'));
     return Number.isFinite(parsed) ? parsed : null;
 }
 
@@ -164,6 +197,9 @@ export function shouldParkInternalIngest(camera = {}, now = Date.now(), {
     parkAfterMs = INGEST_PARK_AFTER_MS,
     healthFreshMs = INGEST_PARK_HEALTH_FRESH_MS,
     currentlyParked = false,
+    // The tz the zoneless health timestamps are written in (camera_runtime_state = display tz). The
+    // caller supplies it (this module stays DB-free); without it, zoneless values are read naively.
+    timeZone = null,
 } = {}) {
     if (!isIngestParkEnabled()) return false;
 
@@ -176,10 +212,10 @@ export function shouldParkInternalIngest(camera = {}, now = Date.now(), {
 
     if (currentlyParked) return true;
 
-    const lastOnlineAt = toMillis(camera.last_online_at);
+    const lastOnlineAt = toMillis(camera.last_online_at, timeZone);
     if (lastOnlineAt === null || (now - lastOnlineAt) < parkAfterMs) return false;
 
-    const lastHealthCheckAt = toMillis(camera.last_health_check_at);
+    const lastHealthCheckAt = toMillis(camera.last_health_check_at, timeZone);
     if (lastHealthCheckAt === null || (now - lastHealthCheckAt) > healthFreshMs) return false;
 
     return true;

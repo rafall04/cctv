@@ -15,6 +15,7 @@
 import { Alert, Badge, Button, Card, PageHeader, TableShell, Table, THead, TBody, TR, TH, TD } from '../components/ui';
 import { useCameraReportsPage } from '../hooks/admin/useCameraReportsPage.js';
 import { buildPlaybackMomentPath } from '../utils/playbackUrlState';
+import { useTimezone, TIMESTAMP_STORAGE } from '../contexts/TimezoneContext.jsx';
 
 const STATUS_TABS = [
     { value: 'open', label: 'Belum ditutup' },
@@ -28,12 +29,6 @@ const STATUS_TONE = { baru: 'warn', dibaca: 'brand', selesai: 'idle' };
 
 const SELECT_CLASS = 'w-full rounded-control border border-edge-strong bg-surface px-3 py-2 text-sm text-content transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary';
 
-const when = (value) => {
-    const at = new Date(String(value || '').replace(' ', 'T'));
-    if (Number.isNaN(at.getTime())) return value || '—';
-    return at.toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
-};
-
 function Stat({ label, value, tone = 'text-content' }) {
     return (
         <div className="min-w-0">
@@ -46,6 +41,12 @@ function Stat({ label, value, tone = 'text-content' }) {
 export default function CameraReportsManagement() {
     const page = useCameraReportsPage();
     const { summary, pagination } = page;
+    const { formatDateTime } = useTimezone();
+    // createdAt is a UTC SQL datetime('now') column — render it in the CONFIGURED tz, not the browser's
+    // (a naive new Date() read it 7h early even for a WIB admin).
+    const when = (value) => (value
+        ? formatDateTime(value, { storage: TIMESTAMP_STORAGE.UTC_SQL, day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+        : '—');
 
     return (
         <div className="space-y-6 py-6">
