@@ -21,6 +21,8 @@
 import { useState, useEffect } from 'react';
 import PlaybackAccessPanel from './PlaybackAccessPanel.jsx';
 import usePlaybackAccessOffer from '../../hooks/playback/usePlaybackAccessOffer';
+import { formatHoursHuman } from '../../utils/durationUnits.js';
+import { formatStoredDate, formatStoredDateTime } from '../../utils/playbackTokenSummary.js';
 
 /** One labelled fact. Stacking these beats a run-on sentence: each value is findable at a glance. */
 function Fact({ label, value, onToggle, isOpen }) {
@@ -34,7 +36,7 @@ function Fact({ label, value, onToggle, isOpen }) {
                         type="button"
                         onClick={onToggle}
                         aria-expanded={isOpen}
-                        className="inline-flex items-center gap-1 text-primary underline-offset-2 hover:underline"
+                        className="inline-flex items-center gap-1 text-content underline decoration-dotted decoration-content-subtle underline-offset-2 hover:decoration-solid"
                     >
                         {value}
                         <svg className={`h-3.5 w-3.5 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
@@ -131,9 +133,17 @@ export default function PlaybackTokenAccess({
      * both plain falsehoods for the area-scoped, expiring token that was really in force. The reach
      * survives because the server resolves it per camera on every request.
      */
+    // Depth: an absolute date range (Fase 2) reads as "26 Agu – 31 Agu"; a rolling window in
+    // friendly units ("7 hari terakhir"); neither means the full retained history.
+    const rangeFrom = tokenStatus?.playback_from || null;
+    const rangeTo = tokenStatus?.playback_to || null;
+    const hasRange = Boolean(rangeFrom || rangeTo);
+    const reachValue = hasRange
+        ? `${formatStoredDate(rangeFrom) || 'awal'} – ${formatStoredDate(rangeTo) || 'sekarang'}`
+        : (windowHours ? `${formatHoursHuman(windowHours)} terakhir` : 'Semua rekaman');
     const facts = [{
         label: 'Jangkauan',
-        value: windowHours ? `${windowHours} jam terakhir` : 'Semua rekaman',
+        value: reachValue,
     }];
 
     const allowedIds = tokenStatus?.allowed_camera_ids || tokenStatus?.camera_ids || [];
@@ -155,7 +165,7 @@ export default function PlaybackTokenAccess({
         });
         facts.push({
             label: 'Berlaku',
-            value: tokenStatus.expires_at ? `Sampai ${tokenStatus.expires_at}` : 'Selamanya',
+            value: tokenStatus.expires_at ? `Sampai ${formatStoredDateTime(tokenStatus.expires_at)}` : 'Selamanya',
         });
     }
 
@@ -200,9 +210,11 @@ export default function PlaybackTokenAccess({
                 )}
 
                 <p className="mt-3 text-xs leading-5 text-content-muted">
-                    {windowHours
-                        ? `Rekaman yang lebih lama dari ${windowHours} jam ke belakang tidak ditampilkan.`
-                        : 'Seluruh rekaman yang masih tersimpan bisa diputar.'}
+                    {hasRange
+                        ? `Hanya rekaman ${formatStoredDate(rangeFrom) || 'sejak awal'} – ${formatStoredDate(rangeTo) || 'sekarang'} yang bisa diputar.`
+                        : windowHours
+                            ? `Rekaman yang lebih lama dari ${formatHoursHuman(windowHours)} ke belakang tidak ditampilkan.`
+                            : 'Seluruh rekaman yang masih tersimpan bisa diputar.'}
                 </p>
 
                 <div className="mt-3 flex flex-wrap gap-2">

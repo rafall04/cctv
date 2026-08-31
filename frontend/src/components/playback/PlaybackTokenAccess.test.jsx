@@ -64,13 +64,15 @@ describe('PlaybackTokenAccess when access is held', () => {
     it('states the reach, the coverage and the expiry as separate labelled facts', () => {
         setup({
             playbackPolicy: TOKEN_POLICY,
-            tokenStatus: { allowed_camera_ids: [1, 2, 3], expires_at: '04 Agu 2026, 10.02' },
+            // expires_at is a stored UTC SQL value; the panel formats it to a nice LOCAL date.
+            tokenStatus: { allowed_camera_ids: [1, 2, 3], expires_at: '2026-08-04 10:02:00' },
         });
 
         expect(screen.getByText('Jangkauan')).toBeTruthy();
         expect(screen.getByText('4 jam terakhir')).toBeTruthy();
         expect(screen.getByText('3 kamera')).toBeTruthy();
-        expect(screen.getByText('Sampai 04 Agu 2026, 10.02')).toBeTruthy();
+        expect(screen.getByText('Berlaku')).toBeTruthy();
+        expect(screen.getByText(/^Sampai .*2026/)).toBeTruthy();
     });
 
     it('says so plainly when nothing limits the reach, rather than leaving it blank', () => {

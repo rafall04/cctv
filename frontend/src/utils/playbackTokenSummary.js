@@ -22,6 +22,39 @@ function formatDate(value) {
     }
 }
 
+// A STORED value (UTC SQL "YYYY-MM-DD HH:MM:SS", or ISO) parsed as UTC → ms. Distinct from formatDate,
+// which parses a LOCAL datetime-local value from the admin form; these are for values read back from
+// the server (public token panel), where a bare SQL string is UTC and must be shown in local time.
+function parseStoredMs(value) {
+    if (!value) return NaN;
+    const s = String(value).trim();
+    return Date.parse(s.includes('T') ? s : `${s.replace(' ', 'T')}Z`);
+}
+
+/** UTC-stored date → local "5 Sep 2026". Empty on unparseable. */
+export function formatStoredDate(value) {
+    const ms = parseStoredMs(value);
+    if (!Number.isFinite(ms)) return '';
+    try {
+        return new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(ms));
+    } catch {
+        return new Date(ms).toISOString().slice(0, 10);
+    }
+}
+
+/** UTC-stored datetime → local "5 Sep 2026, 23.05". Empty on unparseable. */
+export function formatStoredDateTime(value) {
+    const ms = parseStoredMs(value);
+    if (!Number.isFinite(ms)) return '';
+    try {
+        return new Intl.DateTimeFormat('id-ID', {
+            day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+        }).format(new Date(ms));
+    } catch {
+        return new Date(ms).toISOString().slice(0, 16).replace('T', ' ');
+    }
+}
+
 function formatRange(from, to) {
     const a = from ? formatDate(from) : null;
     const b = to ? formatDate(to) : null;

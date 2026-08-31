@@ -73,8 +73,14 @@ export default function PlaybackTokenForm({
                         </div>
                         {isRange ? (
                             <div className="flex gap-2">
-                                <input type="datetime-local" value={form.playback_from} onChange={(event) => onUpdateForm('playback_from', event.target.value)} className="w-full rounded-lg border border-edge-strong px-2 py-2 text-sm dark:bg-gray-950 dark:text-white" />
-                                <input type="datetime-local" value={form.playback_to} onChange={(event) => onUpdateForm('playback_to', event.target.value)} className="w-full rounded-lg border border-edge-strong px-2 py-2 text-sm dark:bg-gray-950 dark:text-white" />
+                                <label className="block w-full">
+                                    <span className="mb-1 block text-xs text-content-subtle">Dari</span>
+                                    <input type="datetime-local" value={form.playback_from} onChange={(event) => onUpdateForm('playback_from', event.target.value)} className="w-full rounded-lg border border-edge-strong px-2 py-2 text-sm dark:bg-gray-950 dark:text-white" />
+                                </label>
+                                <label className="block w-full">
+                                    <span className="mb-1 block text-xs text-content-subtle">Sampai</span>
+                                    <input type="datetime-local" value={form.playback_to} onChange={(event) => onUpdateForm('playback_to', event.target.value)} className="w-full rounded-lg border border-edge-strong px-2 py-2 text-sm dark:bg-gray-950 dark:text-white" />
+                                </label>
                             </div>
                         ) : (
                             <div className="flex gap-2">
@@ -170,10 +176,22 @@ export default function PlaybackTokenForm({
                                     <span className="truncate text-content">{camera.name}</span>
                                 </label>
                                 {selectedCameraIds.has(camera.id) && (
-                                    <div className="mt-2 grid gap-2 sm:grid-cols-3">
-                                        <input type="number" min="1" placeholder="Maks. mundur (jam)" value={form.camera_rules[camera.id]?.playback_window_hours || ''} onChange={(event) => onUpdateCameraRule(camera.id, 'playback_window_hours', event.target.value)} className="rounded-lg border border-edge-strong px-2 py-1 text-xs dark:bg-gray-950 dark:text-white" />
-                                        <input type="datetime-local" value={form.camera_rules[camera.id]?.expires_at || ''} onChange={(event) => onUpdateCameraRule(camera.id, 'expires_at', event.target.value)} className="rounded-lg border border-edge-strong px-2 py-1 text-xs dark:bg-gray-950 dark:text-white" />
-                                        <input placeholder="Catatan" value={form.camera_rules[camera.id]?.note || ''} onChange={(event) => onUpdateCameraRule(camera.id, 'note', event.target.value)} className="rounded-lg border border-edge-strong px-2 py-1 text-xs dark:bg-gray-950 dark:text-white" />
+                                    <div className="mt-2">
+                                        <p className="mb-1 text-[11px] text-content-subtle">Khusus kamera ini (opsional — kosong = ikut token):</p>
+                                        <div className="grid gap-2 sm:grid-cols-3">
+                                            <label className="block">
+                                                <span className="mb-0.5 block text-[10px] text-content-subtle">Maks. mundur (jam)</span>
+                                                <input type="number" min="1" placeholder="ikut token" value={form.camera_rules[camera.id]?.playback_window_hours || ''} onChange={(event) => onUpdateCameraRule(camera.id, 'playback_window_hours', event.target.value)} className="w-full rounded-lg border border-edge-strong px-2 py-1 text-xs dark:bg-gray-950 dark:text-white" />
+                                            </label>
+                                            <label className="block">
+                                                <span className="mb-0.5 block text-[10px] text-content-subtle">Berlaku sampai</span>
+                                                <input type="datetime-local" value={form.camera_rules[camera.id]?.expires_at || ''} onChange={(event) => onUpdateCameraRule(camera.id, 'expires_at', event.target.value)} className="w-full rounded-lg border border-edge-strong px-2 py-1 text-xs dark:bg-gray-950 dark:text-white" />
+                                            </label>
+                                            <label className="block">
+                                                <span className="mb-0.5 block text-[10px] text-content-subtle">Catatan</span>
+                                                <input placeholder="—" value={form.camera_rules[camera.id]?.note || ''} onChange={(event) => onUpdateCameraRule(camera.id, 'note', event.target.value)} className="w-full rounded-lg border border-edge-strong px-2 py-1 text-xs dark:bg-gray-950 dark:text-white" />
+                                            </label>
+                                        </div>
                                     </div>
                                 )}
                             </div>

@@ -19,8 +19,8 @@
 
 import { Button } from '../../ui';
 import { PLAYBACK_TOKEN_SESSION_LIMIT_MODES, formatPlaybackTokenSessionPolicy } from '../../../hooks/admin/usePlaybackTokenManagementPage.js';
-import { DURATION_UNITS, friendlyToHours } from '../../../utils/durationUnits.js';
-import { describeTokenLimits } from '../../../utils/playbackTokenSummary.js';
+import { DURATION_UNITS, friendlyToHours, formatHoursHuman } from '../../../utils/durationUnits.js';
+import { describeTokenLimits, formatStoredDate } from '../../../utils/playbackTokenSummary.js';
 
 function scopeLabel(token) {
     const count = token.allowed_camera_ids?.length || token.camera_ids?.length || token.camera_rules?.filter((rule) => rule.enabled !== false).length || 0;
@@ -116,12 +116,22 @@ function TokenEditFields({
                                     <span>{camera.name}</span>
                                 </label>
                                 {selectedEditCameraIds.has(camera.id) && (
-                                    <div className="mt-1 grid gap-1 sm:grid-cols-3">
-                                        <input type="number" min="1" placeholder="Maks. mundur (jam)" value={editForm.camera_rules[camera.id]?.playback_window_hours || ''} onChange={(event) => onUpdateEditCameraRule(camera.id, 'playback_window_hours', event.target.value)} className="rounded-control border border-edge-strong bg-surface px-2 py-1 text-xs text-content" />
-                                        {/* Per-camera expiry existed on the CREATE form but was dropped here, so a
-                                            rule's expiry could be set once and never changed — now editable too. */}
-                                        <input type="datetime-local" value={toDateTimeLocal(editForm.camera_rules[camera.id]?.expires_at)} onChange={(event) => onUpdateEditCameraRule(camera.id, 'expires_at', event.target.value)} className="rounded-control border border-edge-strong bg-surface px-2 py-1 text-xs text-content" />
-                                        <input placeholder="Catatan" value={editForm.camera_rules[camera.id]?.note || ''} onChange={(event) => onUpdateEditCameraRule(camera.id, 'note', event.target.value)} className="rounded-control border border-edge-strong bg-surface px-2 py-1 text-xs text-content" />
+                                    <div className="mt-1">
+                                        <p className="mb-1 text-[10px] text-content-subtle">Khusus kamera ini (opsional — kosong = ikut token):</p>
+                                        <div className="grid gap-1 sm:grid-cols-3">
+                                            <label className="block">
+                                                <span className="mb-0.5 block text-[10px] text-content-subtle">Maks. mundur (jam)</span>
+                                                <input type="number" min="1" placeholder="ikut token" value={editForm.camera_rules[camera.id]?.playback_window_hours || ''} onChange={(event) => onUpdateEditCameraRule(camera.id, 'playback_window_hours', event.target.value)} className="w-full rounded-control border border-edge-strong bg-surface px-2 py-1 text-xs text-content" />
+                                            </label>
+                                            <label className="block">
+                                                <span className="mb-0.5 block text-[10px] text-content-subtle">Berlaku sampai</span>
+                                                <input type="datetime-local" value={toDateTimeLocal(editForm.camera_rules[camera.id]?.expires_at)} onChange={(event) => onUpdateEditCameraRule(camera.id, 'expires_at', event.target.value)} className="w-full rounded-control border border-edge-strong bg-surface px-2 py-1 text-xs text-content" />
+                                            </label>
+                                            <label className="block">
+                                                <span className="mb-0.5 block text-[10px] text-content-subtle">Catatan</span>
+                                                <input placeholder="—" value={editForm.camera_rules[camera.id]?.note || ''} onChange={(event) => onUpdateEditCameraRule(camera.id, 'note', event.target.value)} className="w-full rounded-control border border-edge-strong bg-surface px-2 py-1 text-xs text-content" />
+                                            </label>
+                                        </div>
                                     </div>
                                 )}
                             </div>
@@ -144,8 +154,14 @@ function TokenEditFields({
                     </div>
                     {isRange ? (
                         <div className="flex gap-2">
-                            <input type="datetime-local" value={toDateTimeLocal(editForm.playback_from)} onChange={(event) => onUpdateEditForm('playback_from', event.target.value)} className={FIELD} />
-                            <input type="datetime-local" value={toDateTimeLocal(editForm.playback_to)} onChange={(event) => onUpdateEditForm('playback_to', event.target.value)} className={FIELD} />
+                            <label className="block w-full">
+                                <span className="mb-0.5 block text-[10px] text-content-subtle">Dari</span>
+                                <input type="datetime-local" value={toDateTimeLocal(editForm.playback_from)} onChange={(event) => onUpdateEditForm('playback_from', event.target.value)} className={FIELD} />
+                            </label>
+                            <label className="block w-full">
+                                <span className="mb-0.5 block text-[10px] text-content-subtle">Sampai</span>
+                                <input type="datetime-local" value={toDateTimeLocal(editForm.playback_to)} onChange={(event) => onUpdateEditForm('playback_to', event.target.value)} className={FIELD} />
+                            </label>
                         </div>
                     ) : (
                         <div className="flex gap-2">
@@ -248,8 +264,10 @@ function TokenCard({
                         <Detail label="Akses">{scopeLabel(token)}</Detail>
                         {/* How far back this token may reach. Invisible before, so the only way to
                             know a token was capped to 1 hour was to open the edit form. */}
-                        <Detail label="Maks. mundur">
-                            {token.playback_window_hours ? `${token.playback_window_hours} jam terakhir` : 'Semua rekaman'}
+                        <Detail label="Kedalaman">
+                            {(token.playback_from || token.playback_to)
+                                ? `${formatStoredDate(token.playback_from) || 'awal'} – ${formatStoredDate(token.playback_to) || 'sekarang'}`
+                                : token.playback_window_hours ? `${formatHoursHuman(token.playback_window_hours)} terakhir` : 'Semua rekaman'}
                         </Detail>
                         <Detail label="Berlaku">{formatTokenDate(token.expires_at)}</Detail>
                         <Detail label="Sesi">{formatPlaybackTokenSessionPolicy(token)}</Detail>

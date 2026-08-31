@@ -189,17 +189,24 @@ describe('PlaybackTokenTable actions', () => {
  * capped to one hour was to open the edit form and read a field labelled "Window Jam".
  */
 describe('PlaybackTokenTable reach limit', () => {
-    it('states how far back a capped token may reach', () => {
+    it('states how far back a capped token may reach, in friendly units', () => {
         setup({ tokens: [{ ...ACTIVE, playback_window_hours: 24 }] });
 
-        expect(screen.getByText('Maks. mundur')).toBeTruthy();
-        expect(screen.getByText('24 jam terakhir')).toBeTruthy();
+        expect(screen.getByText('Kedalaman')).toBeTruthy();
+        expect(screen.getByText('1 hari terakhir')).toBeTruthy(); // 24 jam → 1 hari
     });
 
     it('says "Semua rekaman" when the token is uncapped, rather than leaving it blank', () => {
         setup({ tokens: [{ ...ACTIVE, playback_window_hours: null }] });
 
         expect(screen.getByText('Semua rekaman')).toBeTruthy();
+    });
+
+    it('shows an absolute date range on the card when the token carries one', () => {
+        setup({ tokens: [{ ...ACTIVE, playback_window_hours: null, playback_from: '2026-08-01 00:00:00', playback_to: '2026-08-05 00:00:00' }] });
+
+        expect(screen.getByText(/–/)).toBeTruthy(); // a date range, not "Semua rekaman"
+        expect(screen.queryByText('Semua rekaman')).toBeNull();
     });
 });
 
