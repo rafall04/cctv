@@ -1,7 +1,7 @@
 {
   "_comment": "The ONE control point for staged rollout. Each channel names the release TAG that clients on that channel deploy. safe-deploy.sh reads THIS file from origin/main, so promotion is a git commit here — no box decides its own version. Flow: tag a release from main (git tag vX.Y.Z), point 'canary' at it + push this file, let the canary client deploy + verify, then point 'stable' at the same tag + push. A regression stays on canary; stable clients never move until promoted. Clients with DEPLOY_CHANNEL=main (legacy default) ignore this file and track origin/main. See docs/release-channels.md.",
   "channels": {
-    "stable": "v1.1.4",
-    "canary": "v1.1.4"
+    "stable": "v1.1.5",
+    "canary": "v1.1.5"
   }
 }
