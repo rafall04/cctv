@@ -613,9 +613,9 @@ class PlaybackTokenService {
         const expiresAt = preset.expiresInHours === null
             ? customExpiresAt
             : new Date(now.getTime() + preset.expiresInHours * 60 * 60 * 1000);
-        const playbackWindowHours = presetKey === 'custom'
-            ? normalizePositiveInteger(payload.playback_window_hours)
-            : preset.playbackWindowHours;
+        // Window decoupled from preset: an explicit "Maksimal mundur (jam)" wins on ANY preset
+        // (matches the edit path); empty falls back to the preset's own window. Expiry stays preset-led.
+        const playbackWindowHours = normalizePositiveInteger(payload.playback_window_hours) ?? preset.playbackWindowHours;
         const sessionPolicy = this.resolveSessionPolicy(payload, presetKey);
         const label = String(payload.label || preset.label).trim() || preset.label;
         const shareTemplate = typeof payload.share_template === 'string' && payload.share_template.trim()

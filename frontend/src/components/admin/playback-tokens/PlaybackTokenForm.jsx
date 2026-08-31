@@ -53,12 +53,13 @@ export default function PlaybackTokenForm({
                           * be reached. Same field, same behaviour; it just says what it does now.
                           */}
                         <span className="mb-1 block text-sm font-medium text-content-muted">Maksimal mundur (jam)</span>
-                        <input type="number" min="1" value={form.playback_window_hours} onChange={(event) => onUpdateForm('playback_window_hours', event.target.value)} placeholder="Kosong = semua rekaman" className="w-full rounded-lg border border-edge-strong px-3 py-2 text-sm dark:bg-gray-950 dark:text-white" />
-                        <span className="mt-1 block text-xs text-content-subtle">Mis. 24 = hanya rekaman 24 jam terakhir.</span>
+                        <input type="number" min="1" value={form.playback_window_hours} onChange={(event) => onUpdateForm('playback_window_hours', event.target.value)} placeholder="Kosong = ikut preset" className="w-full rounded-lg border border-edge-strong px-3 py-2 text-sm dark:bg-gray-950 dark:text-white" />
+                        <span className="mt-1 block text-xs text-content-subtle">Mis. 24 = hanya rekaman 24 jam terakhir. Berlaku di preset apa pun (mengganti bawaan preset).</span>
                     </label>
                     <label className="block">
                         <span className="mb-1 block text-sm font-medium text-content-muted">Expired</span>
                         <input type="datetime-local" value={form.expires_at} onChange={(event) => onUpdateForm('expires_at', event.target.value)} className="w-full rounded-lg border border-edge-strong px-3 py-2 text-sm dark:bg-gray-950 dark:text-white" />
+                        <span className="mt-1 block text-xs text-content-subtle">Masa berlaku token mengikuti preset; isian ini hanya dipakai di preset Custom/Lifetime.</span>
                     </label>
                 </div>
             </div>

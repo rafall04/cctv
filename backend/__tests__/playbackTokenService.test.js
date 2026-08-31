@@ -54,6 +54,51 @@ describe('playbackTokenService', () => {
         expect(connectionPool.execute.mock.calls[0][1][1]).not.toBe(result.token);
     });
 
+    // Regression: create used to DROP an explicit "Maksimal mundur (jam)" unless preset==='custom',
+    // so a window typed on a trial/client token was silently replaced by the preset default. The edit
+    // path already honored it, so create was also inconsistent. INSERT param index 9 = playback_window_hours.
+    it('honors an explicit playback window on a NON-custom preset (trial_3d + 24 → 24, not the preset 72)', async () => {
+        vi.spyOn(connectionPool, 'execute').mockReturnValue({ lastInsertRowid: 91, changes: 1 });
+        vi.spyOn(connectionPool, 'queryOne')
+            .mockReturnValueOnce(null)
+            .mockReturnValueOnce({
+                id: 91, label: 'Windowed Trial', token_prefix: 'rafpb_win', preset: 'trial_3d',
+                scope_type: 'all', camera_ids_json: '[]', playback_window_hours: 24,
+                expires_at: '2026-05-08 12:00:00', revoked_at: null, last_used_at: null, use_count: 0,
+                share_template: null, created_by: 1, created_at: '2026-05-05 12:00:00', updated_at: '2026-05-05 12:00:00',
+            })
+            .mockReturnValue(undefined);
+        const { default: playbackTokenService } = await import('../services/playbackTokenService.js');
+
+        playbackTokenService.createToken(
+            { label: 'Windowed Trial', preset: 'trial_3d', scope_type: 'all', playback_window_hours: 24 },
+            { user: { id: 1 }, headers: { origin: 'https://cctv.raf.my.id' } }
+        );
+
+        expect(connectionPool.execute.mock.calls[0][1][9]).toBe(24);
+    });
+
+    it('falls back to the preset window when none is typed (trial_3d, empty → 72)', async () => {
+        vi.spyOn(connectionPool, 'execute').mockReturnValue({ lastInsertRowid: 92, changes: 1 });
+        vi.spyOn(connectionPool, 'queryOne')
+            .mockReturnValueOnce(null)
+            .mockReturnValueOnce({
+                id: 92, label: 'Preset Trial', token_prefix: 'rafpb_pre', preset: 'trial_3d',
+                scope_type: 'all', camera_ids_json: '[]', playback_window_hours: 72,
+                expires_at: '2026-05-08 12:00:00', revoked_at: null, last_used_at: null, use_count: 0,
+                share_template: null, created_by: 1, created_at: '2026-05-05 12:00:00', updated_at: '2026-05-05 12:00:00',
+            })
+            .mockReturnValue(undefined);
+        const { default: playbackTokenService } = await import('../services/playbackTokenService.js');
+
+        playbackTokenService.createToken(
+            { label: 'Preset Trial', preset: 'trial_3d', scope_type: 'all' },
+            { user: { id: 1 }, headers: { origin: 'https://cctv.raf.my.id' } }
+        );
+
+        expect(connectionPool.execute.mock.calls[0][1][9]).toBe(72);
+    });
+
     it('stores per-token session policy overrides at creation', async () => {
         vi.spyOn(connectionPool, 'execute').mockReturnValue({ lastInsertRowid: 31, changes: 1 });
         vi.spyOn(connectionPool, 'queryOne')
