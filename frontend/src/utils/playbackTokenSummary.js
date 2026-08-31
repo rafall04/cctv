@@ -55,9 +55,24 @@ export function formatStoredDateTime(value) {
     }
 }
 
+// Local datetime-local value → "26 Agu 2026, 09.10". Range endpoints show the TIME because footage
+// comes in 10-minute segments, so the minute is a real boundary the customer needs to see.
+function formatDateTimeLocal(value) {
+    if (!value) return '';
+    const ms = Date.parse(value);
+    if (!Number.isFinite(ms)) return String(value);
+    try {
+        return new Intl.DateTimeFormat('id-ID', {
+            day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+        }).format(new Date(ms));
+    } catch {
+        return new Date(ms).toISOString().slice(0, 16).replace('T', ' ');
+    }
+}
+
 function formatRange(from, to) {
-    const a = from ? formatDate(from) : null;
-    const b = to ? formatDate(to) : null;
+    const a = from ? formatDateTimeLocal(from) : null;
+    const b = to ? formatDateTimeLocal(to) : null;
     if (a && b) return `${a} – ${b}`;
     if (a) return `sejak ${a}`;
     if (b) return `sampai ${b}`;

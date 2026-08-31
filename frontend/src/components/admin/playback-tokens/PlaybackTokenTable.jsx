@@ -20,7 +20,7 @@
 import { Button } from '../../ui';
 import { PLAYBACK_TOKEN_SESSION_LIMIT_MODES, formatPlaybackTokenSessionPolicy } from '../../../hooks/admin/usePlaybackTokenManagementPage.js';
 import { DURATION_UNITS, friendlyToHours, formatHoursHuman } from '../../../utils/durationUnits.js';
-import { describeTokenLimits, formatStoredDate } from '../../../utils/playbackTokenSummary.js';
+import { describeTokenLimits, formatStoredDateTime } from '../../../utils/playbackTokenSummary.js';
 
 function scopeLabel(token) {
     const count = token.allowed_camera_ids?.length || token.camera_ids?.length || token.camera_rules?.filter((rule) => rule.enabled !== false).length || 0;
@@ -156,11 +156,11 @@ function TokenEditFields({
                         <div className="flex gap-2">
                             <label className="block w-full">
                                 <span className="mb-0.5 block text-[10px] text-content-subtle">Dari</span>
-                                <input type="datetime-local" value={toDateTimeLocal(editForm.playback_from)} onChange={(event) => onUpdateEditForm('playback_from', event.target.value)} className={FIELD} />
+                                <input type="datetime-local" step="600" value={toDateTimeLocal(editForm.playback_from)} onChange={(event) => onUpdateEditForm('playback_from', event.target.value)} className={FIELD} />
                             </label>
                             <label className="block w-full">
                                 <span className="mb-0.5 block text-[10px] text-content-subtle">Sampai</span>
-                                <input type="datetime-local" value={toDateTimeLocal(editForm.playback_to)} onChange={(event) => onUpdateEditForm('playback_to', event.target.value)} className={FIELD} />
+                                <input type="datetime-local" step="600" value={toDateTimeLocal(editForm.playback_to)} onChange={(event) => onUpdateEditForm('playback_to', event.target.value)} className={FIELD} />
                             </label>
                         </div>
                     ) : (
@@ -266,7 +266,7 @@ function TokenCard({
                             know a token was capped to 1 hour was to open the edit form. */}
                         <Detail label="Kedalaman">
                             {(token.playback_from || token.playback_to)
-                                ? `${formatStoredDate(token.playback_from) || 'awal'} – ${formatStoredDate(token.playback_to) || 'sekarang'}`
+                                ? `${formatStoredDateTime(token.playback_from) || 'awal'} – ${formatStoredDateTime(token.playback_to) || 'sekarang'}`
                                 : token.playback_window_hours ? `${formatHoursHuman(token.playback_window_hours)} terakhir` : 'Semua rekaman'}
                         </Detail>
                         <Detail label="Berlaku">{formatTokenDate(token.expires_at)}</Detail>

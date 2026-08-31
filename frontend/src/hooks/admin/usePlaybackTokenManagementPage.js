@@ -19,6 +19,7 @@ export const DEFAULT_PLAYBACK_TOKEN_TEMPLATE = `Halo, berikut token akses playba
 Kode Akses: {{token}}
 Link: {{playback_url}}
 Berlaku: {{expires_at}}
+Rekaman: {{playback_window}}
 Akses: {{camera_scope}}`;
 
 export const PLAYBACK_TOKEN_PRESETS = [

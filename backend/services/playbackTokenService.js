@@ -11,6 +11,7 @@ import { execute, query, queryOne, transaction } from '../database/connectionPoo
 import { parseUtcSql, toUtcSql } from './timeService.js';
 import playbackTokenRuleService from './playbackTokenRuleService.js';
 import { normalizeCameraIds, parseCameraIdsJson, parseAreaIdsJson, resolveAreaIdsForWrite } from './playbackTokenScopeIds.js';
+import { formatLocalDateTime, formatShareDepth } from './playbackShareFormat.js';
 
 export const PLAYBACK_TOKEN_COOKIE = 'raf_playback_token';
 export const PLAYBACK_TOKEN_SESSION_COOKIE = 'raf_playback_session';
@@ -563,7 +564,8 @@ class PlaybackTokenService {
 
     buildShareText({ token, shareKey, tokenRow, request }) {
         const row = sanitizeTokenRow(tokenRow) || tokenRow;
-        const template = row?.share_template?.trim() || DEFAULT_SHARE_TEMPLATE;
+        const rawTemplate = row?.share_template?.trim() || DEFAULT_SHARE_TEMPLATE;
+        const template = rawTemplate.includes('{{playback_window}}') ? rawTemplate : `${rawTemplate}\nRekaman: {{playback_window}}`;
         const accessCode = shareKey || token;
         const allowedCameraIds = row?.scope_type === 'selected'
             ? resolveAllowedCameraIds(row)
@@ -575,10 +577,8 @@ class PlaybackTokenService {
         const cameraScope = row?.scope_type === 'selected'
             ? buildSelectedCameraScope(row, allowedCameraIds)
             : 'Semua kamera playback';
-        const expiresAt = row?.expires_at || 'Selamanya';
-        const playbackWindow = row?.playback_window_hours
-            ? `${row.playback_window_hours} jam terakhir`
-            : 'Full sesuai rekaman tersedia';
+        const expiresAt = row?.expires_at ? formatLocalDateTime(row.expires_at) : 'Selamanya';
+        const playbackWindow = formatShareDepth(row);
 
         return template
             .replaceAll('{{token}}', accessCode)

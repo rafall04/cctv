@@ -211,7 +211,7 @@ export default function PlaybackTokenAccess({
 
                 <p className="mt-3 text-xs leading-5 text-content-muted">
                     {hasRange
-                        ? `Hanya rekaman ${formatStoredDate(rangeFrom) || 'sejak awal'} – ${formatStoredDate(rangeTo) || 'sekarang'} yang bisa diputar.`
+                        ? `Hanya rekaman ${formatStoredDateTime(rangeFrom) || 'sejak awal'} – ${formatStoredDateTime(rangeTo) || 'sekarang'} yang bisa diputar.`
                         : windowHours
                             ? `Rekaman yang lebih lama dari ${formatHoursHuman(windowHours)} ke belakang tidak ditampilkan.`
                             : 'Seluruh rekaman yang masih tersimpan bisa diputar.'}
