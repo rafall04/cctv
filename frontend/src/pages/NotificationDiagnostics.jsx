@@ -17,6 +17,14 @@ const EVENT_OPTIONS = [
     { value: 'online', label: 'Online' },
 ];
 
+// Map the three Indonesian IANA zones to their local abbreviations; any other configured
+// timezone falls back to its IANA name (see timezoneLabel below), never crashing.
+const TIMEZONE_ABBR = {
+    'Asia/Jakarta': 'WIB',
+    'Asia/Makassar': 'WITA',
+    'Asia/Jayapura': 'WIT',
+};
+
 function statusTone(success) {
     return success ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-700 dark:text-red-300';
 }
@@ -57,7 +65,7 @@ export default function NotificationDiagnostics() {
     const selectedCameraId = useMemo(() => Number.parseInt(cameraId, 10), [cameraId]);
     const canPreview = Number.isInteger(selectedCameraId) && selectedCameraId > 0;
     const canDrill = Boolean(preview?.routing?.canSend && canPreview && !drilling);
-    const timezoneLabel = !timezone || timezone === 'Asia/Jakarta' ? 'WIB' : timezone;
+    const timezoneLabel = TIMEZONE_ABBR[timezone] || timezone || 'WIB';
 
     function formatRuntimeTimestamp(value) {
         if (!value) return '-';

@@ -12,6 +12,7 @@ import billingAdminService from '../../../services/billingAdminService';
 import { formatRupiah, formatDateTime, StatusBadge, PAY_STATUS_BADGES } from './billingFormat';
 import { TableShell } from '../../ui/DataTable';
 import { useConfirm } from '../../../contexts/ConfirmContext';
+import { useTimezone } from '../../../contexts/TimezoneContext';
 import { Card } from '../../ui/Card';
 
 const FILTERS = [
@@ -42,6 +43,7 @@ function ConfirmBtn({ payment, full, busy, onConfirm }) {
 export default function PaymentsTab({ payments, run, busy }) {
     const [filter, setFilter] = useState('all');
     const confirm = useConfirm();
+    const { timezone } = useTimezone();
 
     const counts = useMemo(() => {
         const c = {};
@@ -132,7 +134,7 @@ export default function PaymentsTab({ payments, run, busy }) {
                                 <td className="px-3 py-2 text-content-muted">{payment.gateway}</td>
                                 <td className="px-3 py-2 text-right font-semibold">{formatRupiah(payment.amount)}</td>
                                 <td className="px-3 py-2 text-center"><StatusBadge className={PAY_STATUS_BADGES[payment.status] || ''}>{payment.status}</StatusBadge></td>
-                                <td className="px-3 py-2 whitespace-nowrap text-content-muted">{formatDateTime(payment.created_at)}</td>
+                                <td className="px-3 py-2 whitespace-nowrap text-content-muted">{formatDateTime(payment.created_at, timezone)}</td>
                                 <td className="px-3 py-2 text-right"><ConfirmBtn payment={payment} busy={busy} onConfirm={confirmPaid} /></td>
                             </tr>
                         ))}
@@ -147,7 +149,7 @@ export default function PaymentsTab({ payments, run, busy }) {
                         <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0">
                                 <p className="truncate font-semibold text-content">{payment.username || payment.user_id}</p>
-                                <p className="text-xs text-content-subtle">#{payment.id} · {payment.gateway} · {formatDateTime(payment.created_at)}</p>
+                                <p className="text-xs text-content-subtle">#{payment.id} · {payment.gateway} · {formatDateTime(payment.created_at, timezone)}</p>
                             </div>
                             <StatusBadge className={PAY_STATUS_BADGES[payment.status] || ''}>{payment.status}</StatusBadge>
                         </div>

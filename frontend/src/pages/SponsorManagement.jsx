@@ -9,6 +9,7 @@ SideEffects: Calls admin sponsor / sponsor-packages / camera APIs.
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNotification } from '../contexts/NotificationContext';
 import { useConfirm } from '../contexts/ConfirmContext';
+import { useTimezone } from '../contexts/TimezoneContext';
 import * as sponsorService from '../services/sponsorService';
 import sponsorPackageService from '../services/sponsorPackageService';
 import { cameraService } from '../services/cameraService';
@@ -58,6 +59,7 @@ function normalizeCameraRows(response) {
 function SponsorManagement() {
     const { success: notifySuccess, error: notifyError } = useNotification();
     const confirm = useConfirm();
+    const { formatDate } = useTimezone();
     const [sponsors, setSponsors] = useState([]);
     const [packages, setPackages] = useState([]);
     const [stats, setStats] = useState(null);
@@ -470,8 +472,8 @@ function SponsorManagement() {
                                             <td className="px-4 py-3 text-content-muted text-sm">
                                                 {sponsor.start_date && (
                                                     <div>
-                                                        <p>{new Date(sponsor.start_date).toLocaleDateString('id-ID')}</p>
-                                                        {sponsor.end_date && <p className="text-xs">s/d {new Date(sponsor.end_date).toLocaleDateString('id-ID')}</p>}
+                                                        <p>{formatDate(sponsor.start_date, { year: 'numeric', month: 'numeric', day: 'numeric' })}</p>
+                                                        {sponsor.end_date && <p className="text-xs">s/d {formatDate(sponsor.end_date, { year: 'numeric', month: 'numeric', day: 'numeric' })}</p>}
                                                     </div>
                                                 )}
                                             </td>

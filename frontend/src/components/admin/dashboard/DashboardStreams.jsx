@@ -15,6 +15,7 @@ Chrome removed in the 2026-07 admin pass, and why:
 */
 
 import { useRef } from 'react';
+import { TIMESTAMP_STORAGE, useTimezone } from '../../../contexts/TimezoneContext.jsx';
 import { NoStreamsEmptyState } from '../../ui/EmptyState';
 import { useFocusTrap } from '../../../hooks/useFocusTrap';
 import { Modal } from '../../ui/Modal';
@@ -77,6 +78,8 @@ function DeviceIcon({ type }) {
 }
 
 export function ViewerSessionsModal({ title, sessions, onClose }) {
+    const { formatTime } = useTimezone();
+
     return (
         <Modal title={title} description={`${sessions.length} viewer aktif`} onClose={onClose} size="md">
             {sessions.length === 0 ? (
@@ -103,9 +106,11 @@ export function ViewerSessionsModal({ title, sessions, onClose }) {
                                     <span>{formatDuration(session.durationSeconds)}</span>
                                     {session.startedAt && (
                                         <span>
-                                            Mulai {new Date(session.startedAt).toLocaleTimeString('id-ID', {
+                                            Mulai {formatTime(session.startedAt, {
+                                                storage: TIMESTAMP_STORAGE.LOCAL_SQL,
                                                 hour: '2-digit',
                                                 minute: '2-digit',
+                                                second: undefined,
                                             })}
                                         </span>
                                     )}

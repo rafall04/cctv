@@ -9,6 +9,7 @@ import billingAdminService from '../../../services/billingAdminService';
 import { formatDateTime } from './billingFormat';
 import { TableShell } from '../../ui/DataTable';
 import { useConfirm } from '../../../contexts/ConfirmContext';
+import { useTimezone } from '../../../contexts/TimezoneContext';
 import { Card } from '../../ui/Card';
 
 function PlanTag({ reg }) {
@@ -51,6 +52,7 @@ function ActionButtons({ reg, full, busy, onApprove, onReject }) {
 
 export default function RegistrationsTab({ registrations, run, busy }) {
     const confirm = useConfirm();
+    const { timezone } = useTimezone();
     const approve = (reg) => run(() => billingAdminService.approveRegistration(reg.id), 'Pendaftaran disetujui');
     const reject = async (reg) => {
         if (await confirm({ title: `Tolak pendaftaran ${reg.username}?`, message: 'Akun tidak akan bisa login.', confirmLabel: 'Tolak', tone: 'danger' })) {
@@ -93,7 +95,7 @@ export default function RegistrationsTab({ registrations, run, busy }) {
                                         <td className="px-3 py-2 font-medium text-content">{reg.username}</td>
                                         <td className="px-3 py-2 text-content-muted">{reg.phone || reg.email || '—'}</td>
                                         <td className="px-3 py-2 text-content-muted"><PlanTag reg={reg} /></td>
-                                        <td className="px-3 py-2 text-content-muted">{formatDateTime(reg.created_at)}</td>
+                                        <td className="px-3 py-2 text-content-muted">{formatDateTime(reg.created_at, timezone)}</td>
                                         <td className="px-3 py-2"><ActionButtons reg={reg} busy={busy} onApprove={approve} onReject={reject} /></td>
                                     </tr>
                                 ))}
@@ -109,7 +111,7 @@ export default function RegistrationsTab({ registrations, run, busy }) {
                                 <p className="mt-0.5 break-words text-sm text-content-muted">{reg.phone || reg.email || '—'}</p>
                                 <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-sm text-content-muted">
                                     <PlanTag reg={reg} />
-                                    <span className="text-xs text-content-subtle">{formatDateTime(reg.created_at)}</span>
+                                    <span className="text-xs text-content-subtle">{formatDateTime(reg.created_at, timezone)}</span>
                                 </div>
                                 <div className="mt-3"><ActionButtons reg={reg} full busy={busy} onApprove={approve} onReject={reject} /></div>
                             </Card>

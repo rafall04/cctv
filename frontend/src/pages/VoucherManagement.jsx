@@ -10,6 +10,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNotification } from '../contexts/NotificationContext';
 import { useConfirm } from '../contexts/ConfirmContext';
+import { useTimezone } from '../contexts/TimezoneContext';
 import voucherAdminService from '../services/voucherAdminService';
 import { areaService } from '../services/areaService';
 import { TableSkeleton } from '../components/ui/Skeleton';
@@ -72,6 +73,7 @@ function areaLabel(area) {
 export default function VoucherManagement() {
     const { success: notifySuccess, error: notifyError } = useNotification();
     const confirm = useConfirm();
+    const { formatDateTime } = useTimezone();
 
     const [loading, setLoading] = useState(true);
     const [enabled, setEnabled] = useState(false);
@@ -464,7 +466,7 @@ export default function VoucherManagement() {
                                         <td className="px-4 py-3 text-xs text-content-muted">{profilesById[c.profile_id]?.name || `#${c.profile_id}`}</td>
                                         <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded text-xs font-medium ${codeStatusBadge(c.status)}`}>{c.status}</span></td>
                                         <td className="px-4 py-3 text-xs text-content-muted">{c.redeemed_count ?? 0}</td>
-                                        <td className="px-4 py-3 text-xs text-content-muted">{c.expires_at ? new Date(c.expires_at).toLocaleString('id-ID') : '—'}</td>
+                                        <td className="px-4 py-3 text-xs text-content-muted">{c.expires_at ? formatDateTime(c.expires_at, { year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric' }) : '—'}</td>
                                         <td className="px-4 py-3 text-xs text-content-muted">{c.buyer_name || c.buyer_phone || '—'}</td>
                                         <td className="px-4 py-3">
                                             {c.status !== 'revoked' && c.status !== 'expired' && (

@@ -1,19 +1,19 @@
 import { execute, query, queryOne } from '../database/connectionPool.js';
-import { getTimezone } from './timezoneService.js';
 import { nextDeadStreak } from './cameraSourceDeadPolicy.js';
 
+/**
+ * A UTC ISO-8601 instant (…Z), NOT a display-tz wall-clock. These columns (last_online_at,
+ * last_health_check_at, updated_at) are read by MORE than one tz: the offline-skip billing check via
+ * getBillingTimezone() (pinned separately from display), the ingest-park policy, and the admin display
+ * via the configured tz. Storing a display-tz wall-clock leaked the DISPLAY tz into the BILLING day
+ * boundary — set the display tz to WITA/WIT and a camera last online 23:30 WIB got stamped 00:30 the
+ * NEXT day, so the billing check saw "worked today" and charged a day the camera was actually off (the
+ * exact midnight double-charge the billing tz-pin exists to prevent). An absolute UTC instant lets each
+ * reader re-project into ITS OWN tz — billingCalc.storedLocalDate and internalIngestPolicy.toMillis both
+ * already parse the trailing Z correctly, and the admin display formats it via useTimezone.
+ */
 function getTimestamp() {
-    const timezone = getTimezone();
-    return new Date().toLocaleString('sv-SE', {
-        timeZone: timezone,
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false,
-    });
+    return new Date().toISOString();
 }
 
 function normalizeOnlineFlag(value) {

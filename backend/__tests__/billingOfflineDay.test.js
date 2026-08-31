@@ -106,6 +106,11 @@ describe('hari yang kameranya tidak pernah hidup tidak ditagih', () => {
         expect(storedLocalDate('')).toBe('');
         // ISO-Z = instant UTC → diproyeksi ke Asia/Jakarta: 23:30Z = 06:30 WIB keesokan hari.
         expect(storedLocalDate('2026-08-29T23:30:00.000Z')).toBe('2026-08-30');
+        // P0: getTimestamp() kini menulis UTC ISO-Z. Aktivitas 23:30 WIB hari D = 16:30Z hari D → tetap
+        // diproyeksi ke hari D (billing WIB), BUKAN D+1. Ini menutup kebocoran tz-display ke batas
+        // billing: dulu display=WITA menstempel '00:30 D+1' wall-clock lalu di-slice verbatim → salah
+        // tagih hari D+1 padahal kamera mati sepanjang D+1.
+        expect(storedLocalDate('2026-08-19T16:30:00.000Z')).toBe('2026-08-19');
     });
 
     it('kamera terakhir hidup kemarin → hari ini tidak ditagih, langganan TETAP aktif', () => {

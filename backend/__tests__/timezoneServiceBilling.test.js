@@ -13,9 +13,29 @@ vi.mock('../database/connectionPool.js', () => ({
     execute: vi.fn(),
 }));
 
-const { getBillingTimezone } = await import('../services/timezoneService.js');
+const { getBillingTimezone, isValidTimezone } = await import('../services/timezoneService.js');
 
 beforeEach(() => { ROWS = {}; });
+
+describe('isValidTimezone (any IANA zone — not locked to Indonesia)', () => {
+    it('accepts the WIB/WITA/WIT aliases', () => {
+        expect(isValidTimezone('WIB')).toBe(true);
+        expect(isValidTimezone('WITA')).toBe(true);
+        expect(isValidTimezone('WIT')).toBe(true);
+    });
+
+    it('accepts a real IANA zone from ANY region', () => {
+        for (const tz of ['Asia/Jakarta', 'Asia/Makassar', 'Asia/Jayapura', 'America/New_York', 'Europe/London', 'Australia/Sydney', 'UTC']) {
+            expect(isValidTimezone(tz)).toBe(true);
+        }
+    });
+
+    it('rejects empty / garbage / non-zones', () => {
+        for (const bad of ['', null, undefined, 'Not/AZone', 'WIByes', 123, 'Asia/Nowhere']) {
+            expect(isValidTimezone(bad)).toBe(false);
+        }
+    });
+});
 
 describe('getBillingTimezone (#12 billing-tz pin)', () => {
     it('returns the pinned billing_timezone even when the display timezone differs', () => {

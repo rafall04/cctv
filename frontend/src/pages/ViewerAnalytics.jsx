@@ -110,7 +110,7 @@ function renderLiveHistoryCell(session, column, formatDateTime) {
 }
 
 export default function ViewerAnalytics() {
-    const { formatDateTime } = useTimezone();
+    const { formatDateTime, formatTime, timezone } = useTimezone();
     const {
         period,
         customDate,
@@ -233,8 +233,9 @@ export default function ViewerAnalytics() {
     const overview = analytics?.overview;
     const comparison = analytics?.comparison;
 
+    const dayLabelFormatter = new Intl.DateTimeFormat('id-ID', { timeZone: timezone, weekday: 'short', day: 'numeric' });
     const sessionsByDayData = (charts?.sessionsByDay || []).slice(-14).map((item) => ({
-        label: new Date(item.date).toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric' }),
+        label: dayLabelFormatter.format(new Date(item.date)),
         value: item.sessions,
         rawDate: item.date,
     }));
@@ -301,7 +302,7 @@ export default function ViewerAnalytics() {
                 <Alert
                     type="warning"
                     title="Auto-refresh gagal"
-                    message={`Tidak dapat memuat data terbaru. Update terakhir: ${lastUpdate?.toLocaleTimeString('id-ID') || '-'}`}
+                    message={`Tidak dapat memuat data terbaru. Update terakhir: ${lastUpdate ? formatTime(lastUpdate) : '-'}`}
                     dismissible
                     onDismiss={() => setRefreshError(false)}
                 />

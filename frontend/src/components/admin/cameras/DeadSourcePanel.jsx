@@ -19,12 +19,14 @@
 import { useEffect, useState } from 'react';
 import { Badge, Card, CardHeader } from '../../ui';
 import { cameraService } from '../../../services/cameraService';
+import { useTimezone } from '../../../contexts/TimezoneContext';
 
 /** ISO in, local phrasing out. "sejak 31 Agu 10.29" reads faster than a raw timestamp. */
-function sinceText(iso) {
+function sinceText(iso, timeZone) {
     const at = new Date(iso);
     if (Number.isNaN(at.getTime())) return null;
     return at.toLocaleString('id-ID', {
+        timeZone,
         day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
     });
 }
@@ -33,6 +35,7 @@ const durationText = (hours) => (hours >= 48 ? `${Math.floor(hours / 24)} hari` 
 
 export default function DeadSourcePanel() {
     const [data, setData] = useState(null);
+    const { timezone } = useTimezone();
 
     useEffect(() => {
         let alive = true;
@@ -68,7 +71,7 @@ export default function DeadSourcePanel() {
                             <span className="text-xs text-content-subtle">{camera.areaName}</span>
                         )}
                         <span className="text-xs tabular-nums text-content-muted">
-                            sejak {sinceText(camera.since)} · {durationText(camera.hours)}
+                            sejak {sinceText(camera.since, timezone)} · {durationText(camera.hours)}
                         </span>
                         {/*
                           * "Masih tayang" is the actionable half. A dead camera the operator already

@@ -1,14 +1,17 @@
+import { useTimezone } from '../../../contexts/TimezoneContext.jsx';
+
 function parseValidDate(timestamp) {
     if (!timestamp) return null;
     const parsed = new Date(timestamp);
     return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
-function formatTimestamp(timestamp) {
+function formatTimestamp(timestamp, timeZone) {
     const parsed = parseValidDate(timestamp);
     if (!parsed) return '-';
 
     return parsed.toLocaleString('id-ID', {
+        timeZone,
         year: 'numeric',
         month: 'short',
         day: 'numeric',
@@ -78,8 +81,8 @@ function formatRecoveryDuration(restartTime, recoveryTime) {
     return remainingMinutes > 0 ? `${hours} jam ${remainingMinutes} menit` : `${hours} jam`;
 }
 
-function renderRecovery(log) {
-    const recoveryLabel = formatTimestamp(log.recovery_time);
+function renderRecovery(log, timeZone) {
+    const recoveryLabel = formatTimestamp(log.recovery_time, timeZone);
     const duration = formatRecoveryDuration(log.restart_time, log.recovery_time);
 
     if (recoveryLabel === '-') {
@@ -101,6 +104,8 @@ function renderRecovery(log) {
 }
 
 export default function RecordingRestartLogs({ logs }) {
+    const { timezone } = useTimezone();
+
     return (
         <div className="rounded-2xl border border-edge bg-surface p-5 shadow-sm md:p-6">
             <h2 className="mb-4 text-xl font-bold text-content">Auto-Restart Logs</h2>
@@ -133,8 +138,8 @@ export default function RecordingRestartLogs({ logs }) {
                                             {getStatusInfo(log.success, log.recovery_time).label}
                                         </span>
                                     </td>
-                                    <td className="px-4 py-3 text-sm text-content">{formatTimestamp(log.restart_time)}</td>
-                                    <td className="px-4 py-3">{renderRecovery(log)}</td>
+                                    <td className="px-4 py-3 text-sm text-content">{formatTimestamp(log.restart_time, timezone)}</td>
+                                    <td className="px-4 py-3">{renderRecovery(log, timezone)}</td>
                                 </tr>
                             ))}
                         </tbody>

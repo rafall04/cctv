@@ -12,7 +12,6 @@ import { query, queryOne } from '../database/connectionPool.js';
 import { resolveInternalIngestPolicy, shouldParkInternalIngest, isIngestParkEnabled } from '../utils/internalIngestPolicy.js';
 import { resolveInternalRtspTransport, toMediaMtxSourceProtocol } from '../utils/internalRtspTransportPolicy.js';
 import { buildPushHookFields } from './mediaMtxHookConfig.js';
-import { getTimezone } from './timezoneService.js';
 
 // Centralized Axios instance for MediaMTX API to avoid repetition and enforce standard timeouts
 const mtxApi = axios.create({
@@ -113,9 +112,6 @@ class MediaMtxService {
         // lifts itself the moment the camera answers again. See shouldParkInternalIngest.
         const parked = shouldParkInternalIngest(camera, Date.now(), {
             currentlyParked: this.parkedPaths?.has(camera.path_name) ?? false,
-            // Health timestamps are stored in the display tz, not UTC; hand the policy the tz so it
-            // resolves them to the right instant on a UTC-process host (else a dead camera never parks).
-            timeZone: getTimezone(),
         });
         return {
             source: camera.rtsp_url,
@@ -302,13 +298,11 @@ class MediaMtxService {
         }
 
         const cameras = this.getDatabaseCameras();
-        const timeZone = getTimezone(); // resolved once — the health timestamps are stored in it
         let changed = 0;
 
         for (const camera of cameras) {
             const shouldPark = shouldParkInternalIngest(camera, now, {
                 currentlyParked: this.parkedPaths.has(camera.path_name),
-                timeZone,
             });
             if (shouldPark === this.parkedPaths.has(camera.path_name)) {
                 continue;

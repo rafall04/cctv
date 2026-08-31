@@ -484,12 +484,9 @@ class RecordingPlaybackService {
         const isDeep = DEEP_PLAYBACK_MODES.has(access.accessMode);
         const range = isDeep ? requestedRange : null;
         const previewLimit = getPreviewSegmentLimit(access.previewMinutes);
-        // owner_full sees the same full history as staff — for their own camera only.
-        //
-        // Scope the LOCAL query to the entitled window (request ∩ entitlement) and take the NEWEST rows
-        // within it. The old `order:'oldest' LIMIT 1000` (unscoped) kept the oldest 1000 rows overall and
-        // dropped the newest — so a recent range on a camera with >1000 local segments (retention >~7d)
-        // listed and streamed NOTHING that exists on disk, while the coverage bar drew it green.
+        // owner_full = staff's full history, own camera only. Scope the LOCAL query to the entitled window +
+        // take NEWEST: the old unscoped `order:'oldest' LIMIT 1000` dropped newest → a recent range on a
+        // >1000-segment camera listed/streamed NOTHING on disk while the coverage bar drew it green.
         const deepBounds = isDeep ? intersectWithAccessWindow(range, access) : null;
         const queryOptions = isDeep
             ? { cameraId, order: 'latest', limit: 1000, returnAscending: true, fromIso: deepBounds?.from ?? null, toIso: deepBounds?.to ?? null }
@@ -505,13 +502,10 @@ class RecordingPlaybackService {
         ).filter((segment) => isWithinRange(segment, range));
 
         /*
-         * An empty result is NOT a missing resource. A camera that simply has not recorded
-         * yet is a normal, expected state, and answering 404 made it indistinguishable from
-         * "Camera not found" (also 404) — the frontend had to string-match the message to
-         * tell them apart, and every visit to a fresh camera logged a console error on a
-         * page that was working correctly. Callers that genuinely cannot represent
-         * emptiness (generatePlaylist — an HLS playlist with no segments is meaningless)
-         * raise the 404 themselves.
+         * An empty result is NOT a missing resource — a camera that has not recorded yet is normal, but a
+         * 404 made it indistinguishable from "Camera not found" (frontend string-matched the message, and
+         * every fresh-camera visit logged a console error on a working page). Callers that truly cannot
+         * represent emptiness (generatePlaylist — an HLS playlist with no segments is meaningless) raise it.
          */
         return {
             camera,

@@ -1,3 +1,5 @@
+import { useTimezone } from '../../../contexts/TimezoneContext';
+
 function formatReason(reason) {
     if (!reason) {
         return 'Belum ada data';
@@ -6,7 +8,7 @@ function formatReason(reason) {
     return reason.replace(/_/g, ' ');
 }
 
-function formatTimestamp(value) {
+function formatTimestamp(value, timeZone) {
     if (!value) {
         return '-';
     }
@@ -16,7 +18,7 @@ function formatTimestamp(value) {
         return value;
     }
 
-    return date.toLocaleString('id-ID');
+    return date.toLocaleString('id-ID', { timeZone });
 }
 
 function renderTarget(label, value) {
@@ -76,6 +78,7 @@ export default function CameraHealthDebugPanel({
     onFilterChange,
     onPageChange,
 }) {
+    const { timezone } = useTimezone();
     const hasItems = Array.isArray(items) && items.length > 0;
 
     return (
@@ -98,7 +101,7 @@ export default function CameraHealthDebugPanel({
                         </p>
                     </div>
                     <div className="text-xs text-content-subtle">
-                        Last updated: {lastUpdated ? formatTimestamp(lastUpdated) : '-'}
+                        Last updated: {lastUpdated ? formatTimestamp(lastUpdated, timezone) : '-'}
                     </div>
                 </div>
 
@@ -327,12 +330,12 @@ export default function CameraHealthDebugPanel({
                                                 </div>
                                             </td>
                                             <td className="px-3 py-3 text-xs text-content-muted">
-                                                <div>Probe: {formatTimestamp(item.lastProbeAt)}</div>
-                                                <div>Runtime ok: {formatTimestamp(item.lastRuntimeSuccessAt)}</div>
-                                                <div>Runtime fresh: {formatTimestamp(item.lastRuntimeFreshAt)}</div>
+                                                <div>Probe: {formatTimestamp(item.lastProbeAt, timezone)}</div>
+                                                <div>Runtime ok: {formatTimestamp(item.lastRuntimeSuccessAt, timezone)}</div>
+                                                <div>Runtime fresh: {formatTimestamp(item.lastRuntimeFreshAt, timezone)}</div>
                                                 <div>Signal: {item.lastRuntimeSignalType || '-'}</div>
-                                                <div>Grace: {formatTimestamp(item.runtimeGraceUntil)}</div>
-                                                <div>Backoff: {formatTimestamp(item.domainBackoffUntil)}</div>
+                                                <div>Grace: {formatTimestamp(item.runtimeGraceUntil, timezone)}</div>
+                                                <div>Backoff: {formatTimestamp(item.domainBackoffUntil, timezone)}</div>
                                             </td>
                                         </tr>
                                     ))}

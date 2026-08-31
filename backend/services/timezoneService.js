@@ -31,12 +31,33 @@ export function getBillingTimezone() {
     return setting?.setting_value || getTimezone();
 }
 
+/**
+ * Any real IANA zone name (or a WIB/WITA/WIT alias). Not locked to Indonesia — a future deployment
+ * could be anywhere, so we validate against the runtime's own zone database instead of a fixed list.
+ * `Intl.DateTimeFormat` throws a RangeError for an unknown zone; that is the check.
+ */
+export function isValidTimezone(timezone) {
+    const resolved = TIMEZONE_MAP[timezone] || timezone;
+    if (typeof resolved !== 'string' || !resolved) return false;
+    try {
+        new Intl.DateTimeFormat('en-US', { timeZone: resolved });
+        return true;
+    } catch {
+        return false;
+    }
+}
+
 export function setTimezone(timezone) {
     const validTimezone = TIMEZONE_MAP[timezone] || timezone;
+    if (!isValidTimezone(validTimezone)) {
+        const err = new Error(`Invalid timezone: ${timezone}`);
+        err.statusCode = 400;
+        throw err;
+    }
     execute(
-        `INSERT INTO system_settings (setting_key, setting_value, updated_at) 
+        `INSERT INTO system_settings (setting_key, setting_value, updated_at)
          VALUES ('timezone', ?, CURRENT_TIMESTAMP)
-         ON CONFLICT(setting_key) DO UPDATE SET 
+         ON CONFLICT(setting_key) DO UPDATE SET
          setting_value = excluded.setting_value,
          updated_at = CURRENT_TIMESTAMP`,
         [validTimezone]

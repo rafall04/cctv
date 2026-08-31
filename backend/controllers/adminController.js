@@ -17,7 +17,7 @@ import {
     saveTelegramSettings
 } from '../services/telegramService.js';
 import cache from '../services/cacheService.js';
-import { getTimezone, setTimezone, TIMEZONE_MAP, formatDateTime } from '../services/timezoneService.js';
+import { getTimezone, setTimezone, isValidTimezone, TIMEZONE_MAP, formatDateTime } from '../services/timezoneService.js';
 import { logAdminAction } from '../services/securityAuditLogger.js';
 import backupService from '../services/backupService.js';
 import cameraHealthService from '../services/cameraHealthService.js';
@@ -461,9 +461,10 @@ export async function clearCache(request, reply) {
 export async function getTimezoneConfig(request, reply) {
     try {
         const timezone = getTimezone();
+        // WIB/WITA/WIT alias when the zone is one of those; otherwise the IANA name itself (any region).
         const shortName = Object.keys(TIMEZONE_MAP).find(
             key => TIMEZONE_MAP[key] === timezone
-        ) || 'WIB';
+        ) || timezone;
 
         return reply.send({
             success: true,
@@ -488,10 +489,12 @@ export async function updateTimezoneConfig(request, reply) {
     try {
         const { timezone } = request.body;
 
-        if (!['WIB', 'WITA', 'WIT'].includes(timezone)) {
+        // Accept ANY real IANA zone (or a WIB/WITA/WIT alias) — not locked to Indonesia, since a future
+        // deployment could be anywhere. isValidTimezone checks it against the runtime's own zone database.
+        if (!isValidTimezone(timezone)) {
             return reply.code(400).send({
                 success: false,
-                message: 'Invalid timezone. Use: WIB, WITA, or WIT',
+                message: 'Zona waktu tidak valid. Pakai nama IANA (mis. Asia/Jakarta, Asia/Makassar, America/New_York) atau WIB/WITA/WIT.',
             });
         }
 

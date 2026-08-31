@@ -18,12 +18,13 @@
 
 import { Alert, Badge, Button, Card, PageHeader, TableShell, Table, THead, TBody, TR, TH, TD, SortableTH } from '../components/ui';
 import { useCameraReactionsPage, positiveShare } from '../hooks/admin/useCameraReactionsPage.js';
+import { useTimezone, parseBackendDateInput, TIMESTAMP_STORAGE } from '../contexts/TimezoneContext';
 
-const when = (value) => {
+const when = (value, timeZone) => {
     if (!value) return '—';
-    const at = new Date(String(value).replace(' ', 'T'));
+    const at = parseBackendDateInput(value, { storage: TIMESTAMP_STORAGE.UTC_SQL });
     if (Number.isNaN(at.getTime())) return value;
-    return at.toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+    return at.toLocaleString('id-ID', { timeZone, day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 };
 
 function Stat({ label, value, tone = 'text-content' }) {
@@ -37,6 +38,7 @@ function Stat({ label, value, tone = 'text-content' }) {
 
 export default function CameraReactionsOverview() {
     const page = useCameraReactionsPage();
+    const { timezone } = useTimezone();
     const { totals, sort } = page;
 
     /** 'none' for every column except the active one — SortableTH turns that into aria-sort. */
@@ -135,7 +137,7 @@ export default function CameraReactionsOverview() {
                                         <TD align="right" mono>
                                             {share === null ? <span className="text-content-subtle">—</span> : `${share}%`}
                                         </TD>
-                                        <TD mono className="text-content-muted">{when(camera.lastVoteAt)}</TD>
+                                        <TD mono className="text-content-muted">{when(camera.lastVoteAt, timezone)}</TD>
                                         <TD>
                                             {camera.enabled
                                                 ? <Badge tone="live" dot>Tayang</Badge>

@@ -9,6 +9,7 @@ SideEffects: Downloads backup files, previews/imports backup data, and reloads t
 import { useState, useRef } from 'react';
 import { adminAPI } from '../../../services/api';
 import { useConfirm } from '../../../contexts/ConfirmContext';
+import { useTimezone } from '../../../contexts/TimezoneContext.jsx';
 import { Download, Upload, Database, FileJson, Info } from 'lucide-react';
 import TelegramBackupPanel from './TelegramBackupPanel';
 
@@ -21,6 +22,7 @@ export default function BackupSettingsTab() {
     const [error, setError] = useState(null);
     const [success, setSuccess] = useState(false);
     const confirm = useConfirm();
+    const { timezone } = useTimezone();
     const fileInputRef = useRef(null);
 
     const handleExportBackup = async () => {
@@ -229,7 +231,7 @@ export default function BackupSettingsTab() {
                                     <div className="flex justify-between">
                                         <span className="text-content-muted">Exported:</span>
                                         <span className="font-mono text-content">
-                                            {new Date(backupPreview.exported_at).toLocaleString('id-ID')}
+                                            {new Date(backupPreview.exported_at).toLocaleString('id-ID', { timeZone: timezone })}
                                         </span>
                                     </div>
                                     <div className="border-t border-edge pt-2 mt-2">
