@@ -116,6 +116,25 @@ describe('PlaybackTimeline', () => {
         expect(screen.getByTitle('Hilang: 110 menit')).toBeTruthy();
     });
 
+    it('names the day on the bound labels when the range crosses midnight', () => {
+        // Local ISO (no Z) so the day boundary is deterministic regardless of the test machine's TZ.
+        render(
+            <PlaybackTimeline
+                segments={[
+                    { id: 1, start_time: '2026-08-26T02:10:00', end_time: '2026-08-26T02:20:00', duration: 600 },
+                    { id: 2, start_time: '2026-08-31T00:00:00', end_time: '2026-08-31T00:10:00', duration: 600 },
+                ]}
+                selectedSegment={null}
+                onSegmentClick={vi.fn()}
+                onTimelineClick={vi.fn()}
+                formatTimestamp={(v) => String(v)}
+            />,
+        );
+
+        expect(screen.getByText('26 Agu 02.10')).toBeTruthy();
+        expect(screen.getByText('31 Agu 00.10')).toBeTruthy();
+    });
+
     /*
      * THE PUBLIC SURFACE MUST NOT LEARN HOW DEEP THE ARCHIVE GOES.
      *

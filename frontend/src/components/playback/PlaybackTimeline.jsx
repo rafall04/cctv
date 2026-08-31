@@ -18,6 +18,7 @@
 import { memo, useMemo, useRef, useState } from 'react';
 import PlaybackCoverageStrip from './PlaybackCoverageStrip';
 import PlaybackRangePicker from './PlaybackRangePicker';
+import { boundsSpanDays, formatBoundLabel } from '../../utils/playbackTimeLabel';
 
 /** Below this, a seam between two clips is timer rounding, not a hole worth marking. */
 const GAP_THRESHOLD_SECONDS = 30;
@@ -177,7 +178,7 @@ function PlaybackTimeline({
         const pct = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
         const absMs = timelineData.start + pct * timelineData.duration * 1000;
         setHoverPercent(pct * 100);
-        setHoverLabel(new Date(absMs).toLocaleTimeString('id-ID'));
+        setHoverLabel(formatBoundLabel(absMs, boundsSpanDays(timelineData.start, timelineData.end)));
     };
 
     const handleTimelineLeave = () => {
@@ -186,6 +187,7 @@ function PlaybackTimeline({
     };
 
     const canBrowseDays = Boolean(dayScope?.coverage?.runs?.length);
+    const spansDays = timelineData.start !== null && boundsSpanDays(timelineData.start, timelineData.end);
     // Nothing to place AND nothing to navigate with: the card would be an empty box.
     if (timelineData.start === null && !canBrowseDays) return null;
 
@@ -226,9 +228,9 @@ function PlaybackTimeline({
             ) : (
             <div className="mb-4 sm:mb-6">
                 <div className="flex justify-between text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2">
-                    <span>{new Date(timelineData.start).toLocaleTimeString('id-ID')}</span>
+                    <span>{formatBoundLabel(timelineData.start, spansDays)}</span>
                     {hoverLabel && <span className="font-semibold text-gray-900 dark:text-white">{hoverLabel}</span>}
-                    <span>{new Date(timelineData.end).toLocaleTimeString('id-ID')}</span>
+                    <span>{formatBoundLabel(timelineData.end, spansDays)}</span>
                 </div>
 
                 <div

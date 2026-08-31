@@ -353,10 +353,31 @@ describe('usePlaybackTokenManagementPage area scope editing', () => {
         expect(playbackTokenService.updateToken).toHaveBeenCalledWith(15, expect.objectContaining({
             playback_window_hours: 48,
         }));
-        // Expiry is carried as a LOCAL datetime-local that round-trips to the stored UTC instant
-        // (the tz-drift fix), not the raw UTC string.
+        // Expiry is sent as an ABSOLUTE UTC instant (Z), not a naive local string. A naive string is
+        // what let prod's UTC-tz Node process read the operator's WIB wall-clock as UTC and shift it 7h.
         const sentExpiry = playbackTokenService.updateToken.mock.calls[0][1].expires_at;
+        expect(sentExpiry).toMatch(/Z$/);
         expect(Date.parse(sentExpiry)).toBe(Date.parse('2026-08-04T10:02:00Z'));
+    });
+
+    it('sends range bounds as absolute UTC instants (Z), immune to the server process timezone', async () => {
+        const { result } = renderHook(() => usePlaybackTokenManagementPage());
+        await waitFor(() => expect(result.current.loading).toBe(false));
+
+        act(() => result.current.beginEditToken(result.current.tokens[0]));
+        act(() => result.current.updateEditForm('depth_mode', 'range'));
+        act(() => result.current.updateEditForm('playback_from', '2026-08-26T02:10'));
+        act(() => result.current.updateEditForm('playback_to', '2026-08-31T01:20'));
+        await act(async () => { await result.current.handleUpdateToken(15); });
+
+        const sent = playbackTokenService.updateToken.mock.calls.at(-1)[1];
+        // The Z suffix is the guard: without it a UTC-tz server reparses "02:10" as 02:10 UTC (= 09:10
+        // WIB), the exact 7h drift the operator saw on the public panel.
+        expect(sent.playback_from).toMatch(/Z$/);
+        expect(sent.playback_to).toMatch(/Z$/);
+        // The absolute instant still means the local wall-clock the operator typed.
+        expect(new Date(sent.playback_from)).toEqual(new Date('2026-08-26T02:10'));
+        expect(new Date(sent.playback_to)).toEqual(new Date('2026-08-31T01:20'));
     });
 });
 
@@ -406,11 +427,14 @@ describe('usePlaybackTokenManagementPage preset quick-fill + friendly units', ()
         act(() => result.current.updateForm('playback_to', '2026-08-05T23:59'));
         await act(async () => { await result.current.handleCreate(submitEvent()); });
 
-        expect(playbackTokenService.createToken).toHaveBeenCalledWith(expect.objectContaining({
-            playback_window_hours: null,
-            playback_from: '2026-08-01T00:00',
-            playback_to: '2026-08-05T23:59',
-        }));
+        const sent = playbackTokenService.createToken.mock.calls.at(-1)[0];
+        expect(sent.playback_window_hours).toBeNull();
+        // Sent as absolute UTC instants (Z), not the naive local strings that a UTC-tz server would
+        // reparse 7h off. The instant still means the wall-clock the operator typed.
+        expect(sent.playback_from).toMatch(/Z$/);
+        expect(sent.playback_to).toMatch(/Z$/);
+        expect(new Date(sent.playback_from)).toEqual(new Date('2026-08-01T00:00'));
+        expect(new Date(sent.playback_to)).toEqual(new Date('2026-08-05T23:59'));
     });
 
     it('loads a stored UTC expiry as a local input that round-trips to the SAME instant (no tz drift)', async () => {

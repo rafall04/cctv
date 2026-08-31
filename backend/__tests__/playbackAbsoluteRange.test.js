@@ -35,6 +35,17 @@ describe('resolveAccessBounds', () => {
     it('neither → unlimited (both null)', () => {
         expect(resolveAccessBounds({}, now)).toEqual({ fromIso: null, toIso: null });
     });
+
+    // REGRESSION: the bounds are STORED by toUtcSql as space-separated UTC with NO zone
+    // ("2026-08-26 02:10:00"). V8 reads a zoneless string as the server's LOCAL time, so on a non-UTC
+    // process (the deployment's intended Asia/Jakarta) the floor/ceiling shifted 7h while segment
+    // timestamps (always `...Z`) did not — leaking pre-window footage and hiding paid footage. The
+    // earlier tests used `...Z` fixtures that never exercised the real stored shape, so the bug hid.
+    it('pins a STORED space-separated UTC bound to UTC, not the server timezone', () => {
+        const b = resolveAccessBounds({ playbackFrom: '2026-08-26 02:10:00', playbackTo: '2026-08-31 01:20:00' });
+        expect(b.fromIso).toBe('2026-08-26T02:10:00.000Z');
+        expect(b.toIso).toBe('2026-08-31T01:20:00.000Z');
+    });
 });
 
 describe('intersectWithAccessWindow — absolute range is a hard [floor, ceiling]', () => {

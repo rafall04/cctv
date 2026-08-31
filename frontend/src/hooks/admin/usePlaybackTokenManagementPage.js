@@ -47,10 +47,8 @@ function toDateTimeLocalInput(ms) {
 }
 
 // A STORED value (UTC SQL "YYYY-MM-DD HH:MM:SS") → a LOCAL datetime-local value for the edit form.
-// WHY: the backend parses a datetime-local as SERVER-local time (Asia/Jakarta) on save, so the form
-// must show — and round-trip — the SAME local wall-clock. Loading the raw UTC string and re-saving it
-// (untouched) made the backend re-read UTC digits as local, shifting the date earlier by the tz offset
-// every edit — the drift that pushed a token's per-camera expiry into the past and silently blocked it.
+// The stored value is UTC; the form shows it as browser-local wall-clock, and localInputToUtcIso below
+// converts it straight back to UTC on save, so the round-trip is exact regardless of the server tz.
 // An already-local value (create form, edit-in-progress) is passed through unchanged.
 function utcSqlToLocalInput(value) {
     if (!value) return '';
@@ -58,6 +56,17 @@ function utcSqlToLocalInput(value) {
     if (s.includes('T') && !/(Z|[+-]\d\d:?\d\d)$/.test(s)) return s.slice(0, 16);
     const ms = Date.parse(s.includes('T') ? s : `${s.replace(' ', 'T')}Z`);
     return Number.isFinite(ms) ? toDateTimeLocalInput(ms) : '';
+}
+
+// A `<input type="datetime-local">` value is browser-local wall-clock ("YYYY-MM-DDTHH:mm"). Send it as an
+// explicit UTC ISO ("...Z"), NOT as the naive string, so the stored instant never depends on the SERVER
+// process timezone. Prod's Node process runs in UTC, so a naive "02:10" was parsed AS 02:10 UTC and the
+// customer's WIB wall-clock landed 7h off (typed 02:10 → shown 09:10 on the public panel). Converting in
+// the browser makes 02:10 mean 02:10 here, deterministically. Empty → null (inherit / no bound).
+function localInputToUtcIso(value) {
+    if (!value) return null;
+    const ms = Date.parse(value);
+    return Number.isFinite(ms) ? new Date(ms).toISOString() : null;
 }
 
 export const PLAYBACK_TOKEN_SESSION_LIMIT_MODES = [
@@ -161,8 +170,8 @@ function buildDepthPayload(form) {
     if (form.depth_mode === 'range') {
         return {
             playback_window_hours: null,
-            playback_from: form.playback_from || null,
-            playback_to: form.playback_to || null,
+            playback_from: localInputToUtcIso(form.playback_from),
+            playback_to: localInputToUtcIso(form.playback_to),
         };
     }
     return {
@@ -179,7 +188,7 @@ export function buildTokenCameraRulesPayload(ruleMap) {
             camera_id: Number.parseInt(rule.camera_id, 10),
             enabled: true,
             playback_window_hours: normalizeNumberOrNull(rule.playback_window_hours),
-            expires_at: rule.expires_at || null,
+            expires_at: localInputToUtcIso(rule.expires_at),
             note: rule.note || '',
         }))
         .filter((rule) => Number.isInteger(rule.camera_id) && rule.camera_id > 0);
@@ -531,7 +540,7 @@ export function usePlaybackTokenManagementPage() {
                 camera_ids: cameraRules.map((rule) => rule.camera_id),
                 camera_rules: cameraRules,
                 ...buildDepthPayload(form),
-                expires_at: form.expires_at || null,
+                expires_at: localInputToUtcIso(form.expires_at),
             };
             const response = await playbackTokenService.createToken(payload);
             if (!response.success) {
@@ -630,7 +639,7 @@ export function usePlaybackTokenManagementPage() {
                 camera_ids: cameraRules.map((rule) => rule.camera_id),
                 camera_rules: cameraRules,
                 ...buildDepthPayload(editForm),
-                expires_at: editForm.expires_at || null,
+                expires_at: localInputToUtcIso(editForm.expires_at),
                 max_active_sessions: editForm.max_active_sessions === '' ? null : editForm.max_active_sessions,
                 session_limit_mode: editForm.session_limit_mode,
                 session_timeout_seconds: editForm.session_timeout_seconds,

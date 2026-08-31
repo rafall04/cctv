@@ -22,7 +22,16 @@
 /** Reject anything that is not a parseable instant, so a typo narrows nothing instead of everything. */
 function toIso(value) {
     if (value === undefined || value === null || value === '') return null;
-    const parsed = Date.parse(String(value));
+    const text = String(value).trim();
+    // Token bounds are stored UTC "YYYY-MM-DD HH:MM:SS" (space, NO zone). V8 reads a zoneless string as
+    // the SERVER's local time, so on any non-UTC process the bound shifts by the tz offset while segment
+    // timestamps (always `...Z`) do not — the 7h drift that leaked pre-window footage and hid paid
+    // footage. Pin a zoneless "YYYY-MM-DD[ T]HH:MM(:SS)" to UTC; anything already carrying a zone (the
+    // request's ISO-`Z` from/to) is left untouched.
+    const normalized = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?$/.test(text)
+        ? `${text.replace(' ', 'T')}Z`
+        : text;
+    const parsed = Date.parse(normalized);
     return Number.isFinite(parsed) ? new Date(parsed).toISOString() : null;
 }
 
