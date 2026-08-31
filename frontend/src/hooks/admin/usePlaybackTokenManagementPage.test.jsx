@@ -352,8 +352,11 @@ describe('usePlaybackTokenManagementPage area scope editing', () => {
 
         expect(playbackTokenService.updateToken).toHaveBeenCalledWith(15, expect.objectContaining({
             playback_window_hours: 48,
-            expires_at: '2026-08-04 10:02:00',
         }));
+        // Expiry is carried as a LOCAL datetime-local that round-trips to the stored UTC instant
+        // (the tz-drift fix), not the raw UTC string.
+        const sentExpiry = playbackTokenService.updateToken.mock.calls[0][1].expires_at;
+        expect(Date.parse(sentExpiry)).toBe(Date.parse('2026-08-04T10:02:00Z'));
     });
 });
 
@@ -408,5 +411,25 @@ describe('usePlaybackTokenManagementPage preset quick-fill + friendly units', ()
             playback_from: '2026-08-01T00:00',
             playback_to: '2026-08-05T23:59',
         }));
+    });
+
+    it('loads a stored UTC expiry as a local input that round-trips to the SAME instant (no tz drift)', async () => {
+        playbackTokenService.listTokens.mockResolvedValue({
+            success: true,
+            data: [{
+                id: 20, label: 'Z', scope_type: 'all', area_ids: [], camera_ids: [], camera_rules: [],
+                playback_window_hours: 24, expires_at: '2026-09-05 16:05:00',
+            }],
+        });
+        const { result } = renderHook(() => usePlaybackTokenManagementPage());
+        await waitFor(() => expect(result.current.loading).toBe(false));
+
+        act(() => result.current.beginEditToken(result.current.tokens[0]));
+
+        // The form holds a LOCAL datetime-local value ("YYYY-MM-DDTHH:MM")...
+        expect(result.current.editForm.expires_at).toMatch(/^\d{4}-\d\d-\d\dT\d\d:\d\d$/);
+        // ...which, read back as local time, is the SAME instant as the stored UTC — so re-saving it
+        // untouched can't drift the date (the bug that pushed per-camera expiries into the past).
+        expect(Date.parse(result.current.editForm.expires_at)).toBe(Date.parse('2026-09-05T16:05:00Z'));
     });
 });

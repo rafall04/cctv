@@ -223,14 +223,14 @@ describe('PlaybackTokenAccess when the token does not reach this camera', () => 
     it('explains WHY rather than selling a trial to someone who already paid', () => {
         setup({ playbackPolicy: OUT_OF_SCOPE, tokenStatus: { id: 5, scope_type: 'area' } });
 
-        expect(screen.getByText(/tidak mencakup kamera ini/)).toBeTruthy();
+        expect(screen.getByText(/tidak tercakup/)).toBeTruthy();
         expect(screen.queryByText(/Belum punya token/)).toBeNull();
     });
 
     it('still offers the trial to a visitor who genuinely holds nothing', () => {
         setup({ playbackPolicy: OUT_OF_SCOPE, tokenStatus: null });
 
-        expect(screen.queryByText(/tidak mencakup kamera ini/)).toBeNull();
+        expect(screen.queryByText(/tidak tercakup/)).toBeNull();
         expect(screen.getByText(/Belum punya token/)).toBeTruthy();
     });
 

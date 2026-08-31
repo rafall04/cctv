@@ -1315,7 +1315,7 @@ class PlaybackTokenService {
                 playbackWindowHours: token.playback_window_hours,
             };
         if (normalizedCameraId > 0 && !cameraPolicy.allowed) {
-            const err = new Error('Token playback tidak mencakup kamera ini');
+            const err = new Error(cameraPolicy.message || 'Token playback tidak mencakup kamera ini');
             err.statusCode = 403;
             throw err;
         }

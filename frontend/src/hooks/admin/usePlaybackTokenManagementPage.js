@@ -45,6 +45,20 @@ function toDateTimeLocalInput(ms) {
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+// A STORED value (UTC SQL "YYYY-MM-DD HH:MM:SS") → a LOCAL datetime-local value for the edit form.
+// WHY: the backend parses a datetime-local as SERVER-local time (Asia/Jakarta) on save, so the form
+// must show — and round-trip — the SAME local wall-clock. Loading the raw UTC string and re-saving it
+// (untouched) made the backend re-read UTC digits as local, shifting the date earlier by the tz offset
+// every edit — the drift that pushed a token's per-camera expiry into the past and silently blocked it.
+// An already-local value (create form, edit-in-progress) is passed through unchanged.
+function utcSqlToLocalInput(value) {
+    if (!value) return '';
+    const s = String(value).trim();
+    if (s.includes('T') && !/(Z|[+-]\d\d:?\d\d)$/.test(s)) return s.slice(0, 16);
+    const ms = Date.parse(s.includes('T') ? s : `${s.replace(' ', 'T')}Z`);
+    return Number.isFinite(ms) ? toDateTimeLocalInput(ms) : '';
+}
+
 export const PLAYBACK_TOKEN_SESSION_LIMIT_MODES = [
     { value: '', label: 'Ikuti preset' },
     { value: 'strict', label: 'Tolak device baru' },
@@ -132,7 +146,8 @@ function buildInitialRuleMap(rules = [], fallbackIds = []) {
             camera_id: cameraId,
             enabled: rule.enabled !== false,
             playback_window_hours: rule.playback_window_hours || '',
-            expires_at: rule.expires_at || '',
+            // Convert stored UTC → local so re-saving an untouched rule doesn't drift its expiry.
+            expires_at: utcSqlToLocalInput(rule.expires_at),
             note: rule.note || '',
         };
     });
@@ -487,9 +502,10 @@ export function usePlaybackTokenManagementPage() {
             depth_mode: (token.playback_from || token.playback_to) ? 'range' : 'rolling',
             playback_window_value: hoursToFriendly(token.playback_window_hours).value,
             playback_window_unit: hoursToFriendly(token.playback_window_hours).unit,
-            playback_from: token.playback_from || '',
-            playback_to: token.playback_to || '',
-            expires_at: token.expires_at || '',
+            // Convert stored UTC → local so an untouched date isn't re-interpreted (and drifted) on save.
+            playback_from: utcSqlToLocalInput(token.playback_from),
+            playback_to: utcSqlToLocalInput(token.playback_to),
+            expires_at: utcSqlToLocalInput(token.expires_at),
             max_active_sessions: token.max_active_sessions ?? '',
             session_limit_mode: token.session_limit_mode || 'unlimited',
             session_timeout_seconds: token.session_timeout_seconds || 60,

@@ -267,8 +267,8 @@ export default function PlaybackTokenAccess({
                      */}
                     {heldButOutOfScope && (
                         <p className="mt-1 text-xs leading-5 text-status-warn">
-                            Token Anda aktif, tetapi tidak mencakup kamera ini. Pilih kamera lain yang termasuk
-                            dalam token, atau masukkan token lain.
+                            Token Anda aktif, tetapi kamera ini tidak tercakup — atau aturan aksesnya untuk
+                            kamera ini sudah kedaluwarsa. Pilih kamera lain yang termasuk, atau masukkan token lain.
                         </p>
                     )}
                     {!isSwapping && !heldButOutOfScope && accessOffered && (
