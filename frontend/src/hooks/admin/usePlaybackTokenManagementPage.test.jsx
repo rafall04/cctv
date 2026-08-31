@@ -393,4 +393,20 @@ describe('usePlaybackTokenManagementPage preset quick-fill + friendly units', ()
             playback_window_hours: 336, // 2 minggu = 336 jam
         }));
     });
+
+    it('range mode sends absolute from/to and nulls the rolling window', async () => {
+        const { result } = renderHook(() => usePlaybackTokenManagementPage());
+        await waitFor(() => expect(result.current.loading).toBe(false));
+
+        act(() => result.current.updateForm('depth_mode', 'range'));
+        act(() => result.current.updateForm('playback_from', '2026-08-01T00:00'));
+        act(() => result.current.updateForm('playback_to', '2026-08-05T23:59'));
+        await act(async () => { await result.current.handleCreate(submitEvent()); });
+
+        expect(playbackTokenService.createToken).toHaveBeenCalledWith(expect.objectContaining({
+            playback_window_hours: null,
+            playback_from: '2026-08-01T00:00',
+            playback_to: '2026-08-05T23:59',
+        }));
+    });
 });

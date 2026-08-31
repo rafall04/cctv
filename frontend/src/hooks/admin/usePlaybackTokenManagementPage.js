@@ -139,6 +139,23 @@ function buildInitialRuleMap(rules = [], fallbackIds = []) {
     return ruleMap;
 }
 
+// Depth payload for a token form: rolling → hours (value+unit); range → absolute from/to. In range
+// mode the window is nulled so the backend reads the range (which wins there anyway).
+function buildDepthPayload(form) {
+    if (form.depth_mode === 'range') {
+        return {
+            playback_window_hours: null,
+            playback_from: form.playback_from || null,
+            playback_to: form.playback_to || null,
+        };
+    }
+    return {
+        playback_window_hours: friendlyToHours(form.playback_window_value, form.playback_window_unit),
+        playback_from: null,
+        playback_to: null,
+    };
+}
+
 export function buildTokenCameraRulesPayload(ruleMap) {
     return Object.values(ruleMap)
         .filter((rule) => rule.enabled)
@@ -165,8 +182,12 @@ function createDefaultForm() {
         // what makes a camera added to the area later covered by a token issued earlier.
         area_ids: [],
         camera_rules: {},
+        // Depth is EITHER a rolling window ('rolling') OR an absolute date range ('range').
+        depth_mode: 'rolling',
         playback_window_value: wf.value,
         playback_window_unit: wf.unit,
+        playback_from: '',
+        playback_to: '',
         expires_at: toDateTimeLocalInput(Date.now() + fill.expiresInHours * 60 * 60 * 1000),
         access_code_mode: 'auto',
         access_code_length: 8,
@@ -225,8 +246,11 @@ export function usePlaybackTokenManagementPage() {
         // what makes a camera added to the area later covered by a token issued earlier.
         area_ids: [],
         camera_rules: {},
+        depth_mode: 'rolling',
         playback_window_value: '',
         playback_window_unit: 'day',
+        playback_from: '',
+        playback_to: '',
         expires_at: '',
         max_active_sessions: '',
         session_limit_mode: 'unlimited',
@@ -310,6 +334,10 @@ export function usePlaybackTokenManagementPage() {
             return {
                 ...current,
                 preset,
+                // Presets are rolling windows, so a preset also switches depth mode back to rolling.
+                depth_mode: 'rolling',
+                playback_from: '',
+                playback_to: '',
                 playback_window_value: fill.windowHours ? wf.value : '',
                 playback_window_unit: fill.windowHours ? wf.unit : 'day',
                 expires_at: fill.expiresInHours
@@ -456,8 +484,11 @@ export function usePlaybackTokenManagementPage() {
             area_ids: Array.isArray(token.area_ids) ? [...token.area_ids] : [],
             camera_ids: fallbackIds,
             camera_rules: buildInitialRuleMap(token.camera_rules || [], fallbackIds),
+            depth_mode: (token.playback_from || token.playback_to) ? 'range' : 'rolling',
             playback_window_value: hoursToFriendly(token.playback_window_hours).value,
             playback_window_unit: hoursToFriendly(token.playback_window_hours).unit,
+            playback_from: token.playback_from || '',
+            playback_to: token.playback_to || '',
             expires_at: token.expires_at || '',
             max_active_sessions: token.max_active_sessions ?? '',
             session_limit_mode: token.session_limit_mode || 'unlimited',
@@ -482,7 +513,7 @@ export function usePlaybackTokenManagementPage() {
                 ...form,
                 camera_ids: cameraRules.map((rule) => rule.camera_id),
                 camera_rules: cameraRules,
-                playback_window_hours: friendlyToHours(form.playback_window_value, form.playback_window_unit),
+                ...buildDepthPayload(form),
                 expires_at: form.expires_at || null,
             };
             const response = await playbackTokenService.createToken(payload);
@@ -581,7 +612,7 @@ export function usePlaybackTokenManagementPage() {
                 area_ids: editForm.area_ids || [],
                 camera_ids: cameraRules.map((rule) => rule.camera_id),
                 camera_rules: cameraRules,
-                playback_window_hours: friendlyToHours(editForm.playback_window_value, editForm.playback_window_unit),
+                ...buildDepthPayload(editForm),
                 expires_at: editForm.expires_at || null,
                 max_active_sessions: editForm.max_active_sessions === '' ? null : editForm.max_active_sessions,
                 session_limit_mode: editForm.session_limit_mode,

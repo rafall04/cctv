@@ -20,7 +20,7 @@ import { RECORDINGS_BASE_PATH } from './recordingPaths.js';
 import archivedSegmentSourceService from './archivedSegmentSourceService.js';
 import { resolveOwnerScopeAccess, resolveOwnerIssuedTokenAccess } from './rentalPlaybackAccessPolicy.js';
 import recordingCoverageRunsService from './recordingCoverageRunsService.js';
-import { intersectWithAccessWindow, isWithinRange, parsePlaybackRange } from './playbackRangePolicy.js';
+import { intersectWithAccessWindow, isWithinRange, parsePlaybackRange, resolveAccessBounds } from './playbackRangePolicy.js';
 import { noteTokenRefusal } from './playbackTokenRefusalLog.js';
 
 /**
@@ -360,6 +360,10 @@ class RecordingPlaybackService {
                 isPublicPreview: false,
                 previewMinutes: null,
                 playbackWindowHours: tokenAccess.effective_playback_window_hours ?? tokenAccess.playback_window_hours,
+                // Absolute date-range depth (if set) is carried alongside the rolling window; the range
+                // wins in resolveAccessBounds so the token sees exactly [from, to], nothing newer.
+                playbackFrom: tokenAccess.playback_from ?? null,
+                playbackTo: tokenAccess.playback_to ?? null,
                 tokenId: tokenAccess.id,
                 notice: null,
                 contact: null,
@@ -556,12 +560,16 @@ class RecordingPlaybackService {
     }
 
     applyPlaybackWindow(segments, access) {
-        if (!access?.playbackWindowHours) {
-            return segments;
-        }
-
-        const cutoffMs = Date.now() - access.playbackWindowHours * 60 * 60 * 1000;
-        return segments.filter((segment) => new Date(segment.start_time).getTime() >= cutoffMs);
+        // Bounds unify the rolling window (floor now−N) and an absolute range [from, to] — range wins,
+        // adding the CEILING a rolling window never had.
+        const { fromIso, toIso } = resolveAccessBounds(access);
+        if (!fromIso && !toIso) return segments;
+        const fromMs = fromIso ? Date.parse(fromIso) : null;
+        const toMs = toIso ? Date.parse(toIso) : null;
+        return segments.filter((segment) => {
+            const atMs = new Date(segment.start_time).getTime();
+            return Number.isFinite(atMs) && (fromMs === null || atMs >= fromMs) && (toMs === null || atMs <= toMs);
+        });
     }
 
     /**
@@ -602,13 +610,14 @@ class RecordingPlaybackService {
 
         if (access.accessMode !== 'admin_full' && access.accessMode !== 'owner_full') {
             if (access.accessMode === 'token_full') {
-                const cutoffIso = access.playbackWindowHours
-                    ? new Date(Date.now() - access.playbackWindowHours * 60 * 60 * 1000).toISOString()
-                    : null;
+                // Same bounds as the list: floor AND (for an absolute range) ceiling, so a range token
+                // cannot stream a segment newer than its `to`.
+                const { fromIso, toIso } = resolveAccessBounds(access);
                 const allowedSegment = recordingSegmentRepository.findSegmentInWindow({
                     cameraId,
                     filename,
-                    startAfterIso: cutoffIso,
+                    startAfterIso: fromIso,
+                    startBeforeIso: toIso,
                 });
                 if (!allowedSegment) {
                     const err = new Error('Segment not available for this playback scope');

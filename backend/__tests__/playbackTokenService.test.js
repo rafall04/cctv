@@ -100,7 +100,7 @@ describe('playbackTokenService', () => {
     });
 
     // Preset is a QUICK-FILL, not a lock: an explicit expiry wins on any preset (else preset lifetime).
-    // INSERT param index 10 = expires_at (right after playback_window_hours at 9). Noon UTC so no TZ flip.
+    // INSERT param index 12 = expires_at (after window=9, playback_from=10, playback_to=11). Noon UTC → no TZ flip.
     it('honors an explicit expiry on a NON-custom preset (trial_3d + a date → that date, not now+72h)', async () => {
         vi.spyOn(connectionPool, 'execute').mockReturnValue({ lastInsertRowid: 93, changes: 1 });
         vi.spyOn(connectionPool, 'queryOne')
@@ -119,7 +119,37 @@ describe('playbackTokenService', () => {
             { user: { id: 1 }, headers: { origin: 'https://cctv.raf.my.id' } }
         );
 
-        expect(String(connectionPool.execute.mock.calls[0][1][10])).toContain('2027-06-15');
+        expect(String(connectionPool.execute.mock.calls[0][1][12])).toContain('2027-06-15');
+    });
+
+    // Fase 2: an absolute date range is an alternative to the rolling window and WINS over it —
+    // storing from/to (params 10, 11) and nulling playback_window_hours (param 9).
+    it('an absolute date range wins over the rolling window (stores from/to, nulls the window)', async () => {
+        vi.spyOn(connectionPool, 'execute').mockReturnValue({ lastInsertRowid: 94, changes: 1 });
+        vi.spyOn(connectionPool, 'queryOne')
+            .mockReturnValueOnce(null)
+            .mockReturnValueOnce({
+                id: 94, label: 'Range', token_prefix: 'rafpb_rng', preset: 'custom', scope_type: 'all',
+                camera_ids_json: '[]', playback_window_hours: null, playback_from: '2026-08-01 00:00:00',
+                playback_to: '2026-08-05 23:59:59', expires_at: null, revoked_at: null, last_used_at: null,
+                use_count: 0, share_template: null, created_by: 1, created_at: '2026-05-05 12:00:00', updated_at: '2026-05-05 12:00:00',
+            })
+            .mockReturnValue(undefined);
+        const { default: playbackTokenService } = await import('../services/playbackTokenService.js');
+
+        playbackTokenService.createToken(
+            {
+                label: 'Range', preset: 'custom', scope_type: 'all',
+                playback_window_hours: 720, // provided but IGNORED because a range is set
+                playback_from: '2026-08-01T00:00:00Z', playback_to: '2026-08-05T23:59:59Z',
+            },
+            { user: { id: 1 }, headers: { origin: 'https://cctv.raf.my.id' } }
+        );
+
+        const params = connectionPool.execute.mock.calls[0][1];
+        expect(params[9]).toBeNull();                       // window nulled by the range
+        expect(String(params[10])).toContain('2026-08-01'); // playback_from stored
+        expect(String(params[11])).toContain('2026-08-05'); // playback_to stored
     });
 
     it('stores per-token session policy overrides at creation', async () => {

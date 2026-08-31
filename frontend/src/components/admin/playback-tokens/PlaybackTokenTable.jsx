@@ -55,6 +55,8 @@ function TokenEditFields({
     totalCameraCount, visibleEditCameraCount, onUpdateEditCameraSearch, onToggleEditCameraRule,
     onUpdateEditCameraRule, areaOptions = [], selectedEditAreaIds = new Set(), onToggleEditArea,
 }) {
+    const isRange = editForm.depth_mode === 'range';
+    const modeBtn = (active) => `flex-1 rounded-control px-2 py-1 text-xs font-medium ${active ? 'bg-primary text-white' : 'bg-surface-sunken text-content-muted'}`;
     return (
         <div className="space-y-3">
             <label className="block">
@@ -135,13 +137,24 @@ function TokenEditFields({
               */}
             <div className="grid gap-3 sm:grid-cols-2">
                 <label className="block">
-                    <span className="mb-1 block text-xs font-semibold text-content-muted">Maksimal mundur</span>
-                    <div className="flex gap-2">
-                        <input type="number" min="1" value={editForm.playback_window_value ?? ''} onChange={(event) => onUpdateEditForm('playback_window_value', event.target.value)} placeholder="Kosong = semua" className={FIELD} />
-                        <select value={editForm.playback_window_unit || 'day'} onChange={(event) => onUpdateEditForm('playback_window_unit', event.target.value)} className="rounded-control border border-edge-strong bg-surface px-2 py-2 text-sm text-content">
-                            {DURATION_UNITS.map((unit) => <option key={unit.value} value={unit.value}>{unit.label}</option>)}
-                        </select>
+                    <span className="mb-1 block text-xs font-semibold text-content-muted">Batas kedalaman</span>
+                    <div className="mb-2 flex gap-1">
+                        <button type="button" onClick={() => onUpdateEditForm('depth_mode', 'rolling')} className={modeBtn(!isRange)}>N terakhir</button>
+                        <button type="button" onClick={() => onUpdateEditForm('depth_mode', 'range')} className={modeBtn(isRange)}>Rentang tanggal</button>
                     </div>
+                    {isRange ? (
+                        <div className="flex gap-2">
+                            <input type="datetime-local" value={toDateTimeLocal(editForm.playback_from)} onChange={(event) => onUpdateEditForm('playback_from', event.target.value)} className={FIELD} />
+                            <input type="datetime-local" value={toDateTimeLocal(editForm.playback_to)} onChange={(event) => onUpdateEditForm('playback_to', event.target.value)} className={FIELD} />
+                        </div>
+                    ) : (
+                        <div className="flex gap-2">
+                            <input type="number" min="1" value={editForm.playback_window_value ?? ''} onChange={(event) => onUpdateEditForm('playback_window_value', event.target.value)} placeholder="Kosong = semua" className={FIELD} />
+                            <select value={editForm.playback_window_unit || 'day'} onChange={(event) => onUpdateEditForm('playback_window_unit', event.target.value)} className="rounded-control border border-edge-strong bg-surface px-2 py-2 text-sm text-content">
+                                {DURATION_UNITS.map((unit) => <option key={unit.value} value={unit.value}>{unit.label}</option>)}
+                            </select>
+                        </div>
+                    )}
                 </label>
                 <label className="block">
                     <span className="mb-1 block text-xs font-semibold text-content-muted">Berlaku sampai</span>
@@ -154,7 +167,9 @@ function TokenEditFields({
             <div className="rounded-control border border-edge bg-surface-sunken px-3 py-2 text-xs text-content" data-testid="playback-token-edit-limit-preview">
                 <span className="mr-1 font-semibold text-content-muted">Ringkasan:</span>
                 {describeTokenLimits({
-                    windowHours: friendlyToHours(editForm.playback_window_value, editForm.playback_window_unit),
+                    windowHours: isRange ? null : friendlyToHours(editForm.playback_window_value, editForm.playback_window_unit),
+                    playbackFrom: isRange ? (editForm.playback_from || null) : null,
+                    playbackTo: isRange ? (editForm.playback_to || null) : null,
                     expiresAt: editForm.expires_at || null,
                     scopeType: editForm.scope_type,
                     cameraCount: selectedEditCameraIds.size,

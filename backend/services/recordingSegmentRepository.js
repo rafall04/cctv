@@ -150,16 +150,23 @@ class RecordingSegmentRepository {
         );
     }
 
-    findSegmentInWindow({ cameraId, filename, startAfterIso = null }) {
-        if (!startAfterIso) {
+    findSegmentInWindow({ cameraId, filename, startAfterIso = null, startBeforeIso = null }) {
+        if (!startAfterIso && !startBeforeIso) {
             return this.findSegmentByFilename({ cameraId, filename });
         }
+
+        // Floor (>= startAfterIso) AND, for an absolute-range token, ceiling (<= startBeforeIso). Both
+        // string-compare against the ISO-8601 UTC start_time (chronological), same as the range policy.
+        const clauses = ['camera_id = ?', 'filename = ?'];
+        const params = [cameraId, filename];
+        if (startAfterIso) { clauses.push('start_time >= ?'); params.push(startAfterIso); }
+        if (startBeforeIso) { clauses.push('start_time <= ?'); params.push(startBeforeIso); }
 
         return queryOne(
             `SELECT ${SEGMENT_SELECT_FIELDS}
             FROM recording_segments
-            WHERE camera_id = ? AND filename = ? AND start_time >= ?`,
-            [cameraId, filename, startAfterIso]
+            WHERE ${clauses.join(' AND ')}`,
+            params
         );
     }
 

@@ -252,6 +252,10 @@ function sanitizeTokenRow(row) {
         camera_names: Array.isArray(row.camera_names) ? row.camera_names : [],
         allowed_camera_ids: [...new Set(allowedCameraIds)],
         playback_window_hours: row.playback_window_hours,
+        // Absolute date-range depth (an alternative to the rolling window): when either is set, the
+        // token sees exactly [from, to] and the rolling window is ignored (enforced downstream).
+        playback_from: row.playback_from || null,
+        playback_to: row.playback_to || null,
         expires_at: row.expires_at,
         revoked_at: row.revoked_at,
         last_used_at: row.last_used_at,
@@ -613,9 +617,14 @@ class PlaybackTokenService {
         // Expiry honored on ANY preset when explicitly set (preset = quick-fill); else preset lifetime.
         const expiresAt = customExpiresAt
             ?? (preset.expiresInHours === null ? null : new Date(now.getTime() + preset.expiresInHours * 60 * 60 * 1000));
-        // Window decoupled from preset: an explicit "Maksimal mundur (jam)" wins on ANY preset
-        // (matches the edit path); empty falls back to the preset's own window. Expiry stays preset-led.
-        const playbackWindowHours = normalizePositiveInteger(payload.playback_window_hours) ?? preset.playbackWindowHours;
+        // Depth is EITHER an absolute date range OR a rolling window. An absolute range (playback_from/
+        // playback_to) WINS and nulls the window so enforcement reads the range; else the window wins
+        // on ANY preset (explicit "Maksimal mundur"), falling back to the preset's own window.
+        const playbackFrom = parseDate(payload.playback_from);
+        const playbackTo = parseDate(payload.playback_to);
+        const playbackWindowHours = (playbackFrom || playbackTo)
+            ? null
+            : normalizePositiveInteger(payload.playback_window_hours) ?? preset.playbackWindowHours;
         const sessionPolicy = this.resolveSessionPolicy(payload, presetKey);
         const label = String(payload.label || preset.label).trim() || preset.label;
         const shareTemplate = typeof payload.share_template === 'string' && payload.share_template.trim()
@@ -624,8 +633,8 @@ class PlaybackTokenService {
 
         const result = execute(
             `INSERT INTO playback_tokens
-            (label, token_hash, token_prefix, share_key_hash, share_key_prefix, preset, scope_type, camera_ids_json, area_ids_json, playback_window_hours, expires_at, max_active_sessions, session_limit_mode, session_timeout_seconds, client_note, share_template, created_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            (label, token_hash, token_prefix, share_key_hash, share_key_prefix, preset, scope_type, camera_ids_json, area_ids_json, playback_window_hours, playback_from, playback_to, expires_at, max_active_sessions, session_limit_mode, session_timeout_seconds, client_note, share_template, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 label,
                 tokenHash,
@@ -639,6 +648,8 @@ class PlaybackTokenService {
                 // on a token that was not scoped by area.
                 scopeType === 'area' ? JSON.stringify(areaIds) : null,
                 playbackWindowHours,
+                toSqlDate(playbackFrom),
+                toSqlDate(playbackTo),
                 toSqlDate(expiresAt),
                 sessionPolicy.maxActiveSessions,
                 sessionPolicy.sessionLimitMode,
@@ -757,9 +768,17 @@ class PlaybackTokenService {
         const customExpiresAt = Object.prototype.hasOwnProperty.call(payload, 'expires_at')
             ? parseDate(payload.expires_at)
             : parseUtcSql(existing.expires_at);
-        const playbackWindowHours = Object.prototype.hasOwnProperty.call(payload, 'playback_window_hours')
-            ? normalizePositiveInteger(payload.playback_window_hours)
-            : existing.playback_window_hours;
+        // Absolute date-range depth (edit path, same rule as create): a range wins over — and nulls —
+        // the rolling window. Field absent → keep the stored value (parsed as UTC like expires_at).
+        const playbackFrom = Object.prototype.hasOwnProperty.call(payload, 'playback_from')
+            ? parseDate(payload.playback_from) : parseUtcSql(existing.playback_from);
+        const playbackTo = Object.prototype.hasOwnProperty.call(payload, 'playback_to')
+            ? parseDate(payload.playback_to) : parseUtcSql(existing.playback_to);
+        const playbackWindowHours = (playbackFrom || playbackTo)
+            ? null
+            : (Object.prototype.hasOwnProperty.call(payload, 'playback_window_hours')
+                ? normalizePositiveInteger(payload.playback_window_hours)
+                : existing.playback_window_hours);
         const rawRules = Array.isArray(payload.camera_rules)
             ? payload.camera_rules
             : existing.camera_ids.map((cameraId) => ({ camera_id: cameraId, enabled: true }));
@@ -789,6 +808,8 @@ class PlaybackTokenService {
                 camera_ids_json = ?,
                 area_ids_json = ?,
                 playback_window_hours = ?,
+                playback_from = ?,
+                playback_to = ?,
                 expires_at = ?,
                 max_active_sessions = ?,
                 session_limit_mode = ?,
@@ -803,6 +824,8 @@ class PlaybackTokenService {
                 JSON.stringify(cameraIds),
                 scopeType === 'area' ? JSON.stringify(areaIds) : null,
                 playbackWindowHours,
+                toSqlDate(playbackFrom),
+                toSqlDate(playbackTo),
                 toSqlDate(customExpiresAt),
                 sessionPolicy.maxActiveSessions,
                 sessionPolicy.sessionLimitMode,

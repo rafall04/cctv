@@ -41,23 +41,51 @@ export function parsePlaybackRange(query = {}) {
     return { from, to };
 }
 
+/** Later of two ISO instants (null = open end → the other wins). */
+function laterIso(a, b) {
+    if (!a) return b || null;
+    if (!b) return a;
+    return a > b ? a : b;
+}
+/** Earlier of two ISO instants (null = open end → the other wins). */
+function earlierIso(a, b) {
+    if (!a) return b || null;
+    if (!b) return a;
+    return a < b ? a : b;
+}
+
+/**
+ * The absolute [fromIso, toIso] a caller is entitled to reach, as chronologically-comparable strings.
+ *
+ * An ABSOLUTE range (playbackFrom/playbackTo) WINS over a rolling window: a token cut to "1–5 Aug"
+ * must see exactly that, never "the last N hours". A rolling window (playbackWindowHours) is a floor
+ * at now−N with no ceiling. Neither set → unlimited (both null). Enforced live, so `now` matters.
+ */
+export function resolveAccessBounds({ playbackWindowHours = null, playbackFrom = null, playbackTo = null } = {}, now = Date.now()) {
+    const fromAbs = toIso(playbackFrom);
+    const toAbs = toIso(playbackTo);
+    if (fromAbs || toAbs) return { fromIso: fromAbs, toIso: toAbs };
+    return {
+        fromIso: playbackWindowHours ? new Date(now - playbackWindowHours * 60 * 60 * 1000).toISOString() : null,
+        toIso: null,
+    };
+}
+
 /**
  * Narrow a requested range by the caller's entitlement.
  *
  * A token sold with 7 days of depth may ask for a day three weeks back; it must not receive it just
- * because it named the date. The window is the ceiling, the request only ever tightens it.
+ * because it named the date. The entitlement is the ceiling AND the floor, the request only tightens
+ * it. Accepts the access object directly (playbackWindowHours + playbackFrom/playbackTo); tests still
+ * pass `{ playbackWindowHours, now }`, so `now` is read from that object when present.
  */
-export function intersectWithAccessWindow(range, { playbackWindowHours = null, now = Date.now() } = {}) {
-    const windowFrom = playbackWindowHours
-        ? new Date(now - playbackWindowHours * 60 * 60 * 1000).toISOString()
-        : null;
-
-    if (!range) return windowFrom ? { from: windowFrom, to: null } : null;
-    if (!windowFrom) return range;
-
+export function intersectWithAccessWindow(range, access = {}, now = access.now ?? Date.now()) {
+    const { fromIso, toIso } = resolveAccessBounds(access, now);
+    if (!fromIso && !toIso) return range || null;
+    if (!range) return { from: fromIso, to: toIso };
     return {
-        from: range.from && range.from > windowFrom ? range.from : windowFrom,
-        to: range.to,
+        from: laterIso(range.from, fromIso),
+        to: earlierIso(range.to, toIso),
     };
 }
 
@@ -71,4 +99,4 @@ export function isWithinRange(segment, range) {
     return true;
 }
 
-export default { parsePlaybackRange, intersectWithAccessWindow, isWithinRange };
+export default { parsePlaybackRange, intersectWithAccessWindow, isWithinRange, resolveAccessBounds };

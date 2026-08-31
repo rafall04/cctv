@@ -27,13 +27,17 @@ export default function PlaybackTokenForm({
     onUpdateCameraRule,
     onSubmit,
 }) {
+    const isRange = form.depth_mode === 'range';
     const limitSummary = describeTokenLimits({
-        windowHours: friendlyToHours(form.playback_window_value, form.playback_window_unit),
+        windowHours: isRange ? null : friendlyToHours(form.playback_window_value, form.playback_window_unit),
+        playbackFrom: isRange ? (form.playback_from || null) : null,
+        playbackTo: isRange ? (form.playback_to || null) : null,
         expiresAt: form.expires_at || null,
         scopeType: form.scope_type,
         cameraCount: selectedCameraIds.size,
         areaCount: (form.area_ids || []).length,
     });
+    const modeBtn = (active) => `flex-1 rounded-control px-2 py-1 text-xs font-medium ${active ? 'bg-primary text-white' : 'bg-surface-sunken text-content-muted'}`;
     return (
         <form onSubmit={onSubmit} className="rounded-lg border border-edge bg-surface p-5 shadow-sm">
             <div className="grid gap-4 md:grid-cols-2">
@@ -62,14 +66,25 @@ export default function PlaybackTokenForm({
                           * read as a time window to schedule, not as how far back the footage may
                           * be reached. Same field, same behaviour; it just says what it does now.
                           */}
-                        <span className="mb-1 block text-sm font-medium text-content-muted">Maksimal mundur</span>
-                        <div className="flex gap-2">
-                            <input type="number" min="1" value={form.playback_window_value} onChange={(event) => onUpdateForm('playback_window_value', event.target.value)} placeholder="Kosong = semua" className="w-full rounded-lg border border-edge-strong px-3 py-2 text-sm dark:bg-gray-950 dark:text-white" />
-                            <select value={form.playback_window_unit} onChange={(event) => onUpdateForm('playback_window_unit', event.target.value)} className="rounded-lg border border-edge-strong px-2 py-2 text-sm dark:bg-gray-950 dark:text-white">
-                                {DURATION_UNITS.map((unit) => <option key={unit.value} value={unit.value}>{unit.label}</option>)}
-                            </select>
+                        <span className="mb-1 block text-sm font-medium text-content-muted">Batas kedalaman</span>
+                        <div className="mb-2 flex gap-1">
+                            <button type="button" onClick={() => onUpdateForm('depth_mode', 'rolling')} className={modeBtn(!isRange)}>N terakhir</button>
+                            <button type="button" onClick={() => onUpdateForm('depth_mode', 'range')} className={modeBtn(isRange)}>Rentang tanggal</button>
                         </div>
-                        <span className="mt-1 block text-xs text-content-subtle">Mis. 7 hari = hanya rekaman 7 hari terakhir. Kosong = semua rekaman.</span>
+                        {isRange ? (
+                            <div className="flex gap-2">
+                                <input type="datetime-local" value={form.playback_from} onChange={(event) => onUpdateForm('playback_from', event.target.value)} className="w-full rounded-lg border border-edge-strong px-2 py-2 text-sm dark:bg-gray-950 dark:text-white" />
+                                <input type="datetime-local" value={form.playback_to} onChange={(event) => onUpdateForm('playback_to', event.target.value)} className="w-full rounded-lg border border-edge-strong px-2 py-2 text-sm dark:bg-gray-950 dark:text-white" />
+                            </div>
+                        ) : (
+                            <div className="flex gap-2">
+                                <input type="number" min="1" value={form.playback_window_value} onChange={(event) => onUpdateForm('playback_window_value', event.target.value)} placeholder="Kosong = semua" className="w-full rounded-lg border border-edge-strong px-3 py-2 text-sm dark:bg-gray-950 dark:text-white" />
+                                <select value={form.playback_window_unit} onChange={(event) => onUpdateForm('playback_window_unit', event.target.value)} className="rounded-lg border border-edge-strong px-2 py-2 text-sm dark:bg-gray-950 dark:text-white">
+                                    {DURATION_UNITS.map((unit) => <option key={unit.value} value={unit.value}>{unit.label}</option>)}
+                                </select>
+                            </div>
+                        )}
+                        <span className="mt-1 block text-xs text-content-subtle">{isRange ? 'Hanya rekaman antara dua tanggal (mis. 1–5 Agu).' : 'Mis. 7 hari = hanya rekaman 7 hari terakhir. Kosong = semua.'}</span>
                     </label>
                     <label className="block">
                         <span className="mb-1 block text-sm font-medium text-content-muted">Expired</span>

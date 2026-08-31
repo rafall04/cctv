@@ -27,6 +27,7 @@
 
 import { queryOne } from '../database/connectionPool.js';
 import playbackTokenService from './playbackTokenService.js';
+import { resolveAccessBounds } from './playbackRangePolicy.js';
 
 function httpError(message, statusCode) {
     const err = new Error(message);
@@ -90,16 +91,21 @@ class PublicArchiveAccessService {
             throw httpError('Token playback diperlukan', 401);
         }
 
-        // Gate 4.
+        // Gate 4: recorded_at must fall inside the token's entitlement — the rolling window (floor
+        // now−N) OR an absolute [from, to] range (which also caps the ceiling). Bounds unify both.
         const windowHours = access.effective_playback_window_hours ?? access.playback_window_hours;
-        if (windowHours) {
+        const { fromIso, toIso } = resolveAccessBounds({
+            playbackWindowHours: windowHours,
+            playbackFrom: access.playback_from,
+            playbackTo: access.playback_to,
+        });
+        if (fromIso || toIso) {
             const recordedAtMs = parseTimestampMs(row.recorded_at);
             if (recordedAtMs === null) {
-                // Unknown recording time cannot be proven inside the window — deny.
+                // Unknown recording time cannot be proven inside the entitlement — deny.
                 throw httpError('Segment di luar jangkauan token ini', 403);
             }
-            const cutoffMs = Date.now() - windowHours * 60 * 60 * 1000;
-            if (recordedAtMs < cutoffMs) {
+            if ((fromIso && recordedAtMs < Date.parse(fromIso)) || (toIso && recordedAtMs > Date.parse(toIso))) {
                 throw httpError('Segment di luar jangkauan token ini', 403);
             }
         }
