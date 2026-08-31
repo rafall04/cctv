@@ -7,7 +7,7 @@
  */
 
 import { PLAYBACK_TOKEN_PRESETS, PLAYBACK_TOKEN_SESSION_LIMIT_MODES } from '../../../hooks/admin/usePlaybackTokenManagementPage.js';
-import { DURATION_UNITS, friendlyToHours } from '../../../utils/durationUnits.js';
+import { DURATION_UNITS, friendlyToHours, snapTo10Min } from '../../../utils/durationUnits.js';
 import { describeTokenLimits } from '../../../utils/playbackTokenSummary.js';
 
 export default function PlaybackTokenForm({
@@ -75,11 +75,11 @@ export default function PlaybackTokenForm({
                             <div className="flex gap-2">
                                 <label className="block w-full">
                                     <span className="mb-1 block text-xs text-content-subtle">Dari</span>
-                                    <input type="datetime-local" step="600" value={form.playback_from} onChange={(event) => onUpdateForm('playback_from', event.target.value)} className="w-full rounded-lg border border-edge-strong px-2 py-2 text-sm dark:bg-gray-950 dark:text-white" />
+                                    <input type="datetime-local" value={form.playback_from} onChange={(event) => onUpdateForm('playback_from', snapTo10Min(event.target.value))} className="w-full rounded-lg border border-edge-strong px-2 py-2 text-sm dark:bg-gray-950 dark:text-white" />
                                 </label>
                                 <label className="block w-full">
                                     <span className="mb-1 block text-xs text-content-subtle">Sampai</span>
-                                    <input type="datetime-local" step="600" value={form.playback_to} onChange={(event) => onUpdateForm('playback_to', event.target.value)} className="w-full rounded-lg border border-edge-strong px-2 py-2 text-sm dark:bg-gray-950 dark:text-white" />
+                                    <input type="datetime-local" value={form.playback_to} onChange={(event) => onUpdateForm('playback_to', snapTo10Min(event.target.value))} className="w-full rounded-lg border border-edge-strong px-2 py-2 text-sm dark:bg-gray-950 dark:text-white" />
                                 </label>
                             </div>
                         ) : (
@@ -90,7 +90,7 @@ export default function PlaybackTokenForm({
                                 </select>
                             </div>
                         )}
-                        <span className="mt-1 block text-xs text-content-subtle">{isRange ? 'Hanya rekaman antara dua waktu tsb. Rekaman per segmen 10 menit, jadi jam dibulatkan ke kelipatan 10.' : 'Mis. 7 hari = hanya rekaman 7 hari terakhir. Kosong = semua.'}</span>
+                        <span className="mt-1 block text-xs text-content-subtle">{isRange ? 'Hanya rekaman antara dua waktu tsb. Rekaman per segmen 10 menit, jadi menit otomatis dibulatkan ke bawah (00/10/20…).' : 'Mis. 7 hari = hanya rekaman 7 hari terakhir. Kosong = semua.'}</span>
                     </label>
                     <label className="block">
                         <span className="mb-1 block text-sm font-medium text-content-muted">Expired</span>

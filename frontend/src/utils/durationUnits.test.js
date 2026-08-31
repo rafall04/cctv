@@ -1,5 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { friendlyToHours, hoursToFriendly, formatHoursHuman } from './durationUnits.js';
+import { friendlyToHours, hoursToFriendly, formatHoursHuman, snapTo10Min } from './durationUnits.js';
+
+describe('durationUnits.snapTo10Min', () => {
+    it('floors the minute to the nearest 10 (segments are 10-min)', () => {
+        expect(snapTo10Min('2026-08-31T08:08')).toBe('2026-08-31T08:00');
+        expect(snapTo10Min('2026-08-31T10:15')).toBe('2026-08-31T10:10');
+        expect(snapTo10Min('2026-08-31T10:20')).toBe('2026-08-31T10:20');
+        expect(snapTo10Min('2026-08-31T23:59')).toBe('2026-08-31T23:50');
+    });
+    it('passes through empty / non-datetime values', () => {
+        expect(snapTo10Min('')).toBe('');
+        expect(snapTo10Min(null)).toBe(null);
+        expect(snapTo10Min('bukan-tanggal')).toBe('bukan-tanggal');
+    });
+});
 
 describe('durationUnits.friendlyToHours', () => {
     it('converts value+unit to whole hours', () => {

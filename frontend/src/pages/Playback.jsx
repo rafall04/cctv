@@ -196,6 +196,7 @@ function Playback({
         allowedCameraIds,
         allowedCameras,
         tokenMessage,
+        tokenDenialReason,
         isTokenBusy,
         activateToken,
         clearToken,
@@ -1070,6 +1071,7 @@ function Playback({
                             isBusy={isTokenBusy}
                             tokenStatus={tokenStatus}
                             message={tokenMessage}
+                            denialReason={tokenDenialReason}
                         />
                     </div>
                 </div>
@@ -1138,7 +1140,7 @@ function Playback({
                     <PlaybackTokenAccess
                         tokenInput={tokenInput} onTokenInputChange={setTokenInput}
                         onActivate={activateToken} onClear={clearToken} isBusy={isTokenBusy}
-                        tokenStatus={tokenStatus} message={tokenMessage}
+                        tokenStatus={tokenStatus} message={tokenMessage} denialReason={tokenDenialReason}
                         cameras={visiblePlaybackCameras} onSelectCamera={handleCameraChange}
                         playbackPolicy={playbackPolicy} compact />
                 )}

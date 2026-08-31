@@ -236,6 +236,20 @@ describe('PlaybackTokenAccess when the token does not reach this camera', () => 
         expect(screen.getByText(/Belum punya token/)).toBeTruthy();
     });
 
+    it('shows ONE clear device-limit notice (not the contradictory scope line) on a device_limit rejection', () => {
+        setup({
+            playbackPolicy: OUT_OF_SCOPE,
+            tokenStatus: { id: 5, scope_type: 'area' }, // would normally trigger the "not covered" line
+            message: 'Batas perangkat aktif untuk token ini sudah penuh',
+            denialReason: 'device_limit',
+        });
+
+        expect(screen.getByTestId('playback-device-limit')).toBeTruthy();
+        expect(screen.getByText('Batas perangkat penuh')).toBeTruthy();
+        // The misleading "camera not covered" line is suppressed so the two don't contradict.
+        expect(screen.queryByText(/tidak tercakup/)).toBeNull();
+    });
+
     it('falls back to the activation payload only while no policy has arrived', () => {
         setup({ playbackPolicy: null, tokenStatus: { id: 5 } });
 

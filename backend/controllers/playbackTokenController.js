@@ -316,6 +316,9 @@ export async function activatePlaybackToken(request, reply) {
         return reply.code(error.statusCode || 500).send({
             success: false,
             message: error.statusCode ? error.message : 'Internal server error',
+            // Structured reason (e.g. 'device_limit') so the client can show a clear, specific notice
+            // instead of guessing from the message string.
+            ...(error.reason ? { reason: error.reason } : {}),
         });
     }
 }

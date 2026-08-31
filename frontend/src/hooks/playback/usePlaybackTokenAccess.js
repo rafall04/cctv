@@ -40,6 +40,9 @@ export function usePlaybackTokenAccess({
     const [tokenInput, setTokenInput] = useState('');
     const [tokenStatus, setTokenStatus] = useState(null);
     const [tokenMessage, setTokenMessage] = useState('');
+    // Structured reason for the last denial (e.g. 'device_limit'), so the UI can show a specific,
+    // non-contradictory notice instead of a generic "camera not covered".
+    const [tokenDenialReason, setTokenDenialReason] = useState('');
     const [isTokenBusy, setIsTokenBusy] = useState(false);
     /** The URL credential already activated, so a re-render cannot fire a second attempt. */
     const activatedCredentialRef = useRef(null);
@@ -54,12 +57,14 @@ export function usePlaybackTokenAccess({
 
         setIsTokenBusy(true);
         setTokenMessage(silent ? '' : 'Mengaktifkan token...');
+        setTokenDenialReason('');
         try {
             const response = mode === 'share'
                 ? await playbackTokenService.activateShareKey(token, cameraIdOverride, getOrCreateClientId())
                 : await playbackTokenService.activateToken(token, cameraIdOverride, getOrCreateClientId());
             if (!response?.success) {
                 setTokenMessage(response?.message || 'Token tidak valid');
+                setTokenDenialReason(response?.reason || '');
                 return false;
             }
 
@@ -71,6 +76,7 @@ export function usePlaybackTokenAccess({
             return true;
         } catch (error) {
             setTokenMessage(error?.response?.data?.message || 'Token tidak valid atau sudah kedaluwarsa');
+            setTokenDenialReason(error?.response?.data?.reason || '');
             return false;
         } finally {
             setIsTokenBusy(false);
@@ -234,6 +240,7 @@ export function usePlaybackTokenAccess({
         cameraRules: tokenStatus?.camera_rules || [],
         defaultCameraId: tokenStatus?.default_camera_id || null,
         tokenMessage,
+        tokenDenialReason,
         isTokenBusy,
         activateToken,
         clearToken,

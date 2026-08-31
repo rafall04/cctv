@@ -57,11 +57,15 @@ export default function PlaybackTokenAccess({
     isBusy,
     tokenStatus,
     message,
+    denialReason = '',
     playbackPolicy = null,
     cameras = [],
     onSelectCamera = null,
     compact = false,
 }) {
+    // A device-limit rejection is NOT a scope problem: show one clear, actionable notice for it and
+    // suppress the "camera not covered" line, which contradicted it in the field.
+    const isDeviceLimit = denialReason === 'device_limit';
     const [showAccess, setShowAccess] = useState(false);
     /** Set by "Ganti token": the only way the form returns while access is still held. */
     const [isSwapping, setIsSwapping] = useState(false);
@@ -251,6 +255,16 @@ export default function PlaybackTokenAccess({
             onSubmit={handleSubmit}
             className={`rounded-card border border-edge bg-surface p-3 sm:p-4 ${compact ? 'w-full' : ''}`}
         >
+            {isDeviceLimit && (
+                <div className="mb-3 rounded-control border border-status-warn/40 bg-status-warn/10 p-3 text-xs leading-5" data-testid="playback-device-limit">
+                    <p className="font-semibold text-status-warn">Batas perangkat penuh</p>
+                    <p className="mt-1 text-content-muted">
+                        Token ini dibatasi jumlah perangkat aktif, dan sedang dipakai di perangkat lain. Tutup
+                        playback token ini di perangkat itu (atau tunggu ±1 menit sampai sesinya berakhir), lalu
+                        coba lagi. Atau minta pemilik menaikkan batas / mengganti mode ke &quot;Ganti device terlama&quot;.
+                    </p>
+                </div>
+            )}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
                 <div className="min-w-0 flex-1">
                     <label
@@ -277,7 +291,7 @@ export default function PlaybackTokenAccess({
                      * and activates, so the visitor never has to read and retype what the app
                      * already knows. It stays on screen only because it is worth copying elsewhere.
                      */}
-                    {heldButOutOfScope && (
+                    {heldButOutOfScope && !isDeviceLimit && (
                         <p className="mt-1 text-xs leading-5 text-status-warn">
                             Token Anda aktif, tetapi kamera ini tidak tercakup — atau aturan aksesnya untuk
                             kamera ini sudah kedaluwarsa. Pilih kamera lain yang termasuk, atau masukkan token lain.
@@ -324,7 +338,7 @@ export default function PlaybackTokenAccess({
                     )}
                 </div>
             </div>
-            {message && <p className="mt-2 text-xs text-content-muted">{message}</p>}
+            {message && !isDeviceLimit && <p className="mt-2 text-xs text-content-muted">{message}</p>}
         </form>
     );
 }

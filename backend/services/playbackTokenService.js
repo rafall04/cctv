@@ -929,6 +929,7 @@ class PlaybackTokenService {
                 } else {
                     const err = new Error('Batas perangkat aktif untuk token ini sudah penuh');
                     err.statusCode = 429;
+                    err.reason = 'device_limit';
                     throw err;
                 }
             }

@@ -19,7 +19,7 @@
 
 import { Button } from '../../ui';
 import { PLAYBACK_TOKEN_SESSION_LIMIT_MODES, formatPlaybackTokenSessionPolicy } from '../../../hooks/admin/usePlaybackTokenManagementPage.js';
-import { DURATION_UNITS, friendlyToHours, formatHoursHuman } from '../../../utils/durationUnits.js';
+import { DURATION_UNITS, friendlyToHours, formatHoursHuman, snapTo10Min } from '../../../utils/durationUnits.js';
 import { describeTokenLimits, formatStoredDateTime } from '../../../utils/playbackTokenSummary.js';
 
 function scopeLabel(token) {
@@ -156,11 +156,11 @@ function TokenEditFields({
                         <div className="flex gap-2">
                             <label className="block w-full">
                                 <span className="mb-0.5 block text-[10px] text-content-subtle">Dari</span>
-                                <input type="datetime-local" step="600" value={toDateTimeLocal(editForm.playback_from)} onChange={(event) => onUpdateEditForm('playback_from', event.target.value)} className={FIELD} />
+                                <input type="datetime-local" value={toDateTimeLocal(editForm.playback_from)} onChange={(event) => onUpdateEditForm('playback_from', snapTo10Min(event.target.value))} className={FIELD} />
                             </label>
                             <label className="block w-full">
                                 <span className="mb-0.5 block text-[10px] text-content-subtle">Sampai</span>
-                                <input type="datetime-local" step="600" value={toDateTimeLocal(editForm.playback_to)} onChange={(event) => onUpdateEditForm('playback_to', event.target.value)} className={FIELD} />
+                                <input type="datetime-local" value={toDateTimeLocal(editForm.playback_to)} onChange={(event) => onUpdateEditForm('playback_to', snapTo10Min(event.target.value))} className={FIELD} />
                             </label>
                         </div>
                     ) : (

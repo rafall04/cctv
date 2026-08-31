@@ -36,7 +36,7 @@ describe('guardrail: file-size ratchet (anti-penumpukan)', () => {
         'services/cameraHealthService.js': 3159,
         'services/cameraService.js': 2775,
         'services/hlsProxyService.js': 1581,
-        'services/playbackTokenService.js': 1356,
+        'services/playbackTokenService.js': 1357,
         'middleware/schemaValidators.js': 949,
         'services/telegramService.js': 944,
         'services/externalStreamProxyService.js': 896,
