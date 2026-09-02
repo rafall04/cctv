@@ -65,6 +65,11 @@ class Config:
         self.max_mbps = float(env('MAX_AVG_MBPS', '45'))
         self.batch_size = int(env('BATCH_SIZE', '40'))
         self.max_attempts = int(env('MAX_ATTEMPTS', '4'))
+        # Periodic re-attempt of transiently-failed uploads (bot kicked from a group, long 5xx,
+        # etc.). Without it the watermark advances past a failure forever and the footage is lost
+        # once local retention deletes it. 0 disables. (Audit v1.2.0, A-01.)
+        self.retry_interval = int(env('RETRY_INTERVAL_SEC', '900'))
+        self.retry_batch = int(env('RETRY_BATCH', '20'))
         self.timeout = int(env('REQUEST_TIMEOUT_SEC', '1800'))
         self.backfill = env('BACKFILL', '0') == '1'
         self.stability_sec = int(env('STABILITY_SEC', '3'))
@@ -722,6 +727,52 @@ def process_one(cfg, state, router, seg, cam_meta, log):
     return True
 
 
+def retry_failed(cfg, state, app_db, router, cam_meta, log):
+    """Re-attempt segments that hit a TRANSIENT terminal failure ('failed') and may still be on disk.
+    The main loop advances the watermark past a failure so the queue never wedges, but that means a
+    segment that failed while the bot was (say) removed from its group is otherwise NEVER retried —
+    and footage sold as deep archive is lost once local retention deletes it. 'too_big'/'too_late'/
+    'missing'/'no_route' are deliberately NOT retried: re-attempting cannot change their outcome.
+    Reads app_db (mode=ro) only; all writes go to the state DB. (Audit v1.2.0, A-01.)"""
+    rows = state.execute(
+        "SELECT segment_id FROM uploaded WHERE status = 'failed' ORDER BY segment_id ASC LIMIT ?",
+        (cfg.retry_batch,)).fetchall()
+    if not rows:
+        return 0
+    ids = [r[0] for r in rows]
+    placeholders = ','.join('?' * len(ids))
+    segs = app_db.execute(
+        'SELECT id, camera_id, filename, file_path, file_size, start_time, end_time, duration '
+        'FROM recording_segments WHERE id IN (%s)' % placeholders, ids).fetchall()
+    by_id = {seg['id']: seg for seg in segs}
+
+    # A failed row whose recording_segments row is gone can never be retried — retire it so it stops
+    # crowding the oldest-first retry window. It is marked 'expired' (NEVER 'ok'), so nothing mistakes
+    # it for archived footage.
+    gone = [i for i in ids if i not in by_id]
+    if gone:
+        state.executemany(
+            "UPDATE uploaded SET status='expired', "
+            "detail='segment row gone (retention); cannot retry' WHERE segment_id = ?",
+            [(i,) for i in gone])
+        state.commit()
+        log.warning('retry: %d failed segment(s) expired (no longer on the box)', len(gone))
+
+    retried = ok = 0
+    for i in ids:
+        seg = by_id.get(i)
+        if seg is None:
+            continue
+        retried += 1
+        process_one(cfg, state, router, seg, cam_meta, log)
+        after = state.execute(
+            'SELECT status FROM uploaded WHERE segment_id = ?', (i,)).fetchone()
+        if after and after[0] == 'ok':
+            ok += 1
+    if retried:
+        log.info('retry sweep: re-attempted %d failed segment(s), %d now ok', retried, ok)
+    return retried
+
 def run(cfg, log):
     state = open_state(cfg.state_db)
     app_db = open_app_db(cfg.app_db)
@@ -738,6 +789,7 @@ def run(cfg, log):
 
     cam_meta = load_camera_meta(app_db)
     refreshed = time.time()
+    retried_at = 0.0  # first idle tick runs a retry sweep
     log.info('started: watermark=%s routes=%d cap=%.0f Mbps',
              watermark, len(router.routes), cfg.max_mbps)
 
@@ -751,6 +803,15 @@ def run(cfg, log):
                 cam_meta = load_camera_meta(app_db)
                 refreshed = time.time()
             router.reload()   # picks up routes.json edits without a restart
+
+            # Periodically re-attempt transiently-failed uploads so a failure never silently drops
+            # footage forever. Bounded by RETRY_BATCH so it cannot starve new-segment progress.
+            if cfg.retry_interval > 0 and time.time() - retried_at > cfg.retry_interval:
+                try:
+                    retry_failed(cfg, state, app_db, router, cam_meta, log)
+                except Exception as exc:
+                    log.error('retry sweep error: %s', exc)
+                retried_at = time.time()
 
             rows = fetch_segments(app_db, watermark, cfg.batch_size)
             if not rows:
