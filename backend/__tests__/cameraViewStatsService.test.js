@@ -99,6 +99,8 @@ describe('cameraViewStatsService', () => {
         expect(connectionPool.query).toHaveBeenCalledTimes(1);
         expect(connectionPool.query.mock.calls[0][0]).toContain('LEFT JOIN camera_view_stats cvs');
         expect(connectionPool.query.mock.calls[0][0]).toContain('SELECT camera_id, COUNT(*) as viewer_count');
+        // Public read model: must filter to community, never emit non-community stats. (Audit invariant)
+        expect(connectionPool.query.mock.calls[0][0]).toContain("camera_class = 'community'");
         expect(stats).toEqual({
             1: {
                 live_viewers: 2,

@@ -177,9 +177,16 @@ export function blacklistToken(token, userId = null, reason = 'logout', expiresA
     const expiry = expiresAt || new Date(Date.now() + parseDuration(getSessionConfig().refreshTokenExpiry));
     
     try {
+        // ON CONFLICT (not INSERT OR REPLACE): re-blacklisting a token must never DELETE + reinsert the
+        // row (the project data-safety rule), it just refreshes the reason/expiry so the token stays
+        // blocked for the full new window. (Audit — data-safety invariant.)
         execute(
-            `INSERT OR REPLACE INTO token_blacklist (token_hash, user_id, reason, expires_at) 
-             VALUES (?, ?, ?, ?)`,
+            `INSERT INTO token_blacklist (token_hash, user_id, reason, expires_at)
+             VALUES (?, ?, ?, ?)
+             ON CONFLICT(token_hash) DO UPDATE SET
+                 user_id = excluded.user_id,
+                 reason = excluded.reason,
+                 expires_at = excluded.expires_at`,
             [tokenHash, userId, reason, expiry.toISOString()]
         );
         

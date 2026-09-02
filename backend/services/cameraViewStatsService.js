@@ -107,7 +107,7 @@ class CameraViewStatsService {
                     WHERE is_active = 1
                     GROUP BY camera_id
                 ) active ON active.camera_id = c.id
-                WHERE c.enabled = 1
+                WHERE c.enabled = 1 AND c.camera_class = 'community'
             `);
 
             return rows.reduce((statsByCamera, row) => {
