@@ -15,6 +15,8 @@ import {
     createOrder,
     getOrderStatus,
     handleIpaymuWebhook,
+    createRenewalOrder,
+    recoverTokens,
 } from '../controllers/playbackAccessController.js';
 
 export default async function playbackAccessRoutes(fastify) {
@@ -36,6 +38,37 @@ export default async function playbackAccessRoutes(fastify) {
             },
         },
     }, createOrder);
+
+    fastify.post('/renew', {
+        schema: {
+            body: {
+                type: 'object',
+                required: ['accessCode', 'productKey'],
+                properties: {
+                    accessCode: { type: 'string', maxLength: 64 },
+                    productKey: { type: 'string', maxLength: 32 },
+                    name: { type: ['string', 'null'], maxLength: 80 },
+                    phone: { type: ['string', 'null'], maxLength: 24 },
+                    methodKey: { type: ['string', 'null'], maxLength: 32 },
+                },
+                additionalProperties: false,
+            },
+        },
+    }, createRenewalOrder);
+
+    fastify.post('/recover', {
+        schema: {
+            body: {
+                type: 'object',
+                required: ['phone', 'code'],
+                properties: {
+                    phone: { type: 'string', maxLength: 24 },
+                    code: { type: 'string', maxLength: 16 },
+                },
+                additionalProperties: false,
+            },
+        },
+    }, recoverTokens);
 
     fastify.get('/order/:id', {
         schema: {

@@ -95,6 +95,33 @@ export async function createOrder(request, reply) {
     }
 }
 
+/** POST /api/playback-access/renew { accessCode, productKey, name?, phone?, methodKey? } */
+export async function createRenewalOrder(request, reply) {
+    try {
+        const deviceHash = ensureDevice(request, reply);
+        const { accessCode, productKey, name = null, phone = null, methodKey = null } = request.body || {};
+        const order = await playbackOrderService.createRenewalOrder(accessCode, productKey, {
+            name, phone, deviceHash, methodKey, ip: request.ip,
+        });
+        reply.header('Cache-Control', 'private, no-store');
+        return reply.send({ success: true, data: order });
+    } catch (error) {
+        return fail(reply, error, 'Gagal membuat perpanjangan');
+    }
+}
+
+/** POST /api/playback-access/recover { phone, code } — return this buyer's active tokens (no messaging). */
+export async function recoverTokens(request, reply) {
+    try {
+        const { phone = null, code = null } = request.body || {};
+        const tokens = playbackOrderService.recoverActiveTokens(phone, code);
+        reply.header('Cache-Control', 'private, no-store');
+        return reply.send({ success: true, data: { tokens } });
+    } catch (error) {
+        return fail(reply, error, 'Gagal memulihkan token');
+    }
+}
+
 /** GET /api/playback-access/order/:id — visible only to the device that opened it. */
 export async function getOrderStatus(request, reply) {
     try {

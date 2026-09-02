@@ -24,10 +24,11 @@
  */
 
 import crypto from 'crypto';
-import { queryOne, execute } from '../database/connectionPool.js';
+import { query, queryOne, execute } from '../database/connectionPool.js';
 import paymentSettingsService from './paymentSettingsService.js';
 import playbackProductService from './playbackProductService.js';
 import playbackTokenService from './playbackTokenService.js';
+import playbackTokenRenewalService from './playbackTokenRenewalService.js';
 import { ipaymuRequest, interpretIpaymuTransaction } from '../utils/ipaymuClient.js';
 
 const ORDER_EXPIRY_MINUTES = 30;
@@ -62,15 +63,39 @@ function fallbackEmail(publicBaseUrl) {
     return `pembeli@${host}`;
 }
 
+// Short human-friendly recovery code shown to the buyer, so an anonymous buyer can retrieve their
+// token later (phone + code) without any WhatsApp/Telegram delivery. Ambiguous chars removed.
+const RECOVERY_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+function generateRecoveryCode() {
+    const bytes = crypto.randomBytes(8);
+    let out = '';
+    for (let i = 0; i < 8; i++) out += RECOVERY_ALPHABET[bytes[i] % RECOVERY_ALPHABET.length];
+    return out;
+}
+
 class PlaybackOrderService {
     /**
      * Reuses a still-valid pending order for the same (device, product, amount) rather than opening a
      * duplicate charge — a buyer who reloads the page must not be billed twice for one intent.
      */
     async createOrder(productKey, { name = null, phone = null, deviceHash = null, methodKey = null, ip = null } = {}) {
-        if (!deviceHash || typeof deviceHash !== 'string') {
-            throw badRequest('deviceHash wajib');
-        }
+        const product = this._resolvePurchasableProduct(productKey);
+        return this._openOrder({ product, name, phone, deviceHash, methodKey, ip, orderKind: 'purchase', renewTokenId: null });
+    }
+
+    /**
+     * Renewal (perpanjang): open an iPaymu order that, once paid, EXTENDS the buyer's existing token
+     * instead of minting a new one. The buyer proves ownership by their access code (share key).
+     */
+    async createRenewalOrder(accessCode, productKey, { name = null, phone = null, deviceHash = null, methodKey = null, ip = null } = {}) {
+        const token = playbackTokenRenewalService.findTokenByAccessCode(accessCode);
+        if (!token) throw badRequest('Kode akses tidak ditemukan — periksa kembali kodenya');
+        if (token.revoked_at) throw badRequest('Token ini sudah dicabut dan tidak bisa diperpanjang');
+        const product = this._resolvePurchasableProduct(productKey);
+        return this._openOrder({ product, name, phone, deviceHash, methodKey, ip, orderKind: 'renewal', renewTokenId: token.id });
+    }
+
+    _resolvePurchasableProduct(productKey) {
         const product = playbackProductService.getByKey(productKey);
         if (!product || !product.enabled) {
             throw badRequest('Paket tidak tersedia');
@@ -78,7 +103,14 @@ class PlaybackOrderService {
         if (product.is_trial || !product.price_rupiah || product.price_rupiah <= 0) {
             throw badRequest('Paket ini gratis — pakai tombol coba gratis, tidak perlu bayar');
         }
+        return product;
+    }
 
+    /** Shared charge+order-open for both purchase and renewal. */
+    async _openOrder({ product, name = null, phone = null, deviceHash = null, methodKey = null, ip = null, orderKind = 'purchase', renewTokenId = null }) {
+        if (!deviceHash || typeof deviceHash !== 'string') {
+            throw badRequest('deviceHash wajib');
+        }
         const cfg = paymentSettingsService.getGatewayConfig();
         if (cfg.gateway !== 'ipaymu') {
             throw badRequest('Pembayaran online belum aktif. Hubungi admin.');
@@ -88,9 +120,10 @@ class PlaybackOrderService {
         const reusable = queryOne(
             `SELECT id FROM playback_orders
              WHERE device_hash = ? AND product_id = ? AND amount = ? AND status = 'pending'
+               AND order_kind = ? AND COALESCE(renew_token_id, 0) = COALESCE(?, 0)
                AND (expires_at IS NULL OR expires_at > ?)
              ORDER BY id DESC LIMIT 1`,
-            [deviceHash, product.id, amount, new Date().toISOString()]
+            [deviceHash, product.id, amount, orderKind, renewTokenId, new Date().toISOString()]
         );
         if (reusable) {
             return this.getOrder(reusable.id);
@@ -140,8 +173,8 @@ class PlaybackOrderService {
             : new Date(Date.now() + ORDER_EXPIRY_MINUTES * 60 * 1000).toISOString();
         const result = execute(
             `INSERT INTO playback_orders
-               (product_id, buyer_name, buyer_phone, device_hash, request_ip, gateway, gateway_ref, reference, amount, status, qris_payload, expires_at)
-             VALUES (?, ?, ?, ?, ?, 'ipaymu', ?, ?, ?, 'pending', ?, ?)`,
+               (product_id, buyer_name, buyer_phone, device_hash, request_ip, gateway, gateway_ref, reference, amount, status, qris_payload, expires_at, order_kind, renew_token_id, recovery_code)
+             VALUES (?, ?, ?, ?, ?, 'ipaymu', ?, ?, ?, 'pending', ?, ?, ?, ?, ?)`,
             [
                 product.id,
                 name ? String(name).trim() : null,
@@ -161,6 +194,9 @@ class PlaybackOrderService {
                     payment_name: data.PaymentName || chosen.label || null,
                 }),
                 expiresAt,
+                orderKind,
+                renewTokenId,
+                generateRecoveryCode(),
             ]
         );
         return this.getOrder(result.lastInsertRowid);
@@ -174,7 +210,7 @@ class PlaybackOrderService {
         this._expireIfDue(order);
         // Crash-recovery: paid but never minted (process died mid-issue) gets its token now.
         if (order.status === 'paid' && !order.token_id) {
-            this._ensureTokenIssued(order.id);
+            this._ensureFulfilled(order.id);
         }
         return this._present(queryOne('SELECT * FROM playback_orders WHERE id = ?', [id]));
     }
@@ -272,12 +308,15 @@ class PlaybackOrderService {
             // a token by a crash is healed by _ensureTokenIssued on the next getOrder.
             return queryOne('SELECT * FROM playback_orders WHERE id = ?', [order.id]);
         }
-        this._ensureTokenIssued(order.id);
+        this._ensureFulfilled(order.id);
         return queryOne('SELECT * FROM playback_orders WHERE id = ?', [order.id]);
     }
 
-    /** Idempotent: mint exactly one token for a paid order that has none yet. */
-    _ensureTokenIssued(orderId) {
+    /**
+     * Idempotent fulfilment of a PAID order that still has no token: MINT (purchase) or EXTEND
+     * (renewal) exactly once. Crash-safe — getOrder re-runs it while token_id is NULL.
+     */
+    _ensureFulfilled(orderId) {
         const order = queryOne('SELECT * FROM playback_orders WHERE id = ?', [orderId]);
         if (!order || order.status !== 'paid' || order.token_id) {
             return;
@@ -285,6 +324,23 @@ class PlaybackOrderService {
         const product = playbackProductService.getById(order.product_id);
         if (!product) {
             console.error(`[PlaybackOrder] order ${orderId} references a missing product ${order.product_id}`);
+            return;
+        }
+
+        if (order.order_kind === 'renewal') {
+            if (!order.renew_token_id) {
+                console.error(`[PlaybackOrder] renewal order ${orderId} has no renew_token_id`);
+                return;
+            }
+            // Extend exactly once (renewToken is idempotent on order_id via its ledger), THEN claim the
+            // order so a crash between the two heals cleanly (renewToken sees the ledger and no-ops).
+            try {
+                playbackTokenRenewalService.renewToken(order.renew_token_id, product.validity_days, { orderId: order.id });
+            } catch (error) {
+                console.error(`[PlaybackOrder] renewal of token ${order.renew_token_id} for order ${orderId} failed:`, error.message);
+                return;
+            }
+            execute('UPDATE playback_orders SET token_id = ? WHERE id = ? AND token_id IS NULL', [order.renew_token_id, orderId]);
             return;
         }
         const issued = playbackProductService.issueTokenForProduct(product, {
@@ -355,12 +411,53 @@ class PlaybackOrderService {
             amount: order.amount,
             expiresAt: order.expires_at,
             paidAt: order.paid_at,
+            orderKind: order.order_kind || 'purchase',
+            recoveryCode: order.recovery_code || null,
+            renewTokenId: order.renew_token_id || null,
             product: product
                 ? { key: product.key, label: product.label, windowHours: product.window_hours, validityDays: product.validity_days }
                 : null,
             payment,
             access,
         };
+    }
+
+    /**
+     * Anonymous recovery: given the buyer's phone + the recovery code shown at purchase, return their
+     * still-valid tokens. No messaging needed — the buyer types what they saved. The route rate-limits
+     * this; matching requires BOTH fields so a code alone (or a phone alone) reveals nothing.
+     */
+    recoverActiveTokens(phone, recoveryCode) {
+        const ph = (phone || '').toString().trim();
+        const code = (recoveryCode || '').toString().trim().toUpperCase();
+        if (!ph || !code) throw badRequest('Nomor HP dan kode pemulihan wajib diisi');
+
+        const orders = query(
+            `SELECT id, token_id, product_id, order_kind, created_at, paid_at
+             FROM playback_orders
+             WHERE buyer_phone = ? AND recovery_code = ? AND status = 'paid' AND token_id IS NOT NULL
+             ORDER BY id DESC`,
+            [ph, code]
+        );
+        const out = [];
+        for (const o of orders) {
+            const token = queryOne(
+                'SELECT id, share_key_prefix, expires_at, revoked_at, playback_window_hours FROM playback_tokens WHERE id = ?',
+                [o.token_id]
+            );
+            if (!token || token.revoked_at) continue;
+            const product = playbackProductService.getById(o.product_id);
+            out.push({
+                orderId: o.id,
+                orderKind: o.order_kind || 'purchase',
+                shareKey: token.share_key_prefix,
+                expiresAt: token.expires_at,
+                windowHours: token.playback_window_hours,
+                product: product ? { key: product.key, label: product.label } : null,
+                paidAt: o.paid_at,
+            });
+        }
+        return out;
     }
 }
 

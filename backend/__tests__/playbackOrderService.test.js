@@ -29,6 +29,8 @@ const h = await vi.hoisted(async () => ({
     revoked: [],
     nextTokenId: 500,
     issueReturnsNoId: false,
+    renewLookup: null,
+    renewCalls: [],
 }));
 
 vi.mock('../database/connectionPool.js', () => ({
@@ -80,6 +82,16 @@ vi.mock('../services/playbackTokenService.js', () => ({
     default: { revokeToken: (id) => { h.revoked.push(id); } },
 }));
 
+vi.mock('../services/playbackTokenRenewalService.js', () => ({
+    default: {
+        findTokenByAccessCode: (code) => (h.renewLookup ? h.renewLookup(code) : null),
+        renewToken: (tokenId, days, opts) => {
+            h.renewCalls.push({ tokenId, days, opts });
+            return { alreadyRenewed: false, previousExpiresAt: null, newExpiresAt: '2027-01-01 00:00:00', daysAdded: days };
+        },
+    },
+}));
+
 const service = (await import('../services/playbackOrderService.js')).default;
 
 const okCharge = {
@@ -95,15 +107,16 @@ function seedOrder(over = {}) {
         updated_at: "datetime('now','-1 hour')", ...over,
     };
     const info = db.prepare(`
-        INSERT INTO playback_orders (product_id, buyer_name, device_hash, request_ip, gateway, gateway_ref, reference, amount, status, expires_at, token_id, updated_at)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?, datetime('now','-1 hour'))
-    `).run(row.product_id, row.buyer_name ?? null, row.device_hash, row.request_ip ?? null, row.gateway,
-        row.gateway_ref, row.reference, row.amount, row.status, row.expires_at, row.token_id);
+        INSERT INTO playback_orders (product_id, buyer_name, buyer_phone, device_hash, request_ip, gateway, gateway_ref, reference, amount, status, expires_at, token_id, order_kind, renew_token_id, recovery_code, updated_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, datetime('now','-1 hour'))
+    `).run(row.product_id, row.buyer_name ?? null, row.buyer_phone ?? null, row.device_hash, row.request_ip ?? null, row.gateway,
+        row.gateway_ref, row.reference, row.amount, row.status, row.expires_at, row.token_id,
+        row.order_kind ?? 'purchase', row.renew_token_id ?? null, row.recovery_code ?? null);
     return info.lastInsertRowid;
 }
 
 beforeEach(() => {
-    db.exec('DROP TABLE IF EXISTS playback_orders; DROP TABLE IF EXISTS playback_tokens;');
+    db.exec('DROP TABLE IF EXISTS playback_orders; DROP TABLE IF EXISTS playback_tokens; DROP TABLE IF EXISTS playback_token_renewals;');
     db.exec(`
         CREATE TABLE playback_orders (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -112,15 +125,24 @@ beforeEach(() => {
             gateway TEXT NOT NULL DEFAULT 'ipaymu', gateway_ref TEXT, reference TEXT,
             amount INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'pending',
             qris_payload TEXT, token_id INTEGER, expires_at TEXT, paid_at TEXT,
+            order_kind TEXT NOT NULL DEFAULT 'purchase', renew_token_id INTEGER, recovery_code TEXT,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
         CREATE TABLE playback_tokens (
-            id INTEGER PRIMARY KEY, share_key_prefix TEXT, expires_at DATETIME, playback_window_hours INTEGER
+            id INTEGER PRIMARY KEY, share_key_prefix TEXT, share_key_hash TEXT, expires_at DATETIME,
+            revoked_at TEXT, playback_window_hours INTEGER, updated_at TEXT
+        );
+        CREATE TABLE playback_token_renewals (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, order_id INTEGER UNIQUE, token_id INTEGER NOT NULL,
+            days_added INTEGER NOT NULL, previous_expires_at TEXT, new_expires_at TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
     `);
     h.ipaymuCalls.length = 0;
     h.issued.length = 0;
+    h.renewCalls.length = 0;
+    h.renewLookup = null;
     h.revoked.length = 0;
     h.chargeResponse = okCharge;
     h.txResponse = { httpOk: true, body: { Data: { StatusDesc: 'pending', Amount: PRODUCT.price_rupiah } } };
@@ -368,5 +390,61 @@ describe('expiry', () => {
 
     it('throws 404 for an order that does not exist', () => {
         expect(() => service.getOrder(4242)).toThrow(/tidak ditemukan/i);
+    });
+});
+
+describe('renewal (perpanjang) — extend, not mint', () => {
+    const paidGateway = { httpOk: true, body: { Data: { StatusDesc: 'berhasil', Amount: PRODUCT.price_rupiah } } };
+
+    it('createRenewalOrder opens a renewal order bound to the resolved token', async () => {
+        h.renewLookup = () => ({ id: 777, revoked_at: null });
+        const order = await service.createRenewalOrder('CODE-XYZ', PRODUCT.key, { deviceHash: 'dev-r', phone: '0812' });
+        expect(order.orderKind).toBe('renewal');
+        expect(order.renewTokenId).toBe(777);
+        expect(order.recoveryCode).toMatch(/^[A-Z0-9]{8}$/);
+        const raw = db.prepare('SELECT order_kind, renew_token_id FROM playback_orders WHERE id = ?').get(order.id);
+        expect(raw.order_kind).toBe('renewal');
+        expect(raw.renew_token_id).toBe(777);
+    });
+
+    it('rejects an unknown access code', async () => {
+        h.renewLookup = () => null;
+        await expect(service.createRenewalOrder('NOPE', PRODUCT.key, { deviceHash: 'dev-r' }))
+            .rejects.toThrow(/tidak ditemukan/i);
+    });
+
+    it('a paid renewal order EXTENDS the token (renewToken) and mints nothing', async () => {
+        db.prepare('INSERT INTO playback_tokens (id, share_key_prefix, expires_at, playback_window_hours) VALUES (?,?,?,?)')
+            .run(777, 'key777', '2026-12-01 00:00:00', 24);
+        const id = seedOrder({ order_kind: 'renewal', renew_token_id: 777, device_hash: 'dev-r' });
+        h.txResponse = paidGateway;
+        await service.syncOrder(id);
+        expect(h.renewCalls).toHaveLength(1);
+        expect(h.renewCalls[0]).toMatchObject({ tokenId: 777, days: PRODUCT.validity_days, opts: { orderId: id } });
+        expect(h.issued).toHaveLength(0);                       // NOT a mint
+        const raw = db.prepare('SELECT status, token_id FROM playback_orders WHERE id = ?').get(id);
+        expect(raw.status).toBe('paid');
+        expect(raw.token_id).toBe(777);                          // claimed the existing token
+    });
+
+    it('a double webhook on a renewal extends exactly once', async () => {
+        db.prepare('INSERT INTO playback_tokens (id, share_key_prefix, expires_at, playback_window_hours) VALUES (?,?,?,?)')
+            .run(777, 'key777', '2026-12-01 00:00:00', 24);
+        const id = seedOrder({ order_kind: 'renewal', renew_token_id: 777, device_hash: 'dev-r' });
+        h.txResponse = paidGateway;
+        await service.handleWebhook({ trx_id: 'TRX-1' });
+        await service.handleWebhook({ trx_id: 'TRX-1' });
+        expect(h.renewCalls.length).toBeLessThanOrEqual(1);      // guarded flip = one fulfil
+    });
+
+    it('recoverActiveTokens returns a paid buyer token by phone + code', () => {
+        db.prepare('INSERT INTO playback_tokens (id, share_key_prefix, expires_at, playback_window_hours) VALUES (?,?,?,?)')
+            .run(888, 'key888', '2099-01-01 00:00:00', 24);
+        seedOrder({ status: 'paid', token_id: 888, buyer_phone: '08123', recovery_code: 'ABCD2345' });
+        const out = service.recoverActiveTokens('08123', 'abcd2345');   // case-insensitive code
+        expect(out).toHaveLength(1);
+        expect(out[0]).toMatchObject({ shareKey: 'key888' });
+        expect(service.recoverActiveTokens('08123', 'WRONG')).toHaveLength(0);
+        expect(() => service.recoverActiveTokens('', 'ABCD2345')).toThrow(/wajib/i);
     });
 });
