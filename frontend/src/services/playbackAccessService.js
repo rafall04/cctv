@@ -3,7 +3,7 @@
  *          self-serve iPaymu payment (create order + poll status).
  * Caller: components/playback/PlaybackAccessPanel.
  * Deps: shared apiClient (sends the signed vdev device cookie automatically, same-origin).
- * MainFuncs: getProducts, claimTrial, createOrder, getOrderStatus.
+ * MainFuncs: getProducts, claimTrial, createOrder, getOrderStatus, renewOrder, recoverTokens.
  * SideEffects: HTTP requests only; the device cookie is set server-side on first call.
  */
 
@@ -31,6 +31,19 @@ export const playbackAccessService = {
     // device that opened the order, so this is safe to call from a public page.
     async getOrderStatus(orderId) {
         const response = await apiClient.get(`/api/playback-access/order/${orderId}`);
+        return response.data;
+    },
+
+    // Renew (perpanjang) an existing token: same token, extended validity. Poll the returned order
+    // exactly like a purchase; on 'paid' the buyer's SAME access code keeps working, just longer.
+    async renewOrder({ accessCode, productKey, name = null, phone = null, methodKey = null }) {
+        const response = await apiClient.post('/api/playback-access/renew', { accessCode, productKey, name, phone, methodKey });
+        return response.data;
+    },
+
+    // Recover active tokens by phone + recovery code (shown at purchase). No messaging needed.
+    async recoverTokens({ phone, code }) {
+        const response = await apiClient.post('/api/playback-access/recover', { phone, code });
         return response.data;
     },
 };
