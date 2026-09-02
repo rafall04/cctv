@@ -4,6 +4,7 @@
  */
 
 import Database from 'better-sqlite3';
+import { resolveDbPath } from '../dbPath.js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
@@ -11,7 +12,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 // Resolve database path relative to this migration file
-const dbPath = join(__dirname, '..', '..', 'data', 'cctv.db');
+const dbPath = resolveDbPath();
 
 console.log('Migration: add_camera_status');
 console.log('Database path:', dbPath);

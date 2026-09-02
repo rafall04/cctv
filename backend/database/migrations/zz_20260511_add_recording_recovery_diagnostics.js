@@ -5,12 +5,13 @@
 // SideEffects: Creates recording_recovery_diagnostics table and indexes.
 
 import Database from 'better-sqlite3';
+import { resolveDbPath } from '../dbPath.js';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const dbPath = join(__dirname, '..', '..', 'data', 'cctv.db');
+const dbPath = resolveDbPath();
 const db = new Database(dbPath);
 
 try {

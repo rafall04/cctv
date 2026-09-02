@@ -468,6 +468,13 @@ pm2 delete ${CLIENT_CODE}-mediamtx 2>/dev/null || true
 
 pm2 start deployment/ecosystem.config.cjs
 pm2 save
+
+# Bound pm2 logs: they share the filesystem with recordings/, and the emergency disk-guard reclaims
+# space by DELETING recordings — so an unbounded log is a data-loss path, not just noise. (Audit D-03.)
+pm2 install pm2-logrotate 2>/dev/null || true
+pm2 set pm2-logrotate:max_size 50M
+pm2 set pm2-logrotate:retain 7
+pm2 set pm2-logrotate:compress true
 pm2 startup | tail -n 1 | bash || true
 
 print_success "Services started"

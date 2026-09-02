@@ -12,11 +12,12 @@
 // is an UPDATE of one field, and the aggregate is a plain SUM/COUNT rather than a join.
 
 import Database from 'better-sqlite3';
+import { resolveDbPath } from '../dbPath.js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const db = new Database(join(__dirname, '..', '..', 'data', 'cctv.db'));
+const db = new Database(resolveDbPath());
 
 try {
     db.exec(`

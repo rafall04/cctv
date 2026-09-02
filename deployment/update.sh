@@ -42,15 +42,18 @@ print_info "Updating backend..."
 cd backend
 npm install --production
 
-# Run migrations
-print_info "Running migrations..."
-if [ -d "database/migrations" ]; then
-    for migration in database/migrations/*.js; do
-        if [ -f "$migration" ]; then
-            node "$migration" || true
-        fi
-    done
+# Back up the DB BEFORE migrating — always keep a pre-op copy (AGENTS.md critical invariant).
+print_info "Backing up database before migration..."
+if [ -f data/cctv.db ]; then
+    cp data/cctv.db "data/cctv.db.backup-$(date +%Y%m%d-%H%M%S)"
+    print_success "Database backed up"
 fi
+
+# Run migrations via the tracked runner (ordered, forward-only). No `|| true`: with `set -e` a failed
+# migration ABORTS the update instead of restarting the backend on a half-applied schema. For
+# channel/pin deployments prefer deployment/safe-deploy.sh (backup + gated verification). (Audit D-02.)
+print_info "Running migrations..."
+npm run migrate
 
 # Update frontend
 print_info "Building frontend..."

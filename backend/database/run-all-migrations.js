@@ -10,11 +10,12 @@ import { spawn } from 'child_process';
 import { existsSync, readdirSync, mkdirSync } from 'fs';
 import { dirname, join, resolve } from 'path';
 import { fileURLToPath } from 'url';
+import { resolveDbPath } from './dbPath.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const migrationsDir = join(__dirname, 'migrations');
-const databaseDir = join(__dirname, '..', 'data');
+const databaseDir = dirname(resolveDbPath());
 
 const AGGREGATE_MIGRATION_RUNNERS = new Set([
     'run_all_migrations.js',

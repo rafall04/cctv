@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { mkdirSync, existsSync } from 'fs';
+import { resolveDbPath } from './dbPath.js';
 import { 
   generateStrongPassword, 
   generateInstallationId, 
@@ -14,7 +15,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 // Ensure data directory exists
-const dataDir = join(__dirname, '..', 'data');
+const dbPath = resolveDbPath();
+const dataDir = dirname(dbPath);
 if (!existsSync(dataDir)) {
   mkdirSync(dataDir, { recursive: true });
   console.log('✓ Created data directory:', dataDir);
@@ -22,8 +24,7 @@ if (!existsSync(dataDir)) {
   console.log('✓ Data directory exists:', dataDir);
 }
 
-// Use hardcoded relative path to avoid .env dependency during initial setup
-const dbPath = join(__dirname, '..', 'data', 'cctv.db');
+// Path resolved once above via resolveDbPath() (honours DATABASE_PATH; safe without .env).
 
 console.log('Database configuration:');
 console.log('  Resolved path:', dbPath);

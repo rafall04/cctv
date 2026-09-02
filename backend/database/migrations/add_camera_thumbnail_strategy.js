@@ -7,12 +7,13 @@ SideEffects: Alters cameras table and normalizes invalid thumbnail strategy valu
 */
 
 import Database from 'better-sqlite3';
+import { resolveDbPath } from '../dbPath.js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const dbPath = join(__dirname, '..', '..', 'data', 'cctv.db');
+const dbPath = resolveDbPath();
 
 console.log('[Migration] Adding camera thumbnail strategy...');
 

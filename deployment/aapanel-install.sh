@@ -469,8 +469,12 @@ if [ ! -f mediamtx ]; then
     chmod +x mediamtx
 fi
 
-if [ ! -f mediamtx.yml ] && [ -f mediamtx.yml.example ]; then
-    cp mediamtx.yml.example mediamtx.yml
+# Always install the HARDENED config (binds 127.0.0.1). The tarball ships its OWN mediamtx.yml that
+# binds 0.0.0.0 and overwrites the repo's on extraction — exposing the authless API (:9997) and HLS
+# (:8888) to the LAN and bypassing the subscriber gate. The old `.example` fallback never fired
+# because mediamtx.yml already exists after extraction. Mirror install.sh. (Audit v1.2.0, D-01.)
+if [ -f "$APP_DIR/deployment/mediamtx.yml" ]; then
+    cp "$APP_DIR/deployment/mediamtx.yml" mediamtx.yml
 fi
 
 print_success "MediaMTX configured"
@@ -493,6 +497,14 @@ pm2 start deployment/ecosystem.config.cjs
 
 # Save and startup
 pm2 save
+
+# Bound pm2 logs (see D-03 note in install.sh): unbounded logs can trip the disk-guard that
+# deletes recordings. (Audit v1.2.0, D-03.)
+pm2 install pm2-logrotate 2>/dev/null || true
+pm2 set pm2-logrotate:max_size 50M
+pm2 set pm2-logrotate:retain 7
+pm2 set pm2-logrotate:compress true
+
 pm2 startup | tail -n 1 | bash || true
 
 print_success "Services started"

@@ -37,11 +37,12 @@ data/cctv.db before migrations run; keep that copy until the new counts look rig
 */
 
 import Database from 'better-sqlite3';
+import { resolveDbPath } from '../dbPath.js';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const dbPath = join(__dirname, '..', '..', 'data', 'cctv.db');
+const dbPath = resolveDbPath();
 const db = new Database(dbPath);
 
 function tableExists(name) {

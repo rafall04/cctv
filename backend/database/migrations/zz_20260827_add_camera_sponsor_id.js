@@ -29,11 +29,12 @@ MEMBERSIHKAN, dan salinannya diperbarui dari baris sponsors setiap kali sponsorn
 */
 
 import Database from 'better-sqlite3';
+import { resolveDbPath } from '../dbPath.js';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const db = new Database(join(__dirname, '..', '..', 'data', 'cctv.db'));
+const db = new Database(resolveDbPath());
 
 function adaTabel(nama) {
     return Boolean(db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").get(nama));
