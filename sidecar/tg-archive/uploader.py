@@ -65,9 +65,11 @@ class Config:
         self.max_mbps = float(env('MAX_AVG_MBPS', '45'))
         self.batch_size = int(env('BATCH_SIZE', '40'))
         self.max_attempts = int(env('MAX_ATTEMPTS', '4'))
-        # Periodic re-attempt of transiently-failed uploads (bot kicked from a group, long 5xx,
-        # etc.). Without it the watermark advances past a failure forever and the footage is lost
-        # once local retention deletes it. 0 disables. (Audit v1.2.0, A-01.)
+        # Periodic re-attempt of segments recorded 'failed' — a PERMANENT-at-the-time failure that
+        # stepped past the queue (is_permanent_failure, e.g. the bot was removed from a target group).
+        # Transient failures never reach here (they hold the queue and retry next poll), so this only
+        # recovers the permanent-then-fixed case: once the operator re-adds the bot, the old 'failed'
+        # rows would otherwise stay unsent until retention deleted the files. 0 disables. (Audit A-01.)
         self.retry_interval = int(env('RETRY_INTERVAL_SEC', '900'))
         self.retry_batch = int(env('RETRY_BATCH', '20'))
         self.timeout = int(env('REQUEST_TIMEOUT_SEC', '1800'))
@@ -98,6 +100,14 @@ class Config:
         # Surgical tool for excluding a known-bad window (e.g. a recording incident)
         # without loosening the tolerance rules. Empty = no cutoff.
         self.min_recorded_at = parse_cutoff(env('ARCHIVE_MIN_RECORDED_AT', ''))
+        # Stall alerting. This uploader had NONE: an archive that stopped was completely silent,
+        # and the operator found out when they went looking for footage that was never sent.
+        # 20 minutes is twice the segment length, so a segment still being written cannot trip it.
+        self.stall_alert_min = float(env('STALL_ALERT_MIN', '20'))
+        # Empty = journald only (always written). Set to an ops chat id to get the alert pushed.
+        # Deliberately NOT one of the archive groups: a stall notice does not belong in the
+        # footage feed people scroll.
+        self.alert_chat_id = env('TG_ALERT_CHAT_ID', '') or None
         self.dry_run = env('DRY_RUN', '0') == '1'
         # Set to 0 only if some OTHER process ever needs to consume this bot's updates —
         # Telegram allows a single getUpdates consumer per token (a second one gets 409).
@@ -411,32 +421,6 @@ def is_stable(path, wait_sec):
         return False, 0
 
 
-# Telegram's CLOUD API reports throttling as a structured `parameters.retry_after`. The
-# self-hosted Bot API server does not: it answers HTTP 400 with the hint buried in the
-# description text ("too Many Requests: retry after 8"). In --local mode — the only mode
-# this sidecar runs in — the structured field is therefore always absent, the purpose-built
-# back-off below never fired once, and every throttle fell through to the caller's generic
-# 30/60/90s ladder. Measured on prod 2026-07-31: 15 throttles in 30 minutes, each paying
-# 30s for a documented 8s request, burning ~25% of wall-clock during a backfill.
-RETRY_AFTER_RE = re.compile(r'retry after (\d+)', re.IGNORECASE)
-
-# Prefix on the returned error telling the caller the mandated wait has ALREADY been served
-# inside call(), so it must not stack its own back-off on top.
-RATE_LIMITED = 'RATE_LIMITED'
-
-
-def retry_after_seconds(params, description):
-    """Seconds Telegram asked us to wait, from the structured field or the description."""
-    value = params.get('retry_after')
-    if value is None:
-        match = RETRY_AFTER_RE.search(description or '')
-        value = match.group(1) if match else None
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return None
-
-
 def call(cfg, state, method, payload, log):
     """POST to the local Bot API. Handles 429 back-off and supergroup migration."""
     resp = requests.post(cfg.api(method), data=payload, timeout=cfg.timeout)
@@ -459,14 +443,130 @@ def call(cfg, state, method, payload, log):
         retry['chat_id'] = new
         return call(cfg, state, method, retry, log)
 
-    wait_for = retry_after_seconds(params, desc)
-    if wait_for is not None:
-        wait = wait_for + 1
+    tunggu = retry_after_seconds(params, desc)
+    if tunggu is not None:
+        wait = tunggu + 1
         log.warning('rate limited by Telegram, sleeping %ss', wait)
         time.sleep(wait)
-        return False, None, '%s %s %s' % (RATE_LIMITED, resp.status_code, desc)
 
     return False, None, '%s %s' % (resp.status_code, desc)
+
+
+RETRY_AFTER_RE = re.compile(r'retry after (\d+)', re.IGNORECASE)
+
+
+def retry_after_seconds(params, description):
+    """Detik yang diminta Telegram, dari field terstruktur ATAU dari teks deskripsi.
+
+    Bot API resmi mengirim 429 dengan `parameters.retry_after`. Bot API LOKAL yang dipakai
+    instalasi ini mengirim rate limit sebagai **400** dengan angkanya hanya di dalam kalimat:
+    `400 Bad Request: too Many Requests: retry after 8`. Membaca field saja berarti tidak tahu
+    harus menunggu berapa lama pada satu-satunya bentuk yang benar-benar muncul di produksi —
+    520 kejadian dalam 24 jam, nol di antaranya bergaya 429.
+    """
+    nilai = (params or {}).get('retry_after')
+    if nilai is None:
+        cocok = RETRY_AFTER_RE.search(description or '')
+        nilai = cocok.group(1) if cocok else None
+    try:
+        return int(nilai)
+    except (TypeError, ValueError):
+        return None
+
+
+def is_permanent_failure(err):
+    """
+    True when repeating this exact request can never help.
+
+    Plain HTTP semantics do the classifying. 4xx means the request itself is wrong — the bot was
+    removed from the group, the chat is gone, the file is over the limit — and no amount of
+    retrying fixes that, so those segments are recorded and stepped over. 5xx means the far side
+    failed, which is the definition of "try again". 429 is a rate limit, the most retryable answer
+    there is.
+
+    Anything unrecognised — a timeout string, a proxy's HTML error page, an empty error — counts as
+    RETRYABLE on purpose. Being wrong in that direction costs a bounded stall that raises an alert;
+    being wrong in the other direction costs footage missing from the archive forever, silently.
+    """
+    if not err:
+        return False
+    teks = str(err)
+    # Rate limit tidak pernah permanen, apa pun kode statusnya. Bot API lokal mengirimnya
+    # sebagai 400, bukan 429 — menggolongkannya permanen berarti melangkahi ~1 dari 10
+    # rekaman secara diam-diam, dan Telegram adalah satu-satunya salinan yang lebih tua
+    # dari masa retensi disk.
+    rendah = teks.lower()
+    if RETRY_AFTER_RE.search(teks) or 'too many requests' in rendah:
+        return False
+    # Bot API lokal juga membungkus kegagalan sisi-server dalam amplop 400:
+    # "400 Bad Request: internal Server Error during file upload". Kode statusnya berbohong
+    # tentang siapa yang salah — deskripsinya yang jujur. Terhitung 5 kejadian per 24 jam di
+    # produksi, dan aturan dokumen ini sendiri berkata 5xx adalah definisi coba-lagi.
+    if 'internal server error' in rendah or 'bad gateway' in rendah:
+        return False
+    code = teks.split(' ', 1)[0]
+    if not code.isdigit():
+        return False
+    status = int(code)
+    return 400 <= status < 500 and status != 429
+
+
+def send_alert(cfg, text, log):
+    """
+    Best effort BY DEFINITION: the usual reason to alert is that Telegram cannot be reached, so
+    this is the call most likely to fail too. Every alert is therefore written to the log first,
+    and recovery is announced separately — the recovery message is the one that always arrives.
+
+    Deliberately not routed through call(): that carries the 30-minute upload timeout and sleeps
+    on 429, either of which would freeze the main loop on a message nobody is waiting for.
+    """
+    if not cfg.alert_chat_id:
+        return
+    try:
+        requests.post(cfg.api('sendMessage'),
+                      data={'chat_id': cfg.alert_chat_id, 'text': text},
+                      timeout=15)
+    except requests.RequestException as exc:
+        log.warning('alert not delivered: %s', exc)
+
+
+def note_stall(cfg, stall, seg, pending, log):
+    """
+    Track the head-of-queue segment we are stuck on, and say so ONCE.
+
+    One line per change of state, never one per poll: a stalled archive polls every 60s and an
+    alert per poll would bury the one line that mattered — the mistake this project has already
+    paid for once in its backend logs.
+    """
+    now = time.time()
+    if not stall or stall['seg_id'] != seg['id']:
+        return {'seg_id': seg['id'], 'since': now, 'alerted': False}
+    if stall['alerted']:
+        return stall
+
+    stuck_min = (now - stall['since']) / 60.0
+    if stuck_min < cfg.stall_alert_min:
+        return stall
+
+    log.error('ARCHIVE STALLED %.0f min on seg %s cam%s — %d segment(s) waiting behind it',
+              stuck_min, seg['id'], seg['camera_id'], pending)
+    send_alert(cfg,
+               'Arsip Telegram tertahan %.0f menit di segmen %s (cam%s). %d segmen menunggu di '
+               'belakangnya. Rekaman tetap aman di disk dan antrean lanjut sendiri begitu koneksi '
+               'pulih.' % (stuck_min, seg['id'], seg['camera_id'], pending), log)
+    stall['alerted'] = True
+    return stall
+
+
+def clear_stall(cfg, stall, log):
+    """Announce recovery only if a stall was announced, so a quiet blip stays quiet."""
+    if not stall:
+        return None
+    if stall['alerted']:
+        stuck_min = (time.time() - stall['since']) / 60.0
+        log.info('archive recovered after %.0f min stalled', stuck_min)
+        send_alert(cfg, 'Arsip Telegram jalan lagi setelah tertahan %.0f menit.' % stuck_min, log)
+    return None
 
 
 def send_document(cfg, state, chat_id, seg, caption, log):
@@ -716,24 +816,42 @@ def process_one(cfg, state, router, seg, cam_meta, log):
         log.warning('seg %s upload attempt %s/%s failed: %s',
                     seg['id'], attempt, cfg.max_attempts, err)
         if attempt < cfg.max_attempts:
-            # A throttle has already been waited out inside call(), for exactly as long as
-            # Telegram asked. Stacking the generic ladder on top would triple an 8s wait.
-            if not (err or '').startswith(RATE_LIMITED):
-                time.sleep(min(30 * attempt, 180))
+            time.sleep(min(30 * attempt, 180))
 
-    # Give up on this one rather than wedging the queue behind it forever.
-    record(state, seg, 'failed', err, targets, cfg=cfg, log=log)
-    log.error('seg %s cam%s permanently failed, advancing past it', seg['id'], seg['camera_id'])
-    return True
+    # WHY THIS BRANCHES INSTEAD OF ALWAYS ADVANCING
+    # --------------------------------------------
+    # Advancing past every failure treated "the world is broken" exactly like "this segment is
+    # broken". During an ISP outage that skipped EVERY camera's segments — roughly one per three
+    # minutes of retries, permanently and silently, because nothing ever revisits a `failed` row
+    # and the files are gone to retention long before anyone looks.
+    #
+    # So permanent failures still step aside (a bot removed from a group must not wedge the
+    # queue), and everything else holds position, which is the behaviour the "still growing"
+    # path has always had: stop, keep order, retry next poll.
+    #
+    # Holding is bounded WITHOUT inventing a constant. skip_reason runs on every poll and its
+    # rule 2 retires anything older than MAX_LATE_HOURS, so a segment that can never be sent
+    # ages out on its own and the queue moves on. That ceiling already exists to protect
+    # chronological order, and its own comment already called it "the tolerance for an uploader
+    # outage" — this is the code finally taking it at its word.
+    if is_permanent_failure(err):
+        record(state, seg, 'failed', err, targets, cfg=cfg, log=log)
+        log.error('seg %s cam%s permanently failed, advancing past it', seg['id'], seg['camera_id'])
+        return True
+
+    log.warning('seg %s cam%s not sent (%s) — holding the queue in order, will retry',
+                seg['id'], seg['camera_id'], err)
+    return False
 
 
 def retry_failed(cfg, state, app_db, router, cam_meta, log):
-    """Re-attempt segments that hit a TRANSIENT terminal failure ('failed') and may still be on disk.
-    The main loop advances the watermark past a failure so the queue never wedges, but that means a
-    segment that failed while the bot was (say) removed from its group is otherwise NEVER retried —
-    and footage sold as deep archive is lost once local retention deletes it. 'too_big'/'too_late'/
-    'missing'/'no_route' are deliberately NOT retried: re-attempting cannot change their outcome.
-    Reads app_db (mode=ro) only; all writes go to the state DB. (Audit v1.2.0, A-01.)"""
+    """Re-attempt segments recorded 'failed' — a PERMANENT-at-the-time failure that stepped past the
+    queue (process_one -> is_permanent_failure, e.g. the bot removed from a target group). Transient
+    failures never land here: they hold the queue and retry on the next poll. So this recovers exactly
+    the case the operator fixes out-of-band (re-adding the bot), after which the old 'failed' rows would
+    otherwise stay unsent until retention deleted the files. 'too_big'/'too_late'/'missing'/'no_route'
+    are NOT retried (re-attempting cannot change the outcome). Reads app_db (mode=ro) only; every write
+    goes to the state DB. (Audit v1.2.0, A-01.)"""
     rows = state.execute(
         "SELECT segment_id FROM uploaded WHERE status = 'failed' ORDER BY segment_id ASC LIMIT ?",
         (cfg.retry_batch,)).fetchall()
@@ -746,9 +864,8 @@ def retry_failed(cfg, state, app_db, router, cam_meta, log):
         'FROM recording_segments WHERE id IN (%s)' % placeholders, ids).fetchall()
     by_id = {seg['id']: seg for seg in segs}
 
-    # A failed row whose recording_segments row is gone can never be retried — retire it so it stops
-    # crowding the oldest-first retry window. It is marked 'expired' (NEVER 'ok'), so nothing mistakes
-    # it for archived footage.
+    # A failed row whose recording_segments row is gone can never be retried — retire it ('expired',
+    # NEVER 'ok') so it stops crowding the oldest-first window and is never mistaken for archived.
     gone = [i for i in ids if i not in by_id]
     if gone:
         state.executemany(
@@ -773,6 +890,7 @@ def retry_failed(cfg, state, app_db, router, cam_meta, log):
         log.info('retry sweep: re-attempted %d failed segment(s), %d now ok', retried, ok)
     return retried
 
+
 def run(cfg, log):
     state = open_state(cfg.state_db)
     app_db = open_app_db(cfg.app_db)
@@ -789,9 +907,12 @@ def run(cfg, log):
 
     cam_meta = load_camera_meta(app_db)
     refreshed = time.time()
-    retried_at = 0.0  # first idle tick runs a retry sweep
-    log.info('started: watermark=%s routes=%d cap=%.0f Mbps',
-             watermark, len(router.routes), cfg.max_mbps)
+    # Which segment the queue is currently held on, and whether we have said so out loud.
+    stall = None
+    retried_at = 0.0  # first idle tick runs an A-01 retry sweep
+    log.info('started: watermark=%s routes=%d cap=%.0f Mbps stall_alert=%.0f min%s',
+             watermark, len(router.routes), cfg.max_mbps, cfg.stall_alert_min,
+             '' if cfg.alert_chat_id else ' (log only — TG_ALERT_CHAT_ID unset)')
 
     if cfg.discover_chats:
         threading.Thread(target=discovery_loop, args=(cfg, log),
@@ -804,8 +925,8 @@ def run(cfg, log):
                 refreshed = time.time()
             router.reload()   # picks up routes.json edits without a restart
 
-            # Periodically re-attempt transiently-failed uploads so a failure never silently drops
-            # footage forever. Bounded by RETRY_BATCH so it cannot starve new-segment progress.
+            # Periodically re-attempt 'failed' (permanent-at-the-time) uploads so a group the bot was
+            # removed from — then re-added to — does not silently lose its footage. (Audit A-01.)
             if cfg.retry_interval > 0 and time.time() - retried_at > cfg.retry_interval:
                 try:
                     retry_failed(cfg, state, app_db, router, cam_meta, log)
@@ -820,7 +941,11 @@ def run(cfg, log):
 
             for seg in rows:
                 if not process_one(cfg, state, router, seg, cam_meta, log):
+                    # Held on purpose. Track how long, so a queue that stops moving says so
+                    # instead of going quiet — see note_stall.
+                    stall = note_stall(cfg, stall, seg, len(rows), log)
                     break   # not ready yet — stop, keep order, retry next poll
+                stall = clear_stall(cfg, stall, log)
                 watermark = seg['id']
                 meta_set(state, 'last_segment_id', watermark)
         except sqlite3.Error as exc:
