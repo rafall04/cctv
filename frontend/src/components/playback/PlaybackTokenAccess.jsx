@@ -78,7 +78,9 @@ export default function PlaybackTokenAccess({
     const [isSwapping, setIsSwapping] = useState(false);
     const [showCameras, setShowCameras] = useState(false);
     /** Nothing on sale means there is no invitation to extend — see usePlaybackAccessOffer. */
-    const { offered: accessOffered } = usePlaybackAccessOffer();
+    const { offered: accessOffered, hasPaid } = usePlaybackAccessOffer();
+    /** Only promise "beli akses" when a priced package is actually enabled; otherwise just the trial. */
+    const offerCopy = hasPaid ? 'Coba gratis 3 hari atau beli akses' : 'Coba gratis 3 hari';
 
     /*
      * The capped-playback notice sits far above this box, so its call to action has to do two things
@@ -318,7 +320,7 @@ export default function PlaybackTokenAccess({
                             >
                                 {renewTarget ? 'Perpanjang token' : 'Belum punya token?'}{' '}
                                 <span className="font-medium text-primary">
-                                    {showAccess ? 'Tutup' : (renewTarget ? 'Pilih durasi' : 'Coba gratis 3 hari atau beli akses')}
+                                    {showAccess ? 'Tutup' : (renewTarget ? 'Pilih durasi' : offerCopy)}
                                 </span>
                             </button>
                             {showAccess && (

@@ -57,7 +57,7 @@ export default function PlaybackOptions({
     onAutoPlayToggle,
 }) {
     /** The notice still explains the limit when nothing is on sale; only the sales pitch goes. */
-    const { offered: accessOffered } = usePlaybackAccessOffer();
+    const { offered: accessOffered, hasPaid } = usePlaybackAccessOffer();
     const { timezone } = useTimezone();
     const unreachableMoment = useUnreachableSharedMoment(playbackPolicy);
 
@@ -130,7 +130,7 @@ export default function PlaybackOptions({
                             onClick={() => window.dispatchEvent(new CustomEvent('playback:open-access'))}
                             className="mt-2 inline-flex items-center gap-2 rounded-control bg-primary px-3 py-1.5 text-xs font-medium text-white"
                         >
-                            Coba gratis 3 hari atau beli akses
+                            {hasPaid ? 'Coba gratis 3 hari atau beli akses' : 'Coba gratis 3 hari'}
                         </button>
                     )}
                 </div>

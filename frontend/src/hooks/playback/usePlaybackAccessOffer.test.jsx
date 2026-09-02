@@ -25,6 +25,11 @@ function Probe() {
     return <span data-testid="state">{`${ready ? 'ready' : 'loading'}:${offered ? 'offered' : 'none'}`}</span>;
 }
 
+function PaidProbe() {
+    const { ready, hasPaid } = usePlaybackAccessOffer();
+    return <span data-testid="paid">{`${ready ? 'ready' : 'loading'}:${hasPaid ? 'paid' : 'trial-only'}`}</span>;
+}
+
 const products = (list) => ({ data: { products: list, trial: null } });
 
 beforeEach(() => {
@@ -71,6 +76,32 @@ describe('usePlaybackAccessOffer', () => {
         render(<Probe />);
 
         await waitFor(() => expect(screen.getByTestId('state').textContent).toBe('ready:offered'));
+    });
+
+    it('hasPaid is FALSE when only the free trial is enabled (copy must not promise "beli")', async () => {
+        playbackAccessService.getProducts.mockResolvedValue(products([{ key: 'trial', isTrial: true }]));
+
+        render(<PaidProbe />);
+
+        await waitFor(() => expect(screen.getByTestId('paid').textContent).toBe('ready:trial-only'));
+    });
+
+    it('hasPaid is TRUE when a priced package is enabled', async () => {
+        playbackAccessService.getProducts.mockResolvedValue(products([
+            { key: 'trial', isTrial: true }, { key: 'weekly', isTrial: false },
+        ]));
+
+        render(<PaidProbe />);
+
+        await waitFor(() => expect(screen.getByTestId('paid').textContent).toBe('ready:paid'));
+    });
+
+    it('hasPaid fails OPEN too, so a blip never hides the buy wording', async () => {
+        playbackAccessService.getProducts.mockRejectedValue(new Error('network down'));
+
+        render(<PaidProbe />);
+
+        await waitFor(() => expect(screen.getByTestId('paid').textContent).toBe('ready:paid'));
     });
 
     it('answers every caller on the page from ONE request', async () => {

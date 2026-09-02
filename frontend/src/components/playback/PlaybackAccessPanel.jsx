@@ -101,14 +101,16 @@ export default function PlaybackAccessPanel({ onIssued = null, renewFor = null, 
         savedRef.current = access.shareKey;
         saveToken({
             shareKey: access.shareKey,
-            label: order?.product?.label || renewFor?.label || 'Paket Playback',
+            // order?.product?.label — a paid buy · renewFor?.label — a renewal · trial label — a free
+            // trial (no order) · generic — last resort.
+            label: order?.product?.label || renewFor?.label || (products.find((p) => p.isTrial)?.label) || 'Paket Playback',
             expiresAt: access.expiresAt || null,
             windowHours: access.windowHours || null,
             recoveryCode: order?.recoveryCode || null,
             phone: buyer.phone || null,
         });
         onDone?.();
-    }, [access, order, renewFor, buyer.phone, onDone]);
+    }, [access, order, renewFor, buyer.phone, onDone, products]);
 
     const claimTrial = useCallback(async () => {
         setBusy('trial'); setError(null);

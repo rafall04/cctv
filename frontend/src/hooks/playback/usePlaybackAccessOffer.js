@@ -40,8 +40,14 @@ function loadOffer() {
     if (!inFlight) {
         inFlight = playbackAccessService
             .getProducts()
-            .then((res) => ({ offered: (res?.data?.products || []).length > 0 }))
-            .catch(() => ({ offered: true })) // fail open — see header
+            .then((res) => {
+                const products = res?.data?.products || [];
+                // `offered` = anything at all to activate (trial included, so the entry stays visible).
+                // `hasPaid` = at least one PRICED package is enabled, so the copy may honestly promise
+                // "beli akses". With only the free trial on, saying "beli" would over-promise.
+                return { offered: products.length > 0, hasPaid: products.some((p) => !p.isTrial) };
+            })
+            .catch(() => ({ offered: true, hasPaid: true })) // fail open — see header
             .then((result) => {
                 cachedOffer = result;
                 inFlight = null;
@@ -57,17 +63,19 @@ function loadOffer() {
  */
 export default function usePlaybackAccessOffer() {
     const [state, setState] = useState(() =>
-        cachedOffer ? { ready: true, offered: cachedOffer.offered } : { ready: false, offered: false }
+        cachedOffer
+            ? { ready: true, offered: cachedOffer.offered, hasPaid: cachedOffer.hasPaid }
+            : { ready: false, offered: false, hasPaid: false }
     );
 
     useEffect(() => {
         if (cachedOffer) {
-            setState({ ready: true, offered: cachedOffer.offered });
+            setState({ ready: true, offered: cachedOffer.offered, hasPaid: cachedOffer.hasPaid });
             return undefined;
         }
         let alive = true;
         loadOffer().then((result) => {
-            if (alive) setState({ ready: true, offered: result.offered });
+            if (alive) setState({ ready: true, offered: result.offered, hasPaid: result.hasPaid });
         });
         return () => {
             alive = false;
