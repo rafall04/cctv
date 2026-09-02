@@ -10,6 +10,8 @@ import { createReadStream } from 'fs';
 import recordingPlaybackService from '../services/recordingPlaybackService.js';
 import recordingAssuranceService from '../services/recordingAssuranceService.js';
 import { normalizeRecordingRange } from '../services/recordingPathSafetyPolicy.js';
+import archiveLibrary from '../services/telegramArchiveLibraryService.js';
+import { resolveArchiveOwnerAccess } from '../services/ownerArchiveAccessService.js';
 
 // Start recording untuk camera
 export async function startRecording(request, reply) {
@@ -227,5 +229,40 @@ export async function updateRecordingSettings(request, reply) {
             return reply.code(404).send({ success: false, message: error.message });
         }
         return reply.code(500).send({ success: false, message: 'Internal server error' });
+    }
+}
+
+// Stream ONE archived (Telegram) segment to the camera's OWNER (or admin / owner-issued token).
+// The access decision is reused from recordingPlaybackService (resolveArchiveOwnerAccess); the bytes
+// are proxied through us and never redirected — a Telegram file URL embeds the bot token. (Audit P-01.)
+export async function streamOwnerArchiveSegment(request, reply) {
+    try {
+        const segmentId = request.params.segmentId;
+        const allowed = resolveArchiveOwnerAccess(segmentId, request);
+
+        const requested = archiveLibrary.parseRange(request.headers.range, allowed.fileSize);
+        const { stream, size, filename, range, totalSize } =
+            await archiveLibrary.openSegmentStream(allowed.segmentId, requested);
+
+        reply.header('Content-Type', 'video/mp4');
+        reply.header('Accept-Ranges', 'bytes');
+        // private: authorised for ONE owner; never shared by a proxy/CDN with the next viewer.
+        reply.header('Cache-Control', 'private, max-age=3600');
+        reply.header('Content-Disposition', `inline; filename="${String(filename).replace(/"/g, '')}"`);
+
+        if (range && totalSize) {
+            reply.code(206);
+            reply.header('Content-Range', `bytes ${range.start}-${range.end}/${totalSize}`);
+        }
+        if (size) reply.header('Content-Length', String(size));
+
+        return reply.send(stream);
+    } catch (error) {
+        const code = error.statusCode || 500;
+        if (code === 500) console.error('[OwnerArchive] stream error:', error);
+        return reply.code(code).send({
+            success: false,
+            message: code === 500 ? 'Internal server error' : error.message,
+        });
     }
 }

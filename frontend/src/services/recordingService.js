@@ -148,6 +148,13 @@ export const getSegmentStreamUrl = (cameraId, filename, accessScope = 'public', 
         if (accessScope === 'admin_full') {
             return `${baseUrl}/api/admin/telegram-archive/library/${segment.id}/stream`;
         }
+        // The camera's OWNER replaying their OWN rental footage (MyRecordings, scope=owner). The public
+        // archive route requires community-class + a playback-token cookie, so an owner's subscriber
+        // footage 404/401'd there — and with ~4h local retention almost everything old is archive-only.
+        // This authenticated route re-checks ownership + billing server-side. (Audit P-01.)
+        if (accessScope === 'owner_full') {
+            return `${baseUrl}/api/recordings/archive/${segment.id}/stream${buildPlaybackQuery(accessScope)}`;
+        }
         return `${baseUrl}/api/playback-archive/${segment.id}/stream`;
     }
     return `${baseUrl}/api/recordings/${cameraId}/stream/${filename}${buildPlaybackQuery(accessScope)}`;

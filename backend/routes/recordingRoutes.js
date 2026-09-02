@@ -16,7 +16,8 @@ import {
     streamSegment,
     generatePlaylist,
     getRestartLogs,
-    updateRecordingSettings
+    updateRecordingSettings,
+    streamOwnerArchiveSegment
 } from '../controllers/recordingController.js';
 import { authMiddleware, optionalAuthMiddleware, requireAdmin } from '../middleware/authMiddleware.js';
 
@@ -80,6 +81,20 @@ export default async function recordingRoutes(fastify) {
     fastify.get('/recordings/:cameraId/segments', {
         onRequest: [optionalAuthMiddleware]
     }, getSegments);
+
+    // Stream ONE archived (Telegram) segment to the camera's OWNER. Static 'archive' is registered
+    // before the dynamic :cameraId route. optionalAuth (like the local stream route) so the global
+    // customer lockout hook does not block it; ownership + billing are re-checked server-side. (P-01)
+    fastify.get('/recordings/archive/:segmentId/stream', {
+        onRequest: [optionalAuthMiddleware],
+        schema: {
+            params: {
+                type: 'object',
+                required: ['segmentId'],
+                properties: { segmentId: { type: 'integer', minimum: 1 } },
+            },
+        },
+    }, streamOwnerArchiveSegment);
 
     // Stream segment file
     fastify.get('/recordings/:cameraId/stream/:filename', {
