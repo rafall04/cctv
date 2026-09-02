@@ -20,6 +20,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import playbackAccessService from '../../services/playbackAccessService';
 import { hoursToText } from '../../utils/durationText';
+import { saveToken } from '../../utils/savedPlaybackTokens';
 
 const POLL_MS = 5000;
 
@@ -30,7 +31,7 @@ const rupiah = (v) => `Rp ${Number(v || 0).toLocaleString('id-ID')}`;
  */
 const depth = hoursToText;
 
-export default function PlaybackAccessPanel({ onIssued = null }) {
+export default function PlaybackAccessPanel({ onIssued = null, renewFor = null, onDone = null }) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [products, setProducts] = useState([]);
@@ -41,6 +42,7 @@ export default function PlaybackAccessPanel({ onIssued = null }) {
     const [access, setAccess] = useState(null);
     const [copied, setCopied] = useState(false);
     const pollRef = useRef(null);
+    const savedRef = useRef(null);
 
     const load = useCallback(async () => {
         try {
@@ -89,6 +91,25 @@ export default function PlaybackAccessPanel({ onIssued = null }) {
         return () => clearInterval(pollRef.current);
     }, [order?.id, order?.status, handIssuedKeyUp]);
 
+    /*
+     * Persist every issued token to this browser's "Token Saya" so the buyer sees it again without an
+     * account or any WhatsApp/Telegram delivery. Once per shareKey (savedRef) so a re-render never
+     * re-saves. Carries the recovery code + phone so a NEW-device recovery (phone + code) can work.
+     */
+    useEffect(() => {
+        if (!access?.shareKey || savedRef.current === access.shareKey) return;
+        savedRef.current = access.shareKey;
+        saveToken({
+            shareKey: access.shareKey,
+            label: order?.product?.label || renewFor?.label || 'Paket Playback',
+            expiresAt: access.expiresAt || null,
+            windowHours: access.windowHours || null,
+            recoveryCode: order?.recoveryCode || null,
+            phone: buyer.phone || null,
+        });
+        onDone?.();
+    }, [access, order, renewFor, buyer.phone, onDone]);
+
     const claimTrial = useCallback(async () => {
         setBusy('trial'); setError(null);
         try {
@@ -102,15 +123,15 @@ export default function PlaybackAccessPanel({ onIssued = null }) {
     const buy = useCallback(async (productKey) => {
         setBusy(productKey); setError(null);
         try {
-            const res = await playbackAccessService.createOrder({
-                productKey, name: buyer.name || null, phone: buyer.phone || null,
-            });
+            const res = renewFor
+                ? await playbackAccessService.renewOrder({ accessCode: renewFor.shareKey, productKey, name: buyer.name || null, phone: buyer.phone || null })
+                : await playbackAccessService.createOrder({ productKey, name: buyer.name || null, phone: buyer.phone || null });
             setOrder(res?.data || null);
             if (res?.data?.status === 'paid' && res.data.access) handIssuedKeyUp(res.data.access);
         } catch (err) {
-            setError(err?.response?.data?.message || 'Gagal membuat pembayaran.');
+            setError(err?.response?.data?.message || (renewFor ? 'Gagal membuat perpanjangan.' : 'Gagal membuat pembayaran.'));
         } finally { setBusy(null); }
-    }, [buyer, handIssuedKeyUp]);
+    }, [buyer, handIssuedKeyUp, renewFor]);
 
     /*
      * navigator.clipboard needs a secure context and is absent in some in-app browsers (Telegram,
@@ -155,7 +176,7 @@ export default function PlaybackAccessPanel({ onIssued = null }) {
 
             {access && (
                 <div className="rounded-control border border-edge border-l-2 border-l-status-live bg-surface-raised p-3">
-                    <p className="text-xs font-semibold text-status-live">Akses aktif</p>
+                    <p className="text-xs font-semibold text-status-live">{renewFor ? 'Token diperpanjang' : 'Akses aktif'}</p>
                     {/*
                      * text-content is NOT optional here. `body` carries a hard-coded black, so any
                      * element without its own colour inherits black — measured on prod in dark mode
@@ -181,6 +202,12 @@ export default function PlaybackAccessPanel({ onIssued = null }) {
                         Bisa lihat ke belakang {depth(access.windowHours)} · berlaku sampai {access.expiresAt || '-'}
                         {' · '}sudah aktif di perangkat ini, salin untuk dipakai di perangkat lain
                     </p>
+                    {order?.recoveryCode && (
+                        <p className="mt-1 text-[11px] text-content-muted">
+                            Kode pemulihan: <code className="rounded bg-surface-sunken px-1.5 py-0.5 font-mono text-content">{order.recoveryCode}</code>
+                            {' — '}simpan ini untuk memulihkan token bila ganti HP/browser.
+                        </p>
+                    )}
                 </div>
             )}
 
@@ -197,7 +224,7 @@ export default function PlaybackAccessPanel({ onIssued = null }) {
                 </div>
             )}
 
-            {trialProduct && !access && (
+            {trialProduct && !access && !renewFor && (
                 <div className="rounded-control border border-edge bg-surface-raised p-3">
                     <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
@@ -219,6 +246,11 @@ export default function PlaybackAccessPanel({ onIssued = null }) {
 
             {paid.length > 0 && !access && (
                 <>
+                    {renewFor && (
+                        <p className="rounded-control border border-edge border-l-2 border-l-status-live bg-surface-raised px-3 py-2 text-[11px] text-content">
+                            Perpanjang token <span className="font-mono font-semibold">{renewFor.label || 'Anda'}</span> — pilih durasi tambahan. Token &amp; kode yang sama tetap dipakai, hanya masa berlakunya bertambah.
+                        </p>
+                    )}
                     <div className="grid gap-2 sm:grid-cols-2">
                         <label className="block text-xs">
                             <span className="text-content-subtle">Nama</span>
@@ -253,7 +285,7 @@ export default function PlaybackAccessPanel({ onIssued = null }) {
                             )}
                             <button type="button" onClick={() => buy(p.key)} disabled={!!busy}
                                 className="mt-2 w-full rounded-control bg-primary px-3 py-2 text-xs font-medium text-white disabled:opacity-50">
-                                {busy === p.key ? 'Memproses…' : 'Beli'}
+                                {busy === p.key ? 'Memproses…' : (renewFor ? 'Perpanjang' : 'Beli')}
                             </button>
                         </div>
                     ))}

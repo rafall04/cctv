@@ -20,6 +20,7 @@
 
 import { useState, useEffect } from 'react';
 import PlaybackAccessPanel from './PlaybackAccessPanel.jsx';
+import MyPlaybackTokens from './MyPlaybackTokens.jsx';
 import usePlaybackAccessOffer from '../../hooks/playback/usePlaybackAccessOffer';
 import { formatHoursHuman } from '../../utils/durationUnits.js';
 import { formatStoredDate, formatStoredDateTime } from '../../utils/playbackTokenSummary.js';
@@ -69,6 +70,10 @@ export default function PlaybackTokenAccess({
     const isDeviceLimit = denialReason === 'device_limit';
     const { timezone } = useTimezone();
     const [showAccess, setShowAccess] = useState(false);
+    /** Set by "Perpanjang" on a saved token: puts PlaybackAccessPanel into renewal mode for it. */
+    const [renewTarget, setRenewTarget] = useState(null);
+    /** Bumped whenever a token is saved/recovered so "Token Saya" re-reads. */
+    const [savedVersion, setSavedVersion] = useState(0);
     /** Set by "Ganti token": the only way the form returns while access is still held. */
     const [isSwapping, setIsSwapping] = useState(false);
     const [showCameras, setShowCameras] = useState(false);
@@ -269,6 +274,11 @@ export default function PlaybackTokenAccess({
             )}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
                 <div className="min-w-0 flex-1">
+                    <MyPlaybackTokens
+                        onActivate={(key) => { onTokenInputChange(key); onActivate(key); }}
+                        onRenew={accessOffered ? ((t) => { setRenewTarget(t); setShowAccess(true); }) : null}
+                        version={savedVersion}
+                    />
                     <label
                         htmlFor="playback-token-input"
                         className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-content-subtle"
@@ -303,16 +313,18 @@ export default function PlaybackTokenAccess({
                         <div id="akses-playback">
                             <button
                                 type="button"
-                                onClick={() => setShowAccess((v) => !v)}
+                                onClick={() => { setShowAccess((v) => !v); if (showAccess) setRenewTarget(null); }}
                                 className="mt-1 text-xs text-content-muted underline-offset-2 hover:underline"
                             >
-                                Belum punya token?{' '}
+                                {renewTarget ? 'Perpanjang token' : 'Belum punya token?'}{' '}
                                 <span className="font-medium text-primary">
-                                    {showAccess ? 'Tutup' : 'Coba gratis 3 hari atau beli akses'}
+                                    {showAccess ? 'Tutup' : (renewTarget ? 'Pilih durasi' : 'Coba gratis 3 hari atau beli akses')}
                                 </span>
                             </button>
                             {showAccess && (
                                 <PlaybackAccessPanel
+                                    renewFor={renewTarget}
+                                    onDone={() => setSavedVersion((v) => v + 1)}
                                     onIssued={(key) => { onTokenInputChange(key); onActivate(key); }}
                                 />
                             )}
