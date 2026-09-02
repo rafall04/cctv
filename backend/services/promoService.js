@@ -18,6 +18,7 @@ import { query, queryOne, execute, transaction } from '../database/connectionPoo
 import walletService from './walletService.js';
 import { logAdminAction } from './securityAuditLogger.js';
 import { getLocalDate } from './timeService.js';
+import billingService from './billingService.js';
 
 export const PROMO_TYPES = ['percent', 'flat', 'gift'];
 
@@ -141,8 +142,22 @@ class PromoService {
             return bonus;
         });
         const bonus = run();
+        // Funding a wallet must resume any camera suspended for empty balance AND advance
+        // last_charged_date to today — otherwise the next catch-up tick bills the suspended days.
+        // Every other funding path (payment/topup, bot, admin) does this; redeemGift used to skip it.
+        // Best-effort: the credit is already committed, so a resume hiccup must not fail the redeem
+        // (the next tick or top-up still resumes). (Audit v1.2.0, M-05.)
+        let resume = { resumedCameraIds: [] };
+        try {
+            resume = billingService.tryResumeForUser(userId);
+        } catch (error) {
+            console.error('[Promo] gift redeem resume failed (credit stands):', error.message);
+        }
         if (request) {
-            logAdminAction({ action: 'promo_gift_redeemed', promoCode: promo.code, userId, bonus }, request);
+            logAdminAction({
+                action: 'promo_gift_redeemed', promoCode: promo.code, userId, bonus,
+                resumedCameraIds: resume?.resumedCameraIds || [],
+            }, request);
         }
         return { code: promo.code, bonus, balance: walletService.getBalance(userId) };
     }

@@ -12,7 +12,7 @@ import {
     getViewerStats,
     getViewerHistory
 } from '../controllers/viewerController.js';
-import { authMiddleware } from '../middleware/authMiddleware.js';
+import { authMiddleware, requireAdmin } from '../middleware/authMiddleware.js';
 
 export default async function viewerRoutes(fastify, options) {
     // Public endpoints (called by frontend when viewing streams)
@@ -91,19 +91,19 @@ export default async function viewerRoutes(fastify, options) {
     
     // Get active viewers
     fastify.get('/active', {
-        onRequest: [authMiddleware],
+        onRequest: [authMiddleware, requireAdmin],
         handler: getActiveViewers
     });
 
     // Get viewer statistics
     fastify.get('/stats', {
-        onRequest: [authMiddleware],
+        onRequest: [authMiddleware, requireAdmin],
         handler: getViewerStats
     });
 
     // Get viewer history
     fastify.get('/history', {
-        onRequest: [authMiddleware],
+        onRequest: [authMiddleware, requireAdmin],
         handler: getViewerHistory
     });
 }

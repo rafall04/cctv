@@ -13,6 +13,14 @@ export default function ProtectedRoute({ children, adminOnly = false }) {
         return <Navigate to="/admin/login" replace />;
     }
 
+    // A `customer` JWT authenticates but must never render the admin shell. The backend denies the
+    // data anyway (customerAccessPolicy), but 11 admin pages carry no `adminOnly` flag, so without
+    // this a logged-in customer could open the admin frame. Send them to their portal — the mirror
+    // image of CustomerRoute, which bounces staff out of /my. (Audit v1.2.0, M-01.)
+    if (authService.getCurrentUser()?.role === 'customer') {
+        return <Navigate to="/my" replace />;
+    }
+
     if (adminOnly && !authService.isAdmin()) {
         return <Navigate to="/admin/dashboard" replace />;
     }
