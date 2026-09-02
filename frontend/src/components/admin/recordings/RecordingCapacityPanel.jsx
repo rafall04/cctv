@@ -43,7 +43,9 @@ export default function RecordingCapacityPanel() {
              * halamannya. Tertangkap saat memperluas contrast.spec ke rute admin.
              */
             const d = res.data;
-            if (!d?.rate || !d?.disk || !d?.retention) return;
+            // `projections` is required too: render() maps over it, so a valid response missing it
+            // threw a TypeError that the ErrorBoundary turned into a full-page error. (Audit)
+            if (!d?.rate || !d?.disk || !d?.retention || !Array.isArray(d?.projections)) return;
             setData(d);
             setHoursInput(String(d.retention.currentHours ?? 4));
         });

@@ -142,6 +142,7 @@ describe('bentuk respons yang tidak lengkap', () => {
         ['tanpa rate', { cameras: 2, retention: CAPACITY.retention, disk: CAPACITY.disk }],
         ['tanpa disk', { cameras: 2, retention: CAPACITY.retention, rate: CAPACITY.rate }],
         ['retention bukan objek', { cameras: 2, retention: 4, rate: CAPACITY.rate, disk: CAPACITY.disk }],
+        ['tanpa projections', { cameras: 2, retention: CAPACITY.retention, rate: CAPACITY.rate, disk: CAPACITY.disk }],
     ];
 
     for (const [nama, data] of BENTUK_BURUK) {
