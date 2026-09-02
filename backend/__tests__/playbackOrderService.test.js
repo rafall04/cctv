@@ -448,3 +448,21 @@ describe('renewal (perpanjang) — extend, not mint', () => {
         expect(() => service.recoverActiveTokens('', 'ABCD2345')).toThrow(/wajib/i);
     });
 });
+
+describe('reconcilePendingOrders — self-heal', () => {
+    it('confirms a recently-pending order whose webhook was missed', async () => {
+        const id = seedOrder({});
+        h.txResponse = { httpOk: true, body: { Data: { StatusDesc: 'berhasil', Amount: PRODUCT.price_rupiah } } };
+        const res = await service.reconcilePendingOrders();
+        expect(res.checked).toBeGreaterThanOrEqual(1);
+        expect(db.prepare('SELECT status FROM playback_orders WHERE id = ?').get(id).status).toBe('paid');
+    });
+
+    it('leaves already-paid orders untouched (not in the pending set)', async () => {
+        db.prepare('INSERT INTO playback_tokens (id, share_key_prefix) VALUES (?, ?)').run(555, 'k555');
+        const id = seedOrder({ status: 'paid', token_id: 555 });
+        h.txResponse = { httpOk: true, body: { Data: { StatusDesc: 'berhasil', Amount: PRODUCT.price_rupiah } } };
+        await service.reconcilePendingOrders();
+        expect(db.prepare('SELECT status FROM playback_orders WHERE id = ?').get(id).status).toBe('paid');
+    });
+});

@@ -45,6 +45,7 @@ import { parseThumbnailRequestPath } from './utils/thumbnailRequestPolicy.js';
 
 // Import services
 import { startDailyCleanup, stopDailyCleanup, logSecurityEvent, SECURITY_EVENTS } from './services/securityAuditLogger.js';
+import playbackOrderService from './services/playbackOrderService.js';
 import { startOperationalRetention, stopOperationalRetention } from './services/operationalRetentionService.js';
 import backupTelegramService from './services/backupTelegramService.js';
 import { getSecuritySettings } from './services/securitySettingsService.js';
@@ -582,6 +583,8 @@ const start = async () => {
             });
         }, 5 * 60 * 1000).unref();
         console.log('[Watchdog] Worker liveness watchdog started (5m interval)');
+
+        playbackOrderService.startReconciler();
         
         // Start camera health check service (every 30 seconds)
         cameraHealthService.start(30000);
@@ -676,6 +679,7 @@ const shutdown = async () => {
             playbackViewerSessions: () => playbackViewerSessionService.stopCleanup(),
             thumbnails: () => thumbnailService.stop(),
             billingScheduler: () => billingService.stopBillingScheduler(),
+            playbackOrderReconciler: () => playbackOrderService.stopReconciler(),
             telegramBot: () => telegramBotService.stop(),
             securityLogCleanup: stopDailyCleanup,
             operationalRetention: stopOperationalRetention,

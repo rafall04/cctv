@@ -188,6 +188,10 @@ class PaymentSettingsService {
             gateway: cfg.gateway,
             supported_gateways: SUPPORTED_GATEWAYS,
             public_base_url: cfg.publicBaseUrl,
+            // Warn the admin: with iPaymu active but no public base URL, the notifyUrl is empty so the
+            // gateway webhook cannot reach us. Orders still complete via buyer polling + the reconciler,
+            // but confirmation is slower — set the base URL for instant webhooks.
+            public_base_url_missing: cfg.gateway === 'ipaymu' && !cfg.publicBaseUrl,
             ipaymu: {
                 va: cfg.ipaymu.va,
                 production: cfg.ipaymu.production,

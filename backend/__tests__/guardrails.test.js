@@ -48,6 +48,9 @@ describe('guardrail: file-size ratchet (anti-penumpukan)', () => {
         // here (visible decision) after the timezone/admin-hold/catch-up/atomicity correctness pass;
         // bumped 818→831 for the is_public consent-preservation notes on the suspend/heal paths.
         'services/billingService.js': 831,
+        // Bootstrap that wires every background service — grows by a line or two when a new one is
+        // added. Frozen here (visible decision) at 804 after the playback-order reconciler wiring.
+        'server.js': 804,
     };
 
     const files = walk(BACKEND_ROOT, ['.js']);

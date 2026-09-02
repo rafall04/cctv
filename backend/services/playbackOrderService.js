@@ -427,6 +427,52 @@ class PlaybackOrderService {
      * still-valid tokens. No messaging needed — the buyer types what they saved. The route rate-limits
      * this; matching requires BOTH fields so a code alone (or a phone alone) reveals nothing.
      */
+    /**
+     * Self-healing reconciler: some orders are truly PAID but their webhook failed AND the buyer
+     * closed the tab before polling confirmed it — money captured, no token issued. syncOrder is
+     * idempotent + signed, so a scheduled sweep of recent pending orders finishes them safely.
+     * Bounded (limit) and oldest-first. iPaymu only.
+     */
+    /** Start/stop the background reconciler (see reconcilePendingOrders). Timer is unref'd. */
+    startReconciler(intervalMs = 5 * 60 * 1000) {
+        if (this._reconcileTimer) return;
+        this._reconcileTimer = setInterval(() => {
+            this.reconcilePendingOrders().catch((error) => console.error('[PlaybackOrder] reconcile cycle failed:', error.message));
+        }, intervalMs);
+        this._reconcileTimer.unref?.();
+        console.log('[PlaybackOrder] Pending-order reconciler started (5m interval)');
+    }
+
+    stopReconciler() {
+        if (this._reconcileTimer) {
+            clearInterval(this._reconcileTimer);
+            this._reconcileTimer = null;
+        }
+    }
+
+    async reconcilePendingOrders({ maxAgeHours = 24, limit = 50 } = {}) {
+        const cfg = paymentSettingsService.getGatewayConfig();
+        if (cfg.gateway !== 'ipaymu') return { checked: 0, confirmed: 0 };
+        const rows = query(
+            `SELECT id FROM playback_orders
+             WHERE gateway = 'ipaymu' AND status = 'pending'
+               AND created_at > datetime('now', ?)
+             ORDER BY id ASC LIMIT ?`,
+            [`-${Math.max(1, Number(maxAgeHours) || 24)} hours`, Math.max(1, Number(limit) || 50)]
+        );
+        let confirmed = 0;
+        for (const r of rows) {
+            try {
+                const synced = await this.syncOrder(r.id);
+                if (synced?.status === 'paid') confirmed += 1;
+            } catch (error) {
+                console.error(`[PlaybackOrder] reconcile order ${r.id} failed:`, error.message);
+            }
+        }
+        if (rows.length) console.log(`[PlaybackOrder] reconciled ${rows.length} pending order(s), ${confirmed} now paid`);
+        return { checked: rows.length, confirmed };
+    }
+
     recoverActiveTokens(phone, recoveryCode) {
         const ph = (phone || '').toString().trim();
         const code = (recoveryCode || '').toString().trim().toUpperCase();
