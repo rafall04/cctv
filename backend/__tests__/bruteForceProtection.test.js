@@ -106,8 +106,16 @@ describe('bruteForceProtection — lockout', () => {
         expect(r.lockType).toBe('ip');
     });
 
-    it('is not locked once the failures age out of the window', () => {
+    it('stays locked for the FULL lockout duration, not just the tracking window (Audit)', () => {
+        // 6 failures 20 min ago: past the 15-min tracking window but INSIDE the 30-min lockout. The
+        // old code counted only the tracking window, so the failures aged out and it released early —
+        // capping any configured lockout at ~15 min. Correct behaviour keeps it locked until unlockAt.
         for (let i = 0; i < 6; i++) seedFailure('alice', 'username', minutesAgo(20));
+        expect(checkLockout('alice', null).locked).toBe(true);
+    });
+
+    it('releases only once the failures age past the lockout duration', () => {
+        for (let i = 0; i < 6; i++) seedFailure('alice', 'username', minutesAgo(35)); // > 30-min lockout
         expect(checkLockout('alice', null).locked).toBe(false);
     });
 

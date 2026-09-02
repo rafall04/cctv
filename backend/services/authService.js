@@ -234,7 +234,9 @@ class AuthService {
             oldAccessToken,
             refreshToken,
             user,
-            currentFingerprint
+            currentFingerprint,
+            // Preserve the ORIGINAL login instant so the absolute-session cap is not reset by refresh.
+            decoded.sessionCreatedAt,
         );
 
         logSessionRefreshed({

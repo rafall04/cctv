@@ -14,6 +14,11 @@ import { TableShell } from '../../ui/DataTable';
 import { inputClasses } from '../../ui/Field';
 import { useConfirm } from '../../../contexts/ConfirmContext';
 
+// A fresh idempotency key per top-up intent: a double-submit / network retry then credits once.
+const newTopupKey = () => (typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `k-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+
 function AccountTag({ status }) {
     if (status === 'pending') {
         return <span className="ml-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">menunggu</span>;
@@ -32,7 +37,7 @@ function StatusCell({ customer }) {
 }
 
 export default function CustomersTab({ customers, plans, run, busy }) {
-    const [topupForm, setTopupForm] = useState({ user_id: '', amount: 25000, note: '' });
+    const [topupForm, setTopupForm] = useState(() => ({ user_id: '', amount: 25000, note: '', idempotency_key: newTopupKey() }));
     const [adjustForm, setAdjustForm] = useState({ user_id: '', direction: 'credit', amount: 10000, reason: '' });
     const confirm = useConfirm();
 
@@ -49,10 +54,12 @@ export default function CustomersTab({ customers, plans, run, busy }) {
                 user_id: parseInt(topupForm.user_id, 10),
                 amount: parseInt(topupForm.amount, 10),
                 note: topupForm.note || undefined,
+                idempotency_key: topupForm.idempotency_key,
             }),
             'Saldo ditambahkan'
         );
-        if (ok) setTopupForm({ user_id: '', amount: 25000, note: '' });
+        // Reset with a NEW key so the next top-up is a distinct intent (this one stays deduped).
+        if (ok) setTopupForm({ user_id: '', amount: 25000, note: '', idempotency_key: newTopupKey() });
     };
 
     const submitAdjust = async (e) => {

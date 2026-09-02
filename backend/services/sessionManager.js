@@ -110,8 +110,10 @@ export function createRefreshToken(fastify, user, fingerprint, sessionCreatedAt)
  * @param {string} fingerprint - Client fingerprint
  * @returns {Object} { accessToken, refreshToken, sessionCreatedAt }
  */
-export function createTokenPair(fastify, user, fingerprint) {
-    const sessionCreatedAt = Date.now();
+export function createTokenPair(fastify, user, fingerprint, sessionCreatedAt = Date.now()) {
+    // sessionCreatedAt is the ORIGINAL login instant. On refresh it is threaded through from the old
+    // refresh token so the absolute-session cap (isSessionExpired) measures age since login, not since
+    // the last refresh — otherwise refreshing forever defeats SESSION_ABSOLUTE_TIMEOUT_HOURS. (Audit)
     
     const accessToken = createAccessToken(fastify, user, fingerprint, sessionCreatedAt);
     const refreshToken = createRefreshToken(fastify, user, fingerprint, sessionCreatedAt);
@@ -322,7 +324,7 @@ export function cleanupExpiredBlacklistEntries() {
  * @param {string} fingerprint - Client fingerprint
  * @returns {Object} New token pair
  */
-export function rotateTokens(fastify, oldAccessToken, oldRefreshToken, user, fingerprint) {
+export function rotateTokens(fastify, oldAccessToken, oldRefreshToken, user, fingerprint, sessionCreatedAt) {
     // Blacklist old tokens
     if (oldAccessToken) {
         blacklistToken(oldAccessToken, user.id, 'token_rotation');
@@ -331,8 +333,9 @@ export function rotateTokens(fastify, oldAccessToken, oldRefreshToken, user, fin
         blacklistToken(oldRefreshToken, user.id, 'token_rotation');
     }
     
-    // Create new token pair
-    return createTokenPair(fastify, user, fingerprint);
+    // Create new token pair, PRESERVING the original session-creation instant so the absolute cap
+    // keeps counting from the initial login. Falls back to now only if a caller omits it. (Audit)
+    return createTokenPair(fastify, user, fingerprint, sessionCreatedAt);
 }
 
 /**

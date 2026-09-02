@@ -14,8 +14,10 @@ export const billingAdminService = {
         return response.data;
     },
 
-    async manualTopup({ user_id, amount, note }) {
-        const response = await apiClient.post('/api/admin/billing/topup-manual', { user_id, amount, note });
+    async manualTopup({ user_id, amount, note, idempotency_key }) {
+        // idempotency_key is generated once per top-up intent by the caller, so a double-submit or a
+        // network retry credits the wallet exactly once (backend uses creditOnce on it).
+        const response = await apiClient.post('/api/admin/billing/topup-manual', { user_id, amount, note, idempotency_key });
         return response.data;
     },
 

@@ -95,6 +95,25 @@ describe('sessionManager — token pair', () => {
         expect(access.sessionCreatedAt).toBe(refresh.sessionCreatedAt);
     });
 
+    it('rotateTokens PRESERVES the original sessionCreatedAt so refresh cannot reset the absolute cap (Audit)', () => {
+        const f = makeFastify();
+        const ORIGINAL = Date.now() - 20 * 60 * 60 * 1000; // logged in 20h ago
+        rotateTokens(f, 'old.access', 'old.refresh', USER, 'fp', ORIGINAL);
+        // signed[0]/[1] are the NEW access/refresh (old ones are only blacklisted, not signed)
+        const newAccess = f.signed[0].payload;
+        const newRefresh = f.signed[1].payload;
+        expect(newAccess.sessionCreatedAt).toBe(ORIGINAL);
+        expect(newRefresh.sessionCreatedAt).toBe(ORIGINAL);
+        expect(isSessionExpired({ sessionCreatedAt: newAccess.sessionCreatedAt })).toBe(false); // 20h < 24h
+    });
+
+    it('a session past the 24h window stays expired even after a refresh', () => {
+        const f = makeFastify();
+        const ORIGINAL = Date.now() - 25 * 60 * 60 * 1000; // 25h since login
+        rotateTokens(f, 'old.access', 'old.refresh', USER, 'fp', ORIGINAL);
+        expect(isSessionExpired({ sessionCreatedAt: f.signed[0].payload.sessionCreatedAt })).toBe(true);
+    });
+
     it('hashToken is deterministic SHA-256', () => {
         expect(hashToken('jwt.abc')).toBe(hashToken('jwt.abc'));
         expect(hashToken('jwt.abc')).toMatch(/^[a-f0-9]{64}$/);

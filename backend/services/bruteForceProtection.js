@@ -111,8 +111,8 @@ export function trackSuccessfulLogin(username, ip) {
  * @param {string} identifierType - 'username' or 'ip'
  * @returns {number} Number of failed attempts
  */
-export function getFailedAttemptCount(identifier, identifierType) {
-    const windowStart = new Date(Date.now() - BRUTE_FORCE_CONFIG.trackingWindow).toISOString();
+export function getFailedAttemptCount(identifier, identifierType, windowMs = BRUTE_FORCE_CONFIG.trackingWindow) {
+    const windowStart = new Date(Date.now() - windowMs).toISOString();
     
     const result = queryOne(`
         SELECT COUNT(*) as count FROM login_attempts
@@ -164,8 +164,13 @@ export function cleanupOldAttempts() {
 export function checkLockout(username, ip) {
     // Check username lockout (5 failed attempts = 30 min lockout)
     if (username) {
-        const usernameAttempts = getFailedAttemptCount(username, 'username');
-        if (usernameAttempts >= getBruteForceConfig().maxAttempts.username) {
+        // Count within the LOCKOUT window (not just the 15-min tracking window): otherwise the
+        // triggering attempts age out of the tracking window and the lock releases early, capping any
+        // configured lockout at ~15 min. getUnlockTime still governs the exact release. (Audit)
+        const cfg = getBruteForceConfig();
+        const usernameWindow = Math.max(cfg.trackingWindow, cfg.lockoutDuration.username);
+        const usernameAttempts = getFailedAttemptCount(username, 'username', usernameWindow);
+        if (usernameAttempts >= cfg.maxAttempts.username) {
             const unlockAt = getUnlockTime(username, 'username');
             if (unlockAt && unlockAt > new Date()) {
                 return {
@@ -180,8 +185,10 @@ export function checkLockout(username, ip) {
     
     // Check IP lockout (10 failed attempts = 1 hour lockout)
     if (ip) {
-        const ipAttempts = getFailedAttemptCount(ip, 'ip');
-        if (ipAttempts >= getBruteForceConfig().maxAttempts.ip) {
+        const cfgIp = getBruteForceConfig();
+        const ipWindow = Math.max(cfgIp.trackingWindow, cfgIp.lockoutDuration.ip);
+        const ipAttempts = getFailedAttemptCount(ip, 'ip', ipWindow);
+        if (ipAttempts >= cfgIp.maxAttempts.ip) {
             const unlockAt = getUnlockTime(ip, 'ip');
             if (unlockAt && unlockAt > new Date()) {
                 return {

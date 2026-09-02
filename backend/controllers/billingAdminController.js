@@ -183,26 +183,38 @@ export async function updateRegistrationSettings(request, reply) {
 
 export async function manualTopup(request, reply) {
     try {
-        const { user_id, amount, note } = request.body;
-        const result = walletService.credit({
-            userId: Number(user_id),
-            amount: Number(amount),
-            type: 'topup',
-            reference: `manual-admin:${request.user.id}:${Date.now()}`,
-            note: note || `Top-up manual oleh ${request.user.username}`,
-        });
-        const resume = billingService.tryResumeForUser(Number(user_id));
+        const { user_id, amount, note, idempotency_key } = request.body;
+        const creditNote = note || `Top-up manual oleh ${request.user.username}`;
+        // With a client idempotency key, a double-submit / retry credits exactly once (creditOnce
+        // dedups on the reference). Without one we keep the legacy timestamped credit. (Audit)
+        const result = idempotency_key
+            ? walletService.creditOnce({
+                userId: Number(user_id), amount: Number(amount), type: 'topup',
+                reference: `manual-admin:${request.user.id}:${idempotency_key}`, note: creditNote,
+            })
+            : walletService.credit({
+                userId: Number(user_id), amount: Number(amount), type: 'topup',
+                reference: `manual-admin:${request.user.id}:${Date.now()}`, note: creditNote,
+            });
+
+        // Resume cameras only when a NEW credit actually landed (not on a deduped repeat).
+        const resume = result.alreadyCredited
+            ? { resumedCameraIds: [] }
+            : billingService.tryResumeForUser(Number(user_id));
 
         logAdminAction({
             action: 'billing_manual_topup',
             customerId: Number(user_id),
             amount: Number(amount),
+            alreadyCredited: !!result.alreadyCredited,
             resumedCameraIds: resume.resumedCameraIds,
         }, request);
 
         return reply.send({
             success: true,
-            message: 'Saldo berhasil ditambahkan',
+            message: result.alreadyCredited
+                ? 'Saldo sudah ditambahkan sebelumnya (permintaan ganda diabaikan)'
+                : 'Saldo berhasil ditambahkan',
             data: { ...result, resumed_camera_ids: resume.resumedCameraIds },
         });
     } catch (error) {

@@ -65,6 +65,8 @@ export default async function billingAdminRoutes(fastify) {
                     user_id: { type: 'integer', minimum: 1 },
                     amount: { type: 'integer', minimum: 1000 },
                     note: { type: 'string', maxLength: 200 },
+                    // Client-generated per top-up intent so a double-submit / network retry credits ONCE.
+                    idempotency_key: { type: 'string', maxLength: 64 },
                 },
                 additionalProperties: false,
             },

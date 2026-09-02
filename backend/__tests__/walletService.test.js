@@ -134,6 +134,25 @@ describe('walletService', () => {
             .toThrowError(expect.objectContaining({ statusCode: 402 }));
     });
 
+    it('creditOnce credits exactly once per reference — a double manual top-up is deduped (Audit)', () => {
+        const ref = 'manual-admin:1:intent-abc';
+        const first = walletService.creditOnce({ userId: 5, amount: 25000, type: 'topup', reference: ref });
+        expect(first.alreadyCredited).toBe(false);
+        expect(walletService.getBalance(5)).toBe(25000);
+
+        const second = walletService.creditOnce({ userId: 5, amount: 25000, type: 'topup', reference: ref });
+        expect(second.alreadyCredited).toBe(true);
+        expect(walletService.getBalance(5)).toBe(25000); // unchanged — no double credit
+    });
+
+    it('creditOnce without a reference falls back to a plain credit (not deduped)', () => {
+        const a = walletService.creditOnce({ userId: 5, amount: 1000, type: 'topup' });
+        const b = walletService.creditOnce({ userId: 5, amount: 1000, type: 'topup' });
+        expect(a.alreadyCredited).toBe(false);
+        expect(b.alreadyCredited).toBe(false);
+        expect(walletService.getBalance(5)).toBe(2000);
+    });
+
     it('getTransactions returns balance plus newest-first ledger', () => {
         walletService.credit({ userId: 5, amount: 20000 });
         walletService.debit({ userId: 5, amount: 700, reference: 'charge:1:2026-06-11' });
