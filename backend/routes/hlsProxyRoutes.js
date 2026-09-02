@@ -76,6 +76,17 @@ export default async function hlsProxyRoutes(fastify, _options) {
             return reply.code(400).send('Invalid path - use /hls/{cameraPath}/index.m3u8');
         }
 
+        // Refuse path traversal. Fastify collapses a literal `..`/`%2e%2e` before this handler, but an
+        // ENCODED-SLASH payload (`%2f..%2f`) still arrives here as a `..` segment: the tenancy gate
+        // below evaluates pathParts[0] (e.g. a community key) while the upstream HTTP client collapses
+        // the `..` and points MediaMTX at a DIFFERENT path (e.g. a subscriber key), bypassing the gate.
+        // No legitimate HLS path contains `.`/`..` segments. (Audit v1.2.0, S-01.)
+        if (fullPath.split('/').some((seg) => seg === '..' || seg === '.') || /%2e|%2f/i.test(fullPath)) {
+            reply.header('Content-Type', 'text/plain');
+            reply.header('Cache-Control', 'no-store');
+            return reply.code(400).send('');
+        }
+
         const pathParts = fullPath.split('/');
         const cameraPath = pathParts[0];
         const fileName = pathParts[pathParts.length - 1];

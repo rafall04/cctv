@@ -1416,6 +1416,12 @@ export async function handleExternalStreamProxy(state, request, reply) {
             return reply.code(400).send('Invalid cameraId parameter');
         }
 
+        // Anti-open-proxy / anti-SSRF (Audit S-03): with no valid camera binding, proxy only a host the
+        // operator explicitly allow-listed — else /hls/proxy is an anonymous forwarder + DNS-SSRF.
+        if (!externalCameraConfig && (state.options.externalProxyAllowedHosts || []).length === 0) {
+            return reply.code(400).send('Invalid url parameter');
+        }
+
         // Tenancy gate for camera-bound external proxying: non-community
         // cameras require an authorized viewer; suspended subscriber → 402.
         // (Without a cameraId there is no camera context to gate — and the

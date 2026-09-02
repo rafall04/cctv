@@ -24,8 +24,8 @@ export default async function feedbackRoutes(fastify) {
     }, createFeedback);
 
     // Admin endpoints
-    fastify.get('/', { preHandler: [authMiddleware] }, getAllFeedbacks);
-    fastify.get('/stats', { preHandler: [authMiddleware] }, getFeedbackStats);
+    fastify.get('/', { onRequest: [authMiddleware] }, getAllFeedbacks);
+    fastify.get('/stats', { onRequest: [authMiddleware] }, getFeedbackStats);
     fastify.patch('/:id/status', { preHandler: [authMiddleware, requireAdmin] }, updateFeedbackStatus);
     fastify.delete('/:id', { preHandler: [authMiddleware, requireAdmin] }, deleteFeedback);
 }

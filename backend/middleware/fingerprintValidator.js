@@ -25,6 +25,10 @@ import {
  * @param {Object} reply - Fastify reply
  */
 export async function fingerprintAuthMiddleware(request, reply) {
+    // Mark that this route REQUIRES auth — the customer deny-by-default backstop
+    // (customerAccessPolicy) keys off this flag. Without it, a future staff route
+    // using fingerprint auth (and no role guard) would be reachable by the customer role.
+    request.authWasRequired = true;
     try {
         let token = null;
         let decoded = null;

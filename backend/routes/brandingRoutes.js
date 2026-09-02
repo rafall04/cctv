@@ -12,7 +12,7 @@ export default async function brandingRoutes(fastify, options) {
     fastify.get('/public', getBrandingSettings);
 
     // Admin endpoints - auth required
-    fastify.get('/admin', { preHandler: [authMiddleware] }, getBrandingSettingsAdmin);
+    fastify.get('/admin', { onRequest: [authMiddleware] }, getBrandingSettingsAdmin);
     fastify.put('/:key', { preHandler: [authMiddleware, requireAdmin] }, updateBrandingSetting);
     fastify.post('/bulk', { preHandler: [authMiddleware, requireAdmin] }, bulkUpdateBrandingSettings);
     fastify.post('/reset', { preHandler: [authMiddleware, requireAdmin] }, resetBrandingSettings);

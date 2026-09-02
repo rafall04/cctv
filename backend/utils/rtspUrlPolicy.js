@@ -30,17 +30,41 @@ function parseBlockedHosts() {
         .filter(Boolean);
 }
 
+function isBlockedV4(host) {
+    const octets = host.split('.').map(Number);
+    if (octets[0] === 127) return true;             // loopback
+    if (octets[0] === 0) return true;               // unspecified
+    if (octets[0] === 169 && octets[1] === 254) return true; // link-local
+    if (octets[0] >= 224) return true;              // multicast/reserved/broadcast
+    return false;
+}
+
+// IPv4-mapped IPv6 -> dotted IPv4, else null. Handles both `::ffff:127.0.0.1` and the form Node
+// canonicalises it to, `::ffff:7f00:1`. Without this, `[::ffff:127.0.0.1]` has isIP()===6 and slips
+// the IPv6 branch entirely, defeating the loopback/link-local block. (Audit v1.2.0, S-04.)
+function ipv4MappedToDotted(host) {
+    const m = host.toLowerCase().match(/^::ffff:(.+)$/);
+    if (!m) return null;
+    const tail = m[1];
+    if (tail.includes('.')) return isIP(tail) === 4 ? tail : null;
+    const parts = tail.split(':');
+    if (parts.length !== 2) return null;
+    const hi = parseInt(parts[0], 16);
+    const lo = parseInt(parts[1], 16);
+    if (!Number.isInteger(hi) || !Number.isInteger(lo) || hi < 0 || hi > 0xffff || lo < 0 || lo > 0xffff) {
+        return null;
+    }
+    return `${(hi >> 8) & 0xff}.${hi & 0xff}.${(lo >> 8) & 0xff}.${lo & 0xff}`;
+}
+
 function isBlockedLiteralIp(host) {
     if (isIP(host) === 4) {
-        const octets = host.split('.').map(Number);
-        if (octets[0] === 127) return true;             // loopback
-        if (octets[0] === 0) return true;               // unspecified
-        if (octets[0] === 169 && octets[1] === 254) return true; // link-local
-        if (octets[0] >= 224) return true;              // multicast/reserved/broadcast
-        return false;
+        return isBlockedV4(host);
     }
     if (isIP(host) === 6) {
         const lower = host.toLowerCase();
+        const mapped = ipv4MappedToDotted(lower);
+        if (mapped) return isBlockedV4(mapped);
         return lower === '::1' || lower === '::' || lower.startsWith('fe80:') || lower.startsWith('ff');
     }
     return false;

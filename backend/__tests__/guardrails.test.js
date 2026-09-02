@@ -35,7 +35,9 @@ describe('guardrail: file-size ratchet (anti-penumpukan)', () => {
     const FROZEN = {
         'services/cameraHealthService.js': 3159,
         'services/cameraService.js': 2775,
-        'services/hlsProxyService.js': 1581,
+        // Bumped 1581→1587 (visible decision): the /hls/proxy anti-open-proxy / anti-SSRF guard
+        // (Audit v1.2.0, S-03) — a no-camera-binding request now requires an explicit allow-list.
+        'services/hlsProxyService.js': 1587,
         'services/playbackTokenService.js': 1357,
         'middleware/schemaValidators.js': 949,
         'services/telegramService.js': 944,
@@ -604,5 +606,34 @@ describe('guardrail: cakupan jam kamera sama di Python dan Node', () => {
         expect(js).toContain('172.1[6-9]');
         expect(js).toContain('rtsp://%@10.');
         expect(js).not.toContain('LIKE rtsp://%@% OR');
+    });
+});
+
+describe('guardrail: customer deny-by-default backstop cannot be bypassed by preHandler-phase auth', () => {
+    /*
+     * customerAccessPolicy is a ROOT preHandler hook that keys off request.authWasRequired.
+     * Fastify runs application-level hooks BEFORE route-level ones in the same phase, so a route
+     * that authenticates via `preHandler: [authMiddleware]` sets the flag AFTER the backstop has
+     * already run and no-opped — leaving the route reachable by the `customer` role. Auth that
+     * runs in the onRequest phase sets the flag first, so the backstop fires. The only safe way to
+     * keep auth in preHandler is to pair it with a role guard (requireAdmin / requireCustomerOrAdmin)
+     * that blocks the customer directly. This guard freezes that rule. (Audit v1.2.0, S-02.)
+     */
+    it('no route uses a lone `preHandler: [authMiddleware]` (auth must be onRequest, or paired with a role guard)', () => {
+        const routeFiles = walk(path.join(BACKEND_ROOT, 'routes'), ['.js']);
+        const offenders = [];
+        for (const f of routeFiles) {
+            const src = read(f);
+            // The vulnerable shape: authMiddleware ALONE in a preHandler array (no role guard beside it).
+            if (/preHandler:\s*\[\s*authMiddleware\s*\]/.test(src)) {
+                offenders.push(rel(f));
+            }
+        }
+        expect(
+            offenders,
+            `These route files authenticate in the preHandler phase without a role guard, so the customer `
+            + `deny-by-default backstop no-ops. Move auth to onRequest, or add requireAdmin/requireCustomerOrAdmin: `
+            + offenders.join(', '),
+        ).toEqual([]);
     });
 });

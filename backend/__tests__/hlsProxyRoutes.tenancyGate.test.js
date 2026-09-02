@@ -186,4 +186,20 @@ describe('/hls/* tenancy gate fails CLOSED on an unknown camera row', () => {
         expect(fetchTextUpstreamMock).not.toHaveBeenCalled();
         await fastify.close();
     });
+
+    it('refuses an encoded-slash traversal that would repoint MediaMTX past the gate (S-01)', async () => {
+        // %2f..%2f survives Fastify's own normalisation as a `..` segment; the gate sees pathParts[0]
+        // (a community key) but the upstream client would collapse `..` to a DIFFERENT key. Reject it.
+        queryOneMock.mockReturnValue(communityRow());
+        const fastify = await buildServer();
+
+        const response = await fastify.inject({
+            method: 'GET',
+            url: `/hls/${STREAM_KEY}%2f..%2fother-key/index.m3u8`,
+        });
+
+        expect(response.statusCode).toBe(400);
+        expect(fetchTextUpstreamMock).not.toHaveBeenCalled();
+        await fastify.close();
+    });
 });

@@ -12,7 +12,7 @@ export default async function saweriaRoutes(fastify, options) {
 
     // Admin endpoints - Require authentication
     fastify.get('/settings', { 
-        preHandler: [authMiddleware] 
+        onRequest: [authMiddleware] 
     }, getSaweriaSettingsHandler);
 
     fastify.put('/settings', {
