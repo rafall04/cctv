@@ -21,7 +21,42 @@ from datetime import datetime, timezone, timedelta
 
 import requests
 
-WIB = timezone(timedelta(hours=7))
+
+def _resolve_display_tz():
+    """The ONE configured display timezone (system_settings.timezone in the app DB) plus a short
+    label, for rendering caption times. Falls back to WIB/+7 on ANY error — a caption must never
+    crash the uploader. Resolved once at startup; a tz change reflects after
+    `systemctl restart tg-archive`."""
+    tz_name = 'Asia/Jakarta'
+    try:
+        db_path = os.environ.get('APP_DB', '/var/www/rafnet-cctv/backend/data/cctv.db')
+        conn = sqlite3.connect('file:%s?mode=ro' % db_path, uri=True, timeout=5)
+        try:
+            row = conn.execute(
+                "SELECT setting_value FROM system_settings WHERE setting_key = 'timezone'"
+            ).fetchone()
+            if row and row[0]:
+                tz_name = row[0]
+        finally:
+            conn.close()
+    except Exception:
+        pass
+    label = {'Asia/Jakarta': 'WIB', 'Asia/Makassar': 'WITA', 'Asia/Jayapura': 'WIT'}.get(tz_name)
+    try:
+        from zoneinfo import ZoneInfo
+        tzinfo = ZoneInfo(tz_name)
+        if not label:
+            offset = datetime.now(tzinfo).utcoffset() or timedelta(0)
+            mins = int(offset.total_seconds() // 60)
+            hh, mm = divmod(abs(mins), 60)
+            label = 'GMT%s%d%s' % ('+' if mins >= 0 else '-', hh, (':%02d' % mm) if mm else '')
+        return tzinfo, label
+    except Exception:
+        # zoneinfo missing or an unknown zone → fixed +7 fallback, same as the historical behaviour.
+        return timezone(timedelta(hours=7)), (label or 'WIB')
+
+
+DISPLAY_TZ, DISPLAY_TZ_LABEL = _resolve_display_tz()
 
 
 def env(name, default=None, required=False):
@@ -383,10 +418,10 @@ def max_segment_id(app_db):
 
 # ------------------------------------------------------------------------ upload
 
-def fmt_wib(iso_utc, time_only=False):
-    """recording_segments stores ISO-8601 UTC (…Z). Render as WIB for the caption."""
+def fmt_local(iso_utc, time_only=False):
+    """recording_segments stores ISO-8601 UTC (…Z). Render in the configured display tz for the caption."""
     try:
-        stamp = datetime.fromisoformat(iso_utc.replace('Z', '+00:00')).astimezone(WIB)
+        stamp = datetime.fromisoformat(iso_utc.replace('Z', '+00:00')).astimezone(DISPLAY_TZ)
         return stamp.strftime('%H:%M' if time_only else '%d %b %Y %H:%M')
     except (ValueError, AttributeError):
         return iso_utc or '-'
@@ -396,10 +431,10 @@ def build_caption(seg, cam):
     return (
         '\U0001F4F9 %s\n'
         '\U0001F4CD %s\n'
-        '\U0001F551 %s - %s WIB  (%s dtk)\n'
+        '\U0001F551 %s - %s %s  (%s dtk)\n'
         '\U0001F4E6 %.1f MB  •  cam%s/%s'
     ) % (cam['name'], cam['area_name'],
-         fmt_wib(seg['start_time']), fmt_wib(seg['end_time'], time_only=True), seg['duration'],
+         fmt_local(seg['start_time']), fmt_local(seg['end_time'], time_only=True), DISPLAY_TZ_LABEL, seg['duration'],
          seg['file_size'] / 1048576.0, seg['camera_id'], seg['filename'])
 
 
