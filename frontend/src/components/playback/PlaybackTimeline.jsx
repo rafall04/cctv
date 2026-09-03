@@ -145,7 +145,6 @@ function PlaybackTimeline({
     selectedSegment,
     currentTime = 0,
     onSegmentClick,
-    onTimelineClick,
     formatTimestamp,
     // { coverage, range, setRange } — present only for scopes that can reach past the current
     // slice. Absent for a public preview, which has no depth to browse.
@@ -183,14 +182,26 @@ function PlaybackTimeline({
     }
 
     const handleTimelineClick = (e) => {
-        if (!timelineRef.current || !timelineData.duration) return;
+        if (!timelineRef.current || !timelineData.bands?.length) return;
 
         const rect = timelineRef.current.getBoundingClientRect();
-        const clickX = e.clientX - rect.left;
-        const percentage = clickX / rect.width;
-        const targetTime = percentage * timelineData.duration;
+        const clickPercent = Math.min(100, Math.max(0, ((e.clientX - rect.left) / rect.width) * 100));
 
-        onTimelineClick(targetTime);
+        // Green bands stopPropagation, so this only fires for a gap / empty area. Jump to the segment
+        // under the cursor, else the nearest one — measured in the SAME percent space the bands use.
+        // (The old code passed whole-range seconds into a segment-relative seek, which clamped to
+        //  ±180s and never navigated.) Both geometries agree, so there's no scale mismatch.
+        const bands = timelineData.bands;
+        let target = bands.find((b) => clickPercent >= b.left && clickPercent <= b.left + b.width);
+        if (!target) {
+            let best = null;
+            for (const b of bands) {
+                const dist = Math.abs(clickPercent - (b.left + b.width / 2));
+                if (!best || dist < best.dist) best = { band: b, dist };
+            }
+            target = best?.band;
+        }
+        if (target) onSegmentClick(target.segment);
     };
 
     // Hover-time hint: show the timestamp under the cursor + a thin marker so

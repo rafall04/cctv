@@ -176,6 +176,30 @@ describe('createOrder — refuses before it ever charges', () => {
         expect(db.prepare('SELECT COUNT(*) c FROM playback_orders').get().c).toBe(1);
     });
 
+    it('opens a FRESH order when the requested method differs from the pending order (method switch)', async () => {
+        const id = seedOrder({ device_hash: 'dev-m' });
+        // Pending order used a BCA VA; the mocked resolveIpaymuMethod returns qris, so they differ.
+        db.prepare('UPDATE playback_orders SET qris_payload = ? WHERE id = ?')
+            .run(JSON.stringify({ method: 'va', channel: 'bca' }), id);
+
+        const result = await service.createOrder(PRODUCT.key, { deviceHash: 'dev-m' });
+
+        expect(result.id).not.toBe(Number(id));
+        expect(h.ipaymuCalls.some((c) => c.path.includes('payment/direct'))).toBe(true);
+        expect(db.prepare('SELECT COUNT(*) c FROM playback_orders').get().c).toBe(2);
+    });
+
+    it('still reuses when the requested method matches the pending order', async () => {
+        const id = seedOrder({ device_hash: 'dev-q' });
+        db.prepare('UPDATE playback_orders SET qris_payload = ? WHERE id = ?')
+            .run(JSON.stringify({ method: 'qris', channel: 'qris' }), id);
+
+        const result = await service.createOrder(PRODUCT.key, { deviceHash: 'dev-q' });
+
+        expect(result.id).toBe(Number(id));
+        expect(h.ipaymuCalls).toHaveLength(0);
+    });
+
     it('does NOT reuse another device\'s pending order', async () => {
         seedOrder({ device_hash: 'someone-else' });
         await service.createOrder(PRODUCT.key, { deviceHash: 'dev-a' });

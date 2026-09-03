@@ -88,7 +88,13 @@ export function createRecordingCleanupService({
             await cleanupFilesystemOrphans({ cameraId, retentionWindow, nowMs, result });
             await cleanupPendingPartials({ cameraId, retentionWindow, nowMs, result });
 
-            logger.log?.(`[Cleanup] Camera ${cameraId} summary: ${JSON.stringify(result)}`);
+            // Only log when this camera actually did something. This loop runs for EVERY camera every
+            // scheduled cycle (~5 min); logging an all-zeros summary per camera floods stdout
+            // (~36 cams => ~10k no-op lines/day) and buries the lines that matter (AGENTS.md logging rules).
+            const activity = Object.values(result).reduce((sum, v) => sum + (typeof v === 'number' ? v : 0), 0);
+            if (activity > 0) {
+                logger.log?.(`[Cleanup] Camera ${cameraId} summary: ${JSON.stringify(result)}`);
+            }
             return result;
         } finally {
             inFlightCameraIds.delete(cameraId);

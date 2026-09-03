@@ -82,14 +82,21 @@ class VoucherOrderService {
 
         const amount = profile.price;
         const reusable = queryOne(
-            `SELECT id FROM voucher_orders
+            `SELECT id, qris_payload FROM voucher_orders
              WHERE device_hash = ? AND profile_id = ? AND amount = ? AND status = 'pending'
                AND (expires_at IS NULL OR expires_at > ?)
              ORDER BY id DESC LIMIT 1`,
             [deviceHash, profileId, amount, new Date().toISOString()]
         );
         if (reusable) {
-            return this.getOrder(reusable.id);
+            // Reuse only when the requested payment method matches the pending order's (same fix as paymentService).
+            const chosen = paymentSettingsService.resolveIpaymuMethod(methodKey);
+            let stored = {};
+            try { stored = JSON.parse(reusable.qris_payload || '{}'); } catch { stored = {}; }
+            // Reuse unless the pending order's method is KNOWN and DIFFERENT (unknown/legacy reuses).
+            if (!stored.method || (stored.method === chosen.method && stored.channel === chosen.channel)) {
+                return this.getOrder(reusable.id);
+            }
         }
 
         // Per-IP cap (only NEW charges; reusing a pending order above is free).

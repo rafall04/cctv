@@ -46,6 +46,35 @@ describe('resolveArchiveOwnerAccess', () => {
         });
     }
 
+    it('refuses a token_full segment recorded OUTSIDE the token window (community trial paywall bypass)', () => {
+        getUploadMock.mockReturnValue({ ...UPLOAD, recorded_at: '2026-05-01T00:00:00.000Z' }); // months old
+        resolveAccessMock.mockReturnValue({ accessMode: 'token_full', playbackWindowHours: 1, playbackFrom: null, playbackTo: null });
+        expect(() => resolveArchiveOwnerAccess(42, { query: {} }))
+            .toThrowError(expect.objectContaining({ statusCode: 403 }));
+    });
+
+    it('allows a token_full segment recorded INSIDE the token window', () => {
+        getUploadMock.mockReturnValue({ ...UPLOAD, recorded_at: new Date(Date.now() - 5 * 60000).toISOString() });
+        resolveAccessMock.mockReturnValue({ accessMode: 'token_full', playbackWindowHours: 1, playbackFrom: null, playbackTo: null });
+        expect(resolveArchiveOwnerAccess(42, { query: {} })).toEqual({ segmentId: 42, fileSize: 1234 });
+    });
+
+    it('caps a token_full segment to the absolute [from,to] range (owner-issued share over-exposure)', () => {
+        getUploadMock.mockReturnValue({ ...UPLOAD, recorded_at: '2026-06-01T00:00:00.000Z' }); // after the range
+        resolveAccessMock.mockReturnValue({ accessMode: 'token_full', playbackWindowHours: null, playbackFrom: '2026-05-01T00:00:00.000Z', playbackTo: '2026-05-02T00:00:00.000Z' });
+        expect(() => resolveArchiveOwnerAccess(42, { query: {} }))
+            .toThrowError(expect.objectContaining({ statusCode: 403 }));
+    });
+
+    it('leaves admin_full / owner_full UNBOUNDED (own camera / staff) even for old footage', () => {
+        getUploadMock.mockReturnValue({ ...UPLOAD, recorded_at: '2026-01-01T00:00:00.000Z' });
+        for (const mode of ['admin_full', 'owner_full']) {
+            resolveAccessMock.mockReturnValue({ accessMode: mode, playbackWindowHours: 1 });
+            expect(resolveArchiveOwnerAccess(42, { user: { id: 99 }, query: { scope: 'owner' } }))
+                .toEqual({ segmentId: 42, fileSize: 1234 });
+        }
+    });
+
     it('refuses public_preview with 403 for an authenticated non-owner', () => {
         resolveAccessMock.mockReturnValue({ accessMode: 'public_preview' });
         expect(() => resolveArchiveOwnerAccess(42, { user: { id: 5 }, query: {} }))

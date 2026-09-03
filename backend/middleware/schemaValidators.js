@@ -198,7 +198,10 @@ export const createCameraSchema = {
             },
             source_profile: {
                 anyOf: [{ type: 'string', maxLength: 120 }, { type: 'null' }]
-            }
+            },
+            // Declared here or Fastify's removeAdditional silently strips it (200 OK, not saved).
+            public_playback_mode: { type: 'string', enum: ['inherit', 'disabled', 'preview_only', 'admin_only'] },
+            public_playback_preview_minutes: { anyOf: [{ type: 'integer', minimum: 1 }, { type: 'null' }] }
         },
         additionalProperties: false
     }
@@ -321,7 +324,10 @@ export const updateCameraSchema = {
             },
             source_profile: {
                 anyOf: [{ type: 'string', maxLength: 120 }, { type: 'null' }]
-            }
+            },
+            // Declared here or Fastify's removeAdditional silently strips it (200 OK, not saved).
+            public_playback_mode: { type: 'string', enum: ['inherit', 'disabled', 'preview_only', 'admin_only'] },
+            public_playback_preview_minutes: { anyOf: [{ type: 'integer', minimum: 1 }, { type: 'null' }] }
         },
         additionalProperties: false
     },

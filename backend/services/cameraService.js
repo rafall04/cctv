@@ -137,7 +137,7 @@ const PUBLIC_LANDING_CAMERA_PROJECTION = `
     c.longitude,
     c.status,
     c.enabled,
-    c.enable_recording,
+    c.enable_recording, c.camera_class,
     c.video_codec,
     c.thumbnail_path,
     c.thumbnail_updated_at,

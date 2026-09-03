@@ -118,7 +118,7 @@ class PlaybackOrderService {
 
         const amount = product.price_rupiah;
         const reusable = queryOne(
-            `SELECT id FROM playback_orders
+            `SELECT id, qris_payload FROM playback_orders
              WHERE device_hash = ? AND product_id = ? AND amount = ? AND status = 'pending'
                AND order_kind = ? AND COALESCE(renew_token_id, 0) = COALESCE(?, 0)
                AND (expires_at IS NULL OR expires_at > ?)
@@ -126,7 +126,16 @@ class PlaybackOrderService {
             [deviceHash, product.id, amount, orderKind, renewTokenId, new Date().toISOString()]
         );
         if (reusable) {
-            return this.getOrder(reusable.id);
+            // Reuse only when the requested payment method matches the pending order's — otherwise a
+            // deliberate method switch would be ignored until the order expires (same fix as paymentService).
+            const chosen = paymentSettingsService.resolveIpaymuMethod(methodKey);
+            let stored = {};
+            try { stored = JSON.parse(reusable.qris_payload || '{}'); } catch { stored = {}; }
+            // Reuse unless the pending order's method is KNOWN and DIFFERENT from what was requested
+            // (an unknown/legacy stored method still reuses, to avoid a needless second charge).
+            if (!stored.method || (stored.method === chosen.method && stored.channel === chosen.channel)) {
+                return this.getOrder(reusable.id);
+            }
         }
 
         // Only NEW charges count against the cap; reusing a pending order above is free.

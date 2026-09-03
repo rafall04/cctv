@@ -104,8 +104,14 @@ function Playback({
     const [seekWarning, setSeekWarning] = useState(null);
     const [autoPlayNotification, setAutoPlayNotification] = useState(null);
     const [autoPlayEnabled, setAutoPlayEnabled] = useState(() => {
-        const saved = localStorage.getItem('playback-autoplay-enabled');
-        return saved !== null ? saved === 'true' : true;
+        // Browsers that block site data (Chrome "block all", some in-app WebViews) THROW on any
+        // localStorage access — an unguarded read here escapes render and white-screens /playback.
+        try {
+            const saved = localStorage.getItem('playback-autoplay-enabled');
+            return saved !== null ? saved === 'true' : true;
+        } catch {
+            return true;
+        }
     });
     const playbackCameras = useMemo(() => cameras.filter((camera) => getStreamCapabilities(camera).playback), [cameras]);
     const updatePlaybackSearchParams = useCallback(({
@@ -436,7 +442,11 @@ function Playback({
     const handleAutoPlayToggle = useCallback(() => {
         const newValue = !autoPlayEnabled;
         setAutoPlayEnabled(newValue);
-        localStorage.setItem('playback-autoplay-enabled', String(newValue));
+        try {
+            localStorage.setItem('playback-autoplay-enabled', String(newValue));
+        } catch {
+            // Storage blocked — keep the preference for this session only, never throw.
+        }
 
         setAutoPlayNotification({
             type: newValue ? 'enabled' : 'disabled',
@@ -485,7 +495,13 @@ function Playback({
                     ? await cameraService.getAllCameras(REQUEST_POLICY.BLOCKING)
                     : await cameraService.getActiveCameras(REQUEST_POLICY.BLOCKING);
                 if (response.success) {
-                    const recordingCameras = response.data.filter(cam => cam.enable_recording);
+                    // Public archive is community-ONLY (publicArchiveAccessService). A published rental
+                    // (subscriber) camera passes the LIVE list but its archive always denies for an
+                    // anonymous visitor, so it would sit in the picker as a dead "Belum ada rekaman".
+                    // Offer only what can actually play; admin playback keeps every camera.
+                    const recordingCameras = response.data.filter(cam =>
+                        cam.enable_recording && (isAdminPlayback || cam.camera_class === 'community')
+                    );
                     const uniqueCameras = recordingCameras.filter((cam, index, self) =>
                         index === self.findIndex(c => c.id === cam.id)
                     );
@@ -958,24 +974,6 @@ function Playback({
 
     const toggleFullscreen = () => toggleElementFullscreen(containerRef.current);
 
-    const handleTimelineClick = (targetTime) => {
-        if (!videoRef.current) return;
-
-        const currentPos = videoRef.current.currentTime;
-        const seekDistance = Math.abs(targetTime - currentPos);
-
-        if (seekDistance > MAX_SEEK_DISTANCE) {
-            const direction = targetTime > currentPos ? 1 : -1;
-            const limitedTarget = currentPos + (MAX_SEEK_DISTANCE * direction);
-            videoRef.current.currentTime = limitedTarget;
-            lastSeekTimeRef.current = limitedTarget;
-            setSeekWarning({ type: 'limit' });
-        } else {
-            videoRef.current.currentTime = targetTime;
-            lastSeekTimeRef.current = targetTime;
-        }
-    };
-
     // Handle camera change and update URL for shareable links
     const handleCameraChange = useCallback((camera) => {
         if (!camera || camera.id === selectedCameraIdRef.current) {
@@ -1121,7 +1119,7 @@ function Playback({
 
                 <PlaybackSegmentStepper segments={segments} selectedSegment={selectedSegment} onSegmentClick={handleSegmentClick} />
 
-                <PlaybackTimeline segments={segments} selectedSegment={selectedSegment} currentTime={currentTime} onSegmentClick={handleSegmentClick} onTimelineClick={handleTimelineClick} formatTimestamp={formatTimestamp} dayScope={dayScope} />
+                <PlaybackTimeline segments={segments} selectedSegment={selectedSegment} currentTime={currentTime} onSegmentClick={handleSegmentClick} formatTimestamp={formatTimestamp} dayScope={dayScope} />
 
                 <PlaybackSegmentList segments={segments} selectedSegment={selectedSegment} onSegmentClick={handleSegmentClick} isLoading={isWaitingForSegments} />
 

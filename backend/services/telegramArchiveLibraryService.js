@@ -266,7 +266,7 @@ export function getSummary(filters = {}) {
  */
 export function getUpload(segmentId) {
     const row = queryOne(
-        `SELECT u.segment_id, u.camera_id, u.filename, u.file_size, u.file_id,
+        `SELECT u.segment_id, u.camera_id, u.filename, u.file_size, u.file_id, u.recorded_at,
                 s.file_path AS local_path
          FROM telegram_archive_uploads u
          LEFT JOIN recording_segments s ON s.id = u.segment_id

@@ -118,6 +118,23 @@ describe('billingService', () => {
         expect(dailyCostOf(25000)).toBe(833);
     });
 
+    it('billing summary excludes admin-held cameras from daily_cost (a top-up cannot resume them)', () => {
+        walletService.credit({ userId: 42, amount: 20000 });
+        billingService.assignSubscription({ camera_id: 7, user_id: 42, monthly_price: 21000 }); // 700/day
+        const b = billingService.assignSubscription({ camera_id: 8, user_id: 42, monthly_price: 21000 }); // 700/day
+
+        const before = billingService.getCustomerBillingSummary(42);
+        expect(before.daily_cost).toBe(1400);
+        expect(before.has_admin_hold).toBe(false);
+
+        billingService.updateSubscription(b.id, { status: 'suspended' }); // admin hold (suspend_reason='admin')
+
+        const after = billingService.getCustomerBillingSummary(42);
+        expect(after.daily_cost).toBe(700); // only the still-active camera counts toward the saldo runway
+        expect(after.has_admin_hold).toBe(true);
+        expect(after.subscriptions.find((s) => s.id === b.id).suspend_reason).toBe('admin');
+    });
+
     it('assignment makes the camera subscriber-class, charges day one, and activates', () => {
         walletService.credit({ userId: 42, amount: 10000 });
 

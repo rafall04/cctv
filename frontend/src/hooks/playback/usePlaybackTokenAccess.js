@@ -38,6 +38,13 @@ export function usePlaybackTokenAccess({
     onCleared,
 }) {
     const [tokenInput, setTokenInput] = useState('');
+
+    // onCleared is passed as a fresh inline arrow by Playback, which re-renders ~4x/second during
+    // playback (per-frame setCurrentTime). Depending the 30s heartbeat effect on that identity cleared
+    // and recreated the interval every render, so the heartbeat NEVER fired while a video played (the
+    // session-end / revoked-token detector was defeated). Hold it in a ref so the effect stays stable.
+    const onClearedRef = useRef(onCleared);
+    useEffect(() => { onClearedRef.current = onCleared; }, [onCleared]);
     const [tokenStatus, setTokenStatus] = useState(null);
     const [tokenMessage, setTokenMessage] = useState('');
     // Structured reason for the last denial (e.g. 'device_limit'), so the UI can show a specific,
@@ -194,7 +201,7 @@ export function usePlaybackTokenAccess({
         const clear = (message) => {
             setTokenStatus(null);
             setTokenMessage(message || 'Session token playback berakhir');
-            onCleared?.();
+            onClearedRef.current?.();
         };
 
         const heartbeat = async () => {
@@ -223,7 +230,9 @@ export function usePlaybackTokenAccess({
             isActive = false;
             window.clearInterval(intervalId);
         };
-    }, [cameraId, enabled, onCleared, tokenStatus]);
+        // onCleared intentionally excluded — read via onClearedRef so a per-render identity change
+        // (Playback re-renders ~4x/s during playback) can't tear down and recreate the 30s heartbeat.
+    }, [cameraId, enabled, tokenStatus]);
 
     return {
         tokenInput,

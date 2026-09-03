@@ -739,7 +739,7 @@ class BillingService {
     getCustomerBillingSummary(userId) {
         const wallet = walletService.getWallet(userId);
         const subscriptions = query(
-            `SELECT cs.id, cs.camera_id, cs.monthly_price, cs.status, cs.last_charged_date,
+            `SELECT cs.id, cs.camera_id, cs.monthly_price, cs.status, cs.suspend_reason, cs.last_charged_date,
                     c.name AS camera_name, c.billing_status
              FROM camera_subscriptions cs
              JOIN cameras c ON c.id = cs.camera_id
@@ -748,9 +748,18 @@ class BillingService {
             [userId]
         );
 
-        const dailyTotal = subscriptions
-            .filter((s) => s.status !== 'cancelled')
-            .reduce((sum, s) => sum + dailyCostOf(s.monthly_price), 0);
+        const trial = this._getOwnerTrialState(userId);
+        const onTrialPlan = Boolean(trial?.onTrialPlan);
+        const trialExpired = onTrialPlan && !trial?.active;
+        const hasAdminHold = subscriptions.some((s) => s.suspend_reason === 'admin');
+
+        // Saldo runway counts only subs a top-up would keep/reactivate: exclude admin-held (a top-up
+        // can't resume them) and trial accounts (whose remedy is picking a paid plan, not topping up).
+        const dailyTotal = onTrialPlan
+            ? 0
+            : subscriptions
+                .filter((s) => s.suspend_reason !== 'admin')
+                .reduce((sum, s) => sum + dailyCostOf(s.monthly_price), 0);
         const estimatedDaysLeft = dailyTotal > 0 ? Math.floor(wallet.balance / dailyTotal) : null;
 
         return {
@@ -758,6 +767,9 @@ class BillingService {
             daily_cost: dailyTotal,
             estimated_days_left: estimatedDaysLeft,
             low_balance: estimatedDaysLeft !== null && estimatedDaysLeft < 3,
+            on_trial_plan: onTrialPlan,
+            trial_expired: trialExpired,
+            has_admin_hold: hasAdminHold,
             subscriptions: subscriptions.map((s) => ({
                 ...s,
                 daily_cost: dailyCostOf(s.monthly_price),

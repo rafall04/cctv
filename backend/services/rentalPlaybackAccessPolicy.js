@@ -125,6 +125,10 @@ export function resolveOwnerIssuedTokenAccess(camera, request, options, onRefusa
         isPublicPreview: false,
         previewMinutes: null,
         playbackWindowHours: token.effective_playback_window_hours ?? token.playback_window_hours,
+        // Carry the absolute range too, so the archive/owner gate can cap an owner-issued 'selected'
+        // share to exactly [from, to] — not just the rolling window. Mirrors the community token path.
+        playbackFrom: token.playback_from ?? null,
+        playbackTo: token.playback_to ?? null,
         tokenId: token.id,
         notice: null,
         contact: null,

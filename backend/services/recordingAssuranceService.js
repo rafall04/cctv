@@ -77,6 +77,7 @@ class RecordingAssuranceService {
                 c.name,
                 c.stream_source,
                 c.recording_status,
+                c.is_online,
                 c.last_recording_start
             FROM cameras c
             WHERE c.enabled = 1
@@ -183,8 +184,17 @@ class RecordingAssuranceService {
             if (runtimeStatus?.status === 'unknown' || runtimeStatus?.workerStale) {
                 reasons.push('recording_status_unknown');
             } else if (!runtimeStatus?.isRecording) {
-                reasons.push('recording_process_down');
-                snapshot.summary.recording_down += 1;
+                // A camera that is upstream-OFFLINE has had its recorder correctly suspended — that is
+                // an expected state, not a pipeline fault. Counting it as 'recording_process_down'
+                // (critical) gives a permanent false-alarm baseline that buries a genuine recorder
+                // crash on an ONLINE camera. Mirror recordingHealthDashboardService (is_online=1 gate):
+                // only online cameras that are not recording are a real recorder-down.
+                if (camera.is_online === 0 || camera.is_online === false) {
+                    reasons.push('recording_suspended_offline');
+                } else {
+                    reasons.push('recording_process_down');
+                    snapshot.summary.recording_down += 1;
+                }
             }
 
             let secondsSinceLatestEnd = null;

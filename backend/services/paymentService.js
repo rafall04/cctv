@@ -243,14 +243,29 @@ class PaymentService {
         // so the bonus lands on a fresh payment. A different amount makes a fresh one.
         if (!promo) {
             const reusable = queryOne(
-                `SELECT id FROM payments
+                `SELECT id, qris_payload FROM payments
                  WHERE user_id = ? AND gateway = ? AND amount = ? AND status = 'pending'
                    AND (expires_at IS NULL OR expires_at > ?)
                  ORDER BY id DESC LIMIT 1`,
                 [userId, gateway, amount, new Date().toISOString()]
             );
             if (reusable) {
-                return this.getPayment(reusable.id, userId);
+                // Reuse only when the customer's requested METHOD matches the pending order's method.
+                // Otherwise a deliberate method switch (e.g. QRIS -> BCA VA) would be silently ignored
+                // and the old instrument shown until expiry. For iPaymu compare the resolved
+                // method+channel against what the pending row stored; other gateways have no method.
+                let sameMethod = true;
+                if (gateway === 'ipaymu') {
+                    const chosen = paymentSettingsService.resolveIpaymuMethod(methodKey);
+                    let stored = {};
+                    try { stored = JSON.parse(reusable.qris_payload || '{}'); } catch { stored = {}; }
+                    // Block reuse only when the pending order's method is KNOWN and DIFFERENT from the
+                    // request (an unknown/legacy stored method still reuses, to avoid a needless charge).
+                    sameMethod = !stored.method || (stored.method === chosen.method && stored.channel === chosen.channel);
+                }
+                if (sameMethod) {
+                    return this.getPayment(reusable.id, userId);
+                }
             }
         }
 

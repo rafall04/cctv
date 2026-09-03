@@ -39,15 +39,19 @@ describe('guardrail: file-size ratchet (anti-penumpukan)', () => {
         // (Audit v1.2.0, S-03) — a no-camera-binding request now requires an explicit allow-list.
         'services/hlsProxyService.js': 1587,
         'services/playbackTokenService.js': 1357,
-        'middleware/schemaValidators.js': 949,
+        // Bumped 949→952: declared public_playback_mode + public_playback_preview_minutes on the
+        // camera create/update schemas so Fastify stops silently stripping the admin's setting.
+        'middleware/schemaValidators.js': 952,
         'services/telegramService.js': 944,
         'services/externalStreamProxyService.js': 896,
         'services/telegramBotService.js': 890,
         // Central billing engine. Pure date/money helpers already live in billingCalc.js; the
         // remainder is the charge/suspend/heal state machine, kept in one file on purpose. Frozen
         // here (visible decision) after the timezone/admin-hold/catch-up/atomicity correctness pass;
-        // bumped 818→831 for the is_public consent-preservation notes on the suspend/heal paths.
-        'services/billingService.js': 831,
+        // bumped 818→831 for the is_public consent-preservation notes on the suspend/heal paths;
+        // bumped 831→843 for the customer-summary fix (trial/admin-hold subs excluded from the saldo
+        // runway + suspend_reason/on_trial_plan/has_admin_hold surfaced) so top-up guidance is honest.
+        'services/billingService.js': 843,
         // Bootstrap that wires every background service — grows by a line or two when a new one is
         // added. Frozen here (visible decision) at 804 after the playback-order reconciler wiring.
         'server.js': 804,

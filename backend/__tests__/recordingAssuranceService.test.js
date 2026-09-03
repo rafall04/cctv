@@ -59,6 +59,34 @@ describe('recordingAssuranceService', () => {
         });
     });
 
+    it('does NOT count an OFFLINE not-recording camera as recording_process_down/critical', async () => {
+        // Camera is upstream-offline (is_online=0); its recorder is correctly suspended. This must be
+        // a benign 'recording_suspended_offline' (warning), not a critical recording_process_down that
+        // inflates the operator's red baseline and buries a real online recorder crash.
+        queryMock
+            .mockReturnValueOnce([
+                { id: 7, name: 'Dead source', stream_source: 'external', recording_status: 'recording', is_online: 0, last_recording_start: '2026-05-02T01:45:00.000Z' },
+            ])
+            .mockReturnValueOnce([
+                { camera_id: 7, filename: '20260502_014000.mp4', start_time: '2026-05-02T01:40:00.000Z', end_time: '2026-05-02T01:50:00.000Z', file_size: 1048576, duration: 600, file_path: '/recordings/camera7/20260502_014000.mp4' },
+            ])
+            .mockReturnValueOnce([]);
+        getRuntimeStatusMock.mockResolvedValueOnce({ isRecording: false, status: 'stopped' });
+
+        const result = await recordingAssuranceService.getSnapshot({
+            now: new Date('2026-05-02T01:52:00.000Z'),
+            staleAfterMs: 15 * 60 * 1000,
+            gapToleranceSeconds: 180,
+        });
+
+        expect(result.summary.recording_down).toBe(0);
+        expect(result.summary.critical).toBe(0);
+        const cam = result.cameras.find((c) => c.id === 7);
+        expect(cam.reasons).toContain('recording_suspended_offline');
+        expect(cam.reasons).not.toContain('recording_process_down');
+        expect(cam.health).not.toBe('critical');
+    });
+
     it('classifies enabled recording cameras from batched latest segment and gap queries', async () => {
         queryMock
             .mockReturnValueOnce([

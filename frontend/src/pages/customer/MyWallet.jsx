@@ -500,11 +500,27 @@ export default function MyWallet() {
 
     const daysLeft = summary?.estimated_days_left;
     const hasDailyCost = (summary?.daily_cost || 0) > 0;
+    // daily_cost is already 0 for a trial account and excludes admin-held cameras, so the saldo banner
+    // below only fires for a paid-plan customer whose top-up would actually keep the camera active.
     const emptyBalance = hasDailyCost && (summary?.balance || 0) <= 0;
     const lowBalance = hasDailyCost && daysLeft !== null && daysLeft !== undefined && daysLeft <= 3;
+    const trialExpired = Boolean(summary?.trial_expired);
 
     return (
         <div className="space-y-4">
+        {trialExpired && (
+            <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 dark:border-red-800/50 dark:bg-red-900/20">
+                <span className="text-xl leading-none">⏳</span>
+                <div className="min-w-0">
+                    <p className="text-sm font-semibold text-red-700 dark:text-red-300">
+                        Masa coba gratis selesai — kamera berbayar Anda ditangguhkan
+                    </p>
+                    <p className="mt-0.5 text-xs text-red-600 dark:text-red-400">
+                        Pilih paket berbayar di menu <b>Paket</b> agar kamera aktif kembali. Mengisi saldo saja tidak mengaktifkannya.
+                    </p>
+                </div>
+            </div>
+        )}
         {(emptyBalance || lowBalance) && (
             <div className={`flex items-start gap-3 rounded-2xl border p-4 ${emptyBalance
                 ? 'border-red-200 bg-red-50 dark:border-red-800/50 dark:bg-red-900/20'
