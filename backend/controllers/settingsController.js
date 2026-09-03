@@ -12,9 +12,17 @@ import { logAdminAction } from '../services/securityAuditLogger.js';
 
 function getTimezonePayload() {
     const timezone = getTimezone();
-    const shortName = Object.keys(TIMEZONE_MAP).find(
-        key => TIMEZONE_MAP[key] === timezone
-    ) || 'WIB';
+    // Prefer the friendly Indonesian alias (WIB/WITA/WIT); for any other IANA zone derive a label
+    // from Intl instead of mislabelling it 'WIB'.
+    let shortName = Object.keys(TIMEZONE_MAP).find((key) => TIMEZONE_MAP[key] === timezone);
+    if (!shortName) {
+        try {
+            shortName = new Intl.DateTimeFormat('en-US', { timeZone: timezone, timeZoneName: 'short' })
+                .formatToParts(new Date()).find((p) => p.type === 'timeZoneName')?.value || timezone;
+        } catch {
+            shortName = timezone;
+        }
+    }
 
     return {
         timezone,

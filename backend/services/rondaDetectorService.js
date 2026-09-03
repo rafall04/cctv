@@ -13,6 +13,7 @@
 
 import { execFile } from 'child_process';
 import { promisify } from 'util';
+import { getTimezone } from './timezoneService.js';
 import fs from 'fs';
 import path from 'path';
 import { query, queryOne } from '../database/connectionPool.js';
@@ -224,7 +225,7 @@ class RondaDetectorService {
         return [
             'run', '-d', '--name', name, '--restart', 'unless-stopped', '--network', 'host',
             '--cpus', String(cfg.cpus || 2), '--memory', `${cfg.memory_mb || 2048}m`,
-            ...env('TZ', 'Asia/Jakarta'),
+            ...env('TZ', getTimezone()),
             // `source_url` diisi saat kamera dibuat; cadangan lama dipertahankan supaya config
             // yang ditulis sebelum resolusi sumber ada tetap bisa dinyalakan ulang.
             ...env('RTSP_URL', cfg.source_url || `${RTSP_BASE}/${cfg.stream_key}`),

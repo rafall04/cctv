@@ -9,6 +9,7 @@ SideEffects: Reads and updates /api/admin/settings/timezone.
 import { useState, useEffect, useMemo } from 'react';
 import { adminAPI } from '../../../services/api';
 import { Clock, Save, AlertCircle } from 'lucide-react';
+import { useTimezone } from '../../../contexts/TimezoneContext';
 
 /** Every IANA zone the runtime knows. Not a fixed 3-item list — a future deployment could be anywhere. */
 function useAllTimezones() {
@@ -47,6 +48,7 @@ function zonePreview(tz) {
 
 export default function TimezoneSettingsTab() {
     const allZones = useAllTimezones();
+    const { refreshTimezone } = useTimezone();
     const [timezone, setTimezone] = useState('Asia/Jakarta');
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -80,6 +82,8 @@ export default function TimezoneSettingsTab() {
         setSuccess(false);
         try {
             await adminAPI.put('/api/admin/settings/timezone', { timezone });
+            // Propagate the ONE setting to every mounted display immediately — no page reload needed.
+            await refreshTimezone();
             setSuccess(true);
             setTimeout(() => setSuccess(false), 3000);
         } catch (error) {

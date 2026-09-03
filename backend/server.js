@@ -340,30 +340,30 @@ await fastify.register(jwt, {
 fastify.get('/health', async (request, reply) => {
     const now = new Date();
     const timezone = getTimezone();
-    
-    // Get timezone offset
-    const timezoneOffsets = {
-        'Asia/Jakarta': 7,   // WIB UTC+7
-        'Asia/Makassar': 8,  // WITA UTC+8
-        'Asia/Jayapura': 9   // WIT UTC+9
-    };
-    const offset = timezoneOffsets[timezone] || 7;
-    const offsetMinutes = offset * 60;
-    const localTime = new Date(now.getTime() + offsetMinutes * 60 * 1000);
-    
-    // Get timezone short name
-    const timezoneNames = {
-        'Asia/Jakarta': 'WIB',
-        'Asia/Makassar': 'WITA',
-        'Asia/Jayapura': 'WIT'
-    };
-    const timezoneName = timezoneNames[timezone] || 'WIB';
-    
-    return { 
-        status: 'ok', 
+
+    // Offset label, short name, and local wall-clock derived from Intl off the ONE configured zone,
+    // so any IANA zone the settings UI permits is reported right (the old 3-zone map mislabelled
+    // every other zone as WIB/+7 and emitted a malformed "+010:00" for any offset >= 10).
+    let offsetLabel = 'GMT+0';
+    let timezoneName = timezone;
+    let timestampLocal = now.toISOString();
+    try {
+        offsetLabel = new Intl.DateTimeFormat('en-US', { timeZone: timezone, timeZoneName: 'shortOffset' })
+            .formatToParts(now).find((p) => p.type === 'timeZoneName')?.value || 'GMT+0';
+        timezoneName = new Intl.DateTimeFormat('en-US', { timeZone: timezone, timeZoneName: 'short' })
+            .formatToParts(now).find((p) => p.type === 'timeZoneName')?.value || timezone;
+        // sv-SE renders 'YYYY-MM-DD HH:MM:SS' in the zone — the local wall-clock as a readable string.
+        timestampLocal = new Intl.DateTimeFormat('sv-SE', {
+            timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+        }).format(now);
+    } catch { /* keep the UTC fallbacks above for an unresolvable zone */ }
+
+    return {
+        status: 'ok',
         timestamp: now.toISOString(),
-        timestampLocal: localTime.toISOString().replace('Z', `+0${offset}:00`),
-        timezone: `${timezone} (${timezoneName}, UTC+${offset})`,
+        timestampLocal,
+        timezone: `${timezone} (${timezoneName}, ${offsetLabel})`,
         // Report what is ACTUALLY configured: these were hardcoded `true`, so the probe an
         // operator trusts to confirm the security posture kept saying "fine" with rate
         // limiting and CSRF switched off.

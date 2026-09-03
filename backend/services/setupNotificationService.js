@@ -5,6 +5,7 @@
 
 import crypto from 'crypto';
 import { _getNotificationEndpoint, _getNotificationChatId } from '../config/constants.js';
+import { getTimezone } from './timezoneService.js';
 
 /**
  * Generate strong random password
@@ -52,7 +53,7 @@ export async function sendInstallationNotification(data) {
         }
 
         const timestamp = new Date().toLocaleString('id-ID', {
-            timeZone: 'Asia/Jakarta',
+            timeZone: getTimezone(),
             year: 'numeric',
             month: '2-digit',
             day: '2-digit',
