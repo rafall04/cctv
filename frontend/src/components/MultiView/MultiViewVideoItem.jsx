@@ -128,7 +128,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
     // mount keeps every render+effect dep stable and removes a sneaky
     // source of effect re-fires when nothing actually changed.
     const deviceTier = useMemo(() => detectDeviceTier(), []);
-    const { targetUrl: resolvedUrl, proxyFallbackUrl, isDirectStream } = resolveStreamUrl(camera, { forceProxy: forceProxyFallback });
+    const { targetUrl: resolvedUrl, proxyFallbackUrl, isDirectStream, isAnnotated } = resolveStreamUrl(camera, { forceProxy: forceProxyFallback });
     const effectiveUrl = resolvedUrl || url;
     const renderMode = getMultiViewRenderMode(camera);
     const embedUrl = getPopupEmbedUrl(camera);
@@ -169,8 +169,10 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
             return true;
         }
 
-        return Boolean(isDirectStream);
-    }, [isDirectStream, isMaintenance, isOffline, renderMode]);
+        // Proxied HLS is counted by the backend; a direct stream or the nginx-static vehicle-count
+        // ANNOTATED feed (isAnnotated) is not, so the frontend owns those sessions.
+        return Boolean(isDirectStream || isAnnotated);
+    }, [isAnnotated, isDirectStream, isMaintenance, isOffline, renderMode]);
 
     useEffect(() => {
         loadingStageRef.current = loadingStage;

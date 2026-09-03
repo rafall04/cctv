@@ -205,12 +205,16 @@ function VideoPopup({
     const url = camera.streams?.hls;
     const deviceTier = detectDeviceTier();
     const isExternal = deliveryType === 'external_hls';
-    const { targetUrl: resolvedUrl, proxyFallbackUrl, isDirectStream } = resolveStreamUrl(camera, { forceProxy: forceProxyFallback });
+    const { targetUrl: resolvedUrl, proxyFallbackUrl, isDirectStream, isAnnotated } = resolveStreamUrl(camera, { forceProxy: forceProxyFallback });
     const effectiveUrl = isHlsCamera
         ? (resolvedUrl || url)
         : (deliveryType === 'external_flv' ? flvUrl : (popupEmbedUrl || fallbackExternalUrl));
     const passiveSignalUrl = (deliveryType === 'external_flv' ? flvUrl : null) || officialSourceUrl || effectiveUrl || null;
-    const shouldTrackManualViewerSession = !isStreamResolving && streamCapabilities.popup && (!isHlsCamera || isDirectStream);
+    // Proxied HLS is counted by the backend HLS proxy, so the frontend stays quiet to avoid double
+    // counting. Two cases still need a frontend-owned session: a direct/external stream (no proxy in
+    // the loop), and the vehicle-count ANNOTATED feed (served static by nginx, so the backend proxy
+    // never sees it — see resolveStreamUrl → isAnnotated).
+    const shouldTrackManualViewerSession = !isStreamResolving && streamCapabilities.popup && (!isHlsCamera || isDirectStream || isAnnotated);
 
     const reportRuntimeSuccess = useCallback((signalType) => {
         if (camera.stream_source !== 'external') {

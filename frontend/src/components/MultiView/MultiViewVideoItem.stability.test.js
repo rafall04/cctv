@@ -95,6 +95,11 @@ describe('MultiViewVideoItem HLS stability', () => {
         expect(source).toContain('isDirectStream');
     });
 
+    it('DOES take a frontend viewer session for the nginx-static annotated feed (isAnnotated)', () => {
+        // The vehicle-count annotated feed bypasses the backend proxy, so the frontend must count it.
+        expect(source).toContain('isDirectStream || isAnnotated');
+    });
+
     it('hides the base status badge while fullscreen controls render their own badge', () => {
         const statusBadgeBlock = getSourceBlock(
             '{/* Status badge - disable pulse animation in fullscreen and on low-end devices */}',

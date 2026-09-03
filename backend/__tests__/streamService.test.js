@@ -10,11 +10,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import streamService from '../services/streamService.js';
 import { invalidateCameraAccessCache } from '../services/cameraAccessService.js';
 
-const { queryMock, queryOneMock, viewStatsMock, voucherGatedMock, mockConfig } = vi.hoisted(() => ({
+const { queryMock, queryOneMock, viewStatsMock, voucherGatedMock, annotatedPathMock, mockConfig } = vi.hoisted(() => ({
     queryMock: vi.fn(),
     queryOneMock: vi.fn(),
     viewStatsMock: vi.fn(),
     voucherGatedMock: vi.fn(() => false),
+    annotatedPathMock: vi.fn(() => null),
     // config/config.js loads backend/.env through dotenv at import time, so a developer
     // who sets PUBLIC_STREAM_BASE_URL locally would otherwise see these URL assertions
     // fail against their own machine's config. Pin what buildStreamUrls reads so the
@@ -53,6 +54,10 @@ vi.mock('../services/voucherService.js', () => ({
     default: { isAreaAccessGated: voucherGatedMock },
 }));
 
+vi.mock('../services/vehicleCountService.js', () => ({
+    getAnnotatedStreamPath: (...args) => annotatedPathMock(...args),
+}));
+
 vi.mock('../config/config.js', () => ({ config: mockConfig, default: mockConfig }));
 
 describe('streamService camera response routing', () => {
@@ -66,6 +71,8 @@ describe('streamService camera response routing', () => {
         invalidateCameraAccessCache();
         voucherGatedMock.mockReset();
         voucherGatedMock.mockReturnValue(false);
+        annotatedPathMock.mockReset();
+        annotatedPathMock.mockReturnValue(null);
         // Default = no PUBLIC_STREAM_BASE_URL, i.e. the single-origin deploy.
         mockConfig.mediamtx.hlsUrl = '/hls';
         mockConfig.mediamtx.webrtcUrl = '/webrtc';
@@ -171,6 +178,30 @@ describe('streamService camera response routing', () => {
         expect(response.streams.hls).toBe('/api/stream/11/external.m3u8');
         expect(response.external_hls_url).toBeNull();
         expect(response.external_stream_url).toBeNull();
+    });
+
+    it('serves the vehicle-count ANNOTATED feed and flags streams.annotated so the frontend counts it', () => {
+        // The annotated feed is nginx-static → the backend proxy never tracks it. The flag tells the
+        // frontend to own the viewer session (see resolveStreamUrl → isAnnotated). It must ride INSIDE
+        // `streams`, so it is present exactly when the annotated URL is.
+        annotatedPathMock.mockReturnValue('/hls/hitung/15/live.m3u8');
+        const response = streamService.buildCameraResponse({
+            id: 15,
+            stream_key: 'camera15',
+            stream_source: 'internal',
+        });
+        expect(response.streams.hls).toBe('/hls/hitung/15/live.m3u8');
+        expect(response.streams.annotated).toBe(true);
+    });
+
+    it('does NOT flag streams.annotated when the counter is stale (no annotated path) — backend tracks it', () => {
+        annotatedPathMock.mockReturnValue(null); // counter down → fall back to the backend-proxied path
+        const response = streamService.buildCameraResponse({
+            id: 15,
+            stream_key: 'camera15',
+            stream_source: 'internal',
+        });
+        expect(response.streams.annotated).toBeUndefined();
     });
 
     it('keeps external_hls_url + external_stream_url when proxy is disabled (direct-stream mode)', () => {

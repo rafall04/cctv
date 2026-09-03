@@ -128,7 +128,15 @@ class StreamService {
         // null sehingga umpan kamera asli dipakai lagi. Penghitung tumbang != video mati.
         if (!voucherGated) {
             const beranotasi = getAnnotatedStreamPath(camera.id);
-            if (beranotasi) streams = { ...streams, hls: beranotasi };
+            // The annotated (vehicle-count) feed is served by nginx as STATIC files
+            // (`location ^~ /hls/hitung/`), bypassing the backend proxy entirely — so the backend
+            // viewer-session tracker never sees it and this camera's live-view counter would freeze.
+            // Flag it so the FRONTEND records the session instead (resolveStreamUrl → isAnnotated,
+            // consumed by the tracking gates in VideoPopup / MultiViewVideoItem). The flag rides
+            // INSIDE `streams`, so it is present exactly when the annotated URL is — and absent the
+            // moment the counter goes stale and getAnnotatedStreamPath falls back to the
+            // backend-proxied path, which the backend tracks itself. No double counting either way.
+            if (beranotasi) streams = { ...streams, hls: beranotasi, annotated: true };
         }
 
         return {

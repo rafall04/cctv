@@ -15,7 +15,7 @@ import { getEffectiveDeliveryType } from './cameraDelivery.js';
  */
 export function resolveStreamUrl(camera, { forceProxy = false } = {}) {
     if (!camera) {
-        return { targetUrl: null, proxyFallbackUrl: null, isDirectStream: false };
+        return { targetUrl: null, proxyFallbackUrl: null, isDirectStream: false, isAnnotated: false };
     }
 
     const deliveryType = getEffectiveDeliveryType(camera);
@@ -23,6 +23,11 @@ export function resolveStreamUrl(camera, { forceProxy = false } = {}) {
     const proxyDisabled = camera.external_use_proxy === 0 || camera.external_use_proxy === false;
     const rawUrl = camera._rawExternalHlsUrl || camera.external_stream_url || camera.external_hls_url;
     const currentStreamUrl = camera.streams?.hls || null;
+    // The vehicle-count annotated feed is served by nginx as static files, so the BACKEND proxy
+    // never tracks its viewer sessions — the frontend must. streamService flags it inside `streams`
+    // (see its getStreamData). Surfaced here so both HLS players (VideoPopup, MultiViewVideoItem)
+    // read it from one place instead of sniffing the URL.
+    const isAnnotated = camera.streams?.annotated === true;
 
     // Direct stream conditions:
     // 1. Camera is external
@@ -36,6 +41,7 @@ export function resolveStreamUrl(camera, { forceProxy = false } = {}) {
             targetUrl: currentStreamUrl,
             proxyFallbackUrl: null,
             isDirectStream: false,
+            isAnnotated,
         };
     }
 
@@ -49,5 +55,6 @@ export function resolveStreamUrl(camera, { forceProxy = false } = {}) {
         targetUrl: rawUrl,
         proxyFallbackUrl,
         isDirectStream: true,
+        isAnnotated,
     };
 }
