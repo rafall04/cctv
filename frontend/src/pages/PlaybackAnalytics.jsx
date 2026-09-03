@@ -14,7 +14,7 @@ import { formatWatchTime } from '../components/admin/analytics/AnalyticsPrimitiv
 import { adminService } from '../services/adminService';
 import { cameraService } from '../services/cameraService';
 import { REQUEST_POLICY } from '../services/requestPolicy';
-import { exportToCSV, mapPeriodToApi } from '../utils/admin/viewerAnalyticsAdapter';
+import { exportSessionsToCSV, mapPeriodToApi } from '../utils/admin/viewerAnalyticsAdapter';
 import { useAdminReconnectRefresh } from '../hooks/admin/useAdminReconnectRefresh';
 import { TIMESTAMP_STORAGE, useTimezone } from '../contexts/TimezoneContext';
 import { summarizeUserAgent } from '../utils/admin/deviceLabel.js';
@@ -112,7 +112,7 @@ function renderPlaybackHistoryCard(session, formatDateTime) {
             </div>
             <dl className="mt-2 space-y-0.5">
                 <HistoryLine label="Ditonton">{formatWatchTime(session.duration_seconds)}</HistoryLine>
-                <HistoryLine label="Dibuka">{formatDateTime(session.started_at, { storage: TIMESTAMP_STORAGE.LOCAL_SQL })}</HistoryLine>
+                <HistoryLine label="Dibuka">{formatDateTime(session.started_at, { storage: TIMESTAMP_STORAGE.UTC_SQL })}</HistoryLine>
                 <HistoryLine label="Perangkat">{summarizeUserAgent(session.user_agent) || session.device_type}</HistoryLine>
                 <HistoryLine label="IP">{session.ip_address}</HistoryLine>
                 <HistoryLine label="Token">{session.token_label}</HistoryLine>
@@ -156,7 +156,7 @@ function renderPlaybackHistoryCell(session, column, formatDateTime) {
         case 'device_type':
             return renderDeviceBadge(session.device_type);
         case 'started_at':
-            return formatDateTime(session.started_at, { storage: TIMESTAMP_STORAGE.LOCAL_SQL });
+            return formatDateTime(session.started_at, { storage: TIMESTAMP_STORAGE.UTC_SQL });
         case 'duration_seconds':
             return renderDurationText(session.duration_seconds);
         default:
@@ -357,8 +357,8 @@ export default function PlaybackAnalytics() {
                     { label: 'Viewer / IP', key: 'ip_address' },
                     { label: 'Admin', key: 'admin_username' },
                     { label: 'Device', key: 'device_type' },
-                    { label: 'Mulai', render: (session) => formatDateTime(session.started_at, { storage: TIMESTAMP_STORAGE.LOCAL_SQL }) },
-                    { label: 'Selesai', render: (session) => session.ended_at ? formatDateTime(session.ended_at, { storage: TIMESTAMP_STORAGE.LOCAL_SQL }) : '-' },
+                    { label: 'Mulai', render: (session) => formatDateTime(session.started_at, { storage: TIMESTAMP_STORAGE.UTC_SQL }) },
+                    { label: 'Selesai', render: (session) => session.ended_at ? formatDateTime(session.ended_at, { storage: TIMESTAMP_STORAGE.UTC_SQL }) : '-' },
                     { label: 'Durasi', render: (session) => formatWatchTime(session.duration_seconds || 0) },
                     { label: 'User Agent', key: 'user_agent' },
                 ]}
@@ -457,7 +457,7 @@ export default function PlaybackAnalytics() {
                                       */}
                                     <dl className="mt-2 space-y-0.5">
                                         <HistoryLine label="Ditonton">{formatWatchTime(session.duration_seconds)}</HistoryLine>
-                                        <HistoryLine label="Dibuka">{formatDateTime(session.started_at, { storage: TIMESTAMP_STORAGE.LOCAL_SQL })}</HistoryLine>
+                                        <HistoryLine label="Dibuka">{formatDateTime(session.started_at, { storage: TIMESTAMP_STORAGE.UTC_SQL })}</HistoryLine>
                                         <HistoryLine label="Perangkat">{summarizeUserAgent(session.user_agent) || session.device_type}</HistoryLine>
                                         <HistoryLine label="IP">{session.ip_address}</HistoryLine>
                                         <HistoryLine label="Token">{session.token_label}</HistoryLine>
@@ -541,7 +541,7 @@ export default function PlaybackAnalytics() {
                         onPageChange={(page) => loadHistory({ page, pageSize: history.pagination.pageSize })}
                         onPageSizeChange={(pageSize) => loadHistory({ page: 1, pageSize })}
                         onRowClick={setSelectedHistorySession}
-                        onExport={() => exportToCSV(history.items, 'playback_history')}
+                        onExport={() => exportSessionsToCSV(history.items, 'playback_history', (v) => formatDateTime(v, { storage: TIMESTAMP_STORAGE.UTC_SQL }))}
                         emptyTitle="Belum ada riwayat playback"
                         emptyDescription="Riwayat playback akan muncul setelah ada sesi preview publik atau admin."
                         filters={(

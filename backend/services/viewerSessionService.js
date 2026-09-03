@@ -27,7 +27,7 @@ import { v4 as uuidv4 } from 'uuid';
 import viewerAnalyticsService from './viewerAnalyticsService.js';
 import { cacheGetOrSetSync, cacheKey, CacheNamespace, CacheTTL } from './cacheService.js';
 import cameraViewStatsService from './cameraViewStatsService.js';
-import { diffLocalSqlSeconds, getLocalDate, getLocalDateWithOffset, getLocalSqlWithOffsetDays, nowLocalSql, resolveLocalSqlTimestamp } from './timeService.js';
+import { diffLocalSqlSeconds, getLocalDate, getLocalDateWithOffset, getSqliteTzOffsetModifier, resolveUtcSqlTimestamp, toUtcSql } from './timeService.js';
 
 /**
  * Get current date in configured timezone for date comparisons
@@ -47,26 +47,29 @@ function getDateWithOffset(days) {
 
 function buildHistoryDateFilter(period) {
     const todayDate = getDate();
+    // started_at is stored in UTC; shift it into the configured tz before date() so these day
+    // windows (whose bounds are configured-tz dates) line up. See getSqliteTzOffsetModifier.
+    const tz = getSqliteTzOffsetModifier();
 
     if (typeof period === 'string' && period.startsWith('date:')) {
         const customDate = period.substring(5);
         if (/^\d{4}-\d{2}-\d{2}$/.test(customDate)) {
             return {
-                clause: 'AND date(started_at) = ?',
-                params: [customDate],
+                clause: 'AND date(started_at, ?) = ?',
+                params: [tz, customDate],
             };
         }
     }
 
     switch (period) {
         case 'today':
-            return { clause: 'AND date(started_at) = ?', params: [todayDate] };
+            return { clause: 'AND date(started_at, ?) = ?', params: [tz, todayDate] };
         case 'yesterday':
-            return { clause: 'AND date(started_at) = ?', params: [getDateWithOffset(-1)] };
+            return { clause: 'AND date(started_at, ?) = ?', params: [tz, getDateWithOffset(-1)] };
         case '7days':
-            return { clause: 'AND date(started_at) >= ?', params: [getDateWithOffset(-7)] };
+            return { clause: 'AND date(started_at, ?) >= ?', params: [tz, getDateWithOffset(-7)] };
         case '30days':
-            return { clause: 'AND date(started_at) >= ?', params: [getDateWithOffset(-30)] };
+            return { clause: 'AND date(started_at, ?) >= ?', params: [tz, getDateWithOffset(-30)] };
         default:
             return { clause: '', params: [] };
     }
@@ -176,7 +179,7 @@ class ViewerSessionService {
         const ipAddress = this.getRealIP(request);
         const userAgent = request.headers['user-agent'] || '';
         const deviceType = this.getDeviceType(userAgent);
-        const timestamp = nowLocalSql();
+        const timestamp = toUtcSql(new Date());
 
         try {
             execute(`
@@ -194,7 +197,7 @@ class ViewerSessionService {
 
     heartbeat(sessionId) {
         try {
-            const timestamp = nowLocalSql();
+            const timestamp = toUtcSql(new Date());
             const result = execute(`
                 UPDATE viewer_sessions 
                 SET last_heartbeat = ?
@@ -223,7 +226,7 @@ class ViewerSessionService {
             }
 
             const rawEndTimestamp = options.endedAtMs ?? options.endedAt ?? new Date();
-            const timestamp = resolveLocalSqlTimestamp(rawEndTimestamp);
+            const timestamp = resolveUtcSqlTimestamp(rawEndTimestamp);
             const durationSeconds = diffLocalSqlSeconds(session.started_at, timestamp);
 
             execute(`
@@ -265,12 +268,12 @@ class ViewerSessionService {
 
     cleanupStaleSessions() {
         try {
-            const timestamp = nowLocalSql();
+            // Compare against SQLite's own UTC clock so this can never drift from the UTC-stored column.
             const staleSessions = query(`
-                SELECT session_id, last_heartbeat FROM viewer_sessions 
-                WHERE is_active = 1 
-                AND datetime(last_heartbeat) < datetime(?, '-${SESSION_TIMEOUT} seconds')
-            `, [timestamp]);
+                SELECT session_id, last_heartbeat FROM viewer_sessions
+                WHERE is_active = 1
+                AND datetime(last_heartbeat) < datetime('now', '-${SESSION_TIMEOUT} seconds')
+            `, []);
 
             for (const session of staleSessions) {
                 this.endSession(session.session_id, { endedAt: session.last_heartbeat });
@@ -298,7 +301,8 @@ class ViewerSessionService {
 
     archiveOldHistory(retentionDays = HISTORY_RETENTION_DAYS) {
         try {
-            const cutoff = getLocalSqlWithOffsetDays(-retentionDays);
+            // UTC cutoff via SQLite's own clock — matches the UTC-stored started_at.
+            const days = Number.parseInt(retentionDays, 10) || HISTORY_RETENTION_DAYS;
 
             execute(`
                 INSERT INTO viewer_session_history_archive (
@@ -327,18 +331,18 @@ class ViewerSessionService {
                     created_at,
                     CURRENT_TIMESTAMP
                 FROM viewer_session_history
-                WHERE datetime(started_at) < datetime(?)
+                WHERE datetime(started_at) < datetime('now', '-${days} days')
                 AND NOT EXISTS (
                     SELECT 1
                     FROM viewer_session_history_archive archive
                     WHERE archive.id = viewer_session_history.id
                 )
-            `, [cutoff]);
+            `, []);
 
             execute(`
                 DELETE FROM viewer_session_history
-                WHERE datetime(started_at) < datetime(?)
-            `, [cutoff]);
+                WHERE datetime(started_at) < datetime('now', '-${days} days')
+            `, []);
         } catch (error) {
             if (!String(error?.message || '').includes('no such table')) {
                 console.error('[ViewerSession] Error archiving history:', error);
@@ -348,7 +352,7 @@ class ViewerSessionService {
 
     getActiveSessions() {
         try {
-            const timestamp = nowLocalSql();
+            const timestamp = toUtcSql(new Date());
             return query(`
                 SELECT 
                     vs.session_id,
@@ -372,7 +376,7 @@ class ViewerSessionService {
 
     getActiveSessionsByCamera(cameraId) {
         try {
-            const timestamp = nowLocalSql();
+            const timestamp = toUtcSql(new Date());
             return query(`
                 SELECT 
                     session_id,
@@ -521,15 +525,16 @@ class ViewerSessionService {
                     const activeSessions = this.getActiveSessions();
                     const viewersByCamera = this.getViewerCountByCamera();
                     const todayDate = getDate();
+                    const tz = getSqliteTzOffsetModifier();
 
                     const todayStats = queryOne(`
-                        SELECT 
+                        SELECT
                             COUNT(DISTINCT ip_address) as unique_viewers,
                             COUNT(*) as total_sessions,
                             SUM(duration_seconds) as total_watch_time
                         FROM viewer_session_history
-                        WHERE date(started_at) = ?
-                    `, [todayDate]);
+                        WHERE date(started_at, ?) = ?
+                    `, [tz, todayDate]);
 
                     return {
                         activeViewers,
@@ -581,7 +586,7 @@ class ViewerSessionService {
             const activeViewers = this.getTotalActiveViewers();
             const activeSessions = this.getActiveSessions();
             const viewersByCamera = this.getViewerCountByCamera();
-            const timestamp = nowLocalSql();
+            const timestamp = toUtcSql(new Date());
 
             // Get last 5 minutes activity (using configured timezone)
             const recentActivity = query(`
@@ -621,7 +626,7 @@ class ViewerSessionService {
                 activeSessions: [],
                 viewersByCamera: [],
                 recentActivity: [],
-                timestamp: nowLocalSql(),
+                timestamp: toUtcSql(new Date()),
             };
         }
     }

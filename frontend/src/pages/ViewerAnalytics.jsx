@@ -28,7 +28,7 @@ import { adminService } from '../services/adminService';
 import { cameraService } from '../services/cameraService';
 import { REQUEST_POLICY } from '../services/requestPolicy';
 import { TIMESTAMP_STORAGE, useTimezone } from '../contexts/TimezoneContext';
-import { exportToCSV, formatWatchTime, mapPeriodToApi } from '../utils/admin/viewerAnalyticsAdapter';
+import { exportSessionsToCSV, formatWatchTime, mapPeriodToApi } from '../utils/admin/viewerAnalyticsAdapter';
 
 export { default as DailyDetailModal } from '../components/admin/analytics/DailyDetailModal';
 
@@ -67,9 +67,9 @@ function renderLiveHistoryCard(session, formatDateTime) {
             <p className="font-semibold text-content">{session.camera_name}</p>
             <dl className="mt-2 space-y-0.5">
                 <ViewerHistoryLine label="Ditonton">{formatWatchTime(session.duration_seconds)}</ViewerHistoryLine>
-                <ViewerHistoryLine label="Mulai">{formatDateTime(session.started_at, { storage: TIMESTAMP_STORAGE.LOCAL_SQL })}</ViewerHistoryLine>
+                <ViewerHistoryLine label="Mulai">{formatDateTime(session.started_at, { storage: TIMESTAMP_STORAGE.UTC_SQL })}</ViewerHistoryLine>
                 <ViewerHistoryLine label="Selesai">
-                    {session.ended_at ? formatDateTime(session.ended_at, { storage: TIMESTAMP_STORAGE.LOCAL_SQL }) : 'masih berjalan'}
+                    {session.ended_at ? formatDateTime(session.ended_at, { storage: TIMESTAMP_STORAGE.UTC_SQL }) : 'masih berjalan'}
                 </ViewerHistoryLine>
                 {/* The full user agent, summarised. `device_type` alone only ever said "mobile". */}
                 <ViewerHistoryLine label="Perangkat">{summarizeUserAgent(session.user_agent) || session.device_type}</ViewerHistoryLine>
@@ -99,9 +99,9 @@ function renderLiveHistoryCell(session, column, formatDateTime) {
         case 'device_type':
             return renderDeviceBadge(session.device_type);
         case 'started_at':
-            return formatDateTime(session.started_at, { storage: TIMESTAMP_STORAGE.LOCAL_SQL });
+            return formatDateTime(session.started_at, { storage: TIMESTAMP_STORAGE.UTC_SQL });
         case 'ended_at':
-            return session.ended_at ? formatDateTime(session.ended_at, { storage: TIMESTAMP_STORAGE.LOCAL_SQL }) : '-';
+            return session.ended_at ? formatDateTime(session.ended_at, { storage: TIMESTAMP_STORAGE.UTC_SQL }) : '-';
         case 'duration_seconds':
             return renderDurationText(session.duration_seconds);
         default:
@@ -291,8 +291,8 @@ export default function ViewerAnalytics() {
                     { label: 'Kamera', key: 'camera_name' },
                     { label: 'IP Address', key: 'ip_address' },
                     { label: 'Device', key: 'device_type' },
-                    { label: 'Mulai', render: (session) => formatDateTime(session.started_at, { storage: TIMESTAMP_STORAGE.LOCAL_SQL }) },
-                    { label: 'Selesai', render: (session) => session.ended_at ? formatDateTime(session.ended_at, { storage: TIMESTAMP_STORAGE.LOCAL_SQL }) : '-' },
+                    { label: 'Mulai', render: (session) => formatDateTime(session.started_at, { storage: TIMESTAMP_STORAGE.UTC_SQL }) },
+                    { label: 'Selesai', render: (session) => session.ended_at ? formatDateTime(session.ended_at, { storage: TIMESTAMP_STORAGE.UTC_SQL }) : '-' },
                     { label: 'Durasi', render: (session) => formatWatchTime(session.duration_seconds || 0) },
                     { label: 'User Agent', key: 'user_agent' },
                 ]}
@@ -372,7 +372,7 @@ export default function ViewerAnalytics() {
                                         </div>
                                         <div className="mt-1 break-all font-mono text-xs text-content-muted">{session.ip_address}</div>
                                         <div className="mt-2 text-xs text-content-muted">
-                                            {formatDateTime(session.started_at, { storage: TIMESTAMP_STORAGE.LOCAL_SQL })} • {formatWatchTime(session.duration_seconds)}
+                                            {formatDateTime(session.started_at, { storage: TIMESTAMP_STORAGE.UTC_SQL })} • {formatWatchTime(session.duration_seconds)}
                                         </div>
                                     </button>
                                 ))}
@@ -467,7 +467,7 @@ export default function ViewerAnalytics() {
                         onPageChange={(page) => loadHistory({ page, pageSize: history.pagination.pageSize })}
                         onPageSizeChange={(pageSize) => loadHistory({ page: 1, pageSize })}
                         onRowClick={setSelectedHistorySession}
-                        onExport={() => exportToCSV(history.items, 'viewer_history')}
+                        onExport={() => exportSessionsToCSV(history.items, 'viewer_history', (v) => formatDateTime(v, { storage: TIMESTAMP_STORAGE.UTC_SQL }))}
                         emptyTitle="Belum ada sesi"
                         emptyDescription="Riwayat live akan muncul setelah ada pengunjung yang menonton."
                         filters={(
@@ -564,7 +564,7 @@ export default function ViewerAnalytics() {
                         deviceBreakdown={deviceBreakdown}
                         topVisitors={topVisitors}
                         peakHours={peakHours}
-                        onExportVisitors={() => exportToCSV(topVisitors, 'top_visitors')}
+                        onExportVisitors={() => exportSessionsToCSV(topVisitors, 'top_visitors', (v) => formatDateTime(v, { storage: TIMESTAMP_STORAGE.UTC_SQL }))}
                     />
                     {retention && <RetentionMetrics data={retention} />}
                     {cameraPerformance.length > 0 && <CameraPerformanceTable data={cameraPerformance} />}

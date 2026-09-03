@@ -172,7 +172,9 @@ describe('NotificationDiagnostics', () => {
         fireEvent.change(screen.getByLabelText(/Event/i), { target: { value: 'online' } });
         fireEvent.click(screen.getByRole('button', { name: /Preview Routing/i }));
 
-        expect(await screen.findByText('local_sql:2026-05-11 21:26:32')).toBeTruthy();
+        // Runtime health (last_health_check_at) is UTC-stored like the audit log, so both render via
+        // the explicit UTC_SQL storage mode (converted to the configured tz for display).
+        expect(await screen.findByText('utc_sql:2026-05-11 21:26:32')).toBeTruthy();
         expect(screen.getByText('utc_sql:2026-05-11 14:28:53')).toBeTruthy();
     });
 });

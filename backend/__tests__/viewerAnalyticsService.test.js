@@ -167,12 +167,20 @@ describe('viewerAnalyticsService — dates never reach SQL as literals', () => {
      * any more. Reading the module source is the only way to see that, because a correct
      * result can be produced either way.
      */
-    it('the module contains no quoted date interpolation', async () => {
+    it('interpolates only the validated tz-offset modifier, never a date value, into SQL', async () => {
         const { readFileSync } = await import('fs');
         const src = readFileSync(new URL('../services/viewerAnalyticsService.js', import.meta.url), 'utf8');
 
-        // e.g. `date(started_at) = '${x}'` — a value pasted between single quotes.
-        expect(src).not.toMatch(/'\$\{/);
+        // The ONE sanctioned interpolation is the tz-offset modifier — a code-derived
+        // '[+-]<n> minutes' constant (never user input) that tzOffset() validates before returning,
+        // used to shift the UTC-stored column into the display tz for date()/strftime() bucketing.
+        // Strip those, then assert nothing ELSE is pasted between quotes: dates still travel as `?`.
+        const withoutTzModifier = src
+            .replace(/'\$\{tzOffset\(\)\}'/g, '')
+            .replace(/'\$\{tz\}'/g, '');
+        expect(withoutTzModifier).not.toMatch(/'\$\{/); // e.g. `date(started_at) = '${x}'` — forbidden
         expect(src).toContain('?');
+        // And the modifier is genuinely validated before interpolation.
+        expect(src).toContain('/^[+-]\\d+ minutes$/');
     });
 });

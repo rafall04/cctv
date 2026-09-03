@@ -154,6 +154,35 @@ export function toUtcSql(date = new Date()) {
     return date.toISOString().slice(0, 19).replace('T', ' ');
 }
 
+/**
+ * UTC twin of resolveLocalSqlTimestamp: a bare SQL datetime string is assumed to ALREADY be UTC and
+ * passed through (normalized to 'YYYY-MM-DD HH:MM:SS'); a Date/epoch-ms/parseable string is converted
+ * to UTC SQL. Used on the session end path where the input may be a stored UTC string (stale-cleanup
+ * hands back last_heartbeat) or a fresh Date.
+ */
+export function resolveUtcSqlTimestamp(value = new Date()) {
+    if (typeof value === 'string' && LOCAL_SQL_PATTERN.test(value.trim())) {
+        return value.trim().replace('T', ' ').slice(0, 19);
+    }
+
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        return toUtcSql(new Date(value));
+    }
+
+    if (value instanceof Date && !Number.isNaN(value.getTime())) {
+        return toUtcSql(value);
+    }
+
+    if (typeof value === 'string') {
+        const parsed = new Date(value);
+        if (!Number.isNaN(parsed.getTime())) {
+            return toUtcSql(parsed);
+        }
+    }
+
+    return toUtcSql(new Date());
+}
+
 export function parseUtcSql(value) {
     if (!value) {
         return null;
@@ -166,4 +195,41 @@ export function parseUtcSql(value) {
 
     const parsed = new Date(value);
     return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+/**
+ * Minutes east of UTC for the configured timezone at the current instant (Asia/Jakarta → 420).
+ * Reads the offset off Intl's shortOffset name so it handles whole- and half-hour zones alike.
+ * NOTE: sampled at "now", so for a DST zone it reflects the CURRENT offset only — the shipped
+ * Indonesian zones (WIB/WITA/WIT) are fixed-offset, so this is exact for them.
+ */
+export function getTimezoneOffsetMinutes(timezone = getTimezone()) {
+    try {
+        const parts = new Intl.DateTimeFormat('en-US', { timeZone: timezone, timeZoneName: 'shortOffset' })
+            .formatToParts(new Date());
+        const name = parts.find((p) => p.type === 'timeZoneName')?.value || 'GMT+0';
+        const match = name.match(/GMT([+-])(\d{1,2})(?::(\d{2}))?/);
+        if (!match) {
+            return 0;
+        }
+        const sign = match[1] === '-' ? -1 : 1;
+        return sign * (Number.parseInt(match[2], 10) * 60 + Number.parseInt(match[3] || '0', 10));
+    } catch {
+        return 0;
+    }
+}
+
+/**
+ * A SQLite datetime() modifier that converts a UTC-stored timestamp into the configured display
+ * timezone, e.g. '+420 minutes' for Asia/Jakarta. Use it so day/hour BUCKETING reads in the
+ * operator's wall-clock while storage stays UTC:
+ *     date(started_at, ?)            -- ? = getSqliteTzOffsetModifier()
+ *     strftime('%H', started_at, ?)
+ * A single "minutes" modifier keeps it to one bound parameter and supports half-hour zones.
+ * EXACT ONLY FOR FIXED-OFFSET ZONES (all shipped Indonesian zones qualify); a DST zone would need
+ * JS-side bucketing instead — see getTimezoneOffsetMinutes.
+ */
+export function getSqliteTzOffsetModifier(timezone = getTimezone()) {
+    const minutes = getTimezoneOffsetMinutes(timezone);
+    return `${minutes >= 0 ? '+' : '-'}${Math.abs(minutes)} minutes`;
 }

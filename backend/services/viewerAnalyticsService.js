@@ -1,6 +1,19 @@
 import { query, queryOne } from '../database/connectionPool.js';
 import { getTimezone } from './timezoneService.js';
+import { getSqliteTzOffsetModifier } from './timeService.js';
 // Removed circular dependency import
+
+/**
+ * A SQLite datetime() modifier ('+420 minutes') that shifts a UTC-stored timestamp into the
+ * configured display tz, so date()/strftime() bucketing reads in the operator's wall-clock while
+ * storage stays UTC. It is a code-derived constant (numeric offset, never user input) and is
+ * validated to `[+-]<n> minutes` before being interpolated — the same treatment as the existing
+ * `'-<N> seconds'` interpolations. A malformed value degrades to no shift rather than injecting.
+ */
+function tzOffset() {
+    const modifier = getSqliteTzOffsetModifier();
+    return /^[+-]\d+ minutes$/.test(modifier) ? modifier : '+0 minutes';
+}
 
 /**
  * Viewer Analytics Service
@@ -26,10 +39,10 @@ function sqlDate(value) {
 // A period resolves to a SQL fragment plus the values its placeholders consume. Callers
 // must splice the params in the same order the fragments appear in their statement.
 const NO_FILTER = { sql: '', params: [] };
-const onDate = (date) => ({ sql: 'AND date(started_at) = ?', params: [sqlDate(date)] });
-const sinceDate = (date) => ({ sql: 'AND date(started_at) >= ?', params: [sqlDate(date)] });
+const onDate = (date) => ({ sql: `AND date(started_at, '${tzOffset()}') = ?`, params: [sqlDate(date)] });
+const sinceDate = (date) => ({ sql: `AND date(started_at, '${tzOffset()}') >= ?`, params: [sqlDate(date)] });
 const betweenDates = (from, to) => ({
-    sql: 'AND date(started_at) >= ? AND date(started_at) < ?',
+    sql: `AND date(started_at, '${tzOffset()}') >= ? AND date(started_at, '${tzOffset()}') < ?`,
     params: [sqlDate(from), sqlDate(to)],
 });
 
@@ -170,7 +183,7 @@ class ViewerAnalyticsService {
             LEFT JOIN (
                 SELECT ip_address, COUNT(*) as visit_count
                 FROM viewer_session_history
-                WHERE date(started_at) <= date(?)
+                WHERE date(started_at, '${tzOffset()}') <= date(?)
                 GROUP BY ip_address
             ) h2 ON h1.ip_address = h2.ip_address
             WHERE 1=1 ${dateFilter}
@@ -210,37 +223,41 @@ class ViewerAnalyticsService {
                 ? Math.round((retentionMetrics.returning_visitors / retentionMetrics.total_unique_visitors) * 100)
                 : 0;
 
+            // started_at is UTC; shift into the configured tz before date()/strftime() so day, hour
+            // and day-of-week buckets read in the operator's wall-clock. See tzOffset().
+            const tz = tzOffset();
+
             const sessionsByDay = query(`
-                SELECT 
-                    date(started_at) as date,
+                SELECT
+                    date(started_at, '${tz}') as date,
                     COUNT(*) as sessions,
                     COUNT(DISTINCT ip_address) as unique_visitors,
                     COALESCE(SUM(duration_seconds), 0) as total_watch_time
                 FROM viewer_session_history
                 WHERE 1=1 ${dateFilter}
-                GROUP BY date(started_at)
+                GROUP BY date(started_at, '${tz}')
                 ORDER BY date ASC
             `, dateParams);
 
             const sessionsByHour = query(`
-                SELECT 
-                    strftime('%H', started_at) as hour,
+                SELECT
+                    strftime('%H', started_at, '${tz}') as hour,
                     COUNT(*) as sessions
                 FROM viewer_session_history
                 WHERE 1=1 ${dateFilter}
-                GROUP BY strftime('%H', started_at)
+                GROUP BY strftime('%H', started_at, '${tz}')
                 ORDER BY hour ASC
             `, dateParams);
 
             const activityHeatmap = query(`
-                SELECT 
-                    strftime('%w', started_at) as day_of_week,
-                    strftime('%H', started_at) as hour,
+                SELECT
+                    strftime('%w', started_at, '${tz}') as day_of_week,
+                    strftime('%H', started_at, '${tz}') as hour,
                     COUNT(*) as sessions,
                     COUNT(DISTINCT ip_address) as unique_visitors
                 FROM viewer_session_history
                 WHERE 1=1 ${dateFilter}
-                GROUP BY strftime('%w', started_at), strftime('%H', started_at)
+                GROUP BY strftime('%w', started_at, '${tz}'), strftime('%H', started_at, '${tz}')
                 ORDER BY day_of_week, hour
             `, dateParams);
 
@@ -285,10 +302,10 @@ class ViewerAnalyticsService {
             `, dateParams);
 
             const peakHours = query(`
-                SELECT strftime('%H', started_at) as hour, COUNT(*) as sessions, COUNT(DISTINCT ip_address) as unique_visitors
+                SELECT strftime('%H', started_at, '${tz}') as hour, COUNT(*) as sessions, COUNT(DISTINCT ip_address) as unique_visitors
                 FROM viewer_session_history
                 WHERE 1=1 ${dateFilter}
-                GROUP BY strftime('%H', started_at)
+                GROUP BY strftime('%H', started_at, '${tz}')
                 ORDER BY sessions DESC LIMIT 5
             `, dateParams);
 

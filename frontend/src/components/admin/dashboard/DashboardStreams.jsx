@@ -107,7 +107,7 @@ export function ViewerSessionsModal({ title, sessions, onClose }) {
                                     {session.startedAt && (
                                         <span>
                                             Mulai {formatTime(session.startedAt, {
-                                                storage: TIMESTAMP_STORAGE.LOCAL_SQL,
+                                                storage: TIMESTAMP_STORAGE.UTC_SQL,
                                                 hour: '2-digit',
                                                 minute: '2-digit',
                                                 second: undefined,

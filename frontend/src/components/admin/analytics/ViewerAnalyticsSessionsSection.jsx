@@ -86,7 +86,7 @@ export default function ViewerAnalyticsSessionsSection({
                                         </td>
                                         <td className="py-3 pr-4 text-content-muted">
                                             {formatDateTime(session.started_at, {
-                                                storage: TIMESTAMP_STORAGE.LOCAL_SQL,
+                                                storage: TIMESTAMP_STORAGE.UTC_SQL,
                                                 day: '2-digit',
                                                 month: 'short',
                                                 hour: '2-digit',

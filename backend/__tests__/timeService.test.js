@@ -16,9 +16,12 @@ import {
     diffLocalSqlSeconds,
     getLocalDate,
     getLocalDateWithOffset,
+    getSqliteTzOffsetModifier,
+    getTimezoneOffsetMinutes,
     nowLocalSql,
     parseUtcSql,
     resolveLocalSqlTimestamp,
+    resolveUtcSqlTimestamp,
     toUtcSql,
 } from '../services/timeService.js';
 
@@ -37,5 +40,17 @@ describe('timeService', () => {
     it('formats UTC SQL explicitly for token and audit storage', () => {
         expect(toUtcSql(new Date('2026-05-05T07:25:00.000Z'))).toBe('2026-05-05 07:25:00');
         expect(parseUtcSql('2026-05-05 07:25:00').toISOString()).toBe('2026-05-05T07:25:00.000Z');
+    });
+
+    it('reports the configured-tz offset and a matching SQLite modifier (Asia/Jakarta = +7h)', () => {
+        expect(getTimezoneOffsetMinutes()).toBe(420);
+        expect(getSqliteTzOffsetModifier()).toBe('+420 minutes');
+    });
+
+    it('resolveUtcSqlTimestamp passes a UTC SQL string through and converts Date/epoch to UTC', () => {
+        // A stored value (already UTC) is preserved, not re-shifted — the stale-cleanup end path.
+        expect(resolveUtcSqlTimestamp('2026-05-05 07:25:00')).toBe('2026-05-05 07:25:00');
+        expect(resolveUtcSqlTimestamp(new Date('2026-05-05T07:25:00.000Z'))).toBe('2026-05-05 07:25:00');
+        expect(resolveUtcSqlTimestamp(Date.UTC(2026, 4, 5, 7, 25, 0))).toBe('2026-05-05 07:25:00');
     });
 });

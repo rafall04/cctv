@@ -13,24 +13,32 @@ import { formatDate } from '../../../utils/admin/viewerAnalyticsAdapter';
 import { TIMESTAMP_STORAGE, useTimezone } from '../../../contexts/TimezoneContext';
 import { Modal } from '../../ui/Modal';
 
-function getSessionLocalDate(startedAt) {
-    if (typeof startedAt === 'string' && /^\d{4}-\d{2}-\d{2}[ T]/.test(startedAt)) {
-        return startedAt.slice(0, 10);
-    }
-
-    const parsed = new Date(startedAt);
-    return Number.isNaN(parsed.getTime()) ? '' : parsed.toISOString().split('T')[0];
+/**
+ * The chart's day label comes from the backend as a CONFIGURED-TZ date (date(started_at, tzOffset)).
+ * started_at itself is stored UTC, so we must bucket each session by the same configured-tz calendar
+ * day — slicing the raw UTC prefix would drop the 00:00–07:00 (WIB) sessions into the previous day.
+ */
+function getSessionLocalDate(startedAt, timezone) {
+    if (!startedAt) return '';
+    const raw = String(startedAt);
+    const iso = raw.includes('T') ? raw : `${raw.replace(' ', 'T')}Z`;
+    const parsed = new Date(iso);
+    if (Number.isNaN(parsed.getTime())) return '';
+    // en-CA renders YYYY-MM-DD; timeZone shifts the UTC instant into the operator's calendar day.
+    return new Intl.DateTimeFormat('en-CA', {
+        timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit',
+    }).format(parsed);
 }
 
 export default function DailyDetailModal({ date, sessions, onClose }) {
-    const { formatTime } = useTimezone();
+    const { formatTime, timezone } = useTimezone();
 
     const filteredSessions = useMemo(() => {
         return sessions.filter((session) => {
             if (!date) return false;
-            return getSessionLocalDate(session.started_at) === date;
+            return getSessionLocalDate(session.started_at, timezone) === date;
         });
-    }, [date, sessions]);
+    }, [date, sessions, timezone]);
 
     const stats = useMemo(() => {
         const uniqueIPs = new Set(filteredSessions.map((session) => session.ip_address));
@@ -70,7 +78,7 @@ export default function DailyDetailModal({ date, sessions, onClose }) {
                                     <tr key={session.id || index} className="text-sm">
                                         <td className="py-3 pr-4 text-content-muted">
                                             {formatTime(session.started_at, {
-                                                storage: TIMESTAMP_STORAGE.LOCAL_SQL,
+                                                storage: TIMESTAMP_STORAGE.UTC_SQL,
                                                 hour: '2-digit',
                                                 minute: '2-digit',
                                                 second: undefined,

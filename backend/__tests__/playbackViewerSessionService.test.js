@@ -74,17 +74,18 @@ describe('playbackViewerSessionService', () => {
         ]);
     });
 
-    it('archives playback history using a configured local SQL cutoff instead of SQLite UTC now', () => {
+    it('archives playback history against a UTC cutoff (90 days before now, UTC)', () => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2026-05-05T17:30:00.000Z'));
 
         playbackViewerSessionService.archiveOldHistory(90);
 
+        // Cutoff is UTC (90 * 86400s before the UTC now) so it matches the UTC-stored started_at.
         expect(executeMock).toHaveBeenNthCalledWith(1, expect.stringContaining('INSERT INTO playback_viewer_session_history_archive'), [
-            '2026-02-05 00:30:00',
+            '2026-02-04 17:30:00',
         ]);
         expect(executeMock).toHaveBeenNthCalledWith(2, expect.stringContaining('DELETE FROM playback_viewer_session_history'), [
-            '2026-02-05 00:30:00',
+            '2026-02-04 17:30:00',
         ]);
 
         vi.useRealTimers();

@@ -9,7 +9,7 @@
 import { query, queryOne, execute } from '../database/connectionPool.js';
 import { v4 as uuidv4 } from 'uuid';
 import { cacheGetOrSetSync, cacheKey, CacheNamespace, CacheTTL } from './cacheService.js';
-import { diffLocalSqlSeconds, getLocalDate, getLocalDateWithOffset, getLocalSqlWithOffsetDays, nowLocalSql, resolveLocalSqlTimestamp } from './timeService.js';
+import { diffLocalSqlSeconds, getLocalDate, getLocalDateWithOffset, getSqliteTzOffsetModifier, resolveUtcSqlTimestamp, toUtcSql } from './timeService.js';
 
 const SESSION_TIMEOUT = 15;
 const CLEANUP_INTERVAL = 60000;
@@ -34,26 +34,29 @@ function normalizeAccessMode(value) {
 
 function buildHistoryDateFilter(period) {
     const todayDate = getDate();
+    // started_at is stored in UTC; shift it into the configured tz before date() so these day
+    // windows (whose bounds are configured-tz dates) line up. See getSqliteTzOffsetModifier.
+    const tz = getSqliteTzOffsetModifier();
 
     if (period?.startsWith('date:')) {
         const customDate = period.substring(5);
         if (/^\d{4}-\d{2}-\d{2}$/.test(customDate)) {
             return {
-                clause: 'AND date(started_at) = ?',
-                params: [customDate],
+                clause: 'AND date(started_at, ?) = ?',
+                params: [tz, customDate],
             };
         }
     }
 
     switch (period) {
         case 'today':
-            return { clause: 'AND date(started_at) = ?', params: [todayDate] };
+            return { clause: 'AND date(started_at, ?) = ?', params: [tz, todayDate] };
         case 'yesterday':
-            return { clause: 'AND date(started_at) = ?', params: [getDateWithOffset(-1)] };
+            return { clause: 'AND date(started_at, ?) = ?', params: [tz, getDateWithOffset(-1)] };
         case '7days':
-            return { clause: 'AND date(started_at) >= ?', params: [getDateWithOffset(-7)] };
+            return { clause: 'AND date(started_at, ?) >= ?', params: [tz, getDateWithOffset(-7)] };
         case '30days':
-            return { clause: 'AND date(started_at) >= ?', params: [getDateWithOffset(-30)] };
+            return { clause: 'AND date(started_at, ?) >= ?', params: [tz, getDateWithOffset(-30)] };
         default:
             return { clause: '', params: [] };
     }
@@ -183,7 +186,7 @@ class PlaybackViewerSessionService {
 
     startSession(payload, request) {
         const sessionId = uuidv4();
-        const timestamp = nowLocalSql();
+        const timestamp = toUtcSql(new Date());
         const ipAddress = this.getRealIP(request);
         const userAgent = request.headers['user-agent'] || '';
         const deviceType = this.getDeviceType(userAgent);
@@ -230,7 +233,7 @@ class PlaybackViewerSessionService {
     }
 
     heartbeat(sessionId) {
-        const timestamp = nowLocalSql();
+        const timestamp = toUtcSql(new Date());
         const result = execute(`
             UPDATE playback_viewer_sessions
             SET last_heartbeat = ?
@@ -251,7 +254,7 @@ class PlaybackViewerSessionService {
         }
 
         const rawEndTimestamp = options.endedAtMs ?? options.endedAt ?? new Date();
-        const timestamp = resolveLocalSqlTimestamp(rawEndTimestamp);
+        const timestamp = resolveUtcSqlTimestamp(rawEndTimestamp);
         const durationSeconds = diffLocalSqlSeconds(session.started_at, timestamp);
 
         execute(`
@@ -300,7 +303,7 @@ class PlaybackViewerSessionService {
     }
 
     cleanupStaleSessions() {
-        const timestamp = nowLocalSql();
+        const timestamp = toUtcSql(new Date());
         const staleSessions = query(`
             SELECT session_id, last_heartbeat
             FROM playback_viewer_sessions
@@ -327,7 +330,9 @@ class PlaybackViewerSessionService {
 
     archiveOldHistory(retentionDays = HISTORY_RETENTION_DAYS) {
         try {
-            const cutoff = getLocalSqlWithOffsetDays(-retentionDays);
+            // UTC cutoff to match the UTC-stored started_at.
+            const days = Number.parseInt(retentionDays, 10) || HISTORY_RETENTION_DAYS;
+            const cutoff = toUtcSql(new Date(Date.now() - days * 86400000));
 
             execute(`
                 INSERT INTO playback_viewer_session_history_archive (
@@ -387,7 +392,7 @@ class PlaybackViewerSessionService {
 
     getActiveSessions(filters = {}) {
         const { clause, params } = buildSessionFilters(filters);
-        const timestamp = nowLocalSql();
+        const timestamp = toUtcSql(new Date());
 
         return query(`
             SELECT

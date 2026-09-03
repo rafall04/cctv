@@ -3,6 +3,7 @@ import { query, queryOne } from '../database/connectionPool.js';
 import mediaMtxService from './mediaMtxService.js';
 import viewerSessionService from './viewerSessionService.js';
 import { getTimezone, formatDateTime } from './timezoneService.js';
+import { getSqliteTzOffsetModifier } from './timeService.js';
 
 // Dates are BOUND, not interpolated — see the same note in viewerAnalyticsService. The
 // guard is kept because it still turns a malformed date into a named error instead of a
@@ -14,12 +15,20 @@ function sqlDate(value) {
     return value;
 }
 
+// started_at is stored UTC; this modifier shifts it into the configured tz before date() so the
+// "today"/window buckets read in the operator's wall-clock. Code-derived numeric offset, validated
+// before interpolation (never user input) — see viewerAnalyticsService.tzOffset for the rationale.
+function tzOffset() {
+    const modifier = getSqliteTzOffsetModifier();
+    return /^[+-]\d+ minutes$/.test(modifier) ? modifier : '+0 minutes';
+}
+
 // A period resolves to a SQL fragment plus the values its placeholders consume.
 const NO_FILTER = { sql: '', params: [] };
-const onDate = (date) => ({ sql: 'AND date(started_at) = ?', params: [sqlDate(date)] });
-const sinceDate = (date) => ({ sql: 'AND date(started_at) >= ?', params: [sqlDate(date)] });
+const onDate = (date) => ({ sql: `AND date(started_at, '${tzOffset()}') = ?`, params: [sqlDate(date)] });
+const sinceDate = (date) => ({ sql: `AND date(started_at, '${tzOffset()}') >= ?`, params: [sqlDate(date)] });
 const betweenDates = (from, to) => ({
-    sql: 'AND date(started_at) >= ? AND date(started_at) < ?',
+    sql: `AND date(started_at, '${tzOffset()}') >= ? AND date(started_at, '${tzOffset()}') < ?`,
     params: [sqlDate(from), sqlDate(to)],
 });
 

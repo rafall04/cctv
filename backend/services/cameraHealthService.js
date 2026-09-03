@@ -24,7 +24,6 @@ import {
     sendCameraStatusNotifications,
     getTelegramAlertConfirmationMs
 } from './telegramService.js';
-import { getTimezone } from './timezoneService.js';
 import recordingControl from './recordingControlService.js';
 import thumbnailService from './thumbnailService.js';
 import settingsService from './settingsService.js';
@@ -113,17 +112,9 @@ const TLS_VERIFICATION_ERROR_CODES = new Set([
 ]);
 
 function getTimestamp() {
-    const timezone = getTimezone();
-    return new Date().toLocaleString('sv-SE', {
-        timeZone: timezone,
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false
-    });
+    // cameras.last_online_check is stored in UTC — the same convention as
+    // camera_runtime_state.last_online_at — and converted to the configured tz only at display time.
+    return new Date().toISOString().slice(0, 19).replace('T', ' ');
 }
 
 function deriveMonitoringStateFromOnline(isOnline) {

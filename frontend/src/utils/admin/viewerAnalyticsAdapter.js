@@ -146,3 +146,22 @@ export function exportToCSV(data, filename) {
     link.download = `${filename}_${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
 }
+
+// Session timestamp columns are stored UTC; render them in the configured tz for export so the
+// download matches the on-screen tables instead of dumping raw UTC wall-clock.
+const SESSION_TIME_COLUMNS = ['started_at', 'ended_at', 'last_visit'];
+
+/**
+ * exportToCSV for session rows, converting their UTC timestamp columns to display strings first.
+ * `formatTs` is a bound `(utcValue) => string` formatter (e.g. formatDateTime with UTC_SQL storage).
+ */
+export function exportSessionsToCSV(rows, filename, formatTs) {
+    const formatted = (rows || []).map((row) => {
+        const out = { ...row };
+        for (const key of SESSION_TIME_COLUMNS) {
+            if (out[key]) out[key] = formatTs(out[key]);
+        }
+        return out;
+    });
+    exportToCSV(formatted, filename);
+}

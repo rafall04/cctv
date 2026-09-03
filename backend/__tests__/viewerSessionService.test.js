@@ -83,11 +83,13 @@ describe('viewerSessionService', () => {
         viewerSessionService.lastRetentionRunAt = Date.now();
     });
 
-    it('uses the explicit end time for history duration and live view stats', () => {
+    it('writes the explicit end time as UTC for history duration and live view stats', () => {
         mockActiveSession();
 
+        // started_at (mock) is UTC; the end instant is given in UTC so the stored value is
+        // tz-runner-independent. Both endpoints are UTC now, so the duration is exact.
         const ended = viewerSessionService.endSession('session-1', {
-            endedAtMs: new Date(2026, 4, 5, 0, 0, 10).getTime(),
+            endedAtMs: Date.UTC(2026, 4, 5, 0, 0, 10),
         });
 
         expect(ended).toBe(true);
@@ -124,7 +126,7 @@ describe('viewerSessionService', () => {
         mockActiveSession();
 
         const ended = viewerSessionService.endSession('session-1', {
-            endedAtMs: new Date(2026, 4, 5, 0, 0, 2).getTime(),
+            endedAtMs: Date.UTC(2026, 4, 5, 0, 0, 2),
         });
 
         expect(ended).toBe(true);
@@ -161,19 +163,20 @@ describe('viewerSessionService', () => {
         }));
     });
 
-    it('archives live history using a configured local SQL cutoff instead of SQLite UTC now', () => {
-        vi.useFakeTimers();
-        vi.setSystemTime(new Date('2026-05-05T17:30:00.000Z'));
-
+    it('archives live history against SQLite\'s own UTC clock (no configured-tz cutoff param)', () => {
         viewerSessionService.archiveOldHistory(90);
 
-        expect(executeMock).toHaveBeenNthCalledWith(1, expect.stringContaining('INSERT INTO viewer_session_history_archive'), [
-            '2026-02-05 00:30:00',
-        ]);
-        expect(executeMock).toHaveBeenNthCalledWith(2, expect.stringContaining('DELETE FROM viewer_session_history'), [
-            '2026-02-05 00:30:00',
-        ]);
-
-        vi.useRealTimers();
+        // Cutoff is now expressed inline as datetime('now','-90 days') (UTC) so it can never drift
+        // from the UTC-stored started_at — no bound cutoff param travels with it.
+        expect(executeMock).toHaveBeenNthCalledWith(
+            1,
+            expect.stringContaining("datetime('now', '-90 days')"),
+            [],
+        );
+        expect(executeMock).toHaveBeenNthCalledWith(
+            2,
+            expect.stringContaining('DELETE FROM viewer_session_history'),
+            [],
+        );
     });
 });

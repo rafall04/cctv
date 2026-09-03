@@ -69,7 +69,7 @@ export default function NotificationDiagnostics() {
 
     function formatRuntimeTimestamp(value) {
         if (!value) return '-';
-        return formatDateTime(value, { storage: TIMESTAMP_STORAGE.LOCAL_SQL });
+        return formatDateTime(value, { storage: TIMESTAMP_STORAGE.UTC_SQL });
     }
 
     function formatAuditTimestamp(value) {
