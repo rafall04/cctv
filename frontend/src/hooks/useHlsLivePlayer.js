@@ -161,9 +161,16 @@ export function useHlsLivePlayer({ videoRef, resolveStream, resetKey, active = t
 
         const fail = ({ kind, httpCode = null, message }) => {
             if (cancelled) return;
+            // Terminal: an error verdict must not be reopened. A still-attached hls instance keeps
+            // polling the playlist and could otherwise re-enter the ERROR handler — firing onError twice,
+            // or (on a 404) reverting the verdict to 'loading' via the warmup-404 retry. Mark cancelled
+            // and tear everything down so no later event or timer can undo this.
+            cancelled = true;
             if (loadTimer) { clearTimeout(loadTimer); loadTimer = null; }
+            if (warmupTimer) { clearTimeout(warmupTimer); warmupTimer = null; }
             stopWatch?.();
             stopNative?.();
+            if (hls) { hls.destroy(); hls = null; }
             setState({ status: 'error', kind, httpCode, message: message || messageFor(kind, httpCode), needsGesture: false });
             onErrorRef.current?.({ kind, httpCode });
         };
@@ -242,8 +249,6 @@ export function useHlsLivePlayer({ videoRef, resolveStream, resetKey, active = t
                     // level, then never emits MANIFEST_PARSED — ignoring it loads forever.
                     if (isCodecFailure(data)) {
                         fail({ kind: 'codec' });
-                        hls.destroy();
-                        hls = null;
                         return;
                     }
                     if (!data.fatal) return;
@@ -279,15 +284,11 @@ export function useHlsLivePlayer({ videoRef, resolveStream, resetKey, active = t
                             return;
                         }
                         fail({ kind: 'codec' });
-                        hls.destroy();
-                        hls = null;
                         return;
                     }
 
                     const { kind, httpCode } = classifyFatalHls(data);
                     fail({ kind, httpCode });
-                    hls.destroy();
-                    hls = null;
                 });
             } else if (canPlayNativeHls(video)) {
                 // Safari/iOS native HLS. hls.js isn't involved, so isCodecFailure can't run — this path

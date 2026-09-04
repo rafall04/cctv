@@ -135,6 +135,23 @@ describe('useHlsLivePlayer in-stream error routing (hls.js)', () => {
         await expectError('denied');
     });
 
+    it('is terminal: a later hls ERROR cannot reopen a picture-watch codec verdict', async () => {
+        const onError = vi.fn();
+        render(<Harness resolveStream={resolveOk} onError={onError} />);
+        const inst = await instance();
+        await waitFor(() => expect(watch.opts).toBeTruthy());
+        // Pre-live: the watch reports "took bytes, decoded nothing" → terminal codec verdict.
+        act(() => watch.opts.onNoPicture({ everHadPicture: false }));
+        await expectError('codec');
+        expect(onError).toHaveBeenCalledTimes(1);
+        // The still-attached instance emits a late fatal 404 — must NOT revert to loading (warmup-404)
+        // or re-fire onError. The verdict is terminal.
+        act(() => inst.emit('ERROR', { fatal: true, type: 'networkError', details: 'levelLoadError', response: { code: 404 } }));
+        expect(screen.getByTestId('status').textContent).toBe('error');
+        expect(screen.getByTestId('kind').textContent).toBe('codec');
+        expect(onError).toHaveBeenCalledTimes(1);
+    });
+
     it('recovers a pre-live fatal media error before ever pronouncing codec', async () => {
         render(<Harness resolveStream={resolveOk} />);
         const inst = await instance();
