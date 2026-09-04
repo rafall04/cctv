@@ -247,10 +247,19 @@ class AreaService {
         // never leak (even as a count) into the landing-page area filter.
         const cameraCountFilter = publicOnly ? `AND ${PUBLIC_LIVE_SQL}` : '';
         const areaColumns = publicOnly ? PUBLIC_AREA_COLUMNS : 'a.*';
+        // ...and the area ROW itself is withheld unless it actually holds a public camera. An area
+        // whose cameras are all owner_private/subscriber-suspended (e.g. a home camera the owner
+        // shares only by token) has no public presence, so its name/address/coords must not leak
+        // into the landing list merely because the row exists. Scoping only the count left the row
+        // visible with camera_count=0 — the exact gap that surfaced private areas publicly.
+        const publicAreaFilter = publicOnly
+            ? `WHERE EXISTS (SELECT 1 FROM cameras c WHERE c.area_id = a.id AND ${PUBLIC_LIVE_SQL})`
+            : '';
         const areas = query(`
             SELECT ${areaColumns},
                    (SELECT COUNT(*) FROM cameras c WHERE c.area_id = a.id ${cameraCountFilter}) as camera_count
             FROM areas a
+            ${publicAreaFilter}
             ORDER BY a.kecamatan, a.kelurahan, a.rw, a.rt, a.name ASC
         `);
 
@@ -264,9 +273,14 @@ class AreaService {
             return { data: cached, isCached: true };
         }
 
-        const kecamatans = query(`SELECT DISTINCT kecamatan FROM areas WHERE kecamatan IS NOT NULL AND kecamatan != '' ORDER BY kecamatan`);
-        const kelurahans = query(`SELECT DISTINCT kelurahan, kecamatan FROM areas WHERE kelurahan IS NOT NULL AND kelurahan != '' ORDER BY kelurahan`);
-        const rws = query(`SELECT DISTINCT rw, kelurahan, kecamatan FROM areas WHERE rw IS NOT NULL AND rw != '' ORDER BY rw`);
+        // This endpoint is public (unauthenticated /api/areas/filters), so every DISTINCT division
+        // is scoped to areas that actually hold a public camera. Otherwise a private area's
+        // kecamatan/kelurahan/rw would leak into the filter dropdowns even though its cameras never
+        // appear. Admin filters derive from their own full area list, not this endpoint.
+        const publicAreaExists = `AND EXISTS (SELECT 1 FROM cameras c WHERE c.area_id = areas.id AND ${PUBLIC_LIVE_SQL})`;
+        const kecamatans = query(`SELECT DISTINCT kecamatan FROM areas WHERE kecamatan IS NOT NULL AND kecamatan != '' ${publicAreaExists} ORDER BY kecamatan`);
+        const kelurahans = query(`SELECT DISTINCT kelurahan, kecamatan FROM areas WHERE kelurahan IS NOT NULL AND kelurahan != '' ${publicAreaExists} ORDER BY kelurahan`);
+        const rws = query(`SELECT DISTINCT rw, kelurahan, kecamatan FROM areas WHERE rw IS NOT NULL AND rw != '' ${publicAreaExists} ORDER BY rw`);
 
         const data = {
             kecamatans: kecamatans.map(k => k.kecamatan),

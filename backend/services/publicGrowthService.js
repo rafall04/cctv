@@ -154,6 +154,15 @@ export function getPublicAreaBySlug(areaSlug) {
 
     assertArea(row, normalizedAreaSlug);
 
+    // A slug that resolves to an area with zero public cameras (all owner_private, or
+    // subscriber-suspended) is treated as not found: its name must not leak just because the
+    // row exists and the slug was guessed. Matches the landing list, which withholds the row.
+    if (Number(row.camera_count || 0) === 0) {
+        const error = new Error(`Area ${normalizedAreaSlug} tidak ditemukan`);
+        error.statusCode = 404;
+        throw error;
+    }
+
     return {
         id: row.id,
         name: row.name,

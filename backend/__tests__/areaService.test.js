@@ -3,6 +3,38 @@ import * as connectionPool from '../database/connectionPool.js';
 import cameraHealthService from '../services/cameraHealthService.js';
 import areaService from '../services/areaService.js';
 
+describe('areaService.getAllAreas — public surface must not leak private areas', () => {
+    beforeEach(() => areaService.invalidateAreaCache());
+    afterEach(() => { vi.restoreAllMocks(); areaService.invalidateAreaCache(); });
+
+    it('scopes the PUBLIC list to areas that actually hold a public camera (EXISTS + community)', () => {
+        const querySpy = vi.spyOn(connectionPool, 'query').mockReturnValue([]);
+        areaService.getAllAreas({ publicOnly: true });
+        const sql = querySpy.mock.calls[0][0];
+        // The area ROW is withheld unless a public camera exists — otherwise a private area (all
+        // owner_private/subscriber-suspended cameras) leaks its name/coords into the landing list.
+        expect(sql).toContain('WHERE EXISTS');
+        expect(sql).toContain("camera_class = 'community'");
+    });
+
+    it('does NOT scope the ADMIN list — admins still see every area', () => {
+        const querySpy = vi.spyOn(connectionPool, 'query').mockReturnValue([]);
+        areaService.getAllAreas();
+        const sql = querySpy.mock.calls[0][0];
+        expect(sql).not.toContain('WHERE EXISTS');
+    });
+
+    it('scopes the PUBLIC filter dropdowns to areas with a public camera', () => {
+        const querySpy = vi.spyOn(connectionPool, 'query').mockReturnValue([]);
+        areaService.getAreaFilters();
+        // Every DISTINCT division query must gate on an existing public camera.
+        for (const [sql] of querySpy.mock.calls) {
+            expect(sql).toContain('EXISTS (SELECT 1 FROM cameras c WHERE c.area_id = areas.id');
+            expect(sql).toContain("camera_class = 'community'");
+        }
+    });
+});
+
 describe('areaService.getAdminOverview', () => {
     beforeEach(() => {
         areaService.invalidateAreaCache();
