@@ -49,6 +49,9 @@ const WARMUP_RETRY_DELAY_MS = 1200;
 // A fatal MEDIA_ERROR with no codec detail may be a recoverable pipeline hiccup — recover before
 // pronouncing 'codec', exactly as VideoPopup/MultiViewVideoItem do.
 const MEDIA_MAX_RECOVERY = 2;
+// Wall-clock backstop for the NATIVE (Safari/iOS) branch only: it has no fatal-timeout ladder like
+// hls.js, so a socket that opens then delivers nothing (no bytes, no 'error') would spin forever.
+const NATIVE_LOAD_TIMEOUT_MS = 30000;
 
 // A FATAL hls.js error (BEFORE go-live) → a kind + the HTTP code it carried, if any.
 // NOTE: an in-stream 404 is NEVER 'notfound' — the stream URL was already resolved, so the camera
@@ -127,6 +130,7 @@ export function useHlsLivePlayer({ videoRef, resolveStream, resetKey, active = t
         let stopWatch = null;
         let stopNative = null;
         let warmupTimer = null;
+        let loadTimer = null;
         let hls = null;
         let HlsClass = null;
         // A LOCAL flag, never React state: the ERROR handler closes over this synchronously to decide
@@ -151,11 +155,13 @@ export function useHlsLivePlayer({ videoRef, resolveStream, resetKey, active = t
         const goPlaying = () => {
             if (cancelled) return;
             live = true;
+            if (loadTimer) { clearTimeout(loadTimer); loadTimer = null; }
             setState((prev) => (prev.status === 'playing' ? prev : PLAYING_STATE));
         };
 
         const fail = ({ kind, httpCode = null, message }) => {
             if (cancelled) return;
+            if (loadTimer) { clearTimeout(loadTimer); loadTimer = null; }
             stopWatch?.();
             stopNative?.();
             setState({ status: 'error', kind, httpCode, message: message || messageFor(kind, httpCode), needsGesture: false });
@@ -292,6 +298,10 @@ export function useHlsLivePlayer({ videoRef, resolveStream, resetKey, active = t
                     onError: () => fail({ kind: live ? 'stalled' : 'network' }),
                 });
                 startWatch();
+                // Backstop the one branch with no fatal-timeout of its own (see NATIVE_LOAD_TIMEOUT_MS):
+                // if no decoded frame and no element error arrive in time, surface a retryable error
+                // instead of an eternal spinner. Cleared the moment we go live or fail.
+                loadTimer = setTimeout(() => { if (!cancelled && !live) fail({ kind: 'network' }); }, NATIVE_LOAD_TIMEOUT_MS);
             } else {
                 fail({ kind: 'unsupported' });
             }
@@ -302,6 +312,7 @@ export function useHlsLivePlayer({ videoRef, resolveStream, resetKey, active = t
         return () => {
             cancelled = true;
             if (warmupTimer) clearTimeout(warmupTimer);
+            if (loadTimer) clearTimeout(loadTimer);
             stopWatch?.();
             stopNative?.();
             if (hls) {
