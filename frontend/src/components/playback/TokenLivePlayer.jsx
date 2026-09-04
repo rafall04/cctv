@@ -17,6 +17,7 @@ import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { getLiveGrant, buildSecureStreamUrl } from '../../services/streamTokenService';
 import { isCodecFailure } from '../../utils/publicPopupState.js';
 import { canPlayNativeHls, startNativeHlsPlayback } from '../../utils/nativeHlsPlayback.js';
+import { getDeviceHLSConfig } from '../../utils/hlsConfig.js';
 
 export default function TokenLivePlayer({ camera, onClose }) {
     const dialogRef = useRef(null);
@@ -48,14 +49,12 @@ export default function TokenLivePlayer({ camera, onClose }) {
                 if (cancelled) return;
 
                 if (Hls.isSupported()) {
-                    const hls = new Hls({
-                        enableWorker: true,
-                        lowLatencyMode: false,
-                        backBufferLength: 10,
-                        maxBufferLength: 15,
-                        liveSyncDurationCount: 2,
-                        manifestLoadingMaxRetry: 2,
-                    });
+                    // Reuse the SAME device-adaptive, mobile-resilient config VideoPopup uses — the
+                    // minimal inline config here defaulted hls.js to a 10s manifest timeout, which
+                    // times out on the Indonesian mobile → Cloudflare-SIN path (manifestLoadError).
+                    // getDeviceHLSConfig gives 30s manifest/level/frag timeouts + retries + adaptive
+                    // buffers, so the token live player is as robust as the normal live popup.
+                    const hls = new Hls(getDeviceHLSConfig());
                     hlsRef.current = hls;
                     hls.loadSource(securedUrl);
                     hls.attachMedia(video);
