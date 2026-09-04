@@ -29,7 +29,7 @@ import { resolveTokenScopedCameras } from '../utils/playbackTokenCameras.js';
 
 import PlaybackHeader from '../components/playback/PlaybackHeader';
 import PlaybackVideo from '../components/playback/PlaybackVideo';
-import TokenLivePlayer from '../components/playback/TokenLivePlayer';
+import TokenLiveButton from '../components/playback/TokenLiveButton';
 import PlaybackTimeline from '../components/playback/PlaybackTimeline';
 import PlaybackSegmentList from '../components/playback/PlaybackSegmentList';
 import PlaybackSegmentStepper from '../components/playback/PlaybackSegmentStepper.jsx';
@@ -104,8 +104,6 @@ function Playback({
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [seekWarning, setSeekWarning] = useState(null);
     const [autoPlayNotification, setAutoPlayNotification] = useState(null);
-    // Set to a camera object to open the token-holder live modal (only when the active token allows live).
-    const [liveModalCamera, setLiveModalCamera] = useState(null);
     const [autoPlayEnabled, setAutoPlayEnabled] = useState(() => {
         // Browsers that block site data (Chrome "block all", some in-app WebViews) THROW on any
         // localStorage access — an unguarded read here escapes render and white-screens /playback.
@@ -1082,9 +1080,6 @@ function Playback({
 
     return (
         <>
-            {liveModalCamera && (
-                <TokenLivePlayer camera={liveModalCamera} onClose={() => setLiveModalCamera(null)} />
-            )}
             {showPlaybackPopunder && playbackPopunderTriggerId > 0 && (
                 <GlobalAdScript
                     key={playbackPopunderTriggerId}
@@ -1097,23 +1092,7 @@ function Playback({
             <div className="max-w-7xl mx-auto space-y-3 sm:space-y-4 md:space-y-6">
                 <PlaybackHeader cameras={visiblePlaybackCameras} selectedCamera={selectedCamera} onCameraChange={handleCameraChange} onShare={isAdminPlayback ? null : handleShare} />
 
-                {/*
-                 * Token holders whose token carries the live entitlement can jump from the recording
-                 * to the live feed. Gated on the token-level allow_live from activation; the backend
-                 * re-checks per-camera on the grant, so a per-camera denial still fails closed.
-                 */}
-                {!isAdminPlayback && selectedCamera && tokenStatus?.allow_live && (
-                    <div className="flex justify-end">
-                        <button
-                            type="button"
-                            onClick={() => setLiveModalCamera(selectedCamera)}
-                            className="inline-flex items-center gap-2 rounded-control bg-status-live/15 px-3 py-1.5 text-sm font-medium text-status-live transition-colors hover:bg-status-live/25"
-                        >
-                            <span className="h-2 w-2 rounded-full bg-status-live" />
-                            Tonton Live
-                        </button>
-                    </div>
-                )}
+                <TokenLiveButton camera={selectedCamera} enabled={!isAdminPlayback && !!tokenStatus?.allow_live} />
 
                 <PlaybackVideo
                     videoRef={attachVideo} containerRef={containerRef} isLoadingSegments={isWaitingForSegments}

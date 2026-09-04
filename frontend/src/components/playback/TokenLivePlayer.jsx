@@ -154,7 +154,7 @@ export default function TokenLivePlayer({ camera, onClose }) {
                     </div>
                     <button
                         onClick={onClose}
-                        className="rounded-lg px-3 py-1.5 text-sm text-content-subtle transition-colors hover:bg-gray-800 hover:text-white"
+                        className="rounded-lg px-3 py-1.5 text-sm text-content-subtle transition-colors hover:bg-white/10 hover:text-white"
                     >
                         Tutup ✕
                     </button>

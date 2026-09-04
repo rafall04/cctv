@@ -218,7 +218,7 @@ export default function PlaybackTokenForm({
                                                 <select
                                                     value={form.camera_rules[camera.id]?.allow_live === true ? 'yes' : form.camera_rules[camera.id]?.allow_live === false ? 'no' : 'inherit'}
                                                     onChange={(event) => onUpdateCameraRule(camera.id, 'allow_live', event.target.value === 'inherit' ? null : event.target.value === 'yes')}
-                                                    className="w-full rounded-lg border border-edge-strong px-2 py-1 text-xs dark:bg-gray-950 dark:text-white"
+                                                    className="w-full rounded-lg border border-edge-strong bg-surface px-2 py-1 text-xs text-content"
                                                 >
                                                     <option value="inherit">Ikut token</option>
                                                     <option value="yes">Live: Ya</option>
