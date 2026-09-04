@@ -13,7 +13,7 @@
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Volume2, VolumeX, Maximize, Minimize } from 'lucide-react';
+import { Volume2, VolumeX, Maximize, Minimize, ZoomIn, ZoomOut, RotateCcw, Camera } from 'lucide-react';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
 import ZoomableVideo from '../MultiView/ZoomableVideo';
 import { getLiveGrant, buildSecureStreamUrl } from '../../services/streamTokenService';
@@ -21,17 +21,21 @@ import { isCodecFailure } from '../../utils/publicPopupState.js';
 import { canPlayNativeHls, startNativeHlsPlayback } from '../../utils/nativeHlsPlayback.js';
 import { getDeviceHLSConfig } from '../../utils/hlsConfig.js';
 import { toggleElementFullscreen } from '../../utils/fullscreen.js';
+import { takeSnapshot } from '../../utils/snapshotHelper';
 
 export default function TokenLivePlayer({ camera, onClose }) {
     const dialogRef = useRef(null);
     useFocusTrap(dialogRef, { onEscape: onClose });
     const videoRef = useRef(null);
     const containerRef = useRef(null);
+    const zoomRef = useRef(null);
     const hlsRef = useRef(null);
     const nativeStopRef = useRef(null);
     const [state, setState] = useState({ status: 'loading', message: '' });
     const [muted, setMuted] = useState(true);
     const [isFullscreen, setIsFullscreen] = useState(false);
+    const [zoom, setZoom] = useState(1);
+    const [snapshotMsg, setSnapshotMsg] = useState('');
 
     // Native fullscreen state — the button icon and ZoomableVideo's fill-on-zoom both read it.
     useEffect(() => {
@@ -61,6 +65,14 @@ export default function TokenLivePlayer({ camera, onClose }) {
     const toggleFs = useCallback(() => {
         toggleElementFullscreen(containerRef.current);
     }, []);
+
+    const handleSnapshot = useCallback(async () => {
+        const v = videoRef.current;
+        if (!v) return;
+        const res = await takeSnapshot(v, { cameraName: camera.name || 'kamera', watermarkEnabled: true });
+        setSnapshotMsg(res.message || '');
+        setTimeout(() => setSnapshotMsg(''), 2500);
+    }, [camera.name]);
 
     useEffect(() => {
         let cancelled = false;
@@ -207,8 +219,9 @@ export default function TokenLivePlayer({ camera, onClose }) {
                 </div>
                 <div ref={containerRef} className="relative aspect-video overflow-hidden bg-black">
                     {/* ZoomableVideo = the SAME clean player VideoPopup uses: no native seek/pause bar,
-                        object-contain, pinch-zoom + pan, fullscreen fill. hls.js attaches to videoRef. */}
-                    <ZoomableVideo videoRef={videoRef} isFullscreen={isFullscreen} />
+                        object-contain, pinch-zoom + pan, fullscreen fill (no black bars). hls.js
+                        attaches to videoRef; the ref exposes zoomIn/zoomOut/reset for the buttons. */}
+                    <ZoomableVideo ref={zoomRef} videoRef={videoRef} isFullscreen={isFullscreen} onZoomChange={setZoom} />
 
                     {state.status === 'playing' && (
                         <>
@@ -216,11 +229,34 @@ export default function TokenLivePlayer({ camera, onClose }) {
                                 <span className="h-2 w-2 rounded-full bg-status-live animate-pulse" />
                                 <span className="text-xs font-semibold uppercase tracking-wide text-white">Live</span>
                             </div>
-                            <div className="absolute bottom-3 right-3 z-10 flex items-center gap-1 rounded-xl bg-black/55 p-1">
-                                <button type="button" onClick={toggleMute} aria-label={muted ? 'Bunyikan suara' : 'Bisukan'} className="rounded-lg p-1.5 text-white transition-colors hover:bg-white/20">
+
+                            {snapshotMsg && (
+                                <div className="pointer-events-none absolute left-1/2 top-3 z-20 -translate-x-1/2 rounded-full bg-black/70 px-3 py-1 text-xs text-white">
+                                    {snapshotMsg}
+                                </div>
+                            )}
+
+                            <div className="absolute bottom-3 right-3 z-10 flex items-center gap-0.5 rounded-xl bg-black/55 p-1 text-white">
+                                <button type="button" onClick={() => zoomRef.current?.zoomOut()} disabled={zoom <= 1} aria-label="Perkecil" title="Perkecil" className="rounded-lg p-1.5 transition-colors hover:bg-white/20 disabled:opacity-30">
+                                    <ZoomOut className="h-4 w-4" />
+                                </button>
+                                <span className="w-9 text-center text-[10px] font-medium tabular-nums">{Math.round(zoom * 100)}%</span>
+                                <button type="button" onClick={() => zoomRef.current?.zoomIn()} disabled={zoom >= 4} aria-label="Perbesar" title="Perbesar" className="rounded-lg p-1.5 transition-colors hover:bg-white/20 disabled:opacity-30">
+                                    <ZoomIn className="h-4 w-4" />
+                                </button>
+                                {zoom > 1 && (
+                                    <button type="button" onClick={() => zoomRef.current?.reset()} aria-label="Reset zoom" title="Reset zoom" className="rounded-lg p-1.5 transition-colors hover:bg-white/20">
+                                        <RotateCcw className="h-4 w-4" />
+                                    </button>
+                                )}
+                                <span className="mx-0.5 h-5 w-px bg-white/20" />
+                                <button type="button" onClick={handleSnapshot} aria-label="Ambil screenshot" title="Ambil screenshot" className="rounded-lg p-1.5 transition-colors hover:bg-white/20">
+                                    <Camera className="h-4 w-4" />
+                                </button>
+                                <button type="button" onClick={toggleMute} aria-label={muted ? 'Bunyikan suara' : 'Bisukan'} title={muted ? 'Bunyikan' : 'Bisukan'} className="rounded-lg p-1.5 transition-colors hover:bg-white/20">
                                     {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
                                 </button>
-                                <button type="button" onClick={toggleFs} aria-label={isFullscreen ? 'Keluar layar penuh' : 'Layar penuh'} className="rounded-lg p-1.5 text-white transition-colors hover:bg-white/20">
+                                <button type="button" onClick={toggleFs} aria-label={isFullscreen ? 'Keluar layar penuh' : 'Layar penuh'} title={isFullscreen ? 'Keluar layar penuh' : 'Layar penuh'} className="rounded-lg p-1.5 transition-colors hover:bg-white/20">
                                     {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
                                 </button>
                             </div>
