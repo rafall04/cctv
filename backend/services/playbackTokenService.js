@@ -60,10 +60,8 @@ const DEFAULT_SESSION_TIMEOUT_SECONDS = 60;
 const MIN_SESSION_TIMEOUT_SECONDS = 30;
 const MAX_SESSION_TIMEOUT_SECONDS = 3600;
 const SESSION_TOUCH_THROTTLE_SECONDS = 30;
-// Token-level touch throttle: keeps use_count + audit log from being hammered
-// by every HLS segment GET. Audit-noisy events (segment/playlist GETs that
-// hit the same token within this window) are skipped; activation, share,
-// playlist, and admin events bypass the throttle so they always record.
+// Token-level touch throttle: keeps use_count + audit log from being hammered by every HLS segment
+// GET (access/access_segments within this window are skipped; activation/share/admin always record).
 const TOKEN_TOUCH_THROTTLE_SECONDS = 60;
 const TOKEN_TOUCH_THROTTLED_EVENTS = new Set(['access', 'access_segments']);
 const DEFAULT_SESSION_RETENTION_DAYS = 7;
@@ -253,6 +251,8 @@ function sanitizeTokenRow(row) {
         camera_names: Array.isArray(row.camera_names) ? row.camera_names : [],
         allowed_camera_ids: [...new Set(allowedCameraIds)],
         playback_window_hours: row.playback_window_hours,
+        // Token-wide LIVE default (0/absent = playback-only); per-camera rules override it downstream.
+        allow_live: row.allow_live === 1 || row.allow_live === true,
         // Absolute date-range depth (an alternative to the rolling window): when either is set, the
         // token sees exactly [from, to] and the rolling window is ignored (enforced downstream).
         playback_from: row.playback_from || null,
@@ -435,12 +435,7 @@ class PlaybackTokenService {
         }
     }
 
-    /**
-     * Touch a token's usage stats and write an audit row, with throttling for
-     * the noisy per-segment events so HLS playback does not flood the audit log
-     * or hammer `use_count`. Events not in `TOKEN_TOUCH_THROTTLED_EVENTS`
-     * (activation, share, playlist, admin) always write through.
-     */
+    /** Touch usage stats + write an audit row; throttles noisy per-segment events (see TOKEN_TOUCH_THROTTLED_EVENTS) so HLS playback can't flood the log or hammer use_count. */
     touchTokenUsage(token, { eventType = 'access', cameraId = null, request = {}, detail = null } = {}) {
         if (!token?.id) {
             return { recorded: false, throttled: false };
@@ -466,12 +461,7 @@ class PlaybackTokenService {
         return { recorded: true, throttled: false };
     }
 
-    /**
-     * Record an audit row for a failed public activation attempt. token_id
-     * stays null (we don't know which token was being guessed); IP/UA come
-     * from the request so brute-force attempts become visible in the audit
-     * log instead of disappearing into thrown 401s.
-     */
+    /** Audit a failed public activation. token_id stays null (unknown which token was guessed); IP/UA come from the request so brute-force attempts stay visible instead of vanishing into thrown 401s. */
     logFailedActivation({ request = {}, reason = 'invalid', mode = 'token' } = {}) {
         try {
             this.recordAudit({
@@ -630,11 +620,12 @@ class PlaybackTokenService {
         const shareTemplate = typeof payload.share_template === 'string' && payload.share_template.trim()
             ? payload.share_template.trim()
             : DEFAULT_SHARE_TEMPLATE;
+        const allowLive = payload.allow_live === true || payload.allow_live === 1 || payload.allow_live === '1' ? 1 : 0;
 
         const result = execute(
             `INSERT INTO playback_tokens
-            (label, token_hash, token_prefix, share_key_hash, share_key_prefix, preset, scope_type, camera_ids_json, area_ids_json, playback_window_hours, playback_from, playback_to, expires_at, max_active_sessions, session_limit_mode, session_timeout_seconds, client_note, share_template, created_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            (label, token_hash, token_prefix, share_key_hash, share_key_prefix, preset, scope_type, camera_ids_json, area_ids_json, playback_window_hours, playback_from, playback_to, expires_at, max_active_sessions, session_limit_mode, session_timeout_seconds, client_note, share_template, allow_live, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 label,
                 tokenHash,
@@ -656,6 +647,7 @@ class PlaybackTokenService {
                 sessionPolicy.sessionTimeoutSeconds,
                 sessionPolicy.clientNote,
                 shareTemplate,
+                allowLive,
                 request?.user?.id || null,
             ]
         );
@@ -779,6 +771,9 @@ class PlaybackTokenService {
             : (Object.prototype.hasOwnProperty.call(payload, 'playback_window_hours')
                 ? normalizePositiveInteger(payload.playback_window_hours)
                 : existing.playback_window_hours);
+        // Edit path: field absent → keep the stored value unchanged.
+        const allowLive = Object.prototype.hasOwnProperty.call(payload, 'allow_live')
+            ? (payload.allow_live === true || payload.allow_live === 1 || payload.allow_live === '1' ? 1 : 0) : (existing.allow_live ? 1 : 0);
         const rawRules = Array.isArray(payload.camera_rules)
             ? payload.camera_rules
             : existing.camera_ids.map((cameraId) => ({ camera_id: cameraId, enabled: true }));
@@ -816,6 +811,7 @@ class PlaybackTokenService {
                 session_timeout_seconds = ?,
                 client_note = ?,
                 share_template = ?,
+                allow_live = ?,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = ?`,
             [
@@ -832,6 +828,7 @@ class PlaybackTokenService {
                 sessionPolicy.sessionTimeoutSeconds,
                 sessionPolicy.clientNote,
                 shareTemplate,
+                allowLive,
                 normalizedTokenId,
             ]
         );
@@ -857,6 +854,7 @@ class PlaybackTokenService {
                     'session_timeout_seconds',
                     'client_note',
                     'share_template',
+                    'allow_live',
                 ],
             },
         });
@@ -1338,6 +1336,8 @@ class PlaybackTokenService {
         return {
             ...token,
             effective_playback_window_hours: cameraPolicy.playbackWindowHours ?? token.playback_window_hours,
+            // Effective per-camera LIVE decision (token default + override); a live grant reads only this.
+            effective_allow_live: cameraPolicy.allowLive === true,
             allowed_camera_ids: allowedCameraIds,
             camera_rules: cameraRules,
             default_camera_id: token.scope_type === 'selected'

@@ -1,4 +1,4 @@
-import { getStreamUrls, getAllActiveStreams, generateStreamToken } from '../controllers/streamController.js';
+import { getStreamUrls, getAllActiveStreams, generateStreamToken, generateLiveGrant } from '../controllers/streamController.js';
 import { streamCameraIdParamSchema } from '../middleware/schemaValidators.js';
 import { optionalAuthMiddleware } from '../middleware/authMiddleware.js';
 
@@ -23,5 +23,13 @@ export default async function streamRoutes(fastify, options) {
         schema: streamCameraIdParamSchema,
         onRequest: [optionalAuthMiddleware],
         handler: generateStreamToken,
+    });
+
+    // Mint a LIVE stream_access token from a PLAYBACK token (Playback header / cookie).
+    // For token holders (non-account) whose token carries the live entitlement for this camera.
+    fastify.get('/:cameraId/live-token', {
+        schema: streamCameraIdParamSchema,
+        onRequest: [optionalAuthMiddleware],
+        handler: generateLiveGrant,
     });
 }

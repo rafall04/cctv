@@ -119,7 +119,7 @@ function TokenEditFields({
                                 {selectedEditCameraIds.has(camera.id) && (
                                     <div className="mt-1">
                                         <p className="mb-1 text-[10px] text-content-subtle">Khusus kamera ini (opsional — kosong = ikut token):</p>
-                                        <div className="grid gap-1 sm:grid-cols-3">
+                                        <div className="grid gap-1 sm:grid-cols-4">
                                             <label className="block">
                                                 <span className="mb-0.5 block text-[10px] text-content-subtle">Maks. mundur (jam)</span>
                                                 <input type="number" min="1" placeholder="ikut token" value={editForm.camera_rules[camera.id]?.playback_window_hours || ''} onChange={(event) => onUpdateEditCameraRule(camera.id, 'playback_window_hours', event.target.value)} className="w-full rounded-control border border-edge-strong bg-surface px-2 py-1 text-xs text-content" />
@@ -127,6 +127,18 @@ function TokenEditFields({
                                             <label className="block">
                                                 <span className="mb-0.5 block text-[10px] text-content-subtle">Berlaku sampai</span>
                                                 <input type="datetime-local" value={toDateTimeLocal(editForm.camera_rules[camera.id]?.expires_at)} onChange={(event) => onUpdateEditCameraRule(camera.id, 'expires_at', event.target.value)} className="w-full rounded-control border border-edge-strong bg-surface px-2 py-1 text-xs text-content" />
+                                            </label>
+                                            <label className="block">
+                                                <span className="mb-0.5 block text-[10px] text-content-subtle">Live</span>
+                                                <select
+                                                    value={editForm.camera_rules[camera.id]?.allow_live === true ? 'yes' : editForm.camera_rules[camera.id]?.allow_live === false ? 'no' : 'inherit'}
+                                                    onChange={(event) => onUpdateEditCameraRule(camera.id, 'allow_live', event.target.value === 'inherit' ? null : event.target.value === 'yes')}
+                                                    className="w-full rounded-control border border-edge-strong bg-surface px-2 py-1 text-xs text-content"
+                                                >
+                                                    <option value="inherit">Ikut token</option>
+                                                    <option value="yes">Live: Ya</option>
+                                                    <option value="no">Live: Tidak</option>
+                                                </select>
                                             </label>
                                             <label className="block">
                                                 <span className="mb-0.5 block text-[10px] text-content-subtle">Catatan</span>
@@ -140,6 +152,19 @@ function TokenEditFields({
                     </div>
                 </div>
             )}
+
+            <label className="flex items-start gap-2 rounded-control border border-edge bg-surface-sunken p-2">
+                <input
+                    type="checkbox"
+                    checked={!!editForm.allow_live}
+                    onChange={(event) => onUpdateEditForm('allow_live', event.target.checked)}
+                    className="mt-0.5"
+                />
+                <span className="text-xs">
+                    <span className="block font-semibold text-content">Izinkan Live (bukan hanya playback)</span>
+                    <span className="block text-[11px] text-content-subtle">Default untuk semua kamera token; bisa ditimpa per kamera di atas.</span>
+                </span>
+            </label>
 
             {/*
               * These two were in the payload the whole time but had no inputs, so the editor could

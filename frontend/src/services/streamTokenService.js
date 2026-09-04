@@ -61,8 +61,32 @@ export const getSecureStreamUrl = async (cameraId) => {
 };
 
 /**
+ * Get a LIVE stream grant from a PLAYBACK token (for non-account token holders).
+ *
+ * The playback token travels as the HttpOnly cookie set at activation, so this GET needs no explicit
+ * credential — the backend reads the cookie, checks the token covers this camera AND carries the live
+ * entitlement, and returns BOTH the short-lived stream_access token and the HLS URL. That is why this
+ * path does NOT call the canViewLive-gated /api/stream/:id or /token endpoints (which a token holder
+ * is not entitled to): the live-token response already carries everything the player needs.
+ *
+ * @param {number} cameraId
+ * @returns {Promise<{streamUrl: string, token: string, expiresIn: number}>}
+ * @throws on 401/403 (token missing/does not allow live for this camera), 402 (suspended), 404.
+ */
+export const getLiveGrant = async (cameraId) => {
+    const response = await apiClient.get(`/api/stream/${cameraId}/live-token`, {
+        skipGlobalErrorNotification: true,
+    });
+    if (!response.data?.success) {
+        throw new Error(response.data?.message || 'Gagal mendapatkan akses live');
+    }
+    const { token, streamUrl, expiresIn } = response.data.data;
+    return { token, streamUrl, expiresIn };
+};
+
+/**
  * Build complete HLS URL with token query parameter
- * 
+ *
  * @param {string} baseUrl - Base HLS URL (e.g., /hls/uuid/index.m3u8)
  * @param {string} token - Stream access token
  * @returns {string} Complete URL with token
@@ -106,6 +130,7 @@ export const preloadStreamTokens = async (cameraIds) => {
 
 export default {
     getSecureStreamUrl,
+    getLiveGrant,
     buildSecureStreamUrl,
     clearTokenCache,
     preloadStreamTokens,

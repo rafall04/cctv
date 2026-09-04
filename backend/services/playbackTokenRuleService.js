@@ -76,6 +76,19 @@ function isMissingRuleSchemaError(error) {
         );
 }
 
+/**
+ * A per-camera live OVERRIDE is tri-state: null = inherit the token-level default, true = live
+ * allowed for this camera, false = live denied for this camera even if the token default is on.
+ * Anything not clearly true/false becomes null so an unreadable value fails to "inherit", never to
+ * "grant" — live is opt-in and must never be widened by a malformed value.
+ */
+function normalizeAllowLiveOverride(value) {
+    if (value === null || value === undefined || value === '') {
+        return null;
+    }
+    return value === true || value === 1 || value === '1';
+}
+
 function normalizeRuleRow(row) {
     return {
         camera_id: Number.parseInt(row.camera_id, 10),
@@ -83,6 +96,7 @@ function normalizeRuleRow(row) {
         playback_window_hours: normalizePositiveInteger(row.playback_window_hours),
         expires_at: row.expires_at || null,
         note: typeof row.note === 'string' ? row.note : '',
+        allow_live: normalizeAllowLiveOverride(row.allow_live),
     };
 }
 
@@ -107,6 +121,7 @@ class PlaybackTokenRuleService {
                 playback_window_hours: normalizePositiveInteger(rawRule?.playback_window_hours ?? rawRule?.playbackWindowHours),
                 expires_at: normalizeDate(rawRule?.expires_at ?? rawRule?.expiresAt),
                 note: typeof rawRule?.note === 'string' ? rawRule.note.trim() : '',
+                allow_live: normalizeAllowLiveOverride(rawRule?.allow_live ?? rawRule?.allowLive),
             });
         });
 
@@ -127,8 +142,8 @@ class PlaybackTokenRuleService {
             rules.forEach((rule) => {
                 execute(
                     `INSERT INTO playback_token_camera_rules
-                    (token_id, camera_id, enabled, playback_window_hours, expires_at, note)
-                    VALUES (?, ?, ?, ?, ?, ?)`,
+                    (token_id, camera_id, enabled, playback_window_hours, expires_at, note, allow_live)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)`,
                     [
                         normalizedTokenId,
                         rule.camera_id,
@@ -136,6 +151,7 @@ class PlaybackTokenRuleService {
                         rule.playback_window_hours,
                         rule.expires_at,
                         rule.note,
+                        rule.allow_live === null ? null : (rule.allow_live ? 1 : 0),
                     ]
                 );
             });
@@ -152,7 +168,7 @@ class PlaybackTokenRuleService {
 
         try {
             return query(
-                `SELECT camera_id, enabled, playback_window_hours, expires_at, note
+                `SELECT camera_id, enabled, playback_window_hours, expires_at, note, allow_live
                 FROM playback_token_camera_rules
                 WHERE token_id = ?
                 ORDER BY camera_id ASC`,
@@ -199,6 +215,14 @@ class PlaybackTokenRuleService {
             ? matchingRule
             : null;
         const tokenWindow = normalizePositiveInteger(token?.playback_window_hours);
+        // Live is the token-wide default UNLESS a per-camera rule overrides it (tri-state: the
+        // override is only consulted when it is not null). allowLive is meaningful only when the
+        // camera is allowed at all — every denied branch returns allowLive:false so live can never
+        // outrun playback: no playback access => no live access, by construction.
+        const tokenAllowLive = token?.allow_live === true || token?.allow_live === 1;
+        const ruleAllowLive = enabledRule && enabledRule.allow_live !== null
+            ? enabledRule.allow_live
+            : tokenAllowLive;
 
         if (enabledRule?.expires_at && (parseUtcSql(enabledRule.expires_at)?.getTime() ?? 0) <= Date.now()) {
             return {
@@ -206,6 +230,7 @@ class PlaybackTokenRuleService {
                 reason: 'camera_rule_expired',
                 message: 'Akses token untuk kamera ini sudah kedaluwarsa',
                 playbackWindowHours: null,
+                allowLive: false,
                 ruleSource: 'camera_rule',
             };
         }
@@ -216,6 +241,7 @@ class PlaybackTokenRuleService {
                 reason: null,
                 message: null,
                 playbackWindowHours: enabledRule.playback_window_hours || tokenWindow,
+                allowLive: ruleAllowLive,
                 ruleSource: 'camera_rule',
             };
         }
@@ -227,6 +253,7 @@ class PlaybackTokenRuleService {
                 reason: legacyAllowed ? null : 'token_selected_excludes_camera',
                 message: legacyAllowed ? null : 'Token playback tidak mencakup kamera ini',
                 playbackWindowHours: legacyAllowed ? tokenWindow : null,
+                allowLive: legacyAllowed ? tokenAllowLive : false,
                 ruleSource: legacyAllowed ? 'legacy_camera_ids' : 'none',
             };
         }
@@ -252,6 +279,7 @@ class PlaybackTokenRuleService {
                     reason: 'token_area_excludes_camera',
                     message: 'Token playback tidak mencakup area kamera ini',
                     playbackWindowHours: null,
+                    allowLive: false,
                     ruleSource: 'none',
                 };
             }
@@ -262,6 +290,7 @@ class PlaybackTokenRuleService {
                     reason: 'token_area_excludes_admin_only',
                     message: 'Token playback tidak mencakup kamera admin-only ini',
                     playbackWindowHours: null,
+                    allowLive: false,
                     ruleSource: 'none',
                 };
             }
@@ -271,6 +300,7 @@ class PlaybackTokenRuleService {
                 reason: null,
                 message: null,
                 playbackWindowHours: tokenWindow,
+                allowLive: tokenAllowLive,
                 ruleSource: 'token_area_scope',
             };
         }
@@ -281,6 +311,7 @@ class PlaybackTokenRuleService {
                 reason: 'token_all_excludes_admin_only',
                 message: 'Token playback tidak mencakup kamera admin-only ini',
                 playbackWindowHours: null,
+                allowLive: false,
                 ruleSource: 'none',
             };
         }
@@ -290,6 +321,7 @@ class PlaybackTokenRuleService {
             reason: null,
             message: null,
             playbackWindowHours: tokenWindow,
+            allowLive: tokenAllowLive,
             ruleSource: 'token_scope',
         };
     }

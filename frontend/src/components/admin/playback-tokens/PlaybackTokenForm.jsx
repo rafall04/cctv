@@ -111,7 +111,14 @@ export default function PlaybackTokenForm({
                 </label>
                 <label className="block">
                     <span className="mb-1 block text-sm font-medium text-content-muted">{form.access_code_mode === 'custom' ? 'Kode Custom' : 'Panjang Kode'}</span>
-                    <input value={form.access_code_mode === 'custom' ? form.custom_access_code : form.access_code_length} onChange={(event) => onUpdateForm(form.access_code_mode === 'custom' ? 'custom_access_code' : 'access_code_length', form.access_code_mode === 'custom' ? event.target.value.toUpperCase() : event.target.value)} className="w-full rounded-lg border border-edge-strong px-3 py-2 text-sm dark:bg-gray-950 dark:text-white" />
+                    {/*
+                     * Custom code mirrors the backend alphabet exactly (normalizeCustomAccessCode:
+                     * /^[A-Z0-9_-]{6,32}$/): uppercase, keep BOTH letters and digits, strip only the
+                     * characters the server would reject anyway (spaces/punctuation). Keeping both
+                     * classes is deliberate — a strip that dropped one class would eat what the user
+                     * typed. maxLength caps at the backend's 32 so a paste cannot silently overflow.
+                     */}
+                    <input value={form.access_code_mode === 'custom' ? form.custom_access_code : form.access_code_length} maxLength={form.access_code_mode === 'custom' ? 32 : undefined} onChange={(event) => onUpdateForm(form.access_code_mode === 'custom' ? 'custom_access_code' : 'access_code_length', form.access_code_mode === 'custom' ? event.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, '') : event.target.value)} className="w-full rounded-lg border border-edge-strong px-3 py-2 text-sm dark:bg-gray-950 dark:text-white" />
                 </label>
                 <label className="block">
                     <span className="mb-1 block text-sm font-medium text-content-muted">Limit Device</span>
@@ -122,6 +129,24 @@ export default function PlaybackTokenForm({
                     <select value={form.session_limit_mode} onChange={(event) => onUpdateForm('session_limit_mode', event.target.value)} className="w-full rounded-lg border border-edge-strong px-3 py-2 text-sm dark:bg-gray-950 dark:text-white">
                         {PLAYBACK_TOKEN_SESSION_LIMIT_MODES.map((mode) => <option key={mode.value || 'preset'} value={mode.value}>{mode.label}</option>)}
                     </select>
+                </label>
+            </div>
+
+            <div className="mt-4 rounded-lg border border-edge bg-surface-sunken p-3">
+                <label className="flex items-start gap-3">
+                    <input
+                        type="checkbox"
+                        checked={!!form.allow_live}
+                        onChange={(event) => onUpdateForm('allow_live', event.target.checked)}
+                        className="mt-0.5"
+                    />
+                    <span className="text-sm">
+                        <span className="block font-medium text-content">Izinkan Live (bukan hanya playback)</span>
+                        <span className="block text-xs text-content-subtle">
+                            Token ini juga bisa menonton siaran langsung kamera dalam cakupannya — default untuk semua
+                            kamera token, bisa ditimpa per kamera di bawah. Nonaktif = token hanya untuk rekaman/playback.
+                        </span>
+                    </span>
                 </label>
             </div>
 
@@ -179,7 +204,7 @@ export default function PlaybackTokenForm({
                                 {selectedCameraIds.has(camera.id) && (
                                     <div className="mt-2">
                                         <p className="mb-1 text-[11px] text-content-subtle">Khusus kamera ini (opsional — kosong = ikut token):</p>
-                                        <div className="grid gap-2 sm:grid-cols-3">
+                                        <div className="grid gap-2 sm:grid-cols-4">
                                             <label className="block">
                                                 <span className="mb-0.5 block text-[10px] text-content-subtle">Maks. mundur (jam)</span>
                                                 <input type="number" min="1" placeholder="ikut token" value={form.camera_rules[camera.id]?.playback_window_hours || ''} onChange={(event) => onUpdateCameraRule(camera.id, 'playback_window_hours', event.target.value)} className="w-full rounded-lg border border-edge-strong px-2 py-1 text-xs dark:bg-gray-950 dark:text-white" />
@@ -187,6 +212,18 @@ export default function PlaybackTokenForm({
                                             <label className="block">
                                                 <span className="mb-0.5 block text-[10px] text-content-subtle">Berlaku sampai</span>
                                                 <input type="datetime-local" value={form.camera_rules[camera.id]?.expires_at || ''} onChange={(event) => onUpdateCameraRule(camera.id, 'expires_at', event.target.value)} className="w-full rounded-lg border border-edge-strong px-2 py-1 text-xs dark:bg-gray-950 dark:text-white" />
+                                            </label>
+                                            <label className="block">
+                                                <span className="mb-0.5 block text-[10px] text-content-subtle">Live</span>
+                                                <select
+                                                    value={form.camera_rules[camera.id]?.allow_live === true ? 'yes' : form.camera_rules[camera.id]?.allow_live === false ? 'no' : 'inherit'}
+                                                    onChange={(event) => onUpdateCameraRule(camera.id, 'allow_live', event.target.value === 'inherit' ? null : event.target.value === 'yes')}
+                                                    className="w-full rounded-lg border border-edge-strong px-2 py-1 text-xs dark:bg-gray-950 dark:text-white"
+                                                >
+                                                    <option value="inherit">Ikut token</option>
+                                                    <option value="yes">Live: Ya</option>
+                                                    <option value="no">Live: Tidak</option>
+                                                </select>
                                             </label>
                                             <label className="block">
                                                 <span className="mb-0.5 block text-[10px] text-content-subtle">Catatan</span>

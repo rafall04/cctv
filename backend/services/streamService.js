@@ -312,16 +312,37 @@ class StreamService {
             throw err;
         }
 
+        return this.mintStreamAccessToken(cameraId, requestHost);
+    }
+
+    /**
+     * Low-level mint of a 1h `stream_access` JWT for an enabled camera. Carries NO access decision of
+     * its own — every caller MUST authorize first: `generateStreamToken` via `canViewLive` (staff /
+     * owner / voucher), and the playback-token live grant via
+     * `playbackTokenService.validateRequestForLive` (the token's per-camera live entitlement). The
+     * short 1h lifetime plus the /hls proxy's per-playlist re-check bound how long a grant outlives a
+     * revocation. Do not call this without an access check above it.
+     */
+    mintStreamAccessToken(cameraId, requestHost) {
+        const camera = queryOne(
+            'SELECT id, stream_key, enabled FROM cameras WHERE id = ?',
+            [cameraId]
+        );
+
+        if (!camera || !camera.enabled) {
+            const err = new Error('Camera not found or disabled');
+            err.statusCode = 404;
+            throw err;
+        }
+
         const streamPath = camera.stream_key || `camera${camera.id}`;
 
-        const tokenPayload = {
-            cameraId: camera.id,
-            streamKey: camera.stream_key,
-            type: 'stream_access',
-        };
-
         const token = jwt.sign(
-            tokenPayload,
+            {
+                cameraId: camera.id,
+                streamKey: camera.stream_key,
+                type: 'stream_access',
+            },
             config.jwt.secret,
             { expiresIn: '1h' }
         );

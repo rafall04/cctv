@@ -144,6 +144,8 @@ function buildInitialRuleMap(rules = [], fallbackIds = []) {
             playback_window_hours: '',
             expires_at: '',
             note: '',
+            // null = inherit the token-level live default (tri-state, same as the backend rule).
+            allow_live: null,
         };
     });
     rules.forEach((rule) => {
@@ -159,6 +161,8 @@ function buildInitialRuleMap(rules = [], fallbackIds = []) {
             // Convert stored UTC → local so re-saving an untouched rule doesn't drift its expiry.
             expires_at: utcSqlToLocalInput(rule.expires_at),
             note: rule.note || '',
+            // Backend sends null (inherit) / true / false; keep it verbatim so the select round-trips.
+            allow_live: rule.allow_live ?? null,
         };
     });
     return ruleMap;
@@ -190,6 +194,8 @@ export function buildTokenCameraRulesPayload(ruleMap) {
             playback_window_hours: normalizeNumberOrNull(rule.playback_window_hours),
             expires_at: localInputToUtcIso(rule.expires_at),
             note: rule.note || '',
+            // Tri-state per-camera live override: null = inherit the token default, true/false = pin it.
+            allow_live: rule.allow_live ?? null,
         }))
         .filter((rule) => Number.isInteger(rule.camera_id) && rule.camera_id > 0);
 }
@@ -217,6 +223,8 @@ function createDefaultForm() {
         access_code_mode: 'auto',
         access_code_length: 8,
         custom_access_code: '',
+        // Live is opt-in: a new token is playback-only until this is turned on.
+        allow_live: false,
         max_active_sessions: '',
         session_limit_mode: '',
         session_timeout_seconds: '',
@@ -277,6 +285,7 @@ export function usePlaybackTokenManagementPage() {
         playback_from: '',
         playback_to: '',
         expires_at: '',
+        allow_live: false,
         max_active_sessions: '',
         session_limit_mode: 'unlimited',
         session_timeout_seconds: 60,
@@ -516,6 +525,7 @@ export function usePlaybackTokenManagementPage() {
             playback_from: utcSqlToLocalInput(token.playback_from),
             playback_to: utcSqlToLocalInput(token.playback_to),
             expires_at: utcSqlToLocalInput(token.expires_at),
+            allow_live: !!token.allow_live,
             max_active_sessions: token.max_active_sessions ?? '',
             session_limit_mode: token.session_limit_mode || 'unlimited',
             session_timeout_seconds: token.session_timeout_seconds || 60,
@@ -640,6 +650,7 @@ export function usePlaybackTokenManagementPage() {
                 camera_rules: cameraRules,
                 ...buildDepthPayload(editForm),
                 expires_at: localInputToUtcIso(editForm.expires_at),
+                allow_live: editForm.allow_live,
                 max_active_sessions: editForm.max_active_sessions === '' ? null : editForm.max_active_sessions,
                 session_limit_mode: editForm.session_limit_mode,
                 session_timeout_seconds: editForm.session_timeout_seconds,

@@ -30,8 +30,21 @@ describe('playbackTokenRuleService', () => {
                 playback_window_hours: 24,
                 expires_at: '2026-05-20 00:00:00',
                 note: 'Gate',
+                allow_live: null,
             },
         ]);
+    });
+
+    it('parses a per-camera live override tri-state (true/false/inherit)', async () => {
+        const { default: playbackTokenRuleService } = await import('../services/playbackTokenRuleService.js');
+
+        const rules = playbackTokenRuleService.normalizeRules([
+            { camera_id: 1, enabled: true, allow_live: true },
+            { camera_id: 2, enabled: true, allow_live: false },
+            { camera_id: 3, enabled: true },
+        ]);
+
+        expect(rules.map((r) => r.allow_live)).toEqual([true, false, null]);
     });
 
     it('denies all-scope token on admin_only camera unless explicit rule exists', async () => {
@@ -80,11 +93,47 @@ describe('playbackTokenRuleService', () => {
         );
         expect(executeMock).toHaveBeenCalledWith(
             expect.stringContaining('INSERT INTO playback_token_camera_rules'),
-            [12, 3, 1, 24, null, '']
+            [12, 3, 1, 24, null, '', null]
         );
         expect(rules).toEqual([
-            { camera_id: 3, enabled: true, playback_window_hours: 24, expires_at: null, note: '' },
-            { camera_id: 4, enabled: false, playback_window_hours: null, expires_at: null, note: 'Paused' },
+            { camera_id: 3, enabled: true, playback_window_hours: 24, expires_at: null, note: '', allow_live: null },
+            { camera_id: 4, enabled: false, playback_window_hours: null, expires_at: null, note: 'Paused', allow_live: null },
         ]);
+    });
+
+    it('resolves effective live: per-camera override wins, else token default', async () => {
+        const { default: playbackTokenRuleService } = await import('../services/playbackTokenRuleService.js');
+
+        // token default ON, no per-camera rule -> allowLive true (all scope)
+        const a = playbackTokenRuleService.resolveCameraAccess({
+            token: { id: 1, scope_type: 'all', playback_window_hours: 72, allow_live: 1 },
+            camera: { id: 5, public_playback_mode: 'inherit' },
+            rules: [],
+        });
+        expect(a).toMatchObject({ allowed: true, allowLive: true });
+
+        // token default ON, per-camera override OFF -> allowLive false
+        const b = playbackTokenRuleService.resolveCameraAccess({
+            token: { id: 1, scope_type: 'selected', playback_window_hours: 72, allow_live: 1 },
+            camera: { id: 5, public_playback_mode: 'inherit' },
+            rules: [{ camera_id: 5, enabled: true, allow_live: false }],
+        });
+        expect(b).toMatchObject({ allowed: true, allowLive: false });
+
+        // token default OFF, per-camera override ON -> allowLive true
+        const c = playbackTokenRuleService.resolveCameraAccess({
+            token: { id: 1, scope_type: 'selected', playback_window_hours: 72, allow_live: 0 },
+            camera: { id: 5, public_playback_mode: 'inherit' },
+            rules: [{ camera_id: 5, enabled: true, allow_live: true }],
+        });
+        expect(c).toMatchObject({ allowed: true, allowLive: true });
+
+        // denied camera -> allowLive false regardless of token default
+        const d = playbackTokenRuleService.resolveCameraAccess({
+            token: { id: 1, scope_type: 'selected', playback_window_hours: 72, allow_live: 1 },
+            camera: { id: 9, public_playback_mode: 'inherit' },
+            rules: [{ camera_id: 5, enabled: true }],
+        });
+        expect(d).toMatchObject({ allowed: false, allowLive: false });
     });
 });

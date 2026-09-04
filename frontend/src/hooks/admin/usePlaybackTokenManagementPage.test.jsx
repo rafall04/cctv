@@ -92,7 +92,7 @@ describe('usePlaybackTokenManagementPage', () => {
 
         expect(playbackTokenService.createToken).toHaveBeenCalledWith(expect.objectContaining({
             scope_type: 'selected',
-            camera_rules: [{ camera_id: 3, enabled: true, playback_window_hours: 24, expires_at: null, note: '' }],
+            camera_rules: [{ camera_id: 3, enabled: true, playback_window_hours: 24, expires_at: null, note: '', allow_live: null }],
         }));
     });
 
@@ -128,7 +128,7 @@ describe('usePlaybackTokenManagementPage', () => {
 
         expect(playbackTokenService.updateToken).toHaveBeenCalledWith(9, expect.objectContaining({
             scope_type: 'selected',
-            camera_rules: [{ camera_id: 3, enabled: true, playback_window_hours: 12, expires_at: null, note: '' }],
+            camera_rules: [{ camera_id: 3, enabled: true, playback_window_hours: 12, expires_at: null, note: '', allow_live: null }],
         }));
     });
 

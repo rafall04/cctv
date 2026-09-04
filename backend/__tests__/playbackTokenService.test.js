@@ -337,12 +337,12 @@ describe('playbackTokenService', () => {
 
         expect(result.data.allowed_camera_ids).toEqual([3, 4]);
         expect(result.data.camera_rules).toEqual([
-            { camera_id: 3, enabled: true, playback_window_hours: 24, expires_at: null, note: '' },
-            { camera_id: 4, enabled: true, playback_window_hours: null, expires_at: null, note: '' },
+            { camera_id: 3, enabled: true, playback_window_hours: 24, expires_at: null, note: '', allow_live: null },
+            { camera_id: 4, enabled: true, playback_window_hours: null, expires_at: null, note: '', allow_live: null },
         ]);
         expect(connectionPool.execute).toHaveBeenCalledWith(
             expect.stringContaining('INSERT INTO playback_token_camera_rules'),
-            [52, 3, 1, 24, null, '']
+            [52, 3, 1, 24, null, '', null]
         );
     });
 
@@ -834,7 +834,7 @@ describe('playbackTokenService', () => {
         expect(updateCall?.[0]).not.toContain('share_key_hash');
         expect(connectionPool.execute).toHaveBeenCalledWith(
             expect.stringContaining('INSERT INTO playback_token_camera_rules'),
-            [51, 1, 1, 24, null, '']
+            [51, 1, 1, 24, null, '', null]
         );
         expect(connectionPool.execute).toHaveBeenCalledWith(
             expect.stringContaining('INSERT INTO playback_token_audit_logs'),
