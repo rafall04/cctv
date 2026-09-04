@@ -307,7 +307,13 @@ export function useHlsLivePlayer({ videoRef, resolveStream, resetKey, active = t
             }
         }
 
-        run();
+        // A bare run() would let ANY rejection escape unhandled — most importantly `import('hls.js')`
+        // failing on a stale index.html after a redeploy re-hashes the lazy chunk (Vite does not
+        // auto-retry). The pre-refactor players caught this inside their outer try/catch; preserve that
+        // so a chunk-load failure surfaces a retryable error card instead of an eternal spinner.
+        run().catch(() => {
+            if (!cancelled) fail({ kind: 'unknown', message: 'Gagal memuat pemutar. Muat ulang halaman.' });
+        });
 
         return () => {
             cancelled = true;
