@@ -97,20 +97,7 @@ export default function TokenLivePlayer({ camera, onClose }) {
                             });
                         } else {
                             const rc = data.response?.code;
-                            if (rc) {
-                                setState({ status: 'error', message: `Stream terputus (${data.details} · HTTP ${rc}). Coba lagi sebentar lagi.` });
-                            } else {
-                                // hls.js gave no HTTP code (network/CORS). The stream host is only
-                                // reachable from the field, so probe the manifest directly to capture
-                                // the REAL response the device sees — a Cloudflare/proxy block (HTTP
-                                // 4xx/5xx + body) vs a CORS/connection failure (fetch throws).
-                                fetch(securedUrl, { cache: 'no-store' })
-                                    .then(async (r) => {
-                                        const body = (await r.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 60);
-                                        if (!cancelled) setState({ status: 'error', message: `DIAG ${data.details}: HTTP ${r.status}${r.headers.get('cf-ray') ? ' CF' : ''} · ${body}` });
-                                    })
-                                    .catch((e) => { if (!cancelled) setState({ status: 'error', message: `DIAG ${data.details}: ${String(e).slice(0, 55)}` }); });
-                            }
+                            setState({ status: 'error', message: `Stream terputus${rc ? ' (HTTP ' + rc + ')' : ''}. Coba lagi sebentar lagi.` });
                         }
                         hls.destroy();
                         hlsRef.current = null;
