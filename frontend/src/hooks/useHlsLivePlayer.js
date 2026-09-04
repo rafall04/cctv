@@ -1,26 +1,27 @@
 /*
  * Purpose: The ONE orchestration for an internal live HLS stream — device-adaptive config, a
  *          decoded-frame gate before declaring "playing", live-edge recovery for fatal errors that
- *          arrive after go-live, native-HLS (Safari) fallback, and a single error classifier. Extracted
- *          so TokenLivePlayer / CustomerLivePlayer / MultiViewVideoItem share one battle-tested core
- *          instead of each hand-rolling a thinner, drift-prone copy.
+ *          arrive after go-live, a freeze/stall watchdog on BOTH engines, internal warmup-404 retry,
+ *          tap-to-play recovery when muted autoplay is refused, and a single error classifier. Extracted
+ *          so TokenLivePlayer / CustomerLivePlayer share one battle-tested core instead of each
+ *          hand-rolling a thinner, drift-prone copy.
  * Caller: components/playback/TokenLivePlayer, components/customer/CustomerLivePlayer (+ future live tiles).
  * Deps: hlsConfig.getDeviceHLSConfig, publicPopupState.isCodecFailure, nativeHlsPlayback,
  *       livePictureWatch.startLivePictureWatch, liveEdgeRecovery.resumeAtLiveEdgeOrFail (all shared).
  * MainFuncs: useHlsLivePlayer, LIVE_MESSAGES.
- * SideEffects: Creates/destroys one Hls instance + one picture-watch bound to the caller's <video>.
+ * SideEffects: Creates/destroys one Hls instance + one picture-watch (+ optional native stop) bound to
+ *              the caller's <video>; one pending warmup-retry timer.
  *
  * WHY A HOOK, NOT A COMPONENT
  * The four live players legitimately differ in CHROME (zoom cluster, suspension card, grid tile) and
  * in how they RESOLVE a stream URL (live grant vs gated /api/stream vs multi-view payload). What must
- * NOT differ is the playback engine: the codec verdict, the "prove a decoded frame" rule, and the
- * live-edge recovery that keeps a stream alive when a segment 404s or the short-lived token expires
- * mid-view. This hook owns exactly that, and takes the differences as inputs.
+ * NOT differ is the playback engine: the codec verdict, the "prove a decoded frame" rule, the live-edge
+ * recovery, and the freeze watchdog that keeps a stream from sitting on a frozen frame under a LIVE
+ * badge. This hook owns exactly that, and takes the differences as inputs.
  *
  * NOT for VideoPopup: that player also carries external-origin CORS→proxy fallback, FLV, MJPEG, ads
  * and the FallbackHandler retry ladder — a different, richer machine. It stays the reference the
- * shared PRIMITIVES here were extracted from; it already imports every one of them, so the actual
- * fixes cannot drift even though its orchestration is its own.
+ * shared PRIMITIVES here were extracted from; it already imports every one of them.
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react';
@@ -42,12 +43,18 @@ export const LIVE_MESSAGES = {
     unknown: 'Gagal memuat stream live.',
 };
 
+// An in-stream fatal 404 on manifest/level is a warming MediaMTX camera, retried a few times.
+const WARMUP_MAX_RETRY = 3;
+const WARMUP_RETRY_DELAY_MS = 1200;
+
 // A FATAL hls.js error (BEFORE go-live) → a kind + the HTTP code it carried, if any.
+// NOTE: an in-stream 404 is NEVER 'notfound' — the stream URL was already resolved, so the camera
+// exists; a 404 here is a warming/transient upstream, classified 'network' (retryable copy). Only the
+// GRANT fetch (classifyResolveError) turns a 404 into 'notfound'.
 function classifyFatalHls(data) {
     const httpCode = data.response?.code ?? null;
     if (httpCode === 401 || httpCode === 403) return { kind: 'denied', httpCode };
     if (httpCode === 402) return { kind: 'payment', httpCode };
-    if (httpCode === 404) return { kind: 'notfound', httpCode };
     // A fatal media error with NO http code is a decode failure, not a network drop — the common
     // Android/WebView shape for an H.265/HEVC live feed (recordings still play via native MP4).
     if (data.type === 'mediaError' && !httpCode) return { kind: 'codec', httpCode: null };
@@ -64,8 +71,8 @@ function classifyResolveError(error) {
     return { kind: 'unknown', httpCode };
 }
 
-const LOADING_STATE = { status: 'loading', kind: null, httpCode: null, message: '' };
-const PLAYING_STATE = { status: 'playing', kind: null, httpCode: null, message: '' };
+const LOADING_STATE = { status: 'loading', kind: null, httpCode: null, message: '', needsGesture: false };
+const PLAYING_STATE = { status: 'playing', kind: null, httpCode: null, message: '', needsGesture: false };
 
 /**
  * @param {Object} opts
@@ -74,17 +81,22 @@ const PLAYING_STATE = { status: 'playing', kind: null, httpCode: null, message: 
  *        (an error's `.response.status` / `.friendly` are honored by the classifier).
  * @param {*} opts.resetKey - changing it (e.g. camera id) tears down and restarts the stream.
  * @param {boolean} [opts.active=true] - gate; keep false to hold playback off until ready.
+ * @param {boolean} [opts.respectUserPause=false] - set on a surface that renders a real pause control
+ *        (native <video controls>). Stops the picture-watch from nudging play() / erroring a pause the
+ *        VIEWER chose. Leave false for control-less surfaces (ZoomableVideo) where "paused" is never intended.
  * @param {Object<string,string>} [opts.messages] - per-kind copy overrides.
- * @param {({kind,httpCode}) => (string|undefined)} [opts.mapError] - dynamic copy (e.g. embed HTTP code);
- *        return undefined to fall through to `messages` / LIVE_MESSAGES.
+ * @param {({kind,httpCode}) => (string|undefined)} [opts.mapError] - dynamic copy; return undefined to fall through.
  * @param {({kind,httpCode}) => void} [opts.onError] - side effect on the final error (e.g. clearTokenCache).
- * @returns {{status:'loading'|'playing'|'error', kind:string|null, httpCode:number|null, message:string}}
+ * @returns {{status:'loading'|'playing'|'error', kind:string|null, httpCode:number|null, message:string, needsGesture:boolean}}
  */
-export function useHlsLivePlayer({ videoRef, resolveStream, resetKey, active = true, messages, mapError, onError }) {
+export function useHlsLivePlayer({ videoRef, resolveStream, resetKey, active = true, respectUserPause = false, messages, mapError, onError }) {
     const [state, setState] = useState(LOADING_STATE);
+    // Bumped to re-run the effect for a warmup-404 retry (a fresh resolve + hls instance).
+    const [retryTick, setRetryTick] = useState(0);
+    const warmupRetriesRef = useRef(0);
 
-    // Latest callbacks live in refs so the run effect depends ONLY on resetKey/active — a caller that
-    // re-creates resolveStream every render must not tear the stream down every render.
+    // Latest callbacks live in refs so the run effect depends ONLY on resetKey/active/retryTick — a
+    // caller that re-creates resolveStream every render must not tear the stream down every render.
     const resolveStreamRef = useRef(resolveStream);
     const messagesRef = useRef(messages);
     const mapErrorRef = useRef(mapError);
@@ -101,11 +113,16 @@ export function useHlsLivePlayer({ videoRef, resolveStream, resetKey, active = t
         return table[kind] || table.unknown;
     }, []);
 
+    // A new source starts its warmup budget fresh.
+    useEffect(() => { warmupRetriesRef.current = 0; }, [resetKey]);
+
     useEffect(() => {
         if (!active) return undefined;
 
         let cancelled = false;
         let stopWatch = null;
+        let stopNative = null;
+        let warmupTimer = null;
         let hls = null;
         let HlsClass = null;
         // A LOCAL flag, never React state: the ERROR handler closes over this synchronously to decide
@@ -113,7 +130,19 @@ export function useHlsLivePlayer({ videoRef, resolveStream, resetKey, active = t
         let live = false;
 
         const isStale = () => cancelled;
-        const requestPlay = (el = videoRef.current) => { el?.play?.().catch(() => {}); };
+
+        // Nudge playback; surface a tap-to-play affordance if the browser refuses muted autoplay
+        // (data-saver / low-power / strict WebView) — pre-live only, so a real decode failure still wins.
+        const requestPlay = (el = videoRef.current) => {
+            const played = el?.play?.();
+            if (played?.catch) {
+                played.catch((err) => {
+                    if (!cancelled && !live && err?.name === 'NotAllowedError') {
+                        setState((prev) => (prev.status === 'playing' || prev.needsGesture ? prev : { ...prev, needsGesture: true }));
+                    }
+                });
+            }
+        };
 
         const goPlaying = () => {
             if (cancelled) return;
@@ -124,12 +153,14 @@ export function useHlsLivePlayer({ videoRef, resolveStream, resetKey, active = t
         const fail = ({ kind, httpCode = null, message }) => {
             if (cancelled) return;
             stopWatch?.();
-            setState({ status: 'error', kind, httpCode, message: message || messageFor(kind, httpCode) });
+            stopNative?.();
+            setState({ status: 'error', kind, httpCode, message: message || messageFor(kind, httpCode), needsGesture: false });
             onErrorRef.current?.({ kind, httpCode });
         };
 
         // Decoded-frame gate + ongoing watch: declares "playing" only once a real frame exists, and
-        // keeps watching so a decoder that dies mid-stream can't leave a black rectangle marked LIVE.
+        // keeps watching so a decoder/upstream that dies mid-stream can't leave a black rectangle marked
+        // LIVE. respectUserPause disables the post-live paused-nudge on a surface with a real pause control.
         const startWatch = () => {
             stopWatch = startLivePictureWatch(videoRef.current, {
                 isStale,
@@ -140,6 +171,9 @@ export function useHlsLivePlayer({ videoRef, resolveStream, resetKey, active = t
                     { hls, video: videoRef.current, HlsErrorTypes: HlsClass?.ErrorTypes, requestPlay, onGiveUp: () => fail({ kind: 'stalled' }) },
                 ),
                 requestPlay,
+                // The watch's paused-branch nudge/give-up is documented safe ONLY where no pause control
+                // exists. A surface WITH one (native controls) must not have its viewer's pause fought.
+                ...(respectUserPause ? { pausedNudgeMs: Infinity, pausedGiveUpMs: Infinity } : {}),
             });
         };
 
@@ -194,21 +228,39 @@ export function useHlsLivePlayer({ videoRef, resolveStream, resetKey, active = t
                         return;
                     }
                     if (!data.fatal) return;
+
+                    // Warmup 404: an internal on-demand camera opened cold can 404 on the manifest/level
+                    // until MediaMTX produces the first playlist. Retry a few times (fresh instance)
+                    // instead of hard-failing — the camera is fine, merely warming up.
+                    const isWarmup404 = data.response?.code === 404
+                        && (data.details === 'manifestLoadError' || data.details === 'levelLoadError');
+                    if (isWarmup404 && warmupRetriesRef.current < WARMUP_MAX_RETRY) {
+                        warmupRetriesRef.current += 1;
+                        stopWatch?.();
+                        hls.destroy();
+                        hls = null;
+                        setState(LOADING_STATE);
+                        warmupTimer = setTimeout(() => { if (!cancelled) setRetryTick((t) => t + 1); }, WARMUP_RETRY_DELAY_MS);
+                        return;
+                    }
+
                     const { kind, httpCode } = classifyFatalHls(data);
                     fail({ kind, httpCode });
                     hls.destroy();
                     hls = null;
                 });
             } else if (canPlayNativeHls(video)) {
-                // Safari/iOS native HLS. hls.js isn't involved, so isCodecFailure can't run — this
-                // path reads the codec verdict off the element itself (startNativeHlsPlayback), and
-                // its frame counters are unreliable, so it declares playing on loadedmetadata.
-                video.addEventListener('loadedmetadata', () => { if (!cancelled) goPlaying(); }, { once: true });
-                stopWatch = startNativeHlsPlayback(video, securedUrl, {
+                // Safari/iOS native HLS. hls.js isn't involved, so isCodecFailure can't run — this path
+                // reads the codec verdict off the element (startNativeHlsPlayback). The picture-watch
+                // runs here TOO: its decoded-frame counters are unreliable on Safari (hasPicture then
+                // leans on dimensions), but its currentTime-based FREEZE detector works fine and is the
+                // only thing that catches a silently-stalled native live feed — parity with VideoPopup.
+                stopNative = startNativeHlsPlayback(video, securedUrl, {
                     isStale,
                     onCodecFailure: () => fail({ kind: 'codec' }),
                     onError: () => fail({ kind: 'network' }),
                 });
+                startWatch();
             } else {
                 fail({ kind: 'unsupported' });
             }
@@ -218,14 +270,15 @@ export function useHlsLivePlayer({ videoRef, resolveStream, resetKey, active = t
 
         return () => {
             cancelled = true;
+            if (warmupTimer) clearTimeout(warmupTimer);
             stopWatch?.();
-            stopWatch = null;
+            stopNative?.();
             if (hls) {
                 hls.destroy();
                 hls = null;
             }
         };
-    }, [resetKey, active, messageFor, videoRef]);
+    }, [resetKey, active, retryTick, respectUserPause, messageFor, videoRef]);
 
     return state;
 }

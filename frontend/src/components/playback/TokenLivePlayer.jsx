@@ -110,13 +110,13 @@ export default function TokenLivePlayer({ camera, onClose }) {
     );
 
     return (
-        <div className="fixed inset-0 z-modal flex items-center justify-center bg-black/80 p-4" onClick={onClose}>
+        <div className="fixed inset-0 z-modal flex items-start justify-center overflow-y-auto bg-black/80 p-4" onClick={onClose}>
             <div
                 ref={dialogRef}
                 role="dialog"
                 aria-modal="true"
                 aria-label={`Live ${camera.name}`}
-                className="w-full max-w-3xl overflow-hidden rounded-card bg-black shadow-e2"
+                className="my-auto w-full max-w-3xl overflow-hidden rounded-card bg-black shadow-e2"
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="flex items-center justify-between px-4 py-3">
@@ -135,7 +135,7 @@ export default function TokenLivePlayer({ camera, onClose }) {
                 </div>
                 {/* Dynamic aspect-ratio (measured from the stream), NOT a hardcoded 16:9 — a 4:3 / 16:10 /
                     9:16 camera fills its box instead of pillarboxing, exactly as VideoPopup does. */}
-                <div ref={containerRef} className="relative overflow-hidden bg-black" style={{ aspectRatio: aspectRatio || 16 / 9 }}>
+                <div ref={containerRef} className="relative mx-auto overflow-hidden bg-black" style={{ aspectRatio: aspectRatio || 16 / 9, maxHeight: '80vh' }}>
                     {/* ZoomableVideo = the SAME clean player VideoPopup uses: no native seek/pause bar,
                         object-contain, pinch-zoom + pan, fullscreen fill (no black bars). The shared
                         hook attaches hls.js to videoRef; the ref exposes zoomIn/zoomOut/reset. */}
@@ -162,10 +162,23 @@ export default function TokenLivePlayer({ camera, onClose }) {
                         </div>
                     )}
 
-                    {state.status === 'loading' && (
-                        <div className="absolute inset-0 flex items-center justify-center text-sm text-content-subtle">
+                    {state.status === 'loading' && !state.needsGesture && (
+                        <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-sm text-content-subtle">
                             Memuat siaran langsung…
                         </div>
+                    )}
+                    {/* Muted autoplay refused (data-saver / low-power / strict WebView): a real user
+                        gesture is the only way in. The loading text above is pointer-events-none, so this
+                        button — and any control beneath — stays tappable. */}
+                    {state.status === 'loading' && state.needsGesture && (
+                        <button
+                            type="button"
+                            onClick={() => videoRef.current?.play().catch(() => {})}
+                            className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-black/60 text-white"
+                        >
+                            <span className="text-4xl leading-none">▶</span>
+                            <span className="text-sm">Ketuk untuk memutar</span>
+                        </button>
                     )}
                     {state.status === 'error' && (
                         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/80 p-6 text-center">

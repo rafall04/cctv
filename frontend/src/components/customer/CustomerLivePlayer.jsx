@@ -48,19 +48,22 @@ export default function CustomerLivePlayer({ camera, onClose }) {
         if (kind === 'denied') clearTokenCache(camera.id);
     }, [camera.id]);
 
-    const state = useHlsLivePlayer({ videoRef, resolveStream, resetKey: camera.id, messages, onError });
+    // respectUserPause: this player renders native <video controls>, so a viewer CAN pause — the
+    // picture-watch must not nudge play() back or error a deliberate pause (its nudge is documented
+    // safe only on control-less surfaces).
+    const state = useHlsLivePlayer({ videoRef, resolveStream, resetKey: camera.id, respectUserPause: true, messages, onError });
     const aspectRatio = useVideoAspectRatio(videoRef, camera.id);
 
     const isSuspended = state.status === 'error' && state.kind === 'payment';
 
     return (
-        <div className="fixed inset-0 z-modal flex items-center justify-center bg-black/80 p-4" onClick={onClose}>
+        <div className="fixed inset-0 z-modal flex items-start justify-center overflow-y-auto bg-black/80 p-4" onClick={onClose}>
             <div
                 ref={dialogRef}
                 role="dialog"
                 aria-modal="true"
                 aria-label={`Live ${camera.name}`}
-                className="w-full max-w-3xl overflow-hidden rounded-card bg-black shadow-e2"
+                className="my-auto w-full max-w-3xl overflow-hidden rounded-card bg-black shadow-e2"
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="flex items-center justify-between px-4 py-3">
@@ -79,7 +82,7 @@ export default function CustomerLivePlayer({ camera, onClose }) {
                 </div>
                 {/* Dynamic aspect-ratio (measured from the stream) — a 4:3 / 16:10 camera fills its box
                     instead of pillarboxing, the same fix VideoPopup carries. */}
-                <div className="relative bg-black" style={{ aspectRatio: aspectRatio || 16 / 9 }}>
+                <div className="relative mx-auto bg-black" style={{ aspectRatio: aspectRatio || 16 / 9, maxHeight: '80vh' }}>
                     <video
                         ref={videoRef}
                         className="h-full w-full"
@@ -87,10 +90,22 @@ export default function CustomerLivePlayer({ camera, onClose }) {
                         muted
                         controls
                     />
-                    {state.status === 'loading' && (
-                        <div className="absolute inset-0 flex items-center justify-center text-sm text-content-subtle">
+                    {state.status === 'loading' && !state.needsGesture && (
+                        <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-sm text-content-subtle">
                             Memuat stream…
                         </div>
+                    )}
+                    {/* Muted autoplay refused: surface a real gesture. pointer-events-none on the loading
+                        text above keeps the native controls (and this button) tappable. */}
+                    {state.status === 'loading' && state.needsGesture && (
+                        <button
+                            type="button"
+                            onClick={() => videoRef.current?.play().catch(() => {})}
+                            className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-black/60 text-white"
+                        >
+                            <span className="text-4xl leading-none">▶</span>
+                            <span className="text-sm">Ketuk untuk memutar</span>
+                        </button>
                     )}
                     {isSuspended && (
                         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/80 p-6 text-center">
