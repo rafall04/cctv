@@ -96,7 +96,21 @@ export default function TokenLivePlayer({ camera, onClose }) {
                                 message: 'Perangkat ini tidak bisa memutar codec video kamera ini untuk siaran langsung (kemungkinan H.265/HEVC). Buka di Safari/iPhone, atau minta admin menyetel kamera ke H.264 untuk live.',
                             });
                         } else {
-                            setState({ status: 'error', message: `Stream terputus (${data.details || data.type || 'tidak diketahui'}). Coba lagi sebentar lagi.` });
+                            const rc = data.response?.code;
+                            if (rc) {
+                                setState({ status: 'error', message: `Stream terputus (${data.details} · HTTP ${rc}). Coba lagi sebentar lagi.` });
+                            } else {
+                                // hls.js gave no HTTP code (network/CORS). The stream host is only
+                                // reachable from the field, so probe the manifest directly to capture
+                                // the REAL response the device sees — a Cloudflare/proxy block (HTTP
+                                // 4xx/5xx + body) vs a CORS/connection failure (fetch throws).
+                                fetch(securedUrl, { cache: 'no-store' })
+                                    .then(async (r) => {
+                                        const body = (await r.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 60);
+                                        if (!cancelled) setState({ status: 'error', message: `DIAG ${data.details}: HTTP ${r.status}${r.headers.get('cf-ray') ? ' CF' : ''} · ${body}` });
+                                    })
+                                    .catch((e) => { if (!cancelled) setState({ status: 'error', message: `DIAG ${data.details}: ${String(e).slice(0, 55)}` }); });
+                            }
                         }
                         hls.destroy();
                         hlsRef.current = null;
