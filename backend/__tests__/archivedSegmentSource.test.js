@@ -90,7 +90,7 @@ describe('archivedSegmentSourceService.listArchivedSegments', () => {
 
         const [sql, params] = queryMock.mock.calls[0];
         expect(sql).toContain('AND u.recorded_at >= ?');
-        expect(sql).toContain('AND u.recorded_at <= ?');
+        expect(sql).toContain('AND u.recorded_at < ?');
         expect(params).toEqual([7, '2026-08-01T00:00:00.000Z', '2026-08-01T23:59:59.999Z', 1000]);
     });
 
@@ -99,7 +99,7 @@ describe('archivedSegmentSourceService.listArchivedSegments', () => {
 
         const [sql, params] = queryMock.mock.calls[0];
         expect(sql).toContain('AND u.recorded_at >= ?');
-        expect(sql).not.toContain('AND u.recorded_at <= ?');
+        expect(sql).not.toContain('AND u.recorded_at < ?');
         expect(params).toEqual([7, '2026-08-01T00:00:00.000Z', 1000]);
     });
 

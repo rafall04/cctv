@@ -103,8 +103,11 @@ export function isWithinRange(segment, range) {
     if (!range) return true;
     const at = segment?.start_time;
     if (!at) return false;
+    // Half-open [from, to): inclusive floor, EXCLUSIVE ceiling on the segment START. A segment whose
+    // start equals range.to belongs to the NEXT window, not this one — otherwise it overshoots the
+    // bound by its own duration (the 08:00-10:00 → plays-to-10:10 bug).
     if (range.from && at < range.from) return false;
-    if (range.to && at > range.to) return false;
+    if (range.to && at >= range.to) return false;
     return true;
 }
 

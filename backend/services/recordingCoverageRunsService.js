@@ -104,6 +104,29 @@ function intervalOf(row) {
     return { from, to: from + duration * 1000 };
 }
 
+/**
+ * Clamp each interval to the entitlement bounds so the coverage bar ends EXACTLY at the token's
+ * range, never a segment past it. Filtering source rows by start alone cannot do this: contiguous
+ * clips merge into one run whose end is a full duration beyond its start, so a run that begins inside
+ * [from, to) can still stretch past `to`. Half-open on the upper edge (drop anything that clamps to
+ * zero/negative width) matches the list/stream gates, which now exclude the segment starting at `to`.
+ *
+ * @param {Array<{from: number, to: number}>} intervals epoch-ms intervals from intervalOf
+ * @param {{from: string|null, to: string|null}|null} range entitlement bounds (ISO), or null
+ */
+function clampIntervalsToRange(intervals, range) {
+    if (!range || (!range.from && !range.to)) return intervals;
+    const loMs = range.from ? timeOf(range.from) : null;
+    const hiMs = range.to ? timeOf(range.to) : null;
+    const clamped = [];
+    for (const interval of intervals) {
+        const from = (loMs !== null && interval.from < loMs) ? loMs : interval.from;
+        const to = (hiMs !== null && interval.to > hiMs) ? hiMs : interval.to;
+        if (to > from) clamped.push({ from, to });
+    }
+    return clamped;
+}
+
 class RecordingCoverageRunsService {
     /**
      * @param {number|string} cameraId
@@ -134,7 +157,10 @@ class RecordingCoverageRunsService {
             }
         };
 
-        const intervals = [...read(LOCAL_SQL), ...read(ARCHIVE_SQL)].map(intervalOf).filter(Boolean);
+        const rawIntervals = [...read(LOCAL_SQL), ...read(ARCHIVE_SQL)].map(intervalOf).filter(Boolean);
+        // Bound the DRAWN span to the entitlement so the bar cannot overshoot the token's ceiling by a
+        // segment (a merged run that spans the ceiling would otherwise be drawn to its full end).
+        const intervals = clampIntervalsToRange(rawIntervals, range);
         const runs = mergeIntoRuns(intervals);
 
         return {

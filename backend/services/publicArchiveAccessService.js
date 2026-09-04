@@ -112,7 +112,10 @@ class PublicArchiveAccessService {
                 // Unknown recording time cannot be proven inside the entitlement — deny.
                 throw httpError('Segment di luar jangkauan token ini', 403);
             }
-            if ((fromIso && recordedAtMs < Date.parse(fromIso)) || (toIso && recordedAtMs > Date.parse(toIso))) {
+            // Half-open [from, to): the upper bound is EXCLUSIVE on the segment start (recorded_at), so a
+            // segment starting exactly at toIso is refused — same rule as the local stream gate, so the
+            // archived-stream path cannot serve the one-segment overshoot the list gate now drops.
+            if ((fromIso && recordedAtMs < Date.parse(fromIso)) || (toIso && recordedAtMs >= Date.parse(toIso))) {
                 throw httpError('Segment di luar jangkauan token ini', 403);
             }
         }

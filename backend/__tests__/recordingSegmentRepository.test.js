@@ -77,7 +77,7 @@ describe('recordingSegmentRepository', () => {
 
         const [sql, params] = queryMock.mock.calls[0];
         expect(sql).toContain('start_time >= ?');
-        expect(sql).toContain('start_time <= ?');
+        expect(sql).toContain('start_time < ?');
         expect(sql).toContain('ORDER BY start_time DESC');
         expect(params).toEqual([9, '2026-08-25T19:10:00.000Z', '2026-08-30T18:20:00.000Z', 1000]);
     });

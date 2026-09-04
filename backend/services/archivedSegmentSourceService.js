@@ -48,7 +48,9 @@ class ArchivedSegmentSourceService {
             params.push(range.from);
         }
         if (range?.to) {
-            bounds.push('AND u.recorded_at <= ?');
+            // Half-open [from, to): exclusive upper on the segment START (recorded_at), matching the
+            // local-recording gate so an archived segment starting at the bound does not overshoot it.
+            bounds.push('AND u.recorded_at < ?');
             params.push(range.to);
         }
         params.push(Math.max(1, Math.min(Number(limit) || 1000, 5000)));

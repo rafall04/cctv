@@ -129,10 +129,14 @@ class RecordingSegmentRepository {
         // ORDER BY start_time ASC LIMIT keeps the OLDEST rows and silently drops the NEWEST — so a
         // recent range on a high-retention camera returned nothing on disk (the deep-playback path).
         // Both bounds string-compare against the ISO-8601 UTC start_time, same convention as the range policy.
+        // HALF-OPEN interval [fromIso, toIso): the ceiling is EXCLUSIVE on the segment START. Segments
+        // are keyed by start only but each plays ~one duration past it, so an inclusive `<=` admitted the
+        // segment starting exactly at toIso (e.g. a 10:00 segment for an 08:00-10:00 token) and let it
+        // play to ~10:10 — a full-segment overshoot. `<` drops it so the last segment ends at the bound.
         const clauses = ['camera_id = ?'];
         const params = [cameraId];
         if (fromIso) { clauses.push('start_time >= ?'); params.push(fromIso); }
-        if (toIso) { clauses.push('start_time <= ?'); params.push(toIso); }
+        if (toIso) { clauses.push('start_time < ?'); params.push(toIso); }
         params.push(limit);
 
         const rows = query(
@@ -165,12 +169,14 @@ class RecordingSegmentRepository {
             return this.findSegmentByFilename({ cameraId, filename });
         }
 
-        // Floor (>= startAfterIso) AND, for an absolute-range token, ceiling (<= startBeforeIso). Both
-        // string-compare against the ISO-8601 UTC start_time (chronological), same as the range policy.
+        // Floor (>= startAfterIso) AND, for an absolute-range token, EXCLUSIVE ceiling (< startBeforeIso).
+        // Both string-compare against the ISO-8601 UTC start_time (chronological), same as the range
+        // policy. `<` (not `<=`) so a segment starting exactly at the token's upper bound cannot be
+        // streamed either — the ceiling here must match the list gate in findPlaybackSegments.
         const clauses = ['camera_id = ?', 'filename = ?'];
         const params = [cameraId, filename];
         if (startAfterIso) { clauses.push('start_time >= ?'); params.push(startAfterIso); }
-        if (startBeforeIso) { clauses.push('start_time <= ?'); params.push(startBeforeIso); }
+        if (startBeforeIso) { clauses.push('start_time < ?'); params.push(startBeforeIso); }
 
         return queryOne(
             `SELECT ${SEGMENT_SELECT_FIELDS}

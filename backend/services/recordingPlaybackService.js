@@ -569,7 +569,7 @@ class RecordingPlaybackService {
         const toMs = toIso ? Date.parse(toIso) : null;
         return segments.filter((segment) => {
             const atMs = new Date(segment.start_time).getTime();
-            return Number.isFinite(atMs) && (fromMs === null || atMs >= fromMs) && (toMs === null || atMs <= toMs);
+            return Number.isFinite(atMs) && (fromMs === null || atMs >= fromMs) && (toMs === null || atMs < toMs);
         });
     }
 

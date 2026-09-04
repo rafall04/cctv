@@ -89,9 +89,11 @@ describe('isWithinRange', () => {
         expect(isWithinRange({ start_time: '2020-01-01T00:00:00.000Z' }, null)).toBe(true);
     });
 
-    it('includes the bounds themselves', () => {
+    it('is half-open: includes the FROM bound, excludes the TO bound', () => {
+        // Half-open [from, to): a segment starting exactly at range.to belongs to the NEXT window and
+        // is excluded — this is the fix for the one-segment playback overshoot (08:00-10:00 → 10:10).
         expect(isWithinRange({ start_time: range.from }, range)).toBe(true);
-        expect(isWithinRange({ start_time: range.to }, range)).toBe(true);
+        expect(isWithinRange({ start_time: range.to }, range)).toBe(false);
     });
 
     it('excludes either side and a row with no time at all', () => {
@@ -198,6 +200,20 @@ describe('recordingCoverageRunsService.getCoverage', () => {
             expect(sql).toContain('AND from_at <= ?');
             expect(params).toEqual([7, '2026-08-01T00:00:00.000Z', '2026-08-06T00:00:00.000Z']);
         }
+    });
+
+    it('clamps a run that spans the ceiling so the bar ends at the entitlement, not a segment past it', () => {
+        // One merged run 08:00-10:10 (a 10:00 segment plays to 10:10) under a token whose range ends
+        // at 10:00. Filtering by start alone cannot bound the drawn span — the clamp must.
+        queryMock
+            .mockReturnValueOnce([{ from_at: '2026-08-01T08:00:00.000Z', to_at: '2026-08-01T10:10:00.000Z', duration: 7800 }])
+            .mockReturnValueOnce([]);
+
+        const result = coverage.getCoverage(7, { from: '2026-08-01T08:00:00.000Z', to: '2026-08-01T10:00:00.000Z' });
+
+        expect(result.runs).toHaveLength(1);
+        expect(result.runs[0].from).toBe('2026-08-01T08:00:00.000Z');
+        expect(result.runs[0].to).toBe('2026-08-01T10:00:00.000Z'); // clamped to the bound, not 10:10
     });
 
     it('rejects a non-camera id without touching the database', () => {
