@@ -1,148 +1,57 @@
 /*
- * Purpose: Lean live-only HLS player for the customer portal — fetches ownership-gated
- *          stream URLs, attaches the per-camera stream token, and surfaces suspension (402).
+ * Purpose: Lean live-only HLS player for the customer portal — fetches ownership-gated stream URLs,
+ *          attaches the per-camera stream token, plays through the SHARED live-player core, and
+ *          surfaces suspension (402) as its own amber state.
  * Caller: pages/customer/MyCameras.jsx (modal).
- * Deps: streamService (gated /api/stream/:id), streamTokenService (?token=), lazy hls.js.
+ * Deps: streamService (gated /api/stream/:id), streamTokenService (?token=), useHlsLivePlayer,
+ *       useVideoAspectRatio (shared).
  * MainFuncs: CustomerLivePlayer.
- * SideEffects: Creates/destroys an Hls instance bound to the <video> element.
+ *
+ * WHY THE SHARED CORE: this used to hand-roll a thinner hls.js setup (a 10s manifest timeout that
+ * times out on the ID-mobile → Cloudflare-SIN path, no live-edge recovery, no decoded-frame gate).
+ * Routing through useHlsLivePlayer gives it VideoPopup-grade resilience; the portal keeps only its
+ * own chrome (native controls) and its suspension wording.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useCallback } from 'react';
 import streamService from '../../services/streamService';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
+import { useHlsLivePlayer } from '../../hooks/useHlsLivePlayer';
+import { useVideoAspectRatio } from '../../hooks/useVideoAspectRatio';
 import { getSecureStreamUrl, buildSecureStreamUrl, clearTokenCache } from '../../services/streamTokenService';
-import { isCodecFailure } from '../../utils/publicPopupState.js';
-import { canPlayNativeHls, startNativeHlsPlayback } from '../../utils/nativeHlsPlayback.js';
 
 export default function CustomerLivePlayer({ camera, onClose }) {
     const dialogRef = useRef(null);
     useFocusTrap(dialogRef, { onEscape: onClose });
     const videoRef = useRef(null);
-    const hlsRef = useRef(null);
-    const nativeStopRef = useRef(null);
-    const [state, setState] = useState({ status: 'loading', message: '' });
 
-    useEffect(() => {
-        let cancelled = false;
-
-        async function start() {
-            try {
-                setState({ status: 'loading', message: '' });
-
-                const streamResponse = await streamService.getStreamUrls(camera.id, undefined, {
-                    skipGlobalErrorNotification: true,
-                });
-                const hlsUrl = streamResponse?.data?.streams?.hls;
-                if (!hlsUrl) {
-                    throw Object.assign(new Error('Stream tidak tersedia'), { friendly: true });
-                }
-
-                // Non-community cameras require a camera-bound token; harmless for
-                // community class too, so always attach it in the portal.
-                const { token } = await getSecureStreamUrl(camera.id);
-                const securedUrl = buildSecureStreamUrl(hlsUrl, token);
-
-                const video = videoRef.current;
-                if (cancelled || !video) return;
-
-                const { default: Hls } = await import('hls.js');
-                if (cancelled) return;
-
-                if (Hls.isSupported()) {
-                    const hls = new Hls({
-                        enableWorker: true,
-                        lowLatencyMode: false,
-                        backBufferLength: 10,
-                        maxBufferLength: 15,
-                        liveSyncDurationCount: 2,
-                        manifestLoadingMaxRetry: 2,
-                    });
-                    hlsRef.current = hls;
-                    hls.loadSource(securedUrl);
-                    hls.attachMedia(video);
-                    hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                        if (!cancelled) {
-                            setState({ status: 'playing', message: '' });
-                            video.play().catch(() => {});
-                        }
-                    });
-                    hls.on(Hls.Events.ERROR, (_event, data) => {
-                        if (cancelled) return;
-                        /*
-                         * BEFORE the fatal guard. hls.js reports a codec refusal NON-fatally, drops
-                         * the level, then never emits MANIFEST_PARSED — so this player would sit on
-                         * its loading state forever, and whatever error eventually surfaced would
-                         * blame the stream ("Stream terputus") for the device's missing decoder.
-                         * Same defect as VideoPopup and MultiViewVideoItem; same single predicate.
-                         */
-                        if (isCodecFailure(data)) {
-                            setState({
-                                status: 'error',
-                                message: 'Perangkat ini tidak bisa memutar codec H.265/HEVC kamera tersebut. Coba buka di Safari, atau minta admin mengubah kamera ke H.264.',
-                            });
-                            hls.destroy();
-                            hlsRef.current = null;
-                            return;
-                        }
-                        if (!data.fatal) return;
-                        const httpCode = data.response?.code;
-                        if (httpCode === 402) {
-                            setState({ status: 'suspended', message: 'Saldo habis — kamera ditangguhkan.' });
-                        } else if (httpCode === 401 || httpCode === 403) {
-                            clearTokenCache(camera.id);
-                            setState({ status: 'error', message: 'Akses stream ditolak. Muat ulang halaman.' });
-                        } else {
-                            setState({ status: 'error', message: 'Stream terputus. Coba lagi sebentar lagi.' });
-                        }
-                        hls.destroy();
-                        hlsRef.current = null;
-                    });
-                } else if (canPlayNativeHls(video)) {
-                    // Safari/iOS native HLS — the rewritten playlist keeps the token
-                    // flowing to child playlists and segments.
-                    //
-                    // hls.js is not involved here, so `isCodecFailure` above can never run: this
-                    // branch has to read the verdict off the element itself. Without that it
-                    // reported every failure as "Stream tidak dapat diputar" — blaming the stream
-                    // for a decoder the renter's own phone is missing.
-                    video.addEventListener('loadedmetadata', () => {
-                        if (!cancelled) setState({ status: 'playing', message: '' });
-                    }, { once: true });
-                    nativeStopRef.current = startNativeHlsPlayback(video, securedUrl, {
-                        isStale: () => cancelled,
-                        onCodecFailure: () => setState({
-                            status: 'error',
-                            message: 'Perangkat ini tidak bisa memutar codec H.265/HEVC kamera tersebut. Coba buka di Safari, atau minta admin mengubah kamera ke H.264.',
-                        }),
-                        onError: () => setState({ status: 'error', message: 'Stream tidak dapat diputar di perangkat ini.' }),
-                    });
-                } else {
-                    setState({ status: 'error', message: 'Browser tidak mendukung pemutaran HLS.' });
-                }
-            } catch (error) {
-                if (cancelled) return;
-                const httpStatus = error?.response?.status;
-                if (httpStatus === 402) {
-                    setState({ status: 'suspended', message: 'Saldo habis — kamera ditangguhkan. Isi saldo untuk mengaktifkan kembali.' });
-                } else if (httpStatus === 403 || httpStatus === 404) {
-                    setState({ status: 'error', message: 'Kamera tidak ditemukan atau bukan milik akun ini.' });
-                } else {
-                    setState({ status: 'error', message: error.friendly ? error.message : 'Gagal memuat stream.' });
-                }
-            }
-        }
-
-        start();
-        return () => {
-            cancelled = true;
-            nativeStopRef.current?.();
-            nativeStopRef.current = null;
-            if (hlsRef.current) {
-                hlsRef.current.destroy();
-                hlsRef.current = null;
-            }
-        };
+    const resolveStream = useCallback(async () => {
+        const streamResponse = await streamService.getStreamUrls(camera.id, undefined, {
+            skipGlobalErrorNotification: true,
+        });
+        const hlsUrl = streamResponse?.data?.streams?.hls;
+        if (!hlsUrl) throw Object.assign(new Error('Stream tidak tersedia'), { friendly: true });
+        // Non-community cameras require a camera-bound token; harmless for community class too, so
+        // always attach it in the portal.
+        const { token } = await getSecureStreamUrl(camera.id);
+        return buildSecureStreamUrl(hlsUrl, token);
     }, [camera.id]);
+
+    // Portal wording; `payment` gets its own amber card below (kind === 'payment').
+    const messages = {
+        payment: 'Saldo habis — kamera ditangguhkan.',
+        denied: 'Akses stream ditolak. Muat ulang halaman.',
+        notfound: 'Kamera tidak ditemukan atau bukan milik akun ini.',
+    };
+    // A denied stream means the cached per-camera token is stale — drop it so a reload re-mints.
+    const onError = useCallback(({ kind }) => {
+        if (kind === 'denied') clearTokenCache(camera.id);
+    }, [camera.id]);
+
+    const state = useHlsLivePlayer({ videoRef, resolveStream, resetKey: camera.id, messages, onError });
+    const aspectRatio = useVideoAspectRatio(videoRef, camera.id);
+
+    const isSuspended = state.status === 'error' && state.kind === 'payment';
 
     return (
         <div className="fixed inset-0 z-modal flex items-center justify-center bg-black/80 p-4" onClick={onClose}>
@@ -168,7 +77,9 @@ export default function CustomerLivePlayer({ camera, onClose }) {
                         Tutup ✕
                     </button>
                 </div>
-                <div className="relative aspect-video bg-black">
+                {/* Dynamic aspect-ratio (measured from the stream) — a 4:3 / 16:10 camera fills its box
+                    instead of pillarboxing, the same fix VideoPopup carries. */}
+                <div className="relative bg-black" style={{ aspectRatio: aspectRatio || 16 / 9 }}>
                     <video
                         ref={videoRef}
                         className="h-full w-full"
@@ -181,13 +92,13 @@ export default function CustomerLivePlayer({ camera, onClose }) {
                             Memuat stream…
                         </div>
                     )}
-                    {state.status === 'suspended' && (
+                    {isSuspended && (
                         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/80 p-6 text-center">
                             <span className="text-3xl">⏸️</span>
-                            <p className="font-medium text-amber-300">{state.message}</p>
+                            <p className="font-medium text-amber-300">Saldo habis — kamera ditangguhkan. Isi saldo untuk mengaktifkan kembali.</p>
                         </div>
                     )}
-                    {state.status === 'error' && (
+                    {state.status === 'error' && !isSuspended && (
                         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/80 p-6 text-center">
                             <span className="text-3xl">⚠️</span>
                             <p className="text-sm text-red-300">{state.message}</p>

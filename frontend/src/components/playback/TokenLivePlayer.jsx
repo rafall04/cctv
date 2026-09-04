@@ -1,25 +1,26 @@
 /*
  * Purpose: Lean live-only HLS player for a PLAYBACK TOKEN holder — mints a live stream_access grant
- *          from the token (cookie) and plays the live feed, with the same codec/native-HLS handling
- *          as the customer portal player.
+ *          from the token (cookie) and plays the live feed through the SHARED live-player core, so it
+ *          inherits the exact codec verdict, decoded-frame gate, live-edge recovery and dynamic
+ *          aspect-ratio sizing the public popup uses.
  * Caller: pages/Playback.jsx (modal), when a token that allows live is active.
- * Deps: streamTokenService.getLiveGrant (playback-token → live grant), lazy hls.js.
+ * Deps: streamTokenService.getLiveGrant (playback-token → live grant), useHlsLivePlayer,
+ *       useVideoAspectRatio, ZoomableVideo (all shared).
  * MainFuncs: TokenLivePlayer.
- * SideEffects: Creates/destroys an Hls instance bound to the <video> element.
  *
  * WHY NOT REUSE CustomerLivePlayer: that one resolves the HLS URL through the canViewLive-gated
  * /api/stream/:id + /token endpoints, which a non-account token holder is not entitled to. The live
  * grant here returns the URL AND the token together, so this player never touches those gated paths.
+ * Everything AFTER the URL is shared (useHlsLivePlayer), so a live-player fix reaches both at once.
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Volume2, VolumeX, Maximize, Minimize, ZoomIn, ZoomOut, RotateCcw, Camera } from 'lucide-react';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
+import { useHlsLivePlayer } from '../../hooks/useHlsLivePlayer';
+import { useVideoAspectRatio } from '../../hooks/useVideoAspectRatio';
 import ZoomableVideo from '../MultiView/ZoomableVideo';
 import { getLiveGrant, buildSecureStreamUrl } from '../../services/streamTokenService';
-import { isCodecFailure } from '../../utils/publicPopupState.js';
-import { canPlayNativeHls, startNativeHlsPlayback } from '../../utils/nativeHlsPlayback.js';
-import { getDeviceHLSConfig } from '../../utils/hlsConfig.js';
 import { toggleElementFullscreen } from '../../utils/fullscreen.js';
 import { takeSnapshot } from '../../utils/snapshotHelper';
 
@@ -29,13 +30,29 @@ export default function TokenLivePlayer({ camera, onClose }) {
     const videoRef = useRef(null);
     const containerRef = useRef(null);
     const zoomRef = useRef(null);
-    const hlsRef = useRef(null);
-    const nativeStopRef = useRef(null);
-    const [state, setState] = useState({ status: 'loading', message: '' });
     const [muted, setMuted] = useState(true);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [zoom, setZoom] = useState(1);
     const [snapshotMsg, setSnapshotMsg] = useState('');
+
+    // One call returns both the HLS URL and the short-lived stream_access token; the backend has
+    // already verified this token covers the camera and allows live. Everything after this — codec
+    // handling, decoded-frame gate, live-edge recovery, native HLS — is the shared core's job.
+    const resolveStream = useCallback(async () => {
+        const { token, streamUrl } = await getLiveGrant(camera.id);
+        if (!streamUrl) throw Object.assign(new Error('Stream live tidak tersedia'), { friendly: true });
+        return buildSecureStreamUrl(streamUrl, token);
+    }, [camera.id]);
+
+    // Token-holder wording for the shared error kinds (defaults cover codec/payment/unsupported).
+    const messages = { denied: 'Akses live ditolak. Token mungkin dicabut atau tidak mengizinkan live.' };
+    const mapError = useCallback(
+        ({ kind, httpCode }) => (kind === 'network' && httpCode ? `Stream terputus (HTTP ${httpCode}). Coba lagi sebentar lagi.` : undefined),
+        [],
+    );
+
+    const state = useHlsLivePlayer({ videoRef, resolveStream, resetKey: camera.id, messages, mapError });
+    const aspectRatio = useVideoAspectRatio(videoRef, camera.id);
 
     // Native fullscreen state — the button icon and ZoomableVideo's fill-on-zoom both read it.
     useEffect(() => {
@@ -73,125 +90,6 @@ export default function TokenLivePlayer({ camera, onClose }) {
         setSnapshotMsg(res.message || '');
         setTimeout(() => setSnapshotMsg(''), 2500);
     }, [camera.name]);
-
-    useEffect(() => {
-        let cancelled = false;
-
-        async function start() {
-            try {
-                setState({ status: 'loading', message: '' });
-
-                // One call returns both the HLS URL and the short-lived stream_access token; the
-                // backend has already verified this token covers the camera and allows live.
-                const { token, streamUrl } = await getLiveGrant(camera.id);
-                if (!streamUrl) {
-                    throw Object.assign(new Error('Stream live tidak tersedia'), { friendly: true });
-                }
-                const securedUrl = buildSecureStreamUrl(streamUrl, token);
-
-                const video = videoRef.current;
-                if (cancelled || !video) return;
-
-                const { default: Hls } = await import('hls.js');
-                if (cancelled) return;
-
-                if (Hls.isSupported()) {
-                    // Reuse the SAME device-adaptive, mobile-resilient config VideoPopup uses — the
-                    // minimal inline config here defaulted hls.js to a 10s manifest timeout, which
-                    // times out on the Indonesian mobile → Cloudflare-SIN path (manifestLoadError).
-                    // getDeviceHLSConfig gives 30s manifest/level/frag timeouts + retries + adaptive
-                    // buffers, so the token live player is as robust as the normal live popup.
-                    const hls = new Hls(getDeviceHLSConfig());
-                    hlsRef.current = hls;
-                    hls.loadSource(securedUrl);
-                    hls.attachMedia(video);
-                    hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                        if (!cancelled) {
-                            setState({ status: 'playing', message: '' });
-                            video.play().catch(() => {});
-                        }
-                    });
-                    hls.on(Hls.Events.ERROR, (_event, data) => {
-                        if (cancelled) return;
-                        // BEFORE the fatal guard: hls.js reports a codec refusal non-fatally and then
-                        // never emits MANIFEST_PARSED. Same defect+predicate as VideoPopup /
-                        // MultiViewVideoItem / CustomerLivePlayer.
-                        if (isCodecFailure(data)) {
-                            setState({
-                                status: 'error',
-                                message: 'Perangkat ini tidak bisa memutar codec H.265/HEVC kamera tersebut. Coba buka di Safari, atau minta admin mengubah kamera ke H.264.',
-                            });
-                            hls.destroy();
-                            hlsRef.current = null;
-                            return;
-                        }
-                        if (!data.fatal) return;
-                        const httpCode = data.response?.code;
-                        if (httpCode === 401 || httpCode === 403) {
-                            setState({ status: 'error', message: 'Akses live ditolak. Token mungkin dicabut atau tidak mengizinkan live.' });
-                        } else if (httpCode === 402) {
-                            setState({ status: 'error', message: 'Kamera ditangguhkan.' });
-                        } else if (data.type === 'mediaError' && !httpCode) {
-                            // A FATAL media error with no HTTP code is a decode failure, not a network drop.
-                            // For an H.265/HEVC camera this is the common case on Android Chrome/WebView:
-                            // hls.js/MSE cannot decode HEVC (native MP4 playback can, which is why recordings
-                            // play but live does not). isCodecFailure misses some HEVC shapes on purpose
-                            // (bufferAppendError was excluded to avoid killing healthy streams), so catch the
-                            // fatal ones here and tell the truth instead of blaming the network.
-                            setState({
-                                status: 'error',
-                                message: 'Perangkat ini tidak bisa memutar codec video kamera ini untuk siaran langsung (kemungkinan H.265/HEVC). Buka di Safari/iPhone, atau minta admin menyetel kamera ke H.264 untuk live.',
-                            });
-                        } else {
-                            const rc = data.response?.code;
-                            setState({ status: 'error', message: `Stream terputus${rc ? ' (HTTP ' + rc + ')' : ''}. Coba lagi sebentar lagi.` });
-                        }
-                        hls.destroy();
-                        hlsRef.current = null;
-                    });
-                } else if (canPlayNativeHls(video)) {
-                    // Safari/iOS native HLS — the rewritten playlist keeps the token flowing to child
-                    // playlists and segments. hls.js is not involved, so isCodecFailure can't run here.
-                    video.addEventListener('loadedmetadata', () => {
-                        if (!cancelled) setState({ status: 'playing', message: '' });
-                    }, { once: true });
-                    nativeStopRef.current = startNativeHlsPlayback(video, securedUrl, {
-                        isStale: () => cancelled,
-                        onCodecFailure: () => setState({
-                            status: 'error',
-                            message: 'Perangkat ini tidak bisa memutar codec H.265/HEVC kamera tersebut. Coba buka di Safari, atau minta admin mengubah kamera ke H.264.',
-                        }),
-                        onError: () => setState({ status: 'error', message: 'Stream tidak dapat diputar di perangkat ini.' }),
-                    });
-                } else {
-                    setState({ status: 'error', message: 'Browser tidak mendukung pemutaran HLS.' });
-                }
-            } catch (error) {
-                if (cancelled) return;
-                const httpStatus = error?.response?.status;
-                if (httpStatus === 403 || httpStatus === 401) {
-                    setState({ status: 'error', message: 'Token ini tidak mengizinkan live untuk kamera ini.' });
-                } else if (httpStatus === 402) {
-                    setState({ status: 'error', message: 'Kamera ditangguhkan.' });
-                } else if (httpStatus === 404) {
-                    setState({ status: 'error', message: 'Kamera tidak ditemukan atau dinonaktifkan.' });
-                } else {
-                    setState({ status: 'error', message: error.friendly ? error.message : 'Gagal memuat stream live.' });
-                }
-            }
-        }
-
-        start();
-        return () => {
-            cancelled = true;
-            nativeStopRef.current?.();
-            nativeStopRef.current = null;
-            if (hlsRef.current) {
-                hlsRef.current.destroy();
-                hlsRef.current = null;
-            }
-        };
-    }, [camera.id]);
 
     // One control cluster reused in two places (only one mounts at a time): a footer BELOW the video
     // when windowed (never covering the picture, like VideoPopup), and an overlay ON the video only in
@@ -235,10 +133,12 @@ export default function TokenLivePlayer({ camera, onClose }) {
                         Tutup ✕
                     </button>
                 </div>
-                <div ref={containerRef} className="relative aspect-video overflow-hidden bg-black">
+                {/* Dynamic aspect-ratio (measured from the stream), NOT a hardcoded 16:9 — a 4:3 / 16:10 /
+                    9:16 camera fills its box instead of pillarboxing, exactly as VideoPopup does. */}
+                <div ref={containerRef} className="relative overflow-hidden bg-black" style={{ aspectRatio: aspectRatio || 16 / 9 }}>
                     {/* ZoomableVideo = the SAME clean player VideoPopup uses: no native seek/pause bar,
-                        object-contain, pinch-zoom + pan, fullscreen fill (no black bars). hls.js
-                        attaches to videoRef; the ref exposes zoomIn/zoomOut/reset for the buttons. */}
+                        object-contain, pinch-zoom + pan, fullscreen fill (no black bars). The shared
+                        hook attaches hls.js to videoRef; the ref exposes zoomIn/zoomOut/reset. */}
                     <ZoomableVideo ref={zoomRef} videoRef={videoRef} isFullscreen={isFullscreen} onZoomChange={setZoom} />
 
                     {/* Small badge only — never a control that hides the picture. */}
