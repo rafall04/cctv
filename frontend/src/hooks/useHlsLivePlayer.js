@@ -255,6 +255,11 @@ export function useHlsLivePlayer({ videoRef, resolveStream, resetKey, active = t
                         && (data.details === 'manifestLoadError' || data.details === 'levelLoadError');
                     if (isWarmup404 && warmupRetriesRef.current < WARMUP_MAX_RETRY) {
                         warmupRetriesRef.current += 1;
+                        // A warmup rebuild means "the camera is fine, try again" — so the FRESH instance
+                        // gets a FRESH media-recovery budget (VideoPopup tracks this per-instance). Without
+                        // this, a cold decoder that spent both recoveries on instance A would make instance
+                        // B declare a false, unretryable 'codec' on its first hiccup.
+                        mediaRecoveriesRef.current = 0;
                         stopWatch?.();
                         hls.destroy();
                         hls = null;
