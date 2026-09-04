@@ -1,6 +1,8 @@
 import streamService from '../services/streamService.js';
 import playbackTokenService from '../services/playbackTokenService.js';
 import { readVoucherDeviceHash } from '../services/voucherPass.js';
+import { isOwnerIssuedTokenCamera } from '../services/rentalPlaybackAccessPolicy.js';
+import { queryOne } from '../database/connectionPool.js';
 
 export async function getStreamUrls(request, reply) {
     try {
@@ -56,8 +58,10 @@ export async function generateStreamToken(request, reply) {
  * Mint a live stream_access token from a PLAYBACK token. The playback token (sent as the
  * `Authorization: Playback <token>` header or the playback cookie) is the authorization: it must
  * cover this exact camera AND carry the live entitlement (token default or per-camera override).
- * This is the only live path for a non-account holder — it reuses the playback scope gate, so a
- * token can never grant live for a camera it cannot also play back.
+ * This is the only live path for a non-account holder, and it mirrors the RECORDINGS gate exactly so
+ * live can never exceed playback: a community camera needs the token's scope + live flag; a
+ * non-community camera (owner_private/subscriber) additionally needs an OWNER-ISSUED token — the same
+ * isOwnerIssuedTokenCamera rule the archive gate uses — so private footage stays owner-only for live too.
  */
 export async function generateLiveGrant(request, reply) {
     try {
@@ -67,18 +71,24 @@ export async function generateLiveGrant(request, reply) {
             return reply.code(400).send({ success: false, message: 'Kamera tidak valid' });
         }
         // The playback token (cookie/header) is the authorization: validateRequestForCamera runs the
-        // full existence/revoked/expired/in-scope check (throws 401/403), and effective_allow_live is
-        // the per-camera live decision resolved by that same gate — so live can never exceed playback.
+        // full existence/revoked/expired/in-scope check (throws 401/403). It returns null only when NO
+        // token was presented — a missing credential (401), not a live-permission denial (403).
         // requireSession:false — live is bounded by the short stream_access JWT, not a playback slot.
-        // validateRequestForCamera throws 401/403 for an invalid/out-of-scope token, and returns null
-        // only when NO playback token was presented at all — that is a missing credential (401), not a
-        // live-permission denial (403). effective_allow_live is the per-camera live decision.
         const token = playbackTokenService.validateRequestForCamera(request, id, { requireSession: false });
         if (!token) {
             return reply.code(401).send({ success: false, message: 'Token playback diperlukan untuk akses live' });
         }
         if (token.effective_allow_live !== true) {
             return reply.code(403).send({ success: false, message: 'Token ini tidak mengizinkan akses live untuk kamera ini' });
+        }
+        // Private footage is owner-only for LIVE exactly as for playback: a non-community camera's live
+        // requires the token be owner-issued (created_by === owner_user_id, 'selected' scope, billing OK).
+        // Without this, a broad/other-admin token with allow_live could watch a private camera live even
+        // though the recordings gate would refuse it — live must never exceed playback.
+        const camera = queryOne('SELECT camera_class, owner_user_id, billing_status FROM cameras WHERE id = ?', [id]);
+        if (camera && camera.camera_class && camera.camera_class !== 'community'
+            && !isOwnerIssuedTokenCamera(camera, token)) {
+            return reply.code(403).send({ success: false, message: 'Token ini tidak berwenang menonton live kamera privat ini' });
         }
         const data = streamService.mintStreamAccessToken(id, request.hostname);
         return reply.send({ success: true, data });
