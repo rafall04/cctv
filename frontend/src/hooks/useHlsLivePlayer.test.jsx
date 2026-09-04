@@ -3,15 +3,46 @@
 /*
  * Purpose: Lock the shared live-player core's error classification + side-effect contract, since two
  *          players (TokenLivePlayer, CustomerLivePlayer) now depend on it — a silent change here would
- *          break both. The resolveStream-reject path short-circuits before hls.js loads, so these
- *          cases need no hls mock.
+ *          break both. Covers the resolveStream-reject classification (no hls.js needed) AND the
+ *          in-stream hls.js error routing (mocked hls.js + a hand-driven picture-watch), including the
+ *          billing-critical mid-watch 402 → payment path and the pre-live media-recovery-before-codec path.
  * Caller: Frontend Vitest suite.
- * Deps: React Testing Library, vitest.
+ * Deps: React Testing Library, vitest, mocked hls.js + livePictureWatch.
  */
 
 import { useRef } from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import { render, screen, waitFor, act } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+// Fake hls.js: records instances so a test can fire ERROR events at the running player.
+vi.mock('hls.js', () => {
+    const instances = [];
+    class FakeHls {
+        constructor() { this.handlers = {}; instances.push(this); this.liveSyncPosition = 10; }
+        static isSupported() { return true; }
+        static Events = { MANIFEST_PARSED: 'MANIFEST_PARSED', ERROR: 'ERROR' };
+        static ErrorTypes = { MEDIA_ERROR: 'mediaError', NETWORK_ERROR: 'networkError' };
+        on(evt, cb) { this.handlers[evt] = cb; }
+        loadSource() {}
+        attachMedia() {}
+        destroy() {}
+        recoverMediaError() { this.recovered = (this.recovered || 0) + 1; }
+        startLoad() {}
+        emit(evt, data) { this.handlers[evt]?.(null, data); }
+    }
+    FakeHls.__instances = instances;
+    return { default: FakeHls };
+});
+
+// Picture-watch: capture its opts so a test drives go-live (onPicture) deterministically, by hand.
+const watch = vi.hoisted(() => ({ opts: null }));
+vi.mock('../utils/livePictureWatch.js', () => ({
+    startLivePictureWatch: (_video, opts) => { watch.opts = opts; return () => {}; },
+    hasPicture: () => true,
+    countDecodedFrames: () => 1,
+}));
+
+import Hls from 'hls.js';
 import { useHlsLivePlayer } from './useHlsLivePlayer';
 
 function Harness(props) {
@@ -35,7 +66,9 @@ async function expectError(kind, message) {
     if (message !== undefined) expect(screen.getByTestId('message').textContent).toBe(message);
 }
 
-describe('useHlsLivePlayer error classification', () => {
+describe('useHlsLivePlayer error classification (grant fetch)', () => {
+    beforeEach(() => { Hls.__instances.length = 0; watch.opts = null; });
+
     it('maps HTTP 402 to a payment kind with the default message', async () => {
         render(<Harness resolveStream={rejectWith(402)} />);
         await expectError('payment', 'Kamera ditangguhkan.');
@@ -68,5 +101,53 @@ describe('useHlsLivePlayer error classification', () => {
         const mapError = ({ kind, httpCode }) => (kind === 'notfound' ? `Tidak ada (HTTP ${httpCode})` : undefined);
         render(<Harness resolveStream={rejectWith(404)} mapError={mapError} />);
         await expectError('notfound', 'Tidak ada (HTTP 404)');
+    });
+});
+
+describe('useHlsLivePlayer in-stream error routing (hls.js)', () => {
+    beforeEach(() => { Hls.__instances.length = 0; watch.opts = null; });
+
+    const resolveOk = () => Promise.resolve('https://x/live.m3u8');
+    const instance = async () => {
+        await waitFor(() => expect(Hls.__instances.length).toBeGreaterThan(0));
+        return Hls.__instances[Hls.__instances.length - 1];
+    };
+    const goLive = async () => {
+        await waitFor(() => expect(watch.opts).toBeTruthy());
+        await act(async () => { watch.opts.onPicture(); });
+        await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('playing'));
+    };
+
+    it('surfaces a mid-watch 402 as payment (amber), not a generic stall', async () => {
+        render(<Harness resolveStream={resolveOk} />);
+        const inst = await instance();
+        await goLive();
+        // A suspended camera's next live-playlist refresh returns 402.
+        act(() => inst.emit('ERROR', { fatal: true, type: 'networkError', details: 'levelLoadError', response: { code: 402 } }));
+        await expectError('payment');
+    });
+
+    it('surfaces a mid-watch 401/403 as denied, not a stall', async () => {
+        render(<Harness resolveStream={resolveOk} />);
+        const inst = await instance();
+        await goLive();
+        act(() => inst.emit('ERROR', { fatal: true, type: 'networkError', details: 'levelLoadError', response: { code: 403 } }));
+        await expectError('denied');
+    });
+
+    it('recovers a pre-live fatal media error before ever pronouncing codec', async () => {
+        render(<Harness resolveStream={resolveOk} />);
+        const inst = await instance();
+        // Pre-live (onPicture NOT called): a fatal media error with no http code → recoverMediaError, no verdict.
+        act(() => inst.emit('ERROR', { fatal: true, type: 'mediaError', details: 'bufferAppendError' }));
+        expect(inst.recovered).toBe(1);
+        expect(screen.getByTestId('status').textContent).toBe('loading');
+        // Second one → second recovery, still no codec verdict.
+        act(() => inst.emit('ERROR', { fatal: true, type: 'mediaError', details: 'bufferAppendError' }));
+        expect(inst.recovered).toBe(2);
+        expect(screen.getByTestId('status').textContent).toBe('loading');
+        // Third (recovery budget spent) → NOW the terminal codec verdict.
+        act(() => inst.emit('ERROR', { fatal: true, type: 'mediaError', details: 'bufferAppendError' }));
+        await expectError('codec');
     });
 });

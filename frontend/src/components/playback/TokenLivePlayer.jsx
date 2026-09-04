@@ -53,6 +53,11 @@ export default function TokenLivePlayer({ camera, onClose }) {
 
     const state = useHlsLivePlayer({ videoRef, resolveStream, resetKey: camera.id, messages, mapError });
     const aspectRatio = useVideoAspectRatio(videoRef, camera.id);
+    // Constrain the video box by BOTH the modal width AND a viewport-height budget, preserving the
+    // camera ratio — so a portrait/tall camera narrows (no pillarbox) instead of capping to landscape,
+    // and a landscape camera still fills the modal. Same idea as VideoPopup's getPublicPopupModalStyle.
+    const ar = aspectRatio || 16 / 9;
+    const videoBoxStyle = { aspectRatio: ar, maxHeight: '80vh', maxWidth: `min(100%, calc(80vh * ${ar}))` };
 
     // Native fullscreen state — the button icon and ZoomableVideo's fill-on-zoom both read it.
     useEffect(() => {
@@ -135,7 +140,7 @@ export default function TokenLivePlayer({ camera, onClose }) {
                 </div>
                 {/* Dynamic aspect-ratio (measured from the stream), NOT a hardcoded 16:9 — a 4:3 / 16:10 /
                     9:16 camera fills its box instead of pillarboxing, exactly as VideoPopup does. */}
-                <div ref={containerRef} className="relative mx-auto overflow-hidden bg-black" style={{ aspectRatio: aspectRatio || 16 / 9, maxHeight: '80vh' }}>
+                <div ref={containerRef} className="relative mx-auto overflow-hidden bg-black" style={videoBoxStyle}>
                     {/* ZoomableVideo = the SAME clean player VideoPopup uses: no native seek/pause bar,
                         object-contain, pinch-zoom + pan, fullscreen fill (no black bars). The shared
                         hook attaches hls.js to videoRef; the ref exposes zoomIn/zoomOut/reset. */}

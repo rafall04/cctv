@@ -53,6 +53,10 @@ export default function CustomerLivePlayer({ camera, onClose }) {
     // safe only on control-less surfaces).
     const state = useHlsLivePlayer({ videoRef, resolveStream, resetKey: camera.id, respectUserPause: true, messages, onError });
     const aspectRatio = useVideoAspectRatio(videoRef, camera.id);
+    // Constrain the video box by BOTH modal width AND a viewport-height budget, preserving the camera
+    // ratio, so a portrait/tall camera narrows (no pillarbox) instead of capping to landscape.
+    const ar = aspectRatio || 16 / 9;
+    const videoBoxStyle = { aspectRatio: ar, maxHeight: '80vh', maxWidth: `min(100%, calc(80vh * ${ar}))` };
 
     const isSuspended = state.status === 'error' && state.kind === 'payment';
 
@@ -82,7 +86,7 @@ export default function CustomerLivePlayer({ camera, onClose }) {
                 </div>
                 {/* Dynamic aspect-ratio (measured from the stream) — a 4:3 / 16:10 camera fills its box
                     instead of pillarboxing, the same fix VideoPopup carries. */}
-                <div className="relative mx-auto bg-black" style={{ aspectRatio: aspectRatio || 16 / 9, maxHeight: '80vh' }}>
+                <div className="relative mx-auto bg-black" style={videoBoxStyle}>
                     <video
                         ref={videoRef}
                         className="h-full w-full"

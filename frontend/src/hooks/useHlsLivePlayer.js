@@ -46,6 +46,9 @@ export const LIVE_MESSAGES = {
 // An in-stream fatal 404 on manifest/level is a warming MediaMTX camera, retried a few times.
 const WARMUP_MAX_RETRY = 3;
 const WARMUP_RETRY_DELAY_MS = 1200;
+// A fatal MEDIA_ERROR with no codec detail may be a recoverable pipeline hiccup — recover before
+// pronouncing 'codec', exactly as VideoPopup/MultiViewVideoItem do.
+const MEDIA_MAX_RECOVERY = 2;
 
 // A FATAL hls.js error (BEFORE go-live) → a kind + the HTTP code it carried, if any.
 // NOTE: an in-stream 404 is NEVER 'notfound' — the stream URL was already resolved, so the camera
@@ -94,6 +97,7 @@ export function useHlsLivePlayer({ videoRef, resolveStream, resetKey, active = t
     // Bumped to re-run the effect for a warmup-404 retry (a fresh resolve + hls instance).
     const [retryTick, setRetryTick] = useState(0);
     const warmupRetriesRef = useRef(0);
+    const mediaRecoveriesRef = useRef(0);
 
     // Latest callbacks live in refs so the run effect depends ONLY on resetKey/active/retryTick — a
     // caller that re-creates resolveStream every render must not tear the stream down every render.
@@ -113,8 +117,8 @@ export function useHlsLivePlayer({ videoRef, resolveStream, resetKey, active = t
         return table[kind] || table.unknown;
     }, []);
 
-    // A new source starts its warmup budget fresh.
-    useEffect(() => { warmupRetriesRef.current = 0; }, [resetKey]);
+    // A new source starts its retry budgets fresh.
+    useEffect(() => { warmupRetriesRef.current = 0; mediaRecoveriesRef.current = 0; }, [resetKey]);
 
     useEffect(() => {
         if (!active) return undefined;
@@ -213,6 +217,15 @@ export function useHlsLivePlayer({ videoRef, resolveStream, resetKey, active = t
                     // After go-live a fatal error is a live-edge recovery, NEVER a fresh codec verdict:
                     // the device just decoded this stream. resumeAtLiveEdgeOrFail ignores non-fatals.
                     if (live) {
+                        // EXCEPT auth/billing: seeking the live edge can't fix a 401/402/403, and a
+                        // mid-watch 402 (balance depleted) must still surface as 'payment' (the amber
+                        // "top up" card), not a generic 'stalled'. Everything else is a live-edge recovery.
+                        const authCode = data.fatal ? data.response?.code : null;
+                        if (authCode === 401 || authCode === 402 || authCode === 403) {
+                            const { kind, httpCode } = classifyFatalHls(data);
+                            fail({ kind, httpCode });
+                            return;
+                        }
                         resumeAtLiveEdgeOrFail(data, {
                             hls, video, HlsErrorTypes: HlsClass.ErrorTypes, requestPlay,
                             onGiveUp: () => fail({ kind: 'stalled' }),
@@ -244,6 +257,22 @@ export function useHlsLivePlayer({ videoRef, resolveStream, resetKey, active = t
                         return;
                     }
 
+                    // A fatal MEDIA_ERROR with no HTTP code MIGHT be a recoverable pipeline hiccup — a
+                    // bufferAppendError on a cold decoder, which isCodecFailure deliberately does NOT
+                    // catch (it kills healthy streams). Try recoverMediaError first (like the reference
+                    // players); only a decode that survives that (real H.265/HEVC) becomes 'codec'.
+                    if (data.type === 'mediaError' && !data.response?.code) {
+                        if (mediaRecoveriesRef.current < MEDIA_MAX_RECOVERY) {
+                            mediaRecoveriesRef.current += 1;
+                            hls.recoverMediaError();
+                            return;
+                        }
+                        fail({ kind: 'codec' });
+                        hls.destroy();
+                        hls = null;
+                        return;
+                    }
+
                     const { kind, httpCode } = classifyFatalHls(data);
                     fail({ kind, httpCode });
                     hls.destroy();
@@ -257,8 +286,10 @@ export function useHlsLivePlayer({ videoRef, resolveStream, resetKey, active = t
                 // only thing that catches a silently-stalled native live feed — parity with VideoPopup.
                 stopNative = startNativeHlsPlayback(video, securedUrl, {
                     isStale,
-                    onCodecFailure: () => fail({ kind: 'codec' }),
-                    onError: () => fail({ kind: 'network' }),
+                    // After go-live, a decode/element error is a recoverable stall, NEVER a codec
+                    // dead-end — the device just decoded this feed. Mirrors the hls.js post-live rule.
+                    onCodecFailure: () => fail({ kind: live ? 'stalled' : 'codec' }),
+                    onError: () => fail({ kind: live ? 'stalled' : 'network' }),
                 });
                 startWatch();
             } else {
