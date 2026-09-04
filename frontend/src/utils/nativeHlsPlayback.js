@@ -68,5 +68,16 @@ export function startNativeHlsPlayback(video, url, { onCodecFailure, onError, is
     return () => {
         video.removeEventListener('loadedmetadata', play);
         video.removeEventListener('error', handleError);
+        // Detaching listeners does NOT stop a native <video> from continuing to download the HLS
+        // source. Pause + clear the src so a torn-down or switched-away camera stops loading at once
+        // (parity with VideoPopup's cleanupMediaResources), instead of buffering unwatched behind an
+        // error card or during the next camera's resolve round-trip.
+        try {
+            video.pause();
+            video.removeAttribute('src');
+            video.load();
+        } catch {
+            /* element already detached — nothing to release */
+        }
     };
 }
