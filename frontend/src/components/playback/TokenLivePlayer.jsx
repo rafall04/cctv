@@ -85,8 +85,19 @@ export default function TokenLivePlayer({ camera, onClose }) {
                             setState({ status: 'error', message: 'Akses live ditolak. Token mungkin dicabut atau tidak mengizinkan live.' });
                         } else if (httpCode === 402) {
                             setState({ status: 'error', message: 'Kamera ditangguhkan.' });
+                        } else if (data.type === 'mediaError' && !httpCode) {
+                            // A FATAL media error with no HTTP code is a decode failure, not a network drop.
+                            // For an H.265/HEVC camera this is the common case on Android Chrome/WebView:
+                            // hls.js/MSE cannot decode HEVC (native MP4 playback can, which is why recordings
+                            // play but live does not). isCodecFailure misses some HEVC shapes on purpose
+                            // (bufferAppendError was excluded to avoid killing healthy streams), so catch the
+                            // fatal ones here and tell the truth instead of blaming the network.
+                            setState({
+                                status: 'error',
+                                message: 'Perangkat ini tidak bisa memutar codec video kamera ini untuk siaran langsung (kemungkinan H.265/HEVC). Buka di Safari/iPhone, atau minta admin menyetel kamera ke H.264 untuk live.',
+                            });
                         } else {
-                            setState({ status: 'error', message: 'Stream terputus. Coba lagi sebentar lagi.' });
+                            setState({ status: 'error', message: `Stream terputus (${data.details || data.type || 'tidak diketahui'}). Coba lagi sebentar lagi.` });
                         }
                         hls.destroy();
                         hlsRef.current = null;
