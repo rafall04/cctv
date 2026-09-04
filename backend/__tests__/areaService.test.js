@@ -12,9 +12,12 @@ describe('areaService.getAllAreas — public surface must not leak private areas
         areaService.getAllAreas({ publicOnly: true });
         const sql = querySpy.mock.calls[0][0];
         // The area ROW is withheld unless a public camera exists — otherwise a private area (all
-        // owner_private/subscriber-suspended cameras) leaks its name/coords into the landing list.
+        // owner_private/subscriber-suspended/DISABLED cameras) leaks its name/coords into the list.
         expect(sql).toContain('WHERE EXISTS');
         expect(sql).toContain("camera_class = 'community'");
+        // enabled=1 is load-bearing: an area of only DISABLED community cameras must still be hidden
+        // (matches the landing's visibility). A prod leak proved the EXISTS needs this clause.
+        expect(sql).toContain('c.enabled = 1');
     });
 
     it('does NOT scope the ADMIN list — admins still see every area', () => {
@@ -30,6 +33,7 @@ describe('areaService.getAllAreas — public surface must not leak private areas
         // Every DISTINCT division query must gate on an existing public camera.
         for (const [sql] of querySpy.mock.calls) {
             expect(sql).toContain('EXISTS (SELECT 1 FROM cameras c WHERE c.area_id = areas.id');
+            expect(sql).toContain('c.enabled = 1');
             expect(sql).toContain("camera_class = 'community'");
         }
     });

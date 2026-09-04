@@ -70,8 +70,14 @@ export async function generateLiveGrant(request, reply) {
         // full existence/revoked/expired/in-scope check (throws 401/403), and effective_allow_live is
         // the per-camera live decision resolved by that same gate — so live can never exceed playback.
         // requireSession:false — live is bounded by the short stream_access JWT, not a playback slot.
+        // validateRequestForCamera throws 401/403 for an invalid/out-of-scope token, and returns null
+        // only when NO playback token was presented at all — that is a missing credential (401), not a
+        // live-permission denial (403). effective_allow_live is the per-camera live decision.
         const token = playbackTokenService.validateRequestForCamera(request, id, { requireSession: false });
-        if (!token || token.effective_allow_live !== true) {
+        if (!token) {
+            return reply.code(401).send({ success: false, message: 'Token playback diperlukan untuk akses live' });
+        }
+        if (token.effective_allow_live !== true) {
             return reply.code(403).send({ success: false, message: 'Token ini tidak mengizinkan akses live untuk kamera ini' });
         }
         const data = streamService.mintStreamAccessToken(id, request.hostname);
