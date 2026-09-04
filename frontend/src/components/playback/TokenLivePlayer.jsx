@@ -193,6 +193,24 @@ export default function TokenLivePlayer({ camera, onClose }) {
         };
     }, [camera.id]);
 
+    // One control cluster reused in two places (only one mounts at a time): a footer BELOW the video
+    // when windowed (never covering the picture, like VideoPopup), and an overlay ON the video only in
+    // fullscreen (where no footer exists inside the fullscreen element).
+    const controlCluster = (
+        <>
+            <button type="button" onClick={() => zoomRef.current?.zoomOut()} disabled={zoom <= 1} aria-label="Perkecil" title="Perkecil" className="rounded-lg p-1.5 text-white transition-colors hover:bg-white/20 disabled:opacity-30"><ZoomOut className="h-4 w-4" /></button>
+            <span className="w-9 text-center text-[10px] font-medium tabular-nums text-white">{Math.round(zoom * 100)}%</span>
+            <button type="button" onClick={() => zoomRef.current?.zoomIn()} disabled={zoom >= 4} aria-label="Perbesar" title="Perbesar" className="rounded-lg p-1.5 text-white transition-colors hover:bg-white/20 disabled:opacity-30"><ZoomIn className="h-4 w-4" /></button>
+            {zoom > 1 && (
+                <button type="button" onClick={() => zoomRef.current?.reset()} aria-label="Reset zoom" title="Reset zoom" className="rounded-lg p-1.5 text-white transition-colors hover:bg-white/20"><RotateCcw className="h-4 w-4" /></button>
+            )}
+            <span className="mx-0.5 h-5 w-px bg-white/20" />
+            <button type="button" onClick={handleSnapshot} aria-label="Ambil screenshot" title="Ambil screenshot" className="rounded-lg p-1.5 text-white transition-colors hover:bg-white/20"><Camera className="h-4 w-4" /></button>
+            <button type="button" onClick={toggleMute} aria-label={muted ? 'Bunyikan suara' : 'Bisukan'} title={muted ? 'Bunyikan' : 'Bisukan'} className="rounded-lg p-1.5 text-white transition-colors hover:bg-white/20">{muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}</button>
+            <button type="button" onClick={toggleFs} aria-label={isFullscreen ? 'Keluar layar penuh' : 'Layar penuh'} title={isFullscreen ? 'Keluar layar penuh' : 'Layar penuh'} className="rounded-lg p-1.5 text-white transition-colors hover:bg-white/20">{isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}</button>
+        </>
+    );
+
     return (
         <div className="fixed inset-0 z-modal flex items-center justify-center bg-black/80 p-4" onClick={onClose}>
             <div
@@ -223,44 +241,25 @@ export default function TokenLivePlayer({ camera, onClose }) {
                         attaches to videoRef; the ref exposes zoomIn/zoomOut/reset for the buttons. */}
                     <ZoomableVideo ref={zoomRef} videoRef={videoRef} isFullscreen={isFullscreen} onZoomChange={setZoom} />
 
+                    {/* Small badge only — never a control that hides the picture. */}
                     {state.status === 'playing' && (
-                        <>
-                            <div className="pointer-events-none absolute left-3 top-3 z-10 flex items-center gap-1.5 rounded-full bg-black/55 px-2.5 py-1">
-                                <span className="h-2 w-2 rounded-full bg-status-live animate-pulse" />
-                                <span className="text-xs font-semibold uppercase tracking-wide text-white">Live</span>
-                            </div>
+                        <div className="pointer-events-none absolute left-3 top-3 z-10 flex items-center gap-1.5 rounded-full bg-black/55 px-2.5 py-1">
+                            <span className="h-2 w-2 rounded-full bg-status-live animate-pulse" />
+                            <span className="text-xs font-semibold uppercase tracking-wide text-white">Live</span>
+                        </div>
+                    )}
+                    {snapshotMsg && (
+                        <div className="pointer-events-none absolute left-1/2 top-3 z-20 -translate-x-1/2 rounded-full bg-black/70 px-3 py-1 text-xs text-white">
+                            {snapshotMsg}
+                        </div>
+                    )}
 
-                            {snapshotMsg && (
-                                <div className="pointer-events-none absolute left-1/2 top-3 z-20 -translate-x-1/2 rounded-full bg-black/70 px-3 py-1 text-xs text-white">
-                                    {snapshotMsg}
-                                </div>
-                            )}
-
-                            <div className="absolute bottom-3 right-3 z-10 flex items-center gap-0.5 rounded-xl bg-black/55 p-1 text-white">
-                                <button type="button" onClick={() => zoomRef.current?.zoomOut()} disabled={zoom <= 1} aria-label="Perkecil" title="Perkecil" className="rounded-lg p-1.5 transition-colors hover:bg-white/20 disabled:opacity-30">
-                                    <ZoomOut className="h-4 w-4" />
-                                </button>
-                                <span className="w-9 text-center text-[10px] font-medium tabular-nums">{Math.round(zoom * 100)}%</span>
-                                <button type="button" onClick={() => zoomRef.current?.zoomIn()} disabled={zoom >= 4} aria-label="Perbesar" title="Perbesar" className="rounded-lg p-1.5 transition-colors hover:bg-white/20 disabled:opacity-30">
-                                    <ZoomIn className="h-4 w-4" />
-                                </button>
-                                {zoom > 1 && (
-                                    <button type="button" onClick={() => zoomRef.current?.reset()} aria-label="Reset zoom" title="Reset zoom" className="rounded-lg p-1.5 transition-colors hover:bg-white/20">
-                                        <RotateCcw className="h-4 w-4" />
-                                    </button>
-                                )}
-                                <span className="mx-0.5 h-5 w-px bg-white/20" />
-                                <button type="button" onClick={handleSnapshot} aria-label="Ambil screenshot" title="Ambil screenshot" className="rounded-lg p-1.5 transition-colors hover:bg-white/20">
-                                    <Camera className="h-4 w-4" />
-                                </button>
-                                <button type="button" onClick={toggleMute} aria-label={muted ? 'Bunyikan suara' : 'Bisukan'} title={muted ? 'Bunyikan' : 'Bisukan'} className="rounded-lg p-1.5 transition-colors hover:bg-white/20">
-                                    {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
-                                </button>
-                                <button type="button" onClick={toggleFs} aria-label={isFullscreen ? 'Keluar layar penuh' : 'Layar penuh'} title={isFullscreen ? 'Keluar layar penuh' : 'Layar penuh'} className="rounded-lg p-1.5 transition-colors hover:bg-white/20">
-                                    {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
-                                </button>
-                            </div>
-                        </>
+                    {/* FULLSCREEN only: the footer bar is not inside the fullscreen element, so the
+                        controls overlay the video here (exactly as VideoPopup does in fullscreen). */}
+                    {state.status === 'playing' && isFullscreen && (
+                        <div className="absolute bottom-4 right-4 z-30 flex items-center gap-0.5 rounded-xl bg-black/55 p-1">
+                            {controlCluster}
+                        </div>
                     )}
 
                     {state.status === 'loading' && (
@@ -275,6 +274,14 @@ export default function TokenLivePlayer({ camera, onClose }) {
                         </div>
                     )}
                 </div>
+
+                {/* WINDOWED: controls live in a bar BELOW the video — never covering the picture,
+                    the same layout VideoPopup uses windowed. Hidden in fullscreen (overlay takes over). */}
+                {state.status === 'playing' && !isFullscreen && (
+                    <div className="flex items-center justify-end gap-0.5 border-t border-white/10 px-2 py-1.5">
+                        {controlCluster}
+                    </div>
+                )}
             </div>
         </div>
     );
