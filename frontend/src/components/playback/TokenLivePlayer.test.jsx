@@ -33,6 +33,6 @@ describe('TokenLivePlayer', () => {
         expect(getLiveGrant).toHaveBeenCalledWith(42);
         // Modal chrome + loading state render.
         expect(screen.getByText(/Live · Depan Rumah Aldi/)).toBeTruthy();
-        expect(screen.getByText(/Memuat stream live/i)).toBeTruthy();
+        expect(screen.getByText(/Memuat siaran langsung/i)).toBeTruthy();
     });
 });

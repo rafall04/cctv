@@ -12,20 +12,55 @@
  * grant here returns the URL AND the token together, so this player never touches those gated paths.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
+import { Volume2, VolumeX, Maximize, Minimize } from 'lucide-react';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
+import ZoomableVideo from '../MultiView/ZoomableVideo';
 import { getLiveGrant, buildSecureStreamUrl } from '../../services/streamTokenService';
 import { isCodecFailure } from '../../utils/publicPopupState.js';
 import { canPlayNativeHls, startNativeHlsPlayback } from '../../utils/nativeHlsPlayback.js';
 import { getDeviceHLSConfig } from '../../utils/hlsConfig.js';
+import { toggleElementFullscreen } from '../../utils/fullscreen.js';
 
 export default function TokenLivePlayer({ camera, onClose }) {
     const dialogRef = useRef(null);
     useFocusTrap(dialogRef, { onEscape: onClose });
     const videoRef = useRef(null);
+    const containerRef = useRef(null);
     const hlsRef = useRef(null);
     const nativeStopRef = useRef(null);
     const [state, setState] = useState({ status: 'loading', message: '' });
+    const [muted, setMuted] = useState(true);
+    const [isFullscreen, setIsFullscreen] = useState(false);
+
+    // Native fullscreen state — the button icon and ZoomableVideo's fill-on-zoom both read it.
+    useEffect(() => {
+        const onFsChange = () => setIsFullscreen(!!(document.fullscreenElement || document.webkitFullscreenElement));
+        document.addEventListener('fullscreenchange', onFsChange);
+        document.addEventListener('webkitfullscreenchange', onFsChange);
+        return () => {
+            document.removeEventListener('fullscreenchange', onFsChange);
+            document.removeEventListener('webkitfullscreenchange', onFsChange);
+        };
+    }, []);
+
+    // Re-assert the mute preference onto the element: ZoomableVideo hardcodes `muted`, and React
+    // re-applies it whenever ZoomableVideo re-renders (e.g. on a fullscreen toggle), which would
+    // otherwise silently re-mute a stream the viewer chose to unmute.
+    useEffect(() => {
+        if (videoRef.current) videoRef.current.muted = muted;
+    }, [muted, isFullscreen, state.status]);
+
+    const toggleMute = useCallback(() => {
+        const v = videoRef.current;
+        if (!v) return;
+        v.muted = !v.muted;
+        setMuted(v.muted);
+    }, []);
+
+    const toggleFs = useCallback(() => {
+        toggleElementFullscreen(containerRef.current);
+    }, []);
 
     useEffect(() => {
         let cancelled = false;
@@ -170,17 +205,31 @@ export default function TokenLivePlayer({ camera, onClose }) {
                         Tutup ✕
                     </button>
                 </div>
-                <div className="relative aspect-video bg-black">
-                    <video
-                        ref={videoRef}
-                        className="h-full w-full"
-                        playsInline
-                        muted
-                        controls
-                    />
+                <div ref={containerRef} className="relative aspect-video overflow-hidden bg-black">
+                    {/* ZoomableVideo = the SAME clean player VideoPopup uses: no native seek/pause bar,
+                        object-contain, pinch-zoom + pan, fullscreen fill. hls.js attaches to videoRef. */}
+                    <ZoomableVideo videoRef={videoRef} isFullscreen={isFullscreen} />
+
+                    {state.status === 'playing' && (
+                        <>
+                            <div className="pointer-events-none absolute left-3 top-3 z-10 flex items-center gap-1.5 rounded-full bg-black/55 px-2.5 py-1">
+                                <span className="h-2 w-2 rounded-full bg-status-live animate-pulse" />
+                                <span className="text-xs font-semibold uppercase tracking-wide text-white">Live</span>
+                            </div>
+                            <div className="absolute bottom-3 right-3 z-10 flex items-center gap-1 rounded-xl bg-black/55 p-1">
+                                <button type="button" onClick={toggleMute} aria-label={muted ? 'Bunyikan suara' : 'Bisukan'} className="rounded-lg p-1.5 text-white transition-colors hover:bg-white/20">
+                                    {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+                                </button>
+                                <button type="button" onClick={toggleFs} aria-label={isFullscreen ? 'Keluar layar penuh' : 'Layar penuh'} className="rounded-lg p-1.5 text-white transition-colors hover:bg-white/20">
+                                    {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+                                </button>
+                            </div>
+                        </>
+                    )}
+
                     {state.status === 'loading' && (
                         <div className="absolute inset-0 flex items-center justify-center text-sm text-content-subtle">
-                            Memuat stream live…
+                            Memuat siaran langsung…
                         </div>
                     )}
                     {state.status === 'error' && (
