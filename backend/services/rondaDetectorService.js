@@ -236,6 +236,8 @@ class RondaDetectorService {
             ...env('CONFIG_EVERY', '15'),
             ...env('PROC_W', String(cfg.proc_w || 960)),
             ...env('TARGET_FPS', String(cfg.target_fps || 5)),
+            // Cap waktu (jam WIB) di gambar — default MATI (kamera sudah NTP-sync); di-hot-reload via config.
+            ...env('SHOW_STAMP', cfg.stamp ? '1' : '0'),
             ...env('VAR_THRESH', '50'),
             ...env('MIN_AREA', String(cfg.min_area || 700)),
             ...env('CONFIRM', '2.5'),

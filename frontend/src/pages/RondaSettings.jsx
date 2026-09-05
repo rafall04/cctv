@@ -384,6 +384,19 @@ export function RondaSettings() {
                                     Kirim peringatan ke Telegram
                                 </label>
 
+                                <label className="mt-2 flex items-center gap-2 text-sm text-content">
+                                    <input
+                                        type="checkbox"
+                                        checked={!!draft.stamp}
+                                        onChange={(e) => setField(cam.name, 'stamp', e.target.checked)}
+                                        className="h-5 w-5 rounded border-edge accent-[var(--primary-color)] sm:h-4 sm:w-4"
+                                    />
+                                    Cap waktu (jam) di gambar
+                                </label>
+                                <p className={hintClass}>
+                                    Mati = tanpa jam hijau di kiri (kamera sudah sinkron NTP). Berlaku ~15 detik setelah Simpan, tanpa restart.
+                                </p>
+
                                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
                                     <div className="sm:col-span-2">
                                         <label className={labelClass} htmlFor={`hours-${cam.name}`}>

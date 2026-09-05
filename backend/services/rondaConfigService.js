@@ -22,6 +22,7 @@ const LIVE_ROOT = process.env.RONDA_LIVE_ROOT || '/opt/yolo-poc';
 // Applied live by the detector (it re-reads this file every ~15 s).
 const EDITABLE = new Set([
     'enabled',
+    'stamp',
     'alert_hours',
     'tg_cooldown',
     'tg_cooldown_off',
@@ -223,7 +224,7 @@ class RondaConfigService {
             const editable = EDITABLE.has(key);
             const structural = STRUCTURAL.has(key);
             if (!editable && !structural) continue;
-            if (key === 'enabled') next[key] = Boolean(value);
+            if (key === 'enabled' || key === 'stamp') next[key] = Boolean(value);
             else if (key === 'ignore' || key === 'roi') next[key] = value;
             else if (strings.has(key)) next[key] = String(value).trim();
             else next[key] = Number(value);
