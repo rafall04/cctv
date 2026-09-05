@@ -189,15 +189,11 @@ class RecordingPlaybackService {
             ORDER BY id ASC
         `);
 
-        // Batched: ONE health snapshot + ONE process-state read cover every camera's runtime status,
-        // and ONE GROUP BY covers every camera's storage — instead of two synchronous better-sqlite3
-        // queries PER camera (≈2.3k for 757 cameras, re-polled every 10 s by the dashboard), which
-        // blocked the event loop shared with public HLS/landing.
+        // Batched to ~3 set-queries for ALL cameras, not two sync queries PER camera (≈2.3k for 757, polled every 10 s) that blocked the loop.
         const cameraIds = cameras.map((camera) => camera.id);
         const runtimeMap = await recordingControl.getRuntimeStatusMap(cameraIds);
         const storageMap = recordingService.getStorageUsageMap();
         const EMPTY_STORAGE = { totalSize: 0, segmentCount: 0, totalSizeGB: '0.00' };
-
         const camerasWithStatus = cameras.map((camera) => ({
             ...camera,
             runtime_status: runtimeMap.get(camera.id) || { isRecording: false, status: 'unknown' },
