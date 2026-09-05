@@ -10,6 +10,7 @@ import { useState } from 'react';
 import recordingService from '../services/recordingService';
 import { useNotification } from '../contexts/NotificationContext';
 import { Button, PageHeader } from '../components/ui';
+import { InlineErrorBoundary } from '../components/ui/ErrorBoundary';
 import { TableSkeleton, StatCardSkeleton } from '../components/ui/Skeleton';
 import { useRecordingDashboardData } from '../hooks/admin/useRecordingDashboardData';
 import RecordingSummaryCards from '../components/admin/recordings/RecordingSummaryCards';
@@ -167,23 +168,46 @@ export default function RecordingDashboard() {
                 </div>
             )}
 
-            <RecordingSummaryCards summary={summary} />
-            <RecordingCapacityPanel />
+            {/* Each panel is wrapped on its own so one bad API payload cannot blank the whole page —
+                exactly the RecordingCapacityPanel incident (it read retention.currentHours unguarded).
+                A failed panel shows a compact inline error in its own slot; the rest keep working. */}
+            <InlineErrorBoundary title="Ringkasan rekaman gagal ditampilkan">
+                <RecordingSummaryCards summary={summary} />
+            </InlineErrorBoundary>
+            <InlineErrorBoundary title="Panel kapasitas gagal ditampilkan">
+                <RecordingCapacityPanel />
+            </InlineErrorBoundary>
 
-            <RecordingStorageSettings />
-            <RecordingAudioSetting />
-            <RecordingHealthAlertSetting />
-            <RecordingHealthPanel />
-            <RecordingAssuranceSummary summary={assurance?.summary} />
-            <RecordingAssuranceTable cameras={assurance?.cameras || []} />
-            <RecordingCameraGrid
-                recordings={recordings}
-                onStartRecording={handleStartRecording}
-                onStopRecording={handleStopRecording}
-                onUpdateSettings={handleUpdateSettings}
-                updatingCameraId={updatingCameraId}
-            />
-            <RecordingRestartLogs logs={restartLogs} />
+            <InlineErrorBoundary title="Setelan penyimpanan gagal ditampilkan">
+                <RecordingStorageSettings />
+            </InlineErrorBoundary>
+            <InlineErrorBoundary title="Setelan audio gagal ditampilkan">
+                <RecordingAudioSetting />
+            </InlineErrorBoundary>
+            <InlineErrorBoundary title="Setelan peringatan gagal ditampilkan">
+                <RecordingHealthAlertSetting />
+            </InlineErrorBoundary>
+            <InlineErrorBoundary title="Panel kesehatan gagal ditampilkan">
+                <RecordingHealthPanel />
+            </InlineErrorBoundary>
+            <InlineErrorBoundary title="Ringkasan jaminan gagal ditampilkan">
+                <RecordingAssuranceSummary summary={assurance?.summary} />
+            </InlineErrorBoundary>
+            <InlineErrorBoundary title="Tabel jaminan gagal ditampilkan">
+                <RecordingAssuranceTable cameras={assurance?.cameras || []} />
+            </InlineErrorBoundary>
+            <InlineErrorBoundary title="Daftar kamera gagal ditampilkan">
+                <RecordingCameraGrid
+                    recordings={recordings}
+                    onStartRecording={handleStartRecording}
+                    onStopRecording={handleStopRecording}
+                    onUpdateSettings={handleUpdateSettings}
+                    updatingCameraId={updatingCameraId}
+                />
+            </InlineErrorBoundary>
+            <InlineErrorBoundary title="Log restart gagal ditampilkan">
+                <RecordingRestartLogs logs={restartLogs} />
+            </InlineErrorBoundary>
         </div>
     );
 }

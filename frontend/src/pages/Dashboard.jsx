@@ -10,6 +10,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Alert } from '../components/ui/Alert';
 import { Button, PageHeader } from '../components/ui';
+import { InlineErrorBoundary } from '../components/ui/ErrorBoundary';
 import { QuickStatsCards } from '../components/QuickStatsCards';
 import { DateRangeSelector } from '../components/DateRangeSelector';
 import { DashboardInitialSkeleton } from '../components/admin/dashboard/DashboardSkeletons';
@@ -193,33 +194,41 @@ export default function Dashboard() {
                 onOpenViewer={setViewerModal}
             />
 
+            {/* Per-panel boundaries: a malformed stats payload in one panel must not blank the whole
+                dashboard — the failed panel shows a compact inline error, the rest keep rendering. */}
             <div className="space-y-3">
                 <DateRangeSelector value={dateRange} onChange={setDateRange} />
-                <QuickStatsCards dateRange={dateRange} />
+                <InlineErrorBoundary title="Statistik ringkas gagal ditampilkan">
+                    <QuickStatsCards dateRange={dateRange} />
+                </InlineErrorBoundary>
             </div>
 
             <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-                <DashboardStreamsPanel
-                    stats={stats}
-                    rankedStreams={rankedStreams}
-                    visibleStreams={visibleStreams}
-                    overflowStreamCount={overflowStreamCount}
-                    formatBytes={formatBytes}
-                    getOperationalTone={getOperationalTone}
-                    getStreamTransportTone={getStreamTransportTone}
-                    onOpenViewer={setViewerModal}
-                    onOpenDrawer={() => setIsStreamsDrawerOpen(true)}
-                    onAddCamera={() => navigate('/admin/cameras')}
-                    onRetry={handleRetry}
-                />
+                <InlineErrorBoundary title="Panel stream gagal ditampilkan">
+                    <DashboardStreamsPanel
+                        stats={stats}
+                        rankedStreams={rankedStreams}
+                        visibleStreams={visibleStreams}
+                        overflowStreamCount={overflowStreamCount}
+                        formatBytes={formatBytes}
+                        getOperationalTone={getOperationalTone}
+                        getStreamTransportTone={getStreamTransportTone}
+                        onOpenViewer={setViewerModal}
+                        onOpenDrawer={() => setIsStreamsDrawerOpen(true)}
+                        onAddCamera={() => navigate('/admin/cameras')}
+                        onRetry={handleRetry}
+                    />
+                </InlineErrorBoundary>
 
-                <DashboardSidebar
-                    topCameras={stats?.topCameras || []}
-                    recentLogs={stats?.recentLogs || []}
-                    mtxConnected={stats?.mtxConnected}
-                    lastUpdateLabel={formatLastUpdate(lastSuccessfulUpdate)}
-                    refreshFailed={Boolean(refreshError)}
-                />
+                <InlineErrorBoundary title="Sisi kanan dasbor gagal ditampilkan">
+                    <DashboardSidebar
+                        topCameras={stats?.topCameras || []}
+                        recentLogs={stats?.recentLogs || []}
+                        mtxConnected={stats?.mtxConnected}
+                        lastUpdateLabel={formatLastUpdate(lastSuccessfulUpdate)}
+                        refreshFailed={Boolean(refreshError)}
+                    />
+                </InlineErrorBoundary>
             </div>
 
             {viewerModal && (
