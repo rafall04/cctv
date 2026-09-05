@@ -22,7 +22,7 @@
  * Timezone: All timestamps use configured timezone from system settings
  */
 
-import { query, queryOne, execute } from '../database/connectionPool.js';
+import { query, queryOne, execute, transaction } from '../database/connectionPool.js';
 import { v4 as uuidv4 } from 'uuid';
 import viewerAnalyticsService from './viewerAnalyticsService.js';
 import { cacheGetOrSetSync, cacheKey, CacheNamespace, CacheTTL } from './cacheService.js';
@@ -229,28 +229,30 @@ class ViewerSessionService {
             const timestamp = resolveUtcSqlTimestamp(rawEndTimestamp);
             const durationSeconds = diffLocalSqlSeconds(session.started_at, timestamp);
 
-            execute(`
-                UPDATE viewer_sessions 
-                SET is_active = 0, ended_at = ?, duration_seconds = ?
-                WHERE session_id = ?
-            `, [timestamp, durationSeconds, sessionId]);
-
             const camera = queryOne('SELECT name FROM cameras WHERE id = ?', [session.camera_id]);
 
-            execute(`
-                INSERT INTO viewer_session_history 
-                (camera_id, camera_name, ip_address, user_agent, device_type, started_at, ended_at, duration_seconds)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            `, [
-                session.camera_id,
-                camera?.name || `Camera ${session.camera_id}`,
-                session.ip_address,
-                session.user_agent,
-                session.device_type,
-                session.started_at,
-                timestamp,
-                durationSeconds
-            ]);
+            // Record the ended session to history, then REMOVE it from viewer_sessions — atomically.
+            // The old code UPDATEd is_active=0 and kept the row, but nothing ever reads an ended row
+            // (every reader filters is_active=1) and the identical data is now in viewer_session_history,
+            // so the retained rows were pure bloat: 76k on prod, INSERTed on the hottest public path
+            // (every live /start) into a 7-index table. Deleting on end keeps this table live-only.
+            transaction(() => {
+                execute(`
+                    INSERT INTO viewer_session_history
+                    (camera_id, camera_name, ip_address, user_agent, device_type, started_at, ended_at, duration_seconds)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                `, [
+                    session.camera_id,
+                    camera?.name || `Camera ${session.camera_id}`,
+                    session.ip_address,
+                    session.user_agent,
+                    session.device_type,
+                    session.started_at,
+                    timestamp,
+                    durationSeconds
+                ]);
+                execute('DELETE FROM viewer_sessions WHERE session_id = ?', [sessionId]);
+            })();
 
             cameraViewStatsService.recordCompletedLiveView({
                 cameraId: session.camera_id,

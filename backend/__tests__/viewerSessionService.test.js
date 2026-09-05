@@ -24,6 +24,8 @@ vi.mock('../database/connectionPool.js', () => ({
     query: queryMock,
     queryOne: queryOneMock,
     execute: executeMock,
+    // endSession wraps the history INSERT + DELETE in transaction(fn)() — run the callback inline.
+    transaction: (cb) => cb,
 }));
 
 vi.mock('../services/timezoneService.js', () => ({
@@ -93,11 +95,16 @@ describe('viewerSessionService', () => {
         });
 
         expect(ended).toBe(true);
-        expect(executeMock).toHaveBeenCalledWith(expect.stringContaining('UPDATE viewer_sessions'), [
-            '2026-05-05 00:00:10',
-            10,
-            'session-1',
-        ]);
+        // Ended row is copied to history then REMOVED from viewer_sessions (no more is_active=0 bloat).
+        expect(executeMock).toHaveBeenCalledWith(
+            expect.stringContaining('INSERT INTO viewer_session_history'),
+            expect.arrayContaining([12, '2026-05-05 00:00:00', '2026-05-05 00:00:10', 10]),
+        );
+        expect(executeMock).toHaveBeenCalledWith(
+            expect.stringContaining('DELETE FROM viewer_sessions'),
+            ['session-1'],
+        );
+        expect(executeMock).not.toHaveBeenCalledWith(expect.stringContaining('UPDATE viewer_sessions'), expect.anything());
         expect(recordCompletedLiveViewMock).toHaveBeenCalledWith({
             cameraId: 12,
             durationSeconds: 10,
@@ -130,13 +137,15 @@ describe('viewerSessionService', () => {
         });
 
         expect(ended).toBe(true);
+        // A genuine bounce is recorded to history (unlike a cancel, which erases with no history)…
         expect(executeMock).toHaveBeenCalledWith(
             expect.stringContaining('INSERT INTO viewer_session_history'),
             expect.arrayContaining([12, '2026-05-05 00:00:00', '2026-05-05 00:00:02', 2]),
         );
-        expect(executeMock).not.toHaveBeenCalledWith(
+        // …and its live row is then removed, same as any other end.
+        expect(executeMock).toHaveBeenCalledWith(
             expect.stringContaining('DELETE FROM viewer_sessions'),
-            expect.anything(),
+            ['session-1'],
         );
         expect(recordCompletedLiveViewMock).toHaveBeenCalledWith(expect.objectContaining({
             cameraId: 12,
@@ -152,11 +161,16 @@ describe('viewerSessionService', () => {
 
         viewerSessionService.cleanupStaleSessions();
 
-        expect(executeMock).toHaveBeenCalledWith(expect.stringContaining('UPDATE viewer_sessions'), [
-            '2026-05-05 00:00:20',
-            20,
-            'session-stale',
-        ]);
+        // The reaper closes via endSession, which records the end at the last-heartbeat time and then
+        // removes the live row (durationSeconds = 20 = last-heartbeat minus started_at, not cleanup time).
+        expect(executeMock).toHaveBeenCalledWith(
+            expect.stringContaining('INSERT INTO viewer_session_history'),
+            expect.arrayContaining(['2026-05-05 00:00:20', 20]),
+        );
+        expect(executeMock).toHaveBeenCalledWith(
+            expect.stringContaining('DELETE FROM viewer_sessions'),
+            ['session-stale'],
+        );
         expect(recordCompletedLiveViewMock).toHaveBeenCalledWith(expect.objectContaining({
             durationSeconds: 20,
             viewedAt: '2026-05-05 00:00:20',
