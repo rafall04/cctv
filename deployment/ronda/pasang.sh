@@ -17,7 +17,27 @@ MODEL="yolo11n320_openvino_model"
 
 echo "==> Direktori kerja: $KERJA"
 mkdir -p "$KERJA/config" "$KERJA/live"
-install -m 0644 "$SUMBER/motion.py" "$KERJA/motion.py"
+
+# motion.py: JANGAN timpa buta. Salinan yang berjalan di server pernah menyimpang dari berkas repo ini
+# (hotfix on-box yang belum di-backport), dan skrip ini diiklankan "aman dijalankan ulang" — jadi
+# menimpa kode detektor yang sedang bekerja tiap kali dijalankan ulang justru KEBALIKAN dari aman.
+# Pasang hanya bila belum ada; bila ada dan BEDA, cadangkan lalu PERTAHANKAN yang berjalan, kecuali
+# RONDA_FORCE_MOTION=1. (Perbedaan repo-vs-server memang diketahui — bandingkan sadar sebelum memaksa.)
+if [ ! -f "$KERJA/motion.py" ]; then
+    install -m 0644 "$SUMBER/motion.py" "$KERJA/motion.py"
+    echo "==> motion.py dipasang (baru)"
+elif cmp -s "$SUMBER/motion.py" "$KERJA/motion.py"; then
+    echo "==> motion.py sudah sama dengan repo, dilewati"
+elif [ "${RONDA_FORCE_MOTION:-0}" = "1" ]; then
+    cp "$KERJA/motion.py" "$KERJA/motion.py.bak-$(date +%Y%m%d-%H%M%S)"
+    install -m 0644 "$SUMBER/motion.py" "$KERJA/motion.py"
+    echo "==> motion.py DITIMPA versi repo (RONDA_FORCE_MOTION=1); versi lama dicadangkan"
+else
+    cp "$KERJA/motion.py" "$KERJA/motion.py.bak-$(date +%Y%m%d-%H%M%S)"
+    echo "==> PERINGATAN: motion.py di server BEDA dari repo — DIBIARKAN (versi berjalan diasumsikan benar)."
+    echo "    Versi server sudah dicadangkan. Bandingkan dulu:  diff \"$SUMBER/motion.py\" \"$KERJA/motion.py\""
+    echo "    Untuk memaksa pakai versi repo:  RONDA_FORCE_MOTION=1 bash pasang.sh \"$KERJA\""
+fi
 
 echo "==> Membangun image $IMAGE"
 docker build -t "$IMAGE" -f "$SUMBER/Dockerfile" "$SUMBER"
