@@ -687,7 +687,11 @@ function Playback({
             }
         }
 
-        setCurrentTime(videoTime);
+        // `timeupdate` fires ~4×/s, but `currentTime` only feeds the MM:SS overlay and the timeline
+        // playhead — both second-resolution. Gating to whole seconds lets React bail out ~75% of the
+        // time, so the whole page stops re-rendering four times a second while a clip plays (heaviest
+        // on a phone already busy decoding H.265). Sub-second precision here would change nothing drawn.
+        setCurrentTime((prev) => (Math.floor(prev) === Math.floor(videoTime) ? prev : videoTime));
     }, [hasActiveSource, markPlaybackProgress]);
 
     usePlaybackMediaSource({

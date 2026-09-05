@@ -127,6 +127,28 @@ function clampIntervalsToRange(intervals, range) {
     return clamped;
 }
 
+/*
+ * Coverage is expensive AND hot. Computing it scans a camera's WHOLE archive history (no date cap —
+ * it must describe everything reachable, not just the day on screen); on production that is ~6.5k
+ * archive rows and up to 1.6 s cold. The playback page then re-asks for it every 10 s while open, and
+ * because better-sqlite3 is synchronous each recompute blocks the event loop — so one operator on a
+ * thick-archive camera slows every other request (live, health, billing), not just their own page.
+ *
+ * The answer — "which stretches of time have footage" — is quasi-static: new segments land every ten
+ * minutes, archive uploads lag further. A short TTL cache turns the 6×/min recompute into ~0 ms
+ * cache hits with at most a few tens of seconds of staleness, which the timeline can absolutely wear.
+ * Same shape as cameraAccessService's 30 s access cache.
+ */
+const COVERAGE_TTL_MS = 45_000;
+// A safety ceiling on distinct (camera, range) keys so a burst of token users with varied windows
+// cannot grow this without bound; expired entries are pruned lazily on hit, this catches the rest.
+const COVERAGE_CACHE_MAX = 500;
+const coverageCache = new Map();
+
+function cacheKeyFor(id, range) {
+    return `${id}|${range?.from ?? ''}|${range?.to ?? ''}`;
+}
+
 class RecordingCoverageRunsService {
     /**
      * @param {number|string} cameraId
@@ -140,6 +162,11 @@ class RecordingCoverageRunsService {
         if (!Number.isInteger(id) || id <= 0) {
             return { start: null, end: null, runs: [], segments: 0 };
         }
+
+        const now = Date.now();
+        const key = cacheKeyFor(id, range);
+        const hit = coverageCache.get(key);
+        if (hit && hit.expires > now) return hit.value;
 
         const bounds = boundsClause(range);
         /*
@@ -163,12 +190,31 @@ class RecordingCoverageRunsService {
         const intervals = clampIntervalsToRange(rawIntervals, range);
         const runs = mergeIntoRuns(intervals);
 
-        return {
+        const value = {
             start: runs.length ? runs[0].from : null,
             end: runs.length ? runs[runs.length - 1].to : null,
             runs,
             segments: intervals.length,
         };
+
+        // Keep the map from growing unbounded: once it is full of (likely stale) keys, drop the whole
+        // thing rather than tracking per-entry eviction — a cold recompute for the few still-open
+        // pages is cheaper than the bookkeeping, and they refill within one poll.
+        if (coverageCache.size >= COVERAGE_CACHE_MAX) coverageCache.clear();
+        coverageCache.set(key, { value, expires: now + COVERAGE_TTL_MS });
+        return value;
+    }
+
+    /** Test/ops seam: forget cached coverage (all cameras, or one) so the next read recomputes. */
+    invalidate(cameraId = null) {
+        if (cameraId === null) {
+            coverageCache.clear();
+            return;
+        }
+        const id = Number.parseInt(cameraId, 10);
+        for (const key of coverageCache.keys()) {
+            if (key.startsWith(`${id}|`)) coverageCache.delete(key);
+        }
     }
 }
 

@@ -149,6 +149,9 @@ describe('recordingCoverageRunsService.getCoverage', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         queryMock.mockReturnValue([]);
+        // getCoverage caches per (camera, range) for ~45 s; these cases reuse camera 7 with different
+        // mocked rows, so clear it or the second read would return the first case's cached answer.
+        coverage.invalidate();
     });
 
     it('reads both sources and reports the merged span', () => {

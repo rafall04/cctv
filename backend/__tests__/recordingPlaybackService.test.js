@@ -63,10 +63,15 @@ vi.mock('../services/playbackTokenService.js', () => ({
 }));
 
 const { default: recordingPlaybackService } = await import('../services/recordingPlaybackService.js');
+const { default: recordingCoverageRunsService } = await import('../services/recordingCoverageRunsService.js');
 
 describe('recordingPlaybackService', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        // getSegments calls getCoverage, which caches per (camera, range) for ~45 s. Without a reset,
+        // one case's cached coverage would satisfy the next case's mockReturnValueOnce sequence and
+        // shift every later query mock, so clear it between cases.
+        recordingCoverageRunsService.invalidate();
         existsSyncMock.mockReturnValue(true);
         statSyncMock.mockReturnValue({ size: 100 });
         getPublicPlaybackSettingsMock.mockReturnValue({
