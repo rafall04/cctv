@@ -19,17 +19,68 @@ const __dirname = dirname(__filename);
  * request body (admin endpoint), i.e. attacker-controlled. Anything not named here is rejected
  * rather than interpolated. Keep export and import on this one list so they cannot drift.
  */
+// NOTE: this is the SELECTIVE (JSON) export list, NOT the disaster-recovery backup. Losing the box
+// is covered by the WHOLE-database snapshots (safe-deploy `.backup` + backupTelegramService VACUUM
+// INTO), which capture every table regardless of this list. What THIS list must not do is claim to be
+// a "complete backup" while silently dropping irreplaceable business data — the original 10 tables
+// omitted wallets/payments/subscriptions/tokens/settings entirely. So it now covers everything a
+// human could not reconstruct, and deliberately leaves out the bulky, regenerable operational tables
+// (recording_segments, telegram_archive_uploads, viewer_session_history_archive, *_logs, runtime
+// state) — those bloat a browser download and are already in the whole-DB snapshot.
 const BACKUP_TABLES = [
+    // Identity + access
     'users',
+    'api_keys',
+    'password_history',
+    'token_blacklist',
+    // Cameras + areas + user-generated camera data
     'cameras',
     'areas',
-    'audit_logs',
+    'customer_areas',
+    'camera_reactions',
+    'camera_reports',
+    // Money + billing (irreplaceable)
+    'wallets',
+    'wallet_transactions',
+    'payments',
+    'billing_plans',
+    'camera_subscriptions',
+    // Playback tokens + products
+    'playback_tokens',
+    'playback_token_camera_rules',
+    'playback_token_renewals',
+    'playback_products',
+    'playback_trial_claims',
+    'playback_orders',
+    // Vouchers
+    'voucher_profiles',
+    'voucher_profile_areas',
+    'voucher_codes',
+    'voucher_orders',
+    'voucher_redemptions',
+    // Promos
+    'promo_codes',
+    'promo_redemptions',
+    'promo_banners',
+    'promo_banner_targets',
+    // Affiliate + sponsors + house ads
+    'affiliate_partners',
+    'affiliate_offers',
+    'affiliate_offer_targets',
+    'sponsors',
+    'sponsor_packages',
+    'banner_ads',
+    // Settings + branding + integrations
+    'settings',
+    'system_settings',
+    'branding_settings',
+    'saweria_settings',
+    'monetag_settings',
+    // Feedback + light history
     'feedbacks',
-    'api_keys',
+    'audit_logs',
     'viewer_sessions',
     'viewer_session_history',
-    'system_settings',
-    'saweria_settings'
 ];
 
 /**

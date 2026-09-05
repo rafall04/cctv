@@ -246,8 +246,21 @@ ok "Current commit recorded for rollback: ${ROLLBACK_COMMIT}"
 DB_PATH="$BACKEND_DIR/data/cctv.db"
 if [ -f "$DB_PATH" ]; then
     DB_BAK="${DB_PATH}.backup-$(date +%Y%m%d-%H%M%S)"
-    cp "$DB_PATH" "$DB_BAK"
-    ok "Database backed up: ${DB_BAK}"
+    # WAL-safe backup. The live .db is NOT a complete database on its own — recent commits sit in
+    # ${DB_PATH}-wal (tens of MB on prod: 53 MB while 109 MB was on disk), so a plain `cp` of only the
+    # .db yields a TORN snapshot that restores short (or not at all). `sqlite3 .backup` uses SQLite's
+    # online-backup API for a consistent, WAL-checkpointed single-file copy. Fall back to copying all
+    # three WAL files together only where the CLI is missing.
+    if command -v sqlite3 >/dev/null 2>&1; then
+        sqlite3 "$DB_PATH" ".backup '${DB_BAK}'" \
+            || fatal "sqlite3 .backup failed — refusing to deploy without a consistent DB backup."
+        ok "Database backed up (consistent, WAL checkpointed): ${DB_BAK}"
+    else
+        cp "$DB_PATH" "$DB_BAK"
+        { [ -f "${DB_PATH}-wal" ] && cp "${DB_PATH}-wal" "${DB_BAK}-wal"; } || true
+        { [ -f "${DB_PATH}-shm" ] && cp "${DB_PATH}-shm" "${DB_BAK}-shm"; } || true
+        warn "sqlite3 not found — copied .db + -wal + -shm (restore needs all three files)."
+    fi
 else
     warn "Database not found at ${DB_PATH} (first run?) — skipping DB backup."
 fi

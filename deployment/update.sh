@@ -45,8 +45,19 @@ npm install --production
 # Back up the DB BEFORE migrating — always keep a pre-op copy (AGENTS.md critical invariant).
 print_info "Backing up database before migration..."
 if [ -f data/cctv.db ]; then
-    cp data/cctv.db "data/cctv.db.backup-$(date +%Y%m%d-%H%M%S)"
-    print_success "Database backed up"
+    DB_BAK="data/cctv.db.backup-$(date +%Y%m%d-%H%M%S)"
+    # WAL-safe: a plain `cp` of just the .db drops everything still in data/cctv.db-wal (a torn
+    # snapshot that restores short). sqlite3 .backup asks SQLite for a consistent copy; fall back to
+    # copying all three WAL files together only where the CLI is missing.
+    if command -v sqlite3 >/dev/null 2>&1; then
+        sqlite3 data/cctv.db ".backup '${DB_BAK}'"
+        print_success "Database backed up (consistent): ${DB_BAK}"
+    else
+        cp data/cctv.db "$DB_BAK"
+        { [ -f data/cctv.db-wal ] && cp data/cctv.db-wal "${DB_BAK}-wal"; } || true
+        { [ -f data/cctv.db-shm ] && cp data/cctv.db-shm "${DB_BAK}-shm"; } || true
+        print_success "Database backed up (cp fallback: .db + -wal + -shm)"
+    fi
 fi
 
 # Run migrations via the tracked runner (ordered, forward-only). No `|| true`: with `set -e` a failed
