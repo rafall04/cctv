@@ -366,8 +366,26 @@ env_set "$BACKEND_ENV" "APP_BUILD_ID" "$DEPLOYED_COMMIT"
 info "Restarting services"
 if command -v pm2 >/dev/null 2>&1; then
     pm2 restart "$BACKEND_PM2" --update-env || fatal "pm2 restart ${BACKEND_PM2} failed."
-    pm2 restart "$MEDIAMTX_PM2" --update-env >/dev/null 2>&1 || true
     ok "PM2 restarted ${BACKEND_PM2}"
+
+    # MediaMTX is intentionally NOT bounced on every deploy — a restart drops EVERY live RTSP→HLS
+    # stream and its config (mediamtx.yml) changes rarely. The old line was a double bug: it targeted
+    # "$MEDIAMTX_PM2" (which resolves to a CLIENT_CODE-prefixed name this box does not use — the process
+    # is plain 'mediamtx') AND hid the miss behind `|| true`, so it silently no-oped for months while
+    # looking deliberate. Instead: verify MediaMTX is present under whatever name pm2 actually has, and
+    # flag a name drift so it can be reconciled. Restart MediaMTX by hand after editing mediamtx.yml.
+    MTX_TARGET=""
+    for _cand in "$MEDIAMTX_PM2" mediamtx; do
+        if pm2 describe "$_cand" >/dev/null 2>&1; then MTX_TARGET="$_cand"; break; fi
+    done
+    if [ -z "$MTX_TARGET" ]; then
+        warn "No MediaMTX pm2 process ('${MEDIAMTX_PM2}' or 'mediamtx') found — RTSP→HLS may be down."
+    else
+        ok "MediaMTX present as '${MTX_TARGET}' (left running — restart by hand after a mediamtx.yml change)."
+        if [ "$MTX_TARGET" != "$MEDIAMTX_PM2" ]; then
+            warn "MediaMTX runs as '${MTX_TARGET}', not the expected '${MEDIAMTX_PM2}' — rename it to match ecosystem.config.cjs so tooling can find it."
+        fi
+    fi
 
     # -----------------------------------------------------------------------
     # Recording worker: restart ONLY when recording code actually changed.

@@ -43,6 +43,12 @@ export function createRecordingEmergencyDiskService({
     async function runEmergencyCheckInner() {
         const freeBytes = await diskSpaceService.getFreeBytes(recordingsBasePath);
         if (!Number.isFinite(freeBytes)) {
+            // Loud, not silent: a failed df probe means the emergency cleanup is now BLIND — the disk
+            // could be filling to 100% (taking the DB + backend down with it) and nothing here would
+            // act or say so. This is exactly the kind of "reports normal while failing" the deploy of
+            // 2026-09 flagged. Surface it every cycle it happens so an operator can look.
+            logger.warn?.(`[DiskCheck] Could not read free space at ${recordingsBasePath} — emergency `
+                + 'cleanup is BLIND this cycle (df/statfs probe failed). Check the mount and permissions.');
             return { status: 'skipped_unknown_disk', deleted: 0, deletedBytes: 0 };
         }
 
