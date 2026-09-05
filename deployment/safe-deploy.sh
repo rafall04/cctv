@@ -365,6 +365,19 @@ env_set "$BACKEND_ENV" "APP_BUILD_ID" "$DEPLOYED_COMMIT"
 
 info "Restarting services"
 if command -v pm2 >/dev/null 2>&1; then
+    # Resolve the backend out-log and remember its SIZE before the restart, so the boot-completion
+    # check further down can search only the bytes THIS boot appends. A line-count tail (`tail -n N`)
+    # is defeated by the thumbnail loop, which logs a line per failing external camera — hundreds of
+    # lines in the boot window buried the startup marker past any fixed N, so every healthy deploy
+    # cried "SUSPECT". A byte offset does not care how much spam follows the marker.
+    BACKEND_OUT_LOG="$(pm2 jlist 2>/dev/null \
+        | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{const a=JSON.parse(s).find(p=>p.name==='$BACKEND_PM2');process.stdout.write(a?a.pm2_env.pm_out_log_path:'')}catch(e){process.stdout.write('')}})" \
+        2>/dev/null || true)"
+    OUT_LOG_OFFSET=0
+    if [ -n "$BACKEND_OUT_LOG" ] && [ -f "$BACKEND_OUT_LOG" ]; then
+        OUT_LOG_OFFSET="$(wc -c < "$BACKEND_OUT_LOG" 2>/dev/null || echo 0)"
+    fi
+
     pm2 restart "$BACKEND_PM2" --update-env || fatal "pm2 restart ${BACKEND_PM2} failed."
     ok "PM2 restarted ${BACKEND_PM2}"
 
@@ -569,11 +582,17 @@ BACKEND_OUT_LOG="$(pm2 jlist 2>/dev/null \
     2>/dev/null || true)"
 
 if [ -n "$BACKEND_OUT_LOG" ] && [ -f "$BACKEND_OUT_LOG" ]; then
-    # Search a wide tail, not 400 lines: the thumbnail loop logs a line per failing external camera, so
-    # within seconds of boot the spam pushes the marker past a short tail — the deploy then cried
-    # "SUSPECT" (and exit 1) on every single healthy deploy. A hung boot is still caught: with no marker
-    # from THIS boot, the whole window is post-restart spam, so a previous boot's marker stays out of it.
-    if tail -n 4000 "$BACKEND_OUT_LOG" | grep -qF "$BOOT_MARKER"; then
+    # Search only the bytes THIS boot appended — everything after the pre-restart offset captured in
+    # PHASE 7 — so no amount of thumbnail spam following the marker can bury it (a line-count tail
+    # could not win that race and cried "SUSPECT" + exit 1 on every healthy deploy). Fall back to a
+    # wide tail only if the offset is unusable (never captured, or the log rotated/shrank since).
+    CUR_SIZE="$(wc -c < "$BACKEND_OUT_LOG" 2>/dev/null || echo 0)"
+    if [ "${OUT_LOG_OFFSET:-0}" -gt 0 ] && [ "$CUR_SIZE" -ge "${OUT_LOG_OFFSET:-0}" ]; then
+        BOOT_SLICE="$(tail -c +"$((OUT_LOG_OFFSET + 1))" "$BACKEND_OUT_LOG" 2>/dev/null || true)"
+    else
+        BOOT_SLICE="$(tail -n 4000 "$BACKEND_OUT_LOG" 2>/dev/null || true)"
+    fi
+    if printf '%s' "$BOOT_SLICE" | grep -qF "$BOOT_MARKER"; then
         ok "Boot completed fully — '${BOOT_MARKER}' present."
     else
         hr
