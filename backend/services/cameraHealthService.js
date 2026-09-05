@@ -9,6 +9,7 @@ SideEffects: Updates camera online state/runtime state, repairs MediaMTX paths, 
 import axios from 'axios';
 import https from 'https';
 import { probeRtspSource } from './rtspProbe.js';
+import { redactUrlCredentials } from '../utils/logRedaction.js';
 import {
     SCORE_DECAY_ON_SUCCESS,
     OFFLINE_SCORE_THRESHOLD,
@@ -602,7 +603,7 @@ class CameraHealthService {
                 return { attempted: true, success: true, pathName, action: result.action || null };
             }
         } catch (error) {
-            console.error(`[CameraHealth] Failed to self-heal MediaMTX path ${pathName}:`, error.message);
+            console.error(`[CameraHealth] Failed to self-heal MediaMTX path ${pathName}:`, redactUrlCredentials(error.message));
         }
 
         return { attempted: true, success: false, pathName };
@@ -1336,7 +1337,10 @@ class CameraHealthService {
             try {
                 await thumbnailService.refreshCameraThumbnail(camera.id);
             } catch (error) {
-                console.error(`[CameraHealth] Failed to refresh thumbnail for camera ${camera.id}:`, error.message);
+                // FFmpeg echoes its whole command line on failure, so error.message here carries the
+                // camera's RTSP URL — credentials and all. Redact before it reaches the pm2 error log
+                // (world-readable, archived). redactUrlCredentials is a no-op on credential-free text.
+                console.error(`[CameraHealth] Failed to refresh thumbnail for camera ${camera.id}:`, redactUrlCredentials(error.message));
             }
 
             return;
@@ -2499,7 +2503,7 @@ class CameraHealthService {
                 const streamResult = probe.result.value;
                 // One camera must never cost the sweep: a throw here used to leave every other camera unchecked this tick.
                 const monitoring = await guardProbeSettlement(this.evaluateCameraMonitoringStatus(streamResult.camera, activePaths, streamResult))
-                    .catch((error) => { console.error(`[CameraHealth] Camera ${streamResult.camera.id} monitoring failed:`, error.message); return null; });
+                    .catch((error) => { console.error(`[CameraHealth] Camera ${streamResult.camera.id} monitoring failed:`, redactUrlCredentials(error.message)); return null; });
                 if (!monitoring) continue;
                 const finalResult = {
                     cameraId: streamResult.camera.id,
@@ -2719,7 +2723,7 @@ class CameraHealthService {
             this.lastCheck = new Date();
             console.log(`[CameraHealth] Check complete [${scope}]: ${onlineCount} online, ${offlineCount} offline (${changedCount} changed, ${dueCameras.length} probed)`);
         } catch (error) {
-            console.error(`[CameraHealth] Check failed [${scope}]:`, error.message);
+            console.error(`[CameraHealth] Check failed [${scope}]:`, redactUrlCredentials(error.message));
         } finally {
             this.checkingScopes.delete(scope);
         }
@@ -3128,7 +3132,7 @@ class CameraHealthService {
             this.lastCheck = new Date();
             return result.isOnline === 1;
         } catch (error) {
-            console.error(`[CameraHealth] Check camera ${cameraId} failed:`, error.message);
+            console.error(`[CameraHealth] Check camera ${cameraId} failed:`, redactUrlCredentials(error.message));
             return false;
         }
     }
