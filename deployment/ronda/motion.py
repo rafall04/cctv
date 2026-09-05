@@ -588,7 +588,13 @@ def main():
             continue
 
         skala = PROC_W / bingkai.shape[1]
-        kerja = cv2.resize(bingkai, (PROC_W, max(1, int(bingkai.shape[0] * skala))))
+        # Codec-agnostic: decode H.265 yang glitch (RPS error) bisa mengeluarkan bingkai kurang
+        # beberapa baris (mis. 1432 vs 1440). Tinggi analisa yang ikut sumber membuat MOG2/buffer
+        # beda ukuran antar bingkai lalu crash ("operands could not be broadcast"). Kunci tinggi ke
+        # bingkai pertama yang baik, lalu petakan SEMUA bingkai ke sana — decode wobble tak masalah.
+        if getattr(main, "_proc_h", None) is None:
+            main._proc_h = max(1, int(bingkai.shape[0] * skala))
+        kerja = cv2.resize(bingkai, (PROC_W, main._proc_h))
         tinggi, lebar = kerja.shape[:2]
 
         kabur = cv2.GaussianBlur(cv2.cvtColor(kerja, cv2.COLOR_BGR2GRAY), (5, 5), 0)
