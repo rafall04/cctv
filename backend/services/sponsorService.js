@@ -7,6 +7,7 @@ SideEffects: Reads/writes the sponsors table and sponsor_* columns on cameras.
 */
 
 import { query, queryOne, execute, transaction } from '../database/connectionPool.js';
+import { getLocalDate } from './timeService.js';
 
 // Display order is now driven by sponsor_packages.sort_order (admin-editable
 // in the catalog). The LEFT JOIN keeps legacy/orphan sponsor rows visible —
@@ -64,13 +65,17 @@ export function getAllSponsors() {
  * called by the landing SponsorStrip on every visit), so it reads through PUBLIC_SPONSOR_SELECT
  * and never the admin star-select. See the WHY on that constant.
  */
-export function getActiveSponsors() {
+export function getActiveSponsors(today = getLocalDate()) {
+    // Compare end_date against the LOCAL (WIB) date, not SQLite's DATE('now') which is UTC: for the
+    // first ~7 h of each WIB day the UTC date is still yesterday, so an expired sponsor (end_date =
+    // yesterday) kept showing until 07:00 WIB. `today` defaults to getLocalDate() — the same fix
+    // affiliate/promo use — and is injectable so the boundary is testable without waiting for 07:00.
     return query(`
         ${PUBLIC_SPONSOR_SELECT}
         WHERE s.active = 1
-        AND (s.end_date IS NULL OR s.end_date >= DATE('now'))
+        AND (s.end_date IS NULL OR s.end_date >= ?)
         ORDER BY ${PACKAGE_ORDER_SQL}
-    `);
+    `, [today]);
 }
 
 /**

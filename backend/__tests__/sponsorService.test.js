@@ -39,7 +39,7 @@ vi.mock('../database/connectionPool.js', () => ({
     transaction: (fn) => db.transaction(fn),
 }));
 
-const { getCamerasWithSponsors } = await import('../services/sponsorService.js');
+const { getCamerasWithSponsors, getActiveSponsors } = await import('../services/sponsorService.js');
 
 /* The columns that must never reach an anonymous caller, named so the assertions can be blunt. */
 const SECRET_COLUMNS = ['private_rtsp_url', 'stream_key'];
@@ -137,5 +137,42 @@ describe('getCamerasWithSponsors — permukaan publik', () => {
 
     it('urutan paket tetap gold sebelum bronze', () => {
         expect(getCamerasWithSponsors().map((row) => row.id)).toEqual([11, 12]);
+    });
+});
+
+describe('getActiveSponsors — batas end_date pakai tanggal LOKAL, bukan DATE(now) UTC', () => {
+    beforeEach(() => {
+        db.exec(`
+            DROP TABLE IF EXISTS sponsors;
+            DROP TABLE IF EXISTS sponsor_packages;
+            CREATE TABLE sponsors (
+                id INTEGER PRIMARY KEY, name TEXT, logo TEXT, url TEXT, package TEXT,
+                active INTEGER, end_date TEXT, created_at TEXT
+            );
+            CREATE TABLE sponsor_packages (key TEXT, name TEXT, color TEXT, sort_order INTEGER);
+            INSERT INTO sponsor_packages (key, name, color, sort_order) VALUES ('gold', 'Gold', '#f00', 1);
+            INSERT INTO sponsors (id, name, package, active, end_date, created_at) VALUES
+                (1, 'Berakhir hari ini', 'gold', 1, '2026-09-05', '2026-01-01'),
+                (2, 'Kadaluarsa kemarin', 'gold', 1, '2026-09-04', '2026-01-01'),
+                (3, 'Tanpa batas', 'gold', 1, NULL, '2026-01-01'),
+                (4, 'Nonaktif', 'gold', 0, '2026-12-31', '2026-01-01');
+        `);
+    });
+
+    it('menyertakan yang berakhir hari-lokal + tanpa batas, membuang yang kadaluarsa & nonaktif', () => {
+        // Pukul 03:00 WIB 6 Sep = 20:00 UTC 5 Sep, jadi DATE('now') UTC masih '2026-09-05' dan sponsor
+        // yang harusnya kadaluarsa akhir 5 Sep akan tetap tampil. getLocalDate() memberi '2026-09-06'.
+        const ids = getActiveSponsors('2026-09-06').map((row) => row.id);
+        expect(ids).not.toContain(1); // end_date 2026-09-05 < hari lokal 2026-09-06 → kadaluarsa, hilang
+        expect(ids).not.toContain(2);
+        expect(ids).not.toContain(4); // nonaktif
+        expect(ids).toContain(3);     // end_date NULL → selalu tampil
+    });
+
+    it('masih menampilkan sponsor pada hari terakhirnya (batas inklusif)', () => {
+        const ids = getActiveSponsors('2026-09-05').map((row) => row.id);
+        expect(ids).toContain(1);     // end_date 2026-09-05 >= hari lokal 2026-09-05 → hari terakhir, tampil
+        expect(ids).toContain(3);
+        expect(ids).not.toContain(2);
     });
 });
