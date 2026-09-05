@@ -155,6 +155,50 @@ export async function getRuntimeStatus(cameraId) {
     };
 }
 
+/**
+ * Runtime status for MANY cameras in ONE pass, same per-camera shape as getRuntimeStatus().
+ *
+ * getRuntimeStatus() reads the health snapshot AND a process-state row PER camera. The dashboard
+ * overview called it for every enabled camera (757 on prod), so the single health snapshot was
+ * re-read 757× and recording_process_state was hit 757× — all synchronous better-sqlite3, blocking
+ * the event loop that also serves public HLS. This reads the snapshot once and the whole
+ * process-state table once, then maps each id off those in memory.
+ *
+ * @param {Array<number>} cameraIds
+ * @returns {Promise<Map<number, object>>}
+ */
+export async function getRuntimeStatusMap(cameraIds) {
+    const map = new Map();
+    if (!isWorkerMode()) {
+        // Single-process mode: statuses live in this process, nothing cross-process to batch.
+        const service = await getRecordingService();
+        for (const id of cameraIds) map.set(id, service.getRecordingStatus(id));
+        return map;
+    }
+
+    const heartbeat = workerState.readHealthSnapshot();
+    if (heartbeat.stale) {
+        for (const id of cameraIds) map.set(id, { isRecording: false, status: 'unknown', workerStale: true });
+        return map;
+    }
+
+    const byCamera = new Map(workerState.readAllProcessState().map((row) => [row.camera_id, row]));
+    for (const id of cameraIds) {
+        const row = byCamera.get(id);
+        map.set(id, row
+            ? {
+                isRecording: row.status === 'recording',
+                status: row.status,
+                pid: row.pid,
+                startTime: row.started_at,
+                streamSource: row.stream_source,
+                adopted: row.adopted === 1,
+            }
+            : { isRecording: false, status: 'stopped' });
+    }
+    return map;
+}
+
 export default {
     isWorkerMode,
     reconcile,
@@ -164,4 +208,5 @@ export default {
     restart,
     restartAllActive,
     getRuntimeStatus,
+    getRuntimeStatusMap,
 };

@@ -17,6 +17,7 @@ const stopRecordingMock = vi.fn();
 const reconcileRecordingLifecycleMock = vi.fn();
 const getRecordingStatusMock = vi.fn();
 const getStorageUsageMock = vi.fn();
+const getStorageUsageMapMock = vi.fn();
 const logAdminActionMock = vi.fn();
 const getPublicPlaybackSettingsMock = vi.fn();
 const existsSyncMock = vi.fn();
@@ -43,6 +44,7 @@ vi.mock('../services/recordingService.js', () => ({
         reconcileRecordingLifecycle: reconcileRecordingLifecycleMock,
         getRecordingStatus: getRecordingStatusMock,
         getStorageUsage: getStorageUsageMock,
+        getStorageUsageMap: getStorageUsageMapMock,
     },
 }));
 
@@ -104,7 +106,9 @@ describe('recordingPlaybackService', () => {
         ]).mockReturnValueOnce([{ count: 2 }]);
 
         getRecordingStatusMock.mockReturnValue({ isRecording: true, status: 'recording' });
-        getStorageUsageMock.mockReturnValue({ totalSize: 1024, segmentCount: 2 });
+        // Overview now reads storage in ONE batched GROUP BY (getStorageUsageMap) instead of a
+        // per-camera getStorageUsage, so the map keyed by camera id is what it consumes.
+        getStorageUsageMapMock.mockReturnValue(new Map([[5, { totalSize: 1024, segmentCount: 2 }]]));
 
         const result = await recordingPlaybackService.getRecordingsOverview();
 

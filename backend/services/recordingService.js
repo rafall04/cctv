@@ -621,6 +621,34 @@ class RecordingService {
         }
     }
 
+    /**
+     * Storage usage for ALL cameras in ONE query, keyed by camera_id. getStorageUsage() scans
+     * recording_segments once PER camera; the dashboard overview called it for every enabled camera,
+     * so this replaces N synchronous SUM/COUNT scans with a single GROUP BY. Cameras with no segments
+     * are simply absent from the map — the caller fills the empty default.
+     * @returns {Map<number, {totalSize:number, segmentCount:number, totalSizeGB:string}>}
+     */
+    getStorageUsageMap() {
+        const map = new Map();
+        try {
+            const rows = query(
+                'SELECT camera_id, SUM(file_size) AS total_size, COUNT(*) AS segment_count '
+                + 'FROM recording_segments GROUP BY camera_id'
+            );
+            for (const row of rows) {
+                const total = row.total_size || 0;
+                map.set(row.camera_id, {
+                    totalSize: total,
+                    segmentCount: row.segment_count || 0,
+                    totalSizeGB: (total / 1024 / 1024 / 1024).toFixed(2),
+                });
+            }
+        } catch (error) {
+            console.error('Error getting storage usage map:', error.message);
+        }
+        return map;
+    }
+
 
     getEmergencyDiskService() {
         return this.maintenanceCoordinator.getEmergencyDiskService();
