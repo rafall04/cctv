@@ -236,7 +236,9 @@ class SumberRTSP:
         self._t.start()
 
     def _buka(self):
-        os.environ.setdefault("OPENCV_FFMPEG_CAPTURE_OPTIONS", "rtsp_transport;tcp")
+        # stimeout (µs): sumber H.265 yang glitch bisa diam mendadak; tanpa ini cap.read() BLOKIR
+        # selamanya dan thread pembaca tak pernah reconnect. 5 dtk membuatnya gagal-cepat lalu buka ulang.
+        os.environ.setdefault("OPENCV_FFMPEG_CAPTURE_OPTIONS", "rtsp_transport;tcp|stimeout;5000000")
         cap = cv2.VideoCapture(self.url, cv2.CAP_FFMPEG)
         try:
             cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
