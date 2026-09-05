@@ -318,6 +318,40 @@ if [ -d "$FRONTEND_DIR" ]; then
 fi
 
 # ===========================================================================
+# PHASE 6b — Sidecar sync (tg-archive uploader lives under /opt, OUTSIDE the app tree)
+# ===========================================================================
+# The Telegram archive uploader is a systemd sidecar at /opt/tg-archive, installed once by hand and
+# then invisible to every deploy — which is exactly how the A-01 anti-footage-loss fix sat finished in
+# the repo for weeks while /opt kept running an older copy that silently dropped "failed" segments.
+# Keep it in lockstep: when the tracked uploader.py differs from the deployed one, back the old one up,
+# copy the new one, and restart the service so the new code actually runs. Fully NON-FATAL and guarded
+# — a box without the sidecar (or without systemd) is simply skipped, and a sidecar hiccup never rolls
+# back an otherwise-good backend deploy.
+SIDECAR_SRC="$APP_DIR/sidecar/tg-archive/uploader.py"
+SIDECAR_DST="/opt/tg-archive/uploader.py"
+if [ -f "$SIDECAR_DST" ] && command -v systemctl >/dev/null 2>&1; then
+    hr
+    info "Syncing tg-archive sidecar"
+    if [ ! -f "$SIDECAR_SRC" ]; then
+        warn "Sidecar source missing in repo — skipped."
+    elif cmp -s "$SIDECAR_SRC" "$SIDECAR_DST"; then
+        ok "tg-archive uploader already current."
+    else
+        cp "$SIDECAR_DST" "${SIDECAR_DST}.bak-$(date +%Y%m%d-%H%M%S)" 2>/dev/null \
+            || warn "Could not back up the old uploader (continuing)."
+        if cp "$SIDECAR_SRC" "$SIDECAR_DST" 2>/dev/null; then
+            if systemctl restart tg-archive 2>/dev/null; then
+                ok "tg-archive uploader updated + service restarted."
+            else
+                warn "Uploader copied but 'systemctl restart tg-archive' failed — check the service."
+            fi
+        else
+            warn "Failed to write ${SIDECAR_DST} — check /opt/tg-archive permissions."
+        fi
+    fi
+fi
+
+# ===========================================================================
 # PHASE 7 — Restart + health verify
 # ===========================================================================
 hr
@@ -517,7 +551,11 @@ BACKEND_OUT_LOG="$(pm2 jlist 2>/dev/null \
     2>/dev/null || true)"
 
 if [ -n "$BACKEND_OUT_LOG" ] && [ -f "$BACKEND_OUT_LOG" ]; then
-    if tail -n 400 "$BACKEND_OUT_LOG" | grep -qF "$BOOT_MARKER"; then
+    # Search a wide tail, not 400 lines: the thumbnail loop logs a line per failing external camera, so
+    # within seconds of boot the spam pushes the marker past a short tail — the deploy then cried
+    # "SUSPECT" (and exit 1) on every single healthy deploy. A hung boot is still caught: with no marker
+    # from THIS boot, the whole window is post-restart spam, so a previous boot's marker stays out of it.
+    if tail -n 4000 "$BACKEND_OUT_LOG" | grep -qF "$BOOT_MARKER"; then
         ok "Boot completed fully — '${BOOT_MARKER}' present."
     else
         hr

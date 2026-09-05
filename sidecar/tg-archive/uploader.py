@@ -21,6 +21,11 @@ from datetime import datetime, timezone, timedelta
 
 import requests
 
+# Bumped on any change to this file. Logged at startup (see run()) so `journalctl -u tg-archive` shows
+# which build is actually running — the whole reason A-01 was missing on prod for weeks was that drift
+# between this repo copy and /opt/tg-archive/uploader.py was invisible.
+UPLOADER_VERSION = '2026-09-05'
+
 
 def _resolve_display_tz():
     """The ONE configured display timezone (system_settings.timezone in the app DB) plus a short
@@ -945,8 +950,8 @@ def run(cfg, log):
     # Which segment the queue is currently held on, and whether we have said so out loud.
     stall = None
     retried_at = 0.0  # first idle tick runs an A-01 retry sweep
-    log.info('started: watermark=%s routes=%d cap=%.0f Mbps stall_alert=%.0f min%s',
-             watermark, len(router.routes), cfg.max_mbps, cfg.stall_alert_min,
+    log.info('started: v%s watermark=%s routes=%d cap=%.0f Mbps stall_alert=%.0f min%s',
+             UPLOADER_VERSION, watermark, len(router.routes), cfg.max_mbps, cfg.stall_alert_min,
              '' if cfg.alert_chat_id else ' (log only — TG_ALERT_CHAT_ID unset)')
 
     if cfg.discover_chats:
