@@ -76,6 +76,15 @@ export default function TelegramBackupPanel() {
                 </div>
             </div>
 
+            <div role="note" className="flex items-start gap-2 rounded-control border border-status-warn/40 bg-status-warn/10 p-3">
+                <AlertTriangle className="h-4 w-4 text-status-warn shrink-0 mt-0.5" aria-hidden="true" />
+                <p className="text-sm text-content">
+                    <span className="font-semibold">Gunakan chat PRIBADI saja.</span> Berkas ini berisi{' '}
+                    <span className="italic">seluruh</span> database — termasuk kata sandi, saldo, dan token.
+                    Kirim ke grup/channel yang hanya bisa Anda akses, <span className="font-medium">jangan</span> ke grup warga.
+                </p>
+            </div>
+
             <label className="flex items-center gap-3 cursor-pointer">
                 <input
                     type="checkbox"
@@ -100,8 +109,11 @@ export default function TelegramBackupPanel() {
                                placeholder:text-content-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 />
                 <p className="text-xs text-content-subtle mt-1.5">
-                    ID grup diawali tanda minus (mis. <code>-1001234567890</code>). Untuk mengetahuinya, kirim
-                    <code> /chatid </code> ke bot di dalam grup tersebut. Bot harus sudah menjadi anggota grup.
+                    Cara mendapatkannya: buat grup Telegram pribadi (isi Anda sendiri), tambahkan bot{' '}
+                    <code>@cctv_rafnet_bot</code>, lalu kirim <code>/chatid</code> di grup itu — bot membalas
+                    ID-nya (grup diawali tanda minus, mis. <code>-1001234567890</code>). Atau kirim{' '}
+                    <code>/chatid</code> japri ke bot untuk memakai chat pribadi Anda sendiri. Setelah diisi,
+                    tekan <span className="font-medium">Kirim sekarang</span> untuk menguji jalurnya.
                 </p>
             </div>
 
