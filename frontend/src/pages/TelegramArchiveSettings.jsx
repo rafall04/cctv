@@ -79,6 +79,9 @@ export function TelegramArchiveSettings() {
     const areas = overview?.areas ?? [];
     const routes = overview?.routes ?? [];
     const groups = overview?.groups ?? [];
+    // Delivery health from the sidecar's upload evidence: which routed cameras are actually failing,
+    // and whether the whole pipeline looks stalled. Absent/evidenceAvailable=false → shown as nothing.
+    const delivery = overview?.delivery;
     const routedCount = cameras.filter((camera) => camera.targets.length > 0).length;
     // Recording cameras with NO archive route: their footage lives only on the server disk, with no
     // off-site copy. This is the gap that once went unnoticed (a camera added, its route forgotten),
@@ -272,6 +275,20 @@ export function TelegramArchiveSettings() {
                 actions={<Button variant="primary" onClick={handleAdd}>+ Tambah rute</Button>}
             />
 
+            {delivery?.stalled && (
+                <div className="rounded-card border border-status-fault/50 bg-status-fault/10 p-4">
+                    <p className="text-sm font-semibold text-status-fault">
+                        🔴 Pengarsipan Telegram mungkin berhenti
+                    </p>
+                    <p className="mt-1 text-sm text-content-muted">
+                        Sidecar arsip belum mengunggah footage baru
+                        {delivery.backlogMinutes != null ? ` (tertinggal ~${Math.round(delivery.backlogMinutes)} menit)` : ''}
+                        {' '}— kemungkinan prosesnya mati atau tersumbat. Footage baru sementara
+                        <span className="font-medium"> tidak tercadang</span> off-site.
+                    </p>
+                </div>
+            )}
+
             {unrouted.length > 0 ? (
                 <div className="rounded-card border border-status-warn/40 bg-status-warn/10 p-4">
                     <p className="text-sm font-semibold text-status-warn">
@@ -314,7 +331,7 @@ export function TelegramArchiveSettings() {
                 onDelete={handleDelete}
             />
 
-            <CameraRouting cameras={cameras} routedCount={routedCount} />
+            <CameraRouting cameras={cameras} routedCount={routedCount} delivery={delivery} />
 
             <ArchiveActivity activity={activity} />
 

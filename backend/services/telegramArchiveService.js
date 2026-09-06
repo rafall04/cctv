@@ -293,6 +293,23 @@ class TelegramArchiveService {
         };
     }
 
+    /**
+     * Compact delivery-health for the admin page: which routed cameras are actually FAILING to
+     * upload (route exists but recent sends errored — bot kicked etc.) and whether the whole
+     * pipeline looks stalled/dead. Lets the page show "backup actually working?", not just "route
+     * exists?". Read-only; degrades to evidenceAvailable=false when the sidecar state can't be read.
+     */
+    deliveryHealth() {
+        const snap = this.archiveDeliverySnapshot();
+        const STALL_MINUTES = Number(process.env.ARCHIVE_UPLOAD_ALERT_STALL_MINUTES) || 30;
+        return {
+            evidenceAvailable: snap.evidenceAvailable,
+            backlogMinutes: snap.backlogMinutes,
+            stalled: snap.backlogMinutes != null && snap.backlogMinutes > STALL_MINUTES,
+            failing: snap.failingCameras.map((c) => ({ id: c.id, detail: c.detail })),
+        };
+    }
+
     overview() {
         const doc = readRoutesFile();
         const cameras = loadCameras().map((camera) => ({
@@ -307,6 +324,7 @@ class TelegramArchiveService {
             cameras,
             areas,
             groups: this.groups(),
+            delivery: this.deliveryHealth(),
         };
     }
 

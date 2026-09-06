@@ -14,9 +14,37 @@
  * narrow screen moves the chat id to its own line instead of truncating or breaking the number.
  */
 
+import { useMemo, useState } from 'react';
 import { btnDanger, btnGhost, card, cardHead, cardTitle, resolveRouteTarget } from './archiveUi';
 
+const controlCls = 'rounded-control border border-edge bg-surface-sunken px-2 py-1.5 text-xs text-content '
+    + 'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500';
+
+const SCOPE_LABEL = { camera: 'Kamera', area: 'Area', all: 'Semua kamera' };
+
 export function RouteList({ routes, cameras = [], areas = [], busyId, onToggle, onEdit, onDelete }) {
+    const [q, setQ] = useState('');
+    const [enabled, setEnabled] = useState('all'); // all | on | off
+    const [scope, setScope] = useState('all');
+
+    const shown = useMemo(() => {
+        const needle = q.trim().toLowerCase();
+        return routes.filter((route) => {
+            const off = route.enabled === false;
+            if (enabled === 'on' && off) return false;
+            if (enabled === 'off' && !off) return false;
+            if (scope !== 'all' && route.scope !== (scope === 'global' ? 'all' : scope)) return false;
+            if (needle) {
+                const target = resolveRouteTarget(route, { cameras, areas });
+                const hay = `${route.label || ''} ${target.name || ''} ${route.chatId || ''}`.toLowerCase();
+                if (!hay.includes(needle)) return false;
+            }
+            return true;
+        });
+    }, [routes, cameras, areas, q, enabled, scope]);
+
+    const filtering = q.trim() || enabled !== 'all' || scope !== 'all';
+
     return (
         <section className={card}>
             <div className={cardHead}>
@@ -31,8 +59,36 @@ export function RouteList({ routes, cameras = [], areas = [], busyId, onToggle, 
                     Belum ada rute — tidak ada rekaman yang dikirim ke Telegram.
                 </p>
             ) : (
+                <>
+                    {/* Only worth a filter bar once the list is long enough to hunt through. */}
+                    {routes.length > 4 && (
+                        <div className="flex flex-wrap items-center gap-2 border-b border-edge px-4 py-3 sm:px-5">
+                            <input
+                                type="search" value={q} onChange={(e) => setQ(e.target.value)}
+                                placeholder="Cari label, kamera, ID grup…" aria-label="Cari rute"
+                                className={`${controlCls} min-w-0 flex-1 basis-40`}
+                            />
+                            <select value={enabled} onChange={(e) => setEnabled(e.target.value)} aria-label="Saring status rute" className={controlCls}>
+                                <option value="all">Semua status</option>
+                                <option value="on">Aktif</option>
+                                <option value="off">Nonaktif</option>
+                            </select>
+                            <select value={scope} onChange={(e) => setScope(e.target.value)} aria-label="Saring cakupan" className={controlCls}>
+                                <option value="all">Semua cakupan</option>
+                                <option value="camera">{SCOPE_LABEL.camera}</option>
+                                <option value="area">{SCOPE_LABEL.area}</option>
+                                <option value="global">{SCOPE_LABEL.all}</option>
+                            </select>
+                            {filtering && <span className="ml-auto text-xs text-content-subtle">{shown.length} dari {routes.length}</span>}
+                        </div>
+                    )}
+                    {shown.length === 0 ? (
+                        <p className="px-4 py-8 text-center text-sm text-content-subtle sm:px-5">
+                            Tidak ada rute yang cocok dengan filter ini.
+                        </p>
+                    ) : (
                 <ul className="divide-y divide-edge">
-                    {routes.map((route) => {
+                    {shown.map((route) => {
                         const off = route.enabled === false;
                         const target = resolveRouteTarget(route, { cameras, areas });
                         return (
@@ -116,6 +172,8 @@ export function RouteList({ routes, cameras = [], areas = [], busyId, onToggle, 
                         );
                     })}
                 </ul>
+                    )}
+                </>
             )}
         </section>
     );

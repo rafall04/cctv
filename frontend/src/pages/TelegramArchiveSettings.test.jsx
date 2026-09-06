@@ -179,6 +179,62 @@ describe('per-camera filter bar', () => {
     });
 });
 
+describe('delivery health + views', () => {
+    const section = () => screen.getByRole('heading', { name: /Hasil akhir per kamera/i }).closest('section');
+    const withDelivery = (delivery) => {
+        const ov = structuredClone(OVERVIEW);
+        ov.delivery = delivery;
+        getOverview.mockResolvedValue({ success: true, data: ov });
+    };
+
+    it('flags a routed camera whose uploads are failing', async () => {
+        withDelivery({ evidenceAvailable: true, stalled: false, backlogMinutes: 2, failing: [{ id: 1441, detail: '403 kicked' }] });
+        renderPage();
+        await waitForLoaded();
+        expect(within(section()).getAllByText('⚠ rute rusak').length).toBeGreaterThan(0);
+    });
+
+    it('shows a stall banner when the sidecar looks stopped', async () => {
+        withDelivery({ evidenceAvailable: true, stalled: true, backlogMinutes: 40, failing: [] });
+        renderPage();
+        await waitForLoaded();
+        expect(screen.getByText(/Pengarsipan Telegram mungkin berhenti/i)).toBeTruthy();
+    });
+
+    it('filters to only cameras with a broken route', async () => {
+        withDelivery({ evidenceAvailable: true, stalled: false, backlogMinutes: 2, failing: [{ id: 1441, detail: 'x' }] });
+        renderPage();
+        await waitForLoaded();
+        const s = section();
+        fireEvent.change(within(s).getByLabelText(/Saring status arsip/i), { target: { value: 'failing' } });
+        expect(within(s).getAllByText('CCTV SELATAN AHASS DANDER').length).toBeGreaterThan(0);
+        expect(within(s).queryByText('CCTV LAPANGAN DANDER BARAT')).toBeNull();
+    });
+
+    it('switches to a per-group view that lists each group and the unrouted bucket', async () => {
+        renderPage();
+        await waitForLoaded();
+        const s = section();
+        fireEvent.click(within(s).getByRole('button', { name: 'Per grup' }));
+        expect(within(s).getByText('Arsip Selatan AHASS')).toBeTruthy();
+        expect(within(s).getByText(/Belum diarsipkan \(1\)/)).toBeTruthy();
+    });
+
+    it('filters the route list by search once it is long', async () => {
+        const ov = structuredClone(OVERVIEW);
+        ov.routes = Array.from({ length: 5 }, (_, i) => ({
+            id: `r${i}`, enabled: true, scope: 'camera', cameraId: 1441, chatId: `-100000000${i}`, label: `Rute ${i}`,
+        }));
+        getOverview.mockResolvedValue({ success: true, data: ov });
+        renderPage();
+        await waitForLoaded();
+        const s = screen.getByRole('heading', { name: /Rute aktif/i }).closest('section');
+        fireEvent.change(within(s).getByPlaceholderText(/Cari label/i), { target: { value: 'Rute 3' } });
+        expect(within(s).getByText('Rute 3')).toBeTruthy();
+        expect(within(s).queryByText('Rute 0')).toBeNull();
+    });
+});
+
 describe('scope switching', () => {
     it('shows the camera picker for camera scope and swaps to areas for area scope', async () => {
         renderPage();

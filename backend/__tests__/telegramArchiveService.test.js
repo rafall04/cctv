@@ -289,6 +289,17 @@ describe('archiveDeliverySnapshot', () => {
         // No state.db seeded → #readState returns the null fallback → NOT mistaken for healthy.
         expect(service.archiveDeliverySnapshot()).toMatchObject({ evidenceAvailable: false, failingCameras: [], backlogMinutes: null });
     });
+
+    it('deliveryHealth (used by overview) surfaces failing routed cameras', () => {
+        hoisted.latestSegmentJul = julian("'now'");
+        service.createRoute({ scope: 'camera', cameraId: 1441, chatId: '-5510674082' });
+        seedUploaded([{ cameraId: 1441, status: 'failed', detail: '403 kicked', age: '-5 minutes' }]);
+        const d = service.deliveryHealth();
+        expect(d.evidenceAvailable).toBe(true);
+        expect(d.failing.map((f) => f.id)).toContain(1441);
+        expect(d.stalled).toBe(false);
+        expect(service.overview().delivery).toMatchObject({ evidenceAvailable: true });
+    });
 });
 
 describe('verifyChat', () => {
