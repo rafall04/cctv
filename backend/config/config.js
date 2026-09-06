@@ -250,6 +250,10 @@ export const config = {
     // Proactive recording-pipeline health alerts to the monitoring chat.
     // On by default; set RECORDING_HEALTH_ALERTS_ENABLED=false to silence them.
     healthAlertsEnabled: process.env.RECORDING_HEALTH_ALERTS_ENABLED !== 'false',
+    // Proactive nag when a recording camera has no Telegram archive route — the footage
+    // exists only on the box with no off-site copy. On by default; set
+    // ARCHIVE_ROUTE_ALERTS_ENABLED=false to silence them.
+    archiveRouteAlertsEnabled: process.env.ARCHIVE_ROUTE_ALERTS_ENABLED !== 'false',
   },
 };
 

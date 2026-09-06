@@ -1,7 +1,7 @@
 // Purpose: The recording domain's start/stop sequence, shared by the API process
 //          (single-process mode) and by backend/recorder.js (worker mode).
 // Caller: server.js when config.recording.workerEnabled is false; recorder.js always.
-// Deps: recordingService, recordingScheduler, recordingHealthAlertService.
+// Deps: recordingService, recordingScheduler, recordingHealthAlertService, archiveRouteAlertService.
 // MainFuncs: startRecordingDomain, stopRecordingDomain.
 // SideEffects: Adopts/starts FFmpeg recorders, registers scheduler tasks.
 //
@@ -12,6 +12,7 @@
 import { recordingService } from './recordingService.js';
 import recordingScheduler from './recordingScheduler.js';
 import recordingHealthAlertService from './recordingHealthAlertService.js';
+import archiveRouteAlertService from './archiveRouteAlertService.js';
 
 export async function startRecordingDomain({
     logger = console,
@@ -47,7 +48,16 @@ export async function startRecordingDomain({
             intervalMs: 60000,
             initialDelayMs: 60000,
         });
-        logger.log?.('[Recording] Health-alert watcher registered');
+        // Proactive nag when a recording camera has no Telegram archive route — brings the gap to
+        // the admin instead of waiting for someone to open /admin/telegram-archive. Slow cadence:
+        // the grace/renag windows are measured in hours, so a half-hour tick is plenty responsive.
+        recordingScheduler.register({
+            name: 'archive-route-alert',
+            task: () => archiveRouteAlertService.checkAndAlert(),
+            intervalMs: 30 * 60000,
+            initialDelayMs: 5 * 60000,
+        });
+        logger.log?.('[Recording] Health-alert + archive-route watchers registered');
     }
 
     logger.log?.('[Recording] Recording service initialized');

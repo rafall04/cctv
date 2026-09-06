@@ -83,10 +83,14 @@ export function resolveTargets(routes, cameraId, areaId) {
 }
 
 function loadCameras() {
+    // `enabled = 1 AND enable_recording = 1` is the real recording gate (the two flags are
+    // independent — disabling a camera does NOT clear enable_recording, so it can record again
+    // when re-enabled). recordingHealthDashboardService uses the exact same pair; a disabled camera
+    // produces no footage, so it must not read as an un-backed-up recording camera anywhere.
     return query(
-        `SELECT c.id, c.name, c.area_id AS areaId, a.name AS areaName
+        `SELECT c.id, c.name, c.area_id AS areaId, a.name AS areaName, c.camera_class AS cameraClass
          FROM cameras c LEFT JOIN areas a ON a.id = c.area_id
-         WHERE c.enable_recording = 1
+         WHERE c.enabled = 1 AND c.enable_recording = 1
          ORDER BY c.area_id, c.id`,
     );
 }
@@ -156,6 +160,34 @@ class TelegramArchiveService {
         // The sidecar lives outside the app; say so plainly rather than showing an empty list that
         // reads like a bug on a host where tg-archive was never installed.
         return fs.existsSync(BASE_DIR);
+    }
+
+    /**
+     * The recording cameras whose footage reaches NO Telegram group — the exact gap the archive
+     * page exists to catch, surfaced here so a scheduled watcher can nag about it proactively
+     * instead of relying on someone opening the page. Same route-resolution the sidecar uses.
+     * `cameraClass` is carried so the caller can decide which classes it is responsible for (the
+     * nag excludes `subscriber` — that footage belongs to the renting customer, not the operator).
+     * NOTE: "routed" here means a matching route row EXISTS, not that uploads are succeeding — a
+     * route whose bot was kicked still counts as routed. Detecting a broken/failing route is a
+     * separate, upload-evidence-based check (see the tg-archive state.db `uploaded` table).
+     */
+    unroutedRecordingCameras() {
+        const doc = readRoutesFile();
+        return loadCameras()
+            .filter((camera) => resolveTargets(doc.routes, camera.id, camera.areaId).length === 0)
+            .map((camera) => ({
+                id: camera.id,
+                name: camera.name,
+                areaName: camera.areaName || null,
+                cameraClass: camera.cameraClass || null,
+            }));
+    }
+
+    /** Whether ANY archive route is configured at all — false on a box where archiving was never
+     *  set up, so the nag can stay silent instead of dumping the entire fleet as "unrouted". */
+    hasConfiguredRoutes() {
+        return readRoutesFile().routes.length > 0;
     }
 
     overview() {

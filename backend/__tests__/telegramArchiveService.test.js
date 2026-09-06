@@ -189,6 +189,26 @@ describe('overview', () => {
     });
 });
 
+describe('unroutedRecordingCameras / hasConfiguredRoutes', () => {
+    it('reports no configured routes on a fresh box, then true once one exists', () => {
+        expect(service.hasConfiguredRoutes()).toBe(false);
+        service.createRoute({ scope: 'area', areaId: 3, chatId: '-5562560753' });
+        expect(service.hasConfiguredRoutes()).toBe(true);
+    });
+
+    it('lists every recording camera when nothing is routed', () => {
+        const unrouted = service.unroutedRecordingCameras();
+        expect(unrouted.map((c) => c.id).sort((a, b) => a - b)).toEqual([7, 1435, 1441]);
+        expect(unrouted[0]).toHaveProperty('cameraClass');
+    });
+
+    it('drops a camera once a route covers it', () => {
+        service.createRoute({ scope: 'area', areaId: 3, chatId: '-5562560753' }); // covers cam 7
+        service.createRoute({ scope: 'camera', cameraId: 1441, chatId: '-5510674082' });
+        expect(service.unroutedRecordingCameras().map((c) => c.id)).toEqual([1435]);
+    });
+});
+
 describe('verifyChat', () => {
     beforeEach(() => {
         fs.writeFileSync(process.env.TG_ARCHIVE_ENV_FILE,
