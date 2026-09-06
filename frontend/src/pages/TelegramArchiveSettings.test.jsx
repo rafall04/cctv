@@ -148,6 +148,37 @@ describe('loading and empty states', () => {
     });
 });
 
+describe('per-camera filter bar', () => {
+    const section = () => screen.getByRole('heading', { name: /Hasil akhir per kamera/i }).closest('section');
+
+    it('narrows the list by search text', async () => {
+        renderPage();
+        await waitForLoaded();
+        const s = section();
+        fireEvent.change(within(s).getByPlaceholderText(/Cari kamera/i), { target: { value: 'AHASS' } });
+        expect(within(s).getAllByText('CCTV SELATAN AHASS DANDER').length).toBeGreaterThan(0);
+        expect(within(s).queryByText('CCTV LAPANGAN DANDER BARAT')).toBeNull();
+        expect(within(s).getByText('1 dari 2')).toBeTruthy();
+    });
+
+    it('filters to only the cameras with no backup', async () => {
+        renderPage();
+        await waitForLoaded();
+        const s = section();
+        fireEvent.change(within(s).getByLabelText(/Saring status arsip/i), { target: { value: 'unrouted' } });
+        expect(within(s).getAllByText('CCTV LAPANGAN DANDER BARAT').length).toBeGreaterThan(0);
+        expect(within(s).queryByText('CCTV SELATAN AHASS DANDER')).toBeNull();
+    });
+
+    it('shows an empty state when nothing matches', async () => {
+        renderPage();
+        await waitForLoaded();
+        const s = section();
+        fireEvent.change(within(s).getByPlaceholderText(/Cari kamera/i), { target: { value: 'zzz-tidak-ada' } });
+        expect(within(s).getByText(/Tidak ada kamera yang cocok/i)).toBeTruthy();
+    });
+});
+
 describe('scope switching', () => {
     it('shows the camera picker for camera scope and swaps to areas for area scope', async () => {
         renderPage();
