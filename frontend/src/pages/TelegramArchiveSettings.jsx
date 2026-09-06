@@ -80,6 +80,10 @@ export function TelegramArchiveSettings() {
     const routes = overview?.routes ?? [];
     const groups = overview?.groups ?? [];
     const routedCount = cameras.filter((camera) => camera.targets.length > 0).length;
+    // Recording cameras with NO archive route: their footage lives only on the server disk, with no
+    // off-site copy. This is the gap that once went unnoticed (a camera added, its route forgotten),
+    // so it gets a loud banner below rather than a small "8/16" in the header.
+    const unrouted = cameras.filter((camera) => camera.targets.length === 0);
 
     // Picking a known group already tells us the title and whether the bot may post, so the
     // manual "check this id" step exists only for the fallback path.
@@ -143,6 +147,16 @@ export function TelegramArchiveSettings() {
     const handleAdd = () => {
         setEditingId(null);
         setDraft(EMPTY_DRAFT);
+        setVerified(null);
+        setManualChat(false);
+        setFormOpen(true);
+    };
+
+    // One-click from the "belum diarsipkan" banner: open the route form already pointed at that camera,
+    // so covering a forgotten camera is pick-a-group-and-save, not hunt-for-it-in-a-dropdown.
+    const handleAddForCamera = (cameraId) => {
+        setEditingId(null);
+        setDraft({ ...EMPTY_DRAFT, scope: 'camera', cameraId });
         setVerified(null);
         setManualChat(false);
         setFormOpen(true);
@@ -257,6 +271,38 @@ export function TelegramArchiveSettings() {
                 )}
                 actions={<Button variant="primary" onClick={handleAdd}>+ Tambah rute</Button>}
             />
+
+            {unrouted.length > 0 ? (
+                <div className="rounded-card border border-status-warn/40 bg-status-warn/10 p-4">
+                    <p className="text-sm font-semibold text-status-warn">
+                        ⚠️ {unrouted.length} kamera perekam belum diarsipkan ke Telegram
+                    </p>
+                    <p className="mt-1 text-sm text-content-muted">
+                        Footage kamera ini <span className="font-medium">hanya ada di server</span> — tidak
+                        punya cadangan off-site. Kalau disknya rusak, rekamannya hilang. Klik nama kamera untuk
+                        langsung menambahkan rutenya.
+                    </p>
+                    <ul className="mt-2.5 flex flex-wrap gap-1.5">
+                        {unrouted.map((camera) => (
+                            <li key={camera.id}>
+                                <button
+                                    type="button"
+                                    onClick={() => handleAddForCamera(camera.id)}
+                                    className="rounded-full border border-status-warn/50 bg-surface px-2.5 py-1 text-xs
+                                               text-content hover:border-status-warn hover:bg-status-warn/10
+                                               focus:outline-none focus-visible:ring-2 focus-visible:ring-status-warn"
+                                >
+                                    + {camera.name}
+                                </button>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            ) : cameras.length > 0 && (
+                <div className="rounded-card border border-status-live/30 bg-status-live/10 px-4 py-3 text-sm text-content-muted">
+                    ✓ Semua {cameras.length} kamera perekam sudah punya cadangan off-site ke Telegram.
+                </div>
+            )}
 
             <RouteList
                 routes={routes}

@@ -132,7 +132,19 @@ describe('loading and empty states', () => {
             .map((node) => node.closest('li') || node.closest('tr'))
             .filter(Boolean);
         expect(rows).toHaveLength(2);
-        rows.forEach((row) => expect(within(row).getByText('tidak dikirim')).toBeTruthy());
+        // Loud flag now, not a faint "tidak dikirim": an unrouted (un-backed-up) camera is the whole
+        // point of this table, so it reads as a warning.
+        rows.forEach((row) => expect(within(row).getByText('⚠ belum diarsipkan')).toBeTruthy());
+    });
+
+    it('shows a loud banner listing recording cameras with no off-site backup', async () => {
+        renderPage();
+        await waitForLoaded();
+        // The unrouted camera surfaces in a top-of-page warning as a one-click "+ <name>" button,
+        // so a forgotten route cannot hide (the mistake that once left a camera un-backed-up).
+        const banner = screen.getByText(/belum diarsipkan ke Telegram/i);
+        expect(banner).toBeTruthy();
+        expect(screen.getByRole('button', { name: /\+ CCTV LAPANGAN DANDER BARAT/ })).toBeTruthy();
     });
 });
 
