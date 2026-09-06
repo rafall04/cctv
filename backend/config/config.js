@@ -254,6 +254,9 @@ export const config = {
     // exists only on the box with no off-site copy. On by default; set
     // ARCHIVE_ROUTE_ALERTS_ENABLED=false to silence them.
     archiveRouteAlertsEnabled: process.env.ARCHIVE_ROUTE_ALERTS_ENABLED !== 'false',
+    // Alert when a route EXISTS but is not delivering — uploads failing (bot kicked) or the
+    // sidecar stalled/dead. On by default; set ARCHIVE_UPLOAD_ALERTS_ENABLED=false to silence.
+    archiveUploadAlertsEnabled: process.env.ARCHIVE_UPLOAD_ALERTS_ENABLED !== 'false',
   },
 };
 

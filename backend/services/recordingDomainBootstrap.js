@@ -1,7 +1,8 @@
 // Purpose: The recording domain's start/stop sequence, shared by the API process
 //          (single-process mode) and by backend/recorder.js (worker mode).
 // Caller: server.js when config.recording.workerEnabled is false; recorder.js always.
-// Deps: recordingService, recordingScheduler, recordingHealthAlertService, archiveRouteAlertService.
+// Deps: recordingService, recordingScheduler, recordingHealthAlertService, archiveRouteAlertService,
+//       archiveUploadAlertService.
 // MainFuncs: startRecordingDomain, stopRecordingDomain.
 // SideEffects: Adopts/starts FFmpeg recorders, registers scheduler tasks.
 //
@@ -13,6 +14,7 @@ import { recordingService } from './recordingService.js';
 import recordingScheduler from './recordingScheduler.js';
 import recordingHealthAlertService from './recordingHealthAlertService.js';
 import archiveRouteAlertService from './archiveRouteAlertService.js';
+import archiveUploadAlertService from './archiveUploadAlertService.js';
 
 export async function startRecordingDomain({
     logger = console,
@@ -57,7 +59,15 @@ export async function startRecordingDomain({
             intervalMs: 30 * 60000,
             initialDelayMs: 5 * 60000,
         });
-        logger.log?.('[Recording] Health-alert + archive-route watchers registered');
+        // Delivery-health: a route that EXISTS but is not delivering (uploads failing / sidecar
+        // stalled). Ticks faster than the routing nag — a broken route loses footage every segment.
+        recordingScheduler.register({
+            name: 'archive-upload-alert',
+            task: () => archiveUploadAlertService.checkAndAlert(),
+            intervalMs: 15 * 60000,
+            initialDelayMs: 6 * 60000,
+        });
+        logger.log?.('[Recording] Health-alert + archive route/upload watchers registered');
     }
 
     logger.log?.('[Recording] Recording service initialized');

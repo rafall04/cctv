@@ -34,6 +34,12 @@ function fail(message, statusCode) {
     return err;
 }
 
+/** Trim an uploader error string to a short, single-line reason fit for a Telegram alert. */
+function shortDetail(detail) {
+    if (!detail) return null;
+    return String(detail).replace(/\s+/g, ' ').trim().slice(0, 120) || null;
+}
+
 function readRoutesFile() {
     try {
         const parsed = JSON.parse(fs.readFileSync(ROUTES_FILE, 'utf8'));
@@ -188,6 +194,103 @@ class TelegramArchiveService {
      *  set up, so the nag can stay silent instead of dumping the entire fleet as "unrouted". */
     hasConfiguredRoutes() {
         return readRoutesFile().routes.length > 0;
+    }
+
+    /**
+     * The OTHER half of archive safety: is a route that EXISTS actually delivering? Reads upload
+     * EVIDENCE from the sidecar's state.db (not just the presence of a route row):
+     *   - failingCameras: recording cameras whose route STILL exists but whose recent uploads were
+     *     recorded `status='failed'` — a permanent send failure the uploader stepped past
+     *     (`is_permanent_failure`, e.g. the bot was removed from the group). Each such row is
+     *     refreshed every retry sweep while it stays broken and flips to `ok` once fixed, so a
+     *     recent failed row means "still broken now".
+     *   - backlogMinutes: how far the NEWEST footage is ahead of the LAST upload. The caller reads
+     *     a large positive value as "sidecar dead/wedged" and a small one as "keeping up" — a stall
+     *     is only ever concluded from POSITIVE evidence, never from an absence. The sidecar's own
+     *     20-min stall alert cannot fire if the process itself died, so this is the backstop.
+     *   - evidenceAvailable: false when the state.db could not be read (missing/locked/corrupt). The
+     *     caller must HOLD on this, not treat it as healthy — "cannot read" is not "all clear".
+     * All time math runs in SQL via julianday() (UTC-absolute) so it is correct whatever the process
+     * timezone, and the cross-DB backlog subtraction stays valid.
+     */
+    archiveDeliverySnapshot({ failWindowMinutes = 45 } = {}) {
+        const doc = readRoutesFile();
+        // fallback = null so a READ FAILURE is distinguishable from a genuinely-empty table. "Could
+        // not read the evidence" must never look like "proven healthy" — the caller HOLDS on it,
+        // rather than sending a false recovery that silences a real alarm.
+        const evidence = this.#readState((db) => ({
+            upload: db.prepare(
+                'SELECT MAX(uploaded_at) AS lastAt, julianday(MAX(uploaded_at)) AS lastJul FROM uploaded',
+            ).get() || {},
+            failed: db.prepare(
+                `SELECT camera_id AS cameraId, detail, uploaded_at AS uploadedAt
+                 FROM uploaded
+                 WHERE status = 'failed' AND julianday(uploaded_at) > julianday('now', ?)
+                 ORDER BY uploaded_at DESC`,
+            ).all(`-${Number(failWindowMinutes)} minutes`),
+        }), null);
+
+        if (evidence === null) {
+            return { evidenceAvailable: false, failingCameras: [], lastUploadAt: null, latestSegmentAt: null, backlogMinutes: null };
+        }
+
+        const latestByCam = new Map();
+        for (const row of evidence.failed) {
+            if (!latestByCam.has(row.cameraId)) latestByCam.set(row.cameraId, row);
+        }
+
+        const ids = [...latestByCam.keys()];
+        const metaById = new Map(
+            (ids.length
+                ? query(
+                    `SELECT c.id, c.name, c.area_id AS areaId, a.name AS areaName, c.camera_class AS cameraClass
+                     FROM cameras c LEFT JOIN areas a ON a.id = c.area_id
+                     WHERE c.id IN (${ids.map(() => '?').join(',')})`,
+                    ids,
+                )
+                : []
+            ).map((m) => [m.id, m]),
+        );
+
+        const failingCameras = [...latestByCam.entries()].reduce((acc, [cameraId, row]) => {
+            const m = metaById.get(cameraId);
+            // Only a route that STILL exists is a "broken delivery"; a removed route is the no-route
+            // gap the routing nag already owns, not a delivery failure.
+            if (m && resolveTargets(doc.routes, m.id, m.areaId).length > 0) {
+                acc.push({
+                    id: m.id,
+                    name: m.name,
+                    areaName: m.areaName || null,
+                    cameraClass: m.cameraClass || null,
+                    detail: shortDetail(row.detail),
+                    lastFailedAt: row.uploadedAt,
+                });
+            }
+            return acc;
+        }, []);
+
+        // Backlog = how far the newest FINALIZED footage is ahead of the last upload, in minutes.
+        // end_time (segment completion), not start_time, is the honest reference: a segment can only
+        // be uploaded once it finishes, so healthy delivery keeps backlog near 0 (measured ~0.5m on
+        // prod), and a dead/wedged sidecar makes it climb without bound. When the fleet is idle (no
+        // recent footage) it goes null, so idleness never reads as a stall. Both julianday()s are
+        // UTC-absolute, so the cross-DB subtraction is valid whatever the process timezone.
+        const latest = query(
+            `SELECT MAX(end_time) AS latestAt, julianday(MAX(end_time)) AS latestJul
+             FROM recording_segments WHERE julianday(end_time) > julianday('now', ?)`,
+            ['-3 hours'],
+        )[0] || {};
+        const lastJul = evidence.upload.lastJul ?? null;
+        const latestJul = latest.latestJul ?? null;
+        const backlogMinutes = (lastJul != null && latestJul != null) ? (latestJul - lastJul) * 1440 : null;
+
+        return {
+            evidenceAvailable: true,
+            failingCameras,
+            lastUploadAt: evidence.upload.lastAt || null,
+            latestSegmentAt: latest.latestAt || null,
+            backlogMinutes,
+        };
     }
 
     overview() {

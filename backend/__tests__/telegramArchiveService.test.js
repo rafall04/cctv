@@ -16,8 +16,11 @@ const CAMERAS = [
     { id: 7, name: 'CCTV UTARA PASAR NGITIK 1', areaId: 3, areaName: 'DS TANJUNGHARJO' },
 ];
 
+const hoisted = vi.hoisted(() => ({ latestSegmentAt: null, latestSegmentJul: null }));
+
 vi.mock('../database/connectionPool.js', () => ({
     query: vi.fn((sql, params) => {
+        if (sql.includes('FROM recording_segments')) return [{ latestAt: hoisted.latestSegmentAt, latestJul: hoisted.latestSegmentJul }];
         if (sql.includes('FROM cameras')) return CAMERAS;
         if (sql.includes('FROM areas WHERE id')) {
             return [2, 3].includes(Number(params?.[0])) ? [{ id: Number(params[0]) }] : [];
@@ -206,6 +209,85 @@ describe('unroutedRecordingCameras / hasConfiguredRoutes', () => {
         service.createRoute({ scope: 'area', areaId: 3, chatId: '-5562560753' }); // covers cam 7
         service.createRoute({ scope: 'camera', cameraId: 1441, chatId: '-5510674082' });
         expect(service.unroutedRecordingCameras().map((c) => c.id)).toEqual([1435]);
+    });
+});
+
+describe('archiveDeliverySnapshot', () => {
+    function seedUploaded(rows) {
+        const db = new Database(process.env.TG_ARCHIVE_STATE_DB);
+        db.exec(`CREATE TABLE uploaded (segment_id INTEGER PRIMARY KEY, camera_id INTEGER NOT NULL,
+                 filename TEXT NOT NULL, file_size INTEGER NOT NULL, status TEXT NOT NULL, detail TEXT,
+                 targets TEXT, uploaded_at TEXT NOT NULL)`);
+        const stmt = db.prepare(`INSERT INTO uploaded
+            (segment_id,camera_id,filename,file_size,status,detail,targets,uploaded_at)
+            VALUES (?,?,?,?,?,?,?, datetime('now', ?))`);
+        rows.forEach((r, i) => stmt.run(r.segmentId ?? i + 1, r.cameraId, `f${i}.mp4`, 1000,
+            r.status, r.detail ?? null, null, r.age ?? '+0 minutes'));
+        db.close();
+    }
+    // A real julianday value for the mocked recording_segments query, captured at ~the same instant
+    // as the seeded uploaded_at rows so backlog = difference of the two offsets.
+    function julian(expr) {
+        const db = new Database(':memory:');
+        const v = db.prepare(`SELECT julianday(${expr}) AS j`).get().j;
+        db.close();
+        return v;
+    }
+
+    beforeEach(() => { hoisted.latestSegmentAt = null; hoisted.latestSegmentJul = null; });
+
+    it('flags a camera whose route exists but recent uploads failed', () => {
+        service.createRoute({ scope: 'camera', cameraId: 1441, chatId: '-5510674082' });
+        seedUploaded([{ cameraId: 1441, status: 'failed', detail: '403 Forbidden: bot was kicked', age: '-5 minutes' }]);
+
+        const snap = service.archiveDeliverySnapshot();
+        expect(snap.evidenceAvailable).toBe(true);
+        expect(snap.failingCameras).toHaveLength(1);
+        expect(snap.failingCameras[0]).toMatchObject({ id: 1441, detail: '403 Forbidden: bot was kicked' });
+    });
+
+    it('does NOT flag a failed upload for a camera with no route (that is the no-route gap)', () => {
+        seedUploaded([{ cameraId: 7, status: 'failed', detail: 'x', age: '-5 minutes' }]);
+        expect(service.archiveDeliverySnapshot().failingCameras).toEqual([]);
+    });
+
+    it('ignores a failed row older than the fail window', () => {
+        service.createRoute({ scope: 'camera', cameraId: 1441, chatId: '-5510674082' });
+        seedUploaded([{ cameraId: 1441, status: 'failed', detail: 'x', age: '-90 minutes' }]);
+        expect(service.archiveDeliverySnapshot().failingCameras).toEqual([]);
+    });
+
+    it('reports a small backlog when the sidecar uploaded recently (keeping up)', () => {
+        hoisted.latestSegmentJul = julian("'now'");
+        seedUploaded([{ cameraId: 1441, status: 'ok', age: '-2 minutes' }]);
+        const snap = service.archiveDeliverySnapshot();
+        expect(snap.backlogMinutes).toBeGreaterThan(1);
+        expect(snap.backlogMinutes).toBeLessThan(5); // ~2 min behind → caller reads as "current"
+    });
+
+    it('reports a large backlog when the last upload is far behind the newest footage (stalled)', () => {
+        hoisted.latestSegmentJul = julian("'now'");
+        seedUploaded([{ cameraId: 1441, status: 'ok', age: '-90 minutes' }]);
+        expect(service.archiveDeliverySnapshot().backlogMinutes).toBeGreaterThan(60);
+    });
+
+    it('has a null backlog when the fleet is idle (no recent footage)', () => {
+        hoisted.latestSegmentJul = null; // no segment in the last 3h
+        seedUploaded([{ cameraId: 1441, status: 'ok', age: '-120 minutes' }]);
+        expect(service.archiveDeliverySnapshot().backlogMinutes).toBeNull();
+    });
+
+    it('has a null backlog when the sidecar has never uploaded (empty table)', () => {
+        hoisted.latestSegmentJul = julian("'now'");
+        seedUploaded([]); // table exists but is empty → lastUpload null
+        const snap = service.archiveDeliverySnapshot();
+        expect(snap.evidenceAvailable).toBe(true);
+        expect(snap.backlogMinutes).toBeNull();
+    });
+
+    it('reports evidenceAvailable=false when the sidecar state.db cannot be read', () => {
+        // No state.db seeded → #readState returns the null fallback → NOT mistaken for healthy.
+        expect(service.archiveDeliverySnapshot()).toMatchObject({ evidenceAvailable: false, failingCameras: [], backlogMinutes: null });
     });
 });
 
