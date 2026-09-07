@@ -2,6 +2,10 @@
 
 A secure, high-performance video streaming system that isolates private IP cameras from public exposure while providing public web access to camera streams.
 
+> 🚀 **Baru pasang? Ikuti [QUICKSTART.md](QUICKSTART.md)** — satu jalur pasti dari clone sampai login,
+> plus cara update yang aman untuk data Anda. `<client>` di perintah-perintah di bawah = kode client
+> Anda (lihat `pm2 list`, atau pakai skrip `deployment/status.sh` / `logs.sh` / `healthcheck.sh`).
+
 ## 🎯 Key Features
 
 ### Public Features
@@ -94,7 +98,7 @@ bash aapanel-install.sh
 
 **Duration:** ~5-10 minutes
 
-See [deployment/AAPANEL_QUICK_SETUP.md](deployment/AAPANEL_QUICK_SETUP.md) for details.
+See [QUICKSTART.md](QUICKSTART.md) for the full step-by-step guide.
 
 ### Option 2: Manual Installation
 
@@ -154,8 +158,8 @@ radius entirely by running it as its own process:
 
 ```bash
 echo "RECORDING_WORKER_ENABLED=true" >> backend/.env
-pm2 restart deployment/ecosystem.config.cjs --only rafnet-cctv-backend --update-env
-pm2 start   deployment/ecosystem.config.cjs --only rafnet-cctv-recorder
+pm2 restart deployment/ecosystem.config.cjs --only <client>-cctv-backend --update-env
+pm2 start   deployment/ecosystem.config.cjs --only <client>-cctv-recorder
 pm2 save
 ```
 
@@ -185,7 +189,7 @@ To turn it off fleet-wide without a deploy:
 
 ```bash
 echo "RECORDING_AUDIO=off" >> backend/.env
-pm2 restart deployment/ecosystem.config.cjs --only rafnet-cctv-recorder --update-env
+pm2 restart deployment/ecosystem.config.cjs --only <client>-cctv-recorder --update-env
 ```
 
 Any other value (or none) means audio is recorded. The switch only affects recorders
@@ -208,14 +212,14 @@ disable the mechanism entirely:
 
 ```bash
 echo "MEDIAMTX_PARK_DEAD_INGEST=off" >> backend/.env
-pm2 restart deployment/ecosystem.config.cjs --only rafnet-cctv-backend --update-env
+pm2 restart deployment/ecosystem.config.cjs --only <client>-cctv-backend --update-env
 ```
 
 #### 6. Configure Nginx
 
 ```bash
-cp deployment/nginx.conf /etc/nginx/sites-available/rafnet-cctv
-ln -s /etc/nginx/sites-available/rafnet-cctv /etc/nginx/sites-enabled/
+cp deployment/nginx.conf /etc/nginx/sites-available/<client>-cctv
+ln -s /etc/nginx/sites-available/<client>-cctv /etc/nginx/sites-enabled/
 nginx -t && systemctl reload nginx
 ```
 
@@ -247,15 +251,15 @@ This interactive script will:
 # ===================================
 # Domain Configuration
 # ===================================
-BACKEND_DOMAIN=api-cctv.raf.my.id
-FRONTEND_DOMAIN=cctv.raf.my.id
-SERVER_IP=172.17.11.12
+BACKEND_DOMAIN=api-cctv.example.com
+FRONTEND_DOMAIN=cctv.example.com
+SERVER_IP=YOUR.SERVER.IP
 PORT_PUBLIC=800
 
 # ===================================
 # Public Stream URLs
 # ===================================
-PUBLIC_STREAM_BASE_URL=https://api-cctv.raf.my.id
+PUBLIC_STREAM_BASE_URL=https://api-cctv.example.com
 PUBLIC_HLS_PATH=/hls
 PUBLIC_WEBRTC_PATH=/webrtc
 
@@ -290,10 +294,10 @@ DATABASE_PATH=./data/cctv.db
 
 ```env
 # Backend API URL
-VITE_API_URL=https://api-cctv.raf.my.id
+VITE_API_URL=https://api-cctv.example.com
 
 # Frontend Domain (for meta tags)
-VITE_FRONTEND_DOMAIN=cctv.raf.my.id
+VITE_FRONTEND_DOMAIN=cctv.example.com
 ```
 
 **3. Generate Secrets:**
@@ -315,17 +319,17 @@ If `ALLOWED_ORIGINS` is empty, backend auto-generates from domain config:
 
 ```javascript
 // Generated from:
-FRONTEND_DOMAIN=cctv.raf.my.id
-SERVER_IP=172.17.11.12
+FRONTEND_DOMAIN=cctv.example.com
+SERVER_IP=YOUR.SERVER.IP
 PORT_PUBLIC=800
 
 // Results in:
 ALLOWED_ORIGINS=
-  https://cctv.raf.my.id,
-  http://cctv.raf.my.id,
-  http://cctv.raf.my.id:800,
-  http://172.17.11.12,
-  http://172.17.11.12:800
+  https://cctv.example.com,
+  http://cctv.example.com,
+  http://cctv.example.com:800,
+  http://YOUR.SERVER.IP,
+  http://YOUR.SERVER.IP:800
 ```
 
 **Benefits:**
@@ -359,11 +363,22 @@ paths:
 
 ## 🔐 Security
 
-### Default Credentials
+### Initial Admin Credentials
 
-- **Username:** `admin`
-- **Password:** `admin123`
-- **⚠️ CHANGE IMMEDIATELY IN PRODUCTION!**
+The installer creates the `admin` user with a **randomly generated** password (there is no fixed
+default). Retrieve it after install:
+
+```bash
+cat backend/data/INITIAL_ADMIN_PASSWORD.txt
+```
+
+Login, change the password from the Profile menu, then delete that file. Lost it?
+
+```bash
+cd backend && npm run reset-admin
+```
+
+- **⚠️ Always change the initial password and never leave the credentials file on the server.**
 
 ### Security Features
 
@@ -387,7 +402,7 @@ paths:
 ## 📁 Project Structure
 
 ```
-rafnet-cctv/
+<client>-cctv/
 ├── backend/              # Fastify API server
 │   ├── controllers/      # Route handlers
 │   ├── services/         # Business logic (MediaMTX, recording)
@@ -460,16 +475,16 @@ cd /var/www/cctv
 ### View Logs
 
 ```bash
-pm2 logs rafnet-cctv-backend
-pm2 logs rafnet-mediamtx
-tail -f /var/log/nginx/rafnet-cctv-backend.error.log
+pm2 logs <client>-cctv-backend
+pm2 logs <client>-mediamtx
+tail -f /var/log/nginx/<client>-cctv-backend.error.log
 ```
 
 ### Restart Services
 
 ```bash
-pm2 restart rafnet-cctv-backend
-pm2 restart rafnet-mediamtx
+pm2 restart <client>-cctv-backend
+pm2 restart <client>-mediamtx
 systemctl reload nginx
 ```
 
@@ -509,7 +524,7 @@ cp /var/www/cctv/backend/data/cctv.db /backup/cctv_$(date +%Y%m%d).db
 ### Backend not starting
 
 ```bash
-pm2 logs rafnet-cctv-backend --lines 100
+pm2 logs <client>-cctv-backend --lines 100
 # Check for errors in .env or database
 ```
 
@@ -526,8 +541,8 @@ npm run build
 ```bash
 # Check backend .env
 cat /var/www/cctv/backend/.env | grep ALLOWED_ORIGINS
-# Should include: https://cctv.raf.my.id
-pm2 restart rafnet-cctv-backend
+# Should include: https://cctv.example.com
+pm2 restart <client>-cctv-backend
 ```
 
 ### Stream not loading
@@ -535,7 +550,7 @@ pm2 restart rafnet-cctv-backend
 ```bash
 # Check MediaMTX
 curl http://localhost:9997/v3/paths/list
-pm2 logs rafnet-mediamtx
+pm2 logs <client>-mediamtx
 
 # Check HLS proxy
 curl http://localhost:8888/camera1/index.m3u8
@@ -556,7 +571,7 @@ sqlite3 /var/www/cctv/backend/data/cctv.db "SELECT * FROM cameras WHERE enable_r
 
 ## 📚 Documentation
 
-- **Deployment:** [deployment/AAPANEL_QUICK_SETUP.md](deployment/AAPANEL_QUICK_SETUP.md)
+- **Deployment / Quick start:** [QUICKSTART.md](QUICKSTART.md)
 - **Security:** [SECURITY.md](SECURITY.md)
 - **Agent & Contributor Guide:** [AGENTS.md](AGENTS.md), [SYSTEM_MAP.md](SYSTEM_MAP.md)
 

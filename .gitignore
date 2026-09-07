@@ -53,9 +53,21 @@ backend/data/*.db-shm
 backend/data/*.db-wal
 backend/data/*.db.bak*
 backend/data/*.db.backup*
+backend/data/INITIAL_ADMIN_PASSWORD.txt
 *.sql
 *.sqlite
 *.sqlite3
+
+# Runtime DATA directories (buyer's own recordings/uploads). These are untracked, so `git pull`
+# never touches them — but a plain `git clean -fd` (often suggested to fix a stuck pull) would
+# DELETE an untracked-but-unignored dir. Listing them here makes `git clean -fd` skip them, so a
+# buyer cannot wipe their footage/logos while tidying the repo. (`-x` still clears them by design.)
+/recordings/
+backend/data/thumbnails/
+backend/data/promos/
+backend/data/affiliate/
+backend/data/branding/
+backend/data/backups/
 
 # Logs
 logs/

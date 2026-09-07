@@ -81,12 +81,17 @@ VITE_API_KEY=CHANGE_THIS_AFTER_INSTALLATION
 
 ## Post-Installation
 
-1. **Check Telegram** - Admin credentials dikirim otomatis
-2. **Login admin panel** - Username: admin, Password: [dari Telegram]
-3. **Generate API Key** - Settings > API Keys > Generate
-4. **Update frontend/.env** - Ganti VITE_API_KEY dengan generated key
-5. **Rebuild frontend** - `cd frontend && npm run build`
-6. **Change admin password** - Untuk keamanan
+1. **Ambil password admin awal** - `cat backend/data/INITIAL_ADMIN_PASSWORD.txt` (dibuat acak saat
+   instalasi; juga tampil di ringkasan akhir installer). Lupa/hilang? `cd backend && npm run reset-admin`.
+2. **Login admin panel** - Username: `admin`, password dari langkah 1.
+3. **GANTI password admin** - dari menu Profil, lalu **hapus** `INITIAL_ADMIN_PASSWORD.txt`.
+4. **(Opsional, pengerasan) Generate API Key** - Settings > API Keys > Generate, lalu isi
+   `VITE_API_KEY` di `frontend/.env` dan `cd frontend && npm run build`. Aplikasi **sudah berjalan
+   penuh tanpa langkah ini** (endpoint publik di-whitelist; API key hanya mengeraskan endpoint privat).
+
+> Catatan: pengiriman kredensial via Telegram **MATI secara default** dan hanya aktif bila Anda
+> sengaja mengisi `SETUP_NOTIFY_BOT_TOKEN` + `SETUP_NOTIFY_CHAT_ID`. Jangan mengandalkannya —
+> berkas `INITIAL_ADMIN_PASSWORD.txt` adalah sumber yang pasti.
 
 ## Update/Deploy
 

@@ -8,6 +8,7 @@
     "dev": "nodemon server.js",
     "start": "node server.js",
     "setup-db": "node database/setup.js",
+    "reset-admin": "node scripts/reset-admin.js",
     "migrate": "node database/run-all-migrations.js",
     "migrate-security": "node database/migrate_security.js",
     "extract:surabaya-sits": "node scripts/extractSurabayaSits.js",

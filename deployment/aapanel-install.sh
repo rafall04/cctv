@@ -536,8 +536,13 @@ echo "   Backend:  $BACKEND_URL"
 echo ""
 echo "🔑 Admin Credentials:"
 echo "   Username: admin"
-echo "   Password: [Check Telegram]"
-echo "   ⚠️  Credentials sent to your Telegram"
+if [ -f "$APP_DIR/backend/data/INITIAL_ADMIN_PASSWORD.txt" ]; then
+    echo "   Password: $(grep -E '^Password' "$APP_DIR/backend/data/INITIAL_ADMIN_PASSWORD.txt" | head -1 | cut -d: -f2- | tr -d ' ')"
+    echo "   (juga di $APP_DIR/backend/data/INITIAL_ADMIN_PASSWORD.txt — hapus setelah login)"
+else
+    echo "   Password: cat $APP_DIR/backend/data/INITIAL_ADMIN_PASSWORD.txt"
+fi
+echo "   Lupa nanti?  cd $APP_DIR/backend && npm run reset-admin"
 echo ""
 echo "📊 Service Status:"
 pm2 list | grep ${CLIENT_CODE} || pm2 list

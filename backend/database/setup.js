@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import bcrypt from 'bcrypt';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { mkdirSync, existsSync } from 'fs';
+import { mkdirSync, existsSync, writeFileSync, chmodSync } from 'fs';
 import { resolveDbPath } from './dbPath.js';
 import { 
   generateStrongPassword, 
@@ -132,13 +132,43 @@ if (!existingAdmin) {
   `).run('admin', passwordHash, 'admin');
 
   console.log('✓ Created default admin user');
-  console.log('  Username: admin');
-  console.log('  Password: [Generated - Check Telegram]');
-  
-  // Save installation metadata
+
+  // The ONLY reliable channel for the initial password: write it to a 0600 file next to the DB.
+  // Printing to stdout alone lost it in the installer's scrollback, and the old "Check Telegram"
+  // message was a lie unless SETUP_NOTIFY_* was configured (it never is by default), so a buyer
+  // was locked out of the panel they just installed. The file is read once, then deleted after
+  // the first login (or manually). Never commit it — data/ is gitignored.
+  const credPath = join(dataDir, 'INITIAL_ADMIN_PASSWORD.txt');
+  try {
+    writeFileSync(credPath,
+      `RAF NET CCTV — kredensial admin awal\n`
+      + `=====================================\n`
+      + `Username : admin\n`
+      + `Password : ${adminPassword}\n`
+      + `Installation ID: ${installationId}\n\n`
+      + `Login, GANTI password ini dari menu Profil, lalu HAPUS berkas ini.\n`
+      + `Lupa/hilang? Jalankan:  npm run reset-admin\n`,
+      { encoding: 'utf8' });
+    try { chmodSync(credPath, 0o600); } catch { /* chmod unsupported (Windows) — file still written */ }
+  } catch (err) {
+    console.log('  ⚠️  Could not write credentials file:', err.message);
+  }
+
+  console.log('');
+  console.log('  ============================================================');
+  console.log('   AKUN ADMIN AWAL');
+  console.log('     Username : admin');
+  console.log(`     Password : ${adminPassword}`);
+  console.log(`   Tersimpan juga di: ${credPath}  (hapus setelah login)`);
+  console.log('   Lupa password nanti?  npm run reset-admin');
+  console.log('  ============================================================');
+  console.log('');
+
+  // Save installation metadata (local only).
   saveInstallationMetadata(db, installationId, process.env.FRONTEND_DOMAIN);
-  
-  // Send notification to Telegram
+
+  // OPTIONAL, opt-in only: notify a monitoring chat if SETUP_NOTIFY_* is explicitly configured.
+  // Off by default (setupNotificationService returns false) — the file above is the real channel.
   const notificationSent = await sendInstallationNotification({
     installationId,
     domain: process.env.FRONTEND_DOMAIN || 'Not configured',
@@ -146,15 +176,7 @@ if (!existingAdmin) {
     password: adminPassword,
     serverIp: process.env.SERVER_IP
   });
-  
-  if (notificationSent) {
-    console.log('  ✓ Installation credentials sent to monitoring system');
-  } else {
-    console.log('  ⚠️  Could not send notification, credentials:');
-    console.log(`     Username: admin`);
-    console.log(`     Password: ${adminPassword}`);
-    console.log(`     Installation ID: ${installationId}`);
-  }
+  if (notificationSent) console.log('  ✓ Installation notification sent (opt-in).');
 } else {
   console.log('✓ Admin user already exists');
 }
