@@ -11,6 +11,7 @@ import { tmpdir } from 'os';
 import { describe, expect, it } from 'vitest';
 import {
     ensureDatabaseDirectory,
+    partitionMigrations,
     selectRunnableMigrationFiles,
 } from '../database/run-all-migrations.js';
 
@@ -39,6 +40,20 @@ describe('migration runner helpers', () => {
             'add_recording_system.js',
             'zz_20260503_add_recording_segment_uniqueness.js',
         ]);
+    });
+
+    it('runs only migrations not yet in the ledger', () => {
+        const files = ['a.js', 'b.js', 'c.js'];
+        const { pending, skipped } = partitionMigrations(files, new Set(['a.js', 'c.js']));
+        expect(pending).toEqual(['b.js']);
+        expect(skipped).toBe(2);
+    });
+
+    it('runs everything on a fresh (empty) ledger', () => {
+        const files = ['a.js', 'b.js'];
+        const { pending, skipped } = partitionMigrations(files, new Set());
+        expect(pending).toEqual(['a.js', 'b.js']);
+        expect(skipped).toBe(0);
     });
 
     it('creates the database directory before SQLite migrations open the DB file', async () => {

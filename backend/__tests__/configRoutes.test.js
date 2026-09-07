@@ -45,11 +45,19 @@ describe('configRoutes', () => {
     });
 
     it('serves the dynamic PWA manifest from branding settings', async () => {
-        queryMock.mockReturnValue([
-            { key: 'company_name', value: 'RAF NET CCTV' },
-            { key: 'meta_title', value: 'Monitor CCTV' },
-            { key: 'meta_description', value: 'Pantau CCTV publik' },
-        ]);
+        // Table-aware: branding lives in `branding_settings`, NOT `settings`. Returning rows only for
+        // the correct table means a manifest that queried `settings` (the old bug) would get [] and
+        // fall back to the generic default — so this assertion actually guards the table name.
+        queryMock.mockImplementation((sql) => {
+            if (typeof sql === 'string' && sql.includes('branding_settings')) {
+                return [
+                    { key: 'company_name', value: 'RAF NET CCTV' },
+                    { key: 'meta_title', value: 'Monitor CCTV' },
+                    { key: 'meta_description', value: 'Pantau CCTV publik' },
+                ];
+            }
+            return [];
+        });
 
         const { default: configRoutes } = await import('../routes/configRoutes.js');
         const fastify = Fastify();

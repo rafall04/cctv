@@ -83,7 +83,18 @@ Lakukan dari **UI admin** (tersimpan di database, tidak tertimpa update):
 - **Logo, favicon, gambar share (OG)** — unggah dari **Pengaturan → Branding**.
 - Kamera, area, token playback, arsip Telegram, sponsor/iklan.
 
-## 8. Masalah umum
+## 8. Konten yang perlu Anda ganti dengan milik sendiri
+
+Beberapa berkas statis bersifat spesifik-pemilik. Ganti/atur dengan milik Anda:
+
+- **Halaman jualan `frontend/public/sewa/`** — berisi harga & merek contoh. Ganti isinya, atau hapus
+  tautan "Sewa" bila tak dipakai.
+- **`frontend/public/robots.txt` & `sitemap.xml`** — setel domain Anda (lihat `sitemap-template.xml`).
+- **Verifikasi domain (Google Search Console dll.)** — pakai token milik AKUN ANDA (taruh berkasnya di
+  `frontend/public/`, sudah di-gitignore agar tidak ikut terdistribusi/tertimpa update).
+- **Nama, logo, favicon, warna, kontak** — semua dari **Pengaturan → Branding** (tersimpan di DB).
+
+## 9. Masalah umum
 
 | Gejala | Solusi |
 |---|---|

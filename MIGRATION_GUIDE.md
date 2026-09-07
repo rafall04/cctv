@@ -7,11 +7,11 @@ Script ini akan menjalankan semua migration secara berurutan tanpa menghapus dat
 ### Di Server Ubuntu
 
 ```bash
-cd /var/www/rafnet-cctv
+cd /var/www/cctv
 git pull origin main
 cd backend
 npm run migrate
-pm2 restart rafnet-cctv-backend
+pm2 restart <client>-cctv-backend
 ```
 
 ### Di Development (Windows)
@@ -25,12 +25,18 @@ npm run migrate
 
 ## Cara Kerja
 
-1. **Aman untuk dijalankan berulang kali** - Migration menggunakan pattern:
-   - `ALTER TABLE ADD COLUMN IF NOT EXISTS`
-   - `CREATE TABLE IF NOT EXISTS`
-   - Check existing columns sebelum add
+1. **Dijalankan sekali per migrasi (ledger)** - Runner mencatat tiap migrasi yang sukses ke tabel
+   `schema_migrations` dan **melewatinya** pada run berikutnya. Jadi `npm run migrate` tidak lagi
+   menjalankan ulang semua migrasi tiap update; hanya file BARU yang dijalankan. (Pada run pertama di
+   DB lama, ledger masih kosong sehingga semua migrasi berjalan sekali lalu tercatat.)
 
-2. **Tidak menghapus data** - Hanya menambah:
+2. **Pola tiap migrasi** (SQLite — tidak ada `ADD COLUMN IF NOT EXISTS`):
+   - `CREATE TABLE IF NOT EXISTS ...`
+   - `PRAGMA table_info(...)` untuk cek kolom sebelum `ALTER TABLE ADD COLUMN`
+   - Idempotensi adalah tanggung jawab tiap migrasi (belum dijamin runner) — sebaiknya
+     transaksional agar gagal-di-tengah tidak meng-apply-ganda saat di-retry.
+
+3. **Tidak menghapus data** - Hanya menambah:
    - Kolom baru
    - Tabel baru
    - Index baru
@@ -44,7 +50,7 @@ npm run migrate
 ```
 🚀 Starting migration process...
 
-📁 Database: /var/www/rafnet-cctv/backend/data/cctv.db
+📁 Database: /var/www/cctv/backend/data/cctv.db
 
 ⏳ Running: 001_migrate_security.js
 ✅ Success: 001_migrate_security.js
@@ -71,22 +77,22 @@ npm run migrate
 
 ```bash
 # Stop backend dulu
-pm2 stop rafnet-cctv-backend
+pm2 stop <client>-cctv-backend
 
 # Run migration
 cd backend
 npm run migrate
 
 # Start backend
-pm2 start rafnet-cctv-backend
+pm2 start <client>-cctv-backend
 ```
 
 ### Permission Error
 
 ```bash
 # Ubuntu
-sudo chown -R www-data:www-data /var/www/rafnet-cctv/backend/data
-chmod 644 /var/www/rafnet-cctv/backend/data/cctv.db
+sudo chown -R www-data:www-data /var/www/cctv/backend/data
+chmod 644 /var/www/cctv/backend/data/cctv.db
 ```
 
 ### Verify Migration
@@ -111,13 +117,14 @@ node backend/database/migrations/add_video_codec.js
 sqlite3 backend/data/cctv.db "PRAGMA table_info(cameras)" | grep video_codec
 ```
 
-## Backup (Opsional)
+## Backup (WAJIB sebelum migrate)
 
-Meskipun migration aman, backup tetap recommended:
+Selalu cadangkan DB sebelum migrasi (invarian keamanan data). `deployment/update.sh` sudah
+melakukannya otomatis (WAL-safe `sqlite3 .backup`); bila migrate manual, jalankan dulu:
 
 ```bash
-# Backup database
-cp backend/data/cctv.db backend/data/cctv.db.backup-$(date +%Y%m%d)
+# Backup database (WAL-safe — cp saja bisa merobek snapshot bila ada file -wal)
+sqlite3 backend/data/cctv.db ".backup 'backend/data/cctv.db.backup-$(date +%Y%m%d-%H%M%S)'"
 
 # Restore jika perlu
 cp backend/data/cctv.db.backup-20260204 backend/data/cctv.db

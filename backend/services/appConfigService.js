@@ -56,8 +56,11 @@ export function buildManifestFromBranding(branding = {}) {
 
 function loadBrandingSettings() {
     try {
+        // Branding lives in `branding_settings` (brandingService.js is the source of truth), NOT the
+        // general `settings` table. Reading `settings` here returned {} so the PWA manifest always
+        // fell back to "CCTV System"/#0ea5e9 no matter what the buyer set in the admin panel.
         const settings = query(
-            "SELECT key, value FROM settings WHERE key LIKE 'company_%' OR key LIKE 'meta_%' OR key = 'primary_color'"
+            "SELECT key, value FROM branding_settings WHERE key LIKE 'company_%' OR key LIKE 'meta_%' OR key = 'primary_color'"
         );
 
         return settings.reduce((acc, setting) => {
