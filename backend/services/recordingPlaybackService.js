@@ -173,20 +173,14 @@ class RecordingPlaybackService {
 
     async getRecordingsOverview() {
         const cameras = query(`
-            SELECT 
-                id, 
-                name, 
-                location,
-                enabled,
-                status,
-                enable_recording, 
-                recording_status, 
-                recording_duration_hours,
-                last_recording_start,
-                stream_source
-            FROM cameras 
-            WHERE enabled = 1
-            ORDER BY id ASC
+            SELECT c.id, c.name, c.location, c.enabled, c.status,
+                   c.enable_recording, c.recording_status, c.recording_duration_hours,
+                   c.last_recording_start, c.stream_source,
+                   c.area_id, a.name AS area_name, c.group_name
+            FROM cameras c
+            LEFT JOIN areas a ON c.area_id = a.id
+            WHERE c.enabled = 1
+            ORDER BY c.id ASC
         `);
 
         // Batched to ~3 set-queries for ALL cameras, not two sync queries PER camera (≈2.3k for 757, polled every 10 s) that blocked the loop.

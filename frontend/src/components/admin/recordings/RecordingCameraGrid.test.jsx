@@ -162,6 +162,6 @@ describe('RecordingCameraGrid', () => {
             />
         );
 
-        expect(screen.getByText('Tidak ada kamera dengan recording enabled').className).toMatch(/text-content/);
+        expect(screen.getByText('Tidak ada kamera yang cocok').className).toMatch(/text-content/);
     });
 });

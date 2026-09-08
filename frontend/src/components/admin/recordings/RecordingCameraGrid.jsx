@@ -29,6 +29,9 @@ function RecordingQuickEditCard({
     onStopRecording,
     onUpdateSettings,
     updatingCameraId,
+    selectable = false,
+    selected = false,
+    onToggleSelect,
 }) {
     const { timezone } = useTimezone();
     const cameraId = recording.id || recording.camera_id;
@@ -85,7 +88,17 @@ function RecordingQuickEditCard({
     return (
         <div key={cameraId} className="rounded-2xl border border-edge bg-surface p-5 shadow-sm md:p-6">
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="min-w-0">
+                <div className="flex min-w-0 items-start gap-3">
+                    {selectable && (
+                        <input
+                            type="checkbox"
+                            checked={selected}
+                            onChange={() => onToggleSelect?.(cameraId)}
+                            aria-label={`Pilih ${recording.name || recording.camera_name || cameraId}`}
+                            className="mt-1 h-4 w-4 shrink-0 rounded border-edge-strong text-primary-600 focus:ring-primary-500"
+                        />
+                    )}
+                    <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                         <h3 className="text-lg font-semibold leading-tight text-content">
                             {recording.name || recording.camera_name}
@@ -102,6 +115,7 @@ function RecordingQuickEditCard({
                     <p className="mt-1 text-sm font-medium text-content">
                         {recording.location || 'No location'}
                     </p>
+                    </div>
                 </div>
                 <div
                     data-testid={`recording-status-${cameraId}`}
@@ -262,27 +276,36 @@ export default function RecordingCameraGrid({
     onStopRecording,
     onUpdateSettings,
     updatingCameraId = null,
+    selectable = false,
+    selectedIds = null,
+    onToggleSelect,
 }) {
     if (recordings.length === 0) {
         return (
             <div className="rounded-2xl border border-edge bg-white p-12 text-center shadow-sm dark:bg-gray-800/60">
-                <p className="text-content-muted">Tidak ada kamera dengan recording enabled</p>
+                <p className="text-content-muted">Tidak ada kamera yang cocok</p>
             </div>
         );
     }
 
     return (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 lg:grid-cols-3">
-            {recordings.map((recording) => (
-                <RecordingQuickEditCard
-                    key={recording.id || recording.camera_id}
-                    recording={recording}
-                    onStartRecording={onStartRecording}
-                    onStopRecording={onStopRecording}
-                    onUpdateSettings={onUpdateSettings}
-                    updatingCameraId={updatingCameraId}
-                />
-            ))}
+            {recordings.map((recording) => {
+                const cameraId = recording.id || recording.camera_id;
+                return (
+                    <RecordingQuickEditCard
+                        key={cameraId}
+                        recording={recording}
+                        onStartRecording={onStartRecording}
+                        onStopRecording={onStopRecording}
+                        onUpdateSettings={onUpdateSettings}
+                        updatingCameraId={updatingCameraId}
+                        selectable={selectable}
+                        selected={selectable && selectedIds ? selectedIds.has(cameraId) : false}
+                        onToggleSelect={onToggleSelect}
+                    />
+                );
+            })}
         </div>
     );
 }

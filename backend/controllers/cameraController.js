@@ -8,6 +8,7 @@
 
 import cameraService from '../services/cameraService.js';
 import billingService from '../services/billingService.js';
+import bulkRecordingDurationUpdater from '../services/recordingRetentionBulkService.js';
 
 // Get all cameras (admin only - includes disabled cameras)
 export async function getAllCameras(request, reply) {
@@ -171,6 +172,23 @@ export async function bulkUpdateByArea(request, reply) {
         return reply.send({ success: true, message: 'Bulk update successful', data: result });
     } catch (error) {
         console.error('Bulk update error:', error);
+        if (error.statusCode === 400) {
+            return reply.code(400).send({ success: false, message: error.message });
+        }
+        if (error.statusCode === 404) {
+            return reply.code(404).send({ success: false, message: error.message });
+        }
+        return reply.code(500).send({ success: false, message: 'Internal server error' });
+    }
+}
+
+// Bulk set recording_duration_hours by area / group / selected ids (admin only)
+export async function bulkUpdateRecordingDuration(request, reply) {
+    try {
+        const result = await bulkRecordingDurationUpdater(request.body, request);
+        return reply.send({ success: true, message: `Retensi diperbarui untuk ${result.updated} kamera`, data: result });
+    } catch (error) {
+        console.error('Bulk recording duration error:', error);
         if (error.statusCode === 400) {
             return reply.code(400).send({ success: false, message: error.message });
         }

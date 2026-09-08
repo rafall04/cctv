@@ -21,7 +21,7 @@ import RecordingAudioSetting from '../components/admin/recordings/RecordingAudio
 import RecordingHealthAlertSetting from '../components/admin/recordings/RecordingHealthAlertSetting';
 import RecordingAssuranceSummary from '../components/admin/recordings/RecordingAssuranceSummary';
 import RecordingAssuranceTable from '../components/admin/recordings/RecordingAssuranceTable';
-import RecordingCameraGrid from '../components/admin/recordings/RecordingCameraGrid';
+import RecordingRetentionManager from '../components/admin/recordings/RecordingRetentionManager';
 import RecordingRestartLogs from '../components/admin/recordings/RecordingRestartLogs';
 
 function RecordingLoadingState() {
@@ -41,6 +41,7 @@ function RecordingLoadingState() {
 export default function RecordingDashboard() {
     const { success, error: notifyError } = useNotification();
     const [updatingCameraId, setUpdatingCameraId] = useState(null);
+    const [bulkBusy, setBulkBusy] = useState(false);
     const {
         recordings,
         restartLogs,
@@ -98,6 +99,21 @@ export default function RecordingDashboard() {
             throw error;
         } finally {
             setUpdatingCameraId(null);
+        }
+    };
+
+    const handleBulkUpdateDuration = async (payload) => {
+        try {
+            setBulkBusy(true);
+            const response = await recordingService.bulkUpdateRecordingDuration(payload);
+            if (response.success) {
+                success('Retensi Diperbarui', response.message || `Retensi diperbarui untuk ${response.data?.updated || 0} kamera.`);
+                await fetchData({ mode: 'initial' });
+            }
+        } catch (error) {
+            notifyError('Gagal Memperbarui Retensi', error.response?.data?.message || 'Gagal memperbarui retensi massal');
+        } finally {
+            setBulkBusy(false);
         }
     };
 
@@ -197,12 +213,14 @@ export default function RecordingDashboard() {
                 <RecordingAssuranceTable cameras={assurance?.cameras || []} />
             </InlineErrorBoundary>
             <InlineErrorBoundary title="Daftar kamera gagal ditampilkan">
-                <RecordingCameraGrid
+                <RecordingRetentionManager
                     recordings={recordings}
                     onStartRecording={handleStartRecording}
                     onStopRecording={handleStopRecording}
                     onUpdateSettings={handleUpdateSettings}
                     updatingCameraId={updatingCameraId}
+                    onBulkUpdate={handleBulkUpdateDuration}
+                    bulkBusy={bulkBusy}
                 />
             </InlineErrorBoundary>
             <InlineErrorBoundary title="Log restart gagal ditampilkan">

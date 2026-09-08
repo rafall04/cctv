@@ -77,6 +77,15 @@ export const updateRecordingSettings = async (cameraId, settings) => {
 };
 
 /**
+ * Bulk set recording retention hours (recording_duration_hours) for many cameras at once.
+ * payload: { scope: 'area'|'group'|'ids', areaId?, groupName?, cameraIds?: number[], recordingDurationHours }
+ */
+export const bulkUpdateRecordingDuration = async (payload) => {
+    const response = await apiClient.patch('/api/cameras/bulk/recording-duration', payload);
+    return response.data;
+};
+
+/**
  * Get restart logs
  */
 export const getRestartLogs = async (cameraId = null, limit = 50, policy = REQUEST_POLICY.BLOCKING, config = {}) => {
@@ -174,6 +183,7 @@ export default {
     getRecordingStatus,
     getRecordingsOverview,
     updateRecordingSettings,
+    bulkUpdateRecordingDuration,
     getRestartLogs,
     getRecordingAssurance,
     getSegments,

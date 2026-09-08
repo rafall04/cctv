@@ -22,6 +22,7 @@ import {
     applyCameraRestore,
     bulkUpdateByArea,
     bulkDeleteByArea,
+    bulkUpdateRecordingDuration,
 } from '../controllers/cameraController.js';
 import { authMiddleware, requireAdmin } from '../middleware/authMiddleware.js';
 import { 
@@ -111,6 +112,12 @@ export default async function cameraRoutes(fastify, options) {
     fastify.patch('/bulk/area', {
         onRequest: [authMiddleware, requireAdmin],
         handler: bulkUpdateByArea,
+    });
+
+    // Bulk set recording retention hours by area / group / selected ids
+    fastify.patch('/bulk/recording-duration', {
+        onRequest: [authMiddleware, requireAdmin],
+        handler: bulkUpdateRecordingDuration,
     });
 
     // Bulk Delete By Area
