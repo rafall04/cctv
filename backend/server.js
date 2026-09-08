@@ -104,6 +104,8 @@ import { startRecordingDomain } from './services/recordingDomainBootstrap.js';
 import thumbnailService from './services/thumbnailService.js';
 import telegramBotService from './services/telegramBotService.js';
 import archiveCache from './services/archiveCacheService.js';
+import audioRoutes from './routes/audioRoutes.js';
+import { startAudioBroadcast } from './services/audioBroadcastBootstrap.js';
 
 recordingService.attachScheduler(recordingScheduler);
 
@@ -416,6 +418,7 @@ await fastify.register(billingAdminRoutes, { prefix: '/api/admin/billing' });
 await fastify.register(voucherAdminRoutes, { prefix: '/api/admin/voucher' });
 await fastify.register(rondaAdminRoutes, { prefix: '/api/admin/ronda' });
 await fastify.register(telegramArchiveRoutes, { prefix: '/api/admin/telegram-archive' });
+await fastify.register(audioRoutes, { prefix: '/api/admin/audio' });
 await fastify.register(backupTelegramRoutes, { prefix: '/api/admin/backup' });
 await fastify.register(securitySettingsRoutes, { prefix: '/api/admin/settings' });
 await fastify.register(billingWebhookRoutes, { prefix: '/api/billing' });
@@ -615,20 +618,17 @@ const start = async () => {
         // Prepaid billing: hourly tick, idempotent per local day (suspends empty
         // wallets, resumes topped-up ones). Cheap no-op when nothing is due.
         billingService.startBillingScheduler();
-
-        // Interactive Telegram bot: long-polls for /commands & approve/manage button
-        // taps. Idle (re-checks every 15s) until a bot token is configured, so it is
-        // safe to start the moment a token is saved.
-        // Under pm2 cluster_mode every worker would poll getUpdates on the same token →
-        // Telegram 409 (only one poller allowed per token). Run it on a single worker
-        // only: NODE_APP_INSTANCE is unset in fork mode and '0' on the first cluster worker.
+        // Telegram bot: long-polls /commands + approve taps; idle until a token is set. Primary worker
+        // only — pm2 cluster would 409 (one poller/token); NODE_APP_INSTANCE: unset in fork, '0' on w0.
         const botWorker = process.env.NODE_APP_INSTANCE;
-        if (botWorker === undefined || botWorker === '0') {
+        const onPrimaryWorker = botWorker === undefined || botWorker === '0';
+        if (onPrimaryWorker) {
             telegramBotService.start();
             console.log('[TelegramBot] Customer-management bot started (long-polling)');
         } else {
-            console.log(`[TelegramBot] Not started on cluster worker #${botWorker} (poller runs only on worker 0)`);
+            console.log(`[TelegramBot] Not on cluster worker #${botWorker} (poller only on worker 0)`);
         }
+        startAudioBroadcast(onPrimaryWorker); // audio dir on all workers; ticker on primary only
 
         // LAST line of start(), deliberately. The server binds its port early and then
         // keeps booting for a long time — prod measured ~67s of tail after /health first

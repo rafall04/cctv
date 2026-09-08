@@ -69,6 +69,10 @@ export const AdminIcons = {
     Storefront: ico(<>{p('M4 9h16l-1-4H5L4 9z')}{p('M5 9v10a1 1 0 001 1h12a1 1 0 001-1V9M10 20v-6h4v6')}</>),
     // Megaphone — house promo, distinct from the Ads "display screen" glyph.
     Promo: ico(<>{p('M3 11v2a1 1 0 001 1h2l5 4V6L6 10H4a1 1 0 00-1 1z')}{p('M16 8a5 5 0 010 8')}</>),
+    // Loudspeaker cone + two arcs — the Audio Broadcast route (play audio to camera speakers). A
+    // speaker BOX, deliberately not Promo's angled megaphone: the guardrail test refuses two routes
+    // the same glyph, and these two are different tools (broadcasting audio vs a printed house ad).
+    Broadcast: ico(<>{p('M11 5L6 9H3v6h3l5 4V5z')}{p('M15.5 9a4 4 0 010 6M18 6.5a8 8 0 010 11')}</>),
     Users: ico(p('M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z')),
     Shield: ico(p('M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z')),
     Bell: ico(p('M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0a3 3 0 11-6 0m6 0H9')),
@@ -102,6 +106,7 @@ export const NAV_GROUPS = [
             { label: 'Area', path: '/admin/areas', icon: AdminIcons.Area },
             { label: 'Ronda Digital', path: '/admin/ronda', icon: AdminIcons.Ronda, adminOnly: true },
             { label: 'Hitung Kendaraan', path: '/admin/hitung-kendaraan', icon: AdminIcons.Vehicle, adminOnly: true },
+            { label: 'Siaran Audio', path: '/admin/audio', icon: AdminIcons.Broadcast, adminOnly: true },
             { label: 'Jam Kamera', path: '/admin/jam-kamera', icon: AdminIcons.Clock, adminOnly: true },
             { label: 'Diagnostik Kamera', path: '/admin/health-debug', icon: AdminIcons.Pulse },
             { label: 'Laporan Kamera', path: '/admin/camera-reports', icon: AdminIcons.Report },

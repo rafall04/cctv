@@ -35,6 +35,18 @@ const LARGE_BODY_ROUTES = [
     { method: 'POST', pattern: /^\/api\/admin\/affiliate\/offers\/\d+\/image\/?(\?|$)/ },
 ];
 
+/*
+ * A third, larger tier for the single audio-clip upload (Audio Broadcast). A full song base64-encoded
+ * in JSON is bigger than any poster, so it gets its own ceiling rather than inflating the image tier.
+ * Same discipline as above: ONE exact method + WHOLE path, and this must stay just ABOVE the route's
+ * own bodyLimit (routes/audioRoutes.js = ceil(MAX_AUDIO_UPLOAD_BYTES * 1.4) + 4096) so the route
+ * rejects first and this hook is the outer backstop. Admin-only route, but this hook runs before auth.
+ */
+const MAX_AUDIO_BODY_SIZE = 18 * 1024 * 1024; // 18MB in bytes
+const AUDIO_UPLOAD_ROUTES = [
+    { method: 'POST', pattern: /^\/api\/admin\/audio\/clips\/?(\?|$)/ },
+];
+
 /**
  * Resolve the body-size ceiling for one request.
  * @param {object} request - Fastify request
@@ -43,6 +55,9 @@ const LARGE_BODY_ROUTES = [
 export function resolveBodySizeLimit(request) {
     const url = request?.url || '';
     const method = (request?.method || '').toUpperCase();
+    if (AUDIO_UPLOAD_ROUTES.some((route) => route.method === method && route.pattern.test(url))) {
+        return MAX_AUDIO_BODY_SIZE;
+    }
     const allowed = LARGE_BODY_ROUTES.some((route) => route.method === method && route.pattern.test(url));
     return allowed ? MAX_UPLOAD_BODY_SIZE : MAX_BODY_SIZE;
 }

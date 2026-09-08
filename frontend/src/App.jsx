@@ -58,6 +58,7 @@ const BillingManagement = lazyWithRetry(() => import('./pages/BillingManagement'
 const VoucherManagement = lazyWithRetry(() => import('./pages/VoucherManagement'), 'voucher-management');
 const RondaSettings = lazyWithRetry(() => import('./pages/RondaSettings'), 'ronda-settings');
 const VehicleCountSettings = lazyWithRetry(() => import('./pages/VehicleCountSettings'), 'vehicle-count-settings');
+const AudioBroadcast = lazyWithRetry(() => import('./pages/AudioBroadcast'), 'audio-broadcast');
 const CameraTimeStatus = lazyWithRetry(() => import('./pages/CameraTimeStatus'), 'camera-time-status');
 const TelegramArchiveSettings = lazyWithRetry(() => import('./pages/TelegramArchiveSettings'), 'telegram-archive-settings');
 const TelegramArchiveLibrary = lazyWithRetry(() => import('./pages/TelegramArchiveLibrary'), 'telegram-archive-library');
@@ -392,6 +393,14 @@ function App() {
                     element={
                         <AdminPageRoute>
                             <RecordingDashboard />
+                        </AdminPageRoute>
+                    }
+                />
+                <Route
+                    path="/admin/audio"
+                    element={
+                        <AdminPageRoute adminOnly>
+                            <AudioBroadcast />
                         </AdminPageRoute>
                     }
                 />
