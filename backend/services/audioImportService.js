@@ -53,9 +53,11 @@ export async function createImportJob({ url, name, userId = null }) {
         const e = new Error('Impor YouTube belum tersedia (yt-dlp belum terpasang di server). Gunakan URL berkas audio langsung.');
         e.statusCode = 501; throw e;
     }
-    execute('INSERT INTO audio_import_jobs (source_url, source_kind, requested_name, status, created_by) VALUES (?, ?, ?, ?, ?)',
+    // Read back by the INSERT's own lastInsertRowid — `last_insert_rowid()` via queryOne routes to a
+    // readonly pool connection where it returns 0 (never inserted) → the row comes back undefined.
+    const info = execute('INSERT INTO audio_import_jobs (source_url, source_kind, requested_name, status, created_by) VALUES (?, ?, ?, ?, ?)',
         [safe, kind, String(name || '').trim().slice(0, 120) || null, 'queued', userId]);
-    return queryOne('SELECT * FROM audio_import_jobs WHERE id = last_insert_rowid()');
+    return queryOne('SELECT * FROM audio_import_jobs WHERE id = ?', [info.lastInsertRowid]);
 }
 
 /* -------------------------------------------------------------------- fetchers */

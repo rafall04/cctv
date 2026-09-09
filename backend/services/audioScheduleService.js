@@ -117,14 +117,15 @@ export function listSchedules() {
 
 export function createSchedule(fields) {
     const v = validate(fields, false);
-    execute(`INSERT INTO audio_schedules
+    // Use the INSERT's own lastInsertRowid — `last_insert_rowid()` via queryOne routes to a readonly
+    // pool connection (returns 0), which would read back id=0 → undefined.
+    const info = execute(`INSERT INTO audio_schedules
              (name, camera_ids, source_type, source_id, time_hhmm, days_mask, loop_count, enabled,
               schedule_kind, run_date, start_date, end_date, gain_db)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [v.name, v.camera_ids, v.source_type, v.source_id, v.time_hhmm, v.days_mask, v.loop_count, v.enabled ?? 1,
             v.schedule_kind ?? 'recurring', v.run_date ?? null, v.start_date ?? null, v.end_date ?? null, v.gain_db ?? 0]);
-    const id = queryOne('SELECT last_insert_rowid() AS id').id;
-    return queryOne('SELECT * FROM audio_schedules WHERE id = ?', [id]);
+    return queryOne('SELECT * FROM audio_schedules WHERE id = ?', [info.lastInsertRowid]);
 }
 
 export function updateSchedule(id, fields) {

@@ -47,7 +47,8 @@ function resetSchema() {
             source_type TEXT NOT NULL, source_id INTEGER NOT NULL, time_hhmm TEXT NOT NULL,
             days_mask INTEGER NOT NULL DEFAULT 127, loop_count INTEGER NOT NULL DEFAULT 1,
             enabled INTEGER NOT NULL DEFAULT 1, last_run_at TEXT, created_at TEXT DEFAULT (datetime('now')),
-            schedule_kind TEXT NOT NULL DEFAULT 'recurring', run_date TEXT, start_date TEXT, end_date TEXT);
+            schedule_kind TEXT NOT NULL DEFAULT 'recurring', run_date TEXT, start_date TEXT, end_date TEXT,
+            gain_db INTEGER NOT NULL DEFAULT 0);
     `);
     db.prepare("INSERT INTO audio_clips (name, base_filename) VALUES ('Clip', 'clip-aaaaaaaa')").run();
 }
@@ -93,7 +94,7 @@ describe('audioScheduleService — runDueSchedules firing rules', () => {
         const fired = runDueSchedules(TUE_1730_WIB);
         expect(fired).toBe(1);
         expect(playToCameras).toHaveBeenCalledTimes(1);
-        expect(playToCameras).toHaveBeenCalledWith([1, 2], 'clip', 1, 1);
+        expect(playToCameras).toHaveBeenCalledWith([1, 2], 'clip', 1, 1, { gainDb: 0 });
     });
 
     it('does NOT fire twice in the same minute (last_run guard)', () => {

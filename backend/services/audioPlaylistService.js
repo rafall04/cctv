@@ -51,8 +51,9 @@ export function createPlaylist(name, clipIds = []) {
     const n = cleanName(name);
     let id;
     transaction(() => {
-        execute('INSERT INTO audio_playlists (name) VALUES (?)', [n]);
-        id = queryOne('SELECT last_insert_rowid() AS id').id;
+        // Use the INSERT's own lastInsertRowid (robust in OR out of a transaction) rather than
+        // `last_insert_rowid()` via queryOne, whose value is connection-specific.
+        id = execute('INSERT INTO audio_playlists (name) VALUES (?)', [n]).lastInsertRowid;
         replaceItems(id, clipIds);
     });
     return getPlaylist(id);

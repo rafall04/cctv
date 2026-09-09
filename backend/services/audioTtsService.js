@@ -174,12 +174,14 @@ export async function createTtsJob({ text, engine = 'piper', voice, name, userId
     }
     const v = resolveVoice(engine, voice);
     if (!v) { const e = new Error('Suara tidak valid'); e.statusCode = 400; throw e; }
-    execute(
+    // Read back by the INSERT's own lastInsertRowid — NOT `last_insert_rowid()` via queryOne, which
+    // routes to a readonly pool connection where that function returns 0 (it never inserted) → undefined.
+    const info = execute(
         `INSERT INTO audio_import_jobs (source_url, source_kind, requested_name, status, created_by, tts_text, tts_provider, tts_voice)
          VALUES ('tts', 'tts', ?, 'queued', ?, ?, ?, ?)`,
         [String(name || '').trim().slice(0, 120) || null, userId, clean, engine, v.id],
     );
-    return queryOne('SELECT * FROM audio_import_jobs WHERE id = last_insert_rowid()');
+    return queryOne('SELECT * FROM audio_import_jobs WHERE id = ?', [info.lastInsertRowid]);
 }
 
 export default { synthTtsToTemp, createTtsJob, listTtsEngines, ttsEngineAvailable, MAX_TTS_CHARS };
