@@ -52,22 +52,24 @@ export default function LibraryTab({ clips, loading, reload, onPlayClip }) {
         event.preventDefault();
         if (!importUrl.trim()) { showNotification({ type: 'error', title: 'Isi URL dulu' }); return; }
         setImporting(true);
+        // Determine success from the JOB LIST, not the POST response: under a Cloudflare idle-drop the POST
+        // reaches the server (a job is created) but the client sees a network error. So the truth is
+        // "did a new job appear?", which is idempotent + reliable.
+        const beforeIds = new Set(jobs.map((j) => j.id));
         const result = await importClip(importUrl.trim(), importName.trim());
+        const jr = await getImportJobs();
         setImporting(false);
-        if (!result.success) {
-            await loadJobs(); // the POST may have reached the server (idle-drop); the job list is the truth
-            if (result.transient) {
-                showNotification({ type: 'info', title: 'Impor mungkin sudah dimulai', message: 'Koneksi terputus, tapi cek daftar status di bawah.' });
-                setImportUrl(''); setImportName('');
-            } else {
-                showNotification({ type: 'error', title: 'Gagal impor', message: result.message });
-            }
+        const freshJobs = jr.success ? (jr.data || []) : jobs;
+        setJobs(freshJobs);
+        const created = freshJobs.some((j) => !beforeIds.has(j.id));
+        if (result.success || created) {
+            showNotification({ type: 'success', title: 'Impor dimulai', message: 'Berjalan di latar belakang.' });
+            setImportUrl('');
+            setImportName('');
             return;
         }
-        showNotification({ type: 'success', title: 'Impor dimulai', message: 'Berjalan di latar belakang.' });
-        setImportUrl('');
-        setImportName('');
-        await loadJobs();
+        // No new job AND the POST failed -> a genuine error (e.g. invalid/blocked URL).
+        showNotification({ type: 'error', title: 'Gagal impor', message: result.message });
     };
 
     const pickFile = (f) => {
@@ -218,9 +220,8 @@ export default function LibraryTab({ clips, loading, reload, onPlayClip }) {
                                 <p className="truncate text-sm font-semibold text-content">{clip.name}</p>
                                 <p className="font-mono text-xs tabular-nums text-content-subtle">
                                     {formatDuration(clip.duration_sec)}
-                                    {clip.source_type === 'youtube' ? ' · YouTube'
-                                        : clip.source_type === 'url' ? ' · URL'
-                                            : clip.source_bytes > 0 ? ` · ${formatBytes(clip.source_bytes)}` : ''}
+                                    {clip.source_bytes > 0 ? ` · ${formatBytes(clip.source_bytes)}` : ''}
+                                    {clip.source_type === 'youtube' ? ' · YouTube' : clip.source_type === 'url' ? ' · URL' : ''}
                                 </p>
                             </div>
                             {onPlayClip && (

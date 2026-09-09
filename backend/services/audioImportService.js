@@ -15,7 +15,7 @@ Concurrency is 1 (serial) on the primary worker — the weak box already runs ~2
 
 import { execFile } from 'child_process';
 import { promisify } from 'util';
-import { writeFileSync, unlinkSync, readdirSync } from 'fs';
+import { writeFileSync, unlinkSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
 import { randomBytes } from 'crypto';
 import { query, queryOne, execute } from '../database/connectionPool.js';
@@ -104,7 +104,10 @@ async function fetchYoutubeToTemp(url, prefix) {
     ], { timeout: YTDLP_TIMEOUT_MS });
     const file = readdirSync(AUDIO_DIR).find((f) => f.startsWith(`${prefix}.`));
     if (!file) throw new Error('Unduhan yt-dlp tidak menghasilkan berkas');
-    return { path: join(AUDIO_DIR, file), title: String(meta.title || '').slice(0, 120) };
+    const path = join(AUDIO_DIR, file);
+    let bytes = 0;
+    try { bytes = statSync(path).size; } catch { /* keep 0 */ }
+    return { path, bytes, title: String(meta.title || '').slice(0, 120) };
 }
 
 /* ---------------------------------------------------------------- job processor */
