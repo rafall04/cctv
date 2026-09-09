@@ -30,6 +30,7 @@ import SoundboardTab from '../components/admin/audio/SoundboardTab';
 import EmergencyPanel from '../components/admin/audio/EmergencyPanel';
 import PrayerConfig from '../components/admin/audio/PrayerConfig';
 import MotionArms from '../components/admin/audio/MotionArms';
+import SirenControl from '../components/admin/audio/SirenControl';
 
 const TABS = [
     { id: 'play', label: 'Putar Sekarang' },
@@ -162,6 +163,7 @@ export default function AudioBroadcast() {
                 <TabPanel id="panel" idPrefix="audio">
                     <div className="space-y-6">
                         <EmergencyPanel clips={clips} playlists={playlists} cameras={cameras} areas={areas} />
+                        <SirenControl />
                         <SoundboardTab clips={clips} playlists={playlists} cameras={cameras} />
                     </div>
                 </TabPanel>

@@ -23,6 +23,7 @@ import {
     listEmergencyPresets, createEmergencyPreset, updateEmergencyPreset, deleteEmergencyPreset, playEmergency,
     getPrayerConfig, updatePrayerConfig, getPrayerTimes,
     listMotionArms, setMotionArmHandler, disarmMotionHandler,
+    getImouConfig, setImouConfig, testImou, listImouDevices, setCameraImouSn, cameraSiren,
     listTtsEngines, createTts,
 } from '../controllers/audioController.js';
 import fastifyWebsocket from '@fastify/websocket';
@@ -106,6 +107,14 @@ export default async function audioRoutes(fastify) {
     fastify.get('/prayer/config', admin, getPrayerConfig);
     fastify.put('/prayer/config', admin, updatePrayerConfig);
     fastify.get('/prayer/times', admin, getPrayerTimes);
+
+    // IMOU cloud siren (native active-deterrence, louder than the backchannel)
+    fastify.get('/imou/config', admin, getImouConfig);
+    fastify.put('/imou/config', admin, setImouConfig);
+    fastify.post('/imou/test', admin, testImou);
+    fastify.get('/imou/devices', admin, listImouDevices);
+    fastify.patch('/cameras/:id/imou-sn', admin, setCameraImouSn);
+    fastify.post('/cameras/:id/siren', admin, cameraSiren);
 
     // Motion -> deterrent audio (armed per camera; heavily guarded)
     fastify.get('/motion/arms', admin, listMotionArms);

@@ -251,6 +251,34 @@ export const getPlayHistory = async () => {
     } catch (error) { return failure(error, 'Gagal memuat riwayat'); }
 };
 
+/* ------------------------------------------------------ IMOU cloud siren (native) */
+
+export const getImouConfig = async () => {
+    try { return (await apiClient.get(`${BASE}/imou/config`)).data; }
+    catch (error) { return failure(error, 'Gagal memuat konfigurasi IMOU'); }
+};
+export const setImouConfig = async (payload) => {
+    try { return (await apiClient.put(`${BASE}/imou/config`, payload)).data; }
+    catch (error) { return failure(error, 'Gagal menyimpan kredensial'); }
+};
+export const testImou = async () => {
+    try { return (await apiClient.post(`${BASE}/imou/test`)).data; }
+    catch (error) { return failure(error, 'Gagal koneksi IMOU'); }
+};
+export const getImouDevices = async () => {
+    try { return (await apiClient.get(`${BASE}/imou/devices`)).data; }
+    catch (error) { return failure(error, 'Gagal memuat perangkat IMOU'); }
+};
+export const setCameraImouSn = async (id, sn) => {
+    try { return (await apiClient.patch(`${BASE}/cameras/${id}/imou-sn`, { sn })).data; }
+    catch (error) { return failure(error, 'Gagal menyimpan SN'); }
+};
+/** Turn a camera's built-in siren on/off (IMOU cloud). */
+export const cameraSiren = async (id, on) => {
+    try { return (await apiClient.post(`${BASE}/cameras/${id}/siren`, { on })).data; }
+    catch (error) { return failure(error, 'Gagal memicu sirene'); }
+};
+
 /* ----------------------------------------------------- motion -> deter audio */
 
 export const getMotionArms = async () => {
@@ -396,6 +424,7 @@ export default {
     getEmergencyPresets, createEmergencyPreset, updateEmergencyPreset, deleteEmergencyPreset, playEmergency,
     getPrayerConfig, updatePrayerConfig, getPrayerTimes,
     getMotionArms, setMotionArm, disarmMotion,
+    getImouConfig, setImouConfig, testImou, getImouDevices, setCameraImouSn, cameraSiren,
     getCapability, recheckCapability, recheckCameraCapability, getAreas, toggleArea, setCameraBlocked, setAreaPolicy,
     getGroups, createGroup, updateGroup, deleteGroup,
     getTemplates, createTemplate, updateTemplate, deleteTemplate,

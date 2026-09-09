@@ -37,6 +37,10 @@ import {
 import { mintTicket } from '../services/audioTalkService.js';
 import { getConfig as getPrayerCfg, setConfig as setPrayerCfg, todayTimes as prayerTodayTimes } from '../services/audioPrayerService.js';
 import { listArms as listMotionRows, setArm as setMotionArm, disarm as disarmMotion } from '../services/audioMotionService.js';
+import {
+    configStatus as imouStatus, setConfig as imouSetConfig, listDevices as imouListDevices,
+    testConnection as imouTest, setCameraSn as imouSetSn, listSirenCameras, triggerCameraSiren,
+} from '../services/imouCloudService.js';
 import { logPlay, listHistory } from '../services/audioHistoryService.js';
 import {
     listPresets as listEmergencyRows, createPreset as createEmergencyRow,
@@ -499,6 +503,52 @@ export async function listPlayHistory(request, reply) {
     try {
         return reply.send({ success: true, data: listHistory(request.query?.limit) });
     } catch (error) { return fail(reply, error); }
+}
+
+/* ------------------------------------------------------ IMOU cloud siren (native) */
+
+export async function getImouConfig(request, reply) {
+    try { return reply.send({ success: true, data: { ...imouStatus(), cameras: listSirenCameras() } }); }
+    catch (error) { return fail(reply, error); }
+}
+
+export async function setImouConfig(request, reply) {
+    try {
+        const cfg = imouSetConfig(request.body || {});
+        logAdminAction({ action: 'audio_imou_config', targetType: 'audio_imou', configured: cfg.configured, ...adminContext(request) }, request);
+        return reply.send({ success: true, message: 'Kredensial IMOU disimpan', data: cfg });
+    } catch (error) { return fail(reply, error, 'Gagal menyimpan kredensial'); }
+}
+
+export async function testImou(request, reply) {
+    try { const r = await imouTest(); return reply.send({ success: true, message: 'Koneksi IMOU OK', data: r }); }
+    catch (error) { return fail(reply, error, 'Gagal koneksi IMOU'); }
+}
+
+export async function listImouDevices(request, reply) {
+    try { return reply.send({ success: true, data: await imouListDevices() }); }
+    catch (error) { return fail(reply, error, 'Gagal memuat perangkat IMOU'); }
+}
+
+export async function setCameraImouSn(request, reply) {
+    try {
+        const id = parseId(request.params.id);
+        if (!id) return reply.code(400).send({ success: false, message: 'ID kamera tidak valid' });
+        const r = imouSetSn(id, request.body?.sn);
+        return reply.send({ success: true, message: 'SN IMOU disimpan', data: r });
+    } catch (error) { return fail(reply, error); }
+}
+
+// Turn a camera's built-in siren on/off (louder than the backchannel). body.on = true|false.
+export async function cameraSiren(request, reply) {
+    try {
+        const id = parseId(request.params.id);
+        if (!id) return reply.code(400).send({ success: false, message: 'ID kamera tidak valid' });
+        const on = request.body?.on === true;
+        const r = await triggerCameraSiren(id, on);
+        logAdminAction({ action: 'audio_imou_siren', targetType: 'camera', targetId: id, on, ...adminContext(request) }, request);
+        return reply.send({ success: true, message: on ? 'Sirene dinyalakan' : 'Sirene dimatikan', data: r });
+    } catch (error) { return fail(reply, error, 'Gagal memicu sirene'); }
 }
 
 /* -------------------------------------------------------- motion -> deter audio */
