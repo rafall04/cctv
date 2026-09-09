@@ -31,6 +31,11 @@ export const MAX_AUDIO_UPLOAD_BYTES = 12 * 1024 * 1024; // 12MB source — a ful
 const FFMPEG_TIMEOUT_MS = 60000;
 export const MAX_CLIP_SECONDS = 900; // 15 min hard cap (ffmpeg -t/-fs) — a song/announcement fits; guards imports
 const SAFE_BASE_RE = /^clip-[a-z0-9]{6,40}$/;
+// Loudness normalisation at encode time so every clip (upload/import/YouTube/TTS) lands at a consistent
+// level — no "one whispers, the next blares at 5am". EBU R128 target + a high-pass to drop sub-bass a tiny
+// TOA speaker can't reproduce. Set AUDIO_NORMALIZE=0 to disable. Off by default only if explicitly set.
+const NORMALIZE = process.env.AUDIO_NORMALIZE !== '0';
+const NORM_FILTER = 'highpass=f=80,loudnorm=I=-16:TP=-1.5:LRA=11';
 
 // Magic-byte gate. ffmpeg re-encode is the real validator, but this rejects obvious non-audio before
 // we ever hand bytes to ffmpeg. Covers the formats a phone/PC actually exports.
@@ -122,10 +127,11 @@ export async function finalizeClipFromFile({ name, tempPath, sourceBytes = 0, so
         const duration = await probeDuration(tempPath);
         // Encode to raw u-law 16kHz mono — exactly what audio_cast.py streams (PCMU/16000, PT=103).
         // -t + -fs are the hard caps that keep a mislabelled/huge import from producing an unbounded .ulaw.
-        await execFileAsync('ffmpeg', [
-            '-y', '-i', tempPath, '-vn', '-t', String(MAX_CLIP_SECONDS), '-ar', '16000', '-ac', '1',
-            '-fs', String(16000 * MAX_CLIP_SECONDS), '-f', 'mulaw', outPath,
-        ], { timeout: FFMPEG_TIMEOUT_MS });
+        const ffArgs = ['-y', '-i', tempPath, '-vn'];
+        if (NORMALIZE) ffArgs.push('-af', NORM_FILTER);
+        ffArgs.push('-t', String(MAX_CLIP_SECONDS), '-ar', '16000', '-ac', '1',
+            '-fs', String(16000 * MAX_CLIP_SECONDS), '-f', 'mulaw', outPath);
+        await execFileAsync('ffmpeg', ffArgs, { timeout: FFMPEG_TIMEOUT_MS });
         if (!existsSync(outPath) || statSync(outPath).size === 0) {
             throw new Error('ffmpeg tidak menghasilkan audio');
         }
@@ -147,7 +153,21 @@ export async function finalizeClipFromFile({ name, tempPath, sourceBytes = 0, so
 }
 
 export function listClips() {
-    return query('SELECT id, name, base_filename, duration_sec, source_bytes, source_type, created_at FROM audio_clips ORDER BY created_at DESC, id DESC');
+    return query('SELECT id, name, base_filename, duration_sec, source_bytes, source_type, category, is_favorite, tags, created_at FROM audio_clips ORDER BY is_favorite DESC, created_at DESC, id DESC');
+}
+
+/** Set a clip's organisation meta (category / favourite / tags). Any field omitted is left as-is. */
+export function setClipMeta(id, { category, isFavorite, tags } = {}) {
+    const cid = parseInt(id, 10);
+    const clip = queryOne('SELECT * FROM audio_clips WHERE id = ?', [cid]);
+    if (!clip) { const e = new Error('Audio tidak ditemukan'); e.statusCode = 404; throw e; }
+    const nextCat = category !== undefined
+        ? (typeof category === 'string' && category.trim() ? category.trim().slice(0, 40) : null) : clip.category;
+    const nextFav = isFavorite !== undefined ? (isFavorite ? 1 : 0) : clip.is_favorite;
+    const nextTags = tags !== undefined
+        ? (typeof tags === 'string' && tags.trim() ? tags.trim().slice(0, 200) : null) : clip.tags;
+    execute('UPDATE audio_clips SET category = ?, is_favorite = ?, tags = ? WHERE id = ?', [nextCat, nextFav, nextTags, cid]);
+    return queryOne('SELECT id, name, category, is_favorite, tags FROM audio_clips WHERE id = ?', [cid]);
 }
 
 export function getClip(id) {
@@ -165,5 +185,5 @@ export function deleteClip(id) {
 
 export default {
     AUDIO_DIR, MAX_AUDIO_UPLOAD_BYTES, MAX_CLIP_SECONDS, ensureAudioDir, isSafeBase, clipPath,
-    saveAudioClip, finalizeClipFromFile, listClips, getClip, deleteClip,
+    saveAudioClip, finalizeClipFromFile, listClips, getClip, deleteClip, setClipMeta,
 };

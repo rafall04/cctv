@@ -11,7 +11,7 @@ the outer backstop that runs before auth — see the note there. Everything else
 */
 
 import {
-    listClips, uploadClip, deleteClip,
+    listClips, uploadClip, deleteClip, updateClipMeta,
     listPlaylists, getPlaylist, createPlaylist, updatePlaylist, deletePlaylist,
     listSchedules, createSchedule, updateSchedule, toggleSchedule, deleteSchedule,
     listCameras, playNow,
@@ -46,6 +46,7 @@ export default async function audioRoutes(fastify) {
     fastify.get('/clips/imports', admin, listImportJobs);
     fastify.get('/tts/engines', admin, listTtsEngines);
     fastify.post('/clips/tts', admin, createTts);       // typed text -> spoken clip (async job)
+    fastify.patch('/clips/:id', admin, updateClipMeta);  // category / favourite / tags
     fastify.delete('/clips/:id', admin, deleteClip);
 
     // Playlists

@@ -8,7 +8,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { uploadClip, deleteClip, importClip, getImportJobs, getTtsEngines, createTts, getTemplates, createTemplate, deleteTemplate } from '../../../services/audioService';
+import { uploadClip, deleteClip, updateClipMeta, importClip, getImportJobs, getTtsEngines, createTts, getTemplates, createTemplate, deleteTemplate } from '../../../services/audioService';
 import { useNotification } from '../../../contexts/NotificationContext';
 import { useConfirm } from '../../../contexts/ConfirmContext';
 import { Button, Field, EmptyState } from '../../ui';
@@ -35,6 +35,8 @@ export default function LibraryTab({ clips, loading, reload, onPlayClip }) {
     const [ttsBusy, setTtsBusy] = useState(false);
     const [templates, setTemplates] = useState([]);
     const [templateId, setTemplateId] = useState('');
+    const [favOnly, setFavOnly] = useState(false);
+    const [catFilter, setCatFilter] = useState('');
     const fileRef = useRef(null);
     const { showNotification } = useNotification();
     const confirm = useConfirm();
@@ -186,6 +188,21 @@ export default function LibraryTab({ clips, loading, reload, onPlayClip }) {
             setUploading(false);
         }
     };
+
+    const toggleFav = async (clip) => {
+        const r = await updateClipMeta(clip.id, { isFavorite: !clip.is_favorite });
+        if (r.success) reload(); else showNotification({ type: 'error', title: 'Gagal', message: r.message });
+    };
+    const editCategory = async (clip) => {
+        const cat = window.prompt('Kategori audio (kosongkan untuk hapus):', clip.category || '');
+        if (cat === null) return;
+        const r = await updateClipMeta(clip.id, { category: cat });
+        if (r.success) reload(); else showNotification({ type: 'error', title: 'Gagal', message: r.message });
+    };
+
+    // Filter chips: favourites + distinct categories.
+    const categories = [...new Set(clips.map((c) => c.category).filter(Boolean))].sort();
+    const shownClips = clips.filter((c) => (!favOnly || c.is_favorite) && (!catFilter || c.category === catFilter));
 
     const handleDelete = async (clip) => {
         const confirmed = await confirm({
@@ -358,44 +375,95 @@ export default function LibraryTab({ clips, loading, reload, onPlayClip }) {
                     description="Unggah lagu atau rekaman pengumuman. Berkas otomatis dikonversi ke format yang siap disiarkan ke speaker kamera."
                 />
             ) : (
-                <ul className="space-y-2">
-                    {clips.map((clip) => (
-                        <li
-                            key={clip.id}
-                            className="flex items-center gap-3 rounded-card border border-edge bg-surface p-3 shadow-e1"
+                <div className="space-y-2">
+                    {/* Filter: favourites + categories (favourites sort first from the server). */}
+                    <div className="flex flex-wrap items-center gap-1.5">
+                        <button
+                            type="button"
+                            onClick={() => setFavOnly((v) => !v)}
+                            className={`rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${favOnly ? 'border-status-warn/40 bg-status-warn/10 text-status-warn' : 'border-edge bg-surface text-content-muted hover:border-edge-strong'}`}
                         >
-                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary" aria-hidden="true">
-                                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 19V6l11-2v13M9 19a2 2 0 11-4 0 2 2 0 014 0zm11-2a2 2 0 11-4 0 2 2 0 014 0z" />
-                                </svg>
-                            </span>
-                            <div className="min-w-0 flex-1">
-                                <p className="truncate text-sm font-semibold text-content">{clip.name}</p>
-                                <p className="font-mono text-xs tabular-nums text-content-subtle">
-                                    {formatDuration(clip.duration_sec)}
-                                    {clip.source_bytes > 0 ? ` · ${formatBytes(clip.source_bytes)}` : ''}
-                                    {clip.source_type === 'youtube' ? ' · YouTube' : clip.source_type === 'url' ? ' · URL' : clip.source_type === 'tts' ? ' · Suara (TTS)' : ''}
-                                </p>
-                            </div>
-                            {onPlayClip && (
+                            ★ Favorit
+                        </button>
+                        {categories.length > 0 && (
+                            <>
                                 <button
                                     type="button"
-                                    onClick={() => onPlayClip(clip)}
-                                    className="shrink-0 rounded-control border border-edge bg-surface px-3 py-1.5 text-sm font-medium text-content-muted transition-colors hover:border-edge-strong hover:text-content"
+                                    onClick={() => setCatFilter('')}
+                                    className={`rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${!catFilter ? 'border-primary bg-primary/10 text-primary' : 'border-edge bg-surface text-content-muted hover:border-edge-strong'}`}
                                 >
-                                    Putar
+                                    Semua
                                 </button>
-                            )}
-                            <button
-                                type="button"
-                                onClick={() => handleDelete(clip)}
-                                className="shrink-0 rounded-control border border-edge bg-surface px-3 py-1.5 text-sm font-medium text-status-fault transition-colors hover:border-status-fault/40"
+                                {categories.map((cat) => (
+                                    <button
+                                        key={cat}
+                                        type="button"
+                                        onClick={() => setCatFilter(cat === catFilter ? '' : cat)}
+                                        className={`rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${catFilter === cat ? 'border-primary bg-primary/10 text-primary' : 'border-edge bg-surface text-content-muted hover:border-edge-strong'}`}
+                                    >
+                                        {cat}
+                                    </button>
+                                ))}
+                            </>
+                        )}
+                    </div>
+
+                    <ul className="space-y-2">
+                        {shownClips.map((clip) => (
+                            <li
+                                key={clip.id}
+                                className="flex items-center gap-3 rounded-card border border-edge bg-surface p-3 shadow-e1"
                             >
-                                Hapus
-                            </button>
-                        </li>
-                    ))}
-                </ul>
+                                <button
+                                    type="button"
+                                    onClick={() => toggleFav(clip)}
+                                    aria-label={clip.is_favorite ? 'Hapus dari favorit' : 'Jadikan favorit'}
+                                    className={`shrink-0 text-lg leading-none transition-colors ${clip.is_favorite ? 'text-status-warn' : 'text-content-subtle hover:text-status-warn'}`}
+                                >
+                                    {clip.is_favorite ? '★' : '☆'}
+                                </button>
+                                <div className="min-w-0 flex-1">
+                                    <p className="truncate text-sm font-semibold text-content">
+                                        {clip.name}
+                                        {clip.category ? <span className="ml-1.5 rounded-full bg-surface-sunken px-1.5 py-0.5 text-xs font-normal text-content-muted">{clip.category}</span> : null}
+                                    </p>
+                                    <p className="font-mono text-xs tabular-nums text-content-subtle">
+                                        {formatDuration(clip.duration_sec)}
+                                        {clip.source_bytes > 0 ? ` · ${formatBytes(clip.source_bytes)}` : ''}
+                                        {clip.source_type === 'youtube' ? ' · YouTube' : clip.source_type === 'url' ? ' · URL' : clip.source_type === 'tts' ? ' · Suara (TTS)' : ''}
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => editCategory(clip)}
+                                    className="shrink-0 rounded-control border border-edge bg-surface px-2.5 py-1.5 text-xs font-medium text-content-subtle transition-colors hover:border-edge-strong hover:text-content"
+                                    title="Beri/ubah kategori"
+                                >
+                                    Kategori
+                                </button>
+                                {onPlayClip && (
+                                    <button
+                                        type="button"
+                                        onClick={() => onPlayClip(clip)}
+                                        className="shrink-0 rounded-control border border-edge bg-surface px-3 py-1.5 text-sm font-medium text-content-muted transition-colors hover:border-edge-strong hover:text-content"
+                                    >
+                                        Putar
+                                    </button>
+                                )}
+                                <button
+                                    type="button"
+                                    onClick={() => handleDelete(clip)}
+                                    className="shrink-0 rounded-control border border-edge bg-surface px-3 py-1.5 text-sm font-medium text-status-fault transition-colors hover:border-status-fault/40"
+                                >
+                                    Hapus
+                                </button>
+                            </li>
+                        ))}
+                        {shownClips.length === 0 && (
+                            <li className="rounded-control border border-dashed border-edge bg-surface-sunken p-3 text-center text-xs text-content-subtle">Tak ada audio yang cocok filter.</li>
+                        )}
+                    </ul>
+                </div>
             )}
         </div>
     );

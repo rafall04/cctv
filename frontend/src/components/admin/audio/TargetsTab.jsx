@@ -55,6 +55,20 @@ function AreaPolicy({ area, onSave }) {
     );
 }
 
+// Compact "how long ago" label for a probe timestamp (read-only status).
+function agoLabel(iso) {
+    if (!iso) return 'belum dicek';
+    const then = new Date(iso).getTime(); // audio_out_checked_at is a full ISO-8601 UTC string
+    if (!Number.isFinite(then)) return '';
+    const s = Math.max(0, Math.round((Date.now() - then) / 1000));
+    if (s < 90) return 'baru dicek';
+    const m = Math.round(s / 60);
+    if (m < 60) return `dicek ${m} mnt lalu`;
+    const h = Math.round(m / 60);
+    if (h < 48) return `dicek ${h} jam lalu`;
+    return `dicek ${Math.round(h / 24)} hari lalu`;
+}
+
 function Badge({ supports, blocked }) {
     if (blocked) {
         return <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-status-fault/30 bg-status-fault/10 px-2 py-0.5 text-xs font-medium text-status-fault">⛔ Diblokir</span>;
@@ -146,10 +160,15 @@ export default function TargetsTab({ areas, capability, loading, reloadAreas, re
     // Group the capability rows by area (same as the target picker).
     const capOrder = [];
     const capByArea = new Map();
+    const totals = { supported: 0, unsupported: 0, blocked: 0, unknown: 0 };
     for (const cam of capability) {
         const key = cam.area_name || 'Tanpa area';
         if (!capByArea.has(key)) { capByArea.set(key, []); capOrder.push(key); }
         capByArea.get(key).push(cam);
+        if (cam.audio_out_blocked) totals.blocked += 1;
+        else if (cam.supports_audio_out === 1) totals.supported += 1;
+        else if (cam.supports_audio_out === 0) totals.unsupported += 1;
+        else totals.unknown += 1;
     }
 
     return (
@@ -207,6 +226,16 @@ export default function TargetsTab({ areas, capability, loading, reloadAreas, re
                     <Button onClick={onRecheckAll} loading={rechecking === 'all'} disabled={enabledCount === 0}>Cek ulang semua</Button>
                 </div>
 
+                {/* Peta status titik siaran (read-only) — ringkasan dari data yang sudah ada. */}
+                {capability.length > 0 && (
+                    <div className="flex flex-wrap gap-2 text-xs">
+                        <span className="inline-flex items-center gap-1 rounded-full border border-status-live/30 bg-status-live/10 px-2.5 py-1 font-medium text-status-live">{totals.supported} didukung</span>
+                        <span className="inline-flex items-center gap-1 rounded-full border border-edge bg-surface-sunken px-2.5 py-1 font-medium text-content-subtle">{totals.unsupported} tak didukung</span>
+                        {totals.unknown > 0 && <span className="inline-flex items-center gap-1 rounded-full border border-status-warn/30 bg-status-warn/10 px-2.5 py-1 font-medium text-status-warn">{totals.unknown} perlu tes</span>}
+                        {totals.blocked > 0 && <span className="inline-flex items-center gap-1 rounded-full border border-status-fault/30 bg-status-fault/10 px-2.5 py-1 font-medium text-status-fault">{totals.blocked} diblokir</span>}
+                    </div>
+                )}
+
                 {enabledCount === 0 ? (
                     <EmptyState title="Aktifkan area dulu" description="Nyalakan minimal satu area lokal di atas agar kameranya bisa dideteksi & disiarkan." />
                 ) : capability.length === 0 ? (
@@ -224,6 +253,9 @@ export default function TargetsTab({ areas, capability, loading, reloadAreas, re
                                             <p className="break-words text-sm font-semibold leading-snug text-content">{cam.name}</p>
                                             {cam.audio_out_note && (
                                                 <p className="mt-0.5 break-words text-xs text-content-subtle">{cam.audio_out_note}</p>
+                                            )}
+                                            {!cam.audio_out_blocked && (
+                                                <p className="mt-0.5 text-xs text-content-subtle">{agoLabel(cam.audio_out_checked_at)}</p>
                                             )}
                                         </div>
                                         <Badge supports={cam.supports_audio_out} blocked={cam.audio_out_blocked} />

@@ -36,6 +36,13 @@ export const deleteClip = async (id) => {
     } catch (error) { return failure(error, 'Gagal menghapus audio'); }
 };
 
+/** Update a clip's organisation meta: { category?, isFavorite?, tags? }. */
+export const updateClipMeta = async (id, payload) => {
+    try {
+        return (await apiClient.patch(`${BASE}/clips/${id}`, payload)).data;
+    } catch (error) { return failure(error, 'Gagal memperbarui audio'); }
+};
+
 /** Enqueue an import from a direct media URL or a YouTube link. Returns a queued job (poll getImportJobs). */
 export const importClip = async (url, name) => {
     try {
@@ -271,7 +278,7 @@ export const talkTicket = async (cameraId) => {
 };
 
 export default {
-    getClips, uploadClip, deleteClip, importClip, getImportJobs, getTtsEngines, createTts,
+    getClips, uploadClip, deleteClip, updateClipMeta, importClip, getImportJobs, getTtsEngines, createTts,
     getPlaylists, getPlaylist, createPlaylist, updatePlaylist, deletePlaylist,
     getSchedules, createSchedule, updateSchedule, toggleSchedule, deleteSchedule,
     getCameras, playNow, talkTicket, getActivePlays, stopPlay,

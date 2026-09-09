@@ -9,7 +9,7 @@ SideEffects: writes clip/playlist/schedule rows + audio files; spawns the pusher
 */
 
 import {
-    saveAudioClip, listClips as listClipRows, deleteClip as deleteClipRow, MAX_AUDIO_UPLOAD_BYTES,
+    saveAudioClip, listClips as listClipRows, deleteClip as deleteClipRow, setClipMeta, MAX_AUDIO_UPLOAD_BYTES,
 } from '../services/audioClipService.js';
 import {
     listPlaylists as listPlaylistRows, getPlaylist as getPlaylistRow,
@@ -87,6 +87,16 @@ export async function uploadClip(request, reply) {
         }, request);
         return reply.code(201).send({ success: true, message: 'Audio diunggah', data: clip });
     } catch (error) { return fail(reply, error, 'Gagal memproses audio'); }
+}
+
+// Update a clip's organisation meta (category / favourite / tags).
+export async function updateClipMeta(request, reply) {
+    try {
+        const id = parseId(request.params.id);
+        if (!id) return reply.code(400).send({ success: false, message: 'ID audio tidak valid' });
+        const clip = setClipMeta(id, request.body || {});
+        return reply.send({ success: true, message: 'Audio diperbarui', data: clip });
+    } catch (error) { return fail(reply, error); }
 }
 
 export async function deleteClip(request, reply) {
