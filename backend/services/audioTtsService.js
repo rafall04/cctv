@@ -16,7 +16,7 @@ edge-tts via argv (execFile, no shell — no injection).
 
 import { spawn, execFile } from 'child_process';
 import { promisify } from 'util';
-import { existsSync, statSync } from 'fs';
+import { existsSync, statSync, writeFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { queryOne, execute } from '../database/connectionPool.js';
 import { AUDIO_DIR, ensureAudioDir } from './audioClipService.js';
@@ -26,7 +26,16 @@ const execFileAsync = promisify(execFile);
 const PIPER_BIN = process.env.AUDIO_PIPER_BIN || '/opt/piper/piper/piper';
 const PIPER_MODEL_DIR = process.env.AUDIO_PIPER_MODEL_DIR || '/opt/piper/models';
 const EDGE_BIN = process.env.AUDIO_EDGE_TTS_BIN || 'edge-tts';
-const TTS_TIMEOUT_MS = 120000;             // piper on the weak box can be slow-ish; edge is network-bound
+// Gemini TTS (Google AI Studio, free tier): natural + steerable via a style directive. Key from env
+// (never hard-coded); clip is generated ONCE in the cloud then stored + played offline. Model is a free
+// Flash TTS preview (the Pro TTS is not free) — pin it so a deprecation doesn't silently change behaviour.
+const GEMINI_KEY = process.env.AUDIO_GEMINI_API_KEY || process.env.GEMINI_API_KEY || '';
+const GEMINI_MODEL = process.env.AUDIO_GEMINI_MODEL || 'gemini-2.5-flash-preview-tts';
+// Style directive prepended to the text: pushes delivery toward a warm, conversational tone (away from the
+// "news reader" feel of piper/edge). Phrased as an instruction + colon so the model steers, not reads it.
+const GEMINI_STYLE = process.env.AUDIO_GEMINI_STYLE
+    || 'Ucapkan dengan nada hangat, santai, dan ramah seperti pengurus kampung menyampaikan pengumuman kepada warga, bukan seperti pembaca berita:';
+const TTS_TIMEOUT_MS = 120000;             // piper on the weak box can be slow-ish; edge/gemini are network-bound
 export const MAX_TTS_CHARS = 1500;         // ~1.5 min of speech — a long announcement fits
 
 // Voice catalog. piper voice == an .onnx model on disk; edge voice == a Microsoft neural voice id.
@@ -36,6 +45,24 @@ const ENGINES = {
         online: false,
         voices: [
             { id: 'id_ID-news_tts-medium', label: 'Berita — natural (offline)', model: process.env.AUDIO_PIPER_MODEL || join(PIPER_MODEL_DIR, 'id_ID-news_tts-medium.onnx') },
+        ],
+    },
+    gemini: {
+        label: 'Gemini (cloud gratis, paling natural)',
+        online: true,
+        // Google's 30 prebuilt voices are multilingual (auto-detect Indonesian). A curated, tone-labelled
+        // subset — warm/casual for announcements, firm for urgent. All steered by GEMINI_STYLE at synth.
+        voices: [
+            { id: 'Sulafat', label: 'Sulafat — hangat (perempuan)' },
+            { id: 'Callirrhoe', label: 'Callirrhoe — santai (perempuan)' },
+            { id: 'Vindemiatrix', label: 'Vindemiatrix — lembut (perempuan)' },
+            { id: 'Aoede', label: 'Aoede — ringan (perempuan)' },
+            { id: 'Kore', label: 'Kore — tegas (perempuan)' },
+            { id: 'Zubenelgenubi', label: 'Zubenelgenubi — santai/ngobrol (laki-laki)' },
+            { id: 'Achird', label: 'Achird — ramah (laki-laki)' },
+            { id: 'Charon', label: 'Charon — informatif (laki-laki)' },
+            { id: 'Orus', label: 'Orus — tegas (laki-laki)' },
+            { id: 'Puck', label: 'Puck — ceria (laki-laki)' },
         ],
     },
     edge: {
@@ -69,6 +96,8 @@ export async function ttsEngineAvailable(engine, force = false) {
         } else if (engine === 'edge') {
             await execFileAsync(EDGE_BIN, ['--help'], { timeout: 8000 });
             ok = true;
+        } else if (engine === 'gemini') {
+            ok = Boolean(GEMINI_KEY); // key present = usable; a real request is only made on synth
         }
     } catch { ok = false; }
     availability.set(engine, ok);
@@ -129,8 +158,52 @@ function runPiper(text, model, outPath) {
     });
 }
 
+// Prepend a 44-byte PCM WAV header to raw signed-16-bit little-endian mono PCM (what Gemini returns).
+function pcmToWav(pcm, rate) {
+    const dataSize = pcm.length;
+    const h = Buffer.alloc(44);
+    h.write('RIFF', 0, 'ascii'); h.writeUInt32LE(36 + dataSize, 4); h.write('WAVE', 8, 'ascii');
+    h.write('fmt ', 12, 'ascii'); h.writeUInt32LE(16, 16); h.writeUInt16LE(1, 20); h.writeUInt16LE(1, 22);
+    h.writeUInt32LE(rate, 24); h.writeUInt32LE(rate * 2, 28); h.writeUInt16LE(2, 32); h.writeUInt16LE(16, 34);
+    h.write('data', 36, 'ascii'); h.writeUInt32LE(dataSize, 40);
+    return Buffer.concat([h, pcm]);
+}
+
+// Call Gemini TTS (generateContent, AUDIO modality) → raw PCM16 + sample rate. Key in env only.
+async function geminiSynth(text, voiceName) {
+    if (!GEMINI_KEY) { const e = new Error('Gemini belum terpasang (AUDIO_GEMINI_API_KEY kosong).'); e.statusCode = 501; throw e; }
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+    const body = {
+        contents: [{ parts: [{ text: `${GEMINI_STYLE}\n\n${text}` }] }],
+        generationConfig: {
+            responseModalities: ['AUDIO'],
+            speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } },
+        },
+    };
+    let res;
+    try {
+        res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-goog-api-key': GEMINI_KEY },
+            body: JSON.stringify(body),
+            signal: AbortSignal.timeout(TTS_TIMEOUT_MS),
+        });
+    } catch (e) { const err = new Error(`Gemini tak terjangkau: ${e.message}`); err.statusCode = 502; throw err; }
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+        const err = new Error(`Gemini: ${json?.error?.message || `HTTP ${res.status}`}`);
+        err.statusCode = res.status === 429 ? 429 : 502; throw err;
+    }
+    const part = (json?.candidates?.[0]?.content?.parts || []).find((p) => p.inlineData?.data);
+    const b64 = part?.inlineData?.data;
+    if (!b64) { const e = new Error('Gemini tak mengembalikan audio'); e.statusCode = 502; throw e; }
+    const m = /rate=(\d+)/.exec(part.inlineData.mimeType || '');
+    const rate = m ? parseInt(m[1], 10) : 24000; // Gemini TTS default: 24kHz PCM16 mono
+    return { pcm: Buffer.from(b64, 'base64'), rate };
+}
+
 /**
- * Synthesize text to a temp audio file (WAV for piper, MP3 for edge) under AUDIO_DIR/<prefix>.<ext>.
+ * Synthesize text to a temp audio file (WAV for piper/gemini, MP3 for edge) under AUDIO_DIR/<prefix>.<ext>.
  * The CALLER owns the file (finalizeClipFromFile encodes it, cleanupPrefix removes it).
  * @returns {Promise<{path:string, bytes:number}>}
  */
@@ -151,6 +224,13 @@ export async function synthTtsToTemp({ text, engine = 'piper', voice, prefix }) 
         const outPath = join(AUDIO_DIR, `${prefix}.wav`);
         await runPiper(clean, v.model, outPath);
         if (!existsSync(outPath) || statSync(outPath).size === 0) throw new Error('piper tidak menghasilkan audio');
+        return { path: outPath, bytes: statSync(outPath).size };
+    }
+    if (engine === 'gemini') {
+        const outPath = join(AUDIO_DIR, `${prefix}.wav`);
+        const { pcm, rate } = await geminiSynth(clean, v.id);
+        writeFileSync(outPath, pcmToWav(pcm, rate));
+        if (!existsSync(outPath) || statSync(outPath).size === 0) throw new Error('Gemini tidak menghasilkan audio');
         return { path: outPath, bytes: statSync(outPath).size };
     }
     // edge — `base` is the real MS voice; rate/pitch presets widen the (only two) id-ID voices.
