@@ -13,6 +13,21 @@
 
 import { capabilityInfo } from './audioFormatting';
 
+/** Tiny inline capability indicator: a colour dot + a readable label (never a dot alone). */
+function CapabilityTag({ supports }) {
+    const info = capabilityInfo(supports);
+    const color = info.key === 'supported' ? 'text-status-live'
+        : info.key === 'unsupported' ? 'text-content-subtle' : 'text-status-warn';
+    const dot = info.key === 'supported' ? 'bg-status-live'
+        : info.key === 'unsupported' ? 'bg-edge-strong' : 'bg-status-warn';
+    return (
+        <span className={`inline-flex items-center gap-1 ${color}`}>
+            <span className={`h-1.5 w-1.5 rounded-full ${dot}`} aria-hidden="true" />
+            {info.label}
+        </span>
+    );
+}
+
 /**
  * @param {Array<{id:number,name:string,area_name?:string}>} cameras
  * @param {number[]} value selected camera ids
@@ -59,8 +74,8 @@ export default function CameraMultiSelect({ cameras = [], value = [], onChange, 
                         return (
                             <label
                                 key={cam.id}
-                                className={`flex cursor-pointer items-center gap-2 rounded-control px-2 py-1.5 text-sm transition-colors ${
-                                    on ? 'bg-primary/10 text-content' : 'text-content-muted hover:bg-surface-sunken'
+                                className={`flex cursor-pointer items-start gap-2.5 rounded-control px-2 py-2 transition-colors ${
+                                    on ? 'bg-primary/10' : 'hover:bg-surface-sunken'
                                 }`}
                             >
                                 <input
@@ -68,18 +83,18 @@ export default function CameraMultiSelect({ cameras = [], value = [], onChange, 
                                     checked={on}
                                     disabled={disabled}
                                     onChange={() => toggle(cam.id)}
-                                    className="h-4 w-4 shrink-0 accent-primary"
+                                    className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
                                 />
-                                <span className="min-w-0 flex-1 truncate">{cam.name}</span>
-                                {'supports_audio_out' in cam && (() => {
-                                    const info = capabilityInfo(cam.supports_audio_out);
-                                    const dot = info.key === 'supported' ? 'bg-status-live'
-                                        : info.key === 'unsupported' ? 'bg-edge-strong' : 'bg-status-warn';
-                                    return <span className={`h-2 w-2 shrink-0 rounded-full ${dot}`} title={info.label} aria-label={info.label} />;
-                                })()}
-                                {cam.area_name && (
-                                    <span className="shrink-0 text-xs text-content-subtle">{cam.area_name}</span>
-                                )}
+                                <span className="min-w-0 flex-1">
+                                    {/* Full name, wraps — never truncated, so every camera is identifiable. */}
+                                    <span className={`block break-words text-sm leading-snug ${on ? 'text-content' : 'text-content-muted'}`}>
+                                        {cam.name}
+                                    </span>
+                                    <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-content-subtle">
+                                        {cam.area_name && <span>{cam.area_name}</span>}
+                                        {'supports_audio_out' in cam && <CapabilityTag supports={cam.supports_audio_out} />}
+                                    </span>
+                                </span>
                             </label>
                         );
                     })}

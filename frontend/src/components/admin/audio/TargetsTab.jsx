@@ -125,10 +125,10 @@ export default function TargetsTab({ areas, capability, loading, reloadAreas, re
                 ) : (
                     <ul className="space-y-2">
                         {capability.map((cam) => (
-                            <li key={cam.id} className="flex items-center gap-3 rounded-card border border-edge bg-surface p-3 shadow-e1">
+                            <li key={cam.id} className="flex items-start gap-3 rounded-card border border-edge bg-surface p-3 shadow-e1">
                                 <div className="min-w-0 flex-1">
-                                    <p className="truncate text-sm font-semibold text-content">{cam.name}</p>
-                                    <p className="truncate text-xs text-content-subtle">
+                                    <p className="break-words text-sm font-semibold leading-snug text-content">{cam.name}</p>
+                                    <p className="mt-0.5 break-words text-xs text-content-subtle">
                                         {cam.area_name}{cam.audio_out_note ? ` · ${cam.audio_out_note}` : ''}
                                     </p>
                                 </div>

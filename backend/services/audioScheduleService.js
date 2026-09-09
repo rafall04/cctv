@@ -24,7 +24,15 @@ function wibParts(nowMs = Date.now()) {
     const hh = String(d.getUTCHours()).padStart(2, '0');
     const mm = String(d.getUTCMinutes()).padStart(2, '0');
     const dateKey = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
-    return { hhmm: `${hh}:${mm}`, dayBit: 1 << d.getUTCDay(), minuteKey: `${dateKey} ${hh}:${mm}` };
+    return { hhmm: `${hh}:${mm}`, dayBit: 1 << d.getUTCDay(), dateKey, minuteKey: `${dateKey} ${hh}:${mm}` };
+}
+
+const DATE_RE = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
+function normDate(v) {
+    const s = String(v ?? '').trim();
+    if (!s) return null;
+    if (!DATE_RE.test(s)) { const e = new Error('Tanggal harus format YYYY-MM-DD'); e.statusCode = 400; throw e; }
+    return s;
 }
 
 function parseCameraIds(raw) {
@@ -67,6 +75,31 @@ function validate(f, partial = false) {
         if (!Number.isInteger(l) || l < 1) l = 1;
         out.loop_count = Math.min(l, 20);
     }
+    if (!partial || f.scheduleKind !== undefined) {
+        out.schedule_kind = f.scheduleKind || 'recurring';
+        if (!['recurring', 'once', 'range'].includes(out.schedule_kind)) {
+            const e = new Error('Jenis jadwal harus recurring/once/range'); e.statusCode = 400; throw e;
+        }
+    }
+    if (f.runDate !== undefined) out.run_date = normDate(f.runDate);
+    if (f.startDate !== undefined) out.start_date = normDate(f.startDate);
+    if (f.endDate !== undefined) out.end_date = normDate(f.endDate);
+    // Cross-field rules on CREATE: clear the columns a kind doesn't use so a switch can't leave stale dates.
+    if (!partial) {
+        const kind = out.schedule_kind || 'recurring';
+        if (kind === 'once') {
+            if (!out.run_date) { const e = new Error('Tanggal wajib untuk jadwal sekali-jalan'); e.statusCode = 400; throw e; }
+            out.start_date = null; out.end_date = null;
+        } else if (kind === 'range') {
+            if (!out.start_date && !out.end_date) { const e = new Error('Isi minimal tanggal mulai atau selesai'); e.statusCode = 400; throw e; }
+            if (out.start_date && out.end_date && out.start_date > out.end_date) {
+                const e = new Error('Tanggal mulai tidak boleh setelah tanggal selesai'); e.statusCode = 400; throw e;
+            }
+            out.run_date = null;
+        } else {
+            out.run_date = null; out.start_date = null; out.end_date = null;
+        }
+    }
     if (f.enabled !== undefined) out.enabled = f.enabled === true || f.enabled === 1 || f.enabled === '1' ? 1 : 0;
     return out;
 }
@@ -83,9 +116,12 @@ export function listSchedules() {
 
 export function createSchedule(fields) {
     const v = validate(fields, false);
-    execute(`INSERT INTO audio_schedules (name, camera_ids, source_type, source_id, time_hhmm, days_mask, loop_count, enabled)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [v.name, v.camera_ids, v.source_type, v.source_id, v.time_hhmm, v.days_mask, v.loop_count, v.enabled ?? 1]);
+    execute(`INSERT INTO audio_schedules
+             (name, camera_ids, source_type, source_id, time_hhmm, days_mask, loop_count, enabled,
+              schedule_kind, run_date, start_date, end_date)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [v.name, v.camera_ids, v.source_type, v.source_id, v.time_hhmm, v.days_mask, v.loop_count, v.enabled ?? 1,
+            v.schedule_kind ?? 'recurring', v.run_date ?? null, v.start_date ?? null, v.end_date ?? null]);
     const id = queryOne('SELECT last_insert_rowid() AS id').id;
     return queryOne('SELECT * FROM audio_schedules WHERE id = ?', [id]);
 }
@@ -116,13 +152,36 @@ export function deleteSchedule(id) {
     return { deleted: row.id };
 }
 
+/**
+ * Is this schedule due on the given WIB day? Evaluated per kind:
+ *  - once:      exactly on run_date (days_mask ignored). A missed 'once' (box down) is DROPPED, never
+ *               fired at a random later time — dateKey only ever moves forward.
+ *  - range:     recurring weekly, but only while start_date <= today <= end_date (inclusive; either open).
+ *  - recurring: the original weekly weekday-mask behaviour. Legacy rows (kind NULL) fall here.
+ */
+function dueOnDay(s, dateKey, dayBit) {
+    const kind = s.schedule_kind || 'recurring';
+    if (kind === 'once') return s.run_date === dateKey;
+    if (kind === 'range') {
+        const afterStart = !s.start_date || dateKey >= s.start_date;
+        const beforeEnd = !s.end_date || dateKey <= s.end_date;
+        return afterStart && beforeEnd && Boolean(s.days_mask & dayBit);
+    }
+    return Boolean(s.days_mask & dayBit);
+}
+
 /** One scheduler tick: fire any enabled schedule due this WIB minute (guarded against double-firing). */
 export function runDueSchedules(nowMs = Date.now()) {
-    const { hhmm, dayBit, minuteKey } = wibParts(nowMs);
+    const { hhmm, dayBit, dateKey, minuteKey } = wibParts(nowMs);
     const due = query('SELECT * FROM audio_schedules WHERE enabled = 1 AND time_hhmm = ?', [hhmm])
-        .filter((s) => (s.days_mask & dayBit) && s.last_run_at !== minuteKey);
+        .filter((s) => s.last_run_at !== minuteKey && dueOnDay(s, dateKey, dayBit));
     for (const s of due) {
-        execute('UPDATE audio_schedules SET last_run_at = ? WHERE id = ?', [minuteKey, s.id]); // claim BEFORE firing
+        // Claim BEFORE firing. A 'once' also self-disables so it can never fire on another day.
+        if ((s.schedule_kind || 'recurring') === 'once') {
+            execute('UPDATE audio_schedules SET last_run_at = ?, enabled = 0 WHERE id = ?', [minuteKey, s.id]);
+        } else {
+            execute('UPDATE audio_schedules SET last_run_at = ? WHERE id = ?', [minuteKey, s.id]);
+        }
         const cams = parseCameraIds(s.camera_ids);
         console.log(`[Audio] Schedule "${s.name}" fired ${hhmm} WIB -> ${cams.length} kamera`);
         playToCameras(cams, s.source_type, s.source_id, s.loop_count)

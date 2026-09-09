@@ -61,6 +61,14 @@ function DayPicker({ mask, onChange }) {
     );
 }
 
+/** Human timing phrase for a schedule row, per kind. */
+function describeSchedule(s) {
+    const kind = s.schedule_kind || 'recurring';
+    if (kind === 'once') return `Sekali · ${s.run_date || '—'}`;
+    if (kind === 'range') return `${describeDays(s.days_mask)} · ${s.start_date || '…'} → ${s.end_date || '…'}`;
+    return describeDays(s.days_mask);
+}
+
 function ScheduleForm({ initial, clips, playlists, cameras, onSubmit }) {
     const [name, setName] = useState(initial?.name || '');
     const [sourceType, setSourceType] = useState(initial?.source_type || 'clip');
@@ -69,6 +77,10 @@ function ScheduleForm({ initial, clips, playlists, cameras, onSubmit }) {
     const [timeHHmm, setTimeHHmm] = useState(initial?.time_hhmm || '07:00');
     const [daysMask, setDaysMask] = useState(initial?.days_mask ?? MASK_DAILY);
     const [loopCount, setLoopCount] = useState(initial?.loop_count || 1);
+    const [scheduleKind, setScheduleKind] = useState(initial?.schedule_kind || 'recurring');
+    const [runDate, setRunDate] = useState(initial?.run_date || '');
+    const [startDate, setStartDate] = useState(initial?.start_date || '');
+    const [endDate, setEndDate] = useState(initial?.end_date || '');
 
     const options = sourceType === 'clip' ? clips : playlists;
 
@@ -85,6 +97,10 @@ function ScheduleForm({ initial, clips, playlists, cameras, onSubmit }) {
                     timeHHmm,
                     daysMask,
                     loopCount,
+                    scheduleKind,
+                    runDate: scheduleKind === 'once' ? runDate : '',
+                    startDate: scheduleKind === 'range' ? startDate : '',
+                    endDate: scheduleKind === 'range' ? endDate : '',
                 });
             }}
             className="space-y-4"
@@ -120,7 +136,40 @@ function ScheduleForm({ initial, clips, playlists, cameras, onSubmit }) {
                 <Field type="number" label="Ulang berapa kali" min={1} max={20} value={loopCount} onChange={(e) => setLoopCount(Math.min(20, Math.max(1, parseInt(e.target.value, 10) || 1)))} />
             </div>
 
-            <DayPicker mask={daysMask} onChange={setDaysMask} />
+            <div className="space-y-2">
+                <span className="text-xs font-semibold text-content-muted">Jenis jadwal</span>
+                <div className="flex gap-2">
+                    {[['recurring', 'Berulang'], ['once', 'Sekali'], ['range', 'Rentang']].map(([val, label]) => (
+                        <button
+                            key={val}
+                            type="button"
+                            onClick={() => setScheduleKind(val)}
+                            className={`flex-1 rounded-control border px-3 py-2 text-sm font-medium transition-colors ${
+                                scheduleKind === val ? 'border-primary bg-primary/10 text-primary' : 'border-edge text-content-muted hover:border-edge-strong'
+                            }`}
+                        >
+                            {label}
+                        </button>
+                    ))}
+                </div>
+                <p className="text-xs text-content-subtle">
+                    {scheduleKind === 'once' ? 'Diputar sekali pada satu tanggal, lalu nonaktif otomatis.'
+                        : scheduleKind === 'range' ? 'Berulang mingguan, tapi hanya dalam rentang tanggal.'
+                            : 'Berulang mingguan sesuai hari yang dipilih, tanpa batas tanggal.'}
+                </p>
+            </div>
+
+            {scheduleKind === 'once' && (
+                <Field type="date" label="Tanggal (WIB)" value={runDate} onChange={(e) => setRunDate(e.target.value)} required />
+            )}
+            {scheduleKind === 'range' && (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <Field type="date" label="Mulai (opsional)" value={startDate} onChange={(e) => setStartDate(e.target.value)} hint="Kosongkan = tanpa batas awal" />
+                    <Field type="date" label="Selesai (opsional)" value={endDate} onChange={(e) => setEndDate(e.target.value)} hint="Kosongkan = tanpa batas akhir" />
+                </div>
+            )}
+
+            {scheduleKind !== 'once' && <DayPicker mask={daysMask} onChange={setDaysMask} />}
 
             <CameraMultiSelect cameras={cameras} value={cameraIds} onChange={setCameraIds} />
         </form>
@@ -203,7 +252,7 @@ export default function ScheduleTab({ schedules, clips, playlists, cameras, load
                             <div className="min-w-0 flex-1">
                                 <p className="truncate text-sm font-semibold text-content">{s.name}</p>
                                 <p className="truncate text-xs text-content-subtle">
-                                    {describeDays(s.days_mask)} · {s.source_name || (s.source_type === 'clip' ? 'audio' : 'playlist')} · {(s.camera_ids || []).length} kamera
+                                    {describeSchedule(s)} · {s.source_name || (s.source_type === 'clip' ? 'audio' : 'playlist')} · {(s.camera_ids || []).length} kamera
                                     {s.loop_count > 1 ? ` · ${s.loop_count}×` : ''}
                                 </p>
                             </div>

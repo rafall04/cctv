@@ -46,7 +46,8 @@ function resetSchema() {
             id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, camera_ids TEXT NOT NULL DEFAULT '[]',
             source_type TEXT NOT NULL, source_id INTEGER NOT NULL, time_hhmm TEXT NOT NULL,
             days_mask INTEGER NOT NULL DEFAULT 127, loop_count INTEGER NOT NULL DEFAULT 1,
-            enabled INTEGER NOT NULL DEFAULT 1, last_run_at TEXT, created_at TEXT DEFAULT (datetime('now')));
+            enabled INTEGER NOT NULL DEFAULT 1, last_run_at TEXT, created_at TEXT DEFAULT (datetime('now')),
+            schedule_kind TEXT NOT NULL DEFAULT 'recurring', run_date TEXT, start_date TEXT, end_date TEXT);
     `);
     db.prepare("INSERT INTO audio_clips (name, base_filename) VALUES ('Clip', 'clip-aaaaaaaa')").run();
 }
@@ -138,5 +139,49 @@ describe('audioScheduleService — runDueSchedules firing rules', () => {
         const s = createSchedule(baseFields);
         deleteSchedule(s.id);
         expect(runDueSchedules(TUE_1730_WIB)).toBe(0);
+    });
+});
+
+describe('audioScheduleService — flexible kinds (once / range)', () => {
+    // TUE_1730_WIB is WIB date 2026-09-08 (a Tuesday).
+    it('once fires only on its run_date, then auto-disables', () => {
+        createSchedule({ ...baseFields, scheduleKind: 'once', runDate: '2026-09-08' });
+        expect(runDueSchedules(TUE_1730_WIB)).toBe(1);
+        expect(playToCameras).toHaveBeenCalledTimes(1);
+        expect(runDueSchedules(TUE_1730_WIB + 24 * 3600 * 1000)).toBe(0); // next day: disabled, never re-fires
+        expect(playToCameras).toHaveBeenCalledTimes(1);
+    });
+
+    it('once with a different run_date does not fire (missed once is dropped, not deferred)', () => {
+        createSchedule({ ...baseFields, scheduleKind: 'once', runDate: '2026-09-09' });
+        expect(runDueSchedules(TUE_1730_WIB)).toBe(0);
+    });
+
+    it('once requires a run_date', () => {
+        expect(() => createSchedule({ ...baseFields, scheduleKind: 'once' })).toThrow(/tanggal/i);
+    });
+
+    it('range fires inside [start,end] when the mask matches', () => {
+        createSchedule({ ...baseFields, scheduleKind: 'range', startDate: '2026-09-01', endDate: '2026-09-30' });
+        expect(runDueSchedules(TUE_1730_WIB)).toBe(1);
+    });
+
+    it('range does not fire before start or after end', () => {
+        createSchedule({ ...baseFields, scheduleKind: 'range', startDate: '2026-09-09' }); // starts tomorrow
+        createSchedule({ ...baseFields, scheduleKind: 'range', endDate: '2026-09-07' });   // ended yesterday
+        expect(runDueSchedules(TUE_1730_WIB)).toBe(0);
+    });
+
+    it('range still respects the weekday mask inside the window', () => {
+        createSchedule({ ...baseFields, scheduleKind: 'range', startDate: '2026-09-01', endDate: '2026-09-30', daysMask: 127 & ~4 });
+        expect(runDueSchedules(TUE_1730_WIB)).toBe(0); // Tuesday excluded
+    });
+
+    it('range rejects start after end', () => {
+        expect(() => createSchedule({ ...baseFields, scheduleKind: 'range', startDate: '2026-09-30', endDate: '2026-09-01' })).toThrow(/mulai/i);
+    });
+
+    it('a bad date format is rejected', () => {
+        expect(() => createSchedule({ ...baseFields, scheduleKind: 'once', runDate: '08-09-2026' })).toThrow(/YYYY-MM-DD/);
     });
 });
