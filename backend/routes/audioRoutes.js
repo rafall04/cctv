@@ -16,7 +16,7 @@ import {
     listSchedules, createSchedule, updateSchedule, toggleSchedule, deleteSchedule,
     listCameras, playNow,
     listCapability, recheckCapability, recheckCameraCapability, listAreas, toggleArea,
-    importClip, listImportJobs, talkTicket,
+    importClip, listImportJobs, talkTicket, listActivePlays, stopPlay,
 } from '../controllers/audioController.js';
 import fastifyWebsocket from '@fastify/websocket';
 import { authMiddleware, requireAdmin } from '../middleware/authMiddleware.js';
@@ -65,6 +65,8 @@ export default async function audioRoutes(fastify) {
     fastify.get('/areas', admin, listAreas);
     fastify.patch('/areas/:id/enabled', admin, toggleArea);
 
-    // Play-now
+    // Play-now + stop
     fastify.post('/play', admin, playNow);
+    fastify.get('/play/active', admin, listActivePlays);
+    fastify.post('/play/stop', admin, stopPlay);
 }

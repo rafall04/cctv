@@ -77,6 +77,15 @@ export default function TargetsTab({ areas, capability, loading, reloadAreas, re
 
     const enabledCount = areas.filter((a) => a.audio_broadcast_enabled).length;
 
+    // Group the capability rows by area (same as the target picker).
+    const capOrder = [];
+    const capByArea = new Map();
+    for (const cam of capability) {
+        const key = cam.area_name || 'Tanpa area';
+        if (!capByArea.has(key)) { capByArea.set(key, []); capOrder.push(key); }
+        capByArea.get(key).push(cam);
+    }
+
     return (
         <div className="space-y-6">
             {/* Area allowlist */}
@@ -130,27 +139,34 @@ export default function TargetsTab({ areas, capability, loading, reloadAreas, re
                 ) : capability.length === 0 ? (
                     <p className="text-sm text-content-muted">Belum ada kamera di area aktif.</p>
                 ) : (
-                    <ul className="space-y-2">
-                        {capability.map((cam) => (
-                            <li key={cam.id} className="flex items-start gap-3 rounded-card border border-edge bg-surface p-3 shadow-e1">
-                                <div className="min-w-0 flex-1">
-                                    <p className="break-words text-sm font-semibold leading-snug text-content">{cam.name}</p>
-                                    <p className="mt-0.5 break-words text-xs text-content-subtle">
-                                        {cam.area_name}{cam.audio_out_note ? ` · ${cam.audio_out_note}` : ''}
-                                    </p>
-                                </div>
-                                <Badge supports={cam.supports_audio_out} />
-                                <button
-                                    type="button"
-                                    onClick={() => onRecheckOne(cam)}
-                                    disabled={rechecking === cam.id}
-                                    className="shrink-0 rounded-control border border-edge bg-surface px-3 py-1.5 text-sm font-medium text-content-muted transition-colors hover:border-edge-strong hover:text-content disabled:opacity-50"
-                                >
-                                    {rechecking === cam.id ? '…' : 'Cek'}
-                                </button>
-                            </li>
+                    <div className="space-y-4">
+                        {capOrder.map((area) => (
+                            <div key={area} className="space-y-2">
+                                <p className="text-xs font-semibold text-content-muted">
+                                    {area} <span className="font-normal text-content-subtle">({capByArea.get(area).filter((c) => c.supports_audio_out === 1).length} didukung / {capByArea.get(area).length})</span>
+                                </p>
+                                {capByArea.get(area).map((cam) => (
+                                    <div key={cam.id} className="flex items-start gap-3 rounded-card border border-edge bg-surface p-3 shadow-e1">
+                                        <div className="min-w-0 flex-1">
+                                            <p className="break-words text-sm font-semibold leading-snug text-content">{cam.name}</p>
+                                            {cam.audio_out_note && (
+                                                <p className="mt-0.5 break-words text-xs text-content-subtle">{cam.audio_out_note}</p>
+                                            )}
+                                        </div>
+                                        <Badge supports={cam.supports_audio_out} />
+                                        <button
+                                            type="button"
+                                            onClick={() => onRecheckOne(cam)}
+                                            disabled={rechecking === cam.id}
+                                            className="shrink-0 rounded-control border border-edge bg-surface px-3 py-1.5 text-sm font-medium text-content-muted transition-colors hover:border-edge-strong hover:text-content disabled:opacity-50"
+                                        >
+                                            {rechecking === cam.id ? '…' : 'Cek'}
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
                         ))}
-                    </ul>
+                    </div>
                 )}
             </section>
         </div>

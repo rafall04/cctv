@@ -27,6 +27,34 @@ const PLAY_TIMEOUT_MS = 15 * 60 * 1000; // hard cap so a wedged session can neve
 // is enforced by cameraAudioLock, shared with live push-to-talk — a second RTP stream would garble.
 export { isBusy } from './cameraAudioLock.js';
 
+// Clip/playlist playbacks currently running in the BACKGROUND (fire-and-forget), so the operator can stop
+// one they started by mistake. cameraId -> { child, name, source, startedAt }.
+const playing = new Map();
+
+/** Cameras currently playing a clip/playlist, with elapsed seconds — for the "Sedang diputar" list. */
+export function listPlaying() {
+    const now = Date.now();
+    return [...playing.entries()].map(([cameraId, p]) => ({
+        cameraId, name: p.name, source: p.source, seconds: Math.round((now - p.startedAt) / 1000),
+    }));
+}
+
+/** Stop a running playback on one camera (SIGTERM lets python TEARDOWN the backchannel cleanly). */
+export function stopPlaying(cameraId) {
+    const p = playing.get(parseInt(cameraId, 10));
+    if (!p) return false;
+    try { p.child.kill('SIGTERM'); } catch { /* already gone */ }
+    setTimeout(() => { try { p.child.kill('SIGKILL'); } catch { /* gone */ } }, 1500); // backstop
+    return true;
+}
+
+/** Stop every running playback. Returns how many were stopped. */
+export function stopAllPlaying() {
+    const ids = [...playing.keys()];
+    ids.forEach((id) => stopPlaying(id));
+    return ids.length;
+}
+
 export function parseRtsp(url) {
     const m = /^rtsp:\/\/([^:]+):([^@]+)@([^:/]+)(?::(\d+))?/i.exec(url || '');
     if (!m) return null;
@@ -77,13 +105,16 @@ export function resolveSourceFiles(sourceType, sourceId) {
  * in the background; `onDone` fires when the child actually exits (so the caller releases the camera lock
  * only then). A camera without a backchannel fails fast (open() raises) → {ok:false} well within 30s.
  */
-function runPusher(cam, files, loop, onDone) {
+function runPusher(cam, files, loop, ctx) {
     return new Promise((resolve) => {
         let settled = false;
         let out = '';
         let err = '';
-        let release = onDone;
-        const done = () => { if (release) { const f = release; release = null; f(); } };
+        let release = ctx.onDone;
+        const done = () => {
+            playing.delete(ctx.id);
+            if (release) { const f = release; release = null; f(); }
+        };
         const settle = (r) => { if (!settled) { settled = true; resolve(r); } };
         const child = spawn(PY, [SCRIPT, ...files], {
             env: {
@@ -92,6 +123,8 @@ function runPusher(cam, files, loop, onDone) {
                 CAM_PORT: String(cam.port), LOOP: String(loop),
             },
         });
+        // Track it so the operator can stop a playback they started by mistake.
+        playing.set(ctx.id, { child, name: ctx.name, source: ctx.source, startedAt: Date.now() });
         const timer = setTimeout(() => { try { child.kill('SIGKILL'); } catch { /* gone */ } }, PLAY_TIMEOUT_MS);
         child.stdout.on('data', (d) => {
             out += d.toString();
@@ -101,8 +134,9 @@ function runPusher(cam, files, loop, onDone) {
         child.on('error', (e) => { clearTimeout(timer); settle({ ok: false, message: `spawn gagal: ${e.message}` }); done(); });
         child.on('close', (code) => {
             clearTimeout(timer);
-            settle({ ok: code === 0, message: code === 0 ? 'diputar' : (err.trim().split('\n').pop() || `keluar kode ${code}`) });
-            done(); // playback finished (or failed) -> release the camera lock now
+            // A SIGTERM stop reports as a clean stop, not an error.
+            settle({ ok: code === 0 || code === null, message: code === 0 || code === null ? 'diputar' : (err.trim().split('\n').pop() || `keluar kode ${code}`) });
+            done(); // playback finished/stopped -> release the camera lock now
         });
     });
 }
@@ -129,7 +163,7 @@ export async function playToCameras(cameraIds, sourceType, sourceId, loop = 1) {
         if (!acquire(id, 'clip')) return { cameraId: id, name: row.name, ok: false, message: 'kamera sedang dipakai audio lain' };
         // Lock is released by runPusher's onDone when the child ACTUALLY exits (playback ends), not when
         // this resolves (which is the moment playback STARTED) — else a second play could garble the first.
-        const r = await runPusher(cam, files, loopN, () => release(id));
+        const r = await runPusher(cam, files, loopN, { id, name: row.name, source: sourceType, onDone: () => release(id) });
         return { cameraId: id, name: row.name, ...r };
     }));
     return { results, files: files.length };

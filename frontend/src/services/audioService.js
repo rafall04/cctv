@@ -163,6 +163,19 @@ export const playNow = async ({ cameraIds, sourceType, sourceId, loop = 1 }) => 
     } catch (error) { return failure(error, 'Gagal memutar audio'); }
 };
 
+export const getActivePlays = async () => {
+    try {
+        return (await apiClient.get(`${BASE}/play/active`)).data;
+    } catch (error) { return failure(error, 'Gagal memuat status'); }
+};
+
+/** Stop playback: pass { all: true }, { cameraId }, or { cameraIds }. */
+export const stopPlay = async (payload) => {
+    try {
+        return (await apiClient.post(`${BASE}/play/stop`, payload)).data;
+    } catch (error) { return failure(error, 'Gagal menghentikan'); }
+};
+
 /** Mint a single-use ticket for a live push-to-talk WebSocket to one camera. */
 export const talkTicket = async (cameraId) => {
     try {
@@ -174,6 +187,6 @@ export default {
     getClips, uploadClip, deleteClip, importClip, getImportJobs,
     getPlaylists, getPlaylist, createPlaylist, updatePlaylist, deletePlaylist,
     getSchedules, createSchedule, updateSchedule, toggleSchedule, deleteSchedule,
-    getCameras, playNow, talkTicket,
+    getCameras, playNow, talkTicket, getActivePlays, stopPlay,
     getCapability, recheckCapability, recheckCameraCapability, getAreas, toggleArea,
 };

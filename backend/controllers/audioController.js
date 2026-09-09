@@ -21,7 +21,7 @@ import {
     updateSchedule as updateScheduleRow, setEnabled as setScheduleEnabled,
     deleteSchedule as deleteScheduleRow,
 } from '../services/audioScheduleService.js';
-import { playToCameras } from '../services/audioCastService.js';
+import { playToCameras, listPlaying, stopPlaying, stopAllPlaying } from '../services/audioCastService.js';
 import { listBroadcastTargets, listAreas as listAreaRows, setAreaEnabled } from '../services/audioTargetService.js';
 import { listCapabilities, recheckAll, probeCamera } from '../services/audioCapabilityService.js';
 import { createImportJob, listJobs as listImportRows } from '../services/audioImportService.js';
@@ -293,5 +293,28 @@ export async function playNow(request, reply) {
             message: `Diputar ke ${okCount}/${results.length} kamera`,
             data: { results, files },
         });
+    } catch (error) { return fail(reply, error); }
+}
+
+// Cameras currently playing a clip/playlist (for the "Sedang diputar" list + stop controls).
+export async function listActivePlays(request, reply) {
+    try {
+        return reply.send({ success: true, data: listPlaying() });
+    } catch (error) { return fail(reply, error); }
+}
+
+// Stop playback: a specific camera (body.cameraId), a set (body.cameraIds), or all (body.all).
+export async function stopPlay(request, reply) {
+    try {
+        const { cameraId, cameraIds, all } = request.body || {};
+        let stopped = 0;
+        if (all) {
+            stopped = stopAllPlaying();
+        } else {
+            const ids = cameraId ? [cameraId] : (Array.isArray(cameraIds) ? cameraIds : []);
+            ids.map((x) => parseId(x)).filter(Boolean).forEach((id) => { if (stopPlaying(id)) stopped += 1; });
+        }
+        logAdminAction({ action: 'audio_play_stop', targetType: 'audio', stopped, ...adminContext(request) }, request);
+        return reply.send({ success: true, message: stopped ? `Dihentikan ${stopped} kamera` : 'Tidak ada yang diputar', data: { stopped } });
     } catch (error) { return fail(reply, error); }
 }

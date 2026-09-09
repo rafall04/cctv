@@ -7,8 +7,8 @@
  * SideEffects: spawns a live broadcast to camera speakers via the API.
  */
 
-import { useEffect, useState } from 'react';
-import { playNow } from '../../../services/audioService';
+import { useCallback, useEffect, useState } from 'react';
+import { playNow, getActivePlays, stopPlay } from '../../../services/audioService';
 import { useNotification } from '../../../contexts/NotificationContext';
 import { Button, Field } from '../../ui';
 import CameraMultiSelect from './CameraMultiSelect';
@@ -21,7 +21,30 @@ export default function PlayNowTab({ clips, playlists, cameras, preselect }) {
     const [loop, setLoop] = useState(1);
     const [playing, setPlaying] = useState(false);
     const [results, setResults] = useState(null);
+    const [active, setActive] = useState([]);
     const { showNotification } = useNotification();
+
+    const loadActive = useCallback(async () => {
+        const r = await getActivePlays();
+        if (r.success) setActive(r.data || []);
+    }, []);
+
+    // Playback runs in the background (a 6-min song keeps going after the request returns), so poll the
+    // "Sedang diputar" list — that's where the operator stops one they picked by mistake.
+    useEffect(() => {
+        loadActive();
+        const t = setInterval(loadActive, 3000);
+        return () => clearInterval(t);
+    }, [loadActive]);
+
+    const stopOne = async (cameraId) => {
+        await stopPlay({ cameraId });
+        await loadActive();
+    };
+    const stopEverything = async () => {
+        await stopPlay({ all: true });
+        await loadActive();
+    };
 
     // A "Putar" tap in the library preselects that clip here and jumps to this tab.
     useEffect(() => {
@@ -56,6 +79,7 @@ export default function PlayNowTab({ clips, playlists, cameras, preselect }) {
             type: ok > 0 ? 'success' : 'error',
             title: result.message || 'Selesai',
         });
+        loadActive();
     };
 
     return (
@@ -114,6 +138,32 @@ export default function PlayNowTab({ clips, playlists, cameras, preselect }) {
                 <Button variant="primary" onClick={handlePlay} loading={playing} className="w-full">
                     {playing ? 'Menyiarkan…' : 'Putar sekarang'}
                 </Button>
+
+                {/* Sedang diputar — stop a playback (e.g. a wrong pick) while it's still going. */}
+                {active.length > 0 && (
+                    <div className="space-y-1.5 rounded-control border border-status-live/30 bg-status-live/5 p-2">
+                        <div className="flex items-center justify-between px-1">
+                            <span className="text-xs font-semibold text-content">Sedang diputar ({active.length})</span>
+                            <button type="button" onClick={stopEverything} className="text-xs font-medium text-status-fault hover:underline">
+                                Hentikan semua
+                            </button>
+                        </div>
+                        {active.map((a) => (
+                            <div key={a.cameraId} className="flex items-center gap-2 rounded-control bg-surface px-3 py-2 text-sm">
+                                <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-status-live" aria-hidden="true" />
+                                <span className="min-w-0 flex-1 truncate text-content">{a.name}</span>
+                                <span className="shrink-0 font-mono text-xs tabular-nums text-content-subtle">{formatDuration(a.seconds)}</span>
+                                <button
+                                    type="button"
+                                    onClick={() => stopOne(a.cameraId)}
+                                    className="shrink-0 rounded-control border border-status-fault/40 px-2.5 py-1 text-xs font-medium text-status-fault transition-colors hover:bg-status-fault/10"
+                                >
+                                    Stop
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                )}
 
                 {results && (
                     <ul className="space-y-1.5">

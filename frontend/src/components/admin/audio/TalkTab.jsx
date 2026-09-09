@@ -139,10 +139,14 @@ export default function TalkTab({ cameras }) {
             <div className="rounded-card border border-edge bg-surface p-4 shadow-e1">
                 <Field as="select" label="Kamera tujuan" value={cameraId} onChange={(e) => setCameraId(e.target.value)} disabled={held}>
                     <option value="">— pilih kamera —</option>
-                    {options.map((c) => {
-                        const info = capabilityInfo(c.supports_audio_out);
-                        return <option key={c.id} value={c.id}>{c.name}{c.supports_audio_out !== 1 ? ` (${info.label})` : ''}</option>;
-                    })}
+                    {[...new Set(options.map((c) => c.area_name || 'Tanpa area'))].map((area) => (
+                        <optgroup key={area} label={area}>
+                            {options.filter((c) => (c.area_name || 'Tanpa area') === area).map((c) => {
+                                const info = capabilityInfo(c.supports_audio_out);
+                                return <option key={c.id} value={c.id}>{c.name}{c.supports_audio_out !== 1 ? ` (${info.label})` : ''}</option>;
+                            })}
+                        </optgroup>
+                    ))}
                 </Field>
                 {supported.length === 0 && (
                     <p className="mt-2 text-xs text-content-subtle">
