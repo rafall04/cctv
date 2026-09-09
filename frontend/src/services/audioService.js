@@ -244,6 +244,39 @@ export const stopPlay = async (payload) => {
     } catch (error) { return failure(error, 'Gagal menghentikan'); }
 };
 
+/** Recent broadcasts + per-camera delivery receipt (Riwayat / Bukti siaran). */
+export const getPlayHistory = async () => {
+    try {
+        return (await apiClient.get(`${BASE}/play/history`)).data;
+    } catch (error) { return failure(error, 'Gagal memuat riwayat'); }
+};
+
+/* ---------------------------------------------------------------- soundboard */
+
+export const getSoundboard = async () => {
+    try {
+        return (await apiClient.get(`${BASE}/soundboard`)).data;
+    } catch (error) { return failure(error, 'Gagal memuat panel'); }
+};
+
+export const createSoundboardButton = async (payload) => {
+    try {
+        return (await apiClient.post(`${BASE}/soundboard`, payload)).data;
+    } catch (error) { return failure(error, 'Gagal membuat tombol'); }
+};
+
+export const updateSoundboardButton = async (id, payload) => {
+    try {
+        return (await apiClient.put(`${BASE}/soundboard/${id}`, payload)).data;
+    } catch (error) { return failure(error, 'Gagal memperbarui tombol'); }
+};
+
+export const deleteSoundboardButton = async (id) => {
+    try {
+        return (await apiClient.delete(`${BASE}/soundboard/${id}`)).data;
+    } catch (error) { return failure(error, 'Gagal menghapus tombol'); }
+};
+
 /* -------------------------------------------------- custom manual camera groups */
 
 export const getGroups = async () => {
@@ -281,7 +314,8 @@ export default {
     getClips, uploadClip, deleteClip, updateClipMeta, importClip, getImportJobs, getTtsEngines, createTts,
     getPlaylists, getPlaylist, createPlaylist, updatePlaylist, deletePlaylist,
     getSchedules, createSchedule, updateSchedule, toggleSchedule, deleteSchedule,
-    getCameras, playNow, talkTicket, getActivePlays, stopPlay,
+    getCameras, playNow, talkTicket, getActivePlays, stopPlay, getPlayHistory,
+    getSoundboard, createSoundboardButton, updateSoundboardButton, deleteSoundboardButton,
     getCapability, recheckCapability, recheckCameraCapability, getAreas, toggleArea, setCameraBlocked, setAreaPolicy,
     getGroups, createGroup, updateGroup, deleteGroup,
     getTemplates, createTemplate, updateTemplate, deleteTemplate,

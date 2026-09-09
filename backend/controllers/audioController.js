@@ -9,7 +9,7 @@ SideEffects: writes clip/playlist/schedule rows + audio files; spawns the pusher
 */
 
 import {
-    saveAudioClip, listClips as listClipRows, deleteClip as deleteClipRow, setClipMeta, MAX_AUDIO_UPLOAD_BYTES,
+    saveAudioClip, listClips as listClipRows, deleteClip as deleteClipRow, setClipMeta, getClip, MAX_AUDIO_UPLOAD_BYTES,
 } from '../services/audioClipService.js';
 import {
     listPlaylists as listPlaylistRows, getPlaylist as getPlaylistRow,
@@ -35,6 +35,11 @@ import {
     updateGroup as updateGroupRow, deleteGroup as deleteGroupRow,
 } from '../services/audioGroupService.js';
 import { mintTicket } from '../services/audioTalkService.js';
+import { logPlay, listHistory } from '../services/audioHistoryService.js';
+import {
+    listButtons as listSoundboardRows, createButton as createSoundboardRow,
+    updateButton as updateSoundboardRow, deleteButton as deleteSoundboardRow,
+} from '../services/audioSoundboardService.js';
 import { logAdminAction } from '../services/securityAuditLogger.js';
 
 function parseId(value) {
@@ -438,6 +443,11 @@ export async function playNow(request, reply) {
             }
         }
         const { results, files } = await playToCameras(ids, sourceType, sid, loop || 1);
+        const sourceName = sourceType === 'clip' ? getClip(sid)?.name : getPlaylistRow(sid)?.name;
+        logPlay({
+            sourceType, sourceId: sid, sourceName, cameraIds: ids, results,
+            operatorId: request.user?.id ?? null, operatorName: request.user?.username ?? null,
+        });
         logAdminAction({
             action: 'audio_play_now', targetType: 'audio', sourceType, sourceId: sid,
             cameras: results.length, ok: results.filter((r) => r.ok).length, ...adminContext(request),
@@ -472,4 +482,49 @@ export async function stopPlay(request, reply) {
         logAdminAction({ action: 'audio_play_stop', targetType: 'audio', stopped, ...adminContext(request) }, request);
         return reply.send({ success: true, message: stopped ? `Dihentikan ${stopped} kamera` : 'Tidak ada yang diputar', data: { stopped } });
     } catch (error) { return fail(reply, error); }
+}
+
+/* ---------------------------------------------------- broadcast history (receipts) */
+
+// Recent broadcasts + per-camera delivery receipt (for "Riwayat" / "Bukti siaran" / "Ulangi").
+export async function listPlayHistory(request, reply) {
+    try {
+        return reply.send({ success: true, data: listHistory(request.query?.limit) });
+    } catch (error) { return fail(reply, error); }
+}
+
+/* ---------------------------------------------------------------- soundboard */
+
+export async function listSoundboard(request, reply) {
+    try {
+        return reply.send({ success: true, data: listSoundboardRows() });
+    } catch (error) { return fail(reply, error); }
+}
+
+export async function createSoundboardButton(request, reply) {
+    try {
+        const b = createSoundboardRow({ ...request.body, userId: request.user?.id ?? null });
+        logAdminAction({ action: 'audio_soundboard_created', targetType: 'audio_soundboard', targetId: b.id, label: b.label, ...adminContext(request) }, request);
+        return reply.code(201).send({ success: true, message: 'Tombol dibuat', data: b });
+    } catch (error) { return fail(reply, error, 'Gagal membuat tombol'); }
+}
+
+export async function updateSoundboardButton(request, reply) {
+    try {
+        const id = parseId(request.params.id);
+        if (!id) return reply.code(400).send({ success: false, message: 'ID tombol tidak valid' });
+        const b = updateSoundboardRow(id, request.body || {});
+        logAdminAction({ action: 'audio_soundboard_updated', targetType: 'audio_soundboard', targetId: id, ...adminContext(request) }, request);
+        return reply.send({ success: true, message: 'Tombol diperbarui', data: b });
+    } catch (error) { return fail(reply, error, 'Gagal memperbarui tombol'); }
+}
+
+export async function deleteSoundboardButton(request, reply) {
+    try {
+        const id = parseId(request.params.id);
+        if (!id) return reply.code(400).send({ success: false, message: 'ID tombol tidak valid' });
+        const b = deleteSoundboardRow(id);
+        logAdminAction({ action: 'audio_soundboard_deleted', targetType: 'audio_soundboard', targetId: id, label: b.label, ...adminContext(request) }, request);
+        return reply.send({ success: true, message: 'Tombol dihapus' });
+    } catch (error) { return fail(reply, error, 'Gagal menghapus tombol'); }
 }

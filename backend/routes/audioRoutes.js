@@ -17,8 +17,9 @@ import {
     listCameras, playNow,
     listCapability, recheckCapability, recheckCameraCapability, listAreas, toggleArea, blockCamera,
     setAreaPolicyHandler, listTemplates, createTemplate, updateTemplate, deleteTemplate,
-    importClip, listImportJobs, talkTicket, listActivePlays, stopPlay,
+    importClip, listImportJobs, talkTicket, listActivePlays, stopPlay, listPlayHistory,
     listGroups, createGroup, updateGroup, deleteGroup,
+    listSoundboard, createSoundboardButton, updateSoundboardButton, deleteSoundboardButton,
     listTtsEngines, createTts,
 } from '../controllers/audioController.js';
 import fastifyWebsocket from '@fastify/websocket';
@@ -89,4 +90,11 @@ export default async function audioRoutes(fastify) {
     fastify.post('/play', admin, playNow);
     fastify.get('/play/active', admin, listActivePlays);
     fastify.post('/play/stop', admin, stopPlay);
+    fastify.get('/play/history', admin, listPlayHistory);
+
+    // Soundboard (one-tap shortcuts)
+    fastify.get('/soundboard', admin, listSoundboard);
+    fastify.post('/soundboard', admin, createSoundboardButton);
+    fastify.put('/soundboard/:id', admin, updateSoundboardButton);
+    fastify.delete('/soundboard/:id', admin, deleteSoundboardButton);
 }

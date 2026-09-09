@@ -8,7 +8,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { playNow, getActivePlays, stopPlay } from '../../../services/audioService';
+import { playNow, getActivePlays, stopPlay, getPlayHistory } from '../../../services/audioService';
 import { useNotification } from '../../../contexts/NotificationContext';
 import { useConfirm } from '../../../contexts/ConfirmContext';
 import { Button, Field } from '../../ui';
@@ -23,6 +23,8 @@ export default function PlayNowTab({ clips, playlists, cameras, preselect, group
     const [playing, setPlaying] = useState(false);
     const [results, setResults] = useState(null);
     const [active, setActive] = useState([]);
+    const [history, setHistory] = useState([]);
+    const [expanded, setExpanded] = useState(null);
     const { showNotification } = useNotification();
     const confirm = useConfirm();
 
@@ -30,6 +32,22 @@ export default function PlayNowTab({ clips, playlists, cameras, preselect, group
         const r = await getActivePlays();
         if (r.success) setActive(r.data || []);
     }, []);
+
+    const loadHistory = useCallback(async () => {
+        const r = await getPlayHistory();
+        if (r.success) setHistory(r.data || []);
+    }, []);
+    useEffect(() => { loadHistory(); }, [loadHistory]);
+
+    // "Ulangi": load a past broadcast into the form, RE-RESOLVING targets to cameras still available now
+    // (an out-of-scope / blocked / removed camera is dropped, never blindly replayed).
+    const replay = (entry) => {
+        const validIds = new Set(cameras.map((c) => c.id));
+        setSourceType(entry.source_type);
+        setSourceId(String(entry.source_id));
+        setCameraIds((entry.camera_ids || []).filter((id) => validIds.has(id)));
+        showNotification({ type: 'info', title: 'Dimuat ke form', message: 'Tinjau lalu tekan "Putar sekarang".' });
+    };
 
     // Playback runs in the background (a 6-min song keeps going after the request returns), so poll the
     // "Sedang diputar" list — that's where the operator stops one they picked by mistake.
@@ -94,9 +112,11 @@ export default function PlayNowTab({ clips, playlists, cameras, preselect, group
             title: result.message || 'Selesai',
         });
         loadActive();
+        loadHistory();
     };
 
     return (
+        <div className="space-y-6">
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <div className="space-y-4 rounded-card border border-edge bg-surface p-4 shadow-e1">
                 <div className="space-y-2">
@@ -207,6 +227,42 @@ export default function PlayNowTab({ clips, playlists, cameras, preselect, group
                     </ul>
                 )}
             </div>
+        </div>
+
+        {/* Riwayat siaran + bukti kirim per-titik + Ulangi. */}
+        {history.length > 0 && (
+            <section className="space-y-2 rounded-card border border-edge bg-surface p-4 shadow-e1">
+                <h3 className="text-sm font-semibold text-content">Riwayat siaran</h3>
+                <ul className="space-y-1.5">
+                    {history.map((h) => (
+                        <li key={h.id} className="rounded-control border border-edge bg-surface-sunken px-3 py-2 text-sm">
+                            <div className="flex items-center gap-2">
+                                <span className={`h-2 w-2 shrink-0 rounded-full ${h.ok_count === h.total_count ? 'bg-status-live' : h.ok_count > 0 ? 'bg-status-warn' : 'bg-status-fault'}`} aria-hidden="true" />
+                                <span className="min-w-0 flex-1 truncate text-content">{h.source_name || `#${h.source_id}`}{h.source_type === 'playlist' ? ' (playlist)' : ''}</span>
+                                <span className="shrink-0 text-xs text-content-muted">{h.ok_count}/{h.total_count} berhasil</span>
+                                <button type="button" onClick={() => setExpanded(expanded === h.id ? null : h.id)} className="shrink-0 text-xs font-medium text-content-muted hover:underline">
+                                    {expanded === h.id ? 'Tutup' : 'Rincian'}
+                                </button>
+                                <button type="button" onClick={() => replay(h)} className="shrink-0 rounded-control border border-edge bg-surface px-2.5 py-1 text-xs font-medium text-primary transition-colors hover:border-primary">
+                                    Ulangi
+                                </button>
+                            </div>
+                            {expanded === h.id && (
+                                <ul className="mt-1.5 space-y-1 border-t border-edge pt-1.5">
+                                    {h.results.map((r) => (
+                                        <li key={r.cameraId} className="flex items-center gap-2 text-xs">
+                                            <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${r.ok ? 'bg-status-live' : 'bg-status-fault'}`} aria-hidden="true" />
+                                            <span className="min-w-0 flex-1 truncate text-content-muted">{r.name}</span>
+                                            <span className={`shrink-0 ${r.ok ? 'text-content-subtle' : 'text-status-fault'}`}>{r.ok ? 'berbunyi' : r.message}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </li>
+                    ))}
+                </ul>
+            </section>
+        )}
         </div>
     );
 }

@@ -26,9 +26,11 @@ import PlayNowTab from '../components/admin/audio/PlayNowTab';
 import TargetsTab from '../components/admin/audio/TargetsTab';
 import TalkTab from '../components/admin/audio/TalkTab';
 import GroupsTab from '../components/admin/audio/GroupsTab';
+import SoundboardTab from '../components/admin/audio/SoundboardTab';
 
 const TABS = [
     { id: 'play', label: 'Putar Sekarang' },
+    { id: 'panel', label: 'Panel' },
     { id: 'talk', label: 'Bicara' },
     { id: 'library', label: 'Pustaka' },
     { id: 'playlists', label: 'Playlist' },
@@ -151,6 +153,11 @@ export default function AudioBroadcast() {
                         groups={groups}
                         onSaveGroup={handleSaveGroup}
                     />
+                </TabPanel>
+            )}
+            {active === 'panel' && (
+                <TabPanel id="panel" idPrefix="audio">
+                    <SoundboardTab clips={clips} playlists={playlists} cameras={cameras} />
                 </TabPanel>
             )}
             {active === 'talk' && (
