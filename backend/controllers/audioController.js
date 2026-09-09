@@ -37,6 +37,10 @@ import {
 import { mintTicket } from '../services/audioTalkService.js';
 import { logPlay, listHistory } from '../services/audioHistoryService.js';
 import {
+    listPresets as listEmergencyRows, createPreset as createEmergencyRow,
+    updatePreset as updateEmergencyRow, deletePreset as deleteEmergencyRow, fireEmergency,
+} from '../services/audioEmergencyService.js';
+import {
     listButtons as listSoundboardRows, createButton as createSoundboardRow,
     updateButton as updateSoundboardRow, deleteButton as deleteSoundboardRow,
 } from '../services/audioSoundboardService.js';
@@ -491,6 +495,66 @@ export async function listPlayHistory(request, reply) {
     try {
         return reply.send({ success: true, data: listHistory(request.query?.limit) });
     } catch (error) { return fail(reply, error); }
+}
+
+/* ---------------------------------------------------------------- emergency */
+
+export async function listEmergencyPresets(request, reply) {
+    try {
+        return reply.send({ success: true, data: listEmergencyRows() });
+    } catch (error) { return fail(reply, error); }
+}
+
+export async function createEmergencyPreset(request, reply) {
+    try {
+        const p = createEmergencyRow({ ...request.body, userId: request.user?.id ?? null });
+        logAdminAction({ action: 'audio_emergency_preset_created', targetType: 'audio_emergency', targetId: p.id, label: p.label, ...adminContext(request) }, request);
+        return reply.code(201).send({ success: true, message: 'Preset darurat dibuat', data: p });
+    } catch (error) { return fail(reply, error, 'Gagal membuat preset'); }
+}
+
+export async function updateEmergencyPreset(request, reply) {
+    try {
+        const id = parseId(request.params.id);
+        if (!id) return reply.code(400).send({ success: false, message: 'ID preset tidak valid' });
+        const p = updateEmergencyRow(id, request.body || {});
+        logAdminAction({ action: 'audio_emergency_preset_updated', targetType: 'audio_emergency', targetId: id, ...adminContext(request) }, request);
+        return reply.send({ success: true, message: 'Preset diperbarui', data: p });
+    } catch (error) { return fail(reply, error, 'Gagal memperbarui preset'); }
+}
+
+export async function deleteEmergencyPreset(request, reply) {
+    try {
+        const id = parseId(request.params.id);
+        if (!id) return reply.code(400).send({ success: false, message: 'ID preset tidak valid' });
+        const p = deleteEmergencyRow(id);
+        logAdminAction({ action: 'audio_emergency_preset_deleted', targetType: 'audio_emergency', targetId: id, label: p.label, ...adminContext(request) }, request);
+        return reply.send({ success: true, message: 'Preset dihapus' });
+    } catch (error) { return fail(reply, error, 'Gagal menghapus preset'); }
+}
+
+/**
+ * Fire an emergency broadcast — PREEMPTS current audio + bypasses quiet hours. Requires an EXPLICIT
+ * confirm (the UI double-confirms) so it can never fire by accident.
+ */
+export async function playEmergency(request, reply) {
+    try {
+        const { sourceType, sourceId, targetKind, areaId, cameraIds, loop, confirm } = request.body || {};
+        if (confirm !== true) {
+            return reply.code(409).send({ success: false, requiresConfirm: true, message: 'Siaran DARURAT butuh konfirmasi eksplisit.' });
+        }
+        const sid = parseId(sourceId);
+        if (!sid) return reply.code(400).send({ success: false, message: 'Pilih audio darurat dulu' });
+        const { results, ids } = await fireEmergency({ sourceType: sourceType || 'clip', sourceId: sid, targetKind, areaId, cameraIds, loop });
+        const sourceName = (sourceType || 'clip') === 'clip' ? getClip(sid)?.name : getPlaylistRow(sid)?.name;
+        logPlay({
+            sourceType: sourceType || 'clip', sourceId: sid, sourceName: `DARURAT: ${sourceName || `#${sid}`}`,
+            cameraIds: ids, results, operatorId: request.user?.id ?? null, operatorName: request.user?.username ?? null,
+        });
+        logAdminAction({ action: 'audio_emergency_fired', targetType: 'audio', targetId: sid, cameras: results.length, ...adminContext(request) }, request);
+        const okCount = results.filter((r) => r.ok).length;
+        return reply.send({ success: true, message: `DARURAT diputar ke ${okCount}/${results.length} kamera`, data: { results } });
+    } catch (error) { return fail(reply, error, 'Gagal menyiarkan darurat'); }
 }
 
 /* ---------------------------------------------------------------- soundboard */

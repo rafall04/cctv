@@ -20,6 +20,7 @@ import {
     importClip, listImportJobs, talkTicket, listActivePlays, stopPlay, listPlayHistory,
     listGroups, createGroup, updateGroup, deleteGroup,
     listSoundboard, createSoundboardButton, updateSoundboardButton, deleteSoundboardButton,
+    listEmergencyPresets, createEmergencyPreset, updateEmergencyPreset, deleteEmergencyPreset, playEmergency,
     listTtsEngines, createTts,
 } from '../controllers/audioController.js';
 import fastifyWebsocket from '@fastify/websocket';
@@ -91,6 +92,13 @@ export default async function audioRoutes(fastify) {
     fastify.get('/play/active', admin, listActivePlays);
     fastify.post('/play/stop', admin, stopPlay);
     fastify.get('/play/history', admin, listPlayHistory);
+
+    // Emergency (preempting, quiet-hours-bypassing) broadcast + presets
+    fastify.get('/emergency/presets', admin, listEmergencyPresets);
+    fastify.post('/emergency/presets', admin, createEmergencyPreset);
+    fastify.put('/emergency/presets/:id', admin, updateEmergencyPreset);
+    fastify.delete('/emergency/presets/:id', admin, deleteEmergencyPreset);
+    fastify.post('/play/emergency', admin, playEmergency);
 
     // Soundboard (one-tap shortcuts)
     fastify.get('/soundboard', admin, listSoundboard);

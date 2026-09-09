@@ -251,6 +251,42 @@ export const getPlayHistory = async () => {
     } catch (error) { return failure(error, 'Gagal memuat riwayat'); }
 };
 
+/* ---------------------------------------------------------------- emergency */
+
+export const getEmergencyPresets = async () => {
+    try {
+        return (await apiClient.get(`${BASE}/emergency/presets`)).data;
+    } catch (error) { return failure(error, 'Gagal memuat preset darurat'); }
+};
+
+export const createEmergencyPreset = async (payload) => {
+    try {
+        return (await apiClient.post(`${BASE}/emergency/presets`, payload)).data;
+    } catch (error) { return failure(error, 'Gagal membuat preset'); }
+};
+
+export const updateEmergencyPreset = async (id, payload) => {
+    try {
+        return (await apiClient.put(`${BASE}/emergency/presets/${id}`, payload)).data;
+    } catch (error) { return failure(error, 'Gagal memperbarui preset'); }
+};
+
+export const deleteEmergencyPreset = async (id) => {
+    try {
+        return (await apiClient.delete(`${BASE}/emergency/presets/${id}`)).data;
+    } catch (error) { return failure(error, 'Gagal menghapus preset'); }
+};
+
+/** Fire an emergency broadcast (preempts + bypasses quiet hours). Requires confirm:true. */
+export const playEmergency = async (payload) => {
+    try {
+        return (await apiClient.post(`${BASE}/play/emergency`, payload)).data;
+    } catch (error) {
+        if (error.response?.status === 409 && error.response.data) return error.response.data;
+        return failure(error, 'Gagal menyiarkan darurat');
+    }
+};
+
 /* ---------------------------------------------------------------- soundboard */
 
 export const getSoundboard = async () => {
@@ -316,6 +352,7 @@ export default {
     getSchedules, createSchedule, updateSchedule, toggleSchedule, deleteSchedule,
     getCameras, playNow, talkTicket, getActivePlays, stopPlay, getPlayHistory,
     getSoundboard, createSoundboardButton, updateSoundboardButton, deleteSoundboardButton,
+    getEmergencyPresets, createEmergencyPreset, updateEmergencyPreset, deleteEmergencyPreset, playEmergency,
     getCapability, recheckCapability, recheckCameraCapability, getAreas, toggleArea, setCameraBlocked, setAreaPolicy,
     getGroups, createGroup, updateGroup, deleteGroup,
     getTemplates, createTemplate, updateTemplate, deleteTemplate,

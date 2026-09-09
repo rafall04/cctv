@@ -27,6 +27,7 @@ import TargetsTab from '../components/admin/audio/TargetsTab';
 import TalkTab from '../components/admin/audio/TalkTab';
 import GroupsTab from '../components/admin/audio/GroupsTab';
 import SoundboardTab from '../components/admin/audio/SoundboardTab';
+import EmergencyPanel from '../components/admin/audio/EmergencyPanel';
 
 const TABS = [
     { id: 'play', label: 'Putar Sekarang' },
@@ -157,7 +158,10 @@ export default function AudioBroadcast() {
             )}
             {active === 'panel' && (
                 <TabPanel id="panel" idPrefix="audio">
-                    <SoundboardTab clips={clips} playlists={playlists} cameras={cameras} />
+                    <div className="space-y-6">
+                        <EmergencyPanel clips={clips} playlists={playlists} cameras={cameras} areas={areas} />
+                        <SoundboardTab clips={clips} playlists={playlists} cameras={cameras} />
+                    </div>
                 </TabPanel>
             )}
             {active === 'talk' && (
