@@ -55,7 +55,13 @@ export default function LibraryTab({ clips, loading, reload, onPlayClip }) {
         const result = await importClip(importUrl.trim(), importName.trim());
         setImporting(false);
         if (!result.success) {
-            showNotification({ type: 'error', title: 'Gagal impor', message: result.message });
+            await loadJobs(); // the POST may have reached the server (idle-drop); the job list is the truth
+            if (result.transient) {
+                showNotification({ type: 'info', title: 'Impor mungkin sudah dimulai', message: 'Koneksi terputus, tapi cek daftar status di bawah.' });
+                setImportUrl(''); setImportName('');
+            } else {
+                showNotification({ type: 'error', title: 'Gagal impor', message: result.message });
+            }
             return;
         }
         showNotification({ type: 'success', title: 'Impor dimulai', message: 'Berjalan di latar belakang.' });
@@ -211,7 +217,10 @@ export default function LibraryTab({ clips, loading, reload, onPlayClip }) {
                             <div className="min-w-0 flex-1">
                                 <p className="truncate text-sm font-semibold text-content">{clip.name}</p>
                                 <p className="font-mono text-xs tabular-nums text-content-subtle">
-                                    {formatDuration(clip.duration_sec)} · {formatBytes(clip.source_bytes)}
+                                    {formatDuration(clip.duration_sec)}
+                                    {clip.source_type === 'youtube' ? ' · YouTube'
+                                        : clip.source_type === 'url' ? ' · URL'
+                                            : clip.source_bytes > 0 ? ` · ${formatBytes(clip.source_bytes)}` : ''}
                                 </p>
                             </div>
                             {onPlayClip && (

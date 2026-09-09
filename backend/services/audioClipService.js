@@ -147,7 +147,7 @@ export async function finalizeClipFromFile({ name, tempPath, sourceBytes = 0, so
 }
 
 export function listClips() {
-    return query('SELECT id, name, base_filename, duration_sec, source_bytes, created_at FROM audio_clips ORDER BY created_at DESC, id DESC');
+    return query('SELECT id, name, base_filename, duration_sec, source_bytes, source_type, created_at FROM audio_clips ORDER BY created_at DESC, id DESC');
 }
 
 export function getClip(id) {

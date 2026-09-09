@@ -45,6 +45,21 @@ export default function CameraMultiSelect({ cameras = [], value = [], onChange, 
     const allIds = cameras.map((c) => c.id);
     const allOn = allIds.length > 0 && allIds.every((id) => selected.has(id));
 
+    // Group by area so an operator can pick a whole area in one tap (preset), or still tick cameras
+    // one by one. Groups preserve first-seen order.
+    const order = [];
+    const byArea = new Map();
+    for (const cam of cameras) {
+        const key = cam.area_name || 'Tanpa area';
+        if (!byArea.has(key)) { byArea.set(key, []); order.push(key); }
+        byArea.get(key).push(cam);
+    }
+    const setMany = (ids, on) => {
+        const next = new Set(selected);
+        ids.forEach((id) => (on ? next.add(id) : next.delete(id)));
+        onChange([...next]);
+    };
+
     return (
         <div className="space-y-2">
             <div className="flex items-center justify-between">
@@ -58,44 +73,67 @@ export default function CameraMultiSelect({ cameras = [], value = [], onChange, 
                         onClick={() => onChange(allOn ? [] : allIds)}
                         className="text-xs font-medium text-primary hover:underline disabled:opacity-60"
                     >
-                        {allOn ? 'Kosongkan' : 'Pilih semua'}
+                        {allOn ? 'Kosongkan semua' : 'Pilih semua'}
                     </button>
                 )}
             </div>
 
             {cameras.length === 0 ? (
                 <p className="rounded-control border border-dashed border-edge bg-surface-sunken p-3 text-xs text-content-subtle">
-                    Tidak ada kamera internal dengan RTSP. Audio hanya bisa dikirim ke kamera internal.
+                    Tidak ada kamera. Aktifkan area lokal Anda di tab &quot;Kamera &amp; Area&quot; dulu.
                 </p>
             ) : (
-                <div className="max-h-56 space-y-1 overflow-y-auto rounded-control border border-edge bg-surface p-1">
-                    {cameras.map((cam) => {
-                        const on = selected.has(cam.id);
+                <div className="max-h-72 space-y-2 overflow-y-auto rounded-control border border-edge bg-surface p-1">
+                    {order.map((area) => {
+                        const list = byArea.get(area);
+                        const ids = list.map((c) => c.id);
+                        const inArea = ids.filter((id) => selected.has(id)).length;
+                        const areaOn = inArea === ids.length;
                         return (
-                            <label
-                                key={cam.id}
-                                className={`flex cursor-pointer items-start gap-2.5 rounded-control px-2 py-2 transition-colors ${
-                                    on ? 'bg-primary/10' : 'hover:bg-surface-sunken'
-                                }`}
-                            >
-                                <input
-                                    type="checkbox"
-                                    checked={on}
-                                    disabled={disabled}
-                                    onChange={() => toggle(cam.id)}
-                                    className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
-                                />
-                                <span className="min-w-0 flex-1">
-                                    {/* Full name, wraps — never truncated, so every camera is identifiable. */}
-                                    <span className={`block break-words text-sm leading-snug ${on ? 'text-content' : 'text-content-muted'}`}>
-                                        {cam.name}
+                            <div key={area}>
+                                {/* Area preset header — one tap selects/clears the whole area. */}
+                                <div className="flex items-center justify-between gap-2 rounded-control bg-surface-sunken px-2 py-1.5">
+                                    <span className="min-w-0 truncate text-xs font-semibold text-content">
+                                        {area} <span className="font-normal text-content-subtle">({inArea}/{ids.length})</span>
                                     </span>
-                                    <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-content-subtle">
-                                        {cam.area_name && <span>{cam.area_name}</span>}
-                                        {'supports_audio_out' in cam && <CapabilityTag supports={cam.supports_audio_out} />}
-                                    </span>
-                                </span>
-                            </label>
+                                    <button
+                                        type="button"
+                                        disabled={disabled}
+                                        onClick={() => setMany(ids, !areaOn)}
+                                        className="shrink-0 text-xs font-medium text-primary hover:underline disabled:opacity-60"
+                                    >
+                                        {areaOn ? 'Kosongkan' : 'Pilih area'}
+                                    </button>
+                                </div>
+                                {list.map((cam) => {
+                                    const on = selected.has(cam.id);
+                                    return (
+                                        <label
+                                            key={cam.id}
+                                            className={`flex cursor-pointer items-start gap-2.5 rounded-control px-2 py-2 transition-colors ${
+                                                on ? 'bg-primary/10' : 'hover:bg-surface-sunken'
+                                            }`}
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={on}
+                                                disabled={disabled}
+                                                onChange={() => toggle(cam.id)}
+                                                className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
+                                            />
+                                            <span className="min-w-0 flex-1">
+                                                {/* Full name, wraps — never truncated, so every camera is identifiable. */}
+                                                <span className={`block break-words text-sm leading-snug ${on ? 'text-content' : 'text-content-muted'}`}>
+                                                    {cam.name}
+                                                </span>
+                                                {'supports_audio_out' in cam && (
+                                                    <span className="mt-0.5 flex text-xs"><CapabilityTag supports={cam.supports_audio_out} /></span>
+                                                )}
+                                            </span>
+                                        </label>
+                                    );
+                                })}
+                            </div>
                         );
                     })}
                 </div>

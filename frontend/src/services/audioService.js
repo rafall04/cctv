@@ -40,7 +40,11 @@ export const deleteClip = async (id) => {
 export const importClip = async (url, name) => {
     try {
         return (await apiClient.post(`${BASE}/clips/import`, { url, name })).data;
-    } catch (error) { return failure(error, 'Gagal memulai impor'); }
+    } catch (error) {
+        // `transient` = a network-layer drop (Cloudflare QUIC idle-drop): the POST may have reached the
+        // server anyway, so the caller refreshes the job list instead of declaring a hard failure.
+        return { ...failure(error, 'Gagal memulai impor'), transient: !error.response };
+    }
 };
 
 export const getImportJobs = async () => {
