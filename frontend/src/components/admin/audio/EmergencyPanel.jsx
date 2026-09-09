@@ -17,7 +17,7 @@ import { useConfirm } from '../../../contexts/ConfirmContext';
 import { Button, Field } from '../../ui';
 import CameraMultiSelect from './CameraMultiSelect';
 
-const BLANK = { id: null, label: '', sourceType: 'clip', sourceId: '', targetKind: 'area', areaId: '', cameraIds: [], loop: 3 };
+const BLANK = { id: null, label: '', sourceType: 'clip', sourceId: '', targetKind: 'area', areaId: '', cameraIds: [], loop: 3, gain_db: 6 };
 
 export default function EmergencyPanel({ clips, playlists, cameras, areas }) {
     const [presets, setPresets] = useState([]);
@@ -49,7 +49,7 @@ export default function EmergencyPanel({ clips, playlists, cameras, areas }) {
         setFiring(p.id);
         const result = await playEmergency({
             sourceType: p.source_type, sourceId: p.source_id, targetKind: p.target_kind,
-            areaId: p.area_id, cameraIds: p.camera_ids, loop: p.loop, confirm: true,
+            areaId: p.area_id, cameraIds: p.camera_ids, loop: p.loop, gainDb: p.gain_db, confirm: true,
         });
         setFiring(null);
         if (!result.success) { showNotification({ type: 'error', title: 'Gagal', message: result.message }); return; }
@@ -72,7 +72,7 @@ export default function EmergencyPanel({ clips, playlists, cameras, areas }) {
         const payload = {
             label: form.label.trim(), sourceType: form.sourceType, sourceId: Number(form.sourceId),
             targetKind: form.targetKind, areaId: form.targetKind === 'area' ? Number(form.areaId) : null,
-            cameraIds: form.cameraIds, loop: form.loop,
+            cameraIds: form.cameraIds, loop: form.loop, gain_db: form.gain_db,
         };
         const r = form.id ? await updateEmergencyPreset(form.id, payload) : await createEmergencyPreset(payload);
         setSaving(false);
@@ -138,6 +138,10 @@ export default function EmergencyPanel({ clips, playlists, cameras, areas }) {
                         </div>
                         <Field type="number" label="Ulang" min={1} max={20} value={form.loop} onChange={(e) => setForm({ ...form, loop: Math.min(20, Math.max(1, parseInt(e.target.value, 10) || 1)) })} />
                     </div>
+                    <label className="block">
+                        <span className="mb-1 flex items-baseline justify-between"><span className="text-xs font-semibold text-content-muted">Volume (darurat biasanya keras)</span><span className="text-xs tabular-nums text-content-subtle">{form.gain_db > 0 ? `+${form.gain_db}` : form.gain_db} dB</span></span>
+                        <input type="range" min="-6" max="12" step="1" value={form.gain_db || 0} onChange={(e) => setForm({ ...form, gain_db: parseInt(e.target.value, 10) || 0 })} className="w-full accent-status-fault" />
+                    </label>
                     {form.targetKind === 'area' ? (
                         <Field as="select" label="Area" value={form.areaId} onChange={(e) => setForm({ ...form, areaId: e.target.value })}>
                             <option value="">— pilih area —</option>
@@ -166,7 +170,7 @@ export default function EmergencyPanel({ clips, playlists, cameras, areas }) {
                             </button>
                             {manage && (
                                 <div className="mt-1 flex justify-center gap-2">
-                                    <button type="button" onClick={() => setForm({ id: p.id, label: p.label, sourceType: p.source_type, sourceId: String(p.source_id), targetKind: p.target_kind, areaId: p.area_id ? String(p.area_id) : '', cameraIds: p.camera_ids, loop: p.loop })} className="text-xs font-medium text-content-muted hover:underline">Ubah</button>
+                                    <button type="button" onClick={() => setForm({ id: p.id, label: p.label, sourceType: p.source_type, sourceId: String(p.source_id), targetKind: p.target_kind, areaId: p.area_id ? String(p.area_id) : '', cameraIds: p.camera_ids, loop: p.loop, gain_db: p.gain_db })} className="text-xs font-medium text-content-muted hover:underline">Ubah</button>
                                     <button type="button" onClick={() => remove(p)} className="text-xs font-medium text-status-fault hover:underline">Hapus</button>
                                 </div>
                             )}

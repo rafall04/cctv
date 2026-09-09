@@ -17,6 +17,7 @@ import sys
 import socket
 import struct
 import hashlib
+import subprocess
 import time
 
 CAM_IP = os.environ.get('CAM_IP', '')
@@ -24,7 +25,32 @@ CAM_USER = os.environ.get('CAM_USER', 'admin')
 CAM_PASS = os.environ.get('CAM_PASS', '')
 CAM_PORT = int(os.environ.get('CAM_PORT', '554'))
 LOOP = max(1, int(os.environ.get('LOOP', '1')))
+# Playback loudness knob (dB, runtime): 0 = as-encoded. The camera speaker is already at max, and clips
+# are peak-normalised, so a plain gain would clip — we raise level with a true-peak LIMITER (alimiter) so
+# louder never means harsher. Applied once per file via ffmpeg (stdin->stdout); falls back to the raw file
+# on any failure so a broadcast never breaks over a volume tweak.
+try:
+    GAIN_DB = float(os.environ.get('GAIN_DB', '0') or '0')
+except ValueError:
+    GAIN_DB = 0.0
+GAIN_DB = max(-24.0, min(24.0, GAIN_DB))
 FILES = [f for f in sys.argv[1:] if f]
+
+
+def apply_gain(data):
+    if abs(GAIN_DB) < 0.05 or not data:
+        return data
+    try:
+        p = subprocess.run(
+            ['ffmpeg', '-hide_banner', '-loglevel', 'error', '-f', 'mulaw', '-ar', '16000', '-ac', '1',
+             '-i', 'pipe:0', '-af', 'volume=%.2fdB,alimiter=limit=0.95' % GAIN_DB,
+             '-ar', '16000', '-ac', '1', '-f', 'mulaw', 'pipe:1'],
+            input=data, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=90)
+        if p.returncode == 0 and p.stdout:
+            return p.stdout
+    except Exception:
+        pass
+    return data
 
 BASE = 'rtsp://%s:%d/cam/realmonitor?channel=1&subtype=0&unicast=true&proto=Onvif' % (CAM_IP, CAM_PORT)
 SETUP_URI = BASE + '/trackID=5'
@@ -143,7 +169,7 @@ def main():
     for _ in range(LOOP):
         for path in FILES:
             try:
-                audio = open(path, 'rb').read()
+                audio = apply_gain(open(path, 'rb').read())
             except Exception as e:
                 print('ERR read %s: %s' % (path, e), file=sys.stderr)
                 return 3

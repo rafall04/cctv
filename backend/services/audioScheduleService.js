@@ -75,6 +75,7 @@ function validate(f, partial = false) {
         if (!Number.isInteger(l) || l < 1) l = 1;
         out.loop_count = Math.min(l, 20);
     }
+    if (f.gainDb !== undefined) out.gain_db = Math.max(-24, Math.min(24, Number(f.gainDb) || 0));
     if (!partial || f.scheduleKind !== undefined) {
         out.schedule_kind = f.scheduleKind || 'recurring';
         if (!['recurring', 'once', 'range'].includes(out.schedule_kind)) {
@@ -118,10 +119,10 @@ export function createSchedule(fields) {
     const v = validate(fields, false);
     execute(`INSERT INTO audio_schedules
              (name, camera_ids, source_type, source_id, time_hhmm, days_mask, loop_count, enabled,
-              schedule_kind, run_date, start_date, end_date)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              schedule_kind, run_date, start_date, end_date, gain_db)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [v.name, v.camera_ids, v.source_type, v.source_id, v.time_hhmm, v.days_mask, v.loop_count, v.enabled ?? 1,
-            v.schedule_kind ?? 'recurring', v.run_date ?? null, v.start_date ?? null, v.end_date ?? null]);
+            v.schedule_kind ?? 'recurring', v.run_date ?? null, v.start_date ?? null, v.end_date ?? null, v.gain_db ?? 0]);
     const id = queryOne('SELECT last_insert_rowid() AS id').id;
     return queryOne('SELECT * FROM audio_schedules WHERE id = ?', [id]);
 }
@@ -184,7 +185,7 @@ export function runDueSchedules(nowMs = Date.now()) {
         }
         const cams = parseCameraIds(s.camera_ids);
         console.log(`[Audio] Schedule "${s.name}" fired ${hhmm} WIB -> ${cams.length} kamera`);
-        playToCameras(cams, s.source_type, s.source_id, s.loop_count)
+        playToCameras(cams, s.source_type, s.source_id, s.loop_count, { gainDb: s.gain_db })
             .then((r) => {
                 const ok = r.results.filter((x) => x.ok).length;
                 console.log(`[Audio] Schedule "${s.name}": ${ok}/${r.results.length} kamera OK`);

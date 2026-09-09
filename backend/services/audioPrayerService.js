@@ -60,7 +60,7 @@ export function setConfig(fields = {}) {
             enabled=?, latitude=?, longitude=?, elevation=?, fajr_angle=?, isha_angle=?, asr_factor=?, ikhtiyati=?,
             offset_fajr=?, offset_dhuhr=?, offset_asr=?, offset_maghrib=?, offset_isha=?,
             enable_fajr=?, enable_dhuhr=?, enable_asr=?, enable_maghrib=?, enable_isha=?,
-            clip_id=?, clip_id_fajr=?, target_kind=?, area_id=?, camera_ids=?, loop=?
+            clip_id=?, clip_id_fajr=?, target_kind=?, area_id=?, camera_ids=?, loop=?, gain_db=?
          WHERE id = 1`,
         [
             fields.enabled !== undefined ? (fields.enabled ? 1 : 0) : cur.enabled,
@@ -76,6 +76,7 @@ export function setConfig(fields = {}) {
             f.target_kind === 'cameras' ? 'cameras' : 'area',
             fields.area_id !== undefined ? (parseInt(fields.area_id, 10) || null) : cur.area_id,
             JSON.stringify(camIds), Math.round(numOr(f.loop, cur.loop, 1, 20)),
+            numOr(f.gain_db, cur.gain_db, -24, 24),
         ],
     );
     return getConfig();
@@ -123,7 +124,7 @@ export async function runDuePrayer(nowMs = Date.now()) {
         if (ids.length === 0) { console.warn(`[Adzan] ${LABELS[p]} due but no supported target camera`); return false; }
         const clipId = (p === 'fajr' && cfg.clip_id_fajr) ? cfg.clip_id_fajr : cfg.clip_id;
         try {
-            const { results } = await playToCameras(ids, 'clip', clipId, cfg.loop || 1); // bypasses quiet hours (not via the play controller)
+            const { results } = await playToCameras(ids, 'clip', clipId, cfg.loop || 1, { gainDb: cfg.gain_db }); // bypasses quiet hours (not via the play controller)
             const name = getClip(clipId)?.name;
             logPlay({ sourceType: 'clip', sourceId: clipId, sourceName: `ADZAN ${LABELS[p]}: ${name || ''}`.trim(), cameraIds: ids, results, operatorName: 'jadwal-adzan' });
             const ok = results.filter((r) => r.ok).length;

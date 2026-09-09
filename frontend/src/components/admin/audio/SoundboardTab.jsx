@@ -18,7 +18,7 @@ import { useConfirm } from '../../../contexts/ConfirmContext';
 import { Button, Field, EmptyState } from '../../ui';
 import CameraMultiSelect from './CameraMultiSelect';
 
-const BLANK = { id: null, label: '', sourceType: 'clip', sourceId: '', cameraIds: [], loop: 1 };
+const BLANK = { id: null, label: '', sourceType: 'clip', sourceId: '', cameraIds: [], loop: 1, gain_db: 0 };
 
 export default function SoundboardTab({ clips, playlists, cameras }) {
     const [buttons, setButtons] = useState([]);
@@ -48,7 +48,7 @@ export default function SoundboardTab({ clips, playlists, cameras }) {
             return;
         }
         setFiring(btn.id);
-        const req = { cameraIds: btn.camera_ids, sourceType: btn.source_type, sourceId: btn.source_id, loop: btn.loop };
+        const req = { cameraIds: btn.camera_ids, sourceType: btn.source_type, sourceId: btn.source_id, loop: btn.loop, gainDb: btn.gain_db };
         let result = await playNow(req);
         if (result.requiresConfirm) {
             const ok = await confirm({ title: 'Konfirmasi siaran', message: result.message, confirmLabel: 'Siarkan sekarang', cancelLabel: 'Batal', tone: 'default' });
@@ -67,7 +67,7 @@ export default function SoundboardTab({ clips, playlists, cameras }) {
         setSaving(true);
         const payload = {
             label: form.label.trim(), sourceType: form.sourceType, sourceId: Number(form.sourceId),
-            cameraIds: form.cameraIds, loop: form.loop,
+            cameraIds: form.cameraIds, loop: form.loop, gain_db: form.gain_db,
         };
         const r = form.id ? await updateSoundboardButton(form.id, payload) : await createSoundboardButton(payload);
         setSaving(false);
@@ -117,6 +117,10 @@ export default function SoundboardTab({ clips, playlists, cameras }) {
                         </Field>
                     </div>
                     <Field type="number" label="Ulang berapa kali" min={1} max={20} value={form.loop} onChange={(e) => setForm({ ...form, loop: Math.min(20, Math.max(1, parseInt(e.target.value, 10) || 1)) })} />
+                    <label className="block">
+                        <span className="mb-1 flex items-baseline justify-between"><span className="text-xs font-semibold text-content-muted">Volume</span><span className="text-xs tabular-nums text-content-subtle">{form.gain_db > 0 ? `+${form.gain_db}` : form.gain_db} dB</span></span>
+                        <input type="range" min="-6" max="12" step="1" value={form.gain_db || 0} onChange={(e) => setForm({ ...form, gain_db: parseInt(e.target.value, 10) || 0 })} className="w-full accent-primary" />
+                    </label>
                     <CameraMultiSelect cameras={cameras} value={form.cameraIds} onChange={(ids) => setForm({ ...form, cameraIds: ids })} />
                     <div className="flex justify-end gap-2">
                         <button type="button" onClick={() => setForm(null)} className="rounded-control border border-edge px-3 py-1.5 text-sm font-medium text-content-muted">Batal</button>
@@ -142,7 +146,7 @@ export default function SoundboardTab({ clips, playlists, cameras }) {
                             </button>
                             {manage && (
                                 <div className="mt-1 flex justify-center gap-2">
-                                    <button type="button" onClick={() => setForm({ id: btn.id, label: btn.label, sourceType: btn.source_type, sourceId: String(btn.source_id), cameraIds: btn.camera_ids, loop: btn.loop })} className="text-xs font-medium text-content-muted hover:underline">Ubah</button>
+                                    <button type="button" onClick={() => setForm({ id: btn.id, label: btn.label, sourceType: btn.source_type, sourceId: String(btn.source_id), cameraIds: btn.camera_ids, loop: btn.loop, gain_db: btn.gain_db })} className="text-xs font-medium text-content-muted hover:underline">Ubah</button>
                                     <button type="button" onClick={() => remove(btn)} className="text-xs font-medium text-status-fault hover:underline">Hapus</button>
                                 </div>
                             )}

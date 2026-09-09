@@ -449,7 +449,8 @@ export async function playNow(request, reply) {
                 });
             }
         }
-        const { results, files } = await playToCameras(ids, sourceType, sid, loop || 1);
+        const gainDb = Math.max(-24, Math.min(24, Number(request.body?.gainDb) || 0));
+        const { results, files } = await playToCameras(ids, sourceType, sid, loop || 1, { gainDb });
         const sourceName = sourceType === 'clip' ? getClip(sid)?.name : getPlaylistRow(sid)?.name;
         logPlay({
             sourceType, sourceId: sid, sourceName, cameraIds: ids, results,
@@ -593,13 +594,13 @@ export async function deleteEmergencyPreset(request, reply) {
  */
 export async function playEmergency(request, reply) {
     try {
-        const { sourceType, sourceId, targetKind, areaId, cameraIds, loop, confirm } = request.body || {};
+        const { sourceType, sourceId, targetKind, areaId, cameraIds, loop, gainDb, confirm } = request.body || {};
         if (confirm !== true) {
             return reply.code(409).send({ success: false, requiresConfirm: true, message: 'Siaran DARURAT butuh konfirmasi eksplisit.' });
         }
         const sid = parseId(sourceId);
         if (!sid) return reply.code(400).send({ success: false, message: 'Pilih audio darurat dulu' });
-        const { results, ids } = await fireEmergency({ sourceType: sourceType || 'clip', sourceId: sid, targetKind, areaId, cameraIds, loop });
+        const { results, ids } = await fireEmergency({ sourceType: sourceType || 'clip', sourceId: sid, targetKind, areaId, cameraIds, loop, gainDb });
         const sourceName = (sourceType || 'clip') === 'clip' ? getClip(sid)?.name : getPlaylistRow(sid)?.name;
         logPlay({
             sourceType: sourceType || 'clip', sourceId: sid, sourceName: `DARURAT: ${sourceName || `#${sid}`}`,

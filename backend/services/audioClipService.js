@@ -35,7 +35,11 @@ const SAFE_BASE_RE = /^clip-[a-z0-9]{6,40}$/;
 // level — no "one whispers, the next blares at 5am". EBU R128 target + a high-pass to drop sub-bass a tiny
 // TOA speaker can't reproduce. Set AUDIO_NORMALIZE=0 to disable. Off by default only if explicitly set.
 const NORMALIZE = process.env.AUDIO_NORMALIZE !== '0';
-const NORM_FILTER = 'highpass=f=80,loudnorm=I=-16:TP=-1.5:LRA=11';
+// Target is configurable; default I=-14 LUFS is ~2dB hotter than broadcast -16 so a small outdoor speaker
+// reads loud enough, while loudnorm's own limiter (cleaner than a hard clip) holds true-peak at TP.
+const NORM_I = process.env.AUDIO_NORM_I || '-14';
+const NORM_TP = process.env.AUDIO_NORM_TP || '-1.5';
+const NORM_FILTER = `highpass=f=80,loudnorm=I=${NORM_I}:TP=${NORM_TP}:LRA=11`;
 
 // Magic-byte gate. ffmpeg re-encode is the real validator, but this rejects obvious non-audio before
 // we ever hand bytes to ffmpeg. Covers the formats a phone/PC actually exports.

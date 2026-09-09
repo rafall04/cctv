@@ -122,6 +122,7 @@ function runPusher(cam, files, loop, ctx) {
                 ...process.env,
                 CAM_IP: cam.ip, CAM_USER: cam.user, CAM_PASS: cam.pass,
                 CAM_PORT: String(cam.port), LOOP: String(loop),
+                GAIN_DB: String(ctx.gainDb || 0), // runtime loudness (dB), applied via ffmpeg volume+limiter
             },
         });
         // Track it so the operator can stop a playback they started by mistake.
@@ -148,6 +149,7 @@ function runPusher(cam, files, loop, ctx) {
  */
 export async function playToCameras(cameraIds, sourceType, sourceId, loop = 1, opts = {}) {
     const preemptMode = opts.preempt === true; // emergency: displace whatever is playing + bypass the governor cap
+    const gainDb = Math.max(-24, Math.min(24, Number(opts.gainDb) || 0)); // runtime loudness (dB)
     const { files } = resolveSourceFiles(sourceType, sourceId);
     if (files.length === 0) {
         const err = new Error('Tidak ada audio untuk diputar (clip/playlist kosong atau berkas hilang)');
@@ -180,7 +182,7 @@ export async function playToCameras(cameraIds, sourceType, sourceId, loop = 1, o
         const camLoop = row.max_loop ? Math.min(loopN, row.max_loop) : loopN;
         // Lock is released by runPusher's onDone when the child ACTUALLY exits — token-guarded so a play that
         // was preempted mid-flight can't release the emergency holder that replaced it.
-        const r = await runPusher(cam, files, camLoop, { id, name: row.name, source: sourceType, onDone: () => release(id, token) });
+        const r = await runPusher(cam, files, camLoop, { id, name: row.name, source: sourceType, gainDb, onDone: () => release(id, token) });
         return { cameraId: id, name: row.name, ...r };
     }));
     return { results, files: files.length };

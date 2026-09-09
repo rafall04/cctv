@@ -72,8 +72,19 @@ def main():
     seqn = 0
     ts = 0
     ssrc = 0x43435456
-    start = time.time()
     i = 0
+    last_frame = None
+    plc = 0
+    PREROLL = SAMPLES * 4          # ~80ms: let a little audio arrive before the clock starts
+    MAX_PLC = 3                    # conceal a starve by repeating the last frame ~60ms, THEN silence
+    # Pre-roll so opening micro-jitter doesn't tear the first word (bounded, PTT stays snappy).
+    t0 = time.time()
+    while not _eof.is_set() and (time.time() - t0) < 0.5:
+        with _lock:
+            if len(_buf) >= PREROLL:
+                break
+        time.sleep(0.005)
+    start = time.time()            # clock reference AFTER pre-roll (never before, or the first tick bursts)
     try:
         while True:
             with _lock:
@@ -81,9 +92,22 @@ def main():
                     frame = bytes(_buf[:SAMPLES])
                     del _buf[:SAMPLES]
                     empty = len(_buf) < SAMPLES
+                    got = True
+                else:
+                    got = False
+                    empty = True
+            if got:
+                last_frame = frame
+                plc = 0
+            else:
+                # Starve: the RTP timeline must NEVER stall (a stopped timeline underflows the camera and
+                # tears down the backchannel). Conceal with the last frame for a few ticks, then silence —
+                # this replaces choppy instant-silence (the "kresek" mid-word) without risking a stall.
+                if last_frame is not None and plc < MAX_PLC:
+                    frame = last_frame
+                    plc += 1
                 else:
                     frame = SILENCE
-                    empty = True
             rtp = struct.pack('!BBHII', 0x80, PT, seqn & 0xFFFF, ts, ssrc) + frame
             talk.sock.sendall(b'$' + bytes([0]) + struct.pack('!H', len(rtp)) + rtp)
             seqn += 1

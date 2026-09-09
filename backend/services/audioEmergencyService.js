@@ -34,6 +34,8 @@ function validate({ label, sourceType, sourceId, targetKind, areaId, cameraIds, 
     return { cleanLabel, sourceType, sid, kind, aid, ids, n };
 }
 
+const clampGain = (v) => Math.max(-24, Math.min(24, Number(v) || 0));
+
 function decorate(row) {
     let ids = [];
     try { ids = JSON.parse(row.camera_ids || '[]'); } catch { ids = []; }
@@ -47,9 +49,9 @@ export function listPresets() {
 export function createPreset(data) {
     const v = validate(data);
     const info = execute(
-        `INSERT INTO audio_emergency_presets (label, source_type, source_id, target_kind, area_id, camera_ids, loop, created_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [v.cleanLabel, v.sourceType, v.sid, v.kind, v.aid, JSON.stringify(v.ids), v.n, data.userId ?? null],
+        `INSERT INTO audio_emergency_presets (label, source_type, source_id, target_kind, area_id, camera_ids, loop, gain_db, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [v.cleanLabel, v.sourceType, v.sid, v.kind, v.aid, JSON.stringify(v.ids), v.n, clampGain(data.gain_db), data.userId ?? null],
     );
     return decorate(queryOne('SELECT * FROM audio_emergency_presets WHERE id = ?', [info.lastInsertRowid]));
 }
@@ -68,9 +70,10 @@ export function updatePreset(id, data) {
         loop: data.loop !== undefined ? data.loop : existing.loop,
     };
     const v = validate(merged);
+    const gain = data.gain_db !== undefined ? clampGain(data.gain_db) : existing.gain_db;
     execute(
-        'UPDATE audio_emergency_presets SET label = ?, source_type = ?, source_id = ?, target_kind = ?, area_id = ?, camera_ids = ?, loop = ? WHERE id = ?',
-        [v.cleanLabel, v.sourceType, v.sid, v.kind, v.aid, JSON.stringify(v.ids), v.n, pid],
+        'UPDATE audio_emergency_presets SET label = ?, source_type = ?, source_id = ?, target_kind = ?, area_id = ?, camera_ids = ?, loop = ?, gain_db = ? WHERE id = ?',
+        [v.cleanLabel, v.sourceType, v.sid, v.kind, v.aid, JSON.stringify(v.ids), v.n, gain, pid],
     );
     return decorate(queryOne('SELECT * FROM audio_emergency_presets WHERE id = ?', [pid]));
 }
@@ -101,11 +104,11 @@ export function resolveTargets({ targetKind, areaId, cameraIds }) {
  * Fire an emergency: PREEMPT the resolved supported cameras and play the source now, bypassing quiet
  * hours + the governor cap. Returns { results, ids }. Throws 400 if nothing to target.
  */
-export async function fireEmergency({ sourceType = 'clip', sourceId, targetKind, areaId, cameraIds, loop = 3 }) {
+export async function fireEmergency({ sourceType = 'clip', sourceId, targetKind, areaId, cameraIds, loop = 3, gainDb = 0 }) {
     const ids = resolveTargets({ targetKind, areaId, cameraIds });
     if (ids.length === 0) { const e = new Error('Tak ada kamera didukung untuk target darurat ini'); e.statusCode = 400; throw e; }
     const { results } = await playToCameras(ids, sourceType, parseInt(sourceId, 10),
-        Math.min(Math.max(parseInt(loop, 10) || 3, 1), 20), { preempt: true });
+        Math.min(Math.max(parseInt(loop, 10) || 3, 1), 20), { preempt: true, gainDb: clampGain(gainDb) });
     return { results, ids };
 }
 

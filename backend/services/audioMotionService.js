@@ -66,12 +66,13 @@ export function setArm(cameraId, fields = {}) {
         const mins = clampInt(fields.arm_minutes, 0, 0, 1440);
         armUntil = mins > 0 ? new Date(Date.now() + mins * 60000).toISOString() : null;
     }
+    const gainDb = fields.gain_db !== undefined ? Math.max(-24, Math.min(24, Number(fields.gain_db) || 0)) : (existing ? existing.gain_db : 0);
     if (existing) {
-        execute('UPDATE audio_motion_arms SET enabled=?, clip_id=?, cooldown_sec=?, max_per_hour=?, onvif_port=?, arm_until=? WHERE camera_id=?',
-            [enabled, clipId, cooldown, maxHour, port, armUntil, id]);
+        execute('UPDATE audio_motion_arms SET enabled=?, clip_id=?, cooldown_sec=?, max_per_hour=?, onvif_port=?, arm_until=?, gain_db=? WHERE camera_id=?',
+            [enabled, clipId, cooldown, maxHour, port, armUntil, gainDb, id]);
     } else {
-        execute('INSERT INTO audio_motion_arms (camera_id, enabled, clip_id, cooldown_sec, max_per_hour, onvif_port, arm_until) VALUES (?, ?, ?, ?, ?, ?, ?)',
-            [id, enabled, clipId, cooldown, maxHour, port, armUntil]);
+        execute('INSERT INTO audio_motion_arms (camera_id, enabled, clip_id, cooldown_sec, max_per_hour, onvif_port, arm_until, gain_db) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            [id, enabled, clipId, cooldown, maxHour, port, armUntil, gainDb]);
     }
     reconcile();
     return queryOne('SELECT * FROM audio_motion_arms WHERE camera_id = ?', [id]);
@@ -99,7 +100,7 @@ async function maybeFire(cameraId) {
     execute('UPDATE audio_motion_arms SET last_fired = ?, hour_key = ?, fired_in_hour = ? WHERE camera_id = ?',
         [nowIso(), hk, firedInHour + 1, cameraId]);
     try {
-        const { results } = await playToCameras([cameraId], 'clip', a.clip_id, 1); // normal mode (respects lock/governor)
+        const { results } = await playToCameras([cameraId], 'clip', a.clip_id, 1, { gainDb: a.gain_db }); // normal mode (respects lock/governor)
         logPlay({ sourceType: 'clip', sourceId: a.clip_id, sourceName: `MOTION: ${getClip(a.clip_id)?.name || ''}`.trim(), cameraIds: [cameraId], results, operatorName: 'motion-auto' });
         console.log(`[Motion] Deter fired on camera ${cameraId} (${results.filter((r) => r.ok).length}/1)`);
     } catch (e) {

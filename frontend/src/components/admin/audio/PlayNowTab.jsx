@@ -20,6 +20,7 @@ export default function PlayNowTab({ clips, playlists, cameras, preselect, group
     const [sourceId, setSourceId] = useState('');
     const [cameraIds, setCameraIds] = useState([]);
     const [loop, setLoop] = useState(1);
+    const [gainDb, setGainDb] = useState(0);
     const [playing, setPlaying] = useState(false);
     const [results, setResults] = useState(null);
     const [active, setActive] = useState([]);
@@ -88,7 +89,7 @@ export default function PlayNowTab({ clips, playlists, cameras, preselect, group
         setPlaying(true);
         setResults(null);
         // Wide blast / quiet-hours broadcasts come back as requiresConfirm — ask, then re-send with confirm.
-        let result = await playNow({ cameraIds, sourceType, sourceId: Number(sourceId), loop });
+        let result = await playNow({ cameraIds, sourceType, sourceId: Number(sourceId), loop, gainDb });
         if (result.requiresConfirm) {
             const ok = await confirm({
                 title: 'Konfirmasi siaran',
@@ -98,7 +99,7 @@ export default function PlayNowTab({ clips, playlists, cameras, preselect, group
                 tone: 'default',
             });
             if (!ok) { setPlaying(false); return; }
-            result = await playNow({ cameraIds, sourceType, sourceId: Number(sourceId), loop, confirm: true });
+            result = await playNow({ cameraIds, sourceType, sourceId: Number(sourceId), loop, gainDb, confirm: true });
         }
         setPlaying(false);
         if (!result.success) {
@@ -164,6 +165,15 @@ export default function PlayNowTab({ clips, playlists, cameras, preselect, group
                     onChange={(e) => setLoop(Math.min(20, Math.max(1, parseInt(e.target.value, 10) || 1)))}
                     hint="Putar berulang, mis. sirene atau pengumuman singkat."
                 />
+
+                <div>
+                    <div className="mb-1 flex items-baseline justify-between">
+                        <span className="text-xs font-semibold text-content-muted">Volume</span>
+                        <span className="text-xs tabular-nums text-content-subtle">{gainDb > 0 ? `+${gainDb}` : gainDb} dB{gainDb === 0 ? ' (asli)' : gainDb > 0 ? ' (lebih keras)' : ' (lebih pelan)'}</span>
+                    </div>
+                    <input type="range" min="-6" max="12" step="1" value={gainDb} onChange={(e) => setGainDb(parseInt(e.target.value, 10) || 0)} className="w-full accent-primary" />
+                    <p className="mt-0.5 text-xs text-content-subtle">Naikkan agar lebih keras (dijaga limiter agar tak pecah). Speaker kamera sendiri sudah maksimum.</p>
+                </div>
             </div>
 
             <div className="space-y-4 rounded-card border border-edge bg-surface p-4 shadow-e1">

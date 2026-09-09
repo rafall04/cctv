@@ -17,17 +17,24 @@ import { getApiUrl } from '../../../config/config.js';
 import { useNotification } from '../../../contexts/NotificationContext';
 import CameraMultiSelect from './CameraMultiSelect';
 
-// AudioWorklet: resample the mic to 16kHz, encode G.711 u-law, emit 320-byte (20ms) frames + an RMS level.
+// AudioWorklet: mic -> 16kHz with an ANTI-ALIAS box-average (fixes the metallic "kresek" that a naive
+// decimation caused), a settable gain + tanh SOFT-LIMITER instead of a hard clip (fixes the "over"/square
+// distortion), G.711 u-law, 320-byte (20ms) frames + a true post-limiter peak level for an honest meter.
 const WORKLET_SRC = `
 class PTT extends AudioWorkletProcessor {
-  constructor(){ super(); this.ratio = sampleRate/16000; this.phase=0; this.out=new Uint8Array(320); this.n=0; this.sq=0; this.c=0; }
+  constructor(){ super(); this.ratio=sampleRate/16000; this.phase=0; this.acc=0; this.cnt=0;
+    this.out=new Uint8Array(320); this.n=0; this.peak=0; this.gain=1.6;
+    this.port.onmessage=(e)=>{ if(e.data&&typeof e.data.gain==='number') this.gain=e.data.gain; }; }
   static mu(s){ const B=0x84,C=32635; let sign=(s>>8)&0x80; if(sign)s=-s; if(s>C)s=C; s+=B; let e=7; for(let m=0x4000;(s&m)===0&&e>0;m>>=1)e--; const man=(s>>(e+3))&0x0f; return (~(sign|(e<<4)|man))&0xff; }
   process(inputs){ const ch = inputs[0] && inputs[0][0]; if(!ch) return true;
-    for(let i=0;i<ch.length;i++){ this.phase+=1; this.sq+=ch[i]*ch[i]; this.c++;
-      if(this.phase>=this.ratio){ this.phase-=this.ratio; let v=ch[i]; if(v>1)v=1; else if(v<-1)v=-1;
+    for(let i=0;i<ch.length;i++){ this.acc+=ch[i]; this.cnt++; this.phase+=1;
+      if(this.phase>=this.ratio){ this.phase-=this.ratio;
+        let v=this.acc/(this.cnt||1); this.acc=0; this.cnt=0;   // box-average across the window = anti-alias LPF
+        v=Math.tanh(this.gain*v);                                // gain + smooth saturation (no square-wave clip)
+        const a=v<0?-v:v; if(a>this.peak)this.peak=a;
         this.out[this.n++]=PTT.mu((v*32767)|0);
-        if(this.n===320){ const rms=Math.sqrt(this.sq/Math.max(1,this.c)); this.sq=0; this.c=0;
-          const b=this.out.slice(0).buffer; this.port.postMessage({frame:b, rms}, [b]); this.n=0; } } }
+        if(this.n===320){ const level=this.peak; this.peak=0;
+          const b=this.out.slice(0).buffer; this.port.postMessage({frame:b, level}, [b]); this.n=0; } } }
     return true; }
 }
 registerProcessor('ptt', PTT);
@@ -37,9 +44,19 @@ export default function TalkTab({ cameras }) {
     const [cameraIds, setCameraIds] = useState([]);
     const [state, setState] = useState('idle'); // idle | connecting | onair
     const [level, setLevel] = useState(0);
+    const [micGain, setMicGain] = useState(1.6); // mic sensitivity (soft-limited in the worklet)
     const { showNotification } = useNotification();
 
     const refs = useRef({ ws: null, ctx: null, node: null, stream: null, active: false, workletUrl: null });
+    const gainRef = useRef(1.6);
+
+    // Live mic-gain control: keep a ref (so `start` needn't depend on it) and push to the worklet on change.
+    const changeGain = (g) => {
+        const v = Math.max(0.6, Math.min(3, Number(g) || 1));
+        gainRef.current = v;
+        setMicGain(v);
+        try { if (refs.current.node) refs.current.node.port.postMessage({ gain: v }); } catch { /* */ }
+    };
 
     const cleanup = useCallback(() => {
         const r = refs.current;
@@ -90,7 +107,9 @@ export default function TalkTab({ cameras }) {
             if (!refs.current.active) return;
 
             // 2) mic + audio graph.
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+            // autoGainControl OFF: the browser AGC pumps then overshoots on speech onset -> the "over"
+            // distortion. We control loudness ourselves via the mic-gain slider + the worklet soft-limiter.
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: false } });
             refs.current.stream = stream;
             let ctx;
             try { ctx = new AudioContext({ sampleRate: 16000 }); } catch { ctx = new AudioContext(); }
@@ -102,10 +121,11 @@ export default function TalkTab({ cameras }) {
             const srcNode = ctx.createMediaStreamSource(stream);
             const node = new AudioWorkletNode(ctx, 'ptt');
             refs.current.node = node;
+            try { node.port.postMessage({ gain: gainRef.current }); } catch { /* */ } // send initial mic gain
             node.port.onmessage = (e) => {
                 const r = refs.current;
                 if (!r.active || !r.ws || r.ws.readyState !== 1) return;
-                if (e.data.frame) { try { r.ws.send(e.data.frame); } catch { /* */ } setLevel(Math.min(1, e.data.rms * 4)); }
+                if (e.data.frame) { try { r.ws.send(e.data.frame); } catch { /* */ } setLevel(Math.min(1, e.data.level || 0)); }
             };
             srcNode.connect(node);
             // A muted sink keeps the graph pulling on some browsers without echoing to the operator.
@@ -159,10 +179,17 @@ export default function TalkTab({ cameras }) {
                     {state === 'onair' ? 'MENGUDARA…' : state === 'connecting' ? 'Menyambung…' : 'Tahan untuk\nBicara'}
                 </button>
 
-                {/* Level meter */}
+                {/* Level meter (true post-limiter peak) — kalau mentok kanan terus, turunkan sensitivitas. */}
                 <div className="h-2 w-48 overflow-hidden rounded-full bg-surface-sunken">
-                    <div className="h-full rounded-full bg-status-live transition-[width] duration-75" style={{ width: `${Math.round(level * 100)}%` }} />
+                    <div className={`h-full rounded-full transition-[width] duration-75 ${level > 0.95 ? 'bg-status-warn' : 'bg-status-live'}`} style={{ width: `${Math.round(level * 100)}%` }} />
                 </div>
+
+                {/* Mic sensitivity (volume masuk) */}
+                <label className="flex w-48 items-center gap-2 text-xs text-content-muted">
+                    <span className="shrink-0">Sensitivitas</span>
+                    <input type="range" min="0.6" max="3" step="0.1" value={micGain} onChange={(e) => changeGain(e.target.value)} className="min-w-0 flex-1 accent-primary" />
+                    <span className="w-8 shrink-0 text-right tabular-nums">{micGain.toFixed(1)}×</span>
+                </label>
 
                 <p className="text-center text-xs text-content-subtle">
                     Tahan tombol lalu bicara — suara keluar langsung di speaker kamera. Lepas untuk berhenti.
