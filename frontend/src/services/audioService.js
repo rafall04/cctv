@@ -176,6 +176,32 @@ export const stopPlay = async (payload) => {
     } catch (error) { return failure(error, 'Gagal menghentikan'); }
 };
 
+/* -------------------------------------------------- custom manual camera groups */
+
+export const getGroups = async () => {
+    try {
+        return (await apiClient.get(`${BASE}/groups`)).data;
+    } catch (error) { return failure(error, 'Gagal memuat grup'); }
+};
+
+export const createGroup = async (name, cameraIds) => {
+    try {
+        return (await apiClient.post(`${BASE}/groups`, { name, cameraIds })).data;
+    } catch (error) { return failure(error, 'Gagal membuat grup'); }
+};
+
+export const updateGroup = async (id, payload) => {
+    try {
+        return (await apiClient.put(`${BASE}/groups/${id}`, payload)).data;
+    } catch (error) { return failure(error, 'Gagal memperbarui grup'); }
+};
+
+export const deleteGroup = async (id) => {
+    try {
+        return (await apiClient.delete(`${BASE}/groups/${id}`)).data;
+    } catch (error) { return failure(error, 'Gagal menghapus grup'); }
+};
+
 /** Mint a single-use ticket for a live push-to-talk WebSocket to one camera. */
 export const talkTicket = async (cameraId) => {
     try {
@@ -189,4 +215,5 @@ export default {
     getSchedules, createSchedule, updateSchedule, toggleSchedule, deleteSchedule,
     getCameras, playNow, talkTicket, getActivePlays, stopPlay,
     getCapability, recheckCapability, recheckCameraCapability, getAreas, toggleArea,
+    getGroups, createGroup, updateGroup, deleteGroup,
 };

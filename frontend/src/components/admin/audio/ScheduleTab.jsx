@@ -69,7 +69,7 @@ function describeSchedule(s) {
     return describeDays(s.days_mask);
 }
 
-function ScheduleForm({ initial, clips, playlists, cameras, onSubmit }) {
+function ScheduleForm({ initial, clips, playlists, cameras, onSubmit, groups, onSaveGroup, onDeleteGroup }) {
     const [name, setName] = useState(initial?.name || '');
     const [sourceType, setSourceType] = useState(initial?.source_type || 'clip');
     const [sourceId, setSourceId] = useState(initial?.source_id ? String(initial.source_id) : '');
@@ -171,12 +171,19 @@ function ScheduleForm({ initial, clips, playlists, cameras, onSubmit }) {
 
             {scheduleKind !== 'once' && <DayPicker mask={daysMask} onChange={setDaysMask} />}
 
-            <CameraMultiSelect cameras={cameras} value={cameraIds} onChange={setCameraIds} />
+            <CameraMultiSelect
+                cameras={cameras}
+                value={cameraIds}
+                onChange={setCameraIds}
+                groups={groups}
+                onSaveGroup={onSaveGroup}
+                onDeleteGroup={onDeleteGroup}
+            />
         </form>
     );
 }
 
-export default function ScheduleTab({ schedules, clips, playlists, cameras, loading, reload }) {
+export default function ScheduleTab({ schedules, clips, playlists, cameras, loading, reload, groups, onSaveGroup, onDeleteGroup }) {
     const [editing, setEditing] = useState(null);
     const [saving, setSaving] = useState(false);
     const { showNotification } = useNotification();
@@ -285,7 +292,7 @@ export default function ScheduleTab({ schedules, clips, playlists, cameras, load
                         </>
                     )}
                 >
-                    <ScheduleForm initial={editing.id ? editing : null} clips={clips} playlists={playlists} cameras={cameras} onSubmit={handleSubmit} />
+                    <ScheduleForm initial={editing.id ? editing : null} clips={clips} playlists={playlists} cameras={cameras} onSubmit={handleSubmit} groups={groups} onSaveGroup={onSaveGroup} onDeleteGroup={onDeleteGroup} />
                 </Modal>
             )}
         </div>

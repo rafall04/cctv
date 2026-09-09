@@ -25,6 +25,10 @@ import { playToCameras, listPlaying, stopPlaying, stopAllPlaying } from '../serv
 import { listBroadcastTargets, listAreas as listAreaRows, setAreaEnabled } from '../services/audioTargetService.js';
 import { listCapabilities, recheckAll, probeCamera } from '../services/audioCapabilityService.js';
 import { createImportJob, listJobs as listImportRows } from '../services/audioImportService.js';
+import {
+    listGroups as listGroupRows, createGroup as createGroupRow,
+    updateGroup as updateGroupRow, deleteGroup as deleteGroupRow,
+} from '../services/audioGroupService.js';
 import { mintTicket } from '../services/audioTalkService.js';
 import { logAdminAction } from '../services/securityAuditLogger.js';
 
@@ -252,6 +256,43 @@ export async function toggleArea(request, reply) {
         logAdminAction({ action: 'audio_area_toggle', targetType: 'area', targetId: id, enabled: area.audio_broadcast_enabled, ...adminContext(request) }, request);
         return reply.send({ success: true, message: area.audio_broadcast_enabled ? 'Area diaktifkan' : 'Area dinonaktifkan', data: area });
     } catch (error) { return fail(reply, error); }
+}
+
+/* ------------------------------------------------------- custom camera groups */
+
+// Manual, area-free bags of cameras ("Musholla" = cam A,B,C) reused as one-tap presets in the picker.
+export async function listGroups(request, reply) {
+    try {
+        return reply.send({ success: true, data: listGroupRows() });
+    } catch (error) { return fail(reply, error); }
+}
+
+export async function createGroup(request, reply) {
+    try {
+        const g = createGroupRow(request.body?.name, request.body?.cameraIds || [], request.user?.id ?? null);
+        logAdminAction({ action: 'audio_group_created', targetType: 'audio_group', targetId: g.id, name: g.name, cameras: g.camera_count, ...adminContext(request) }, request);
+        return reply.code(201).send({ success: true, message: 'Grup dibuat', data: g });
+    } catch (error) { return fail(reply, error, 'Gagal membuat grup'); }
+}
+
+export async function updateGroup(request, reply) {
+    try {
+        const id = parseId(request.params.id);
+        if (!id) return reply.code(400).send({ success: false, message: 'ID grup tidak valid' });
+        const g = updateGroupRow(id, request.body || {});
+        logAdminAction({ action: 'audio_group_updated', targetType: 'audio_group', targetId: id, ...adminContext(request) }, request);
+        return reply.send({ success: true, message: 'Grup diperbarui', data: g });
+    } catch (error) { return fail(reply, error, 'Gagal memperbarui grup'); }
+}
+
+export async function deleteGroup(request, reply) {
+    try {
+        const id = parseId(request.params.id);
+        if (!id) return reply.code(400).send({ success: false, message: 'ID grup tidak valid' });
+        const g = deleteGroupRow(id);
+        logAdminAction({ action: 'audio_group_deleted', targetType: 'audio_group', targetId: id, name: g.name, ...adminContext(request) }, request);
+        return reply.send({ success: true, message: 'Grup dihapus' });
+    } catch (error) { return fail(reply, error, 'Gagal menghapus grup'); }
 }
 
 /* ------------------------------------------------------------- live push-to-talk */

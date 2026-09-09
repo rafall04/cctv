@@ -14,7 +14,7 @@ import { Button, Field } from '../../ui';
 import CameraMultiSelect from './CameraMultiSelect';
 import { formatDuration } from './audioFormatting';
 
-export default function PlayNowTab({ clips, playlists, cameras, preselect }) {
+export default function PlayNowTab({ clips, playlists, cameras, preselect, groups, onSaveGroup, onDeleteGroup }) {
     const [sourceType, setSourceType] = useState('clip');
     const [sourceId, setSourceId] = useState('');
     const [cameraIds, setCameraIds] = useState([]);
@@ -133,7 +133,15 @@ export default function PlayNowTab({ clips, playlists, cameras, preselect }) {
             </div>
 
             <div className="space-y-4 rounded-card border border-edge bg-surface p-4 shadow-e1">
-                <CameraMultiSelect cameras={cameras} value={cameraIds} onChange={setCameraIds} disabled={playing} />
+                <CameraMultiSelect
+                    cameras={cameras}
+                    value={cameraIds}
+                    onChange={setCameraIds}
+                    disabled={playing}
+                    groups={groups}
+                    onSaveGroup={onSaveGroup}
+                    onDeleteGroup={onDeleteGroup}
+                />
 
                 <Button variant="primary" onClick={handlePlay} loading={playing} className="w-full">
                     {playing ? 'Menyiarkan…' : 'Putar sekarang'}

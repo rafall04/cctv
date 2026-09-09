@@ -33,15 +33,42 @@ function CapabilityTag({ supports }) {
  * @param {Array<{id:number,name:string,area_name?:string}>} cameras
  * @param {number[]} value selected camera ids
  * @param {(ids:number[])=>void} onChange
+ * @param {Array<{id:number,name:string,camera_ids:number[],camera_count:number}>} [groups] custom manual groups
+ * @param {(name:string, cameraIds:number[])=>Promise<void>} [onSaveGroup] save current selection as a group
+ * @param {(id:number)=>Promise<void>} [onDeleteGroup] delete a group
  */
-export default function CameraMultiSelect({ cameras = [], value = [], onChange, disabled = false }) {
+export default function CameraMultiSelect({
+    cameras = [], value = [], onChange, disabled = false,
+    groups = null, onSaveGroup = null, onDeleteGroup = null,
+}) {
     const selected = new Set(value);
     const [supportedOnly, setSupportedOnly] = useState(false);
+    const [naming, setNaming] = useState(false);
+    const [groupName, setGroupName] = useState('');
 
     const toggle = (id) => {
         const next = new Set(selected);
         if (next.has(id)) next.delete(id); else next.add(id);
         onChange([...next]);
+    };
+
+    // Custom-group quick-pick: apply/clear a saved bag of cameras in one tap (intersected with the
+    // cameras actually available now, so a member whose area is currently off is simply skipped).
+    const validIds = new Set(cameras.map((c) => c.id));
+    const groupMembers = (g) => (g.camera_ids || []).filter((id) => validIds.has(id));
+    const applyGroup = (g) => {
+        const ids = groupMembers(g);
+        const allOn = ids.length > 0 && ids.every((id) => selected.has(id));
+        const next = new Set(selected);
+        ids.forEach((id) => (allOn ? next.delete(id) : next.add(id)));
+        onChange([...next]);
+    };
+    const saveGroup = async () => {
+        const name = groupName.trim();
+        if (!name || !onSaveGroup) return;
+        await onSaveGroup(name, [...selected]);
+        setGroupName('');
+        setNaming(false);
     };
 
     // Optional filter: only cameras confirmed to support the backchannel (will actually sound).
@@ -91,6 +118,83 @@ export default function CameraMultiSelect({ cameras = [], value = [], onChange, 
                     )}
                 </div>
             </div>
+
+            {/* Custom manual groups — area-free presets the operator saved (e.g. "Musholla" = cam A,B,C). */}
+            {groups && (
+                <div className="space-y-1.5 rounded-control border border-edge bg-surface-sunken p-2">
+                    <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-semibold text-content-muted">Grup kustom</span>
+                        {onSaveGroup && !naming && (
+                            <button
+                                type="button"
+                                disabled={disabled || selected.size === 0}
+                                onClick={() => setNaming(true)}
+                                className="shrink-0 text-xs font-medium text-primary hover:underline disabled:opacity-40"
+                                title={selected.size === 0 ? 'Pilih kamera dulu' : 'Simpan pilihan sebagai grup'}
+                            >
+                                + Simpan {selected.size > 0 ? `(${selected.size})` : ''} sebagai grup
+                            </button>
+                        )}
+                    </div>
+
+                    {naming && (
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="text"
+                                autoFocus
+                                value={groupName}
+                                maxLength={80}
+                                placeholder="Nama grup, mis. Musholla"
+                                onChange={(e) => setGroupName(e.target.value)}
+                                onKeyDown={(e) => { if (e.key === 'Enter') saveGroup(); if (e.key === 'Escape') { setNaming(false); setGroupName(''); } }}
+                                className="min-w-0 flex-1 rounded-control border border-edge bg-surface px-2 py-1.5 text-sm text-content focus:border-primary focus:outline-none"
+                            />
+                            <button type="button" onClick={saveGroup} disabled={!groupName.trim()} className="shrink-0 rounded-control bg-primary px-2.5 py-1.5 text-xs font-medium text-white disabled:opacity-40">Simpan</button>
+                            <button type="button" onClick={() => { setNaming(false); setGroupName(''); }} className="shrink-0 rounded-control border border-edge px-2.5 py-1.5 text-xs font-medium text-content-muted">Batal</button>
+                        </div>
+                    )}
+
+                    {groups.length === 0 ? (
+                        !naming && <p className="text-xs text-content-subtle">Belum ada grup. Pilih beberapa kamera lalu simpan sebagai grup untuk memilihnya sekali tap.</p>
+                    ) : (
+                        <div className="flex flex-wrap gap-1.5">
+                            {groups.map((g) => {
+                                const ids = groupMembers(g);
+                                const on = ids.length > 0 && ids.every((id) => selected.has(id));
+                                return (
+                                    <span
+                                        key={g.id}
+                                        className={`inline-flex items-center gap-1 rounded-full border py-1 pl-2.5 pr-1 text-xs transition-colors ${
+                                            on ? 'border-primary bg-primary/10 text-primary' : 'border-edge bg-surface text-content-muted'
+                                        }`}
+                                    >
+                                        <button
+                                            type="button"
+                                            disabled={disabled || ids.length === 0}
+                                            onClick={() => applyGroup(g)}
+                                            className="font-medium disabled:opacity-40"
+                                            title={ids.length === 0 ? 'Tidak ada anggota di area aktif' : `${g.name} — ${ids.length} kamera`}
+                                        >
+                                            {g.name} <span className="font-normal opacity-70">({ids.length || g.camera_count})</span>
+                                        </button>
+                                        {onDeleteGroup && (
+                                            <button
+                                                type="button"
+                                                disabled={disabled}
+                                                onClick={() => onDeleteGroup(g.id)}
+                                                className="flex h-4 w-4 items-center justify-center rounded-full text-content-subtle hover:bg-status-fault/10 hover:text-status-fault"
+                                                aria-label={`Hapus grup ${g.name}`}
+                                            >
+                                                ×
+                                            </button>
+                                        )}
+                                    </span>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            )}
 
             {shown.length === 0 ? (
                 <p className="rounded-control border border-dashed border-edge bg-surface-sunken p-3 text-xs text-content-subtle">

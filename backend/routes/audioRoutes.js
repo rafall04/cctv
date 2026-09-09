@@ -17,6 +17,7 @@ import {
     listCameras, playNow,
     listCapability, recheckCapability, recheckCameraCapability, listAreas, toggleArea,
     importClip, listImportJobs, talkTicket, listActivePlays, stopPlay,
+    listGroups, createGroup, updateGroup, deleteGroup,
 } from '../controllers/audioController.js';
 import fastifyWebsocket from '@fastify/websocket';
 import { authMiddleware, requireAdmin } from '../middleware/authMiddleware.js';
@@ -64,6 +65,12 @@ export default async function audioRoutes(fastify) {
     fastify.post('/capability/recheck/:id', admin, recheckCameraCapability);
     fastify.get('/areas', admin, listAreas);
     fastify.patch('/areas/:id/enabled', admin, toggleArea);
+
+    // Custom manual camera groups (area-free presets)
+    fastify.get('/groups', admin, listGroups);
+    fastify.post('/groups', admin, createGroup);
+    fastify.put('/groups/:id', admin, updateGroup);
+    fastify.delete('/groups/:id', admin, deleteGroup);
 
     // Play-now + stop
     fastify.post('/play', admin, playNow);

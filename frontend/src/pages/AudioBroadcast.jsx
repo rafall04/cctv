@@ -15,6 +15,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
     getClips, getPlaylists, getSchedules, getCameras, getAreas, getCapability,
+    getGroups, createGroup, deleteGroup,
 } from '../services/audioService';
 import { useNotification } from '../contexts/NotificationContext';
 import { PageHeader, Tabs, TabPanel } from '../components/ui';
@@ -42,6 +43,7 @@ export default function AudioBroadcast() {
     const [cameras, setCameras] = useState([]);
     const [areas, setAreas] = useState([]);
     const [capability, setCapability] = useState([]);
+    const [groups, setGroups] = useState([]);
     const [loading, setLoading] = useState(true);
     const [preselectClip, setPreselectClip] = useState(null);
     const { showNotification } = useNotification();
@@ -80,12 +82,29 @@ export default function AudioBroadcast() {
         if (cam.success) setCameras(cam.data || []);
     }, [warn]);
 
+    const reloadGroups = useCallback(async () => {
+        const r = await getGroups();
+        if (r.success) setGroups(r.data || []); else warn(r, 'Gagal memuat grup');
+    }, [warn]);
+
+    // Save the current camera selection as a custom manual group; delete removes it. Both refresh the list.
+    const handleSaveGroup = useCallback(async (name, cameraIds) => {
+        const r = await createGroup(name, cameraIds);
+        if (r.success) { showNotification({ type: 'success', title: 'Grup disimpan', message: name }); reloadGroups(); }
+        else warn(r, 'Gagal membuat grup');
+    }, [reloadGroups, warn, showNotification]);
+
+    const handleDeleteGroup = useCallback(async (id) => {
+        const r = await deleteGroup(id);
+        if (r.success) reloadGroups(); else warn(r, 'Gagal menghapus grup');
+    }, [reloadGroups, warn]);
+
     useEffect(() => {
         let cancelled = false;
         (async () => {
             setLoading(true);
-            const [c, p, s, cam, ar, cap] = await Promise.all([
-                getClips(), getPlaylists(), getSchedules(), getCameras(), getAreas(), getCapability(),
+            const [c, p, s, cam, ar, cap, gr] = await Promise.all([
+                getClips(), getPlaylists(), getSchedules(), getCameras(), getAreas(), getCapability(), getGroups(),
             ]);
             if (cancelled) return;
             if (c.success) setClips(c.data || []); else warn(c, 'Gagal memuat audio');
@@ -94,6 +113,7 @@ export default function AudioBroadcast() {
             if (cam.success) setCameras(cam.data || []); else warn(cam, 'Gagal memuat kamera');
             if (ar.success) setAreas(ar.data || []);
             if (cap.success) setCapability(cap.data || []);
+            if (gr.success) setGroups(gr.data || []);
             setLoading(false);
         })();
         return () => { cancelled = true; };
@@ -115,7 +135,15 @@ export default function AudioBroadcast() {
 
             {active === 'play' && (
                 <TabPanel id="play" idPrefix="audio">
-                    <PlayNowTab clips={clips} playlists={playlists} cameras={cameras} preselect={preselectClip} />
+                    <PlayNowTab
+                        clips={clips}
+                        playlists={playlists}
+                        cameras={cameras}
+                        preselect={preselectClip}
+                        groups={groups}
+                        onSaveGroup={handleSaveGroup}
+                        onDeleteGroup={handleDeleteGroup}
+                    />
                 </TabPanel>
             )}
             {active === 'talk' && (
@@ -142,6 +170,9 @@ export default function AudioBroadcast() {
                         cameras={cameras}
                         loading={loading}
                         reload={reloadSchedules}
+                        groups={groups}
+                        onSaveGroup={handleSaveGroup}
+                        onDeleteGroup={handleDeleteGroup}
                     />
                 </TabPanel>
             )}
