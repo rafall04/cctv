@@ -159,10 +159,17 @@ export const playNow = async ({ cameraIds, sourceType, sourceId, loop = 1 }) => 
     } catch (error) { return failure(error, 'Gagal memutar audio'); }
 };
 
+/** Mint a single-use ticket for a live push-to-talk WebSocket to one camera. */
+export const talkTicket = async (cameraId) => {
+    try {
+        return (await apiClient.post(`${BASE}/talk/ticket`, { cameraId })).data;
+    } catch (error) { return failure(error, 'Gagal memulai bicara'); }
+};
+
 export default {
     getClips, uploadClip, deleteClip, importClip, getImportJobs,
     getPlaylists, getPlaylist, createPlaylist, updatePlaylist, deletePlaylist,
     getSchedules, createSchedule, updateSchedule, toggleSchedule, deleteSchedule,
-    getCameras, playNow,
+    getCameras, playNow, talkTicket,
     getCapability, recheckCapability, recheckCameraCapability, getAreas, toggleArea,
 };

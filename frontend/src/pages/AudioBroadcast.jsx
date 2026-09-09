@@ -23,9 +23,11 @@ import PlaylistTab from '../components/admin/audio/PlaylistTab';
 import ScheduleTab from '../components/admin/audio/ScheduleTab';
 import PlayNowTab from '../components/admin/audio/PlayNowTab';
 import TargetsTab from '../components/admin/audio/TargetsTab';
+import TalkTab from '../components/admin/audio/TalkTab';
 
 const TABS = [
     { id: 'play', label: 'Putar Sekarang' },
+    { id: 'talk', label: 'Bicara' },
     { id: 'library', label: 'Pustaka' },
     { id: 'playlists', label: 'Playlist' },
     { id: 'schedules', label: 'Jadwal' },
@@ -114,6 +116,11 @@ export default function AudioBroadcast() {
             {active === 'play' && (
                 <TabPanel id="play" idPrefix="audio">
                     <PlayNowTab clips={clips} playlists={playlists} cameras={cameras} preselect={preselectClip} />
+                </TabPanel>
+            )}
+            {active === 'talk' && (
+                <TabPanel id="talk" idPrefix="audio">
+                    <TalkTab cameras={cameras} />
                 </TabPanel>
             )}
             {active === 'library' && (

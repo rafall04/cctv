@@ -16,10 +16,12 @@ import {
     listSchedules, createSchedule, updateSchedule, toggleSchedule, deleteSchedule,
     listCameras, playNow,
     listCapability, recheckCapability, recheckCameraCapability, listAreas, toggleArea,
-    importClip, listImportJobs,
+    importClip, listImportJobs, talkTicket,
 } from '../controllers/audioController.js';
+import fastifyWebsocket from '@fastify/websocket';
 import { authMiddleware, requireAdmin } from '../middleware/authMiddleware.js';
 import { MAX_AUDIO_UPLOAD_BYTES } from '../services/audioClipService.js';
+import { talkHandler } from '../services/audioTalkService.js';
 
 // base64 inflates by 4/3; add headroom for the surrounding JSON envelope. Stays below the sanitizer's
 // MAX_AUDIO_BODY_SIZE so this route rejects an oversize body first.
@@ -27,6 +29,12 @@ const UPLOAD_BODY_LIMIT = Math.ceil(MAX_AUDIO_UPLOAD_BYTES * 1.4) + 4096;
 
 export default async function audioRoutes(fastify) {
     const admin = { preHandler: [authMiddleware, requireAdmin] };
+
+    // Live push-to-talk uses a WebSocket. Register the plugin inside THIS scope (server.js is frozen) so
+    // the /talk route can be a WS route. maxPayload bounds a rogue client's frame size.
+    await fastify.register(fastifyWebsocket, { options: { maxPayload: 8192 } });
+    fastify.post('/talk/ticket', admin, talkTicket);       // authed: mints a single-use WS ticket
+    fastify.get('/talk', { websocket: true }, talkHandler); // ticket-gated inside the handler (browsers can't auth a WS)
 
     // Clips
     fastify.get('/clips', admin, listClips);

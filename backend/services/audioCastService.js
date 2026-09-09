@@ -16,19 +16,16 @@ import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { query, queryOne } from '../database/connectionPool.js';
 import { clipPath, getClip } from './audioClipService.js';
+import { acquire, release } from './cameraAudioLock.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SCRIPT = join(__dirname, '..', 'scripts', 'audio_cast.py');
 const PY = process.env.AUDIO_CAST_PYTHON || 'python3';
 const PLAY_TIMEOUT_MS = 15 * 60 * 1000; // hard cap so a wedged session can never pin a camera
 
-// Cameras currently streaming audio — one broadcast per camera at a time (overlapping RTP = garble).
-const busy = new Set();
-
-/** True while a camera is mid-broadcast — the capability prober skips it (a second backchannel = garble). */
-export function isBusy(id) {
-    return busy.has(parseInt(id, 10));
-}
+// Re-exported for audioCapabilityService (skip a camera that is mid-broadcast). One audio-out per camera
+// is enforced by cameraAudioLock, shared with live push-to-talk — a second RTP stream would garble.
+export { isBusy } from './cameraAudioLock.js';
 
 export function parseRtsp(url) {
     const m = /^rtsp:\/\/([^:]+):([^@]+)@([^:/]+)(?::(\d+))?/i.exec(url || '');
@@ -118,13 +115,12 @@ export async function playToCameras(cameraIds, sourceType, sourceId, loop = 1) {
         if (!row) return { cameraId: id, name: `#${id}`, ok: false, message: 'kamera tidak ada' };
         const cam = parseRtsp(row.private_rtsp_url);
         if (!cam) return { cameraId: id, name: row.name, ok: false, message: 'kamera tanpa RTSP internal' };
-        if (busy.has(id)) return { cameraId: id, name: row.name, ok: false, message: 'kamera sedang memutar audio' };
-        busy.add(id);
+        if (!acquire(id, 'clip')) return { cameraId: id, name: row.name, ok: false, message: 'kamera sedang dipakai audio lain' };
         try {
             const r = await runPusher(cam, files, loopN);
             return { cameraId: id, name: row.name, ...r };
         } finally {
-            busy.delete(id);
+            release(id);
         }
     }));
     return { results, files: files.length };

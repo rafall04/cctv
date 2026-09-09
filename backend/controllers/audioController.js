@@ -25,6 +25,7 @@ import { playToCameras } from '../services/audioCastService.js';
 import { listBroadcastTargets, listAreas as listAreaRows, setAreaEnabled } from '../services/audioTargetService.js';
 import { listCapabilities, recheckAll, probeCamera } from '../services/audioCapabilityService.js';
 import { createImportJob, listJobs as listImportRows } from '../services/audioImportService.js';
+import { mintTicket } from '../services/audioTalkService.js';
 import { logAdminAction } from '../services/securityAuditLogger.js';
 
 function parseId(value) {
@@ -246,6 +247,19 @@ export async function toggleArea(request, reply) {
         const area = setAreaEnabled(id, request.body?.enabled === true);
         logAdminAction({ action: 'audio_area_toggle', targetType: 'area', targetId: id, enabled: area.audio_broadcast_enabled, ...adminContext(request) }, request);
         return reply.send({ success: true, message: area.audio_broadcast_enabled ? 'Area diaktifkan' : 'Area dinonaktifkan', data: area });
+    } catch (error) { return fail(reply, error); }
+}
+
+/* ------------------------------------------------------------- live push-to-talk */
+
+// Mint a single-use WS ticket (browser can't set an Authorization header on a WebSocket).
+export async function talkTicket(request, reply) {
+    try {
+        const cameraId = parseId(request.body?.cameraId);
+        if (!cameraId) return reply.code(400).send({ success: false, message: 'ID kamera tidak valid' });
+        const t = mintTicket(cameraId, request.user?.id ?? null);
+        logAdminAction({ action: 'audio_talk_ticket', targetType: 'camera', targetId: cameraId, ...adminContext(request) }, request);
+        return reply.send({ success: true, data: t });
     } catch (error) { return fail(reply, error); }
 }
 
