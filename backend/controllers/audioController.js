@@ -29,7 +29,7 @@ import {
 } from '../services/audioTemplateService.js';
 import { listCapabilities, recheckAll, probeCamera, setCameraBlocked } from '../services/audioCapabilityService.js';
 import { createImportJob, listJobs as listImportRows } from '../services/audioImportService.js';
-import { createTtsJob, listTtsEngines as listTtsEngineRows } from '../services/audioTtsService.js';
+import { createTtsJob, listTtsEngines as listTtsEngineRows, ttsConfigStatus, setTtsConfig as setTtsConfigRow } from '../services/audioTtsService.js';
 import {
     listGroups as listGroupRows, createGroup as createGroupRow,
     updateGroup as updateGroupRow, deleteGroup as deleteGroupRow,
@@ -165,6 +165,21 @@ export async function listImportJobs(request, reply) {
 export async function listTtsEngines(request, reply) {
     try {
         return reply.send({ success: true, data: await listTtsEngineRows() });
+    } catch (error) { return fail(reply, error); }
+}
+
+// Cloud-TTS config (Gemini API key) — status is masked; the raw key never leaves the server.
+export async function getTtsConfig(request, reply) {
+    try {
+        return reply.send({ success: true, data: ttsConfigStatus() });
+    } catch (error) { return fail(reply, error); }
+}
+
+export async function setTtsConfig(request, reply) {
+    try {
+        const status = setTtsConfigRow({ geminiApiKey: request.body?.geminiApiKey });
+        logAdminAction({ action: 'audio_tts_config_updated', targetType: 'audio_tts', configured: status.gemini_configured, ...adminContext(request) }, request);
+        return reply.send({ success: true, message: 'Kunci Gemini disimpan', data: status });
     } catch (error) { return fail(reply, error); }
 }
 

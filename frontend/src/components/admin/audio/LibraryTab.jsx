@@ -8,7 +8,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { uploadClip, deleteClip, updateClipMeta, importClip, getImportJobs, getTtsEngines, createTts, getTemplates, createTemplate, deleteTemplate, fetchClipPreview } from '../../../services/audioService';
+import { uploadClip, deleteClip, updateClipMeta, importClip, getImportJobs, getTtsEngines, createTts, getTemplates, createTemplate, deleteTemplate, fetchClipPreview, getTtsConfig, setTtsConfig } from '../../../services/audioService';
 import { useNotification } from '../../../contexts/NotificationContext';
 import { useConfirm } from '../../../contexts/ConfirmContext';
 import { Button, Field, EmptyState } from '../../ui';
@@ -33,6 +33,9 @@ export default function LibraryTab({ clips, loading, reload, onPlayClip }) {
     const [ttsVoice, setTtsVoice] = useState('');
     const [engines, setEngines] = useState([]);
     const [ttsBusy, setTtsBusy] = useState(false);
+    const [ttsCfg, setTtsCfg] = useState(null);       // { gemini_configured, gemini_source, gemini_hint }
+    const [geminiKey, setGeminiKey] = useState('');
+    const [savingKey, setSavingKey] = useState(false);
     const [templates, setTemplates] = useState([]);
     const [templateId, setTemplateId] = useState('');
     const [tplBody, setTplBody] = useState('');
@@ -48,18 +51,37 @@ export default function LibraryTab({ clips, loading, reload, onPlayClip }) {
     const { showNotification } = useNotification();
     const confirm = useConfirm();
 
-    // Load TTS engines/voices once; default to the most NATURAL available engine (prefer the online
-    // neural voice — the offline piper is noticeably more robotic). Operator can still switch to piper.
-    useEffect(() => {
-        (async () => {
-            const r = await getTtsEngines();
-            if (!r.success) return;
-            const list = r.data || [];
-            setEngines(list);
+    // Load TTS engines/voices + cloud-key status. autoPick (first load) defaults to the most NATURAL
+    // available engine (prefer an online neural voice — offline piper is noticeably more robotic).
+    const loadEngines = useCallback(async (autoPick) => {
+        const [r, c] = await Promise.all([getTtsEngines(), getTtsConfig()]);
+        if (c.success) setTtsCfg(c.data);
+        if (!r.success) return;
+        const list = r.data || [];
+        setEngines(list);
+        if (autoPick) {
             const pick = list.find((e) => e.available && e.online) || list.find((e) => e.available) || list[0];
             if (pick) { setTtsEngine(pick.id); setTtsVoice(pick.voices?.[0]?.id || ''); }
-        })();
+        }
     }, []);
+    useEffect(() => { loadEngines(true); }, [loadEngines]);
+
+    const saveGeminiKey = async () => {
+        if (!geminiKey.trim()) { showNotification({ type: 'error', title: 'Tempel kunci API dulu' }); return; }
+        setSavingKey(true);
+        const r = await setTtsConfig({ geminiApiKey: geminiKey.trim() });
+        setSavingKey(false);
+        if (!r.success) { showNotification({ type: 'error', title: 'Gagal', message: r.message }); return; }
+        setGeminiKey('');
+        showNotification({ type: 'success', title: 'Kunci Gemini disimpan', message: 'Mesin Gemini aktif.' });
+        await loadEngines(false); // refresh availability, keep the current selection
+    };
+    const removeGeminiKey = async () => {
+        const r = await setTtsConfig({ geminiApiKey: '' });
+        if (!r.success) { showNotification({ type: 'error', title: 'Gagal', message: r.message }); return; }
+        showNotification({ type: 'success', title: 'Kunci dihapus' });
+        await loadEngines(false);
+    };
 
     // Stop + release the current preview (revoke the blob URL so it doesn't leak).
     const stopPreview = useCallback(() => {
@@ -425,9 +447,42 @@ export default function LibraryTab({ clips, loading, reload, onPlayClip }) {
                     </div>
                     <Field label="Nama (opsional)" value={ttsName} onChange={(e) => setTtsName(e.target.value)} placeholder="mis. Kerja Bakti" maxLength={120} />
                 </div>
+
+                {/* Gemini = mesin cloud paling natural; operator tempel kunci API GRATIS di sini (tanpa SSH). */}
+                {currentEngine?.id === 'gemini' && (
+                    ttsCfg?.gemini_configured ? (
+                        <div className="flex flex-wrap items-center justify-between gap-2 rounded-control border border-status-live/30 bg-status-live/10 p-2.5 text-xs">
+                            <span className="text-content-muted">
+                                ✓ Gemini aktif{ttsCfg.gemini_hint ? ` — kunci ${ttsCfg.gemini_hint}` : ''}{ttsCfg.gemini_source === 'env' ? ' (dari server)' : ''}. Bisa disuruh bicara santai.
+                            </span>
+                            {ttsCfg.gemini_source === 'ui' && (
+                                <button type="button" onClick={removeGeminiKey} className="shrink-0 font-medium text-status-fault hover:underline">Hapus kunci</button>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="space-y-2 rounded-control border border-status-warn/40 bg-status-warn/10 p-2.5">
+                            <p className="text-xs text-content-muted">
+                                Gemini butuh kunci API <span className="font-semibold">gratis</span> (tanpa kartu kredit). Buat di{' '}
+                                <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer" className="font-medium text-primary hover:underline">aistudio.google.com/apikey</a>, lalu tempel di sini.
+                            </p>
+                            <div className="flex flex-wrap items-center gap-2">
+                                <input
+                                    type="password"
+                                    value={geminiKey}
+                                    onChange={(e) => setGeminiKey(e.target.value)}
+                                    placeholder="Tempel kunci API Gemini (AIza…)"
+                                    className="min-w-0 flex-1 rounded-control border border-edge bg-surface px-2.5 py-1.5 text-sm text-content focus:border-primary focus:outline-none"
+                                />
+                                <Button type="button" variant="secondary" loading={savingKey} onClick={saveGeminiKey} disabled={!geminiKey.trim()}>Simpan kunci</Button>
+                            </div>
+                        </div>
+                    )
+                )}
+
                 <div className="flex items-center justify-between gap-2">
                     <p className="text-xs text-content-subtle">
-                        {currentEngine?.online ? 'Suara cloud gratis (butuh internet), natural.' : 'Suara offline di server, natural (bukan robot).'}
+                        {currentEngine?.id === 'gemini' ? 'Suara cloud paling natural — dibuat sekali lalu tersimpan (main offline).'
+                            : currentEngine?.online ? 'Suara cloud gratis (butuh internet), natural.' : 'Suara offline di server, natural (bukan robot).'}
                     </p>
                     <Button type="submit" variant="secondary" loading={ttsBusy} disabled={!ttsText.trim() || !currentEngine?.available}>
                         {ttsBusy ? 'Membuat…' : 'Buat suara'}

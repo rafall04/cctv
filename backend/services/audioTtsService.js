@@ -29,8 +29,19 @@ const EDGE_BIN = process.env.AUDIO_EDGE_TTS_BIN || 'edge-tts';
 // Gemini TTS (Google AI Studio, free tier): natural + steerable via a style directive. Key from env
 // (never hard-coded); clip is generated ONCE in the cloud then stored + played offline. Model is a free
 // Flash TTS preview (the Pro TTS is not free) — pin it so a deprecation doesn't silently change behaviour.
-const GEMINI_KEY = process.env.AUDIO_GEMINI_API_KEY || process.env.GEMINI_API_KEY || '';
+const GEMINI_KEY_ENV = process.env.AUDIO_GEMINI_API_KEY || process.env.GEMINI_API_KEY || '';
 const GEMINI_MODEL = process.env.AUDIO_GEMINI_MODEL || 'gemini-2.5-flash-preview-tts';
+
+// The Gemini key can come from the admin UI (audio_tts_config, so an operator need not touch .env over
+// SSH) or from env as a fallback. Read fresh each time so a key saved in the UI takes effect immediately.
+function getGeminiKey() {
+    try {
+        const row = queryOne('SELECT gemini_api_key FROM audio_tts_config WHERE id = 1');
+        const k = row && row.gemini_api_key ? String(row.gemini_api_key).trim() : '';
+        if (k) return k;
+    } catch { /* table may not exist yet (pre-migration) */ }
+    return GEMINI_KEY_ENV;
+}
 // Style directive prepended to the text: pushes delivery toward a warm, conversational tone (away from the
 // "news reader" feel of piper/edge). Phrased as an instruction + colon so the model steers, not reads it.
 const GEMINI_STYLE = process.env.AUDIO_GEMINI_STYLE
@@ -97,7 +108,7 @@ export async function ttsEngineAvailable(engine, force = false) {
             await execFileAsync(EDGE_BIN, ['--help'], { timeout: 8000 });
             ok = true;
         } else if (engine === 'gemini') {
-            ok = Boolean(GEMINI_KEY); // key present = usable; a real request is only made on synth
+            ok = Boolean(getGeminiKey()); // key present = usable; a real request is only made on synth
         }
     } catch { ok = false; }
     availability.set(engine, ok);
@@ -171,7 +182,8 @@ function pcmToWav(pcm, rate) {
 
 // Call Gemini TTS (generateContent, AUDIO modality) → raw PCM16 + sample rate. Key in env only.
 async function geminiSynth(text, voiceName) {
-    if (!GEMINI_KEY) { const e = new Error('Gemini belum terpasang (AUDIO_GEMINI_API_KEY kosong).'); e.statusCode = 501; throw e; }
+    const apiKey = getGeminiKey();
+    if (!apiKey) { const e = new Error('Gemini belum terpasang (kunci API kosong).'); e.statusCode = 501; throw e; }
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
     const body = {
         contents: [{ parts: [{ text: `${GEMINI_STYLE}\n\n${text}` }] }],
@@ -184,7 +196,7 @@ async function geminiSynth(text, voiceName) {
     try {
         res = await fetch(url, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'x-goog-api-key': GEMINI_KEY },
+            headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
             body: JSON.stringify(body),
             signal: AbortSignal.timeout(TTS_TIMEOUT_MS),
         });
@@ -264,4 +276,33 @@ export async function createTtsJob({ text, engine = 'piper', voice, name, userId
     return queryOne('SELECT * FROM audio_import_jobs WHERE id = ?', [info.lastInsertRowid]);
 }
 
-export default { synthTtsToTemp, createTtsJob, listTtsEngines, ttsEngineAvailable, MAX_TTS_CHARS };
+/** Public status of cloud-TTS config (never returns the raw key). */
+export function ttsConfigStatus() {
+    const k = getGeminiKey();
+    let source = 'none';
+    try {
+        const row = queryOne('SELECT gemini_api_key FROM audio_tts_config WHERE id = 1');
+        if (row && row.gemini_api_key) source = 'ui'; else if (GEMINI_KEY_ENV) source = 'env';
+    } catch { source = GEMINI_KEY_ENV ? 'env' : 'none'; }
+    return {
+        gemini_configured: Boolean(k),
+        gemini_source: source, // 'ui' | 'env' | 'none'
+        gemini_hint: k ? `${k.slice(0, 4)}…${k.slice(-4)}` : '',
+    };
+}
+
+/** Save the Gemini API key from the admin UI (server-side only; masked back via ttsConfigStatus). */
+export function setTtsConfig({ geminiApiKey } = {}) {
+    try {
+        const has = queryOne('SELECT id FROM audio_tts_config WHERE id = 1');
+        if (!has) execute('INSERT OR IGNORE INTO audio_tts_config (id) VALUES (1)');
+    } catch { const e = new Error('Tabel konfigurasi TTS belum ada (jalankan migrasi).'); e.statusCode = 500; throw e; }
+    if (geminiApiKey !== undefined) {
+        const v = String(geminiApiKey || '').trim();
+        execute("UPDATE audio_tts_config SET gemini_api_key = ?, updated_at = datetime('now') WHERE id = 1", [v || null]);
+        availability.delete('gemini'); // re-evaluate availability next listing
+    }
+    return ttsConfigStatus();
+}
+
+export default { synthTtsToTemp, createTtsJob, listTtsEngines, ttsEngineAvailable, ttsConfigStatus, setTtsConfig, MAX_TTS_CHARS };

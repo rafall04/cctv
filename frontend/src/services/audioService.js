@@ -76,6 +76,20 @@ export const getTtsEngines = async () => {
     } catch (error) { return failure(error, 'Gagal memuat mesin TTS'); }
 };
 
+/** Cloud-TTS (Gemini) key status — masked; the raw key never leaves the server. */
+export const getTtsConfig = async () => {
+    try {
+        return (await apiClient.get(`${BASE}/tts/config`)).data;
+    } catch (error) { return failure(error, 'Gagal memuat konfigurasi TTS'); }
+};
+
+/** Save the Gemini API key (entered in the UI so no SSH/.env needed). */
+export const setTtsConfig = async (payload) => {
+    try {
+        return (await apiClient.put(`${BASE}/tts/config`, payload)).data;
+    } catch (error) { return failure(error, 'Gagal menyimpan kunci'); }
+};
+
 /** Generate a spoken clip from typed text (async job — poll getImportJobs). */
 export const createTts = async ({ text, engine, voice, name }) => {
     try {
