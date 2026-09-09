@@ -251,6 +251,26 @@ export const getPlayHistory = async () => {
     } catch (error) { return failure(error, 'Gagal memuat riwayat'); }
 };
 
+/* ----------------------------------------------------- motion -> deter audio */
+
+export const getMotionArms = async () => {
+    try {
+        return (await apiClient.get(`${BASE}/motion/arms`)).data;
+    } catch (error) { return failure(error, 'Gagal memuat arm motion'); }
+};
+
+export const setMotionArm = async (cameraId, payload) => {
+    try {
+        return (await apiClient.put(`${BASE}/motion/arms/${cameraId}`, payload)).data;
+    } catch (error) { return failure(error, 'Gagal menyimpan arm'); }
+};
+
+export const disarmMotion = async (cameraId) => {
+    try {
+        return (await apiClient.delete(`${BASE}/motion/arms/${cameraId}`)).data;
+    } catch (error) { return failure(error, 'Gagal menonaktifkan arm'); }
+};
+
 /* ---------------------------------------------------------------- adzan */
 
 export const getPrayerConfig = async () => {
@@ -375,6 +395,7 @@ export default {
     getSoundboard, createSoundboardButton, updateSoundboardButton, deleteSoundboardButton,
     getEmergencyPresets, createEmergencyPreset, updateEmergencyPreset, deleteEmergencyPreset, playEmergency,
     getPrayerConfig, updatePrayerConfig, getPrayerTimes,
+    getMotionArms, setMotionArm, disarmMotion,
     getCapability, recheckCapability, recheckCameraCapability, getAreas, toggleArea, setCameraBlocked, setAreaPolicy,
     getGroups, createGroup, updateGroup, deleteGroup,
     getTemplates, createTemplate, updateTemplate, deleteTemplate,

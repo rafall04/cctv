@@ -22,6 +22,7 @@ import {
     listSoundboard, createSoundboardButton, updateSoundboardButton, deleteSoundboardButton,
     listEmergencyPresets, createEmergencyPreset, updateEmergencyPreset, deleteEmergencyPreset, playEmergency,
     getPrayerConfig, updatePrayerConfig, getPrayerTimes,
+    listMotionArms, setMotionArmHandler, disarmMotionHandler,
     listTtsEngines, createTts,
 } from '../controllers/audioController.js';
 import fastifyWebsocket from '@fastify/websocket';
@@ -105,6 +106,11 @@ export default async function audioRoutes(fastify) {
     fastify.get('/prayer/config', admin, getPrayerConfig);
     fastify.put('/prayer/config', admin, updatePrayerConfig);
     fastify.get('/prayer/times', admin, getPrayerTimes);
+
+    // Motion -> deterrent audio (armed per camera; heavily guarded)
+    fastify.get('/motion/arms', admin, listMotionArms);
+    fastify.put('/motion/arms/:id', admin, setMotionArmHandler);
+    fastify.delete('/motion/arms/:id', admin, disarmMotionHandler);
 
     // Soundboard (one-tap shortcuts)
     fastify.get('/soundboard', admin, listSoundboard);

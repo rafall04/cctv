@@ -36,6 +36,7 @@ import {
 } from '../services/audioGroupService.js';
 import { mintTicket } from '../services/audioTalkService.js';
 import { getConfig as getPrayerCfg, setConfig as setPrayerCfg, todayTimes as prayerTodayTimes } from '../services/audioPrayerService.js';
+import { listArms as listMotionRows, setArm as setMotionArm, disarm as disarmMotion } from '../services/audioMotionService.js';
 import { logPlay, listHistory } from '../services/audioHistoryService.js';
 import {
     listPresets as listEmergencyRows, createPreset as createEmergencyRow,
@@ -496,6 +497,34 @@ export async function stopPlay(request, reply) {
 export async function listPlayHistory(request, reply) {
     try {
         return reply.send({ success: true, data: listHistory(request.query?.limit) });
+    } catch (error) { return fail(reply, error); }
+}
+
+/* -------------------------------------------------------- motion -> deter audio */
+
+export async function listMotionArms(request, reply) {
+    try {
+        return reply.send({ success: true, data: listMotionRows() });
+    } catch (error) { return fail(reply, error); }
+}
+
+export async function setMotionArmHandler(request, reply) {
+    try {
+        const id = parseId(request.params.id);
+        if (!id) return reply.code(400).send({ success: false, message: 'ID kamera tidak valid' });
+        const arm = setMotionArm(id, request.body || {});
+        logAdminAction({ action: 'audio_motion_arm', targetType: 'camera', targetId: id, enabled: arm.enabled, ...adminContext(request) }, request);
+        return reply.send({ success: true, message: arm.enabled ? 'Kamera dipersenjatai (motion)' : 'Arm disimpan', data: arm });
+    } catch (error) { return fail(reply, error, 'Gagal menyimpan arm'); }
+}
+
+export async function disarmMotionHandler(request, reply) {
+    try {
+        const id = parseId(request.params.id);
+        if (!id) return reply.code(400).send({ success: false, message: 'ID kamera tidak valid' });
+        disarmMotion(id);
+        logAdminAction({ action: 'audio_motion_disarm', targetType: 'camera', targetId: id, ...adminContext(request) }, request);
+        return reply.send({ success: true, message: 'Arm dinonaktifkan' });
     } catch (error) { return fail(reply, error); }
 }
 

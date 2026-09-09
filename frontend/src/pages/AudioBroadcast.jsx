@@ -29,6 +29,7 @@ import GroupsTab from '../components/admin/audio/GroupsTab';
 import SoundboardTab from '../components/admin/audio/SoundboardTab';
 import EmergencyPanel from '../components/admin/audio/EmergencyPanel';
 import PrayerConfig from '../components/admin/audio/PrayerConfig';
+import MotionArms from '../components/admin/audio/MotionArms';
 
 const TABS = [
     { id: 'play', label: 'Putar Sekarang' },
@@ -210,6 +211,7 @@ export default function AudioBroadcast() {
             )}
             {active === 'targets' && (
                 <TabPanel id="targets" idPrefix="audio">
+                  <div className="space-y-6">
                     <TargetsTab
                         areas={areas}
                         capability={capability}
@@ -217,6 +219,8 @@ export default function AudioBroadcast() {
                         reloadAreas={reloadAreas}
                         reloadCapability={reloadCapability}
                     />
+                    <MotionArms capability={capability} clips={clips} />
+                  </div>
                 </TabPanel>
             )}
         </div>
