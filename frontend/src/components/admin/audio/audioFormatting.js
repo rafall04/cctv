@@ -55,6 +55,18 @@ export const MASK_DAILY = 127;   // setiap hari
 export const MASK_WEEKDAYS = 62; // Senin–Jumat
 export const MASK_WEEKEND = 65;  // Sabtu + Minggu
 
+/**
+ * Tri-state audio-out capability -> a UI badge descriptor.
+ * 1 = probed & the pusher will make sound; 0 = probed & no usable backchannel; null = never probed.
+ * NOTE: "unsupported" is NOT a fault (a camera legitimately has no speaker backchannel), so it uses a
+ * muted tone, never status-fault red (design-token honesty).
+ */
+export function capabilityInfo(supports) {
+    if (supports === 1) return { key: 'supported', label: 'Didukung', tone: 'live' };
+    if (supports === 0) return { key: 'unsupported', label: 'Tak didukung', tone: 'muted' };
+    return { key: 'unknown', label: 'Perlu tes', tone: 'idle' };
+}
+
 /** A short human phrase for a weekday mask, used in the schedule list. */
 export function describeDays(mask) {
     const m = Number(mask) & 127;

@@ -14,7 +14,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import {
-    getClips, getPlaylists, getSchedules, getCameras,
+    getClips, getPlaylists, getSchedules, getCameras, getAreas, getCapability,
 } from '../services/audioService';
 import { useNotification } from '../contexts/NotificationContext';
 import { PageHeader, Tabs, TabPanel } from '../components/ui';
@@ -22,12 +22,14 @@ import LibraryTab from '../components/admin/audio/LibraryTab';
 import PlaylistTab from '../components/admin/audio/PlaylistTab';
 import ScheduleTab from '../components/admin/audio/ScheduleTab';
 import PlayNowTab from '../components/admin/audio/PlayNowTab';
+import TargetsTab from '../components/admin/audio/TargetsTab';
 
 const TABS = [
     { id: 'play', label: 'Putar Sekarang' },
     { id: 'library', label: 'Pustaka' },
     { id: 'playlists', label: 'Playlist' },
     { id: 'schedules', label: 'Jadwal' },
+    { id: 'targets', label: 'Kamera & Area' },
 ];
 
 export default function AudioBroadcast() {
@@ -36,6 +38,8 @@ export default function AudioBroadcast() {
     const [playlists, setPlaylists] = useState([]);
     const [schedules, setSchedules] = useState([]);
     const [cameras, setCameras] = useState([]);
+    const [areas, setAreas] = useState([]);
+    const [capability, setCapability] = useState([]);
     const [loading, setLoading] = useState(true);
     const [preselectClip, setPreselectClip] = useState(null);
     const { showNotification } = useNotification();
@@ -61,16 +65,33 @@ export default function AudioBroadcast() {
         if (r.success) setSchedules(r.data || []); else warn(r, 'Gagal memuat jadwal');
     }, [warn]);
 
+    // Reloading the scope also refreshes the camera picker — enabling an area changes who is a target.
+    const reloadAreas = useCallback(async () => {
+        const [ar, cam] = await Promise.all([getAreas(), getCameras()]);
+        if (ar.success) setAreas(ar.data || []); else warn(ar, 'Gagal memuat area');
+        if (cam.success) setCameras(cam.data || []);
+    }, [warn]);
+
+    const reloadCapability = useCallback(async () => {
+        const [cap, cam] = await Promise.all([getCapability(), getCameras()]);
+        if (cap.success) setCapability(cap.data || []); else warn(cap, 'Gagal memuat kapabilitas');
+        if (cam.success) setCameras(cam.data || []);
+    }, [warn]);
+
     useEffect(() => {
         let cancelled = false;
         (async () => {
             setLoading(true);
-            const [c, p, s, cam] = await Promise.all([getClips(), getPlaylists(), getSchedules(), getCameras()]);
+            const [c, p, s, cam, ar, cap] = await Promise.all([
+                getClips(), getPlaylists(), getSchedules(), getCameras(), getAreas(), getCapability(),
+            ]);
             if (cancelled) return;
             if (c.success) setClips(c.data || []); else warn(c, 'Gagal memuat audio');
             if (p.success) setPlaylists(p.data || []); else warn(p, 'Gagal memuat playlist');
             if (s.success) setSchedules(s.data || []); else warn(s, 'Gagal memuat jadwal');
             if (cam.success) setCameras(cam.data || []); else warn(cam, 'Gagal memuat kamera');
+            if (ar.success) setAreas(ar.data || []);
+            if (cap.success) setCapability(cap.data || []);
             setLoading(false);
         })();
         return () => { cancelled = true; };
@@ -114,6 +135,17 @@ export default function AudioBroadcast() {
                         cameras={cameras}
                         loading={loading}
                         reload={reloadSchedules}
+                    />
+                </TabPanel>
+            )}
+            {active === 'targets' && (
+                <TabPanel id="targets" idPrefix="audio">
+                    <TargetsTab
+                        areas={areas}
+                        capability={capability}
+                        loading={loading}
+                        reloadAreas={reloadAreas}
+                        reloadCapability={reloadCapability}
                     />
                 </TabPanel>
             )}

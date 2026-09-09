@@ -15,6 +15,7 @@ import {
     listPlaylists, getPlaylist, createPlaylist, updatePlaylist, deletePlaylist,
     listSchedules, createSchedule, updateSchedule, toggleSchedule, deleteSchedule,
     listCameras, playNow,
+    listCapability, recheckCapability, recheckCameraCapability, listAreas, toggleArea,
 } from '../controllers/audioController.js';
 import { authMiddleware, requireAdmin } from '../middleware/authMiddleware.js';
 import { MAX_AUDIO_UPLOAD_BYTES } from '../services/audioClipService.js';
@@ -45,7 +46,14 @@ export default async function audioRoutes(fastify) {
     fastify.patch('/schedules/:id/enabled', admin, toggleSchedule);
     fastify.delete('/schedules/:id', admin, deleteSchedule);
 
-    // Targets + play-now
-    fastify.get('/cameras', admin, listCameras);
+    // Targets + capability + area scope
+    fastify.get('/cameras', admin, listCameras);           // scoped + capability-annotated
+    fastify.get('/capability', admin, listCapability);
+    fastify.post('/capability/recheck', admin, recheckCapability);
+    fastify.post('/capability/recheck/:id', admin, recheckCameraCapability);
+    fastify.get('/areas', admin, listAreas);
+    fastify.patch('/areas/:id/enabled', admin, toggleArea);
+
+    // Play-now
     fastify.post('/play', admin, playNow);
 }

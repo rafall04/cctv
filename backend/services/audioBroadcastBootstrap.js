@@ -10,6 +10,7 @@ SideEffects: on the primary worker, creates data/audio and starts the schedule t
 
 import { ensureAudioDir } from './audioClipService.js';
 import { startScheduler } from './audioScheduleService.js';
+import { startCapabilitySweep } from './audioCapabilityService.js';
 
 /**
  * ensureAudioDir runs on every worker (a harmless mkdir), but the schedule ticker runs ONLY on the
@@ -21,6 +22,7 @@ export function startAudioBroadcast(isPrimaryWorker) {
     ensureAudioDir();
     if (isPrimaryWorker) {
         startScheduler();
+        startCapabilitySweep();
     } else {
         console.log('[Audio] Scheduler not started on secondary worker (runs only on worker 0)');
     }

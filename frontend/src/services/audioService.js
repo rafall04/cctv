@@ -108,6 +108,38 @@ export const getCameras = async () => {
     } catch (error) { return failure(error, 'Gagal memuat kamera'); }
 };
 
+/* --------------------------------------------------------- capability + area scope */
+
+export const getCapability = async () => {
+    try {
+        return (await apiClient.get(`${BASE}/capability`)).data;
+    } catch (error) { return failure(error, 'Gagal memuat kapabilitas'); }
+};
+
+export const recheckCapability = async () => {
+    try {
+        return (await apiClient.post(`${BASE}/capability/recheck`)).data;
+    } catch (error) { return failure(error, 'Gagal memeriksa kamera'); }
+};
+
+export const recheckCameraCapability = async (id) => {
+    try {
+        return (await apiClient.post(`${BASE}/capability/recheck/${id}`)).data;
+    } catch (error) { return failure(error, 'Gagal memeriksa kamera'); }
+};
+
+export const getAreas = async () => {
+    try {
+        return (await apiClient.get(`${BASE}/areas`)).data;
+    } catch (error) { return failure(error, 'Gagal memuat area'); }
+};
+
+export const toggleArea = async (id, enabled) => {
+    try {
+        return (await apiClient.patch(`${BASE}/areas/${id}/enabled`, { enabled })).data;
+    } catch (error) { return failure(error, 'Gagal mengubah area'); }
+};
+
 export const playNow = async ({ cameraIds, sourceType, sourceId, loop = 1 }) => {
     try {
         return (await apiClient.post(`${BASE}/play`, { cameraIds, sourceType, sourceId, loop })).data;
@@ -119,4 +151,5 @@ export default {
     getPlaylists, getPlaylist, createPlaylist, updatePlaylist, deletePlaylist,
     getSchedules, createSchedule, updateSchedule, toggleSchedule, deleteSchedule,
     getCameras, playNow,
+    getCapability, recheckCapability, recheckCameraCapability, getAreas, toggleArea,
 };

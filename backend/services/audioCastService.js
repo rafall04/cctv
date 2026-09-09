@@ -25,7 +25,12 @@ const PLAY_TIMEOUT_MS = 15 * 60 * 1000; // hard cap so a wedged session can neve
 // Cameras currently streaming audio — one broadcast per camera at a time (overlapping RTP = garble).
 const busy = new Set();
 
-function parseRtsp(url) {
+/** True while a camera is mid-broadcast — the capability prober skips it (a second backchannel = garble). */
+export function isBusy(id) {
+    return busy.has(parseInt(id, 10));
+}
+
+export function parseRtsp(url) {
     const m = /^rtsp:\/\/([^:]+):([^@]+)@([^:/]+)(?::(\d+))?/i.exec(url || '');
     if (!m) return null;
     return {

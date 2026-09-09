@@ -11,6 +11,8 @@
  * failure at play time. The label says as much rather than promising every camera will play.
  */
 
+import { capabilityInfo } from './audioFormatting';
+
 /**
  * @param {Array<{id:number,name:string,area_name?:string}>} cameras
  * @param {number[]} value selected camera ids
@@ -69,6 +71,12 @@ export default function CameraMultiSelect({ cameras = [], value = [], onChange, 
                                     className="h-4 w-4 shrink-0 accent-primary"
                                 />
                                 <span className="min-w-0 flex-1 truncate">{cam.name}</span>
+                                {'supports_audio_out' in cam && (() => {
+                                    const info = capabilityInfo(cam.supports_audio_out);
+                                    const dot = info.key === 'supported' ? 'bg-status-live'
+                                        : info.key === 'unsupported' ? 'bg-edge-strong' : 'bg-status-warn';
+                                    return <span className={`h-2 w-2 shrink-0 rounded-full ${dot}`} title={info.label} aria-label={info.label} />;
+                                })()}
                                 {cam.area_name && (
                                     <span className="shrink-0 text-xs text-content-subtle">{cam.area_name}</span>
                                 )}
