@@ -17,7 +17,7 @@ import { useConfirm } from '../../../contexts/ConfirmContext';
 import { Button, Field } from '../../ui';
 import CameraMultiSelect from './CameraMultiSelect';
 
-const BLANK = { id: null, label: '', sourceType: 'clip', sourceId: '', targetKind: 'area', areaId: '', cameraIds: [], loop: 3, gain_db: 6 };
+const BLANK = { id: null, label: '', sourceType: 'clip', sourceId: '', targetKind: 'area', areaId: '', cameraIds: [], loop: 3, gain_db: 0 };
 
 export default function EmergencyPanel({ clips, playlists, cameras, areas }) {
     const [presets, setPresets] = useState([]);
@@ -138,10 +138,6 @@ export default function EmergencyPanel({ clips, playlists, cameras, areas }) {
                         </div>
                         <Field type="number" label="Ulang" min={1} max={20} value={form.loop} onChange={(e) => setForm({ ...form, loop: Math.min(20, Math.max(1, parseInt(e.target.value, 10) || 1)) })} />
                     </div>
-                    <label className="block">
-                        <span className="mb-1 flex items-baseline justify-between"><span className="text-xs font-semibold text-content-muted">Volume (darurat biasanya keras)</span><span className="text-xs tabular-nums text-content-subtle">{form.gain_db > 0 ? `+${form.gain_db}` : form.gain_db} dB</span></span>
-                        <input type="range" min="-6" max="12" step="1" value={form.gain_db || 0} onChange={(e) => setForm({ ...form, gain_db: parseInt(e.target.value, 10) || 0 })} className="w-full accent-status-fault" />
-                    </label>
                     {form.targetKind === 'area' ? (
                         <Field as="select" label="Area" value={form.areaId} onChange={(e) => setForm({ ...form, areaId: e.target.value })}>
                             <option value="">— pilih area —</option>

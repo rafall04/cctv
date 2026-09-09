@@ -114,10 +114,6 @@ export default function MotionArms({ capability, clips }) {
                                             <Field type="number" label="Jeda (dtk)" min={10} max={3600} value={form.cooldown_sec} onChange={(e) => setForm({ ...form, cooldown_sec: e.target.value })} />
                                             <Field type="number" label="Maks/jam" min={1} max={60} value={form.max_per_hour} onChange={(e) => setForm({ ...form, max_per_hour: e.target.value })} />
                                         </div>
-                                        <label className="block">
-                                            <span className="mb-1 flex items-baseline justify-between"><span className="text-xs font-semibold text-content-muted">Volume</span><span className="text-xs tabular-nums text-content-subtle">{form.gain_db > 0 ? `+${form.gain_db}` : form.gain_db} dB</span></span>
-                                            <input type="range" min="-6" max="12" step="1" value={form.gain_db || 0} onChange={(e) => setForm({ ...form, gain_db: parseInt(e.target.value, 10) || 0 })} className="w-full accent-status-warn" />
-                                        </label>
                                         <div className="flex justify-end gap-2">
                                             <button type="button" onClick={() => setEditing(null)} className="rounded-control border border-edge px-3 py-1.5 text-sm font-medium text-content-muted">Batal</button>
                                             <button type="button" onClick={() => arm(cam)} className="rounded-control bg-status-warn px-3 py-1.5 text-sm font-semibold text-white hover:bg-status-warn/90">Persenjatai</button>

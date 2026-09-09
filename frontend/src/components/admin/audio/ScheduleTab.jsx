@@ -81,7 +81,6 @@ function ScheduleForm({ initial, clips, playlists, cameras, onSubmit, groups, on
     const [runDate, setRunDate] = useState(initial?.run_date || '');
     const [startDate, setStartDate] = useState(initial?.start_date || '');
     const [endDate, setEndDate] = useState(initial?.end_date || '');
-    const [gainDb, setGainDb] = useState(initial?.gain_db || 0);
 
     const options = sourceType === 'clip' ? clips : playlists;
 
@@ -102,7 +101,6 @@ function ScheduleForm({ initial, clips, playlists, cameras, onSubmit, groups, on
                     runDate: scheduleKind === 'once' ? runDate : '',
                     startDate: scheduleKind === 'range' ? startDate : '',
                     endDate: scheduleKind === 'range' ? endDate : '',
-                    gainDb,
                 });
             }}
             className="space-y-4"
@@ -172,11 +170,6 @@ function ScheduleForm({ initial, clips, playlists, cameras, onSubmit, groups, on
             )}
 
             {scheduleKind !== 'once' && <DayPicker mask={daysMask} onChange={setDaysMask} />}
-
-            <label className="block">
-                <span className="mb-1 flex items-baseline justify-between"><span className="text-xs font-semibold text-content-muted">Volume</span><span className="text-xs tabular-nums text-content-subtle">{gainDb > 0 ? `+${gainDb}` : gainDb} dB</span></span>
-                <input type="range" min="-6" max="12" step="1" value={gainDb} onChange={(e) => setGainDb(parseInt(e.target.value, 10) || 0)} className="w-full accent-primary" />
-            </label>
 
             <CameraMultiSelect
                 cameras={cameras}

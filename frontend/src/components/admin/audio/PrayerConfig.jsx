@@ -120,13 +120,6 @@ export default function PrayerConfig({ clips, areas }) {
                 </Field>
                 <Field type="number" label="Ulang" min={1} max={20} value={cfg.loop} onChange={(e) => set({ loop: e.target.value })} />
             </div>
-            <label className="block">
-                <span className="mb-1 flex items-baseline justify-between">
-                    <span className="text-xs font-semibold text-content-muted">Volume adzan</span>
-                    <span className="text-xs tabular-nums text-content-subtle">{Number(cfg.gain_db) > 0 ? `+${cfg.gain_db}` : Number(cfg.gain_db)} dB</span>
-                </span>
-                <input type="range" min="-6" max="12" step="1" value={cfg.gain_db || 0} onChange={(e) => set({ gain_db: parseInt(e.target.value, 10) || 0 })} className="w-full accent-primary" />
-            </label>
 
             {/* Per-prayer enable + offset */}
             <div className="space-y-1.5">

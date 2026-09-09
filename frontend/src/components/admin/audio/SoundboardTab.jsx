@@ -117,10 +117,6 @@ export default function SoundboardTab({ clips, playlists, cameras }) {
                         </Field>
                     </div>
                     <Field type="number" label="Ulang berapa kali" min={1} max={20} value={form.loop} onChange={(e) => setForm({ ...form, loop: Math.min(20, Math.max(1, parseInt(e.target.value, 10) || 1)) })} />
-                    <label className="block">
-                        <span className="mb-1 flex items-baseline justify-between"><span className="text-xs font-semibold text-content-muted">Volume</span><span className="text-xs tabular-nums text-content-subtle">{form.gain_db > 0 ? `+${form.gain_db}` : form.gain_db} dB</span></span>
-                        <input type="range" min="-6" max="12" step="1" value={form.gain_db || 0} onChange={(e) => setForm({ ...form, gain_db: parseInt(e.target.value, 10) || 0 })} className="w-full accent-primary" />
-                    </label>
                     <CameraMultiSelect cameras={cameras} value={form.cameraIds} onChange={(ids) => setForm({ ...form, cameraIds: ids })} />
                     <div className="flex justify-end gap-2">
                         <button type="button" onClick={() => setForm(null)} className="rounded-control border border-edge px-3 py-1.5 text-sm font-medium text-content-muted">Batal</button>
