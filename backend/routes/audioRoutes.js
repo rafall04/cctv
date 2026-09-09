@@ -21,6 +21,7 @@ import {
     listGroups, createGroup, updateGroup, deleteGroup,
     listSoundboard, createSoundboardButton, updateSoundboardButton, deleteSoundboardButton,
     listEmergencyPresets, createEmergencyPreset, updateEmergencyPreset, deleteEmergencyPreset, playEmergency,
+    getPrayerConfig, updatePrayerConfig, getPrayerTimes,
     listTtsEngines, createTts,
 } from '../controllers/audioController.js';
 import fastifyWebsocket from '@fastify/websocket';
@@ -99,6 +100,11 @@ export default async function audioRoutes(fastify) {
     fastify.put('/emergency/presets/:id', admin, updateEmergencyPreset);
     fastify.delete('/emergency/presets/:id', admin, deleteEmergencyPreset);
     fastify.post('/play/emergency', admin, playEmergency);
+
+    // Adzan (automatic prayer-time broadcasts)
+    fastify.get('/prayer/config', admin, getPrayerConfig);
+    fastify.put('/prayer/config', admin, updatePrayerConfig);
+    fastify.get('/prayer/times', admin, getPrayerTimes);
 
     // Soundboard (one-tap shortcuts)
     fastify.get('/soundboard', admin, listSoundboard);

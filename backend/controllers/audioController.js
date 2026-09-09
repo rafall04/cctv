@@ -35,6 +35,7 @@ import {
     updateGroup as updateGroupRow, deleteGroup as deleteGroupRow,
 } from '../services/audioGroupService.js';
 import { mintTicket } from '../services/audioTalkService.js';
+import { getConfig as getPrayerCfg, setConfig as setPrayerCfg, todayTimes as prayerTodayTimes } from '../services/audioPrayerService.js';
 import { logPlay, listHistory } from '../services/audioHistoryService.js';
 import {
     listPresets as listEmergencyRows, createPreset as createEmergencyRow,
@@ -494,6 +495,29 @@ export async function stopPlay(request, reply) {
 export async function listPlayHistory(request, reply) {
     try {
         return reply.send({ success: true, data: listHistory(request.query?.limit) });
+    } catch (error) { return fail(reply, error); }
+}
+
+/* ------------------------------------------------------------- adzan (prayer) */
+
+export async function getPrayerConfig(request, reply) {
+    try {
+        return reply.send({ success: true, data: getPrayerCfg() });
+    } catch (error) { return fail(reply, error); }
+}
+
+export async function updatePrayerConfig(request, reply) {
+    try {
+        const cfg = setPrayerCfg(request.body || {});
+        logAdminAction({ action: 'audio_prayer_config', targetType: 'audio_prayer', enabled: cfg.enabled, ...adminContext(request) }, request);
+        return reply.send({ success: true, message: 'Pengaturan adzan disimpan', data: cfg });
+    } catch (error) { return fail(reply, error, 'Gagal menyimpan adzan'); }
+}
+
+// Today's computed prayer times (WIB) for the preview — operator verifies vs local Kemenag.
+export async function getPrayerTimes(request, reply) {
+    try {
+        return reply.send({ success: true, data: prayerTodayTimes() });
     } catch (error) { return fail(reply, error); }
 }
 

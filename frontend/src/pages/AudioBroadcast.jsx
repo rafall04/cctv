@@ -28,6 +28,7 @@ import TalkTab from '../components/admin/audio/TalkTab';
 import GroupsTab from '../components/admin/audio/GroupsTab';
 import SoundboardTab from '../components/admin/audio/SoundboardTab';
 import EmergencyPanel from '../components/admin/audio/EmergencyPanel';
+import PrayerConfig from '../components/admin/audio/PrayerConfig';
 
 const TABS = [
     { id: 'play', label: 'Putar Sekarang' },
@@ -192,6 +193,8 @@ export default function AudioBroadcast() {
             )}
             {active === 'schedules' && (
                 <TabPanel id="schedules" idPrefix="audio">
+                  <div className="space-y-6">
+                    <PrayerConfig clips={clips} areas={areas} />
                     <ScheduleTab
                         schedules={schedules}
                         clips={clips}
@@ -202,6 +205,7 @@ export default function AudioBroadcast() {
                         groups={groups}
                         onSaveGroup={handleSaveGroup}
                     />
+                  </div>
                 </TabPanel>
             )}
             {active === 'targets' && (

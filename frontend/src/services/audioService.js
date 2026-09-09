@@ -251,6 +251,26 @@ export const getPlayHistory = async () => {
     } catch (error) { return failure(error, 'Gagal memuat riwayat'); }
 };
 
+/* ---------------------------------------------------------------- adzan */
+
+export const getPrayerConfig = async () => {
+    try {
+        return (await apiClient.get(`${BASE}/prayer/config`)).data;
+    } catch (error) { return failure(error, 'Gagal memuat pengaturan adzan'); }
+};
+
+export const updatePrayerConfig = async (payload) => {
+    try {
+        return (await apiClient.put(`${BASE}/prayer/config`, payload)).data;
+    } catch (error) { return failure(error, 'Gagal menyimpan adzan'); }
+};
+
+export const getPrayerTimes = async () => {
+    try {
+        return (await apiClient.get(`${BASE}/prayer/times`)).data;
+    } catch (error) { return failure(error, 'Gagal memuat waktu sholat'); }
+};
+
 /* ---------------------------------------------------------------- emergency */
 
 export const getEmergencyPresets = async () => {
@@ -353,6 +373,7 @@ export default {
     getCameras, playNow, talkTicket, getActivePlays, stopPlay, getPlayHistory,
     getSoundboard, createSoundboardButton, updateSoundboardButton, deleteSoundboardButton,
     getEmergencyPresets, createEmergencyPreset, updateEmergencyPreset, deleteEmergencyPreset, playEmergency,
+    getPrayerConfig, updatePrayerConfig, getPrayerTimes,
     getCapability, recheckCapability, recheckCameraCapability, getAreas, toggleArea, setCameraBlocked, setAreaPolicy,
     getGroups, createGroup, updateGroup, deleteGroup,
     getTemplates, createTemplate, updateTemplate, deleteTemplate,
