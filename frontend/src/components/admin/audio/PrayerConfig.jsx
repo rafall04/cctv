@@ -13,8 +13,10 @@ import { useCallback, useEffect, useState } from 'react';
 import { getPrayerConfig, updatePrayerConfig, getPrayerTimes } from '../../../services/audioService';
 import { useNotification } from '../../../contexts/NotificationContext';
 import { Field } from '../../ui';
+import { PRAYER_LOCATIONS, PRAYER_LOCATION_GROUPS, matchLocation } from './prayerLocations';
 
 const PRAYERS = [['fajr', 'Subuh'], ['dhuhr', 'Dzuhur'], ['asr', 'Ashar'], ['maghrib', 'Maghrib'], ['isha', 'Isya']];
+const TZ_LABEL = { 7: 'WIB (+7)', 8: 'WITA (+8)', 9: 'WIT (+9)' };
 
 export default function PrayerConfig({ clips, areas }) {
     const [cfg, setCfg] = useState(null);
@@ -39,6 +41,25 @@ export default function PrayerConfig({ clips, areas }) {
     if (!cfg) return <p className="text-sm text-content-muted">Memuat pengaturan adzan…</p>;
 
     const set = (patch) => setCfg((c) => ({ ...c, ...patch }));
+
+    // Lokasi belum diatur = lintang & bujur masih 0 (default). Dengan 0,0 semua waktu geser ~7 jam
+    // (koreksi bujur hilang), jadi ini WAJIB ditangani sebelum adzan diaktifkan.
+    const locationUnset = !(Number(cfg.latitude) || Number(cfg.longitude));
+    const currentLocId = matchLocation(cfg.latitude, cfg.longitude)?.id || '';
+
+    const pickLocation = (id) => {
+        const loc = PRAYER_LOCATIONS.find((l) => l.id === id);
+        if (!loc) return;
+        set({ latitude: loc.lat, longitude: loc.lon, timezone: loc.tz });
+    };
+
+    const toggleEnabled = () => {
+        if (!cfg.enabled && locationUnset) {
+            showNotification({ type: 'error', title: 'Lokasi belum diatur', message: 'Pilih kabupaten/kota dulu agar waktu sholat benar.' });
+            return;
+        }
+        set({ enabled: cfg.enabled ? 0 : 1 });
+    };
 
     const useGps = () => {
         if (!navigator.geolocation) { showNotification({ type: 'error', title: 'GPS tak tersedia' }); return; }
@@ -67,7 +88,7 @@ export default function PrayerConfig({ clips, areas }) {
                 </div>
                 <button
                     type="button" role="switch" aria-checked={Boolean(cfg.enabled)}
-                    onClick={() => set({ enabled: cfg.enabled ? 0 : 1 })}
+                    onClick={toggleEnabled}
                     className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${cfg.enabled ? 'bg-status-live' : 'bg-edge-strong'}`}
                     aria-label={cfg.enabled ? 'Nonaktifkan adzan' : 'Aktifkan adzan'}
                 >
@@ -75,11 +96,21 @@ export default function PrayerConfig({ clips, areas }) {
                 </button>
             </div>
 
+            {locationUnset && (
+                <div className="rounded-control border border-status-warn/40 bg-status-warn/10 p-3 text-xs text-status-warn">
+                    <span className="font-semibold">Lokasi belum diatur.</span> Pilih kabupaten/kota di bawah dulu —
+                    tanpa itu waktu sholat bisa meleset berjam-jam dan adzan tak akan berbunyi meski diaktifkan.
+                </div>
+            )}
+
             {/* Preview: today's computed times */}
             {times && (
                 <div className="rounded-control border border-edge bg-surface-sunken p-3">
                     <div className="mb-2 flex items-center justify-between">
-                        <span className="text-xs font-semibold text-content-muted">Waktu sholat hari ini ({times.date})</span>
+                        <span className="text-xs font-semibold text-content-muted">
+                            Waktu sholat hari ini ({times.date})
+                            {times.locationSet === false && <span className="ml-1 font-normal text-status-warn">— lokasi belum diatur, belum akurat</span>}
+                        </span>
                         <button type="button" onClick={reloadTimes} className="text-xs font-medium text-primary hover:underline">Muat ulang</button>
                     </div>
                     <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
@@ -93,12 +124,32 @@ export default function PrayerConfig({ clips, areas }) {
                 </div>
             )}
 
-            {/* Location */}
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <Field type="number" label="Lintang (latitude)" value={cfg.latitude} onChange={(e) => set({ latitude: e.target.value })} hint="mis. -7.5" />
-                <Field type="number" label="Bujur (longitude)" value={cfg.longitude} onChange={(e) => set({ longitude: e.target.value })} hint="mis. 111.88" />
-                <div className="flex items-end">
-                    <button type="button" onClick={useGps} className="min-h-11 w-full rounded-control border border-edge bg-surface px-3 py-2 text-sm font-medium text-content-muted transition-colors hover:border-edge-strong">📍 Pakai lokasi HP</button>
+            {/* Location — pick a kabupaten/kota (fills lat/lon/timezone) so nobody has to type raw coords. */}
+            <div className="space-y-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-[2fr_1fr]">
+                    <Field as="select" label="Lokasi (kabupaten/kota)" value={currentLocId} onChange={(e) => pickLocation(e.target.value)}>
+                        <option value="">{currentLocId ? '— pilih lokasi —' : '— pilih kabupaten/kota —'}</option>
+                        {PRAYER_LOCATION_GROUPS.map((g) => (
+                            <optgroup key={g} label={g}>
+                                {PRAYER_LOCATIONS.filter((l) => l.group === g).map((l) => (
+                                    <option key={l.id} value={l.id}>{l.name}</option>
+                                ))}
+                            </optgroup>
+                        ))}
+                    </Field>
+                    <Field as="select" label="Zona waktu" value={Number(cfg.timezone ?? 7)} onChange={(e) => set({ timezone: Number(e.target.value) })}>
+                        {[7, 8, 9].map((tz) => <option key={tz} value={tz}>{TZ_LABEL[tz]}</option>)}
+                    </Field>
+                </div>
+                <p className="text-xs text-content-subtle">
+                    Tak ada di daftar? Isi lintang/bujur manual atau pakai GPS HP. {currentLocId ? '' : locationUnset ? '' : 'Koordinat saat ini di luar daftar preset.'}
+                </p>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <Field type="number" label="Lintang (latitude)" value={cfg.latitude} onChange={(e) => set({ latitude: e.target.value })} hint="mis. -7.15" />
+                    <Field type="number" label="Bujur (longitude)" value={cfg.longitude} onChange={(e) => set({ longitude: e.target.value })} hint="mis. 111.88" />
+                    <div className="flex items-end">
+                        <button type="button" onClick={useGps} className="min-h-11 w-full rounded-control border border-edge bg-surface px-3 py-2 text-sm font-medium text-content-muted transition-colors hover:border-edge-strong">📍 Pakai lokasi HP</button>
+                    </div>
                 </div>
             </div>
 

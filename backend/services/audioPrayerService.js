@@ -57,14 +57,15 @@ export function setConfig(fields = {}) {
         : cur.camera_ids;
     execute(
         `UPDATE audio_prayer_config SET
-            enabled=?, latitude=?, longitude=?, elevation=?, fajr_angle=?, isha_angle=?, asr_factor=?, ikhtiyati=?,
+            enabled=?, latitude=?, longitude=?, timezone=?, elevation=?, fajr_angle=?, isha_angle=?, asr_factor=?, ikhtiyati=?,
             offset_fajr=?, offset_dhuhr=?, offset_asr=?, offset_maghrib=?, offset_isha=?,
             enable_fajr=?, enable_dhuhr=?, enable_asr=?, enable_maghrib=?, enable_isha=?,
             clip_id=?, clip_id_fajr=?, target_kind=?, area_id=?, camera_ids=?, loop=?, gain_db=?
          WHERE id = 1`,
         [
             fields.enabled !== undefined ? (fields.enabled ? 1 : 0) : cur.enabled,
-            numOr(f.latitude, cur.latitude, -90, 90), numOr(f.longitude, cur.longitude, -180, 180), numOr(f.elevation, cur.elevation, -500, 9000),
+            numOr(f.latitude, cur.latitude, -90, 90), numOr(f.longitude, cur.longitude, -180, 180),
+            numOr(f.timezone, cur.timezone ?? 7, 5, 10), numOr(f.elevation, cur.elevation, -500, 9000),
             numOr(f.fajr_angle, cur.fajr_angle, 10, 25), numOr(f.isha_angle, cur.isha_angle, 10, 25), numOr(f.asr_factor, cur.asr_factor, 1, 2),
             Math.round(numOr(f.ikhtiyati, cur.ikhtiyati, 0, 30)),
             Math.round(numOr(f.offset_fajr, cur.offset_fajr, -60, 60)), Math.round(numOr(f.offset_dhuhr, cur.offset_dhuhr, -60, 60)),
@@ -84,11 +85,19 @@ export function setConfig(fields = {}) {
 
 function cfgToParams(cfg) {
     return {
-        lat: cfg.latitude, lon: cfg.longitude, tz: 7,
+        lat: cfg.latitude, lon: cfg.longitude, tz: cfg.timezone ?? 7,
         fajrAngle: cfg.fajr_angle, ishaAngle: cfg.isha_angle, asrFactor: cfg.asr_factor,
         ikhtiyati: cfg.ikhtiyati,
         offsets: { fajr: cfg.offset_fajr, dhuhr: cfg.offset_dhuhr, asr: cfg.offset_asr, maghrib: cfg.offset_maghrib, isha: cfg.offset_isha },
     };
+}
+
+// The location is unset when both lat & lon are 0 (the migration default). Computing with 0,0 yields
+// times ~7h off (the longitude correction is missing), so we must never fire adzan in that state.
+function hasValidLocation(cfg) {
+    const lat = Number(cfg.latitude);
+    const lon = Number(cfg.longitude);
+    return Number.isFinite(lat) && Number.isFinite(lon) && !(lat === 0 && lon === 0);
 }
 
 /** Today's computed prayer times (WIB) + which are enabled, for the preview + scheduler. */
@@ -96,7 +105,8 @@ export function todayTimes(nowMs = Date.now()) {
     const cfg = getConfig();
     const now = wibNow(nowMs);
     const times = computePrayerTimes({ year: now.year, month: now.month, day: now.day }, cfgToParams(cfg));
-    return { date: now.dateKey, times, cfg };
+    // Tell the UI when the location is still unset so it can warn instead of showing ~7h-off times as real.
+    return { date: now.dateKey, times, cfg, locationSet: hasValidLocation(cfg) };
 }
 
 function resolveTargets(cfg) {
@@ -112,6 +122,9 @@ function resolveTargets(cfg) {
 export async function runDuePrayer(nowMs = Date.now()) {
     const cfg = getConfig();
     if (!cfg.enabled || !cfg.clip_id) return false;
+    // Never broadcast adzan at a wrong time: if the location was never set (lat=lon=0), the computed
+    // times are ~7h off. Skip loudly rather than blast the mosque call at the wrong hour.
+    if (!hasValidLocation(cfg)) { console.warn('[Adzan] enabled but location unset (lat=lon=0) — skipping; set kabupaten/koordinat first'); return false; }
     const now = wibNow(nowMs);
     const { times } = todayTimes(nowMs);
     for (const p of PRAYERS) {
