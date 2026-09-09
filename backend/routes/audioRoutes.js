@@ -16,6 +16,7 @@ import {
     listSchedules, createSchedule, updateSchedule, toggleSchedule, deleteSchedule,
     listCameras, playNow,
     listCapability, recheckCapability, recheckCameraCapability, listAreas, toggleArea, blockCamera,
+    setAreaPolicyHandler, listTemplates, createTemplate, updateTemplate, deleteTemplate,
     importClip, listImportJobs, talkTicket, listActivePlays, stopPlay,
     listGroups, createGroup, updateGroup, deleteGroup,
     listTtsEngines, createTts,
@@ -69,6 +70,13 @@ export default async function audioRoutes(fastify) {
     fastify.patch('/cameras/:id/blocked', admin, blockCamera); // safety block for hang-prone devices
     fastify.get('/areas', admin, listAreas);
     fastify.patch('/areas/:id/enabled', admin, toggleArea);
+    fastify.patch('/areas/:id/policy', admin, setAreaPolicyHandler); // quiet hours + loop cap
+
+    // Announcement templates (fill-in-the-blank scripts for TTS / live talk)
+    fastify.get('/templates', admin, listTemplates);
+    fastify.post('/templates', admin, createTemplate);
+    fastify.put('/templates/:id', admin, updateTemplate);
+    fastify.delete('/templates/:id', admin, deleteTemplate);
 
     // Custom manual camera groups (area-free presets)
     fastify.get('/groups', admin, listGroups);

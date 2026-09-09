@@ -22,7 +22,11 @@ import {
     deleteSchedule as deleteScheduleRow,
 } from '../services/audioScheduleService.js';
 import { playToCameras, listPlaying, stopPlaying, stopAllPlaying } from '../services/audioCastService.js';
-import { listBroadcastTargets, listAreas as listAreaRows, setAreaEnabled } from '../services/audioTargetService.js';
+import { listBroadcastTargets, listAreas as listAreaRows, setAreaEnabled, setAreaPolicy, quietTargets } from '../services/audioTargetService.js';
+import {
+    listTemplates as listTemplateRows, createTemplate as createTemplateRow,
+    updateTemplate as updateTemplateRow, deleteTemplate as deleteTemplateRow,
+} from '../services/audioTemplateService.js';
 import { listCapabilities, recheckAll, probeCamera, setCameraBlocked } from '../services/audioCapabilityService.js';
 import { createImportJob, listJobs as listImportRows } from '../services/audioImportService.js';
 import { createTtsJob, listTtsEngines as listTtsEngineRows } from '../services/audioTtsService.js';
@@ -293,6 +297,53 @@ export async function toggleArea(request, reply) {
     } catch (error) { return fail(reply, error); }
 }
 
+// Set an area's quiet hours + loop ceiling.
+export async function setAreaPolicyHandler(request, reply) {
+    try {
+        const id = parseId(request.params.id);
+        if (!id) return reply.code(400).send({ success: false, message: 'ID area tidak valid' });
+        const area = setAreaPolicy(id, request.body || {});
+        logAdminAction({ action: 'audio_area_policy', targetType: 'area', targetId: id, ...adminContext(request) }, request);
+        return reply.send({ success: true, message: 'Kebijakan area disimpan', data: area });
+    } catch (error) { return fail(reply, error); }
+}
+
+/* ------------------------------------------------------- announcement templates */
+
+export async function listTemplates(request, reply) {
+    try {
+        return reply.send({ success: true, data: listTemplateRows() });
+    } catch (error) { return fail(reply, error); }
+}
+
+export async function createTemplate(request, reply) {
+    try {
+        const t = createTemplateRow({ ...request.body, userId: request.user?.id ?? null });
+        logAdminAction({ action: 'audio_template_created', targetType: 'audio_template', targetId: t.id, name: t.name, ...adminContext(request) }, request);
+        return reply.code(201).send({ success: true, message: 'Template dibuat', data: t });
+    } catch (error) { return fail(reply, error, 'Gagal membuat template'); }
+}
+
+export async function updateTemplate(request, reply) {
+    try {
+        const id = parseId(request.params.id);
+        if (!id) return reply.code(400).send({ success: false, message: 'ID template tidak valid' });
+        const t = updateTemplateRow(id, request.body || {});
+        logAdminAction({ action: 'audio_template_updated', targetType: 'audio_template', targetId: id, ...adminContext(request) }, request);
+        return reply.send({ success: true, message: 'Template diperbarui', data: t });
+    } catch (error) { return fail(reply, error, 'Gagal memperbarui template'); }
+}
+
+export async function deleteTemplate(request, reply) {
+    try {
+        const id = parseId(request.params.id);
+        if (!id) return reply.code(400).send({ success: false, message: 'ID template tidak valid' });
+        const t = deleteTemplateRow(id);
+        logAdminAction({ action: 'audio_template_deleted', targetType: 'audio_template', targetId: id, name: t.name, ...adminContext(request) }, request);
+        return reply.send({ success: true, message: 'Template dihapus' });
+    } catch (error) { return fail(reply, error, 'Gagal menghapus template'); }
+}
+
 /* ------------------------------------------------------- custom camera groups */
 
 // Manual, area-free bags of cameras ("Musholla" = cam A,B,C) reused as one-tap presets in the picker.
@@ -350,15 +401,33 @@ export async function talkTicket(request, reply) {
  * Per-camera results come back individually — a camera without a speaker (S41FE-class) simply reports
  * its failure line; the others still play. Not every internal camera exposes an ONVIF backchannel.
  */
+const WIDE_BROADCAST_THRESHOLD = 5; // targeting this many cameras at once needs an explicit confirm
+
 export async function playNow(request, reply) {
     try {
-        const { cameraIds, sourceType, sourceId, loop } = request.body || {};
+        const { cameraIds, sourceType, sourceId, loop, confirm } = request.body || {};
         if (!['clip', 'playlist'].includes(sourceType)) {
             return reply.code(400).send({ success: false, message: 'sourceType harus clip atau playlist' });
         }
         const sid = parseId(sourceId);
         if (!sid) return reply.code(400).send({ success: false, message: 'sourceId tidak valid' });
-        const { results, files } = await playToCameras(cameraIds || [], sourceType, sid, loop || 1);
+        const ids = Array.isArray(cameraIds) ? cameraIds : [];
+        // Defense-in-depth (not UI-only): a wide blast or a broadcast into an area's quiet hours must be
+        // explicitly confirmed. The client re-sends with confirm:true after the operator agrees.
+        if (confirm !== true) {
+            const quiet = quietTargets(ids);
+            const wide = ids.length >= WIDE_BROADCAST_THRESHOLD;
+            if (wide || quiet.length > 0) {
+                const reasons = [];
+                if (wide) reasons.push(`menyiarkan ke ${ids.length} kamera sekaligus`);
+                if (quiet.length > 0) reasons.push(`${quiet.length} kamera sedang dalam jam tenang`);
+                return reply.code(409).send({
+                    success: false, requiresConfirm: true, reason: reasons.join(' & '),
+                    message: `Konfirmasi diperlukan: ${reasons.join(' & ')}.`,
+                });
+            }
+        }
+        const { results, files } = await playToCameras(ids, sourceType, sid, loop || 1);
         logAdminAction({
             action: 'audio_play_now', targetType: 'audio', sourceType, sourceId: sid,
             cameras: results.length, ok: results.filter((r) => r.ok).length, ...adminContext(request),

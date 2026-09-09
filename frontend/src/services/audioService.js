@@ -181,10 +181,47 @@ export const setCameraBlocked = async (id, blocked) => {
     } catch (error) { return failure(error, 'Gagal mengubah status blokir'); }
 };
 
-export const playNow = async ({ cameraIds, sourceType, sourceId, loop = 1 }) => {
+export const playNow = async ({ cameraIds, sourceType, sourceId, loop = 1, confirm = false }) => {
     try {
-        return (await apiClient.post(`${BASE}/play`, { cameraIds, sourceType, sourceId, loop })).data;
-    } catch (error) { return failure(error, 'Gagal memutar audio'); }
+        return (await apiClient.post(`${BASE}/play`, { cameraIds, sourceType, sourceId, loop, confirm })).data;
+    } catch (error) {
+        // A 409 carries { requiresConfirm } (wide blast / quiet hours) — surface it so the caller can ask + retry.
+        if (error.response?.status === 409 && error.response.data) return error.response.data;
+        return failure(error, 'Gagal memutar audio');
+    }
+};
+
+/** Set an area's quiet hours (HH:MM) + loop ceiling. Pass empty strings to clear quiet hours. */
+export const setAreaPolicy = async (id, payload) => {
+    try {
+        return (await apiClient.patch(`${BASE}/areas/${id}/policy`, payload)).data;
+    } catch (error) { return failure(error, 'Gagal menyimpan kebijakan area'); }
+};
+
+/* ------------------------------------------------------- announcement templates */
+
+export const getTemplates = async () => {
+    try {
+        return (await apiClient.get(`${BASE}/templates`)).data;
+    } catch (error) { return failure(error, 'Gagal memuat template'); }
+};
+
+export const createTemplate = async (payload) => {
+    try {
+        return (await apiClient.post(`${BASE}/templates`, payload)).data;
+    } catch (error) { return failure(error, 'Gagal membuat template'); }
+};
+
+export const updateTemplate = async (id, payload) => {
+    try {
+        return (await apiClient.put(`${BASE}/templates/${id}`, payload)).data;
+    } catch (error) { return failure(error, 'Gagal memperbarui template'); }
+};
+
+export const deleteTemplate = async (id) => {
+    try {
+        return (await apiClient.delete(`${BASE}/templates/${id}`)).data;
+    } catch (error) { return failure(error, 'Gagal menghapus template'); }
 };
 
 export const getActivePlays = async () => {
@@ -238,6 +275,7 @@ export default {
     getPlaylists, getPlaylist, createPlaylist, updatePlaylist, deletePlaylist,
     getSchedules, createSchedule, updateSchedule, toggleSchedule, deleteSchedule,
     getCameras, playNow, talkTicket, getActivePlays, stopPlay,
-    getCapability, recheckCapability, recheckCameraCapability, getAreas, toggleArea, setCameraBlocked,
+    getCapability, recheckCapability, recheckCameraCapability, getAreas, toggleArea, setCameraBlocked, setAreaPolicy,
     getGroups, createGroup, updateGroup, deleteGroup,
+    getTemplates, createTemplate, updateTemplate, deleteTemplate,
 };

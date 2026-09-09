@@ -157,16 +157,21 @@ export async function playToCameras(cameraIds, sourceType, sourceId, loop = 1) {
     const loopN = Math.min(Math.max(parseInt(loop, 10) || 1, 1), 20);
 
     const results = await Promise.all(ids.map(async (id) => {
-        const row = queryOne('SELECT id, name, private_rtsp_url, audio_out_blocked FROM cameras WHERE id = ?', [id]);
+        const row = queryOne(
+            'SELECT c.id, c.name, c.private_rtsp_url, c.audio_out_blocked, a.max_loop FROM cameras c LEFT JOIN areas a ON a.id = c.area_id WHERE c.id = ?',
+            [id],
+        );
         if (!row) return { cameraId: id, name: `#${id}`, ok: false, message: 'kamera tidak ada' };
         // Hard safety stop: a blocked camera (V380-class) is never opened — a backchannel can hang it.
         if (row.audio_out_blocked) return { cameraId: id, name: row.name, ok: false, message: 'diblokir (perangkat rawan hang)' };
         const cam = parseRtsp(row.private_rtsp_url);
         if (!cam) return { cameraId: id, name: row.name, ok: false, message: 'kamera tanpa RTSP internal' };
         if (!acquire(id, 'clip')) return { cameraId: id, name: row.name, ok: false, message: 'kamera sedang dipakai audio lain' };
+        // Per-area loop ceiling (plafon) caps repeats on this camera's area; falls back to the requested loop.
+        const camLoop = row.max_loop ? Math.min(loopN, row.max_loop) : loopN;
         // Lock is released by runPusher's onDone when the child ACTUALLY exits (playback ends), not when
         // this resolves (which is the moment playback STARTED) — else a second play could garble the first.
-        const r = await runPusher(cam, files, loopN, { id, name: row.name, source: sourceType, onDone: () => release(id) });
+        const r = await runPusher(cam, files, camLoop, { id, name: row.name, source: sourceType, onDone: () => release(id) });
         return { cameraId: id, name: row.name, ...r };
     }));
     return { results, files: files.length };

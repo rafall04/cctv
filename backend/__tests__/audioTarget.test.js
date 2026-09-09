@@ -28,7 +28,8 @@ function resetSchema() {
     db.exec(`
         DROP TABLE IF EXISTS cameras;
         DROP TABLE IF EXISTS areas;
-        CREATE TABLE areas (id INTEGER PRIMARY KEY, name TEXT, audio_broadcast_enabled INTEGER NOT NULL DEFAULT 0);
+        CREATE TABLE areas (id INTEGER PRIMARY KEY, name TEXT, audio_broadcast_enabled INTEGER NOT NULL DEFAULT 0,
+            quiet_start TEXT, quiet_end TEXT, max_loop INTEGER);
         CREATE TABLE cameras (
             id INTEGER PRIMARY KEY, name TEXT, area_id INTEGER, enabled INTEGER DEFAULT 1,
             stream_source TEXT DEFAULT 'internal', private_rtsp_url TEXT,

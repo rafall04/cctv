@@ -8,7 +8,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { uploadClip, deleteClip, importClip, getImportJobs, getTtsEngines, createTts } from '../../../services/audioService';
+import { uploadClip, deleteClip, importClip, getImportJobs, getTtsEngines, createTts, getTemplates, createTemplate, deleteTemplate } from '../../../services/audioService';
 import { useNotification } from '../../../contexts/NotificationContext';
 import { useConfirm } from '../../../contexts/ConfirmContext';
 import { Button, Field, EmptyState } from '../../ui';
@@ -33,6 +33,8 @@ export default function LibraryTab({ clips, loading, reload, onPlayClip }) {
     const [ttsVoice, setTtsVoice] = useState('');
     const [engines, setEngines] = useState([]);
     const [ttsBusy, setTtsBusy] = useState(false);
+    const [templates, setTemplates] = useState([]);
+    const [templateId, setTemplateId] = useState('');
     const fileRef = useRef(null);
     const { showNotification } = useNotification();
     const confirm = useConfirm();
@@ -48,6 +50,34 @@ export default function LibraryTab({ clips, loading, reload, onPlayClip }) {
             if (pick) { setTtsEngine(pick.id); setTtsVoice(pick.voices?.[0]?.id || ''); }
         })();
     }, []);
+
+    const loadTemplates = useCallback(async () => {
+        const r = await getTemplates();
+        if (r.success) setTemplates(r.data || []);
+    }, []);
+    useEffect(() => { loadTemplates(); }, [loadTemplates]);
+
+    // Load a template's body into the TTS box (operator fills the {…} placeholders, then generates).
+    const applyTemplate = (id) => {
+        setTemplateId(id);
+        const t = templates.find((x) => String(x.id) === String(id));
+        if (t) { setTtsText(t.body); if (!ttsName.trim()) setTtsName(t.name); }
+    };
+    const saveAsTemplate = async () => {
+        const name = window.prompt('Nama template:');
+        if (!name || !name.trim()) return;
+        const r = await createTemplate({ name: name.trim(), body: ttsText.trim() });
+        if (r.success) { showNotification({ type: 'success', title: 'Template disimpan' }); loadTemplates(); }
+        else showNotification({ type: 'error', title: 'Gagal', message: r.message });
+    };
+    const removeTemplate = async () => {
+        const t = templates.find((x) => String(x.id) === String(templateId));
+        if (!t) return;
+        const ok = await confirm({ title: 'Hapus template?', message: `"${t.name}" akan dihapus.`, confirmLabel: 'Hapus', cancelLabel: 'Batal', tone: 'danger' });
+        if (!ok) return;
+        const r = await deleteTemplate(t.id);
+        if (r.success) { setTemplateId(''); loadTemplates(); } else showNotification({ type: 'error', title: 'Gagal', message: r.message });
+    };
 
     const currentEngine = engines.find((e) => e.id === ttsEngine);
 
@@ -236,6 +266,25 @@ export default function LibraryTab({ clips, loading, reload, onPlayClip }) {
                     <span className="text-sm font-semibold text-content">Buat suara dari teks (TTS)</span>
                     <span className="text-xs text-content-subtle">{ttsText.length}/{MAX_TTS}</span>
                 </div>
+
+                {/* Template pengumuman: pilih -> isi otomatis, ganti bagian {…}. */}
+                <div className="flex flex-wrap items-center gap-2">
+                    <select
+                        value={templateId}
+                        onChange={(e) => applyTemplate(e.target.value)}
+                        className="min-w-0 flex-1 rounded-control border border-edge bg-surface px-2 py-1.5 text-sm text-content focus:border-primary focus:outline-none"
+                    >
+                        <option value="">— pakai template —</option>
+                        {templates.map((t) => (
+                            <option key={t.id} value={t.id}>{t.category ? `${t.category} · ` : ''}{t.name}</option>
+                        ))}
+                    </select>
+                    {templateId && (
+                        <button type="button" onClick={removeTemplate} className="shrink-0 rounded-control border border-edge px-2.5 py-1.5 text-xs font-medium text-status-fault hover:border-status-fault/40">Hapus template</button>
+                    )}
+                    <button type="button" onClick={saveAsTemplate} disabled={!ttsText.trim()} className="shrink-0 rounded-control border border-edge px-2.5 py-1.5 text-xs font-medium text-content-muted hover:border-edge-strong disabled:opacity-40">Simpan teks jadi template</button>
+                </div>
+
                 <textarea
                     value={ttsText}
                     onChange={(e) => setTtsText(e.target.value.slice(0, MAX_TTS))}

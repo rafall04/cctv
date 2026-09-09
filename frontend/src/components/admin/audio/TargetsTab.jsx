@@ -12,10 +12,48 @@
  */
 
 import { useEffect, useState } from 'react';
-import { toggleArea, recheckCameraCapability, recheckCapability, setCameraBlocked } from '../../../services/audioService';
+import { toggleArea, recheckCameraCapability, recheckCapability, setCameraBlocked, setAreaPolicy } from '../../../services/audioService';
 import { useNotification } from '../../../contexts/NotificationContext';
 import { Button, EmptyState } from '../../ui';
 import { capabilityInfo } from './audioFormatting';
+
+// Inline editor for an area's quiet hours (WIB) + loop ceiling. Both quiet bounds together, or neither.
+function AreaPolicy({ area, onSave }) {
+    const [qs, setQs] = useState(area.quiet_start || '');
+    const [qe, setQe] = useState(area.quiet_end || '');
+    const [cap, setCap] = useState(area.max_loop ? String(area.max_loop) : '');
+    const [saving, setSaving] = useState(false);
+    const dirty = qs !== (area.quiet_start || '') || qe !== (area.quiet_end || '') || cap !== (area.max_loop ? String(area.max_loop) : '');
+    const save = async () => {
+        setSaving(true);
+        await onSave(area, { quiet_start: qs, quiet_end: qe, max_loop: cap });
+        setSaving(false);
+    };
+    return (
+        <div className="mt-2 flex flex-wrap items-end gap-2 border-t border-edge pt-2">
+            <label className="text-xs text-content-muted">
+                <span className="mb-0.5 block">Jam tenang (WIB)</span>
+                <span className="flex items-center gap-1">
+                    <input type="time" value={qs} onChange={(e) => setQs(e.target.value)} className="rounded-control border border-edge bg-surface px-2 py-1 text-sm text-content" />
+                    <span className="text-content-subtle">–</span>
+                    <input type="time" value={qe} onChange={(e) => setQe(e.target.value)} className="rounded-control border border-edge bg-surface px-2 py-1 text-sm text-content" />
+                </span>
+            </label>
+            <label className="text-xs text-content-muted">
+                <span className="mb-0.5 block">Plafon ulang</span>
+                <input type="number" min={1} max={20} value={cap} placeholder="—" onChange={(e) => setCap(e.target.value)} className="w-20 rounded-control border border-edge bg-surface px-2 py-1 text-sm text-content" />
+            </label>
+            <button
+                type="button"
+                onClick={save}
+                disabled={!dirty || saving}
+                className="rounded-control border border-edge bg-surface px-3 py-1.5 text-sm font-medium text-primary transition-colors hover:border-primary disabled:opacity-40"
+            >
+                {saving ? '…' : 'Simpan'}
+            </button>
+        </div>
+    );
+}
 
 function Badge({ supports, blocked }) {
     if (blocked) {
@@ -80,6 +118,16 @@ export default function TargetsTab({ areas, capability, loading, reloadAreas, re
         await reloadCapability();
     };
 
+    const onSavePolicy = async (area, payload) => {
+        const result = await setAreaPolicy(area.id, payload);
+        if (!result.success) {
+            showNotification({ type: 'error', title: 'Gagal menyimpan', message: result.message });
+            return;
+        }
+        showNotification({ type: 'success', title: 'Kebijakan area disimpan', message: area.name });
+        await reloadAreas();
+    };
+
     const onRecheckAll = async () => {
         setRechecking('all');
         const result = await recheckCapability();
@@ -120,22 +168,29 @@ export default function TargetsTab({ areas, capability, loading, reloadAreas, re
                 ) : (
                     <ul className="space-y-1.5">
                         {areas.map((area) => (
-                            <li key={area.id} className="flex items-center gap-3 rounded-control border border-edge px-3 py-2">
-                                <div className="min-w-0 flex-1">
-                                    <p className="truncate text-sm font-medium text-content">{area.name}</p>
-                                    <p className="text-xs text-content-subtle">{area.internal_camera_count} kamera internal</p>
+                            <li key={area.id} className="rounded-control border border-edge px-3 py-2">
+                                <div className="flex items-center gap-3">
+                                    <div className="min-w-0 flex-1">
+                                        <p className="truncate text-sm font-medium text-content">{area.name}</p>
+                                        <p className="text-xs text-content-subtle">
+                                            {area.internal_camera_count} kamera internal
+                                            {area.quiet_start && area.quiet_end ? ` · jam tenang ${area.quiet_start}–${area.quiet_end}` : ''}
+                                            {area.max_loop ? ` · maks ulang ${area.max_loop}×` : ''}
+                                        </p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        role="switch"
+                                        aria-checked={Boolean(area.audio_broadcast_enabled)}
+                                        disabled={busyArea === area.id}
+                                        onClick={() => onToggleArea(area)}
+                                        className={`relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-50 ${area.audio_broadcast_enabled ? 'bg-status-live' : 'bg-edge-strong'}`}
+                                        aria-label={area.audio_broadcast_enabled ? 'Nonaktifkan area' : 'Aktifkan area'}
+                                    >
+                                        <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-surface shadow transition-all ${area.audio_broadcast_enabled ? 'left-[22px]' : 'left-0.5'}`} />
+                                    </button>
                                 </div>
-                                <button
-                                    type="button"
-                                    role="switch"
-                                    aria-checked={Boolean(area.audio_broadcast_enabled)}
-                                    disabled={busyArea === area.id}
-                                    onClick={() => onToggleArea(area)}
-                                    className={`relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-50 ${area.audio_broadcast_enabled ? 'bg-status-live' : 'bg-edge-strong'}`}
-                                    aria-label={area.audio_broadcast_enabled ? 'Nonaktifkan area' : 'Aktifkan area'}
-                                >
-                                    <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-surface shadow transition-all ${area.audio_broadcast_enabled ? 'left-[22px]' : 'left-0.5'}`} />
-                                </button>
+                                {area.audio_broadcast_enabled ? <AreaPolicy area={area} onSave={onSavePolicy} /> : null}
                             </li>
                         ))}
                     </ul>

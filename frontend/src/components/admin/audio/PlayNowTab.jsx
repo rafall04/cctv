@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { playNow, getActivePlays, stopPlay } from '../../../services/audioService';
 import { useNotification } from '../../../contexts/NotificationContext';
+import { useConfirm } from '../../../contexts/ConfirmContext';
 import { Button, Field } from '../../ui';
 import CameraMultiSelect from './CameraMultiSelect';
 import { formatDuration } from './audioFormatting';
@@ -23,6 +24,7 @@ export default function PlayNowTab({ clips, playlists, cameras, preselect, group
     const [results, setResults] = useState(null);
     const [active, setActive] = useState([]);
     const { showNotification } = useNotification();
+    const confirm = useConfirm();
 
     const loadActive = useCallback(async () => {
         const r = await getActivePlays();
@@ -67,7 +69,19 @@ export default function PlayNowTab({ clips, playlists, cameras, preselect, group
         }
         setPlaying(true);
         setResults(null);
-        const result = await playNow({ cameraIds, sourceType, sourceId: Number(sourceId), loop });
+        // Wide blast / quiet-hours broadcasts come back as requiresConfirm — ask, then re-send with confirm.
+        let result = await playNow({ cameraIds, sourceType, sourceId: Number(sourceId), loop });
+        if (result.requiresConfirm) {
+            const ok = await confirm({
+                title: 'Konfirmasi siaran',
+                message: result.message || 'Siaran ini butuh konfirmasi.',
+                confirmLabel: 'Siarkan sekarang',
+                cancelLabel: 'Batal',
+                tone: 'default',
+            });
+            if (!ok) { setPlaying(false); return; }
+            result = await playNow({ cameraIds, sourceType, sourceId: Number(sourceId), loop, confirm: true });
+        }
         setPlaying(false);
         if (!result.success) {
             showNotification({ type: 'error', title: 'Gagal memutar', message: result.message });
