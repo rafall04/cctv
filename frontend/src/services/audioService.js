@@ -157,6 +157,13 @@ export const toggleArea = async (id, enabled) => {
     } catch (error) { return failure(error, 'Gagal mengubah area'); }
 };
 
+/** Block/unblock a camera from ALL audio (safety switch for hang-prone V380-class devices). */
+export const setCameraBlocked = async (id, blocked) => {
+    try {
+        return (await apiClient.patch(`${BASE}/cameras/${id}/blocked`, { blocked })).data;
+    } catch (error) { return failure(error, 'Gagal mengubah status blokir'); }
+};
+
 export const playNow = async ({ cameraIds, sourceType, sourceId, loop = 1 }) => {
     try {
         return (await apiClient.post(`${BASE}/play`, { cameraIds, sourceType, sourceId, loop })).data;
@@ -214,6 +221,6 @@ export default {
     getPlaylists, getPlaylist, createPlaylist, updatePlaylist, deletePlaylist,
     getSchedules, createSchedule, updateSchedule, toggleSchedule, deleteSchedule,
     getCameras, playNow, talkTicket, getActivePlays, stopPlay,
-    getCapability, recheckCapability, recheckCameraCapability, getAreas, toggleArea,
+    getCapability, recheckCapability, recheckCameraCapability, getAreas, toggleArea, setCameraBlocked,
     getGroups, createGroup, updateGroup, deleteGroup,
 };

@@ -67,8 +67,10 @@ function persist(cameraId, verdict, note) {
 
 /** Probe ONE camera by id (used by the on-demand "recheck" button). Persists a conclusive result. */
 export async function probeCamera(cameraId) {
-    const row = queryOne('SELECT id, name, private_rtsp_url, stream_source FROM cameras WHERE id = ?', [parseInt(cameraId, 10)]);
+    const row = queryOne('SELECT id, name, private_rtsp_url, stream_source, audio_out_blocked FROM cameras WHERE id = ?', [parseInt(cameraId, 10)]);
     if (!row) { const e = new Error('Kamera tidak ditemukan'); e.statusCode = 404; throw e; }
+    // A blocked camera (V380-class) must NEVER be probed — a DESCRIBE can hang the device. Refuse silently.
+    if (row.audio_out_blocked) return { cameraId: row.id, name: row.name, verdict: 'unknown', note: 'diblokir (perangkat rawan hang)' };
     if (row.stream_source !== 'internal') return { cameraId: row.id, name: row.name, verdict: 'unknown', note: 'bukan kamera internal' };
     if (isBusy(row.id)) return { cameraId: row.id, name: row.name, verdict: 'unknown', note: 'kamera sedang broadcast' };
     const cam = parseRtsp(row.private_rtsp_url);
@@ -87,6 +89,7 @@ function dueCameras(limit) {
         WHERE c.enabled = 1 AND c.stream_source = 'internal'
           AND c.private_rtsp_url IS NOT NULL AND c.private_rtsp_url != ''
           AND a.audio_broadcast_enabled = 1
+          AND c.audio_out_blocked = 0
           AND (c.supports_audio_out IS NULL OR c.audio_out_checked_at IS NULL OR c.audio_out_checked_at < ?)
         ORDER BY c.audio_out_checked_at IS NOT NULL, c.audio_out_checked_at ASC
         LIMIT ?`, [staleBefore, limit]);
@@ -101,7 +104,8 @@ export async function recheckAll({ force = false } = {}) {
     const rows = force
         ? query(`SELECT c.id, c.name, c.private_rtsp_url FROM cameras c JOIN areas a ON a.id = c.area_id
                  WHERE c.enabled = 1 AND c.stream_source = 'internal' AND c.private_rtsp_url IS NOT NULL
-                   AND c.private_rtsp_url != '' AND a.audio_broadcast_enabled = 1 ORDER BY c.name LIMIT 200`)
+                   AND c.private_rtsp_url != '' AND a.audio_broadcast_enabled = 1 AND c.audio_out_blocked = 0
+                 ORDER BY c.name LIMIT 200`)
         : dueCameras(SWEEP_MAX_PER_RUN);
     const tally = { supported: 0, unsupported: 0, unknown: 0 };
     for (const row of rows) {
@@ -119,16 +123,34 @@ export async function recheckAll({ force = false } = {}) {
     return { probed: rows.length, ...tally };
 }
 
-/** Capability rows for the admin UI (scoped to audio-enabled areas). */
+/** Capability rows for the admin UI (scoped to audio-enabled areas). Blocked cameras ARE shown (badged
+ *  "Diblokir") so the operator can see and manage them; they just never get probed/broadcast. */
 export function listCapabilities() {
     return query(`
         SELECT c.id, c.name, a.name AS area_name, c.area_id,
-               c.supports_audio_out, c.audio_out_checked_at, c.audio_out_note
+               c.supports_audio_out, c.audio_out_checked_at, c.audio_out_note, c.audio_out_blocked
         FROM cameras c JOIN areas a ON a.id = c.area_id
         WHERE c.enabled = 1 AND c.stream_source = 'internal'
           AND c.private_rtsp_url IS NOT NULL AND c.private_rtsp_url != ''
           AND a.audio_broadcast_enabled = 1
-        ORDER BY c.supports_audio_out DESC NULLS LAST, c.name ASC`);
+        ORDER BY c.audio_out_blocked ASC, c.supports_audio_out DESC NULLS LAST, c.name ASC`);
+}
+
+/**
+ * Block/unblock a camera from ALL audio paths (safety switch for devices that hang, e.g. V380).
+ * Blocking is instant + never probes. Unblocking marks the camera stale so the next sweep re-probes it.
+ */
+export function setCameraBlocked(cameraId, blocked) {
+    const id = parseInt(cameraId, 10);
+    const row = queryOne('SELECT id, name FROM cameras WHERE id = ?', [id]);
+    if (!row) { const e = new Error('Kamera tidak ditemukan'); e.statusCode = 404; throw e; }
+    if (blocked) {
+        execute("UPDATE cameras SET audio_out_blocked = 1, audio_out_note = 'Diblokir manual: perangkat rawan hang' WHERE id = ?", [id]);
+    } else {
+        // Lift the block and mark stale (checked_at=NULL) so capability is re-probed instead of stale.
+        execute("UPDATE cameras SET audio_out_blocked = 0, audio_out_checked_at = NULL, audio_out_note = 'Blokir dilepas — menunggu tes ulang' WHERE id = ?", [id]);
+    }
+    return { id: row.id, name: row.name, audio_out_blocked: blocked ? 1 : 0 };
 }
 
 /** Mark a camera for re-probe (call when its IP/RTSP/creds change). Non-blocking; sweep/button re-probes. */
@@ -155,4 +177,4 @@ export function triggerBackgroundRecheck() {
     recheckAll({ force: false }).catch((e) => console.error('[AudioCap] Background recheck error:', e.message));
 }
 
-export default { probeCamera, recheckAll, listCapabilities, markStale, startCapabilitySweep, triggerBackgroundRecheck };
+export default { probeCamera, recheckAll, listCapabilities, setCameraBlocked, markStale, startCapabilitySweep, triggerBackgroundRecheck };

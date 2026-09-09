@@ -31,6 +31,7 @@ export function listBroadcastTargets({ includeUnknown = true } = {}) {
         WHERE c.enabled = 1 AND c.stream_source = 'internal'
           AND c.private_rtsp_url IS NOT NULL AND c.private_rtsp_url != ''
           AND a.audio_broadcast_enabled = 1
+          AND c.audio_out_blocked = 0
           AND ${capClause}
         ORDER BY (c.supports_audio_out = 1) DESC, a.name ASC, c.name ASC`);
     return cameras;

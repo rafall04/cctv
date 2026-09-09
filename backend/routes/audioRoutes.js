@@ -15,7 +15,7 @@ import {
     listPlaylists, getPlaylist, createPlaylist, updatePlaylist, deletePlaylist,
     listSchedules, createSchedule, updateSchedule, toggleSchedule, deleteSchedule,
     listCameras, playNow,
-    listCapability, recheckCapability, recheckCameraCapability, listAreas, toggleArea,
+    listCapability, recheckCapability, recheckCameraCapability, listAreas, toggleArea, blockCamera,
     importClip, listImportJobs, talkTicket, listActivePlays, stopPlay,
     listGroups, createGroup, updateGroup, deleteGroup,
 } from '../controllers/audioController.js';
@@ -63,6 +63,7 @@ export default async function audioRoutes(fastify) {
     fastify.get('/capability', admin, listCapability);
     fastify.post('/capability/recheck', admin, recheckCapability);
     fastify.post('/capability/recheck/:id', admin, recheckCameraCapability);
+    fastify.patch('/cameras/:id/blocked', admin, blockCamera); // safety block for hang-prone devices
     fastify.get('/areas', admin, listAreas);
     fastify.patch('/areas/:id/enabled', admin, toggleArea);
 

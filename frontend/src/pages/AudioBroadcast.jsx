@@ -15,7 +15,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
     getClips, getPlaylists, getSchedules, getCameras, getAreas, getCapability,
-    getGroups, createGroup, deleteGroup,
+    getGroups, createGroup, updateGroup, deleteGroup,
 } from '../services/audioService';
 import { useNotification } from '../contexts/NotificationContext';
 import { PageHeader, Tabs, TabPanel } from '../components/ui';
@@ -25,12 +25,14 @@ import ScheduleTab from '../components/admin/audio/ScheduleTab';
 import PlayNowTab from '../components/admin/audio/PlayNowTab';
 import TargetsTab from '../components/admin/audio/TargetsTab';
 import TalkTab from '../components/admin/audio/TalkTab';
+import GroupsTab from '../components/admin/audio/GroupsTab';
 
 const TABS = [
     { id: 'play', label: 'Putar Sekarang' },
     { id: 'talk', label: 'Bicara' },
     { id: 'library', label: 'Pustaka' },
     { id: 'playlists', label: 'Playlist' },
+    { id: 'groups', label: 'Grup' },
     { id: 'schedules', label: 'Jadwal' },
     { id: 'targets', label: 'Kamera & Area' },
 ];
@@ -94,6 +96,12 @@ export default function AudioBroadcast() {
         else warn(r, 'Gagal membuat grup');
     }, [reloadGroups, warn, showNotification]);
 
+    const handleUpdateGroup = useCallback(async (id, payload) => {
+        const r = await updateGroup(id, payload);
+        if (r.success) { showNotification({ type: 'success', title: 'Grup diperbarui' }); reloadGroups(); }
+        else warn(r, 'Gagal memperbarui grup');
+    }, [reloadGroups, warn, showNotification]);
+
     const handleDeleteGroup = useCallback(async (id) => {
         const r = await deleteGroup(id);
         if (r.success) reloadGroups(); else warn(r, 'Gagal menghapus grup');
@@ -142,7 +150,6 @@ export default function AudioBroadcast() {
                         preselect={preselectClip}
                         groups={groups}
                         onSaveGroup={handleSaveGroup}
-                        onDeleteGroup={handleDeleteGroup}
                     />
                 </TabPanel>
             )}
@@ -161,6 +168,17 @@ export default function AudioBroadcast() {
                     <PlaylistTab playlists={playlists} clips={clips} loading={loading} reload={reloadPlaylists} />
                 </TabPanel>
             )}
+            {active === 'groups' && (
+                <TabPanel id="groups" idPrefix="audio">
+                    <GroupsTab
+                        groups={groups}
+                        cameras={cameras}
+                        onSaveGroup={handleSaveGroup}
+                        onUpdateGroup={handleUpdateGroup}
+                        onDeleteGroup={handleDeleteGroup}
+                    />
+                </TabPanel>
+            )}
             {active === 'schedules' && (
                 <TabPanel id="schedules" idPrefix="audio">
                     <ScheduleTab
@@ -172,7 +190,6 @@ export default function AudioBroadcast() {
                         reload={reloadSchedules}
                         groups={groups}
                         onSaveGroup={handleSaveGroup}
-                        onDeleteGroup={handleDeleteGroup}
                     />
                 </TabPanel>
             )}

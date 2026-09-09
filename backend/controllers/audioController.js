@@ -23,7 +23,7 @@ import {
 } from '../services/audioScheduleService.js';
 import { playToCameras, listPlaying, stopPlaying, stopAllPlaying } from '../services/audioCastService.js';
 import { listBroadcastTargets, listAreas as listAreaRows, setAreaEnabled } from '../services/audioTargetService.js';
-import { listCapabilities, recheckAll, probeCamera } from '../services/audioCapabilityService.js';
+import { listCapabilities, recheckAll, probeCamera, setCameraBlocked } from '../services/audioCapabilityService.js';
 import { createImportJob, listJobs as listImportRows } from '../services/audioImportService.js';
 import {
     listGroups as listGroupRows, createGroup as createGroupRow,
@@ -245,6 +245,18 @@ export async function recheckCameraCapability(request, reply) {
 export async function listAreas(request, reply) {
     try {
         return reply.send({ success: true, data: listAreaRows() });
+    } catch (error) { return fail(reply, error); }
+}
+
+// Block/unblock a camera from all audio (safety switch for hang-prone V380-class devices).
+export async function blockCamera(request, reply) {
+    try {
+        const id = parseId(request.params.id);
+        if (!id) return reply.code(400).send({ success: false, message: 'ID kamera tidak valid' });
+        const blocked = request.body?.blocked === true;
+        const cam = setCameraBlocked(id, blocked);
+        logAdminAction({ action: 'audio_camera_block', targetType: 'camera', targetId: id, blocked: cam.audio_out_blocked, ...adminContext(request) }, request);
+        return reply.send({ success: true, message: blocked ? 'Kamera diblokir dari audio' : 'Blokir dilepas', data: cam });
     } catch (error) { return fail(reply, error); }
 }
 

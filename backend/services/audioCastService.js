@@ -73,6 +73,7 @@ export function listTargetCameras() {
         FROM cameras c LEFT JOIN areas a ON a.id = c.area_id
         WHERE c.enabled = 1 AND c.stream_source = 'internal'
           AND c.private_rtsp_url IS NOT NULL AND c.private_rtsp_url != ''
+          AND c.audio_out_blocked = 0
         ORDER BY c.name ASC
     `);
 }
@@ -156,8 +157,10 @@ export async function playToCameras(cameraIds, sourceType, sourceId, loop = 1) {
     const loopN = Math.min(Math.max(parseInt(loop, 10) || 1, 1), 20);
 
     const results = await Promise.all(ids.map(async (id) => {
-        const row = queryOne('SELECT id, name, private_rtsp_url FROM cameras WHERE id = ?', [id]);
+        const row = queryOne('SELECT id, name, private_rtsp_url, audio_out_blocked FROM cameras WHERE id = ?', [id]);
         if (!row) return { cameraId: id, name: `#${id}`, ok: false, message: 'kamera tidak ada' };
+        // Hard safety stop: a blocked camera (V380-class) is never opened — a backchannel can hang it.
+        if (row.audio_out_blocked) return { cameraId: id, name: row.name, ok: false, message: 'diblokir (perangkat rawan hang)' };
         const cam = parseRtsp(row.private_rtsp_url);
         if (!cam) return { cameraId: id, name: row.name, ok: false, message: 'kamera tanpa RTSP internal' };
         if (!acquire(id, 'clip')) return { cameraId: id, name: row.name, ok: false, message: 'kamera sedang dipakai audio lain' };

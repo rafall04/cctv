@@ -32,7 +32,8 @@ function resetSchema() {
         CREATE TABLE cameras (
             id INTEGER PRIMARY KEY, name TEXT, area_id INTEGER, enabled INTEGER DEFAULT 1,
             stream_source TEXT DEFAULT 'internal', private_rtsp_url TEXT,
-            supports_audio_out INTEGER, audio_out_checked_at TEXT, audio_out_note TEXT);
+            supports_audio_out INTEGER, audio_out_checked_at TEXT, audio_out_note TEXT,
+            audio_out_blocked INTEGER NOT NULL DEFAULT 0);
     `);
     // Area 1 = local (Dander), enabled. Area 2 = Surabaya, disabled (default 0).
     db.prepare("INSERT INTO areas (id,name,audio_broadcast_enabled) VALUES (1,'Dander',1),(2,'Surabaya',0)").run();
@@ -66,6 +67,12 @@ describe('audioTargetService — local scoping', () => {
     it('enabling the Surabaya area WOULD include it (proves the gate is the area flag, not an IP heuristic)', () => {
         setAreaEnabled(2, true);
         expect(listBroadcastTargets({ includeUnknown: true }).map((c) => c.id).sort()).toEqual([1, 3, 4]);
+    });
+
+    it('a blocked camera (V380-class) is excluded even when supported & in an enabled area', () => {
+        db.prepare('UPDATE cameras SET audio_out_blocked = 1 WHERE id = 1').run(); // was the only supported local cam
+        expect(listBroadcastTargets({ includeUnknown: false }).map((c) => c.id)).toEqual([]);
+        expect(listBroadcastTargets({ includeUnknown: true }).map((c) => c.id).sort()).toEqual([3]); // 1 blocked out
     });
 });
 

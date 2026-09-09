@@ -40,10 +40,12 @@ function sweepTickets() {
 export function mintTicket(cameraId, adminUserId) {
     sweepTickets();
     const id = parseInt(cameraId, 10);
-    const cam = queryOne("SELECT id, name, private_rtsp_url, stream_source FROM cameras WHERE id = ? AND enabled = 1", [id]);
+    const cam = queryOne("SELECT id, name, private_rtsp_url, stream_source, audio_out_blocked FROM cameras WHERE id = ? AND enabled = 1", [id]);
     if (!cam || cam.stream_source !== 'internal' || !cam.private_rtsp_url) {
         const e = new Error('Kamera tidak bisa menerima audio'); e.statusCode = 400; throw e;
     }
+    // A blocked camera (V380-class) is refused for live talk too — an unexpected backchannel can hang it.
+    if (cam.audio_out_blocked) { const e = new Error('Kamera diblokir dari audio (perangkat rawan hang)'); e.statusCode = 400; throw e; }
     const ticket = randomBytes(24).toString('base64url');
     tickets.set(ticket, { cameraId: id, adminUserId, expiresAt: Date.now() + TICKET_TTL_MS });
     return { ticket, wsPath: `/api/admin/audio/talk?ticket=${ticket}`, expiresInMs: TICKET_TTL_MS, cameraName: cam.name };

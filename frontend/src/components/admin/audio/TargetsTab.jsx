@@ -12,12 +12,15 @@
  */
 
 import { useEffect, useState } from 'react';
-import { toggleArea, recheckCameraCapability, recheckCapability } from '../../../services/audioService';
+import { toggleArea, recheckCameraCapability, recheckCapability, setCameraBlocked } from '../../../services/audioService';
 import { useNotification } from '../../../contexts/NotificationContext';
 import { Button, EmptyState } from '../../ui';
 import { capabilityInfo } from './audioFormatting';
 
-function Badge({ supports }) {
+function Badge({ supports, blocked }) {
+    if (blocked) {
+        return <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-status-fault/30 bg-status-fault/10 px-2 py-0.5 text-xs font-medium text-status-fault">⛔ Diblokir</span>;
+    }
     const info = capabilityInfo(supports);
     const cls = info.tone === 'live'
         ? 'border-status-live/30 bg-status-live/10 text-status-live'
@@ -59,6 +62,21 @@ export default function TargetsTab({ areas, capability, loading, reloadAreas, re
             return;
         }
         showNotification({ type: 'success', title: cam.name, message: `Hasil: ${result.data?.verdict}` });
+        await reloadCapability();
+    };
+
+    const onToggleBlock = async (cam) => {
+        const nextBlocked = !cam.audio_out_blocked;
+        // Unblocking a hang-prone device is the risky direction — confirm it.
+        if (!nextBlocked && !window.confirm(`"${cam.name}" ditandai rawan hang (mis. V380). Lepas blokir & izinkan audio lagi?`)) return;
+        setRechecking(`block-${cam.id}`);
+        const result = await setCameraBlocked(cam.id, nextBlocked);
+        setRechecking(null);
+        if (!result.success) {
+            showNotification({ type: 'error', title: 'Gagal', message: result.message });
+            return;
+        }
+        showNotification({ type: nextBlocked ? 'warning' : 'success', title: nextBlocked ? 'Kamera diblokir' : 'Blokir dilepas', message: cam.name });
         await reloadCapability();
     };
 
@@ -129,7 +147,7 @@ export default function TargetsTab({ areas, capability, loading, reloadAreas, re
                 <div className="flex items-center justify-between">
                     <div>
                         <h3 className="text-sm font-semibold text-content">Kapabilitas kamera</h3>
-                        <p className="mt-0.5 text-xs text-content-muted">Deteksi speaker two-way tanpa membunyikan apa pun (probe senyap).</p>
+                        <p className="mt-0.5 text-xs text-content-muted">Deteksi speaker two-way tanpa membunyikan apa pun (probe senyap). Perangkat rawan hang (mis. V380) bisa <span className="font-medium text-status-fault">Diblokir</span> agar tak pernah disentuh audio.</p>
                     </div>
                     <Button onClick={onRecheckAll} loading={rechecking === 'all'} disabled={enabledCount === 0}>Cek ulang semua</Button>
                 </div>
@@ -146,22 +164,44 @@ export default function TargetsTab({ areas, capability, loading, reloadAreas, re
                                     {area} <span className="font-normal text-content-subtle">({capByArea.get(area).filter((c) => c.supports_audio_out === 1).length} didukung / {capByArea.get(area).length})</span>
                                 </p>
                                 {capByArea.get(area).map((cam) => (
-                                    <div key={cam.id} className="flex items-start gap-3 rounded-card border border-edge bg-surface p-3 shadow-e1">
+                                    <div key={cam.id} className={`flex items-start gap-3 rounded-card border p-3 shadow-e1 ${cam.audio_out_blocked ? 'border-status-fault/30 bg-status-fault/5' : 'border-edge bg-surface'}`}>
                                         <div className="min-w-0 flex-1">
                                             <p className="break-words text-sm font-semibold leading-snug text-content">{cam.name}</p>
                                             {cam.audio_out_note && (
                                                 <p className="mt-0.5 break-words text-xs text-content-subtle">{cam.audio_out_note}</p>
                                             )}
                                         </div>
-                                        <Badge supports={cam.supports_audio_out} />
-                                        <button
-                                            type="button"
-                                            onClick={() => onRecheckOne(cam)}
-                                            disabled={rechecking === cam.id}
-                                            className="shrink-0 rounded-control border border-edge bg-surface px-3 py-1.5 text-sm font-medium text-content-muted transition-colors hover:border-edge-strong hover:text-content disabled:opacity-50"
-                                        >
-                                            {rechecking === cam.id ? '…' : 'Cek'}
-                                        </button>
+                                        <Badge supports={cam.supports_audio_out} blocked={cam.audio_out_blocked} />
+                                        {cam.audio_out_blocked ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => onToggleBlock(cam)}
+                                                disabled={rechecking === `block-${cam.id}`}
+                                                className="shrink-0 rounded-control border border-status-fault/40 bg-surface px-3 py-1.5 text-sm font-medium text-status-fault transition-colors hover:bg-status-fault/10 disabled:opacity-50"
+                                            >
+                                                {rechecking === `block-${cam.id}` ? '…' : 'Lepas blokir'}
+                                            </button>
+                                        ) : (
+                                            <div className="flex shrink-0 items-center gap-1.5">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => onRecheckOne(cam)}
+                                                    disabled={rechecking === cam.id}
+                                                    className="rounded-control border border-edge bg-surface px-3 py-1.5 text-sm font-medium text-content-muted transition-colors hover:border-edge-strong hover:text-content disabled:opacity-50"
+                                                >
+                                                    {rechecking === cam.id ? '…' : 'Cek'}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => onToggleBlock(cam)}
+                                                    disabled={rechecking === `block-${cam.id}`}
+                                                    title="Blokir dari audio (perangkat rawan hang)"
+                                                    className="rounded-control border border-edge bg-surface px-2.5 py-1.5 text-sm font-medium text-content-subtle transition-colors hover:border-status-fault/40 hover:text-status-fault disabled:opacity-50"
+                                                >
+                                                    Blokir
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
                                 ))}
                             </div>
