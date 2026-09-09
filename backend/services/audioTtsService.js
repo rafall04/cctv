@@ -84,9 +84,21 @@ function resolveVoice(engine, voiceId) {
     return e.voices.find((v) => v.id === voiceId) || e.voices[0] || null;
 }
 
+// Make written PA text SPEAK naturally (piper/edge read symbols literally otherwise):
+//  - drop any unfilled {placeholder} so it is never read aloud as "nama" (belt-and-suspenders; the fill-in
+//    UI already substitutes them),
+//  - "/" -> " atau " ("Bapak/Ibu" -> "Bapak atau Ibu"; "RT/RW" -> "RT atau RW"),
+//  - "&" -> " dan ".
+export function normalizeForSpeech(s) {
+    return String(s || '')
+        .replace(/\{[^{}]*\}/g, ' ')
+        .replace(/\s*\/\s*/g, ' atau ')
+        .replace(/\s*&\s*/g, ' dan ');
+}
+
 function cleanText(text) {
-    // Normalise whitespace (also flattens any stray control char into a space) then trim.
-    const t = String(text || '').replace(/\s+/g, ' ').trim();
+    // Normalise for speech, then collapse whitespace (also flattens any stray control char) + trim.
+    const t = normalizeForSpeech(text).replace(/\s+/g, ' ').trim();
     if (!t) { const err = new Error('Teks wajib diisi'); err.statusCode = 400; throw err; }
     if (t.length > MAX_TTS_CHARS) { const err = new Error(`Teks melebihi ${MAX_TTS_CHARS} karakter`); err.statusCode = 400; throw err; }
     return t;

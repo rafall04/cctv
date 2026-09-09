@@ -16,7 +16,7 @@ import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { query, queryOne } from '../database/connectionPool.js';
 import { clipPath, getClip } from './audioClipService.js';
-import { acquire, release } from './cameraAudioLock.js';
+import { acquire, preempt, release, busyReason } from './cameraAudioLock.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SCRIPT = join(__dirname, '..', 'scripts', 'audio_cast.py');
@@ -146,7 +146,8 @@ function runPusher(cam, files, loop, ctx) {
  * Play a source (clip|playlist) to one or more cameras concurrently.
  * @returns {Promise<{results: Array, files: number}>}
  */
-export async function playToCameras(cameraIds, sourceType, sourceId, loop = 1) {
+export async function playToCameras(cameraIds, sourceType, sourceId, loop = 1, opts = {}) {
+    const preemptMode = opts.preempt === true; // emergency: displace whatever is playing + bypass the governor cap
     const { files } = resolveSourceFiles(sourceType, sourceId);
     if (files.length === 0) {
         const err = new Error('Tidak ada audio untuk diputar (clip/playlist kosong atau berkas hilang)');
@@ -166,12 +167,20 @@ export async function playToCameras(cameraIds, sourceType, sourceId, loop = 1) {
         if (row.audio_out_blocked) return { cameraId: id, name: row.name, ok: false, message: 'diblokir (perangkat rawan hang)' };
         const cam = parseRtsp(row.private_rtsp_url);
         if (!cam) return { cameraId: id, name: row.name, ok: false, message: 'kamera tanpa RTSP internal' };
-        if (!acquire(id, 'clip')) return { cameraId: id, name: row.name, ok: false, message: 'kamera sedang dipakai audio lain' };
+        // The stop callback lets a later higher-priority broadcast preempt THIS play (kill its child cleanly).
+        const stopThis = () => stopPlaying(id);
+        let token;
+        if (preemptMode) {
+            token = preempt(id, 'clip', stopThis).token; // emergency: take the camera now
+        } else {
+            token = acquire(id, 'clip', stopThis);
+            if (!token) return { cameraId: id, name: row.name, ok: false, message: busyReason(id) };
+        }
         // Per-area loop ceiling (plafon) caps repeats on this camera's area; falls back to the requested loop.
         const camLoop = row.max_loop ? Math.min(loopN, row.max_loop) : loopN;
-        // Lock is released by runPusher's onDone when the child ACTUALLY exits (playback ends), not when
-        // this resolves (which is the moment playback STARTED) — else a second play could garble the first.
-        const r = await runPusher(cam, files, camLoop, { id, name: row.name, source: sourceType, onDone: () => release(id) });
+        // Lock is released by runPusher's onDone when the child ACTUALLY exits — token-guarded so a play that
+        // was preempted mid-flight can't release the emergency holder that replaced it.
+        const r = await runPusher(cam, files, camLoop, { id, name: row.name, source: sourceType, onDone: () => release(id, token) });
         return { cameraId: id, name: row.name, ...r };
     }));
     return { results, files: files.length };

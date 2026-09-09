@@ -35,6 +35,8 @@ export default function LibraryTab({ clips, loading, reload, onPlayClip }) {
     const [ttsBusy, setTtsBusy] = useState(false);
     const [templates, setTemplates] = useState([]);
     const [templateId, setTemplateId] = useState('');
+    const [tplBody, setTplBody] = useState('');
+    const [tplFills, setTplFills] = useState({});
     const [favOnly, setFavOnly] = useState(false);
     const [catFilter, setCatFilter] = useState('');
     const fileRef = useRef(null);
@@ -59,11 +61,26 @@ export default function LibraryTab({ clips, loading, reload, onPlayClip }) {
     }, []);
     useEffect(() => { loadTemplates(); }, [loadTemplates]);
 
-    // Load a template's body into the TTS box (operator fills the {…} placeholders, then generates).
+    // Fill-in-the-blank: parse {placeholder} tokens so the operator fills a FIELD (replacing EVERY
+    // occurrence at once) instead of hand-editing raw text — a missed {nama} would otherwise be spoken.
+    const PLACEHOLDER_RE = /\{([^{}]+)\}/g;
+    const parsePlaceholders = (body) => [...new Set((String(body).match(PLACEHOLDER_RE) || []).map((m) => m.slice(1, -1)))];
+    const substitute = (body, fills) => String(body).replace(PLACEHOLDER_RE, (m, k) => (fills[k] && fills[k].trim() ? fills[k].trim() : m));
+    const placeholders = tplBody ? parsePlaceholders(tplBody) : [];
+
     const applyTemplate = (id) => {
         setTemplateId(id);
         const t = templates.find((x) => String(x.id) === String(id));
-        if (t) { setTtsText(t.body); if (!ttsName.trim()) setTtsName(t.name); }
+        if (!t) { setTplBody(''); setTplFills({}); return; }
+        setTplBody(t.body);
+        setTplFills({});
+        setTtsText(t.body);
+        if (!ttsName.trim()) setTtsName(t.name);
+    };
+    const setFill = (key, val) => {
+        const next = { ...tplFills, [key]: val };
+        setTplFills(next);
+        setTtsText(substitute(tplBody, next));
     };
     const saveAsTemplate = async () => {
         const name = window.prompt('Nama template:');
@@ -135,6 +152,15 @@ export default function LibraryTab({ clips, loading, reload, onPlayClip }) {
     const handleTts = async (event) => {
         event.preventDefault();
         if (!ttsText.trim()) { showNotification({ type: 'error', title: 'Tulis teksnya dulu' }); return; }
+        // Catch a missed {placeholder} before it becomes silent/garbled speech.
+        if (/\{[^{}]+\}/.test(ttsText)) {
+            const ok = await confirm({
+                title: 'Masih ada bagian belum diisi',
+                message: 'Ada bagian {…} yang belum diisi — bagian itu tidak akan dibacakan. Tetap buat suara?',
+                confirmLabel: 'Tetap buat', cancelLabel: 'Batal', tone: 'default',
+            });
+            if (!ok) return;
+        }
         setTtsBusy(true);
         // Outcome-checked like import: a job appearing is the source of truth (survives a Cloudflare idle-drop).
         const beforeIds = new Set(jobs.map((j) => j.id));
@@ -301,6 +327,24 @@ export default function LibraryTab({ clips, loading, reload, onPlayClip }) {
                     )}
                     <button type="button" onClick={saveAsTemplate} disabled={!ttsText.trim()} className="shrink-0 rounded-control border border-edge px-2.5 py-1.5 text-xs font-medium text-content-muted hover:border-edge-strong disabled:opacity-40">Simpan teks jadi template</button>
                 </div>
+
+                {/* Isian per-placeholder: isi sekali -> ganti SEMUA kemunculan {ini} di teks. */}
+                {placeholders.length > 0 && (
+                    <div className="grid grid-cols-2 gap-2 rounded-control border border-edge bg-surface-sunken p-2 sm:grid-cols-3">
+                        {placeholders.map((key) => (
+                            <label key={key} className="text-xs text-content-muted">
+                                <span className="mb-0.5 block truncate">{key}</span>
+                                <input
+                                    type="text"
+                                    value={tplFills[key] || ''}
+                                    onChange={(e) => setFill(key, e.target.value)}
+                                    placeholder={`isi ${key}`}
+                                    className="w-full rounded-control border border-edge bg-surface px-2 py-1 text-sm text-content focus:border-primary focus:outline-none"
+                                />
+                            </label>
+                        ))}
+                    </div>
+                )}
 
                 <textarea
                     value={ttsText}
