@@ -15,7 +15,7 @@ The base filename is allowlisted before it ever reaches join(), the same defence
 
 import { execFile } from 'child_process';
 import { promisify } from 'util';
-import { existsSync, mkdirSync, writeFileSync, unlinkSync, statSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync, unlinkSync, statSync, readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { randomBytes } from 'crypto';
@@ -178,6 +178,51 @@ export function getClip(id) {
     return queryOne('SELECT * FROM audio_clips WHERE id = ?', [parseInt(id, 10)]);
 }
 
+// G.711 u-law -> signed PCM16 decode table (built once). Clips are stored as raw u-law 16kHz mono;
+// browsers can't play raw u-law, so in-page preview needs a PCM WAV. Decoding in Node is a 256-entry
+// table lookup (near-zero CPU, fully offline — no ffmpeg spawn per preview click on this weak box).
+const ULAW_TO_PCM16 = (() => {
+    const table = new Int16Array(256);
+    for (let i = 0; i < 256; i++) {
+        const u = ~i & 0xff;
+        let sample = ((u & 0x0f) << 3) + 0x84; // 0x84 = bias (33 << 2)
+        sample <<= (u & 0x70) >> 4;
+        sample -= 0x84;
+        table[i] = (u & 0x80) ? -sample : sample;
+    }
+    return table;
+})();
+
+/**
+ * Decode a clip's stored .ulaw into a browser-playable PCM16 WAV buffer for inline preview.
+ * @returns {{buffer: Buffer, name: string}}
+ */
+export function getClipWav(id) {
+    const clip = getClip(id);
+    if (!clip) { const e = new Error('Audio tidak ditemukan'); e.statusCode = 404; throw e; }
+    const p = clipPath(clip.base_filename);
+    if (!p || !existsSync(p)) { const e = new Error('Berkas audio tidak ada'); e.statusCode = 404; throw e; }
+    const ulaw = readFileSync(p);
+    const n = ulaw.length;
+    const dataSize = n * 2;
+    const buffer = Buffer.allocUnsafe(44 + dataSize);
+    buffer.write('RIFF', 0, 'ascii');
+    buffer.writeUInt32LE(36 + dataSize, 4);
+    buffer.write('WAVE', 8, 'ascii');
+    buffer.write('fmt ', 12, 'ascii');
+    buffer.writeUInt32LE(16, 16);            // PCM fmt chunk size
+    buffer.writeUInt16LE(1, 20);             // audio format: PCM
+    buffer.writeUInt16LE(1, 22);             // channels: mono
+    buffer.writeUInt32LE(16000, 24);         // sample rate
+    buffer.writeUInt32LE(16000 * 2, 28);     // byte rate (rate * blockAlign)
+    buffer.writeUInt16LE(2, 32);             // block align (channels * bytesPerSample)
+    buffer.writeUInt16LE(16, 34);            // bits per sample
+    buffer.write('data', 36, 'ascii');
+    buffer.writeUInt32LE(dataSize, 40);
+    for (let i = 0; i < n; i++) buffer.writeInt16LE(ULAW_TO_PCM16[ulaw[i]], 44 + i * 2);
+    return { buffer, name: clip.name };
+}
+
 export function deleteClip(id) {
     const clip = getClip(id);
     if (!clip) { const err = new Error('Audio tidak ditemukan'); err.statusCode = 404; throw err; }
@@ -189,5 +234,5 @@ export function deleteClip(id) {
 
 export default {
     AUDIO_DIR, MAX_AUDIO_UPLOAD_BYTES, MAX_CLIP_SECONDS, ensureAudioDir, isSafeBase, clipPath,
-    saveAudioClip, finalizeClipFromFile, listClips, getClip, deleteClip, setClipMeta,
+    saveAudioClip, finalizeClipFromFile, listClips, getClip, getClipWav, deleteClip, setClipMeta,
 };

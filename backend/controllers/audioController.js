@@ -9,7 +9,7 @@ SideEffects: writes clip/playlist/schedule rows + audio files; spawns the pusher
 */
 
 import {
-    saveAudioClip, listClips as listClipRows, deleteClip as deleteClipRow, setClipMeta, getClip, MAX_AUDIO_UPLOAD_BYTES,
+    saveAudioClip, listClips as listClipRows, deleteClip as deleteClipRow, setClipMeta, getClip, getClipWav, MAX_AUDIO_UPLOAD_BYTES,
 } from '../services/audioClipService.js';
 import {
     listPlaylists as listPlaylistRows, getPlaylist as getPlaylistRow,
@@ -102,6 +102,20 @@ export async function uploadClip(request, reply) {
         }, request);
         return reply.code(201).send({ success: true, message: 'Audio diunggah', data: clip });
     } catch (error) { return fail(reply, error, 'Gagal memproses audio'); }
+}
+
+// Stream a clip as a browser-playable PCM16 WAV for in-page preview (decoded from the stored u-law).
+// Admin-only; the SPA fetches it as a blob (auth header attached) and plays it inline — no tab jump.
+export async function previewClip(request, reply) {
+    try {
+        const id = parseId(request.params.id);
+        if (!id) return reply.code(400).send({ success: false, message: 'ID audio tidak valid' });
+        const { buffer } = getClipWav(id);
+        reply.header('Content-Type', 'audio/wav');
+        reply.header('Content-Length', String(buffer.length));
+        reply.header('Cache-Control', 'private, max-age=60');
+        return reply.send(buffer);
+    } catch (error) { return fail(reply, error); }
 }
 
 // Update a clip's organisation meta (category / favourite / tags).

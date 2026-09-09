@@ -8,7 +8,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { uploadClip, deleteClip, updateClipMeta, importClip, getImportJobs, getTtsEngines, createTts, getTemplates, createTemplate, deleteTemplate } from '../../../services/audioService';
+import { uploadClip, deleteClip, updateClipMeta, importClip, getImportJobs, getTtsEngines, createTts, getTemplates, createTemplate, deleteTemplate, fetchClipPreview } from '../../../services/audioService';
 import { useNotification } from '../../../contexts/NotificationContext';
 import { useConfirm } from '../../../contexts/ConfirmContext';
 import { Button, Field, EmptyState } from '../../ui';
@@ -39,21 +39,56 @@ export default function LibraryTab({ clips, loading, reload, onPlayClip }) {
     const [tplFills, setTplFills] = useState({});
     const [favOnly, setFavOnly] = useState(false);
     const [catFilter, setCatFilter] = useState('');
+    // In-page preview: which clip is loaded in the hidden <audio>, and whether it's playing.
+    const [previewId, setPreviewId] = useState(null);
+    const [previewPlaying, setPreviewPlaying] = useState(false);
+    const audioRef = useRef(null);
+    const previewUrlRef = useRef(null);
     const fileRef = useRef(null);
     const { showNotification } = useNotification();
     const confirm = useConfirm();
 
-    // Load TTS engines/voices once; default to the first AVAILABLE engine (prefer offline piper).
+    // Load TTS engines/voices once; default to the most NATURAL available engine (prefer the online
+    // neural voice — the offline piper is noticeably more robotic). Operator can still switch to piper.
     useEffect(() => {
         (async () => {
             const r = await getTtsEngines();
             if (!r.success) return;
             const list = r.data || [];
             setEngines(list);
-            const pick = list.find((e) => e.available) || list[0];
+            const pick = list.find((e) => e.available && e.online) || list.find((e) => e.available) || list[0];
             if (pick) { setTtsEngine(pick.id); setTtsVoice(pick.voices?.[0]?.id || ''); }
         })();
     }, []);
+
+    // Stop + release the current preview (revoke the blob URL so it doesn't leak).
+    const stopPreview = useCallback(() => {
+        const a = audioRef.current;
+        if (a) { try { a.pause(); } catch { /* not started */ } a.removeAttribute('src'); try { a.load(); } catch { /* ignore */ } }
+        if (previewUrlRef.current) { URL.revokeObjectURL(previewUrlRef.current); previewUrlRef.current = null; }
+        setPreviewId(null);
+        setPreviewPlaying(false);
+    }, []);
+    // Release the preview on unmount.
+    useEffect(() => stopPreview, [stopPreview]);
+
+    // "Putar" now PREVIEWS the clip in the browser (not a jump to the broadcast tab). Toggle: playing this
+    // clip -> pause; otherwise fetch a WAV blob (decoded server-side from u-law) and play it inline.
+    const togglePreview = async (clip) => {
+        const a = audioRef.current;
+        if (!a) return;
+        if (previewId === clip.id) {
+            if (previewPlaying) { a.pause(); } else { try { await a.play(); } catch { /* ignore */ } }
+            return;
+        }
+        stopPreview();
+        const r = await fetchClipPreview(clip.id);
+        if (!r.success) { showNotification({ type: 'error', title: 'Gagal pratinjau', message: r.message }); return; }
+        previewUrlRef.current = r.url;
+        a.src = r.url;
+        setPreviewId(clip.id);
+        try { await a.play(); } catch { /* a user gesture triggered this, so autoplay is allowed */ }
+    };
 
     const loadTemplates = useCallback(async () => {
         const r = await getTemplates();
@@ -250,6 +285,14 @@ export default function LibraryTab({ clips, loading, reload, onPlayClip }) {
 
     return (
         <div className="space-y-6">
+            {/* Hidden player for in-page clip preview (▶ Putar). One per tab; state mirrors its events. */}
+            <audio
+                ref={audioRef}
+                className="hidden"
+                onPlay={() => setPreviewPlaying(true)}
+                onPause={() => setPreviewPlaying(false)}
+                onEnded={stopPreview}
+            />
             <form
                 onSubmit={handleUpload}
                 className="grid grid-cols-1 gap-3 rounded-card border border-edge bg-surface p-4 shadow-e1 sm:grid-cols-[1fr_auto] sm:items-end"
@@ -485,13 +528,26 @@ export default function LibraryTab({ clips, loading, reload, onPlayClip }) {
                                 >
                                     Kategori
                                 </button>
+                                <button
+                                    type="button"
+                                    onClick={() => togglePreview(clip)}
+                                    className={`shrink-0 rounded-control border px-3 py-1.5 text-sm font-medium transition-colors ${
+                                        previewId === clip.id
+                                            ? 'border-primary bg-primary/10 text-primary'
+                                            : 'border-edge bg-surface text-content-muted hover:border-edge-strong hover:text-content'
+                                    }`}
+                                    title="Dengarkan di sini (pratinjau)"
+                                >
+                                    {previewId === clip.id && previewPlaying ? '⏸ Jeda' : '▶ Putar'}
+                                </button>
                                 {onPlayClip && (
                                     <button
                                         type="button"
                                         onClick={() => onPlayClip(clip)}
                                         className="shrink-0 rounded-control border border-edge bg-surface px-3 py-1.5 text-sm font-medium text-content-muted transition-colors hover:border-edge-strong hover:text-content"
+                                        title="Kirim ke tab Putar Sekarang untuk disiarkan ke speaker kamera"
                                     >
-                                        Putar
+                                        Siarkan
                                     </button>
                                 )}
                                 <button

@@ -41,9 +41,17 @@ const ENGINES = {
     edge: {
         label: 'Edge Neural (cloud, gratis)',
         online: true,
+        // Microsoft only ships two id-ID neural voices (Gadis/Ardi). We widen the choice with prosody
+        // presets (rate/pitch) so an operator can pick a warmer/softer or a firmer/deeper read — the
+        // biggest lever against "sounds like a robot" short of a paid voice. `base` is the real Edge
+        // voice; rate/pitch are passed to edge-tts. Plain ids stay unchanged so old clips still resolve.
         voices: [
-            { id: 'id-ID-GadisNeural', label: 'Gadis — perempuan (cloud, natural)' },
-            { id: 'id-ID-ArdiNeural', label: 'Ardi — laki-laki (cloud, natural)' },
+            { id: 'id-ID-GadisNeural', label: 'Gadis — perempuan, natural' },
+            { id: 'id-ID-GadisNeural-lembut', base: 'id-ID-GadisNeural', rate: '-8%', pitch: '+2Hz', label: 'Gadis — perempuan, lembut & hangat' },
+            { id: 'id-ID-GadisNeural-ceria', base: 'id-ID-GadisNeural', rate: '+8%', pitch: '+6Hz', label: 'Gadis — perempuan, ceria & ringan' },
+            { id: 'id-ID-ArdiNeural', label: 'Ardi — laki-laki, natural' },
+            { id: 'id-ID-ArdiNeural-tegas', base: 'id-ID-ArdiNeural', rate: '+6%', label: 'Ardi — laki-laki, tegas (pengumuman)' },
+            { id: 'id-ID-ArdiNeural-wibawa', base: 'id-ID-ArdiNeural', rate: '-7%', pitch: '-6Hz', label: 'Ardi — laki-laki, berwibawa & dalam' },
         ],
     },
 };
@@ -145,9 +153,13 @@ export async function synthTtsToTemp({ text, engine = 'piper', voice, prefix }) 
         if (!existsSync(outPath) || statSync(outPath).size === 0) throw new Error('piper tidak menghasilkan audio');
         return { path: outPath, bytes: statSync(outPath).size };
     }
-    // edge
+    // edge — `base` is the real MS voice; rate/pitch presets widen the (only two) id-ID voices.
+    // Use `--rate=…`/`--pitch=…` (single token) so a leading '-' isn't parsed as another flag.
     const outPath = join(AUDIO_DIR, `${prefix}.mp3`);
-    await execFileAsync(EDGE_BIN, ['--voice', v.id, '--text', clean, '--write-media', outPath], { timeout: TTS_TIMEOUT_MS });
+    const edgeArgs = ['--voice', v.base || v.id, '--text', clean, '--write-media', outPath];
+    if (v.rate) edgeArgs.push(`--rate=${v.rate}`);
+    if (v.pitch) edgeArgs.push(`--pitch=${v.pitch}`);
+    await execFileAsync(EDGE_BIN, edgeArgs, { timeout: TTS_TIMEOUT_MS });
     if (!existsSync(outPath) || statSync(outPath).size === 0) throw new Error('edge-tts tidak menghasilkan audio');
     return { path: outPath, bytes: statSync(outPath).size };
 }

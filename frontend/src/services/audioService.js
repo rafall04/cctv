@@ -36,6 +36,14 @@ export const deleteClip = async (id) => {
     } catch (error) { return failure(error, 'Gagal menghapus audio'); }
 };
 
+/** Fetch a clip as a browser-playable WAV object URL for in-page preview. Caller must revoke the URL. */
+export const fetchClipPreview = async (id) => {
+    try {
+        const res = await apiClient.get(`${BASE}/clips/${id}/preview`, { responseType: 'blob' });
+        return { success: true, url: URL.createObjectURL(res.data) };
+    } catch (error) { return failure(error, 'Gagal memutar pratinjau'); }
+};
+
 /** Update a clip's organisation meta: { category?, isFavorite?, tags? }. */
 export const updateClipMeta = async (id, payload) => {
     try {
@@ -416,7 +424,7 @@ export const talkTicket = async (cameraIds) => {
 };
 
 export default {
-    getClips, uploadClip, deleteClip, updateClipMeta, importClip, getImportJobs, getTtsEngines, createTts,
+    getClips, uploadClip, deleteClip, fetchClipPreview, updateClipMeta, importClip, getImportJobs, getTtsEngines, createTts,
     getPlaylists, getPlaylist, createPlaylist, updatePlaylist, deletePlaylist,
     getSchedules, createSchedule, updateSchedule, toggleSchedule, deleteSchedule,
     getCameras, playNow, talkTicket, getActivePlays, stopPlay, getPlayHistory,

@@ -11,7 +11,7 @@ the outer backstop that runs before auth — see the note there. Everything else
 */
 
 import {
-    listClips, uploadClip, deleteClip, updateClipMeta,
+    listClips, uploadClip, deleteClip, updateClipMeta, previewClip,
     listPlaylists, getPlaylist, createPlaylist, updatePlaylist, deletePlaylist,
     listSchedules, createSchedule, updateSchedule, toggleSchedule, deleteSchedule,
     listCameras, playNow,
@@ -46,6 +46,7 @@ export default async function audioRoutes(fastify) {
 
     // Clips
     fastify.get('/clips', admin, listClips);
+    fastify.get('/clips/:id/preview', admin, previewClip); // in-page WAV preview (u-law -> PCM16)
     fastify.post('/clips', { ...admin, bodyLimit: UPLOAD_BODY_LIMIT }, uploadClip);
     fastify.post('/clips/import', admin, importClip);   // small JSON (a URL) — default body limit
     fastify.get('/clips/imports', admin, listImportJobs);
