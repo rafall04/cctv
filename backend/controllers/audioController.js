@@ -24,6 +24,7 @@ import {
 import { playToCameras } from '../services/audioCastService.js';
 import { listBroadcastTargets, listAreas as listAreaRows, setAreaEnabled } from '../services/audioTargetService.js';
 import { listCapabilities, recheckAll, probeCamera } from '../services/audioCapabilityService.js';
+import { createImportJob, listJobs as listImportRows } from '../services/audioImportService.js';
 import { logAdminAction } from '../services/securityAuditLogger.js';
 
 function parseId(value) {
@@ -85,6 +86,27 @@ export async function deleteClip(request, reply) {
         deleteClipRow(id);
         logAdminAction({ action: 'audio_clip_deleted', targetType: 'audio_clip', targetId: id, ...adminContext(request) }, request);
         return reply.send({ success: true, message: 'Audio dihapus' });
+    } catch (error) { return fail(reply, error); }
+}
+
+/* ------------------------------------------------------------- import from link */
+
+// Enqueue an async import (direct media URL, or YouTube via yt-dlp). Returns 202 + the queued job.
+export async function importClip(request, reply) {
+    try {
+        const { url, name } = request.body || {};
+        if (typeof url !== 'string' || !url.trim()) {
+            return reply.code(400).send({ success: false, message: 'URL wajib diisi' });
+        }
+        const job = await createImportJob({ url, name, userId: request.user?.id ?? null });
+        logAdminAction({ action: 'audio_import_queued', targetType: 'audio_import', targetId: job.id, kind: job.source_kind, ...adminContext(request) }, request);
+        return reply.code(202).send({ success: true, message: 'Impor dimulai', data: job });
+    } catch (error) { return fail(reply, error, 'Gagal memulai impor'); }
+}
+
+export async function listImportJobs(request, reply) {
+    try {
+        return reply.send({ success: true, data: listImportRows() });
     } catch (error) { return fail(reply, error); }
 }
 

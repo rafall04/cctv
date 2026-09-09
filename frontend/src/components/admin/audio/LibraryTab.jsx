@@ -7,22 +7,62 @@
  * SideEffects: uploads/deletes clips via the API.
  */
 
-import { useRef, useState } from 'react';
-import { uploadClip, deleteClip } from '../../../services/audioService';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { uploadClip, deleteClip, importClip, getImportJobs } from '../../../services/audioService';
 import { useNotification } from '../../../contexts/NotificationContext';
 import { useConfirm } from '../../../contexts/ConfirmContext';
 import { Button, Field, EmptyState } from '../../ui';
 import { formatDuration, formatBytes, fileToBase64 } from './audioFormatting';
 
 const MAX_MB = 12;
+const JOB_LABEL = { queued: 'Menunggu', processing: 'Memproses…', ready: 'Selesai', failed: 'Gagal' };
 
 export default function LibraryTab({ clips, loading, reload, onPlayClip }) {
     const [name, setName] = useState('');
     const [file, setFile] = useState(null);
     const [uploading, setUploading] = useState(false);
+    const [importUrl, setImportUrl] = useState('');
+    const [importName, setImportName] = useState('');
+    const [importing, setImporting] = useState(false);
+    const [jobs, setJobs] = useState([]);
     const fileRef = useRef(null);
     const { showNotification } = useNotification();
     const confirm = useConfirm();
+
+    // Fetch jobs; when a job newly flips to 'ready' (it just created a clip), refresh the clip library.
+    const loadJobs = useCallback(async () => {
+        const r = await getImportJobs();
+        if (!r.success) return;
+        setJobs((prev) => {
+            const next = r.data || [];
+            const wasReady = new Set(prev.filter((j) => j.status === 'ready').map((j) => j.id));
+            if (next.some((j) => j.status === 'ready' && !wasReady.has(j.id))) reload();
+            return next;
+        });
+    }, [reload]);
+
+    // Poll on a steady interval while the Pustaka tab is mounted (loadJobs is stable, so no render loop).
+    useEffect(() => {
+        loadJobs();
+        const t = setInterval(loadJobs, 4000);
+        return () => clearInterval(t);
+    }, [loadJobs]);
+
+    const handleImport = async (event) => {
+        event.preventDefault();
+        if (!importUrl.trim()) { showNotification({ type: 'error', title: 'Isi URL dulu' }); return; }
+        setImporting(true);
+        const result = await importClip(importUrl.trim(), importName.trim());
+        setImporting(false);
+        if (!result.success) {
+            showNotification({ type: 'error', title: 'Gagal impor', message: result.message });
+            return;
+        }
+        showNotification({ type: 'success', title: 'Impor dimulai', message: 'Berjalan di latar belakang.' });
+        setImportUrl('');
+        setImportName('');
+        await loadJobs();
+    };
 
     const pickFile = (f) => {
         setFile(f || null);
@@ -109,6 +149,45 @@ export default function LibraryTab({ clips, loading, reload, onPlayClip }) {
                     {uploading ? 'Mengunggah…' : 'Unggah'}
                 </Button>
             </form>
+
+            {/* Import from a link — a direct media URL (works anytime) or a YouTube link (if yt-dlp is installed). */}
+            <form
+                onSubmit={handleImport}
+                className="grid grid-cols-1 gap-3 rounded-card border border-edge bg-surface p-4 shadow-e1 sm:grid-cols-[1fr_auto] sm:items-end"
+            >
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <Field
+                        label="URL audio / YouTube"
+                        value={importUrl}
+                        onChange={(e) => setImportUrl(e.target.value)}
+                        placeholder="https://…/lagu.mp3  atau  https://youtu.be/…"
+                        hint="Berkas media langsung, atau tautan YouTube."
+                    />
+                    <Field label="Nama (opsional)" value={importName} onChange={(e) => setImportName(e.target.value)} placeholder="mis. Lagu Desa" maxLength={120} />
+                </div>
+                <Button type="submit" variant="secondary" loading={importing} disabled={!importUrl.trim()}>
+                    {importing ? 'Memulai…' : 'Impor'}
+                </Button>
+                <p className="text-xs text-content-subtle sm:col-span-2">
+                    Pastikan Anda berhak menyiarkan audio ini di ruang publik (hak cipta/ToS jadi tanggung jawab operator).
+                </p>
+            </form>
+
+            {jobs.length > 0 && (
+                <ul className="space-y-1.5">
+                    {jobs.slice(0, 6).map((j) => (
+                        <li key={j.id} className="flex items-center gap-2 rounded-control border border-edge bg-surface-sunken px-3 py-2 text-sm">
+                            <span className={`h-2 w-2 shrink-0 rounded-full ${
+                                j.status === 'ready' ? 'bg-status-live' : j.status === 'failed' ? 'bg-status-fault' : 'bg-status-warn'
+                            }`} />
+                            <span className="min-w-0 flex-1 truncate text-content-muted">{j.title || j.requested_name || j.source_url}</span>
+                            <span className={`shrink-0 text-xs ${j.status === 'failed' ? 'text-status-fault' : 'text-content-subtle'}`}>
+                                {j.status === 'failed' && j.error ? j.error : (JOB_LABEL[j.status] || j.status)}
+                            </span>
+                        </li>
+                    ))}
+                </ul>
+            )}
 
             {loading ? (
                 <p className="text-sm text-content-muted">Memuat…</p>

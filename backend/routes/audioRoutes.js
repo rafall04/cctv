@@ -16,6 +16,7 @@ import {
     listSchedules, createSchedule, updateSchedule, toggleSchedule, deleteSchedule,
     listCameras, playNow,
     listCapability, recheckCapability, recheckCameraCapability, listAreas, toggleArea,
+    importClip, listImportJobs,
 } from '../controllers/audioController.js';
 import { authMiddleware, requireAdmin } from '../middleware/authMiddleware.js';
 import { MAX_AUDIO_UPLOAD_BYTES } from '../services/audioClipService.js';
@@ -30,6 +31,8 @@ export default async function audioRoutes(fastify) {
     // Clips
     fastify.get('/clips', admin, listClips);
     fastify.post('/clips', { ...admin, bodyLimit: UPLOAD_BODY_LIMIT }, uploadClip);
+    fastify.post('/clips/import', admin, importClip);   // small JSON (a URL) — default body limit
+    fastify.get('/clips/imports', admin, listImportJobs);
     fastify.delete('/clips/:id', admin, deleteClip);
 
     // Playlists

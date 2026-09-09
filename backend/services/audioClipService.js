@@ -29,6 +29,7 @@ export const MAX_AUDIO_UPLOAD_BYTES = 12 * 1024 * 1024; // 12MB source — a ful
 // to G.711 anyway, so source bitrate above ~128kbps is wasted. Kept modest because the matching
 // body-size allowance in inputSanitizer.js runs BEFORE route auth (see the note there).
 const FFMPEG_TIMEOUT_MS = 60000;
+export const MAX_CLIP_SECONDS = 900; // 15 min hard cap (ffmpeg -t/-fs) — a song/announcement fits; guards imports
 const SAFE_BASE_RE = /^clip-[a-z0-9]{6,40}$/;
 
 // Magic-byte gate. ffmpeg re-encode is the real validator, but this rejects obvious non-audio before
@@ -82,7 +83,6 @@ async function probeDuration(filePath) {
  * @returns {Promise<object>} the audio_clips row
  */
 export async function saveAudioClip(name, buffer, userId = null) {
-    const cleanName = String(name || '').trim().slice(0, 120) || 'Tanpa nama';
     if (!Buffer.isBuffer(buffer) || buffer.length === 0) {
         const err = new Error('Berkas audio kosong'); err.statusCode = 400; throw err;
     }
@@ -97,35 +97,52 @@ export async function saveAudioClip(name, buffer, userId = null) {
     }
 
     ensureAudioDir();
-    const base = `clip-${randomBytes(8).toString('hex')}`;
-    const tempPath = join(AUDIO_DIR, `.upload-${base}.${kind}`);
-    const outPath = join(AUDIO_DIR, `${base}.ulaw`);
-
+    const tempPath = join(AUDIO_DIR, `.upload-${randomBytes(8).toString('hex')}.${kind}`);
     try {
         writeFileSync(tempPath, buffer);
+        return await finalizeClipFromFile({ name, tempPath, sourceBytes: buffer.length, sourceType: 'upload', userId });
+    } finally {
+        try { unlinkSync(tempPath); } catch { /* never written / already gone */ }
+    }
+}
+
+/**
+ * Encode an on-disk audio file to a streamable G.711 clip + record it. Shared by upload and the
+ * URL/YouTube importer. The CALLER owns tempPath (this function never deletes it). ffmpeg is the real
+ * format validator + the hard duration/byte cap, so an oversize or non-audio source fails cleanly.
+ * @param {{name?:string, tempPath:string, sourceBytes?:number, sourceType?:string, sourceUrl?:string, sourceTitle?:string, userId?:number|null}} args
+ * @returns {Promise<object>} the audio_clips row
+ */
+export async function finalizeClipFromFile({ name, tempPath, sourceBytes = 0, sourceType = 'upload', sourceUrl = null, sourceTitle = null, userId = null }) {
+    const cleanName = String(name || sourceTitle || '').trim().slice(0, 120) || 'Tanpa nama';
+    ensureAudioDir();
+    const base = `clip-${randomBytes(8).toString('hex')}`;
+    const outPath = join(AUDIO_DIR, `${base}.ulaw`);
+    try {
         const duration = await probeDuration(tempPath);
         // Encode to raw u-law 16kHz mono — exactly what audio_cast.py streams (PCMU/16000, PT=103).
+        // -t + -fs are the hard caps that keep a mislabelled/huge import from producing an unbounded .ulaw.
         await execFileAsync('ffmpeg', [
-            '-y', '-i', tempPath, '-vn', '-ar', '16000', '-ac', '1', '-f', 'mulaw', outPath,
+            '-y', '-i', tempPath, '-vn', '-t', String(MAX_CLIP_SECONDS), '-ar', '16000', '-ac', '1',
+            '-fs', String(16000 * MAX_CLIP_SECONDS), '-f', 'mulaw', outPath,
         ], { timeout: FFMPEG_TIMEOUT_MS });
         if (!existsSync(outPath) || statSync(outPath).size === 0) {
             throw new Error('ffmpeg tidak menghasilkan audio');
         }
-
+        const cappedDuration = Math.min(duration || 0, MAX_CLIP_SECONDS);
         execute(
-            'INSERT INTO audio_clips (name, base_filename, duration_sec, source_bytes, created_by) VALUES (?, ?, ?, ?, ?)',
-            [cleanName, base, duration, buffer.length, userId],
+            `INSERT INTO audio_clips (name, base_filename, duration_sec, source_bytes, created_by, source_type, source_url, source_title)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [cleanName, base, cappedDuration, sourceBytes, userId, sourceType, sourceUrl, sourceTitle],
         );
         const row = queryOne('SELECT * FROM audio_clips WHERE base_filename = ?', [base]);
-        console.log(`[Audio] Stored clip "${cleanName}" (${base}): ${kind} ${Math.round(buffer.length / 1024)}KB -> ${Math.round(statSync(outPath).size / 1024)}KB ulaw, ${duration.toFixed(1)}s`);
+        console.log(`[Audio] Stored clip "${cleanName}" (${base}, ${sourceType}) -> ${Math.round(statSync(outPath).size / 1024)}KB ulaw, ${cappedDuration.toFixed(1)}s`);
         return row;
     } catch (error) {
         try { unlinkSync(outPath); } catch { /* already gone */ }
         if (error.statusCode) throw error;
         console.error('[Audio] Encode failed:', error.message);
         const err = new Error('Gagal memproses audio'); err.statusCode = 500; throw err;
-    } finally {
-        try { unlinkSync(tempPath); } catch { /* never written / already gone */ }
     }
 }
 
@@ -147,6 +164,6 @@ export function deleteClip(id) {
 }
 
 export default {
-    AUDIO_DIR, MAX_AUDIO_UPLOAD_BYTES, ensureAudioDir, isSafeBase, clipPath,
-    saveAudioClip, listClips, getClip, deleteClip,
+    AUDIO_DIR, MAX_AUDIO_UPLOAD_BYTES, MAX_CLIP_SECONDS, ensureAudioDir, isSafeBase, clipPath,
+    saveAudioClip, finalizeClipFromFile, listClips, getClip, deleteClip,
 };

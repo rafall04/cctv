@@ -36,6 +36,19 @@ export const deleteClip = async (id) => {
     } catch (error) { return failure(error, 'Gagal menghapus audio'); }
 };
 
+/** Enqueue an import from a direct media URL or a YouTube link. Returns a queued job (poll getImportJobs). */
+export const importClip = async (url, name) => {
+    try {
+        return (await apiClient.post(`${BASE}/clips/import`, { url, name })).data;
+    } catch (error) { return failure(error, 'Gagal memulai impor'); }
+};
+
+export const getImportJobs = async () => {
+    try {
+        return (await apiClient.get(`${BASE}/clips/imports`)).data;
+    } catch (error) { return failure(error, 'Gagal memuat status impor'); }
+};
+
 /* ------------------------------------------------------------------- playlists */
 
 export const getPlaylists = async () => {
@@ -147,7 +160,7 @@ export const playNow = async ({ cameraIds, sourceType, sourceId, loop = 1 }) => 
 };
 
 export default {
-    getClips, uploadClip, deleteClip,
+    getClips, uploadClip, deleteClip, importClip, getImportJobs,
     getPlaylists, getPlaylist, createPlaylist, updatePlaylist, deletePlaylist,
     getSchedules, createSchedule, updateSchedule, toggleSchedule, deleteSchedule,
     getCameras, playNow,
