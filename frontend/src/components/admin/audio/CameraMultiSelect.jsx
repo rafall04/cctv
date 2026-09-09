@@ -11,6 +11,7 @@
  * failure at play time. The label says as much rather than promising every camera will play.
  */
 
+import { useState } from 'react';
 import { capabilityInfo } from './audioFormatting';
 
 /** Tiny inline capability indicator: a colour dot + a readable label (never a dot alone). */
@@ -35,6 +36,7 @@ function CapabilityTag({ supports }) {
  */
 export default function CameraMultiSelect({ cameras = [], value = [], onChange, disabled = false }) {
     const selected = new Set(value);
+    const [supportedOnly, setSupportedOnly] = useState(false);
 
     const toggle = (id) => {
         const next = new Set(selected);
@@ -42,14 +44,18 @@ export default function CameraMultiSelect({ cameras = [], value = [], onChange, 
         onChange([...next]);
     };
 
-    const allIds = cameras.map((c) => c.id);
+    // Optional filter: only cameras confirmed to support the backchannel (will actually sound).
+    const hasCapability = cameras.some((c) => 'supports_audio_out' in c);
+    const shown = supportedOnly ? cameras.filter((c) => c.supports_audio_out === 1) : cameras;
+
+    const allIds = shown.map((c) => c.id);
     const allOn = allIds.length > 0 && allIds.every((id) => selected.has(id));
 
     // Group by area so an operator can pick a whole area in one tap (preset), or still tick cameras
     // one by one. Groups preserve first-seen order.
     const order = [];
     const byArea = new Map();
-    for (const cam of cameras) {
+    for (const cam of shown) {
         const key = cam.area_name || 'Tanpa area';
         if (!byArea.has(key)) { byArea.set(key, []); order.push(key); }
         byArea.get(key).push(cam);
@@ -62,25 +68,34 @@ export default function CameraMultiSelect({ cameras = [], value = [], onChange, 
 
     return (
         <div className="space-y-2">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-semibold text-content-muted">
-                    Kamera tujuan ({selected.size}/{cameras.length})
+                    Kamera tujuan ({selected.size}/{shown.length})
                 </span>
-                {cameras.length > 0 && (
-                    <button
-                        type="button"
-                        disabled={disabled}
-                        onClick={() => onChange(allOn ? [] : allIds)}
-                        className="text-xs font-medium text-primary hover:underline disabled:opacity-60"
-                    >
-                        {allOn ? 'Kosongkan semua' : 'Pilih semua'}
-                    </button>
-                )}
+                <div className="flex items-center gap-3">
+                    {hasCapability && (
+                        <label className="flex cursor-pointer items-center gap-1 text-xs text-content-muted">
+                            <input type="checkbox" checked={supportedOnly} onChange={(e) => setSupportedOnly(e.target.checked)} className="h-3.5 w-3.5 accent-primary" />
+                            Hanya yang didukung
+                        </label>
+                    )}
+                    {shown.length > 0 && (
+                        <button
+                            type="button"
+                            disabled={disabled}
+                            onClick={() => onChange(allOn ? [] : allIds)}
+                            className="shrink-0 text-xs font-medium text-primary hover:underline disabled:opacity-60"
+                        >
+                            {allOn ? 'Kosongkan' : 'Pilih semua'}
+                        </button>
+                    )}
+                </div>
             </div>
 
-            {cameras.length === 0 ? (
+            {shown.length === 0 ? (
                 <p className="rounded-control border border-dashed border-edge bg-surface-sunken p-3 text-xs text-content-subtle">
-                    Tidak ada kamera. Aktifkan area lokal Anda di tab &quot;Kamera &amp; Area&quot; dulu.
+                    {supportedOnly ? 'Belum ada kamera "Didukung". Jalankan "Cek ulang" di tab Kamera & Area.'
+                        : 'Tidak ada kamera. Aktifkan area lokal Anda di tab "Kamera & Area" dulu.'}
                 </p>
             ) : (
                 <div className="max-h-72 space-y-2 overflow-y-auto rounded-control border border-edge bg-surface p-1">

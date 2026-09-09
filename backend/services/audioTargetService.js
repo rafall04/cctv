@@ -13,6 +13,7 @@ any probe runs.
 */
 
 import { query, queryOne, execute } from '../database/connectionPool.js';
+import { triggerBackgroundRecheck } from './audioCapabilityService.js';
 
 /**
  * Cameras that can be audio-broadcast targets, scoped to audio-enabled areas.
@@ -52,6 +53,9 @@ export function setAreaEnabled(areaId, enabled) {
     const area = queryOne('SELECT id, name FROM areas WHERE id = ?', [id]);
     if (!area) { const e = new Error('Area tidak ditemukan'); e.statusCode = 404; throw e; }
     execute('UPDATE areas SET audio_broadcast_enabled = ? WHERE id = ?', [enabled ? 1 : 0, id]);
+    // Enabling an area brings its cameras into scope — probe them in the background so they don't sit
+    // on "Perlu tes" until the 6h sweep or a manual click.
+    if (enabled) triggerBackgroundRecheck();
     return { id: area.id, name: area.name, audio_broadcast_enabled: enabled ? 1 : 0 };
 }
 

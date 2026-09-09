@@ -71,8 +71,20 @@ export function resolveSourceFiles(sourceType, sourceId) {
     return { files, duration, clipCount: clips.length };
 }
 
-function runPusher(cam, files, loop) {
+/**
+ * Spawn the pusher and resolve AS SOON AS the backchannel is open ('PLAYING'), not when playback ends —
+ * a 6-minute song must not hold the HTTP request open (the client times out at 30s). Playback continues
+ * in the background; `onDone` fires when the child actually exits (so the caller releases the camera lock
+ * only then). A camera without a backchannel fails fast (open() raises) → {ok:false} well within 30s.
+ */
+function runPusher(cam, files, loop, onDone) {
     return new Promise((resolve) => {
+        let settled = false;
+        let out = '';
+        let err = '';
+        let release = onDone;
+        const done = () => { if (release) { const f = release; release = null; f(); } };
+        const settle = (r) => { if (!settled) { settled = true; resolve(r); } };
         const child = spawn(PY, [SCRIPT, ...files], {
             env: {
                 ...process.env,
@@ -80,18 +92,17 @@ function runPusher(cam, files, loop) {
                 CAM_PORT: String(cam.port), LOOP: String(loop),
             },
         });
-        let out = '';
-        let err = '';
-        const timer = setTimeout(() => child.kill('SIGKILL'), PLAY_TIMEOUT_MS);
-        child.stdout.on('data', (d) => { out += d.toString(); });
+        const timer = setTimeout(() => { try { child.kill('SIGKILL'); } catch { /* gone */ } }, PLAY_TIMEOUT_MS);
+        child.stdout.on('data', (d) => {
+            out += d.toString();
+            if (out.includes('PLAYING')) settle({ ok: true, message: 'diputar' }); // started; keep running
+        });
         child.stderr.on('data', (d) => { err += d.toString(); });
-        child.on('error', (e) => { clearTimeout(timer); resolve({ ok: false, message: `spawn gagal: ${e.message}` }); });
+        child.on('error', (e) => { clearTimeout(timer); settle({ ok: false, message: `spawn gagal: ${e.message}` }); done(); });
         child.on('close', (code) => {
             clearTimeout(timer);
-            const ok = code === 0;
-            const msg = ok ? (out.trim().split('\n').pop() || 'OK')
-                : (err.trim().split('\n').pop() || `keluar kode ${code}`);
-            resolve({ ok, message: msg });
+            settle({ ok: code === 0, message: code === 0 ? 'diputar' : (err.trim().split('\n').pop() || `keluar kode ${code}`) });
+            done(); // playback finished (or failed) -> release the camera lock now
         });
     });
 }
@@ -116,12 +127,10 @@ export async function playToCameras(cameraIds, sourceType, sourceId, loop = 1) {
         const cam = parseRtsp(row.private_rtsp_url);
         if (!cam) return { cameraId: id, name: row.name, ok: false, message: 'kamera tanpa RTSP internal' };
         if (!acquire(id, 'clip')) return { cameraId: id, name: row.name, ok: false, message: 'kamera sedang dipakai audio lain' };
-        try {
-            const r = await runPusher(cam, files, loopN);
-            return { cameraId: id, name: row.name, ...r };
-        } finally {
-            release(id);
-        }
+        // Lock is released by runPusher's onDone when the child ACTUALLY exits (playback ends), not when
+        // this resolves (which is the moment playback STARTED) — else a second play could garble the first.
+        const r = await runPusher(cam, files, loopN, () => release(id));
+        return { cameraId: id, name: row.name, ...r };
     }));
     return { results, files: files.length };
 }

@@ -11,7 +11,7 @@
  * handful of local cameras an operator opts in — never the remote fleet.
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toggleArea, recheckCameraCapability, recheckCapability } from '../../../services/audioService';
 import { useNotification } from '../../../contexts/NotificationContext';
 import { Button, EmptyState } from '../../ui';
@@ -31,6 +31,13 @@ export default function TargetsTab({ areas, capability, loading, reloadAreas, re
     const [busyArea, setBusyArea] = useState(null);
     const [rechecking, setRechecking] = useState(null); // cameraId | 'all'
     const { showNotification } = useNotification();
+
+    // The probe runs in the BACKGROUND (initial sweep / after enabling an area / manual recheck), so poll
+    // while this tab is open to let capability results ("Didukung"/"Tak didukung") land on their own.
+    useEffect(() => {
+        const t = setInterval(() => { reloadCapability(); }, 6000);
+        return () => clearInterval(t);
+    }, [reloadCapability]);
 
     const onToggleArea = async (area) => {
         setBusyArea(area.id);
@@ -63,8 +70,8 @@ export default function TargetsTab({ areas, capability, loading, reloadAreas, re
             showNotification({ type: 'error', title: 'Gagal memeriksa', message: result.message });
             return;
         }
-        const d = result.data || {};
-        showNotification({ type: 'success', title: 'Pemeriksaan selesai', message: `${d.probed} kamera: ${d.supported || 0} didukung` });
+        // Runs in the background now; results land via the poll above.
+        showNotification({ type: 'info', title: 'Pemeriksaan dimulai', message: 'Hasil muncul bertahap di bawah.' });
         await reloadCapability();
     };
 

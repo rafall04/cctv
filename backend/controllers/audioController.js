@@ -216,12 +216,16 @@ export async function listCapability(request, reply) {
     } catch (error) { return fail(reply, error); }
 }
 
-// Re-probe (silent DESCRIBE, no sound) all in-scope cameras. Force = ignore the 7-day freshness TTL.
+// Re-probe (silent DESCRIBE, no sound) all in-scope cameras. FIRE-AND-FORGET: probing N cameras
+// sequentially can exceed the client's 30s HTTP timeout, so kick it off in the background and return
+// immediately. The client polls GET /capability for results as they land.
 export async function recheckCapability(request, reply) {
     try {
-        const result = await recheckAll({ force: true });
-        logAdminAction({ action: 'audio_capability_recheck_all', targetType: 'audio', ...result, ...adminContext(request) }, request);
-        return reply.send({ success: true, message: `Diperiksa ${result.probed} kamera`, data: result });
+        recheckAll({ force: true })
+            .then((r) => console.log(`[AudioCap] Manual recheck done: ${r.probed} probed`))
+            .catch((e) => console.error('[AudioCap] Manual recheck error:', e.message));
+        logAdminAction({ action: 'audio_capability_recheck_all', targetType: 'audio', ...adminContext(request) }, request);
+        return reply.send({ success: true, message: 'Pemeriksaan dimulai — hasil muncul bertahap' });
     } catch (error) { return fail(reply, error); }
 }
 

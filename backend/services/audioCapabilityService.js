@@ -137,12 +137,22 @@ export function markStale(cameraId) {
 }
 
 export function startCapabilitySweep() {
+    // Initial probe shortly after boot so capability populates on its own (no 6h wait, no manual click).
+    const first = setTimeout(() => {
+        recheckAll({ force: false }).catch((e) => console.error('[AudioCap] Initial sweep error:', e.message));
+    }, 45000);
+    if (first.unref) first.unref();
     const t = setInterval(() => {
         recheckAll({ force: false }).catch((e) => console.error('[AudioCap] Sweep error:', e.message));
     }, SWEEP_INTERVAL_MS);
     if (t.unref) t.unref();
-    console.log('[AudioCap] Capability sweep started (6h, audio-enabled areas only)');
+    console.log('[AudioCap] Capability sweep started (initial 45s, then 6h; audio-enabled areas only)');
     return t;
 }
 
-export default { probeCamera, recheckAll, listCapabilities, markStale, startCapabilitySweep };
+/** Kick a background probe of all in-scope cameras (used after an area is enabled). Never awaited. */
+export function triggerBackgroundRecheck() {
+    recheckAll({ force: false }).catch((e) => console.error('[AudioCap] Background recheck error:', e.message));
+}
+
+export default { probeCamera, recheckAll, listCapabilities, markStale, startCapabilitySweep, triggerBackgroundRecheck };

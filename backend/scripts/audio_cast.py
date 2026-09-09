@@ -139,6 +139,7 @@ def main():
         print('ERR: CAM_IP env and at least one .ulaw file required', file=sys.stderr)
         return 2
     total = 0
+    announced = False
     for _ in range(LOOP):
         for path in FILES:
             try:
@@ -150,6 +151,10 @@ def main():
             try:
                 talk = RtspTalk(CAM_IP, CAM_PORT, CAM_USER, CAM_PASS)
                 talk.open()
+                if not announced:
+                    # Backchannel is open -> the caller can return NOW (playback runs in the background).
+                    print('PLAYING', flush=True)
+                    announced = True
                 sent = talk.play(audio)
                 total += sent
                 print('OK %s -> %.0fs (%d pkt)' % (os.path.basename(path), sent * PACKET_INTERVAL, sent))
