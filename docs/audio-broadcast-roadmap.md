@@ -298,13 +298,16 @@ kontinu multi-menit + aliran silence tanpa teardown; jitter pacing 20ms saat ~20
 Workflow menghasilkan dua penamaan device (`speaker_nodes`/`/api/speaker-node` vs `audio_devices`/`/api/audio-device`).
 **Dokumen ini mengunci `audio_devices` + `/api/audio-device`** (konsisten namespace `audio_*`); agen fisik di STB tetap disebut "speaker-node".
 
-### Yang WAJIB diverifikasi di box (prod sedang unreachable)
-1. **SDP asli** IMOU PS3E (positif: `sendonly`+`trackID=5`+`PCMU/16000`?) & S41FE (negatif: 200-tanpa-track **atau** 551/501?) — kunci parser probe. Apakah `trackID` **selalu 5** di semua unit, atau harus baca `a=control`?
-2. `yt-dlp` terpasang & versinya? python3/pip untuk update? kapasitas disk `data/audio`?
-3. Routing subnet STB→backend (nginx TLS vs port LAN langsung) + ufw antar-subnet; `request.ip` STB terpisah atau kolaps NAT? Tidak ada 429 di `/poll`? Tidak ada `ERR_HTTP_HEADERS_SENT` baru saat device putus.
-4. Latensi spawn probe DESCRIBE saat ~20 ffmpeg jalan (validasi cap konkurensi). Cap sesi-RTSP nyata per-NVR.
-5. Mode pm2 fork vs cluster (kalau cluster, kunci anti-tumpang **dan lock talk** harus di DB, bukan `Set` in-memory).
-6. **(F/PTT)** Apakah backchannel IMOU PS3E **menahan RECORD kontinu multi-menit + aliran silence 0xFF** tanpa teardown (jalur file cuma terbukti durasi klip)? **Latensi glass-to-glass** mic→speaker (target sub-1.5s) + kedalaman jitter-buffer kamera. Cloudflare/nginx **menahan WSS aktif** ~menit tanpa idle-drop (butuh ping ~10s)? `@fastify/websocket`+`ws` bisa di-install? `AudioContext(16000)` dihormati Chrome Android / jatuh ke fallback?
+### Verifikasi box — DIJALANKAN 2026-09-09 (prod terjangkau, probe SDP senyap nol-suara)
+1. ✅ **SDP asli terkunci.** IMOU PS3E AHASS Dander (`192.168.12.6`) & Ngitik (`192.168.16.4`) → `m=audio a=sendonly`, menawarkan **`103=PCMU/16000`** (+ L16/16000, PCMA/16000), **`trackID=5` ADA**. Pusher (SETUP trackID=5 + PT=103) **VALID** untuk keduanya — dua kamera desa yang bisa disuarakan sekarang. S41FE (`192.168.12.2`) → **200 TANPA track audio** → UNSUPPORTED (cabang negatif = 200-tanpa-track, bukan 551).
+2. ⚠️ **`trackID` TIDAK selalu 5.** 4 kamera lain punya `sendonly` di **trackID 1/2/3, codec PCMA/PCMU 8000** (bukan 16k, tanpa trackID=5) → pusher hardcode-5 **gagal** di sini. Cek `'sendonly'` mentah **over-count (6 vs 2 nyata)**. → **Predikat SUPPORTED wajib cocok trackID/codec yang di-SETUP**; untuk menambah cakupan, **generalisasi pusher baca `a=control` trackID + rtpmap dari SDP** (jangan hardcode 5/103). (Apakah 4 kamera itu benar punya backchannel butuh uji SETUP = berisiko suara → tunda.)
+3. ✅ **UNKNOWN≠UNSUPPORTED terbukti live** (timeout/refused → UNKNOWN, bukan divonis 0).
+4. ✅ **pm2**: backend `cluster_mode` **tapi 1 instance** (NODE_APP_INSTANCE=0) → scheduler + lock in-memory **aman SEKARANG**, tapi **RAPUH**: menaikkan `instances` diam-diam mematahkannya. Untuk B/F siapkan **lock DB** (`UNIQUE(camera_id)`) atau pin worker-0.
+5. ✅ **yt-dlp MISSING** (validasi: URL-file jadi jalur utama, YT di-flag). python3.8 + `audioop` OK, ffmpeg `/usr/bin/ffmpeg`. **`@fastify/websocket` belum ada** (dep Sumbu F).
+6. ✅ **Sumbu F nginx**: config **aktif** = `sites-available/rafnet-cctv`; `microphone=()` di host SPA **baris 124** → edit 1 baris jadi `microphone=(self)`. **`/webrtc` CLOSED (403)** di config aktif (file `cctv` yang `/webrtc`-terbuka **tidak ter-symlink/mati**). `/api/` **WS-upgrade-ready** (baris 218/355). MediaMTX **bind 127.0.0.1** (webrtc 8889, rtsp 8554).
+7. ✅ **Surabaya**: **394 dari 414** kamera internal+RTSP = `36.66.208.x`. Sumbu C (scope area) **prioritas tinggi + WAJIB sebelum probe massal** (jangan probe 394 kamera remote).
+
+**Sisa yang butuh uji BERISIKO-SUARA (tunda sampai aba-aba):** ketahanan backchannel PS3E menahan RECORD kontinu multi-menit + aliran silence 0xFF; latensi glass-to-glass mic→speaker (target sub-1.5s); Cloudflare/nginx menahan WSS aktif ~menit. Ini perlu SETUP/RECORD (membunyikan) — belum dijalankan.
 
 ### Urutan build yang disarankan
 1. **A (deteksi kapabilitas)** — nilai tertinggi, kecil, sekaligus fondasi scope. `audio_probe.py` + `audioCapabilityService` + migrasi kolom + tombol "cek ulang" + badge.
