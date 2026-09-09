@@ -406,10 +406,11 @@ export async function deleteGroup(request, reply) {
 // Mint a single-use WS ticket (browser can't set an Authorization header on a WebSocket).
 export async function talkTicket(request, reply) {
     try {
-        const cameraId = parseId(request.body?.cameraId);
-        if (!cameraId) return reply.code(400).send({ success: false, message: 'ID kamera tidak valid' });
-        const t = mintTicket(cameraId, request.user?.id ?? null);
-        logAdminAction({ action: 'audio_talk_ticket', targetType: 'camera', targetId: cameraId, ...adminContext(request) }, request);
+        const body = request.body || {};
+        const ids = Array.isArray(body.cameraIds) ? body.cameraIds : (body.cameraId ? [body.cameraId] : []);
+        if (ids.length === 0) return reply.code(400).send({ success: false, message: 'Pilih minimal satu kamera' });
+        const t = mintTicket(ids, request.user?.id ?? null);
+        logAdminAction({ action: 'audio_talk_ticket', targetType: 'camera', targetId: parseId(ids[0]), count: t.cameraCount, ...adminContext(request) }, request);
         return reply.send({ success: true, data: t });
     } catch (error) { return fail(reply, error); }
 }

@@ -359,10 +359,11 @@ export const deleteGroup = async (id) => {
     } catch (error) { return failure(error, 'Gagal menghapus grup'); }
 };
 
-/** Mint a single-use ticket for a live push-to-talk WebSocket to one camera. */
-export const talkTicket = async (cameraId) => {
+/** Mint a single-use ticket for a live push-to-talk WebSocket to one or more cameras (zone paging). */
+export const talkTicket = async (cameraIds) => {
     try {
-        return (await apiClient.post(`${BASE}/talk/ticket`, { cameraId })).data;
+        const payload = Array.isArray(cameraIds) ? { cameraIds } : { cameraId: cameraIds };
+        return (await apiClient.post(`${BASE}/talk/ticket`, payload)).data;
     } catch (error) { return failure(error, 'Gagal memulai bicara'); }
 };
 

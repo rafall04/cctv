@@ -15,8 +15,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { talkTicket } from '../../../services/audioService';
 import { getApiUrl } from '../../../config/config.js';
 import { useNotification } from '../../../contexts/NotificationContext';
-import { Field } from '../../ui';
-import { capabilityInfo } from './audioFormatting';
+import CameraMultiSelect from './CameraMultiSelect';
 
 // AudioWorklet: resample the mic to 16kHz, encode G.711 u-law, emit 320-byte (20ms) frames + an RMS level.
 const WORKLET_SRC = `
@@ -35,7 +34,7 @@ registerProcessor('ptt', PTT);
 `;
 
 export default function TalkTab({ cameras }) {
-    const [cameraId, setCameraId] = useState('');
+    const [cameraIds, setCameraIds] = useState([]);
     const [state, setState] = useState('idle'); // idle | connecting | onair
     const [level, setLevel] = useState(0);
     const { showNotification } = useNotification();
@@ -59,7 +58,7 @@ export default function TalkTab({ cameras }) {
 
     const start = useCallback(async () => {
         if (refs.current.active) return;
-        if (!cameraId) { showNotification({ type: 'error', title: 'Pilih kamera dulu' }); return; }
+        if (cameraIds.length === 0) { showNotification({ type: 'error', title: 'Pilih kamera dulu' }); return; }
         if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
             showNotification({ type: 'error', title: 'Mic tidak tersedia', message: 'Butuh HTTPS + browser asli (bukan in-app).' });
             return;
@@ -68,7 +67,7 @@ export default function TalkTab({ cameras }) {
         setState('connecting');
         try {
             // 1) ticket (authed) -> WS URL on the API origin.
-            const tk = await talkTicket(Number(cameraId));
+            const tk = await talkTicket(cameraIds);
             if (!tk.success) throw new Error(tk.message || 'Gagal tiket');
             if (!refs.current.active) return;
             const apiBase = getApiUrl() || window.location.origin;
@@ -115,7 +114,7 @@ export default function TalkTab({ cameras }) {
             if (refs.current.active) showNotification({ type: 'error', title: 'Gagal bicara', message: error.message });
             cleanup();
         }
-    }, [cameraId, showNotification, stop, cleanup]);
+    }, [cameraIds, showNotification, stop, cleanup]);
 
     // Safety: releasing focus / leaving must stop a hot mic. Also clean up on unmount.
     useEffect(() => {
@@ -130,35 +129,22 @@ export default function TalkTab({ cameras }) {
         };
     }, [stop, cleanup]);
 
-    const supported = cameras.filter((c) => c.supports_audio_out === 1);
-    const options = supported.length > 0 ? supported : cameras;
     const held = state === 'onair' || state === 'connecting';
 
     return (
         <div className="space-y-5">
             <div className="rounded-card border border-edge bg-surface p-4 shadow-e1">
-                <Field as="select" label="Kamera tujuan" value={cameraId} onChange={(e) => setCameraId(e.target.value)} disabled={held}>
-                    <option value="">— pilih kamera —</option>
-                    {[...new Set(options.map((c) => c.area_name || 'Tanpa area'))].map((area) => (
-                        <optgroup key={area} label={area}>
-                            {options.filter((c) => (c.area_name || 'Tanpa area') === area).map((c) => {
-                                const info = capabilityInfo(c.supports_audio_out);
-                                return <option key={c.id} value={c.id}>{c.name}{c.supports_audio_out !== 1 ? ` (${info.label})` : ''}</option>;
-                            })}
-                        </optgroup>
-                    ))}
-                </Field>
-                {supported.length === 0 && (
-                    <p className="mt-2 text-xs text-content-subtle">
-                        Belum ada kamera bertanda &quot;Didukung&quot;. Jalankan &quot;Cek ulang&quot; di tab Kamera &amp; Area dulu untuk hasil terbaik.
-                    </p>
-                )}
+                <CameraMultiSelect cameras={cameras} value={cameraIds} onChange={setCameraIds} disabled={held} />
+                <p className="mt-2 text-xs text-content-subtle">
+                    Bisa banyak kamera sekaligus (paging zona) — maksimum beberapa kamera per sesi; hanya yang
+                    &quot;Didukung&quot; yang berbunyi, yang sibuk dilewati. Endurance kamera murah belum teruji: uji dulu.
+                </p>
             </div>
 
             <div className="flex flex-col items-center gap-4 rounded-card border border-edge bg-surface p-6 shadow-e1">
                 <button
                     type="button"
-                    disabled={!cameraId}
+                    disabled={cameraIds.length === 0}
                     onPointerDown={(e) => { e.preventDefault(); start(); }}
                     onPointerUp={stop}
                     onPointerCancel={stop}

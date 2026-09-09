@@ -1,16 +1,19 @@
 /*
-Purpose: Live push-to-talk bridge — an admin's browser mic (u-law 16k frames over a WebSocket) is piped
-         to a camera's ONVIF speaker in real time via scripts/audio_talk.py. The server does ZERO audio
-         transcoding (the browser already produced exactly the RTP payload), so it stays light.
-Caller: audioRoutes (mint ticket + the WS route), spawned python per active talk session.
+Purpose: Live push-to-talk / ZONE PAGING — an admin's browser mic (u-law 16k frames over a WebSocket) is
+         fanned out to ONE OR MORE camera ONVIF speakers in real time via scripts/audio_talk.py (one child
+         per camera). The server does ZERO transcoding (the browser already produced the RTP payload).
+Caller: audioRoutes (mint ticket + the WS route), spawned python per active talk camera.
 Deps: child_process, connectionPool, audioCastService.parseRtsp, cameraAudioLock.
 MainFuncs: mintTicket, talkHandler.
-SideEffects: spawns python3 audio_talk.py (creds via ENV only); holds the shared camera audio lock.
+SideEffects: spawns python3 audio_talk.py per camera (creds via ENV only); holds the shared camera lock.
 
 Auth: a browser cannot set an Authorization header on a WS, so the client first POSTs (admin JWT + CSRF)
-to mint a single-use, 30s ticket bound to {cameraId, adminUserId}. The WS presents the ticket; the server
-also checks same-site Origin. Camera RTSP creds NEVER reach the browser — read here, passed to the child
-via env. One talk per camera (shared lock); if a clip is playing the talk is refused (no garble).
+to mint a single-use, 30s ticket bound to {cameraIds, adminUserId}. The WS presents the ticket; the server
+also checks same-site Origin. Camera RTSP creds NEVER reach the browser.
+
+Zone paging caveat: cheap-camera backchannel endurance under simultaneous RECORD is unproven, so the
+fan-out is capped hard (AUDIO_MAX_TALK, default 4), only SUPPORTED + non-blocked cameras are eligible, and
+a busy camera is skipped (never preempted by talk). One audio-out per camera (shared lock).
 */
 
 import { spawn } from 'child_process';
@@ -28,27 +31,32 @@ const TICKET_TTL_MS = 30 * 1000;
 const IDLE_MS = 15 * 1000;             // no audio frame for this long -> auto-stop
 const HARD_CAP_MS = 5 * 60 * 1000;     // a session can never pin a camera longer than this
 const MAX_FRAME_BYTES = 4096;          // a 20ms u-law frame is 320B; anything huge is bogus -> drop
+const MAX_TALK_CAMERAS = Math.max(1, parseInt(process.env.AUDIO_MAX_TALK || '4', 10));
 
-const tickets = new Map(); // ticket -> { cameraId, adminUserId, expiresAt }
+const tickets = new Map(); // ticket -> { cameraIds:[], adminUserId, expiresAt }
 
 function sweepTickets() {
     const now = Date.now();
     for (const [t, v] of tickets) if (v.expiresAt < now) tickets.delete(t);
 }
 
-/** Mint a single-use talk ticket (called from an authed admin POST). */
-export function mintTicket(cameraId, adminUserId) {
+/**
+ * Mint a single-use talk ticket for one OR MORE cameras (zone paging). Filters to eligible cameras
+ * (internal + has RTSP + NOT blocked) and caps the fan-out. Throws 400 if none are eligible.
+ */
+export function mintTicket(cameraIds, adminUserId) {
     sweepTickets();
-    const id = parseInt(cameraId, 10);
-    const cam = queryOne("SELECT id, name, private_rtsp_url, stream_source, audio_out_blocked FROM cameras WHERE id = ? AND enabled = 1", [id]);
-    if (!cam || cam.stream_source !== 'internal' || !cam.private_rtsp_url) {
-        const e = new Error('Kamera tidak bisa menerima audio'); e.statusCode = 400; throw e;
+    const raw = Array.isArray(cameraIds) ? cameraIds : [cameraIds];
+    const ids = [...new Set(raw.map((x) => parseInt(x, 10)).filter((n) => Number.isInteger(n) && n > 0))].slice(0, MAX_TALK_CAMERAS);
+    const eligible = [];
+    for (const id of ids) {
+        const cam = queryOne('SELECT id, name, private_rtsp_url, stream_source, audio_out_blocked FROM cameras WHERE id = ? AND enabled = 1', [id]);
+        if (cam && cam.stream_source === 'internal' && cam.private_rtsp_url && !cam.audio_out_blocked) eligible.push(cam.id);
     }
-    // A blocked camera (V380-class) is refused for live talk too — an unexpected backchannel can hang it.
-    if (cam.audio_out_blocked) { const e = new Error('Kamera diblokir dari audio (perangkat rawan hang)'); e.statusCode = 400; throw e; }
+    if (eligible.length === 0) { const e = new Error('Tak ada kamera yang bisa menerima audio'); e.statusCode = 400; throw e; }
     const ticket = randomBytes(24).toString('base64url');
-    tickets.set(ticket, { cameraId: id, adminUserId, expiresAt: Date.now() + TICKET_TTL_MS });
-    return { ticket, wsPath: `/api/admin/audio/talk?ticket=${ticket}`, expiresInMs: TICKET_TTL_MS, cameraName: cam.name };
+    tickets.set(ticket, { cameraIds: eligible, adminUserId, expiresAt: Date.now() + TICKET_TTL_MS });
+    return { ticket, wsPath: `/api/admin/audio/talk?ticket=${ticket}`, expiresInMs: TICKET_TTL_MS, cameraCount: eligible.length };
 }
 
 function sameSiteOrigin(req) {
@@ -64,8 +72,8 @@ function sameSiteOrigin(req) {
 }
 
 /**
- * WebSocket handler (@fastify/websocket v11 passes the socket directly). Validates the ticket, spawns the
- * live pusher, and pipes binary frames to it until stop/close/timeout.
+ * WebSocket handler (@fastify/websocket v11 passes the socket directly). Validates the ticket, spawns a
+ * pusher per eligible+free camera, and fans out binary frames to all of them until stop/close/timeout.
  */
 export function talkHandler(socket, req) {
     const close = (code, msg) => { try { socket.close(code, msg); } catch { /* already closed */ } };
@@ -76,57 +84,78 @@ export function talkHandler(socket, req) {
     tickets.delete(ticket);                       // single-use
     if (!t || t.expiresAt < Date.now()) { close(1008, 'ticket'); return; }
 
-    const cam = queryOne('SELECT id, name, private_rtsp_url FROM cameras WHERE id = ?', [t.cameraId]);
-    const creds = cam && parseRtsp(cam.private_rtsp_url);
-    if (!creds) { close(1011, 'camera'); return; }
+    // Acquire + spawn a child per camera that is free (talk never preempts; a busy camera is skipped).
+    const sessions = []; // { id, name, child, token }
+    for (const id of t.cameraIds) {
+        const cam = queryOne('SELECT id, name, private_rtsp_url FROM cameras WHERE id = ?', [id]);
+        const creds = cam && parseRtsp(cam.private_rtsp_url);
+        if (!creds) continue;
+        if (holderKind(id)) continue;             // already sounding (clip/talk) -> skip
+        const token = acquire(id, 'talk', () => killSession(id, 'preempted'));
+        if (!token) continue;                     // governor full / raced -> skip
+        const child = spawn(PY, [SCRIPT], {
+            env: { ...process.env, CAM_IP: creds.ip, CAM_USER: creds.user, CAM_PASS: creds.pass, CAM_PORT: String(creds.port) },
+        });
+        const s = { id, name: cam.name, child, token };
+        child.stdout.on('data', (d) => { if (d.toString().includes('READY')) s.ready = true; });
+        child.stderr.on('data', () => { /* python logs to stderr; quiet unless debugging */ });
+        child.on('error', () => killSession(id, 'spawn-error'));
+        child.on('close', () => killSession(id, 'child-exit'));
+        sessions.push(s);
+    }
 
-    // One audio-out per camera. A clip currently playing is NOT preempted in this phase (no garble).
-    if (holderKind(t.cameraId) || !acquire(t.cameraId, 'talk')) {
-        try { socket.send(JSON.stringify({ type: 'error', message: 'Kamera sedang dipakai audio lain' })); } catch { /* */ }
+    if (sessions.length === 0) {
+        try { socket.send(JSON.stringify({ type: 'error', message: 'Semua kamera tujuan sedang dipakai audio lain' })); } catch { /* */ }
         close(1013, 'busy');
         return;
     }
 
-    const child = spawn(PY, [SCRIPT], {
-        env: { ...process.env, CAM_IP: creds.ip, CAM_USER: creds.user, CAM_PASS: creds.pass, CAM_PORT: String(creds.port) },
-    });
     let lastFrame = Date.now();
     let stopped = false;
 
-    const stop = (reason) => {
+    function killSession(id, reason) {
+        const i = sessions.findIndex((x) => x.id === id);
+        if (i === -1) return;
+        const s = sessions[i];
+        sessions.splice(i, 1);
+        try { s.child.stdin.end(); } catch { /* */ }
+        setTimeout(() => { try { s.child.kill('SIGTERM'); } catch { /* */ } }, 500);
+        release(id, s.token);
+        if (sessions.length === 0 && !stopped) stopAll(`all-ended:${reason}`);
+    }
+
+    function stopAll(reason) {
         if (stopped) return;
         stopped = true;
-        try { child.stdin.end(); } catch { /* */ }
-        setTimeout(() => { try { child.kill('SIGTERM'); } catch { /* */ } }, 500); // let python TEARDOWN, then force
-        release(t.cameraId);
         clearInterval(idleTimer);
         clearTimeout(hardCap);
-        console.log(`[AudioTalk] Session end cam ${t.cameraId} (${reason}) by admin ${t.adminUserId}`);
+        for (const s of sessions.slice()) {
+            try { s.child.stdin.end(); } catch { /* */ }
+            setTimeout(() => { try { s.child.kill('SIGTERM'); } catch { /* */ } }, 500);
+            release(s.id, s.token);
+        }
+        sessions.length = 0;
+        console.log(`[AudioTalk] Session end (${reason}) by admin ${t.adminUserId}`);
+        try { socket.send(JSON.stringify({ type: 'ended' })); } catch { /* */ }
         close(1000, reason);
-    };
-
-    child.stdout.on('data', (d) => {
-        if (d.toString().includes('READY')) { try { socket.send(JSON.stringify({ type: 'ready', camera: cam.name })); } catch { /* */ } }
-    });
-    child.stderr.on('data', () => { /* python logs errors to stderr; keep quiet unless debugging */ });
-    child.on('error', () => stop('spawn-error'));
-    child.on('close', () => { if (!stopped) { try { socket.send(JSON.stringify({ type: 'ended' })); } catch { /* */ } stop('child-exit'); } });
+    }
 
     socket.on('message', (data, isBinary) => {
         if (isBinary) {
             if (data.length === 0 || data.length > MAX_FRAME_BYTES) return;
             lastFrame = Date.now();
-            try { if (!stopped) child.stdin.write(data); } catch { /* child gone */ }
+            for (const s of sessions) { try { s.child.stdin.write(data); } catch { /* child gone */ } }
         } else {
-            try { const m = JSON.parse(data.toString()); if (m.type === 'stop') stop('client-stop'); } catch { /* ignore non-JSON */ }
+            try { const m = JSON.parse(data.toString()); if (m.type === 'stop') stopAll('client-stop'); } catch { /* ignore non-JSON */ }
         }
     });
-    socket.on('close', () => stop('ws-close'));
-    socket.on('error', () => stop('ws-error'));
+    socket.on('close', () => stopAll('ws-close'));
+    socket.on('error', () => stopAll('ws-error'));
 
-    const idleTimer = setInterval(() => { if (Date.now() - lastFrame > IDLE_MS) stop('idle'); }, 5000);
-    const hardCap = setTimeout(() => stop('hard-cap'), HARD_CAP_MS);
-    console.log(`[AudioTalk] Session start cam ${t.cameraId} by admin ${t.adminUserId}`);
+    const idleTimer = setInterval(() => { if (Date.now() - lastFrame > IDLE_MS) stopAll('idle'); }, 5000);
+    const hardCap = setTimeout(() => stopAll('hard-cap'), HARD_CAP_MS);
+    try { socket.send(JSON.stringify({ type: 'ready', cameras: sessions.map((s) => s.name), count: sessions.length })); } catch { /* */ }
+    console.log(`[AudioTalk] Session start ${sessions.length} camera(s) by admin ${t.adminUserId}`);
 }
 
 export default { mintTicket, talkHandler };
