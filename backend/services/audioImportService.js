@@ -21,6 +21,7 @@ import { randomBytes } from 'crypto';
 import { query, queryOne, execute } from '../database/connectionPool.js';
 import { assertSafeImportUrl } from '../utils/audioImportUrlPolicy.js';
 import { AUDIO_DIR, ensureAudioDir, MAX_CLIP_SECONDS, finalizeClipFromFile } from './audioClipService.js';
+import { synthTtsToTemp } from './audioTtsService.js';
 
 const execFileAsync = promisify(execFile);
 const YTDLP = process.env.AUDIO_YTDLP_BIN || 'yt-dlp';
@@ -42,7 +43,7 @@ export async function ytdlpAvailable() {
 }
 
 export function listJobs() {
-    return query('SELECT id, source_url, source_kind, requested_name, status, clip_id, title, duration_sec, error, created_at, finished_at FROM audio_import_jobs ORDER BY id DESC LIMIT 50');
+    return query('SELECT id, source_url, source_kind, requested_name, status, clip_id, title, duration_sec, error, created_at, finished_at, tts_text, tts_provider, tts_voice FROM audio_import_jobs ORDER BY id DESC LIMIT 50');
 }
 
 /** Validate + enqueue an import. Returns the queued job. YouTube requires yt-dlp; direct URLs never do. */
@@ -127,12 +128,15 @@ export async function processNextJob() {
         if (job.source_kind === 'youtube') {
             src = await fetchYoutubeToTemp(job.source_url, prefix);
             title = job.requested_name || src.title;
+        } else if (job.source_kind === 'tts') {
+            src = await synthTtsToTemp({ text: job.tts_text, engine: job.tts_provider, voice: job.tts_voice, prefix });
+            title = job.requested_name || (job.tts_text || '').slice(0, 60);
         } else {
             src = await fetchUrlToTemp(job.source_url, join(AUDIO_DIR, prefix));
         }
         const clip = await finalizeClipFromFile({
             name: title, tempPath: src.path, sourceBytes: src.bytes || 0, sourceType: job.source_kind,
-            sourceUrl: job.source_url, sourceTitle: title, userId: job.created_by,
+            sourceUrl: job.source_kind === 'tts' ? null : job.source_url, sourceTitle: title, userId: job.created_by,
         });
         execute("UPDATE audio_import_jobs SET status = 'ready', clip_id = ?, title = ?, duration_sec = ?, finished_at = datetime('now'), error = NULL WHERE id = ?",
             [clip.id, clip.name, clip.duration_sec, job.id]);

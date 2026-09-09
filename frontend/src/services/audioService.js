@@ -53,6 +53,23 @@ export const getImportJobs = async () => {
     } catch (error) { return failure(error, 'Gagal memuat status impor'); }
 };
 
+/* ------------------------------------------------------------ text-to-speech */
+
+export const getTtsEngines = async () => {
+    try {
+        return (await apiClient.get(`${BASE}/tts/engines`)).data;
+    } catch (error) { return failure(error, 'Gagal memuat mesin TTS'); }
+};
+
+/** Generate a spoken clip from typed text (async job — poll getImportJobs). */
+export const createTts = async ({ text, engine, voice, name }) => {
+    try {
+        return (await apiClient.post(`${BASE}/clips/tts`, { text, engine, voice, name })).data;
+    } catch (error) {
+        return { ...failure(error, 'Gagal membuat suara'), transient: !error.response };
+    }
+};
+
 /* ------------------------------------------------------------------- playlists */
 
 export const getPlaylists = async () => {
@@ -217,7 +234,7 @@ export const talkTicket = async (cameraId) => {
 };
 
 export default {
-    getClips, uploadClip, deleteClip, importClip, getImportJobs,
+    getClips, uploadClip, deleteClip, importClip, getImportJobs, getTtsEngines, createTts,
     getPlaylists, getPlaylist, createPlaylist, updatePlaylist, deletePlaylist,
     getSchedules, createSchedule, updateSchedule, toggleSchedule, deleteSchedule,
     getCameras, playNow, talkTicket, getActivePlays, stopPlay,

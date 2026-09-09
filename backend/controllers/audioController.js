@@ -25,6 +25,7 @@ import { playToCameras, listPlaying, stopPlaying, stopAllPlaying } from '../serv
 import { listBroadcastTargets, listAreas as listAreaRows, setAreaEnabled } from '../services/audioTargetService.js';
 import { listCapabilities, recheckAll, probeCamera, setCameraBlocked } from '../services/audioCapabilityService.js';
 import { createImportJob, listJobs as listImportRows } from '../services/audioImportService.js';
+import { createTtsJob, listTtsEngines as listTtsEngineRows } from '../services/audioTtsService.js';
 import {
     listGroups as listGroupRows, createGroup as createGroupRow,
     updateGroup as updateGroupRow, deleteGroup as deleteGroupRow,
@@ -113,6 +114,28 @@ export async function listImportJobs(request, reply) {
     try {
         return reply.send({ success: true, data: listImportRows() });
     } catch (error) { return fail(reply, error); }
+}
+
+/* -------------------------------------------------------------- text-to-speech */
+
+// Available TTS engines + voices + whether each is installed (piper offline / edge cloud-free).
+export async function listTtsEngines(request, reply) {
+    try {
+        return reply.send({ success: true, data: await listTtsEngineRows() });
+    } catch (error) { return fail(reply, error); }
+}
+
+// Enqueue a TTS synth (typed text -> spoken clip). Reuses the import job queue; poll listImportJobs.
+export async function createTts(request, reply) {
+    try {
+        const { text, engine, voice, name } = request.body || {};
+        if (typeof text !== 'string' || !text.trim()) {
+            return reply.code(400).send({ success: false, message: 'Teks wajib diisi' });
+        }
+        const job = await createTtsJob({ text, engine, voice, name, userId: request.user?.id ?? null });
+        logAdminAction({ action: 'audio_tts_queued', targetType: 'audio_import', targetId: job.id, engine: job.tts_provider, voice: job.tts_voice, ...adminContext(request) }, request);
+        return reply.code(202).send({ success: true, message: 'Pembuatan suara dimulai', data: job });
+    } catch (error) { return fail(reply, error, 'Gagal membuat suara'); }
 }
 
 /* ---------------------------------------------------------------- playlists */

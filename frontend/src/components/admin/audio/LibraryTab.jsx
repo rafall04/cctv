@@ -8,13 +8,14 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { uploadClip, deleteClip, importClip, getImportJobs } from '../../../services/audioService';
+import { uploadClip, deleteClip, importClip, getImportJobs, getTtsEngines, createTts } from '../../../services/audioService';
 import { useNotification } from '../../../contexts/NotificationContext';
 import { useConfirm } from '../../../contexts/ConfirmContext';
 import { Button, Field, EmptyState } from '../../ui';
 import { formatDuration, formatBytes, fileToBase64 } from './audioFormatting';
 
 const MAX_MB = 12;
+const MAX_TTS = 1500;
 const JOB_LABEL = { queued: 'Menunggu', processing: 'Memproses…', ready: 'Selesai', failed: 'Gagal' };
 
 export default function LibraryTab({ clips, loading, reload, onPlayClip }) {
@@ -25,9 +26,30 @@ export default function LibraryTab({ clips, loading, reload, onPlayClip }) {
     const [importName, setImportName] = useState('');
     const [importing, setImporting] = useState(false);
     const [jobs, setJobs] = useState([]);
+    // TTS (ketik teks -> suara)
+    const [ttsText, setTtsText] = useState('');
+    const [ttsName, setTtsName] = useState('');
+    const [ttsEngine, setTtsEngine] = useState('');
+    const [ttsVoice, setTtsVoice] = useState('');
+    const [engines, setEngines] = useState([]);
+    const [ttsBusy, setTtsBusy] = useState(false);
     const fileRef = useRef(null);
     const { showNotification } = useNotification();
     const confirm = useConfirm();
+
+    // Load TTS engines/voices once; default to the first AVAILABLE engine (prefer offline piper).
+    useEffect(() => {
+        (async () => {
+            const r = await getTtsEngines();
+            if (!r.success) return;
+            const list = r.data || [];
+            setEngines(list);
+            const pick = list.find((e) => e.available) || list[0];
+            if (pick) { setTtsEngine(pick.id); setTtsVoice(pick.voices?.[0]?.id || ''); }
+        })();
+    }, []);
+
+    const currentEngine = engines.find((e) => e.id === ttsEngine);
 
     // Fetch jobs; when a job newly flips to 'ready' (it just created a clip), refresh the clip library.
     const loadJobs = useCallback(async () => {
@@ -70,6 +92,33 @@ export default function LibraryTab({ clips, loading, reload, onPlayClip }) {
         }
         // No new job AND the POST failed -> a genuine error (e.g. invalid/blocked URL).
         showNotification({ type: 'error', title: 'Gagal impor', message: result.message });
+    };
+
+    const onEngineChange = (id) => {
+        setTtsEngine(id);
+        const e = engines.find((x) => x.id === id);
+        setTtsVoice(e?.voices?.[0]?.id || '');
+    };
+
+    const handleTts = async (event) => {
+        event.preventDefault();
+        if (!ttsText.trim()) { showNotification({ type: 'error', title: 'Tulis teksnya dulu' }); return; }
+        setTtsBusy(true);
+        // Outcome-checked like import: a job appearing is the source of truth (survives a Cloudflare idle-drop).
+        const beforeIds = new Set(jobs.map((j) => j.id));
+        const result = await createTts({ text: ttsText.trim(), engine: ttsEngine, voice: ttsVoice, name: ttsName.trim() });
+        const jr = await getImportJobs();
+        setTtsBusy(false);
+        const freshJobs = jr.success ? (jr.data || []) : jobs;
+        setJobs(freshJobs);
+        const created = freshJobs.some((j) => !beforeIds.has(j.id));
+        if (result.success || created) {
+            showNotification({ type: 'success', title: 'Suara sedang dibuat', message: 'Muncul di pustaka saat selesai.' });
+            setTtsText('');
+            setTtsName('');
+            return;
+        }
+        showNotification({ type: 'error', title: 'Gagal membuat suara', message: result.message });
     };
 
     const pickFile = (f) => {
@@ -181,6 +230,61 @@ export default function LibraryTab({ clips, loading, reload, onPlayClip }) {
                 </p>
             </form>
 
+            {/* Buat suara dari teks (TTS) — suara neural natural, bukan robot. */}
+            <form onSubmit={handleTts} className="space-y-3 rounded-card border border-edge bg-surface p-4 shadow-e1">
+                <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-semibold text-content">Buat suara dari teks (TTS)</span>
+                    <span className="text-xs text-content-subtle">{ttsText.length}/{MAX_TTS}</span>
+                </div>
+                <textarea
+                    value={ttsText}
+                    onChange={(e) => setTtsText(e.target.value.slice(0, MAX_TTS))}
+                    rows={3}
+                    placeholder="Ketik pengumuman… mis. 'Diberitahukan kepada seluruh warga, kerja bakti akan dilaksanakan besok pagi pukul tujuh.'"
+                    className="w-full rounded-control border border-edge bg-surface px-3 py-2 text-sm text-content focus:border-primary focus:outline-none"
+                />
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <div className="min-w-0">
+                        <span className="mb-1.5 block text-xs font-semibold text-content-muted">Mesin suara</span>
+                        <select
+                            value={ttsEngine}
+                            onChange={(e) => onEngineChange(e.target.value)}
+                            className="w-full min-h-11 rounded-control border border-edge bg-surface px-3 py-2 text-sm text-content focus:border-primary focus:outline-none"
+                        >
+                            {engines.map((e) => (
+                                <option key={e.id} value={e.id} disabled={!e.available}>
+                                    {e.label}{e.available ? '' : ' — belum terpasang'}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="min-w-0">
+                        <span className="mb-1.5 block text-xs font-semibold text-content-muted">Suara</span>
+                        <select
+                            value={ttsVoice}
+                            onChange={(e) => setTtsVoice(e.target.value)}
+                            className="w-full min-h-11 rounded-control border border-edge bg-surface px-3 py-2 text-sm text-content focus:border-primary focus:outline-none"
+                        >
+                            {(currentEngine?.voices || []).map((v) => (
+                                <option key={v.id} value={v.id}>{v.label}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <Field label="Nama (opsional)" value={ttsName} onChange={(e) => setTtsName(e.target.value)} placeholder="mis. Kerja Bakti" maxLength={120} />
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs text-content-subtle">
+                        {currentEngine?.online ? 'Suara cloud gratis (butuh internet), natural.' : 'Suara offline di server, natural (bukan robot).'}
+                    </p>
+                    <Button type="submit" variant="secondary" loading={ttsBusy} disabled={!ttsText.trim() || !currentEngine?.available}>
+                        {ttsBusy ? 'Membuat…' : 'Buat suara'}
+                    </Button>
+                </div>
+                {engines.length > 0 && !engines.some((e) => e.available) && (
+                    <p className="text-xs text-status-warn">Belum ada mesin TTS terpasang di server. Hubungi admin untuk memasang Piper/edge-tts.</p>
+                )}
+            </form>
+
             {jobs.length > 0 && (
                 <ul className="space-y-1.5">
                     {jobs.slice(0, 6).map((j) => (
@@ -188,7 +292,7 @@ export default function LibraryTab({ clips, loading, reload, onPlayClip }) {
                             <span className={`h-2 w-2 shrink-0 rounded-full ${
                                 j.status === 'ready' ? 'bg-status-live' : j.status === 'failed' ? 'bg-status-fault' : 'bg-status-warn'
                             }`} />
-                            <span className="min-w-0 flex-1 truncate text-content-muted">{j.title || j.requested_name || j.source_url}</span>
+                            <span className="min-w-0 flex-1 truncate text-content-muted">{j.title || j.requested_name || (j.source_kind === 'tts' ? j.tts_text : j.source_url)}</span>
                             <span className={`shrink-0 text-xs ${j.status === 'failed' ? 'text-status-fault' : 'text-content-subtle'}`}>
                                 {j.status === 'failed' && j.error ? j.error : (JOB_LABEL[j.status] || j.status)}
                             </span>
@@ -221,7 +325,7 @@ export default function LibraryTab({ clips, loading, reload, onPlayClip }) {
                                 <p className="font-mono text-xs tabular-nums text-content-subtle">
                                     {formatDuration(clip.duration_sec)}
                                     {clip.source_bytes > 0 ? ` · ${formatBytes(clip.source_bytes)}` : ''}
-                                    {clip.source_type === 'youtube' ? ' · YouTube' : clip.source_type === 'url' ? ' · URL' : ''}
+                                    {clip.source_type === 'youtube' ? ' · YouTube' : clip.source_type === 'url' ? ' · URL' : clip.source_type === 'tts' ? ' · Suara (TTS)' : ''}
                                 </p>
                             </div>
                             {onPlayClip && (

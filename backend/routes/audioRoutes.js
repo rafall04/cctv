@@ -18,6 +18,7 @@ import {
     listCapability, recheckCapability, recheckCameraCapability, listAreas, toggleArea, blockCamera,
     importClip, listImportJobs, talkTicket, listActivePlays, stopPlay,
     listGroups, createGroup, updateGroup, deleteGroup,
+    listTtsEngines, createTts,
 } from '../controllers/audioController.js';
 import fastifyWebsocket from '@fastify/websocket';
 import { authMiddleware, requireAdmin } from '../middleware/authMiddleware.js';
@@ -42,6 +43,8 @@ export default async function audioRoutes(fastify) {
     fastify.post('/clips', { ...admin, bodyLimit: UPLOAD_BODY_LIMIT }, uploadClip);
     fastify.post('/clips/import', admin, importClip);   // small JSON (a URL) — default body limit
     fastify.get('/clips/imports', admin, listImportJobs);
+    fastify.get('/tts/engines', admin, listTtsEngines);
+    fastify.post('/clips/tts', admin, createTts);       // typed text -> spoken clip (async job)
     fastify.delete('/clips/:id', admin, deleteClip);
 
     // Playlists
