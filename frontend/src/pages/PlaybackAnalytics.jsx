@@ -378,7 +378,7 @@ export default function PlaybackAnalytics() {
                     <div className="grid gap-3 rounded-2xl border border-edge bg-surface p-4 lg:grid-cols-3">
                         <label className="space-y-1 text-sm">
                             <span className="font-medium text-content">Periode</span>
-                            <select value={period} onChange={(event) => setPeriod(event.target.value)} className="w-full rounded-xl border border-edge bg-surface px-3 py-2 dark:text-white">
+                            <select value={period} onChange={(event) => setPeriod(event.target.value)} className="w-full rounded-xl border border-edge bg-surface px-3 py-2 text-base sm:text-sm text-content">
                                 {PERIOD_OPTIONS.map((option) => (
                                     <option key={option.value} value={option.value}>{option.label}</option>
                                 ))}
@@ -387,7 +387,7 @@ export default function PlaybackAnalytics() {
 
                         <label className="space-y-1 text-sm">
                             <span className="font-medium text-content">Kamera</span>
-                            <select value={cameraId} onChange={(event) => setCameraId(event.target.value)} className="w-full rounded-xl border border-edge bg-surface px-3 py-2 dark:text-white">
+                            <select value={cameraId} onChange={(event) => setCameraId(event.target.value)} className="w-full rounded-xl border border-edge bg-surface px-3 py-2 text-base sm:text-sm text-content">
                                 <option value="">Semua Kamera</option>
                                 {cameraOptions.map((camera) => (
                                     <option key={camera.id} value={camera.id}>{camera.name}</option>
@@ -397,7 +397,7 @@ export default function PlaybackAnalytics() {
 
                         <label className="space-y-1 text-sm">
                             <span className="font-medium text-content">Akses</span>
-                            <select value={accessMode} onChange={(event) => setAccessMode(event.target.value)} className="w-full rounded-xl border border-edge bg-surface px-3 py-2 dark:text-white">
+                            <select value={accessMode} onChange={(event) => setAccessMode(event.target.value)} className="w-full rounded-xl border border-edge bg-surface px-3 py-2 text-base sm:text-sm text-content">
                                 {ACCESS_MODE_OPTIONS.map((option) => (
                                     <option key={option.value} value={option.value}>{option.label}</option>
                                 ))}
@@ -554,7 +554,7 @@ export default function PlaybackAnalytics() {
                             <div className="grid gap-3 lg:grid-cols-4">
                                 <label className="space-y-1 text-sm">
                                     <span className="font-medium text-content">Akses</span>
-                                    <select value={accessMode} onChange={(event) => setAccessMode(event.target.value)} className="w-full rounded-xl border border-edge bg-surface px-3 py-2 dark:text-white">
+                                    <select value={accessMode} onChange={(event) => setAccessMode(event.target.value)} className="w-full rounded-xl border border-edge bg-surface px-3 py-2 text-base sm:text-sm text-content">
                                         {ACCESS_MODE_OPTIONS.map((option) => (
                                             <option key={option.value} value={option.value}>{option.label}</option>
                                         ))}
@@ -562,7 +562,7 @@ export default function PlaybackAnalytics() {
                                 </label>
                                 <label className="space-y-1 text-sm">
                                     <span className="font-medium text-content">Perangkat</span>
-                                    <select value={historyDeviceType} onChange={(event) => setHistoryDeviceType(event.target.value)} className="w-full rounded-xl border border-edge bg-surface px-3 py-2 dark:text-white">
+                                    <select value={historyDeviceType} onChange={(event) => setHistoryDeviceType(event.target.value)} className="w-full rounded-xl border border-edge bg-surface px-3 py-2 text-base sm:text-sm text-content">
                                         <option value="">Semua Perangkat</option>
                                         <option value="desktop">Desktop</option>
                                         <option value="mobile">Mobile</option>
@@ -572,7 +572,7 @@ export default function PlaybackAnalytics() {
                                 </label>
                                 <label className="space-y-1 text-sm">
                                     <span className="font-medium text-content">Urutkan</span>
-                                    <select value={historySort} onChange={(event) => setHistorySort(event.target.value)} className="w-full rounded-xl border border-edge bg-surface px-3 py-2 dark:text-white">
+                                    <select value={historySort} onChange={(event) => setHistorySort(event.target.value)} className="w-full rounded-xl border border-edge bg-surface px-3 py-2 text-base sm:text-sm text-content">
                                         {SORT_OPTIONS.map((option) => (
                                             <option key={option.value} value={option.value}>{option.label}</option>
                                         ))}
@@ -584,7 +584,7 @@ export default function PlaybackAnalytics() {
                                         value={historySearch}
                                         onChange={(event) => setHistorySearch(event.target.value)}
                                         placeholder="Kamera, IP, segmen, token, admin"
-                                        className="w-full rounded-xl border border-edge bg-surface px-3 py-2 dark:text-white"
+                                        className="w-full rounded-xl border border-edge bg-surface px-3 py-2 text-base sm:text-sm text-content"
                                     />
                                 </label>
                             </div>

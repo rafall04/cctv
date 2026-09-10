@@ -63,7 +63,7 @@ function Field({ label, hint, children }) {
     );
 }
 
-const inputClass = 'w-full rounded-control border border-edge bg-surface px-3 py-2 text-sm text-content transition-colors focus:border-edge-strong focus:outline-none';
+const inputClass = 'w-full rounded-control border border-edge bg-surface px-3 py-2 text-base sm:text-sm text-content transition-colors focus:border-edge-strong focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary';
 
 /**
  * Searchable multi-select. Cameras number in the hundreds, so the list is filtered

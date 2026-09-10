@@ -529,7 +529,7 @@ function SponsorManagement() {
                         value={assignmentSearch}
                         onChange={(e) => setAssignmentSearch(e.target.value)}
                         placeholder="Cari kamera / area / sponsor"
-                        className="bg-surface border border-edge-strong rounded-lg px-3 py-2 text-sm text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary md:w-72"
+                        className="bg-surface border border-edge-strong rounded-lg px-3 py-2 text-base sm:text-sm text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary md:w-72"
                     />
                 </div>
                 {recordingCameras.length === 0 ? (
@@ -578,7 +578,7 @@ function SponsorManagement() {
                                                         if (target === camera.sponsor_name) return;
                                                         handleQuickAssign(camera.id, target);
                                                     }}
-                                                    className="bg-surface border border-edge-strong rounded-lg px-3 py-1.5 text-sm text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50"
+                                                    className="bg-surface border border-edge-strong rounded-lg px-3 py-1.5 text-base sm:text-sm text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50"
                                                 >
                                                     <option value="">— Tanpa sponsor —</option>
                                                     {activeSponsorOptions.map((sponsor) => (
@@ -739,7 +739,7 @@ function SponsorManagement() {
                                         value={cameraSearch}
                                         onChange={(e) => setCameraSearch(e.target.value)}
                                         placeholder="Cari kamera"
-                                        className="bg-surface border border-edge-strong rounded-lg px-3 py-1.5 text-sm text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary md:w-60"
+                                        className="bg-surface border border-edge-strong rounded-lg px-3 py-1.5 text-base sm:text-sm text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary md:w-60"
                                     />
                                 </div>
                                 {overCameraLimit && (

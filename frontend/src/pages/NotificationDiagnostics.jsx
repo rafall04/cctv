@@ -132,7 +132,7 @@ export default function NotificationDiagnostics() {
                                 setCameraId(event.target.value);
                                 setPreview(null);
                             }}
-                            className="mt-1 w-full rounded-lg border border-edge-strong bg-surface px-3 py-2 text-sm dark:text-white"
+                            className="mt-1 w-full rounded-lg border border-edge-strong bg-surface px-3 py-2 text-base sm:text-sm text-content"
                         >
                             <option value="">Pilih CCTV</option>
                             {cameras.map((camera) => (
@@ -152,7 +152,7 @@ export default function NotificationDiagnostics() {
                                 setEventType(event.target.value);
                                 setPreview(null);
                             }}
-                            className="mt-1 w-full rounded-lg border border-edge-strong bg-surface px-3 py-2 text-sm dark:text-white"
+                            className="mt-1 w-full rounded-lg border border-edge-strong bg-surface px-3 py-2 text-base sm:text-sm text-content"
                         >
                             {EVENT_OPTIONS.map((option) => (
                                 <option key={option.value} value={option.value}>{option.label}</option>

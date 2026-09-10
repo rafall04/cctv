@@ -80,7 +80,7 @@ export default function CameraReactionsOverview() {
                             value={page.search}
                             onChange={(event) => page.setSearch(event.target.value)}
                             placeholder="Nama kamera atau area…"
-                            className="mt-1 w-full rounded-control border border-edge-strong bg-surface px-3 py-2 text-sm text-content transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
+                            className="mt-1 w-full rounded-control border border-edge-strong bg-surface px-3 py-2 text-base sm:text-sm text-content transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                         />
                     </label>
                     <label className="flex items-center gap-2 text-sm text-content sm:pt-5">

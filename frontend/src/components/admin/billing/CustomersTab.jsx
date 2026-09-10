@@ -93,7 +93,7 @@ export default function CustomersTab({ customers, plans, run, busy }) {
             title={plans.find((plan) => plan.key === customer.plan_key)?.name || '(tanpa paket)'}
             disabled={busy}
             onChange={(e) => changePlan(customer, e.target.value)}
-            className={`min-w-0 rounded-lg border border-edge bg-surface-sunken px-2 py-1 text-xs text-content ${extra}`}
+            className={`min-w-0 rounded-lg border border-edge bg-surface-sunken px-2 py-1 text-base sm:text-xs text-content ${extra}`}
         >
             <option value="">(tanpa paket)</option>
             {plans.map((plan) => (

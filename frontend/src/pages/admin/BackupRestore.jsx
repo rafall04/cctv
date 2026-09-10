@@ -195,7 +195,7 @@ export default function BackupRestore() {
                 actions={(
                     <Link
                         to="/admin/import-export"
-                        className="inline-flex items-center gap-2 rounded-control bg-surface-sunken px-4 py-2.5 text-content-muted transition-colors hover:bg-surface-raised"
+                        className="inline-flex items-center gap-2 rounded-control bg-surface-sunken px-4 py-2.5 text-base sm:text-sm text-content-muted transition-colors hover:bg-surface-raised"
                     >
                         Kembali ke Import/Export
                     </Link>
@@ -261,7 +261,7 @@ export default function BackupRestore() {
                             <select
                                 value={scopeMode}
                                 onChange={(event) => updateQuickScope(event.target.value, selectedAreaId)}
-                                className="mt-2 w-full rounded-xl border border-edge bg-surface px-4 py-2.5 text-content"
+                                className="mt-2 w-full rounded-xl border border-edge bg-surface px-4 py-2.5 text-base sm:text-sm text-content"
                             >
                                 <option value="all">Semua kamera existing</option>
                                 <option value="unresolved_only">Hanya kamera unresolved</option>
@@ -275,7 +275,7 @@ export default function BackupRestore() {
                                 value={selectedAreaId}
                                 disabled={scopeMode !== 'area_ids' || loadingAreas}
                                 onChange={(event) => updateQuickScope('area_ids', event.target.value)}
-                                className="mt-2 w-full rounded-xl border border-edge bg-surface px-4 py-2.5 text-content disabled:opacity-60"
+                                className="mt-2 w-full rounded-xl border border-edge bg-surface px-4 py-2.5 text-base sm:text-sm text-content disabled:opacity-60"
                             >
                                 <option value="">Pilih area</option>
                                 {areas.map((area) => (

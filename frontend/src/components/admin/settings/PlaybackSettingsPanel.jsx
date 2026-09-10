@@ -151,7 +151,7 @@ export default function PlaybackSettingsPanel() {
                             name="public_playback_preview_minutes"
                             value={settings.public_playback_preview_minutes}
                             onChange={handleChange}
-                            className="w-full rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-sm text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
+                            className="w-full rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-base sm:text-sm text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                         >
                             {PREVIEW_OPTIONS.map((value) => (
                                 <option key={value} value={value}>
@@ -183,7 +183,7 @@ export default function PlaybackSettingsPanel() {
                             name="public_playback_notice_title"
                             value={settings.public_playback_notice_title}
                             onChange={handleChange}
-                            className="w-full rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-sm text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
+                            className="w-full rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-base sm:text-sm text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                         />
                     </div>
 
@@ -197,7 +197,7 @@ export default function PlaybackSettingsPanel() {
                             value={settings.public_playback_notice_text}
                             onChange={handleChange}
                             rows={4}
-                            className="w-full rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-sm text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
+                            className="w-full rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-base sm:text-sm text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                         />
                     </div>
 
@@ -210,7 +210,7 @@ export default function PlaybackSettingsPanel() {
                             name="public_playback_contact_mode"
                             value={settings.public_playback_contact_mode}
                             onChange={handleChange}
-                            className="w-full rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-sm text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
+                            className="w-full rounded-xl border border-edge-strong bg-surface px-4 py-2.5 text-base sm:text-sm text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                         >
                             <option value="branding_whatsapp">WhatsApp dari branding</option>
                         </select>

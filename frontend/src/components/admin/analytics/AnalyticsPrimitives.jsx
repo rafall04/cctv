@@ -101,7 +101,7 @@ export function PeriodSelector({ value, onChange, customDate, onCustomDateChange
                         onChange('custom');
                     }}
                     max={getLocalDateInputValue(new Date(), timezone)}
-                    className="px-3 py-2 text-sm bg-surface border border-edge rounded-lg text-content focus:ring-2 focus:ring-primary focus:border-transparent"
+                    className="px-3 py-2 text-base sm:text-sm bg-surface border border-edge rounded-lg text-content focus:ring-2 focus:ring-primary focus:border-transparent"
                 />
             )}
         </div>
@@ -113,7 +113,7 @@ export function CameraFilter({ cameras, value, onChange }) {
         <select
             value={value}
             onChange={(event) => onChange(event.target.value)}
-            className="px-3 py-2 text-sm bg-surface border border-edge rounded-lg text-content focus:ring-2 focus:ring-primary focus:border-transparent"
+            className="px-3 py-2 text-base sm:text-sm bg-surface border border-edge rounded-lg text-content focus:ring-2 focus:ring-primary focus:border-transparent"
         >
             <option value="">Semua Kamera</option>
             {cameras.map((camera) => (

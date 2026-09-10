@@ -43,17 +43,17 @@ export default function PlaybackTokenForm({
             <div className="grid gap-4 md:grid-cols-2">
                 <label className="block">
                     <span className="mb-1 block text-sm font-medium text-content-muted">Nama Token</span>
-                    <input value={form.label} onChange={(event) => onUpdateForm('label', event.target.value)} className="w-full rounded-lg border border-edge-strong px-3 py-2 text-sm dark:bg-gray-950 dark:text-white" />
+                    <input value={form.label} onChange={(event) => onUpdateForm('label', event.target.value)} className="w-full rounded-lg border border-edge-strong px-3 py-2 text-base sm:text-sm dark:bg-gray-950 dark:text-white" />
                 </label>
                 <label className="block">
                     <span className="mb-1 block text-sm font-medium text-content-muted">Preset (isi cepat)</span>
-                    <select value={form.preset} onChange={(event) => onPresetChange(event.target.value)} className="w-full rounded-lg border border-edge-strong px-3 py-2 text-sm dark:bg-gray-950 dark:text-white">
+                    <select value={form.preset} onChange={(event) => onPresetChange(event.target.value)} className="w-full rounded-lg border border-edge-strong px-3 py-2 text-base sm:text-sm dark:bg-gray-950 dark:text-white">
                         {PLAYBACK_TOKEN_PRESETS.map((preset) => <option key={preset.value} value={preset.value}>{preset.label}</option>)}
                     </select>
                 </label>
                 <label className="block">
                     <span className="mb-1 block text-sm font-medium text-content-muted">Scope Kamera</span>
-                    <select value={form.scope_type} onChange={(event) => onUpdateForm('scope_type', event.target.value)} className="w-full rounded-lg border border-edge-strong px-3 py-2 text-sm dark:bg-gray-950 dark:text-white">
+                    <select value={form.scope_type} onChange={(event) => onUpdateForm('scope_type', event.target.value)} className="w-full rounded-lg border border-edge-strong px-3 py-2 text-base sm:text-sm dark:bg-gray-950 dark:text-white">
                         <option value="all">Semua kamera playback</option>
                         <option value="area">Per area</option>
                         <option value="selected">Kamera tertentu</option>
@@ -76,17 +76,17 @@ export default function PlaybackTokenForm({
                             <div className="flex flex-col gap-2">
                                 <label className="block w-full">
                                     <span className="mb-1 block text-xs text-content-subtle">Dari</span>
-                                    <input type="datetime-local" value={form.playback_from} onChange={(event) => onUpdateForm('playback_from', snapTo10Min(event.target.value))} className="w-full rounded-lg border border-edge-strong px-2 py-2 text-sm dark:bg-gray-950 dark:text-white" />
+                                    <input type="datetime-local" value={form.playback_from} onChange={(event) => onUpdateForm('playback_from', snapTo10Min(event.target.value))} className="w-full rounded-lg border border-edge-strong px-2 py-2 text-base sm:text-sm dark:bg-gray-950 dark:text-white" />
                                 </label>
                                 <label className="block w-full">
                                     <span className="mb-1 block text-xs text-content-subtle">Sampai</span>
-                                    <input type="datetime-local" value={form.playback_to} onChange={(event) => onUpdateForm('playback_to', snapTo10Min(event.target.value))} className="w-full rounded-lg border border-edge-strong px-2 py-2 text-sm dark:bg-gray-950 dark:text-white" />
+                                    <input type="datetime-local" value={form.playback_to} onChange={(event) => onUpdateForm('playback_to', snapTo10Min(event.target.value))} className="w-full rounded-lg border border-edge-strong px-2 py-2 text-base sm:text-sm dark:bg-gray-950 dark:text-white" />
                                 </label>
                             </div>
                         ) : (
                             <div className="flex gap-2">
-                                <input type="number" min="1" value={form.playback_window_value} onChange={(event) => onUpdateForm('playback_window_value', event.target.value)} placeholder="Kosong = semua" className="w-full rounded-lg border border-edge-strong px-3 py-2 text-sm dark:bg-gray-950 dark:text-white" />
-                                <select value={form.playback_window_unit} onChange={(event) => onUpdateForm('playback_window_unit', event.target.value)} className="rounded-lg border border-edge-strong px-2 py-2 text-sm dark:bg-gray-950 dark:text-white">
+                                <input type="number" min="1" value={form.playback_window_value} onChange={(event) => onUpdateForm('playback_window_value', event.target.value)} placeholder="Kosong = semua" className="w-full rounded-lg border border-edge-strong px-3 py-2 text-base sm:text-sm dark:bg-gray-950 dark:text-white" />
+                                <select value={form.playback_window_unit} onChange={(event) => onUpdateForm('playback_window_unit', event.target.value)} className="rounded-lg border border-edge-strong px-2 py-2 text-base sm:text-sm dark:bg-gray-950 dark:text-white">
                                     {DURATION_UNITS.map((unit) => <option key={unit.value} value={unit.value}>{unit.label}</option>)}
                                 </select>
                             </div>
@@ -95,7 +95,7 @@ export default function PlaybackTokenForm({
                     </label>
                     <label className="block">
                         <span className="mb-1 block text-sm font-medium text-content-muted">Expired</span>
-                        <input type="datetime-local" value={form.expires_at} onChange={(event) => onUpdateForm('expires_at', event.target.value)} className="w-full rounded-lg border border-edge-strong px-3 py-2 text-sm dark:bg-gray-950 dark:text-white" />
+                        <input type="datetime-local" value={form.expires_at} onChange={(event) => onUpdateForm('expires_at', event.target.value)} className="w-full rounded-lg border border-edge-strong px-3 py-2 text-base sm:text-sm dark:bg-gray-950 dark:text-white" />
                         <span className="mt-1 block text-xs text-content-subtle">Masa berlaku token mengikuti preset; isian ini hanya dipakai di preset Custom/Lifetime.</span>
                     </label>
                 </div>
@@ -104,7 +104,7 @@ export default function PlaybackTokenForm({
             <div className="mt-4 grid gap-4 md:grid-cols-4">
                 <label className="block">
                     <span className="mb-1 block text-sm font-medium text-content-muted">Kode Akses</span>
-                    <select value={form.access_code_mode} onChange={(event) => onUpdateForm('access_code_mode', event.target.value)} className="w-full rounded-lg border border-edge-strong px-3 py-2 text-sm dark:bg-gray-950 dark:text-white">
+                    <select value={form.access_code_mode} onChange={(event) => onUpdateForm('access_code_mode', event.target.value)} className="w-full rounded-lg border border-edge-strong px-3 py-2 text-base sm:text-sm dark:bg-gray-950 dark:text-white">
                         <option value="auto">Otomatis</option>
                         <option value="custom">Custom</option>
                     </select>
@@ -118,15 +118,15 @@ export default function PlaybackTokenForm({
                      * classes is deliberate — a strip that dropped one class would eat what the user
                      * typed. maxLength caps at the backend's 32 so a paste cannot silently overflow.
                      */}
-                    <input value={form.access_code_mode === 'custom' ? form.custom_access_code : form.access_code_length} maxLength={form.access_code_mode === 'custom' ? 32 : undefined} onChange={(event) => onUpdateForm(form.access_code_mode === 'custom' ? 'custom_access_code' : 'access_code_length', form.access_code_mode === 'custom' ? event.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, '') : event.target.value)} className="w-full rounded-lg border border-edge-strong px-3 py-2 text-sm dark:bg-gray-950 dark:text-white" />
+                    <input value={form.access_code_mode === 'custom' ? form.custom_access_code : form.access_code_length} maxLength={form.access_code_mode === 'custom' ? 32 : undefined} onChange={(event) => onUpdateForm(form.access_code_mode === 'custom' ? 'custom_access_code' : 'access_code_length', form.access_code_mode === 'custom' ? event.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, '') : event.target.value)} className="w-full rounded-lg border border-edge-strong px-3 py-2 text-base sm:text-sm dark:bg-gray-950 dark:text-white" />
                 </label>
                 <label className="block">
                     <span className="mb-1 block text-sm font-medium text-content-muted">Limit Device</span>
-                    <input type="number" min="0" value={form.max_active_sessions} onChange={(event) => onUpdateForm('max_active_sessions', event.target.value)} placeholder="Preset" className="w-full rounded-lg border border-edge-strong px-3 py-2 text-sm dark:bg-gray-950 dark:text-white" />
+                    <input type="number" min="0" value={form.max_active_sessions} onChange={(event) => onUpdateForm('max_active_sessions', event.target.value)} placeholder="Preset" className="w-full rounded-lg border border-edge-strong px-3 py-2 text-base sm:text-sm dark:bg-gray-950 dark:text-white" />
                 </label>
                 <label className="block">
                     <span className="mb-1 block text-sm font-medium text-content-muted">Mode Limit</span>
-                    <select value={form.session_limit_mode} onChange={(event) => onUpdateForm('session_limit_mode', event.target.value)} className="w-full rounded-lg border border-edge-strong px-3 py-2 text-sm dark:bg-gray-950 dark:text-white">
+                    <select value={form.session_limit_mode} onChange={(event) => onUpdateForm('session_limit_mode', event.target.value)} className="w-full rounded-lg border border-edge-strong px-3 py-2 text-base sm:text-sm dark:bg-gray-950 dark:text-white">
                         {PLAYBACK_TOKEN_SESSION_LIMIT_MODES.map((mode) => <option key={mode.value || 'preset'} value={mode.value}>{mode.label}</option>)}
                     </select>
                 </label>
@@ -192,7 +192,7 @@ export default function PlaybackTokenForm({
                         value={cameraSearch}
                         onChange={(event) => onUpdateCameraSearch?.(event.target.value)}
                         placeholder="Filter nama CCTV"
-                        className="mb-3 w-full rounded-lg border border-edge-strong px-3 py-2 text-sm dark:bg-gray-950 dark:text-white"
+                        className="mb-3 w-full rounded-lg border border-edge-strong px-3 py-2 text-base sm:text-sm dark:bg-gray-950 dark:text-white"
                     />
                     <div className="grid max-h-72 gap-2 overflow-y-auto lg:grid-cols-2">
                         {cameras.map((camera) => (
@@ -207,18 +207,18 @@ export default function PlaybackTokenForm({
                                         <div className="grid gap-2 sm:grid-cols-4">
                                             <label className="block">
                                                 <span className="mb-0.5 block text-[10px] text-content-subtle">Maks. mundur (jam)</span>
-                                                <input type="number" min="1" placeholder="ikut token" value={form.camera_rules[camera.id]?.playback_window_hours || ''} onChange={(event) => onUpdateCameraRule(camera.id, 'playback_window_hours', event.target.value)} className="w-full rounded-lg border border-edge-strong px-2 py-1 text-xs dark:bg-gray-950 dark:text-white" />
+                                                <input type="number" min="1" placeholder="ikut token" value={form.camera_rules[camera.id]?.playback_window_hours || ''} onChange={(event) => onUpdateCameraRule(camera.id, 'playback_window_hours', event.target.value)} className="w-full rounded-lg border border-edge-strong px-2 py-1 text-base sm:text-xs dark:bg-gray-950 dark:text-white" />
                                             </label>
                                             <label className="block">
                                                 <span className="mb-0.5 block text-[10px] text-content-subtle">Berlaku sampai</span>
-                                                <input type="datetime-local" value={form.camera_rules[camera.id]?.expires_at || ''} onChange={(event) => onUpdateCameraRule(camera.id, 'expires_at', event.target.value)} className="w-full rounded-lg border border-edge-strong px-2 py-1 text-xs dark:bg-gray-950 dark:text-white" />
+                                                <input type="datetime-local" value={form.camera_rules[camera.id]?.expires_at || ''} onChange={(event) => onUpdateCameraRule(camera.id, 'expires_at', event.target.value)} className="w-full rounded-lg border border-edge-strong px-2 py-1 text-base sm:text-xs dark:bg-gray-950 dark:text-white" />
                                             </label>
                                             <label className="block">
                                                 <span className="mb-0.5 block text-[10px] text-content-subtle">Live</span>
                                                 <select
                                                     value={form.camera_rules[camera.id]?.allow_live === true ? 'yes' : form.camera_rules[camera.id]?.allow_live === false ? 'no' : 'inherit'}
                                                     onChange={(event) => onUpdateCameraRule(camera.id, 'allow_live', event.target.value === 'inherit' ? null : event.target.value === 'yes')}
-                                                    className="w-full rounded-lg border border-edge-strong bg-surface px-2 py-1 text-xs text-content"
+                                                    className="w-full rounded-lg border border-edge-strong bg-surface px-2 py-1 text-base sm:text-xs text-content"
                                                 >
                                                     <option value="inherit">Ikut token</option>
                                                     <option value="yes">Live: Ya</option>
@@ -227,7 +227,7 @@ export default function PlaybackTokenForm({
                                             </label>
                                             <label className="block">
                                                 <span className="mb-0.5 block text-[10px] text-content-subtle">Catatan</span>
-                                                <input placeholder="—" value={form.camera_rules[camera.id]?.note || ''} onChange={(event) => onUpdateCameraRule(camera.id, 'note', event.target.value)} className="w-full rounded-lg border border-edge-strong px-2 py-1 text-xs dark:bg-gray-950 dark:text-white" />
+                                                <input placeholder="—" value={form.camera_rules[camera.id]?.note || ''} onChange={(event) => onUpdateCameraRule(camera.id, 'note', event.target.value)} className="w-full rounded-lg border border-edge-strong px-2 py-1 text-base sm:text-xs dark:bg-gray-950 dark:text-white" />
                                             </label>
                                         </div>
                                     </div>
@@ -240,7 +240,7 @@ export default function PlaybackTokenForm({
 
             <label className="mt-4 block">
                 <span className="mb-1 block text-sm font-medium text-content-muted">Template Share</span>
-                <textarea rows={5} value={form.share_template} onChange={(event) => onUpdateForm('share_template', event.target.value)} className="w-full rounded-lg border border-edge-strong px-3 py-2 text-sm dark:bg-gray-950 dark:text-white" />
+                <textarea rows={5} value={form.share_template} onChange={(event) => onUpdateForm('share_template', event.target.value)} className="w-full rounded-lg border border-edge-strong px-3 py-2 text-base sm:text-sm dark:bg-gray-950 dark:text-white" />
             </label>
 
             {/* Live preview of the EFFECTIVE limit — so the operator reads what the token grants in

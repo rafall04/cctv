@@ -28,7 +28,7 @@ function scopeLabel(token) {
     return token.scope_type === 'selected' ? `${count} kamera` : 'Semua kamera';
 }
 
-const FIELD = 'w-full rounded-control border border-edge-strong bg-surface px-3 py-2 text-sm text-content';
+const FIELD = 'w-full rounded-control border border-edge-strong bg-surface px-3 py-2 text-base sm:text-sm text-content';
 
 /**
  * SQL datetime ("2026-08-04 10:02:00") -> the "YYYY-MM-DDTHH:mm" that <input type="datetime-local">

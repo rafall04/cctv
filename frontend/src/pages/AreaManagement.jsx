@@ -399,7 +399,7 @@ export default function AreaManagement() {
                     </Link>
                     {kecamatans.length > 0 && (
                         <select value={filterKecamatan} onChange={(e) => setFilterKecamatan(e.target.value)}
-                            className="min-w-0 max-w-full px-4 py-2.5 bg-surface border border-edge rounded-xl text-content text-sm focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary">
+                            className="min-w-0 max-w-full px-4 py-2.5 bg-surface border border-edge rounded-xl text-content text-base sm:text-sm focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary">
                             <option value="">Semua Kecamatan</option>
                             {kecamatans.map(k => <option key={k} value={k}>{k}</option>)}
                         </select>
@@ -546,7 +546,7 @@ export default function AreaManagement() {
                                     <select aria-label="Mode Operasi"
                                         value={bulkConfig.operation}
                                         onChange={(e) => setBulkConfig((current) => ({ ...current, operation: e.target.value }))}
-                                        className="w-full bg-surface border border-edge-strong text-content text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5"
+                                        className="w-full bg-surface border border-edge-strong text-content text-base sm:text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5"
                                     >
                                         <option value="policy_update">Bulk Policy Update</option>
                                         <option value="normalization">Bulk Normalization</option>
@@ -558,7 +558,7 @@ export default function AreaManagement() {
                                     <select aria-label="Target Kamera"
                                         value={effectiveBulkTargetFilter}
                                         onChange={(e) => setBulkConfig((current) => ({ ...current, targetFilter: e.target.value }))}
-                                        className="w-full bg-surface border border-edge-strong text-content text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5"
+                                        className="w-full bg-surface border border-edge-strong text-content text-base sm:text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5"
                                     >
                                         <option value="all">Semua Kamera Area</option>
                                         <option value="internal_only">Hanya Internal</option>
@@ -593,7 +593,7 @@ export default function AreaManagement() {
                                         aria-label="Health Monitoring"
                                         value={bulkConfig.external_health_mode}
                                         onChange={(e) => setBulkConfig((current) => ({ ...current, external_health_mode: e.target.value }))}
-                                        className="w-full bg-surface border border-edge-strong text-content text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5"
+                                        className="w-full bg-surface border border-edge-strong text-content text-base sm:text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5"
                                     >
                                         <option value="ignore">Biarkan Seperti Semula</option>
                                         <option value="default">Ikuti Default Area/Global</option>
@@ -611,7 +611,7 @@ export default function AreaManagement() {
                                     <select aria-label="Delivery Type"
                                         value={bulkConfig.delivery_type}
                                         onChange={(e) => setBulkConfig({ ...bulkConfig, delivery_type: e.target.value })}
-                                        className="w-full bg-surface border border-edge-strong text-content text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5"
+                                        className="w-full bg-surface border border-edge-strong text-content text-base sm:text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5"
                                     >
                                         <option value="ignore">Biarkan Seperti Semula</option>
                         <option value="external_hls">External HLS</option>
@@ -627,7 +627,7 @@ export default function AreaManagement() {
                                     <select aria-label="Origin Mode"
                                         value={bulkConfig.external_origin_mode}
                                         onChange={(e) => setBulkConfig((current) => ({ ...current, external_origin_mode: e.target.value }))}
-                                        className="w-full bg-surface border border-edge-strong text-content text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5"
+                                        className="w-full bg-surface border border-edge-strong text-content text-base sm:text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5"
                                     >
                                         <option value="ignore">Biarkan Seperti Semula</option>
                                         <option value="direct">Direct</option>
@@ -639,7 +639,7 @@ export default function AreaManagement() {
                                     <select aria-label="Gunakan Proxy Server"
                                         value={bulkConfig.external_use_proxy}
                                         onChange={(e) => setBulkConfig((current) => ({ ...current, external_use_proxy: e.target.value }))}
-                                        className="w-full bg-surface border border-edge-strong text-content text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5"
+                                        className="w-full bg-surface border border-edge-strong text-content text-base sm:text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5"
                                     >
                                         <option value="ignore">Biarkan Seperti Semula</option>
                                         <option value="1">Aktifkan</option>
@@ -651,7 +651,7 @@ export default function AreaManagement() {
                                     <select aria-label="Mode TLS"
                                         value={bulkConfig.external_tls_mode}
                                         onChange={(e) => setBulkConfig((current) => ({ ...current, external_tls_mode: e.target.value }))}
-                                        className="w-full bg-surface border border-edge-strong text-content text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5"
+                                        className="w-full bg-surface border border-edge-strong text-content text-base sm:text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5"
                                     >
                                         <option value="ignore">Biarkan Seperti Semula</option>
                                         <option value="strict">Strict</option>
@@ -663,7 +663,7 @@ export default function AreaManagement() {
                                     <select aria-label="Recording"
                                         value={bulkConfig.enable_recording}
                                         onChange={(e) => setBulkConfig({ ...bulkConfig, enable_recording: e.target.value })}
-                                        className="w-full bg-surface border border-edge-strong text-content text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5"
+                                        className="w-full bg-surface border border-edge-strong text-content text-base sm:text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5"
                                     >
                                         <option value="ignore">Biarkan Seperti Semula</option>
                                         <option value="1">Aktifkan</option>
@@ -678,7 +678,7 @@ export default function AreaManagement() {
                                     <select aria-label="Status Publik"
                                         value={bulkConfig.enabled}
                                         onChange={(e) => setBulkConfig({ ...bulkConfig, enabled: e.target.value })}
-                                        className="w-full bg-surface border border-edge-strong text-content text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5"
+                                        className="w-full bg-surface border border-edge-strong text-content text-base sm:text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5"
                                     >
                                         <option value="ignore">Biarkan Seperti Semula</option>
                                         <option value="1">Aktifkan</option>
@@ -693,7 +693,7 @@ export default function AreaManagement() {
                                     <select aria-label="Video Codec"
                                         value={bulkConfig.video_codec}
                                         onChange={(e) => setBulkConfig({ ...bulkConfig, video_codec: e.target.value })}
-                                        className="w-full bg-surface border border-edge-strong text-content text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5"
+                                        className="w-full bg-surface border border-edge-strong text-content text-base sm:text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5"
                                     >
                                         <option value="ignore">Biarkan Seperti Semula</option>
                                         <option value="h264">H.264</option>

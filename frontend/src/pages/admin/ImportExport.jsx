@@ -478,7 +478,7 @@ export default function ImportExport() {
 
                             <div>
                                 <label htmlFor="import-profile-select" className="block text-sm font-medium text-content-muted mb-1">Import Profile</label>
-                                <select id="import-profile-select" value={sourceProfile} onChange={(event) => setSourceProfile(event.target.value)} className="w-full bg-surface-sunken border border-edge-strong text-content text-sm rounded-lg focus:ring-primary focus:border-primary block p-2.5">
+                                <select id="import-profile-select" value={sourceProfile} onChange={(event) => setSourceProfile(event.target.value)} className="w-full bg-surface-sunken border border-edge-strong text-content text-base sm:text-sm rounded-lg focus:ring-primary focus:border-primary block p-2.5">
                                     {sourceOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                                 </select>
                             </div>
@@ -503,7 +503,7 @@ export default function ImportExport() {
 
                             <div>
                                 <label className="block text-sm font-medium text-content-muted mb-1">Target Area</label>
-                                <input aria-label="Target Area" type="text" value={targetArea} onChange={(event) => { setTargetArea(event.target.value); setPreviewResult(null); }} className="w-full bg-surface-sunken border border-edge-strong text-content text-sm rounded-lg focus:ring-primary focus:border-primary block p-2.5" placeholder="Nama area target" />
+                                <input aria-label="Target Area" type="text" value={targetArea} onChange={(event) => { setTargetArea(event.target.value); setPreviewResult(null); }} className="w-full bg-surface-sunken border border-edge-strong text-content text-base sm:text-sm rounded-lg focus:ring-primary focus:border-primary block p-2.5" placeholder="Nama area target" />
                             </div>
                         </div>
 
@@ -512,26 +512,26 @@ export default function ImportExport() {
                             <div className="grid grid-cols-1 gap-3">
                                 <div>
                                     <label className="block text-xs font-medium text-content-muted mb-1">Delivery Type Override</label>
-                                    <select aria-label="Delivery Type Override" value={globalOverrides.delivery_type} onChange={(event) => handleOverrideChange('delivery_type', event.target.value)} disabled={isPrivateRtspProfile} className="w-full rounded-lg border border-edge-strong bg-surface-sunken p-2 text-sm disabled:opacity-60 dark:text-white">
+                                    <select aria-label="Delivery Type Override" value={globalOverrides.delivery_type} onChange={(event) => handleOverrideChange('delivery_type', event.target.value)} disabled={isPrivateRtspProfile} className="w-full rounded-lg border border-edge-strong bg-surface-sunken p-2 text-base sm:text-sm disabled:opacity-60 text-content">
                                         {DELIVERY_TYPE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                                     </select>
                                     {isPrivateRtspProfile && <p className="mt-1 text-[11px] text-content-muted">Profile ini selalu dipaksa ke `internal_hls`.</p>}
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-content-muted mb-1">External Health Mode</label>
-                                    <select aria-label="External Health Mode" value={globalOverrides.external_health_mode} onChange={(event) => handleOverrideChange('external_health_mode', event.target.value)} disabled={isPrivateRtspProfile} className="w-full rounded-lg border border-edge-strong bg-surface-sunken p-2 text-sm disabled:opacity-60 dark:text-white">
+                                    <select aria-label="External Health Mode" value={globalOverrides.external_health_mode} onChange={(event) => handleOverrideChange('external_health_mode', event.target.value)} disabled={isPrivateRtspProfile} className="w-full rounded-lg border border-edge-strong bg-surface-sunken p-2 text-base sm:text-sm disabled:opacity-60 text-content">
                                         {HEALTH_MODE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                                     </select>
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-content-muted mb-1">TLS Mode</label>
-                                    <select aria-label="TLS Mode" value={globalOverrides.external_tls_mode} onChange={(event) => handleOverrideChange('external_tls_mode', event.target.value)} disabled={isPrivateRtspProfile} className="w-full rounded-lg border border-edge-strong bg-surface-sunken p-2 text-sm disabled:opacity-60 dark:text-white">
+                                    <select aria-label="TLS Mode" value={globalOverrides.external_tls_mode} onChange={(event) => handleOverrideChange('external_tls_mode', event.target.value)} disabled={isPrivateRtspProfile} className="w-full rounded-lg border border-edge-strong bg-surface-sunken p-2 text-base sm:text-sm disabled:opacity-60 text-content">
                                         {TLS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                                     </select>
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-content-muted mb-1">Origin Mode</label>
-                                    <select aria-label="Origin Mode" value={globalOverrides.external_origin_mode} onChange={(event) => handleOverrideChange('external_origin_mode', event.target.value)} disabled={isPrivateRtspProfile} className="w-full rounded-lg border border-edge-strong bg-surface-sunken p-2 text-sm disabled:opacity-60 dark:text-white">
+                                    <select aria-label="Origin Mode" value={globalOverrides.external_origin_mode} onChange={(event) => handleOverrideChange('external_origin_mode', event.target.value)} disabled={isPrivateRtspProfile} className="w-full rounded-lg border border-edge-strong bg-surface-sunken p-2 text-base sm:text-sm disabled:opacity-60 text-content">
                                         {ORIGIN_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                                     </select>
                                 </div>

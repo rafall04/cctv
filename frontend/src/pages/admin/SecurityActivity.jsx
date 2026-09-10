@@ -213,7 +213,7 @@ export default function SecurityActivity() {
                     aria-label="Filter tipe event"
                     value={eventType}
                     onChange={(event) => { setEventType(event.target.value); setPage(1); }}
-                    className="min-w-0 rounded-xl border border-edge-strong bg-surface px-3 py-2 text-sm text-content"
+                    className="min-w-0 rounded-xl border border-edge-strong bg-surface px-3 py-2 text-base sm:text-sm text-content"
                 >
                     <option value="">Semua Event</option>
                     {ALL_EVENT_TYPES.map((type) => (
@@ -225,7 +225,7 @@ export default function SecurityActivity() {
                     value={search}
                     onChange={(event) => setSearch(event.target.value)}
                     placeholder="Cari IP, user, endpoint, detail..."
-                    className="min-w-0 flex-1 rounded-xl border border-edge-strong bg-surface px-3 py-2 text-sm text-content"
+                    className="min-w-0 flex-1 rounded-xl border border-edge-strong bg-surface px-3 py-2 text-base sm:text-sm text-content"
                 />
                 <button
                     type="submit"

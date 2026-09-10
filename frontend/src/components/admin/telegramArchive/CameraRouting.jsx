@@ -15,7 +15,7 @@
 import { useMemo, useState } from 'react';
 import { card, cardHead, cardTitle } from './archiveUi';
 
-const controlCls = 'rounded-control border border-edge bg-surface-sunken px-2 py-1.5 text-xs text-content '
+const controlCls = 'rounded-control border border-edge bg-surface-sunken px-2 py-1.5 text-base sm:text-xs text-content '
     + 'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500';
 
 const STATUS_OPTIONS = [

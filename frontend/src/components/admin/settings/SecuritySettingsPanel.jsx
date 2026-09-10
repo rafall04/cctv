@@ -178,7 +178,7 @@ export default function SecuritySettingsPanel() {
                                         <select
                                             value={form[field.key] ? 'true' : 'false'}
                                             onChange={(e) => setField(field.key, e.target.value === 'true')}
-                                            className="mt-1 w-full rounded-control border border-edge bg-surface px-3 py-2 text-sm text-content"
+                                            className="mt-1 w-full rounded-control border border-edge bg-surface px-3 py-2 text-base sm:text-sm text-content"
                                         >
                                             <option value="true">Aktif</option>
                                             <option value="false">Nonaktif</option>
@@ -192,7 +192,7 @@ export default function SecuritySettingsPanel() {
                                                     field.key,
                                                     field.type === 'duration' ? e.target.value : Number(e.target.value)
                                                 )}
-                                                className="w-full rounded-control border border-edge bg-surface px-3 py-2 text-sm text-content"
+                                                className="w-full rounded-control border border-edge bg-surface px-3 py-2 text-base sm:text-sm text-content"
                                             />
                                             {field.suffix && (
                                                 <span className="shrink-0 text-xs text-content-muted">{field.suffix}</span>

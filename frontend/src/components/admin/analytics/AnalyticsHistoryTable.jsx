@@ -100,7 +100,7 @@ export default function AnalyticsHistoryTable({
                         <select
                             value={pagination.pageSize}
                             onChange={(event) => onPageSizeChange(Number(event.target.value))}
-                            className="rounded-xl border border-edge bg-surface px-3 py-2 dark:text-white"
+                            className="rounded-xl border border-edge bg-surface px-3 py-2 text-base sm:text-sm text-content"
                         >
                             {[10, 25, 50, 100].map((size) => (
                                 <option key={size} value={size}>{size} / halaman</option>

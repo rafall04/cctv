@@ -53,7 +53,7 @@ export default function CameraRecordingSection({ formData, isSubmitting, onChang
                         value={formData.recording_duration_hours || 5}
                         onChange={onChange}
                         disabled={isSubmitting}
-                        className="w-full px-3 py-2 bg-surface border border-edge-strong rounded-lg text-content text-sm focus:ring-2 focus:ring-red-500 disabled:opacity-50"
+                        className="w-full px-3 py-2 bg-surface border border-edge-strong rounded-lg text-content text-base sm:text-sm focus:ring-2 focus:ring-red-500 disabled:opacity-50"
                     >
                         {recordingDurationOptions.map((group) => (
                             <optgroup key={group.label} label={group.label}>
@@ -87,7 +87,7 @@ export default function CameraRecordingSection({ formData, isSubmitting, onChang
                         value={formData.public_playback_mode || 'inherit'}
                         onChange={onChange}
                         disabled={isSubmitting}
-                        className="w-full px-3 py-2 bg-surface border border-edge-strong rounded-lg text-content text-sm focus:ring-2 focus:ring-red-500 disabled:opacity-50"
+                        className="w-full px-3 py-2 bg-surface border border-edge-strong rounded-lg text-content text-base sm:text-sm focus:ring-2 focus:ring-red-500 disabled:opacity-50"
                     >
                         {PUBLIC_PLAYBACK_MODES.map((option) => (
                             <option key={option.value} value={option.value}>{option.label}</option>
@@ -105,7 +105,7 @@ export default function CameraRecordingSection({ formData, isSubmitting, onChang
                         value={formData.public_playback_preview_minutes ?? ''}
                         onChange={onChange}
                         disabled={isSubmitting}
-                        className="w-full px-3 py-2 bg-surface border border-edge-strong rounded-lg text-content text-sm focus:ring-2 focus:ring-red-500 disabled:opacity-50"
+                        className="w-full px-3 py-2 bg-surface border border-edge-strong rounded-lg text-content text-base sm:text-sm focus:ring-2 focus:ring-red-500 disabled:opacity-50"
                     >
                         {PUBLIC_PLAYBACK_PREVIEW_OPTIONS.map((option) => (
                             <option key={String(option.value)} value={option.value}>{option.label}</option>

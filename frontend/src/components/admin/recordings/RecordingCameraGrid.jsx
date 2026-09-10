@@ -202,7 +202,7 @@ function RecordingQuickEditCard({
                                         value={draft.recording_duration_hours}
                                         onChange={(event) => handleDraftChange('recording_duration_hours', event.target.value)}
                                         disabled={isSaving}
-                                        className="w-full rounded-lg border border-edge-strong bg-surface px-3 py-2 text-sm text-content focus:ring-2 focus:ring-red-500 disabled:opacity-50"
+                                        className="w-full rounded-lg border border-edge-strong bg-surface px-3 py-2 text-base sm:text-sm text-content focus:ring-2 focus:ring-red-500 disabled:opacity-50"
                                     >
                                         {recordingDurationOptions.map((group) => (
                                             <optgroup key={group.label} label={group.label}>

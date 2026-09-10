@@ -29,7 +29,7 @@ function DurationSelect({ id, value, onChange, disabled }) {
             value={value}
             onChange={(event) => onChange(Number(event.target.value))}
             disabled={disabled}
-            className="rounded-lg border border-edge-strong bg-surface px-3 py-2 text-sm text-content focus:ring-2 focus:ring-primary-500 disabled:opacity-50"
+            className="rounded-control border border-edge-strong bg-surface px-3 py-2 text-base sm:text-sm text-content focus:ring-2 focus:ring-primary-500 disabled:opacity-50"
         >
             {recordingDurationOptions.map((group) => (
                 <optgroup key={group.label} label={group.label}>
@@ -169,7 +169,7 @@ export default function RecordingRetentionManager({
         ? `${visibleSelected.length} kamera terpilih`
         : `${filteredIds.length} kamera${filtersActive ? ' (hasil filter)' : ''}`;
 
-    const controlClass = 'rounded-lg border border-edge-strong bg-surface px-3 py-2 text-sm text-content focus:ring-2 focus:ring-primary-500';
+    const controlClass = 'rounded-control border border-edge-strong bg-surface px-3 py-2 text-base sm:text-sm text-content focus:ring-2 focus:ring-primary-500';
 
     return (
         <div className="space-y-4">
