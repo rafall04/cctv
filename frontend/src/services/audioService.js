@@ -274,11 +274,18 @@ export const getActivePlays = async () => {
     } catch (error) { return failure(error, 'Gagal memuat status'); }
 };
 
-/** Stop playback: pass { all: true }, { cameraId }, or { cameraIds }. */
+/** Stop playback: pass { all: true } (also stops Bicara + Sirene), { cameraId }, or { cameraIds }. */
 export const stopPlay = async (payload) => {
     try {
         return (await apiClient.post(`${BASE}/play/stop`, payload)).data;
     } catch (error) { return failure(error, 'Gagal menghentikan'); }
+};
+
+/** Uji suara: putar klip pendek ke kamera untuk memastikan speaker benar-benar terdengar (bypass area). */
+export const testSpeaker = async ({ cameraIds, sourceId }) => {
+    try {
+        return (await apiClient.post(`${BASE}/play/test`, { cameraIds, sourceId })).data;
+    } catch (error) { return failure(error, 'Gagal menguji speaker'); }
 };
 
 /** Recent broadcasts + per-camera delivery receipt (Riwayat / Bukti siaran). */
@@ -314,6 +321,16 @@ export const setCameraImouSn = async (id, sn) => {
 export const cameraSiren = async (id, on) => {
     try { return (await apiClient.post(`${BASE}/cameras/${id}/siren`, { on })).data; }
     catch (error) { return failure(error, 'Gagal memicu sirene'); }
+};
+/** Cameras whose IMOU siren is currently ON. */
+export const getActiveSirens = async () => {
+    try { return (await apiClient.get(`${BASE}/imou/sirens`)).data; }
+    catch (error) { return failure(error, 'Gagal memuat status sirene'); }
+};
+/** Silence every siren that is currently ON. */
+export const stopAllSirens = async () => {
+    try { return (await apiClient.post(`${BASE}/imou/sirens/stop`)).data; }
+    catch (error) { return failure(error, 'Gagal mematikan sirene'); }
 };
 
 /* ----------------------------------------------------- motion -> deter audio */

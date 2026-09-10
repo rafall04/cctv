@@ -12,7 +12,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { toggleArea, recheckCameraCapability, recheckCapability, setCameraBlocked, setAreaPolicy } from '../../../services/audioService';
+import { toggleArea, recheckCameraCapability, recheckCapability, setCameraBlocked, setAreaPolicy, testSpeaker } from '../../../services/audioService';
 import { useNotification } from '../../../contexts/NotificationContext';
 import { Button, EmptyState } from '../../ui';
 import { capabilityInfo } from './audioFormatting';
@@ -82,10 +82,32 @@ function Badge({ supports, blocked }) {
     return <span className={`inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-xs font-medium ${cls}`}>{info.label}</span>;
 }
 
-export default function TargetsTab({ areas, capability, loading, reloadAreas, reloadCapability }) {
+export default function TargetsTab({ areas, capability, clips = [], loading, reloadAreas, reloadCapability }) {
     const [busyArea, setBusyArea] = useState(null);
     const [rechecking, setRechecking] = useState(null); // cameraId | 'all'
+    const [testClipId, setTestClipId] = useState('');
+    const [testing, setTesting] = useState(null); // cameraId | 'all-test'
     const { showNotification } = useNotification();
+
+    // AUDIBLE test (vs the silent "Cek" probe): actually play a short clip to the speaker so the operator
+    // hears it works in the field. Bypasses the area allowlist server-side, so testing before enabling works.
+    const onTest = async (cam) => {
+        if (!testClipId) { showNotification({ type: 'error', title: 'Pilih audio uji dulu' }); return; }
+        setTesting(cam.id);
+        const r = await testSpeaker({ cameraIds: [cam.id], sourceId: Number(testClipId) });
+        setTesting(null);
+        const ok = (r.data?.results || []).filter((x) => x && x.ok).length;
+        showNotification({ type: r.success && ok > 0 ? 'success' : 'error', title: cam.name, message: r.success ? (ok > 0 ? 'Uji terkirim — dengarkan speaker' : 'Gagal berbunyi') : r.message });
+    };
+    const onTestAll = async () => {
+        if (!testClipId) { showNotification({ type: 'error', title: 'Pilih audio uji dulu' }); return; }
+        const ids = capability.filter((c) => c.supports_audio_out === 1 && !c.audio_out_blocked).map((c) => c.id);
+        if (ids.length === 0) { showNotification({ type: 'error', title: 'Tak ada kamera didukung untuk diuji' }); return; }
+        setTesting('all-test');
+        const r = await testSpeaker({ cameraIds: ids, sourceId: Number(testClipId) });
+        setTesting(null);
+        showNotification({ type: r.success ? 'success' : 'error', title: 'Uji semua', message: r.message });
+    };
 
     // The probe runs in the BACKGROUND (initial sweep / after enabling an area / manual recheck), so poll
     // while this tab is open to let capability results ("Didukung"/"Tak didukung") land on their own.
@@ -226,6 +248,18 @@ export default function TargetsTab({ areas, capability, loading, reloadAreas, re
                     <Button onClick={onRecheckAll} loading={rechecking === 'all'} disabled={enabledCount === 0}>Cek ulang semua</Button>
                 </div>
 
+                {/* Uji suara NYATA (bukan probe senyap): putar klip pendek ke speaker agar terdengar di lapangan. */}
+                {clips.length > 0 && capability.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-2 rounded-control border border-edge bg-surface-sunken p-2">
+                        <span className="text-xs font-medium text-content-muted">🔊 Uji suara:</span>
+                        <select value={testClipId} onChange={(e) => setTestClipId(e.target.value)} className="min-w-0 flex-1 rounded-control border border-edge bg-surface px-2 py-1 text-sm text-content sm:w-52 sm:flex-none">
+                            <option value="">— pilih audio uji —</option>
+                            {clips.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        </select>
+                        <button type="button" onClick={onTestAll} disabled={!testClipId || testing === 'all-test'} className="rounded-control border border-edge bg-surface px-2.5 py-1.5 text-xs font-medium text-content-muted hover:border-edge-strong disabled:opacity-40">{testing === 'all-test' ? '…' : 'Uji semua didukung'}</button>
+                    </div>
+                )}
+
                 {/* Peta status titik siaran (read-only) — ringkasan dari data yang sudah ada. */}
                 {capability.length > 0 && (
                     <div className="flex flex-wrap gap-2 text-xs">
@@ -270,6 +304,15 @@ export default function TargetsTab({ areas, capability, loading, reloadAreas, re
                                             </button>
                                         ) : (
                                             <div className="flex shrink-0 items-center gap-1.5">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => onTest(cam)}
+                                                    disabled={testing === cam.id || !testClipId}
+                                                    title={testClipId ? 'Putar audio uji ke speaker ini' : 'Pilih audio uji di atas dulu'}
+                                                    className="rounded-control border border-edge bg-surface px-2.5 py-1.5 text-sm font-medium text-content-muted transition-colors hover:border-primary hover:text-primary disabled:opacity-40"
+                                                >
+                                                    {testing === cam.id ? '…' : '🔊 Uji'}
+                                                </button>
                                                 <button
                                                     type="button"
                                                     onClick={() => onRecheckOne(cam)}

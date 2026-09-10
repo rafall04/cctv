@@ -217,6 +217,7 @@ export default function AudioBroadcast() {
                     <TargetsTab
                         areas={areas}
                         capability={capability}
+                        clips={clips}
                         loading={loading}
                         reloadAreas={reloadAreas}
                         reloadCapability={reloadCapability}

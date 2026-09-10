@@ -110,15 +110,51 @@ async function setSiren(sn, on) {
     return rpc('setDeviceCameraStatus', { token, deviceId: sn, channelId: '0', enableType: 'siren', enable: Boolean(on) });
 }
 
-/** Turn a camera's built-in siren on/off by our camera id (resolves its IMOU SN). */
+// In-memory active-siren tracker (valid on the single/primary worker, like cameraAudioLock). It exists for
+// two safety reasons the cloud toggle lacks: (1) AUTO-OFF so a lost OFF call (cloud 502, tab closed) can't
+// leave a siren wailing forever; (2) a global STOP / "matikan semua sirene" can silence them all at once.
+const activeSirens = new Map(); // cameraId -> { sn, name, since, timer }
+const SIREN_AUTO_OFF_MS = Math.max(5, parseInt(process.env.AUDIO_SIREN_AUTO_OFF_SEC || '60', 10)) * 1000;
+
+/** Turn a camera's built-in siren on/off by our camera id (resolves its IMOU SN). ON schedules auto-off. */
 export async function triggerCameraSiren(cameraId, on) {
     const cam = queryOne('SELECT id, name, imou_sn FROM cameras WHERE id = ?', [parseInt(cameraId, 10)]);
     if (!cam) { const e = new Error('Kamera tidak ditemukan'); e.statusCode = 404; throw e; }
     if (!cam.imou_sn) { const e = new Error('Kamera belum dipetakan ke SN IMOU'); e.statusCode = 400; throw e; }
+    const prev = activeSirens.get(cam.id);
+    if (prev && prev.timer) clearTimeout(prev.timer);
     await setSiren(cam.imou_sn, on);
-    return { id: cam.id, name: cam.name, siren: Boolean(on) };
+    if (on) {
+        const timer = setTimeout(() => {
+            setSiren(cam.imou_sn, false).catch((e) => console.error('[IMOU] sirene auto-off gagal:', e.message));
+            activeSirens.delete(cam.id);
+        }, SIREN_AUTO_OFF_MS);
+        if (timer.unref) timer.unref();
+        activeSirens.set(cam.id, { sn: cam.imou_sn, name: cam.name, since: Date.now(), timer });
+    } else {
+        activeSirens.delete(cam.id);
+    }
+    return { id: cam.id, name: cam.name, siren: Boolean(on), autoOffSec: on ? SIREN_AUTO_OFF_MS / 1000 : null };
+}
+
+/** Silence every siren currently ON. Returns how many were turned off. */
+export async function stopAllSirens() {
+    const list = [...activeSirens.values()];
+    activeSirens.clear();
+    let n = 0;
+    for (const s of list) {
+        if (s.timer) clearTimeout(s.timer);
+        try { await setSiren(s.sn, false); n += 1; } catch (e) { console.error('[IMOU] stop-all sirene gagal:', e.message); }
+    }
+    return n;
+}
+
+/** Cameras whose siren is currently ON (for the UI status + elapsed indicator). */
+export function listActiveSirens() {
+    return [...activeSirens.entries()].map(([id, s]) => ({ id, name: s.name, since: s.since }));
 }
 
 export default {
-    getConfig, configStatus, setConfig, listDevices, testConnection, setCameraSn, listSirenCameras, triggerCameraSiren,
+    getConfig, configStatus, setConfig, listDevices, testConnection, setCameraSn, listSirenCameras,
+    triggerCameraSiren, stopAllSirens, listActiveSirens,
 };

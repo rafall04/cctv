@@ -14,7 +14,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { getImouConfig, setImouConfig, testImou, getImouDevices, setCameraImouSn, cameraSiren } from '../../../services/audioService';
+import { getImouConfig, setImouConfig, testImou, getImouDevices, setCameraImouSn, cameraSiren, getActiveSirens, stopAllSirens } from '../../../services/audioService';
 import { useNotification } from '../../../contexts/NotificationContext';
 import { useConfirm } from '../../../contexts/ConfirmContext';
 import { Button, Field } from '../../ui';
@@ -43,6 +43,7 @@ export default function SirenControl() {
     const [devices, setDevices] = useState(null);
     const [busy, setBusy] = useState(null);
     const [snEdits, setSnEdits] = useState({}); // camId -> pending SN (unsaved)
+    const [activeSirens, setActiveSirens] = useState([]);
     const { showNotification } = useNotification();
     const confirm = useConfirm();
 
@@ -51,6 +52,24 @@ export default function SirenControl() {
         if (r.success) setCfg(r.data);
     }, []);
     useEffect(() => { load(); }, [load]);
+
+    // Poll which sirens are currently ON so the operator always sees a live one and can silence it.
+    const loadSirens = useCallback(async () => {
+        const r = await getActiveSirens();
+        if (r.success) setActiveSirens(r.data || []);
+    }, []);
+    useEffect(() => {
+        if (!cfg?.configured) return undefined;
+        loadSirens();
+        const t = setInterval(loadSirens, 8000);
+        return () => clearInterval(t);
+    }, [cfg, loadSirens]);
+
+    const silenceAll = async () => {
+        const r = await stopAllSirens();
+        if (r.success) { showNotification({ type: 'success', title: r.message || 'Sirene dimatikan' }); loadSirens(); }
+        else showNotification({ type: 'error', title: 'Gagal', message: r.message });
+    };
 
     // Auto-match unmapped cameras against the loaded device list (pending edits, not saved).
     const autoMatch = useCallback((devs, cams) => {
@@ -131,6 +150,7 @@ export default function SirenControl() {
         const r = await cameraSiren(cam.id, on);
         setBusy(null);
         showNotification({ type: r.success ? (on ? 'warning' : 'success') : 'error', title: r.success ? (on ? 'Sirene menyala' : 'Sirene mati') : 'Gagal', message: r.message });
+        loadSirens();
     };
 
     const pendingCount = useMemo(
@@ -144,8 +164,15 @@ export default function SirenControl() {
         <section className="space-y-3 rounded-card border border-edge bg-surface p-4 shadow-e1">
             <div>
                 <h3 className="text-sm font-semibold text-content">🔊 Sirene native (IMOU Cloud)</h3>
-                <p className="mt-0.5 text-xs text-content-muted">Sirene bawaan kamera — jauh lebih keras dari jalur suara biasa. Lewat cloud IMOU (butuh internet + kamera ter-bind di IMOU Life). Kredensial juga bisa diatur di Pengaturan → Integrasi & Kunci API.</p>
+                <p className="mt-0.5 text-xs text-content-muted">Sirene bawaan kamera — jauh lebih keras dari jalur suara biasa. Lewat cloud IMOU (butuh internet + kamera ter-bind di IMOU Life). Kredensial juga bisa diatur di Pengaturan → Integrasi & Kunci API. Sirene mati otomatis setelah beberapa saat sebagai pengaman.</p>
             </div>
+
+            {activeSirens.length > 0 && (
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-control border-2 border-status-fault bg-status-fault/10 px-3 py-2">
+                    <span className="text-sm font-bold text-status-fault">🔊 {activeSirens.length} sirene MENYALA: {activeSirens.map((s) => s.name).join(', ')}</span>
+                    <button type="button" onClick={silenceAll} className="shrink-0 rounded-control border-2 border-status-fault bg-surface px-3 py-1.5 text-sm font-bold text-status-fault hover:bg-status-fault/20">🔇 Matikan semua sirene</button>
+                </div>
+            )}
 
             {/* Credentials */}
             {!cfg.configured ? (

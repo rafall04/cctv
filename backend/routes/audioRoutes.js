@@ -17,13 +17,13 @@ import {
     listCameras, playNow,
     listCapability, recheckCapability, recheckCameraCapability, listAreas, toggleArea, blockCamera,
     setAreaPolicyHandler, listTemplates, createTemplate, updateTemplate, deleteTemplate,
-    importClip, listImportJobs, talkTicket, listActivePlays, stopPlay, listPlayHistory,
+    importClip, listImportJobs, talkTicket, listActivePlays, stopPlay, listPlayHistory, testSpeaker,
     listGroups, createGroup, updateGroup, deleteGroup,
     listSoundboard, createSoundboardButton, updateSoundboardButton, deleteSoundboardButton,
     listEmergencyPresets, createEmergencyPreset, updateEmergencyPreset, deleteEmergencyPreset, playEmergency,
     getPrayerConfig, updatePrayerConfig, getPrayerTimes,
     listMotionArms, setMotionArmHandler, disarmMotionHandler,
-    getImouConfig, setImouConfig, testImou, listImouDevices, setCameraImouSn, cameraSiren,
+    getImouConfig, setImouConfig, testImou, listImouDevices, setCameraImouSn, cameraSiren, listSirens, stopSirens,
     listTtsEngines, createTts, previewTts, getTtsConfig, setTtsConfig,
 } from '../controllers/audioController.js';
 import fastifyWebsocket from '@fastify/websocket';
@@ -97,7 +97,8 @@ export default async function audioRoutes(fastify) {
     // Play-now + stop
     fastify.post('/play', admin, playNow);
     fastify.get('/play/active', admin, listActivePlays);
-    fastify.post('/play/stop', admin, stopPlay);
+    fastify.post('/play/stop', admin, stopPlay);       // all=true stops clips + talk + sirens (kill-switch)
+    fastify.post('/play/test', admin, testSpeaker);    // uji suara: putar klip pendek ke kamera (bypass area)
     fastify.get('/play/history', admin, listPlayHistory);
 
     // Emergency (preempting, quiet-hours-bypassing) broadcast + presets
@@ -119,6 +120,8 @@ export default async function audioRoutes(fastify) {
     fastify.get('/imou/devices', admin, listImouDevices);
     fastify.patch('/cameras/:id/imou-sn', admin, setCameraImouSn);
     fastify.post('/cameras/:id/siren', admin, cameraSiren);
+    fastify.get('/imou/sirens', admin, listSirens);       // sirene yang sedang menyala
+    fastify.post('/imou/sirens/stop', admin, stopSirens); // matikan semua sirene
 
     // Motion -> deterrent audio (armed per camera; heavily guarded)
     fastify.get('/motion/arms', admin, listMotionArms);

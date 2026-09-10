@@ -95,9 +95,16 @@ export default function TalkTab({ cameras }) {
             ws.onmessage = (ev) => {
                 try {
                     const m = JSON.parse(ev.data);
-                    if (m.type === 'ready') setState('onair');
-                    else if (m.type === 'error') { showNotification({ type: 'error', title: m.message || 'Ditolak' }); stop(); }
-                    else if (m.type === 'ended') stop();
+                    if (m.type === 'ready') {
+                        // Only NOW are the speakers actually connected — start sending frames (gated below)
+                        // so the operator's first words aren't pushed into a not-yet-open channel.
+                        refs.current.onair = true;
+                        setState('onair');
+                        if (typeof m.count === 'number' && m.count < cameraIds.length) {
+                            showNotification({ type: 'warning', title: `${m.count}/${cameraIds.length} kamera tersambung`, message: 'Sebagian dilewati (sibuk / tak didukung).' });
+                        }
+                    } else if (m.type === 'error') { showNotification({ type: 'error', title: m.message || 'Ditolak' }); stop(); } else if (m.type === 'ended') stop();
+                    // 'connecting' → tetap di state 'connecting' (tombol "Menyambung…"), belum kirim suara.
                 } catch { /* non-JSON */ }
             };
             ws.onclose = () => stop();
@@ -124,7 +131,9 @@ export default function TalkTab({ cameras }) {
             try { node.port.postMessage({ gain: gainRef.current }); } catch { /* */ } // send initial mic gain
             node.port.onmessage = (e) => {
                 const r = refs.current;
-                if (!r.active || !r.ws || r.ws.readyState !== 1) return;
+                // Gate on `onair`: drop mic frames until the server confirms the speakers are connected,
+                // so the first words are never lost into a half-open channel.
+                if (!r.active || !r.onair || !r.ws || r.ws.readyState !== 1) return;
                 if (e.data.frame) { try { r.ws.send(e.data.frame); } catch { /* */ } setLevel(Math.min(1, e.data.level || 0)); }
             };
             srcNode.connect(node);

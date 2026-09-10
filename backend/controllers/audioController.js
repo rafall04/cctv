@@ -21,7 +21,7 @@ import {
     updateSchedule as updateScheduleRow, setEnabled as setScheduleEnabled,
     deleteSchedule as deleteScheduleRow,
 } from '../services/audioScheduleService.js';
-import { playToCameras, listPlaying, stopPlaying, stopAllPlaying } from '../services/audioCastService.js';
+import { playToCameras, testCamera, listPlaying, stopPlaying, stopAllPlaying } from '../services/audioCastService.js';
 import { listBroadcastTargets, listAreas as listAreaRows, setAreaEnabled, setAreaPolicy, quietTargets } from '../services/audioTargetService.js';
 import {
     listTemplates as listTemplateRows, createTemplate as createTemplateRow,
@@ -34,12 +34,13 @@ import {
     listGroups as listGroupRows, createGroup as createGroupRow,
     updateGroup as updateGroupRow, deleteGroup as deleteGroupRow,
 } from '../services/audioGroupService.js';
-import { mintTicket } from '../services/audioTalkService.js';
+import { mintTicket, stopAllTalk } from '../services/audioTalkService.js';
 import { getConfig as getPrayerCfg, setConfig as setPrayerCfg, todayTimes as prayerTodayTimes } from '../services/audioPrayerService.js';
 import { listArms as listMotionRows, setArm as setMotionArm, disarm as disarmMotion } from '../services/audioMotionService.js';
 import {
     configStatus as imouStatus, setConfig as imouSetConfig, listDevices as imouListDevices,
     testConnection as imouTest, setCameraSn as imouSetSn, listSirenCameras, triggerCameraSiren,
+    stopAllSirens, listActiveSirens,
 } from '../services/imouCloudService.js';
 import { logPlay, listHistory } from '../services/audioHistoryService.js';
 import {
@@ -525,16 +526,62 @@ export async function listActivePlays(request, reply) {
 export async function stopPlay(request, reply) {
     try {
         const { cameraId, cameraIds, all } = request.body || {};
-        let stopped = 0;
         if (all) {
-            stopped = stopAllPlaying();
-        } else {
-            const ids = cameraId ? [cameraId] : (Array.isArray(cameraIds) ? cameraIds : []);
-            ids.map((x) => parseId(x)).filter(Boolean).forEach((id) => { if (stopPlaying(id)) stopped += 1; });
+            // A true kill-switch: clips/playlists AND live push-to-talk AND cloud sirens (all separate
+            // subsystems). Before, "HENTIKAN SEMUA" left a stuck mic / a wailing siren running — dangerous.
+            const stopped = stopAllPlaying();
+            const talk = stopAllTalk();
+            let sirens = 0;
+            try { sirens = await stopAllSirens(); } catch (e) { console.error('[Audio] stop-all sirene gagal:', e.message); }
+            logAdminAction({ action: 'audio_play_stop', targetType: 'audio', all: true, stopped, talk, sirens, ...adminContext(request) }, request);
+            const parts = [];
+            if (stopped) parts.push(`${stopped} siaran`);
+            if (talk) parts.push(`${talk} bicara`);
+            if (sirens) parts.push(`${sirens} sirene`);
+            return reply.send({ success: true, message: parts.length ? `Dihentikan: ${parts.join(', ')}` : 'Tidak ada yang aktif', data: { stopped, talk, sirens } });
         }
+        let stopped = 0;
+        const ids = cameraId ? [cameraId] : (Array.isArray(cameraIds) ? cameraIds : []);
+        ids.map((x) => parseId(x)).filter(Boolean).forEach((id) => { if (stopPlaying(id)) stopped += 1; });
         logAdminAction({ action: 'audio_play_stop', targetType: 'audio', stopped, ...adminContext(request) }, request);
         return reply.send({ success: true, message: stopped ? `Dihentikan ${stopped} kamera` : 'Tidak ada yang diputar', data: { stopped } });
     } catch (error) { return fail(reply, error); }
+}
+
+// Play a short test clip to one or more cameras to confirm the speaker is actually audible in the field
+// (not just "supported" in the probe). Bypasses the area allowlist so a camera can be tested before its
+// area is enabled. Body: { cameraIds:[...], sourceId } (a clip id the operator picks).
+export async function testSpeaker(request, reply) {
+    try {
+        const ids = Array.isArray(request.body?.cameraIds) ? request.body.cameraIds : (request.body?.cameraId ? [request.body.cameraId] : []);
+        const sid = parseId(request.body?.sourceId);
+        if (!sid) return reply.code(400).send({ success: false, message: 'Pilih audio untuk uji dulu' });
+        const cleanIds = ids.map((x) => parseId(x)).filter(Boolean);
+        if (cleanIds.length === 0) return reply.code(400).send({ success: false, message: 'Pilih kamera untuk diuji' });
+        const results = [];
+        for (const id of cleanIds) {
+            // eslint-disable-next-line no-await-in-loop
+            results.push(await testCamera(id, 'clip', sid));
+        }
+        logAdminAction({ action: 'audio_test_speaker', targetType: 'audio', cameras: results.length, ok: results.filter((r) => r && r.ok).length, ...adminContext(request) }, request);
+        const ok = results.filter((r) => r && r.ok).length;
+        return reply.send({ success: true, message: `Uji terkirim ke ${ok}/${results.length} kamera`, data: { results } });
+    } catch (error) { return fail(reply, error, 'Gagal menguji speaker'); }
+}
+
+// Cameras whose IMOU siren is currently ON (status for the UI).
+export async function listSirens(request, reply) {
+    try { return reply.send({ success: true, data: listActiveSirens() }); }
+    catch (error) { return fail(reply, error); }
+}
+
+// Silence every siren that is currently ON.
+export async function stopSirens(request, reply) {
+    try {
+        const n = await stopAllSirens();
+        logAdminAction({ action: 'audio_imou_siren_stop_all', targetType: 'audio_imou', stopped: n, ...adminContext(request) }, request);
+        return reply.send({ success: true, message: n ? `${n} sirene dimatikan` : 'Tidak ada sirene aktif', data: { stopped: n } });
+    } catch (error) { return fail(reply, error, 'Gagal mematikan sirene'); }
 }
 
 /* ---------------------------------------------------- broadcast history (receipts) */

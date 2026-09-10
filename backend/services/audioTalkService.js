@@ -34,10 +34,20 @@ const MAX_FRAME_BYTES = 4096;          // a 20ms u-law frame is 320B; anything h
 const MAX_TALK_CAMERAS = Math.max(1, parseInt(process.env.AUDIO_MAX_TALK || '4', 10));
 
 const tickets = new Map(); // ticket -> { cameraIds:[], adminUserId, expiresAt }
+const activeStops = new Set(); // stopAll fns of LIVE paging sessions — so a global STOP can kill talk too
+const READY_GRACE_MS = 2500;   // hold the browser 'ready' until pushers connect (else first words are cut)
 
 function sweepTickets() {
     const now = Date.now();
     for (const [t, v] of tickets) if (v.expiresAt < now) tickets.delete(t);
+}
+
+/** Stop every live push-to-talk session now. Wired into the global "HENTIKAN SEMUA" so a stuck mic /
+ *  runaway paging can be killed from any admin device (talk sessions live outside the clip `playing` map). */
+export function stopAllTalk() {
+    let n = 0;
+    for (const stop of [...activeStops]) { try { stop('stop-all'); n += 1; } catch { /* already gone */ } }
+    return n;
 }
 
 /**
@@ -127,6 +137,7 @@ export function talkHandler(socket, req) {
     function stopAll(reason) {
         if (stopped) return;
         stopped = true;
+        activeStops.delete(stopAll);
         clearInterval(idleTimer);
         clearTimeout(hardCap);
         for (const s of sessions.slice()) {
@@ -154,8 +165,23 @@ export function talkHandler(socket, req) {
 
     const idleTimer = setInterval(() => { if (Date.now() - lastFrame > IDLE_MS) stopAll('idle'); }, 5000);
     const hardCap = setTimeout(() => stopAll('hard-cap'), HARD_CAP_MS);
-    try { socket.send(JSON.stringify({ type: 'ready', cameras: sessions.map((s) => s.name), count: sessions.length })); } catch { /* */ }
+    activeStops.add(stopAll); // register for the global STOP
+
+    // Tell the browser we are connecting, then HOLD 'ready' until the pushers report READY (their RTSP
+    // handshake to the speaker finished) or a short grace elapses — otherwise the operator starts talking
+    // before the channel is open and the first words are lost. audio_talk.py prints 'READY' -> s.ready.
+    try { socket.send(JSON.stringify({ type: 'connecting', count: sessions.length })); } catch { /* */ }
+    const readyDeadline = Date.now() + READY_GRACE_MS;
+    const readyTimer = setInterval(() => {
+        if (stopped) { clearInterval(readyTimer); return; }
+        const allReady = sessions.length > 0 && sessions.every((s) => s.ready);
+        if (allReady || Date.now() >= readyDeadline) {
+            clearInterval(readyTimer);
+            lastFrame = Date.now(); // reset idle clock so the grace wait doesn't count against it
+            try { socket.send(JSON.stringify({ type: 'ready', cameras: sessions.map((s) => s.name), count: sessions.length })); } catch { /* */ }
+        }
+    }, 100);
     console.log(`[AudioTalk] Session start ${sessions.length} camera(s) by admin ${t.adminUserId}`);
 }
 
-export default { mintTicket, talkHandler };
+export default { mintTicket, talkHandler, stopAllTalk };
