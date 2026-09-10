@@ -21,6 +21,7 @@ import { randomBytes } from 'crypto';
 import { dirname, join } from 'path';
 import { queryOne, execute } from '../database/connectionPool.js';
 import { AUDIO_DIR, ensureAudioDir } from './audioClipService.js';
+import { getAppOffsetMinutes } from './timezoneService.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -142,6 +143,32 @@ function engineNotReady(engine) {
     const e = new Error(msg); e.statusCode = 501; return e;
 }
 
+const DAYS_ID = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+const MONTHS_ID = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+
+/**
+ * Fill DYNAMIC placeholders with the current local date/time at SYNTHESIS time, so a template like
+ * "Hari ini {hari} {tanggal}, pukul {jam}, diberitahukan…" speaks the real date without the operator
+ * retyping it. Uses the app timezone. Case-insensitive. Unknown {placeholders} are left for the fill-in UI
+ * (or dropped by normalizeForSpeech). Kept SEPARATE from the manual fill-in so both can be used together.
+ */
+export function expandDynamicVars(text, nowMs = Date.now()) {
+    const s = String(text || '');
+    if (!/\{\s*(jam|hari|tanggal|tanggal_lengkap)\s*\}/i.test(s)) return s;
+    let off = 420;
+    try { off = getAppOffsetMinutes(nowMs); } catch { off = 420; }
+    const d = new Date(nowMs + off * 60000);
+    const p2 = (n) => String(n).padStart(2, '0');
+    const jam = `${p2(d.getUTCHours())}.${p2(d.getUTCMinutes())}`;
+    const hari = DAYS_ID[d.getUTCDay()];
+    const tanggal = `${d.getUTCDate()} ${MONTHS_ID[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+    return s
+        .replace(/\{\s*jam\s*\}/gi, jam)
+        .replace(/\{\s*hari\s*\}/gi, hari)
+        .replace(/\{\s*tanggal_lengkap\s*\}/gi, `${hari}, ${tanggal}`)
+        .replace(/\{\s*tanggal\s*\}/gi, tanggal);
+}
+
 // Make written PA text SPEAK naturally (piper/edge read symbols literally otherwise):
 //  - drop any unfilled {placeholder} so it is never read aloud as "nama" (belt-and-suspenders; the fill-in
 //    UI already substitutes them),
@@ -155,8 +182,9 @@ export function normalizeForSpeech(s) {
 }
 
 function cleanText(text) {
-    // Normalise for speech, then collapse whitespace (also flattens any stray control char) + trim.
-    const t = normalizeForSpeech(text).replace(/\s+/g, ' ').trim();
+    // Fill dynamic date/time placeholders FIRST (so {jam}/{tanggal}/{hari} become real values), then
+    // normalise for speech + collapse whitespace + trim. normalizeForSpeech drops any leftover {…}.
+    const t = normalizeForSpeech(expandDynamicVars(text)).replace(/\s+/g, ' ').trim();
     if (!t) { const err = new Error('Teks wajib diisi'); err.statusCode = 400; throw err; }
     if (t.length > MAX_TTS_CHARS) { const err = new Error(`Teks melebihi ${MAX_TTS_CHARS} karakter`); err.statusCode = 400; throw err; }
     return t;

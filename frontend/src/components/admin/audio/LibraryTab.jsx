@@ -138,7 +138,10 @@ export default function LibraryTab({ clips, loading, reload, onPlayClip }) {
     // Fill-in-the-blank: parse {placeholder} tokens so the operator fills a FIELD (replacing EVERY
     // occurrence at once) instead of hand-editing raw text — a missed {nama} would otherwise be spoken.
     const PLACEHOLDER_RE = /\{([^{}]+)\}/g;
-    const parsePlaceholders = (body) => [...new Set((String(body).match(PLACEHOLDER_RE) || []).map((m) => m.slice(1, -1)))];
+    // Dynamic vars are filled by the server at synth time (current date/time) — not manual fill-in fields.
+    const DYNAMIC_VARS = ['jam', 'hari', 'tanggal', 'tanggal_lengkap'];
+    const isDynamic = (k) => DYNAMIC_VARS.includes(String(k).trim().toLowerCase());
+    const parsePlaceholders = (body) => [...new Set((String(body).match(PLACEHOLDER_RE) || []).map((m) => m.slice(1, -1)).filter((k) => !isDynamic(k)))];
     const substitute = (body, fills) => String(body).replace(PLACEHOLDER_RE, (m, k) => (fills[k] && fills[k].trim() ? fills[k].trim() : m));
     const placeholders = tplBody ? parsePlaceholders(tplBody) : [];
 
@@ -226,8 +229,10 @@ export default function LibraryTab({ clips, loading, reload, onPlayClip }) {
     const handleTts = async (event) => {
         event.preventDefault();
         if (!ttsText.trim()) { showNotification({ type: 'error', title: 'Tulis teksnya dulu' }); return; }
-        // Catch a missed {placeholder} before it becomes silent/garbled speech.
-        if (/\{[^{}]+\}/.test(ttsText)) {
+        // Catch a missed {placeholder} before it becomes silent/garbled speech — but IGNORE the dynamic
+        // vars ({jam}/{hari}/{tanggal}), which the server fills at synth time.
+        const leftover = ttsText.replace(/\{\s*(jam|hari|tanggal|tanggal_lengkap)\s*\}/gi, '');
+        if (/\{[^{}]+\}/.test(leftover)) {
             const ok = await confirm({
                 title: 'Masih ada bagian belum diisi',
                 message: 'Ada bagian {…} yang belum diisi — bagian itu tidak akan dibacakan. Tetap buat suara?',
@@ -435,6 +440,9 @@ export default function LibraryTab({ clips, loading, reload, onPlayClip }) {
                     placeholder="Ketik pengumuman… mis. 'Diberitahukan kepada seluruh warga, kerja bakti akan dilaksanakan besok pagi pukul tujuh.'"
                     className="w-full rounded-control border border-edge bg-surface px-3 py-2 text-sm text-content focus:border-primary focus:outline-none"
                 />
+                <p className="text-xs text-content-subtle">
+                    Variabel otomatis: <span className="font-mono text-content-muted">{'{jam}'}</span> <span className="font-mono text-content-muted">{'{hari}'}</span> <span className="font-mono text-content-muted">{'{tanggal}'}</span> — terisi sendiri dengan tanggal/jam saat suara dibuat.
+                </p>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                     <div className="min-w-0">
                         <span className="mb-1.5 block text-xs font-semibold text-content-muted">Mesin suara</span>

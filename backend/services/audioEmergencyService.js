@@ -12,6 +12,7 @@ SideEffects: writes audio_emergency_presets; spawns preempting broadcasts on fir
 import { query, queryOne, execute } from '../database/connectionPool.js';
 import { listBroadcastTargets } from './audioTargetService.js';
 import { playToCameras } from './audioCastService.js';
+import { triggerCameraSiren } from './imouCloudService.js';
 
 const MAX_EMERGENCY_CAMERAS = Math.max(1, parseInt(process.env.AUDIO_MAX_EMERGENCY || '12', 10));
 
@@ -49,9 +50,9 @@ export function listPresets() {
 export function createPreset(data) {
     const v = validate(data);
     const info = execute(
-        `INSERT INTO audio_emergency_presets (label, source_type, source_id, target_kind, area_id, camera_ids, loop, gain_db, created_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [v.cleanLabel, v.sourceType, v.sid, v.kind, v.aid, JSON.stringify(v.ids), v.n, clampGain(data.gain_db), data.userId ?? null],
+        `INSERT INTO audio_emergency_presets (label, source_type, source_id, target_kind, area_id, camera_ids, loop, gain_db, siren, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [v.cleanLabel, v.sourceType, v.sid, v.kind, v.aid, JSON.stringify(v.ids), v.n, clampGain(data.gain_db), data.siren ? 1 : 0, data.userId ?? null],
     );
     return decorate(queryOne('SELECT * FROM audio_emergency_presets WHERE id = ?', [info.lastInsertRowid]));
 }
@@ -71,9 +72,10 @@ export function updatePreset(id, data) {
     };
     const v = validate(merged);
     const gain = data.gain_db !== undefined ? clampGain(data.gain_db) : existing.gain_db;
+    const siren = data.siren !== undefined ? (data.siren ? 1 : 0) : existing.siren;
     execute(
-        'UPDATE audio_emergency_presets SET label = ?, source_type = ?, source_id = ?, target_kind = ?, area_id = ?, camera_ids = ?, loop = ?, gain_db = ? WHERE id = ?',
-        [v.cleanLabel, v.sourceType, v.sid, v.kind, v.aid, JSON.stringify(v.ids), v.n, gain, pid],
+        'UPDATE audio_emergency_presets SET label = ?, source_type = ?, source_id = ?, target_kind = ?, area_id = ?, camera_ids = ?, loop = ?, gain_db = ?, siren = ? WHERE id = ?',
+        [v.cleanLabel, v.sourceType, v.sid, v.kind, v.aid, JSON.stringify(v.ids), v.n, gain, siren, pid],
     );
     return decorate(queryOne('SELECT * FROM audio_emergency_presets WHERE id = ?', [pid]));
 }
@@ -104,12 +106,20 @@ export function resolveTargets({ targetKind, areaId, cameraIds }) {
  * Fire an emergency: PREEMPT the resolved supported cameras and play the source now, bypassing quiet
  * hours + the governor cap. Returns { results, ids }. Throws 400 if nothing to target.
  */
-export async function fireEmergency({ sourceType = 'clip', sourceId, targetKind, areaId, cameraIds, loop = 3, gainDb = 0 }) {
+export async function fireEmergency({ sourceType = 'clip', sourceId, targetKind, areaId, cameraIds, loop = 3, gainDb = 0, siren = false }) {
     const ids = resolveTargets({ targetKind, areaId, cameraIds });
     if (ids.length === 0) { const e = new Error('Tak ada kamera didukung untuk target darurat ini'); e.statusCode = 400; throw e; }
     const { results } = await playToCameras(ids, sourceType, parseInt(sourceId, 10),
         Math.min(Math.max(parseInt(loop, 10) || 3, 1), 20), { preempt: true, gainDb: clampGain(gainDb) });
-    return { results, ids };
+    // One-tap panic: also raise the built-in siren on any target that has an IMOU SN (auto-off protects it).
+    let sirens = 0;
+    if (siren) {
+        const sirenCams = query(`SELECT id FROM cameras WHERE id IN (${ids.map(() => '?').join(',')}) AND imou_sn IS NOT NULL AND imou_sn != ''`, ids);
+        for (const c of sirenCams) {
+            try { await triggerCameraSiren(c.id, true); sirens += 1; } catch (e) { console.error('[Darurat] sirene gagal:', e.message); }
+        }
+    }
+    return { results, ids, sirens };
 }
 
 export default { listPresets, createPreset, updatePreset, deletePreset, resolveTargets, fireEmergency, MAX_EMERGENCY_CAMERAS };

@@ -740,21 +740,21 @@ export async function deleteEmergencyPreset(request, reply) {
  */
 export async function playEmergency(request, reply) {
     try {
-        const { sourceType, sourceId, targetKind, areaId, cameraIds, loop, gainDb, confirm } = request.body || {};
+        const { sourceType, sourceId, targetKind, areaId, cameraIds, loop, gainDb, siren, confirm } = request.body || {};
         if (confirm !== true) {
             return reply.code(409).send({ success: false, requiresConfirm: true, message: 'Siaran DARURAT butuh konfirmasi eksplisit.' });
         }
         const sid = parseId(sourceId);
         if (!sid) return reply.code(400).send({ success: false, message: 'Pilih audio darurat dulu' });
-        const { results, ids } = await fireEmergency({ sourceType: sourceType || 'clip', sourceId: sid, targetKind, areaId, cameraIds, loop, gainDb });
+        const { results, ids, sirens } = await fireEmergency({ sourceType: sourceType || 'clip', sourceId: sid, targetKind, areaId, cameraIds, loop, gainDb, siren });
         const sourceName = (sourceType || 'clip') === 'clip' ? getClip(sid)?.name : getPlaylistRow(sid)?.name;
         logPlay({
             sourceType: sourceType || 'clip', sourceId: sid, sourceName: `DARURAT: ${sourceName || `#${sid}`}`,
             cameraIds: ids, results, operatorId: request.user?.id ?? null, operatorName: request.user?.username ?? null,
         });
-        logAdminAction({ action: 'audio_emergency_fired', targetType: 'audio', targetId: sid, cameras: results.length, ...adminContext(request) }, request);
+        logAdminAction({ action: 'audio_emergency_fired', targetType: 'audio', targetId: sid, cameras: results.length, siren: Boolean(siren), ...adminContext(request) }, request);
         const okCount = results.filter((r) => r.ok).length;
-        return reply.send({ success: true, message: `DARURAT diputar ke ${okCount}/${results.length} kamera`, data: { results } });
+        return reply.send({ success: true, message: `DARURAT diputar ke ${okCount}/${results.length} kamera${sirens ? ` + ${sirens} sirene` : ''}`, data: { results, sirens } });
     } catch (error) { return fail(reply, error, 'Gagal menyiarkan darurat'); }
 }
 
