@@ -348,6 +348,51 @@ export default function PrayerConfig({ clips, areas }) {
                 )}
             </div>
 
+            {/* Mode Ramadan: imsak + sahur (buka puasa = adzan Maghrib). */}
+            <div className="space-y-3 rounded-control border border-edge bg-surface-sunken p-3">
+                <label className="flex cursor-pointer items-start justify-between gap-3">
+                    <span className="min-w-0">
+                        <span className="text-sm font-semibold text-content">🌙 Mode Ramadan</span>
+                        <span className="mt-0.5 block text-xs text-content-muted">Pengumuman Imsak (di jam imsak, menjelang Subuh) &amp; pengingat Sahur. Buka puasa = adzan Maghrib.</span>
+                    </span>
+                    <span
+                        role="switch" aria-checked={Boolean(cfg.ramadan_enabled)}
+                        onClick={() => set({ ramadan_enabled: cfg.ramadan_enabled ? 0 : 1 })}
+                        className={`relative mt-0.5 h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors ${cfg.ramadan_enabled ? 'bg-status-live' : 'bg-edge-strong'}`}
+                    >
+                        <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-surface shadow transition-all ${cfg.ramadan_enabled ? 'left-[22px]' : 'left-0.5'}`} />
+                    </span>
+                </label>
+
+                {Boolean(cfg.ramadan_enabled) && (
+                    <>
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <Field type="date" label="Mulai (opsional)" value={cfg.ramadan_start || ''} onChange={(e) => set({ ramadan_start: e.target.value })} hint="kosong = tanpa batas" />
+                            <Field type="date" label="Selesai (opsional)" value={cfg.ramadan_end || ''} onChange={(e) => set({ ramadan_end: e.target.value })} hint="mati sendiri setelah tanggal ini" />
+                        </div>
+                        <Field as="select" label="Audio Imsak" value={cfg.imsak_clip_id || ''} onChange={(e) => set({ imsak_clip_id: e.target.value })}>
+                            <option value="">— tanpa pengumuman imsak —</option>
+                            {clips.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        </Field>
+                        <div className="space-y-2 rounded-control border border-edge bg-surface p-2">
+                            <label className="flex cursor-pointer items-center gap-2 text-sm text-content">
+                                <input type="checkbox" checked={Boolean(cfg.sahur_enabled)} onChange={(e) => set({ sahur_enabled: e.target.checked ? 1 : 0 })} className="h-4 w-4 accent-primary" />
+                                Pengingat Sahur (bangunkan warga)
+                            </label>
+                            {Boolean(cfg.sahur_enabled) && (
+                                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                    <Field type="time" label="Jam sahur" value={cfg.sahur_time || '03:00'} onChange={(e) => set({ sahur_time: e.target.value })} />
+                                    <Field as="select" label="Audio sahur" value={cfg.sahur_clip_id || ''} onChange={(e) => set({ sahur_clip_id: e.target.value })}>
+                                        <option value="">— pilih audio —</option>
+                                        {clips.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                    </Field>
+                                </div>
+                            )}
+                        </div>
+                    </>
+                )}
+            </div>
+
             {/* Advanced params */}
             <div>
                 <button type="button" onClick={() => setAdvanced((v) => !v)} className="text-xs font-medium text-primary hover:underline">{advanced ? 'Sembunyikan' : 'Parameter lanjutan'}</button>

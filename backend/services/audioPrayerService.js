@@ -81,7 +81,9 @@ export function setConfig(fields = {}) {
             clip_id=?, clip_id_fajr=?, target_kind=?, area_id=?, camera_ids=?, loop=?, gain_db=?,
             qori_enabled=?, qori_clip_id=?, qori_clip_id_fajr=?, qori_loop=?,
             qori_lead_fajr=?, qori_lead_dhuhr=?, qori_lead_asr=?, qori_lead_maghrib=?, qori_lead_isha=?,
-            jumat_dhuhr_mode=?, jumat_dhuhr_clip_id=?, imsak_offset=?
+            jumat_dhuhr_mode=?, jumat_dhuhr_clip_id=?, imsak_offset=?,
+            ramadan_enabled=?, ramadan_start=?, ramadan_end=?, imsak_clip_id=?,
+            sahur_enabled=?, sahur_time=?, sahur_clip_id=?
          WHERE id = 1`,
         [
             fields.enabled !== undefined ? (fields.enabled ? 1 : 0) : cur.enabled,
@@ -113,6 +115,14 @@ export function setConfig(fields = {}) {
             ['normal', 'skip', 'custom'].includes(f.jumat_dhuhr_mode) ? f.jumat_dhuhr_mode : (cur.jumat_dhuhr_mode || 'normal'),
             fields.jumat_dhuhr_clip_id !== undefined ? (parseInt(fields.jumat_dhuhr_clip_id, 10) || null) : (cur.jumat_dhuhr_clip_id ?? null),
             Math.round(numOr(f.imsak_offset, cur.imsak_offset ?? 10, 0, 60)),
+            // Ramadan layer
+            fields.ramadan_enabled !== undefined ? (fields.ramadan_enabled ? 1 : 0) : (cur.ramadan_enabled ?? 0),
+            fields.ramadan_start !== undefined ? (/^\d{4}-\d{2}-\d{2}$/.test(String(fields.ramadan_start).trim()) ? String(fields.ramadan_start).trim() : null) : (cur.ramadan_start ?? null),
+            fields.ramadan_end !== undefined ? (/^\d{4}-\d{2}-\d{2}$/.test(String(fields.ramadan_end).trim()) ? String(fields.ramadan_end).trim() : null) : (cur.ramadan_end ?? null),
+            fields.imsak_clip_id !== undefined ? (parseInt(fields.imsak_clip_id, 10) || null) : (cur.imsak_clip_id ?? null),
+            fields.sahur_enabled !== undefined ? (fields.sahur_enabled ? 1 : 0) : (cur.sahur_enabled ?? 0),
+            /^([01]\d|2[0-3]):[0-5]\d$/.test(String(f.sahur_time || '')) ? f.sahur_time : (cur.sahur_time || '03:00'),
+            fields.sahur_clip_id !== undefined ? (parseInt(fields.sahur_clip_id, 10) || null) : (cur.sahur_clip_id ?? null),
         ],
     );
     return getConfig();
@@ -165,6 +175,14 @@ function resolveTargets(cfg) {
 /** Per-prayer qori lead (minutes before adzan). 0 = no qori for that prayer. */
 function qoriLead(cfg, p) {
     return Math.round(numOr(cfg[`qori_lead_${p}`], 0, 0, 120));
+}
+
+/** Is Ramadan mode active for this local date? Optionally bounded by ramadan_start/end (inclusive). */
+function ramadanActive(cfg, dateKey) {
+    if (!cfg.ramadan_enabled) return false;
+    if (cfg.ramadan_start && dateKey < cfg.ramadan_start) return false;
+    if (cfg.ramadan_end && dateKey > cfg.ramadan_end) return false;
+    return true;
 }
 
 /**
@@ -241,6 +259,29 @@ export async function runDuePrayer(nowMs = Date.now()) {
                     await playPrayerClip(cfg, adzanClipId, cfg.loop, { preempt: true, label: `Adzan ${LABELS[p]}${isJumatDhuhr ? ' (Jumat)' : ''} ${times[p]}`, operator: 'jadwal-adzan' });
                     fired = true;
                 }
+            }
+        }
+    }
+
+    // Ramadan layer — only in Ramadan mode (optionally within a date range). Buka puasa is the Maghrib adzan.
+    if (ramadanActive(cfg, now.dateKey)) {
+        // Imsak announcement at Subuh−imsak_offset (times.imsak), gated by the Subuh enable + an imsak clip.
+        if (cfg.imsak_clip_id && cfg.enable_fajr && times.imsak && times.imsak === now.hhmm) {
+            const key = `${now.dateKey} imsak`;
+            if (cfg.last_imsak !== key) {
+                execute('UPDATE audio_prayer_config SET last_imsak = ? WHERE id = 1', [key]);
+                await playPrayerClip(cfg, cfg.imsak_clip_id, cfg.loop, { preempt: true, label: `Imsak ${times.imsak}`, operator: 'jadwal-imsak' });
+                fired = true;
+            }
+        }
+        // Sahur wake-up at a chosen time (default 03:00).
+        const sahurTime = /^([01]\d|2[0-3]):[0-5]\d$/.test(String(cfg.sahur_time || '')) ? cfg.sahur_time : null;
+        if (cfg.sahur_enabled && cfg.sahur_clip_id && sahurTime && sahurTime === now.hhmm) {
+            const key = `${now.dateKey} sahur`;
+            if (cfg.last_sahur !== key) {
+                execute('UPDATE audio_prayer_config SET last_sahur = ? WHERE id = 1', [key]);
+                await playPrayerClip(cfg, cfg.sahur_clip_id, cfg.loop, { preempt: false, label: `Sahur ${sahurTime}`, operator: 'jadwal-sahur' });
+                fired = true;
             }
         }
     }
