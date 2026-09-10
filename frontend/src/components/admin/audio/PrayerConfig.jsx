@@ -98,7 +98,7 @@ export default function PrayerConfig({ clips, areas }) {
         }
         setCfg(r.data);
         reloadTimes(r.data);
-        showNotification({ type: turningOn ? 'success' : 'info', title: turningOn ? 'Adzan otomatis aktif' : 'Adzan otomatis nonaktif', message: turningOn ? 'Tersimpan — akan berkumandang otomatis.' : 'Tersimpan.' });
+        showNotification({ type: turningOn ? 'success' : 'info', title: turningOn ? 'Jadwal sholat aktif' : 'Jadwal sholat nonaktif', message: turningOn ? 'Tersimpan — adzan dan/atau qori berbunyi sesuai pengaturan.' : 'Tersimpan.' });
     };
 
     const useGps = () => {
@@ -123,14 +123,14 @@ export default function PrayerConfig({ clips, areas }) {
         <section className="space-y-4 rounded-card border border-edge bg-surface p-4 shadow-e1">
             <div className="flex items-start justify-between gap-3">
                 <div>
-                    <h3 className="text-sm font-semibold text-content">🕌 Adzan otomatis</h3>
-                    <p className="mt-0.5 text-xs text-content-muted">Waktu sholat dihitung lokal (tanpa internet). <span className="font-medium text-status-warn">Cocokkan dulu dengan jadwal Kemenag setempat</span>, atur offset bila perlu, baru aktifkan.</p>
+                    <h3 className="text-sm font-semibold text-content">🕌 Jadwal Sholat (Adzan &amp; Qori)</h3>
+                    <p className="mt-0.5 text-xs text-content-muted">Waktu sholat dihitung lokal (tanpa internet). <span className="font-medium text-status-warn">Cocokkan dulu dengan jadwal Kemenag setempat</span>, atur offset bila perlu, baru aktifkan. Bisa qori saja tanpa adzan — kosongkan audio adzan di bawah.</p>
                 </div>
                 <button
                     type="button" role="switch" aria-checked={Boolean(cfg.enabled)}
                     onClick={toggleEnabled}
                     className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${cfg.enabled ? 'bg-status-live' : 'bg-edge-strong'}`}
-                    aria-label={cfg.enabled ? 'Nonaktifkan adzan' : 'Aktifkan adzan'}
+                    aria-label={cfg.enabled ? 'Nonaktifkan jadwal sholat' : 'Aktifkan jadwal sholat'}
                 >
                     <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-surface shadow transition-all ${cfg.enabled ? 'left-[22px]' : 'left-0.5'}`} />
                 </button>
@@ -193,10 +193,10 @@ export default function PrayerConfig({ clips, areas }) {
                 </div>
             </div>
 
-            {/* Clip + target */}
+            {/* Clip + target. Audio adzan OPSIONAL: kosong = tanpa adzan (mode qori-saja pengingat). */}
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Field as="select" label="Audio adzan" value={cfg.clip_id || ''} onChange={(e) => set({ clip_id: e.target.value })}>
-                    <option value="">— pilih audio adzan —</option>
+                <Field as="select" label="Audio adzan (opsional)" value={cfg.clip_id || ''} onChange={(e) => set({ clip_id: e.target.value })} hint="Kosongkan = tanpa adzan, hanya qori pengingat (adzan dari masjid).">
+                    <option value="">— tanpa adzan (hanya qori) —</option>
                     {clips.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </Field>
                 <Field as="select" label="Audio adzan Subuh (opsional)" value={cfg.clip_id_fajr || ''} onChange={(e) => set({ clip_id_fajr: e.target.value })}>
@@ -204,6 +204,12 @@ export default function PrayerConfig({ clips, areas }) {
                     {clips.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </Field>
             </div>
+            {!cfg.clip_id && (
+                <div className="rounded-control border border-primary/30 bg-primary/5 px-3 py-2 text-xs text-content-muted">
+                    <span className="font-semibold text-content">Mode qori saja.</span> Tanpa audio adzan, CCTV hanya memutar qori/murottal
+                    sebagai pengingat sebelum waktu sholat — adzan tetap dari masjid. Aktifkan &amp; atur qori di bagian bawah.
+                </div>
+            )}
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field as="select" label="Area target" value={cfg.area_id || ''} onChange={(e) => set({ area_id: e.target.value, target_kind: 'area' })}>
                     <option value="">— pilih area —</option>
@@ -214,7 +220,7 @@ export default function PrayerConfig({ clips, areas }) {
 
             {/* Per-prayer enable + offset */}
             <div className="space-y-1.5">
-                <span className="text-xs font-semibold text-content-muted">Per waktu (aktif + geser menit)</span>
+                <span className="text-xs font-semibold text-content-muted">Waktu sholat aktif + geser menit (berlaku untuk adzan &amp; qori)</span>
                 {PRAYERS.map(([key, label]) => (
                     <div key={key} className="flex items-center gap-3 rounded-control border border-edge px-3 py-1.5">
                         <label className="flex flex-1 cursor-pointer items-center gap-2 text-sm text-content">
@@ -315,7 +321,7 @@ export default function PrayerConfig({ clips, areas }) {
             </div>
 
             <div className="flex items-center justify-between gap-2">
-                <p className="text-xs text-content-subtle">Adzan mengabaikan jam tenang (memang harus berbunyi). Hanya kamera &quot;Didukung&quot; di area yang berbunyi.</p>
+                <p className="text-xs text-content-subtle">Adzan &amp; qori mengabaikan jam tenang (memang harus berbunyi). Hanya kamera &quot;Didukung&quot; di area yang berbunyi.</p>
                 <button type="button" onClick={save} disabled={saving} className="shrink-0 rounded-control bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary/90 disabled:opacity-50">
                     {saving ? 'Menyimpan…' : 'Simpan'}
                 </button>
