@@ -112,11 +112,12 @@ export default function CameraSourceFields({
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div role="radiogroup" aria-label="Delivery Type" className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {DELIVERY_OPTIONS.map((option) => (
                         <button
                             key={option.value}
                             type="button"
+                            aria-pressed={deliveryType === option.value}
                             onClick={() => setDeliveryType(option.value)}
                             disabled={isSubmitting}
                             className={`rounded-xl border px-3 py-3 text-left transition-colors ${deliveryType === option.value

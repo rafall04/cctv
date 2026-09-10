@@ -36,21 +36,22 @@ export function DeviceIcon({ type, className = 'w-4 h-4' }) {
 }
 
 export function StatsCard({ icon, label, value, subValue, color = 'sky', trend }) {
+    // Flat accent tint (one data-accent per card) — no gradient / colored-shadow / hover-scale (design-system).
     const colorClasses = {
-        sky: 'from-primary-400 to-primary-600 shadow-primary/30',
-        purple: 'from-purple-400 to-purple-600 shadow-purple-500/30',
-        emerald: 'from-emerald-400 to-emerald-600 shadow-emerald-500/30',
-        amber: 'from-amber-400 to-amber-600 shadow-amber-500/30',
-        rose: 'from-rose-400 to-rose-600 shadow-rose-500/30',
+        sky: 'bg-primary/15 text-primary',
+        purple: 'bg-purple-500/15 text-purple-500',
+        emerald: 'bg-emerald-500/15 text-emerald-500',
+        amber: 'bg-amber-500/15 text-amber-500',
+        rose: 'bg-rose-500/15 text-rose-500',
     };
 
     return (
-        <div className="bg-surface border border-edge rounded-2xl p-6 hover:shadow-lg transition-all group">
+        <div className="bg-surface border border-edge rounded-card p-6 transition-colors hover:border-edge-strong">
             <div className="flex items-center justify-between mb-4">
-                <div className={`w-12 h-12 bg-gradient-to-br ${colorClasses[color]} rounded-xl flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform`}>
+                <div className={`w-12 h-12 ${colorClasses[color]} rounded-control flex items-center justify-center transition-colors`}>
                     {icon}
                 </div>
-                <span className="text-[10px] font-bold text-content-muted uppercase tracking-wider">{label}</span>
+                <span className="text-xs font-bold text-content-muted uppercase tracking-wider">{label}</span>
             </div>
             <div className="flex items-baseline gap-2 mb-1">
                 <h3 className="text-3xl font-bold text-content">{value}</h3>

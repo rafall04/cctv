@@ -448,7 +448,7 @@ export default function VoucherManagement() {
                         </select>
                         <select value={codeStatusFilter} onChange={(e) => setCodeStatusFilter(e.target.value)} className={`${inputClass} md:w-36`}>
                             <option value="">Semua status</option>
-                            {['unused', 'active', 'expired', 'revoked'].map((s) => <option key={s} value={s}>{s}</option>)}
+                            {['unused', 'active', 'expired', 'revoked'].map((s) => <option key={s} value={s}>{{ unused: 'Belum dipakai', active: 'Aktif', expired: 'Kedaluwarsa', revoked: 'Dicabut' }[s] || s}</option>)}
                         </select>
                     </div>
                 </div>
@@ -469,7 +469,7 @@ export default function VoucherManagement() {
                                     <tr key={c.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
                                         <td className="px-4 py-3 font-mono text-sm text-content">{c.code}</td>
                                         <td className="px-4 py-3 text-xs text-content-muted">{profilesById[c.profile_id]?.name || `#${c.profile_id}`}</td>
-                                        <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded text-xs font-medium ${codeStatusBadge(c.status)}`}>{c.status}</span></td>
+                                        <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded text-xs font-medium ${codeStatusBadge(c.status)}`}>{{ unused: 'Belum dipakai', active: 'Aktif', expired: 'Kedaluwarsa', revoked: 'Dicabut' }[c.status] || c.status}</span></td>
                                         <td className="px-4 py-3 text-xs text-content-muted">{c.redeemed_count ?? 0}</td>
                                         <td className="px-4 py-3 text-xs text-content-muted">{c.expires_at ? formatDateTime(c.expires_at, { year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric' }) : '—'}</td>
                                         <td className="px-4 py-3 text-xs text-content-muted">{c.buyer_name || c.buyer_phone || '—'}</td>

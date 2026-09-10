@@ -41,7 +41,7 @@ export function CameraManagementErrorState({ error, onRetry }) {
             <p className="text-content-muted mb-6">{error}</p>
             <button
                 onClick={onRetry}
-                className="px-6 py-2.5 bg-gradient-to-r from-primary to-primary-600 hover:from-primary-600 hover:to-blue-700 text-white font-semibold rounded-xl shadow-lg shadow-primary/25 transition-all"
+                className="px-6 py-2.5 bg-primary hover:bg-primary-600 text-white font-semibold rounded-control shadow-e1 transition-colors"
             >
                 Coba Lagi
             </button>
@@ -74,7 +74,7 @@ export function CameraManagementNoMatchState({ onResetFilters }) {
             <p className="text-content-muted mb-6">Tidak ada kamera yang sesuai dengan filter aktif.</p>
             <button
                 onClick={onResetFilters}
-                className="px-6 py-2.5 bg-gradient-to-r from-primary to-primary-600 hover:from-primary-600 hover:to-blue-700 text-white font-semibold rounded-xl shadow-lg shadow-primary/25 transition-all"
+                className="px-6 py-2.5 bg-primary hover:bg-primary-600 text-white font-semibold rounded-control shadow-e1 transition-colors"
             >
                 Reset Filter
             </button>

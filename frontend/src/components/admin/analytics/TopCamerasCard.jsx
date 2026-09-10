@@ -9,11 +9,11 @@ export default function TopCamerasCard({ topCameras }) {
                 <div className="space-y-3">
                     {topCameras.slice(0, 5).map((camera, index) => (
                         <div key={camera.camera_id} className="flex items-center gap-3 p-3 bg-surface-sunken rounded-xl">
-                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-sm ${
-                                index === 0 ? 'bg-gradient-to-br from-amber-400 to-amber-600' :
-                                index === 1 ? 'bg-gradient-to-br from-gray-300 to-gray-500' :
-                                index === 2 ? 'bg-gradient-to-br from-orange-400 to-orange-600' :
-                                'bg-gray-400 dark:bg-gray-600'
+                            <div className={`w-8 h-8 rounded-control flex items-center justify-center font-bold text-sm tabular-nums ${
+                                index === 0 ? 'bg-amber-500 text-white' :
+                                index === 1 ? 'bg-slate-400 text-white' :
+                                index === 2 ? 'bg-orange-500 text-white' :
+                                'bg-surface-raised text-content-muted'
                             }`}>
                                 {index + 1}
                             </div>

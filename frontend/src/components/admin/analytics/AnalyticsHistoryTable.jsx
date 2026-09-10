@@ -40,7 +40,7 @@ export function AnalyticsHistoryDrawer({ open, session, title, fields, onClose }
                     </div>
                     <button
                         onClick={onClose}
-                        className="rounded-xl bg-surface-sunken px-3 py-2 text-sm font-medium text-content-muted transition-colors hover:bg-surface-sunken"
+                        className="rounded-control bg-surface-sunken px-3 py-2 text-sm font-medium text-content-muted transition-colors hover:bg-surface-raised"
                     >
                         Tutup
                     </button>

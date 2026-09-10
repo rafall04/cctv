@@ -156,7 +156,7 @@ export default function PromoTab() {
             {showForm && (
                 <Card as="form" onSubmit={handleCreate} className="space-y-2">
                     <h3 className="font-semibold text-content">Kode Promo Baru</h3>
-                    <input name="code" value={form.code} onChange={handleChange} required pattern="[A-Za-z0-9_\-]{3,30}" className={inputClasses({ className: 'uppercase' })} placeholder="KODE (mis. HEMAT10)" />
+                    <input name="code" aria-label="Kode promo" value={form.code} onChange={handleChange} required pattern="[A-Za-z0-9_\-]{3,30}" className={inputClasses({ className: 'uppercase' })} placeholder="KODE (mis. HEMAT10)" />
                     <label className="block text-xs text-content-muted">
                         Tipe
                         <select name="type" value={form.type} onChange={handleChange} className={inputClasses({ className: 'mt-1' })}>
@@ -195,7 +195,7 @@ export default function PromoTab() {
                         Kedaluwarsa (opsional)
                         <input name="expires_at" type="date" value={form.expires_at} onChange={handleChange} className={inputClasses({ className: 'mt-1' })} />
                     </label>
-                    <input name="description" value={form.description} onChange={handleChange} className={inputClasses()} placeholder="Deskripsi singkat (opsional)" />
+                    <input name="description" aria-label="Deskripsi promo" value={form.description} onChange={handleChange} className={inputClasses()} placeholder="Deskripsi singkat (opsional)" />
                     <button type="submit" disabled={busy} className="w-full rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-600 disabled:opacity-50">
                         Buat Kode
                     </button>

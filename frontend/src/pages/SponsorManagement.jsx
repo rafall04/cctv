@@ -449,7 +449,7 @@ function SponsorManagement() {
                                                         <img src={sponsor.logo} alt={sponsor.name} className="w-12 h-12 object-contain bg-surface rounded" />
                                                     ) : (
                                                         <div className="w-12 h-12 bg-surface rounded flex items-center justify-center">
-                                                            <span className="text-content-muted text-xs">No Logo</span>
+                                                            <span className="text-content-muted text-xs">Tanpa logo</span>
                                                         </div>
                                                     )}
                                                     <div>
