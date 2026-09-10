@@ -15,7 +15,7 @@ the same minute while still letting it fire again the next day.
 
 import { query, queryOne, execute } from '../database/connectionPool.js';
 import { playToCameras } from './audioCastService.js';
-import { enabledDeviceIdsForCameras, castClipToDevices } from './audioDeviceService.js';
+import { enabledDeviceIdsForCameras, castToDevices } from './audioDeviceService.js';
 import { getAppOffsetMinutes } from './timezoneService.js';
 import { quietTargets } from './audioTargetService.js';
 import { logPlay } from './audioHistoryService.js';
@@ -69,8 +69,18 @@ function validate(f, partial = false) {
     }
     if (!partial || f.cameraIds !== undefined) {
         const ids = (f.cameraIds || []).map((x) => parseInt(x, 10)).filter(Number.isInteger);
-        if (ids.length === 0) { const e = new Error('Pilih minimal satu kamera'); e.statusCode = 400; throw e; }
         out.camera_ids = JSON.stringify([...new Set(ids)]);
+    }
+    // Explicit Titik Speaker (STB) targets — additive to the area's own devices. A schedule may target
+    // cameras, devices, or both.
+    if (!partial || f.deviceIds !== undefined) {
+        const dids = (f.deviceIds || []).map((x) => parseInt(x, 10)).filter(Number.isInteger);
+        out.device_ids = JSON.stringify([...new Set(dids)]);
+    }
+    if (!partial) { // CREATE: require at least one target (camera OR device)
+        const nCam = JSON.parse(out.camera_ids || '[]').length;
+        const nDev = JSON.parse(out.device_ids || '[]').length;
+        if (nCam + nDev === 0) { const e = new Error('Pilih minimal satu kamera atau titik speaker'); e.statusCode = 400; throw e; }
     }
     if (!partial || f.daysMask !== undefined) {
         let d = parseInt(f.daysMask, 10);
@@ -119,7 +129,7 @@ export function listSchedules() {
                 THEN (SELECT name FROM audio_clips WHERE id = s.source_id)
                 ELSE (SELECT name FROM audio_playlists WHERE id = s.source_id) END AS source_name
         FROM audio_schedules s ORDER BY s.time_hhmm ASC, s.id ASC
-    `).map((s) => ({ ...s, camera_ids: parseCameraIds(s.camera_ids) }));
+    `).map((s) => ({ ...s, camera_ids: parseCameraIds(s.camera_ids), device_ids: parseCameraIds(s.device_ids) }));
 }
 
 export function createSchedule(fields) {
@@ -127,10 +137,10 @@ export function createSchedule(fields) {
     // Use the INSERT's own lastInsertRowid — `last_insert_rowid()` via queryOne routes to a readonly
     // pool connection (returns 0), which would read back id=0 → undefined.
     const info = execute(`INSERT INTO audio_schedules
-             (name, camera_ids, source_type, source_id, time_hhmm, days_mask, loop_count, enabled,
+             (name, camera_ids, device_ids, source_type, source_id, time_hhmm, days_mask, loop_count, enabled,
               schedule_kind, run_date, start_date, end_date, gain_db)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [v.name, v.camera_ids, v.source_type, v.source_id, v.time_hhmm, v.days_mask, v.loop_count, v.enabled ?? 1,
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [v.name, v.camera_ids, v.device_ids ?? '[]', v.source_type, v.source_id, v.time_hhmm, v.days_mask, v.loop_count, v.enabled ?? 1,
             v.schedule_kind ?? 'recurring', v.run_date ?? null, v.start_date ?? null, v.end_date ?? null, v.gain_db ?? 0]);
     return queryOne('SELECT * FROM audio_schedules WHERE id = ?', [info.lastInsertRowid]);
 }
@@ -192,26 +202,26 @@ export function runDueSchedules(nowMs = Date.now()) {
             execute('UPDATE audio_schedules SET last_run_at = ? WHERE id = ?', [minuteKey, s.id]);
         }
         const cams = parseCameraIds(s.camera_ids);
+        const explicitDev = parseCameraIds(s.device_ids);
         // Honour the SAME per-area quiet hours a manual play must confirm past: a scheduled blast at 23:00
         // into an area whose quiet window is 22:00–05:00 must NOT fire there. Fail-OPEN — if the quiet
         // lookup errors (e.g. tables absent in a unit env) we broadcast rather than silently drop.
         let quietSkip = new Set();
         try { quietSkip = new Set(quietTargets(cams, nowMs).map((c) => c.id)); } catch { /* no quiet gate */ }
         const active = cams.filter((id) => !quietSkip.has(id));
+        // Titik Speaker targets: area-derived (from the quiet-filtered cameras) UNION the schedule's explicit
+        // device_ids (explicit ones fire regardless of camera quiet). Clip or playlist. Fire-and-forget,
+        // isolated — this fires even when there are no cameras (a device-only schedule) or all are quiet.
+        const deviceTargets = [...new Set([...enabledDeviceIdsForCameras(active), ...explicitDev])];
+        let dn = 0;
+        try { dn = castToDevices(deviceTargets, s.source_type, s.source_id, s.loop_count, {}); }
+        catch (e) { console.error(`[Audio] Schedule "${s.name}" titik speaker gagal:`, e.message); }
         if (active.length === 0) {
-            console.log(`[Audio] Schedule "${s.name}" ${hhmm}: semua ${cams.length} kamera dalam jam tenang — dilewati`);
+            console.log(`[Audio] Schedule "${s.name}" ${hhmm}: ${cams.length ? `semua ${cams.length} kamera jam tenang` : 'tanpa kamera'}${dn ? ` — ${dn} titik speaker` : ' — dilewati'}`);
             continue;
         }
         const skipped = cams.length - active.length;
-        console.log(`[Audio] Schedule "${s.name}" fired ${hhmm} -> ${active.length} kamera${skipped ? ` (${skipped} dilewati: jam tenang)` : ''}`);
-        // Titik Speaker (STB) in the same area(s) as the quiet-filtered target cameras join the broadcast —
-        // clip only for now (playlist->device fan-out is a follow-up). Fire-and-forget, isolated from cameras.
-        if (s.source_type === 'clip') {
-            try {
-                const dn = castClipToDevices(enabledDeviceIdsForCameras(active), s.source_id, s.loop_count, {});
-                if (dn) console.log(`[Audio] Schedule "${s.name}": + ${dn} titik speaker`);
-            } catch (e) { console.error(`[Audio] Schedule "${s.name}" titik speaker gagal:`, e.message); }
-        }
+        console.log(`[Audio] Schedule "${s.name}" fired ${hhmm} -> ${active.length} kamera${skipped ? ` (${skipped} dilewati: jam tenang)` : ''}${dn ? ` + ${dn} titik speaker` : ''}`);
         // Area-disabled cameras are dropped inside playToCameras (enforceAreaScope default), so a schedule
         // whose area was later turned off stops sounding there without needing to be edited.
         playToCameras(active, s.source_type, s.source_id, s.loop_count, { gainDb: s.gain_db })

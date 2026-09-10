@@ -14,7 +14,7 @@ import { queryOne, execute } from '../database/connectionPool.js';
 import { computePrayerTimes } from './prayerTimeService.js';
 import { listBroadcastTargets } from './audioTargetService.js';
 import { playToCameras } from './audioCastService.js';
-import { enabledDeviceIdsInAreas, enabledDeviceIdsForCameras, castClipToDevices } from './audioDeviceService.js';
+import { enabledDeviceIdsInAreas, enabledDeviceIdsForCameras, castToDevices } from './audioDeviceService.js';
 import { getClip } from './audioClipService.js';
 import { logPlay } from './audioHistoryService.js';
 import { alertBroadcastResult } from './audioAlertService.js';
@@ -200,7 +200,7 @@ async function playPrayerClip(cfg, clipId, loop, { preempt, label, operator }) {
         const deviceIds = (cfg.target_kind || 'area') === 'area'
             ? enabledDeviceIdsInAreas([cfg.area_id])
             : enabledDeviceIdsForCameras(cfg.camera_ids || []);
-        deviceCount = castClipToDevices(deviceIds, clipId, cfg.loop || 1, { preempt });
+        deviceCount = castToDevices(deviceIds, 'clip', clipId, cfg.loop || 1, { preempt });
     } catch (e) { console.error(`[${label}] enqueue titik speaker gagal:`, e.message); }
 
     if (ids.length === 0) {

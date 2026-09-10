@@ -13,6 +13,7 @@ import {
     listDevices as deviceList, createDevice as deviceCreate, updateDevice as deviceUpdate,
     deleteDevice as deviceDelete, regenToken as deviceRegen, authDevice as deviceAuth,
     enqueueCommand as deviceEnqueue, touchDevice as deviceTouch, claimNextCommand as deviceClaim,
+    castToDevices,
 } from '../services/audioDeviceService.js';
 import { getClipWav } from '../services/audioClipService.js';
 import { addSink, removeSink } from '../services/audioDeviceTalk.js';
@@ -95,12 +96,12 @@ export async function testDevice(request, reply) {
 // Broadcast a clip to one or more Titik Speaker now (enqueue; nodes play it on their next poll).
 export async function playDevices(request, reply) {
     try {
-        const { deviceIds, sourceId, loop } = request.body || {};
+        const { deviceIds, sourceId, loop, sourceType } = request.body || {};
         const sid = parseId(sourceId);
         if (!sid) return reply.code(400).send({ success: false, message: 'Pilih audio dulu' });
         const ids = Array.isArray(deviceIds) ? deviceIds : [];
         if (ids.length === 0) return reply.code(400).send({ success: false, message: 'Pilih titik speaker' });
-        const n = deviceEnqueue(ids, 'play', sid, loop || 1);
+        const n = castToDevices(ids, sourceType === 'playlist' ? 'playlist' : 'clip', sid, loop || 1, {});
         logAdminAction({ action: 'audio_device_play', targetType: 'audio_device', devices: n, sourceId: sid, ...adminContext(request) }, request);
         return reply.send({ success: true, message: n ? `Dikirim ke ${n} titik speaker` : 'Tak ada titik speaker aktif terpilih', data: { queued: n } });
     } catch (error) { return fail(reply, error, 'Gagal menyiarkan ke titik speaker'); }

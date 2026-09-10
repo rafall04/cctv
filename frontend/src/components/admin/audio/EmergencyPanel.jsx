@@ -16,8 +16,9 @@ import { useNotification } from '../../../contexts/NotificationContext';
 import { useConfirm } from '../../../contexts/ConfirmContext';
 import { Button, Field } from '../../ui';
 import CameraMultiSelect from './CameraMultiSelect';
+import DeviceMultiSelect from './DeviceMultiSelect';
 
-const BLANK = { id: null, label: '', sourceType: 'clip', sourceId: '', targetKind: 'area', areaId: '', cameraIds: [], loop: 3, gain_db: 0, siren: false };
+const BLANK = { id: null, label: '', sourceType: 'clip', sourceId: '', targetKind: 'area', areaId: '', cameraIds: [], deviceIds: [], loop: 3, gain_db: 0, siren: false };
 
 export default function EmergencyPanel({ clips, playlists, cameras, areas }) {
     const [presets, setPresets] = useState([]);
@@ -58,7 +59,7 @@ export default function EmergencyPanel({ clips, playlists, cameras, areas }) {
         setFiring(p.id);
         const result = await playEmergency({
             sourceType: p.source_type, sourceId: p.source_id, targetKind: p.target_kind,
-            areaId: p.area_id, cameraIds: p.camera_ids, loop: p.loop, gainDb: p.gain_db, siren: Boolean(p.siren), confirm: true,
+            areaId: p.area_id, cameraIds: p.camera_ids, deviceIds: p.device_ids, loop: p.loop, gainDb: p.gain_db, siren: Boolean(p.siren), confirm: true,
         });
         setFiring(null);
         if (!result.success) { showNotification({ type: 'error', title: 'Gagal', message: result.message }); return; }
@@ -82,7 +83,7 @@ export default function EmergencyPanel({ clips, playlists, cameras, areas }) {
         const payload = {
             label: form.label.trim(), sourceType: form.sourceType, sourceId: Number(form.sourceId),
             targetKind: form.targetKind, areaId: form.targetKind === 'area' ? Number(form.areaId) : null,
-            cameraIds: form.cameraIds, loop: form.loop, gain_db: form.gain_db, siren: Boolean(form.siren),
+            cameraIds: form.cameraIds, deviceIds: form.deviceIds, loop: form.loop, gain_db: form.gain_db, siren: Boolean(form.siren),
         };
         const r = form.id ? await updateEmergencyPreset(form.id, payload) : await createEmergencyPreset(payload);
         setSaving(false);
@@ -164,6 +165,7 @@ export default function EmergencyPanel({ clips, playlists, cameras, areas }) {
                             )}
                         </div>
                     )}
+                    <DeviceMultiSelect value={form.deviceIds} onChange={(ids) => setForm({ ...form, deviceIds: ids })} hint="Titik speaker di area target sudah ikut otomatis; ini menambah titik spesifik lain." />
                     <label className="flex cursor-pointer items-center gap-2 rounded-control border border-status-fault/30 bg-status-fault/5 px-3 py-2 text-sm text-content">
                         <input type="checkbox" checked={!!form.siren} onChange={(e) => setForm({ ...form, siren: e.target.checked })} className="h-4 w-4 accent-status-fault" />
                         🔊 Nyalakan sirene juga saat darurat (kamera ber-SN IMOU) — mati otomatis
@@ -188,7 +190,7 @@ export default function EmergencyPanel({ clips, playlists, cameras, areas }) {
                             </button>
                             {manage && (
                                 <div className="mt-1 flex justify-center gap-2">
-                                    <button type="button" onClick={() => setForm({ id: p.id, label: p.label, sourceType: p.source_type, sourceId: String(p.source_id), targetKind: p.target_kind, areaId: p.area_id ? String(p.area_id) : '', cameraIds: p.camera_ids, loop: p.loop, gain_db: p.gain_db, siren: !!p.siren })} className="text-xs font-medium text-content-muted hover:underline">Ubah</button>
+                                    <button type="button" onClick={() => setForm({ id: p.id, label: p.label, sourceType: p.source_type, sourceId: String(p.source_id), targetKind: p.target_kind, areaId: p.area_id ? String(p.area_id) : '', cameraIds: p.camera_ids, deviceIds: p.device_ids || [], loop: p.loop, gain_db: p.gain_db, siren: !!p.siren })} className="text-xs font-medium text-content-muted hover:underline">Ubah</button>
                                     <button type="button" onClick={() => remove(p)} className="text-xs font-medium text-status-fault hover:underline">Hapus</button>
                                 </div>
                             )}

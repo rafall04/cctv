@@ -149,14 +149,24 @@ export function enabledDeviceIdsForCameras(cameraIds) {
         .map((r) => r.id);
 }
 
-/** Cast ONE clip to a set of devices. `preempt` (adzan/emergency) clears the node queue first so the
- *  announcement takes over cleanly; otherwise it appends. Returns how many devices were enqueued. */
-export function castClipToDevices(deviceIds, clipId, loop = 1, { preempt = false } = {}) {
+/** Cast a clip OR playlist to a set of devices. A playlist expands to its items in order (the node's queue
+ *  is FIFO, so it plays them in sequence). `preempt` (adzan/emergency) clears the node queue first so the
+ *  announcement takes over cleanly; otherwise it appends. Returns how many ENABLED devices were enqueued. */
+export function castToDevices(deviceIds, sourceType, sourceId, loop = 1, { preempt = false } = {}) {
     const ids = [...new Set((deviceIds || []).map((x) => parseInt(x, 10)).filter(Number.isInteger))];
-    const cid = parseInt(clipId, 10);
-    if (ids.length === 0 || !cid) return 0;
-    if (preempt) enqueueCommand(ids, 'stop'); // take over: clear the node's queue before the new clip
-    return enqueueCommand(ids, 'play', cid, loop);
+    if (ids.length === 0) return 0;
+    let clipIds;
+    if (sourceType === 'playlist') {
+        clipIds = query('SELECT clip_id FROM audio_playlist_items WHERE playlist_id = ? ORDER BY sort_order ASC, id ASC', [parseInt(sourceId, 10)]).map((r) => r.clip_id);
+    } else {
+        const cid = parseInt(sourceId, 10);
+        clipIds = cid ? [cid] : [];
+    }
+    if (clipIds.length === 0) return 0;
+    if (preempt) enqueueCommand(ids, 'stop'); // take over: clear the node's queue before the new sequence
+    let count = 0;
+    clipIds.forEach((cid, i) => { const c = enqueueCommand(ids, 'play', cid, loop); if (i === 0) count = c; });
+    return count; // enabled devices that received the (first) clip
 }
 
 /** Stop clip playback on every enabled device (kill-switch companion to stopAllPlaying). */
@@ -176,5 +186,5 @@ export function pollDevice(token, ip = null) {
 export default {
     listDevices, createDevice, updateDevice, deleteDevice, regenToken,
     authDevice, enqueueCommand, touchDevice, claimNextCommand, pollDevice,
-    enabledDeviceIdsInAreas, enabledDeviceIdsForCameras, castClipToDevices, stopAllDevices,
+    enabledDeviceIdsInAreas, enabledDeviceIdsForCameras, castToDevices, stopAllDevices,
 };

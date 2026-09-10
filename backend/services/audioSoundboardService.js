@@ -29,7 +29,9 @@ function validate({ label, sourceType, sourceId, loop }) {
 function decorate(row) {
     let ids = [];
     try { ids = JSON.parse(row.camera_ids || '[]'); } catch { ids = []; }
-    return { ...row, camera_ids: Array.isArray(ids) ? ids : [] };
+    let dev = [];
+    try { dev = JSON.parse(row.device_ids || '[]'); } catch { dev = []; }
+    return { ...row, camera_ids: Array.isArray(ids) ? ids : [], device_ids: Array.isArray(dev) ? dev : [] };
 }
 
 export function listButtons() {
@@ -38,17 +40,17 @@ export function listButtons() {
 
 const clampGain = (v) => Math.max(-24, Math.min(24, Number(v) || 0));
 
-export function createButton({ label, color, sourceType, sourceId, cameraIds, loop, gain_db, userId = null }) {
+export function createButton({ label, color, sourceType, sourceId, cameraIds, deviceIds, loop, gain_db, userId = null }) {
     const { cleanLabel, sid, n } = validate({ label, sourceType, sourceId, loop });
     const info = execute(
-        `INSERT INTO audio_soundboard (label, color, source_type, source_id, camera_ids, loop, gain_db, sort_order, created_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM audio_soundboard), ?)`,
-        [cleanLabel, color ? String(color).slice(0, 20) : null, sourceType, sid, JSON.stringify(sanitizeCameraIds(cameraIds)), n, clampGain(gain_db), userId],
+        `INSERT INTO audio_soundboard (label, color, source_type, source_id, camera_ids, device_ids, loop, gain_db, sort_order, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM audio_soundboard), ?)`,
+        [cleanLabel, color ? String(color).slice(0, 20) : null, sourceType, sid, JSON.stringify(sanitizeCameraIds(cameraIds)), JSON.stringify(sanitizeCameraIds(deviceIds)), n, clampGain(gain_db), userId],
     );
     return decorate(queryOne('SELECT * FROM audio_soundboard WHERE id = ?', [info.lastInsertRowid]));
 }
 
-export function updateButton(id, { label, color, sourceType, sourceId, cameraIds, loop, gain_db } = {}) {
+export function updateButton(id, { label, color, sourceType, sourceId, cameraIds, deviceIds, loop, gain_db } = {}) {
     const bid = parseInt(id, 10);
     const existing = queryOne('SELECT * FROM audio_soundboard WHERE id = ?', [bid]);
     if (!existing) { const e = new Error('Tombol tidak ditemukan'); e.statusCode = 404; throw e; }
@@ -61,10 +63,11 @@ export function updateButton(id, { label, color, sourceType, sourceId, cameraIds
     const { cleanLabel, sid, n } = validate(merged);
     const nextColor = color !== undefined ? (color ? String(color).slice(0, 20) : null) : existing.color;
     const nextIds = cameraIds !== undefined ? sanitizeCameraIds(cameraIds) : JSON.parse(existing.camera_ids || '[]');
+    const nextDev = deviceIds !== undefined ? sanitizeCameraIds(deviceIds) : JSON.parse(existing.device_ids || '[]');
     const nextGain = gain_db !== undefined ? clampGain(gain_db) : existing.gain_db;
     execute(
-        'UPDATE audio_soundboard SET label = ?, color = ?, source_type = ?, source_id = ?, camera_ids = ?, loop = ?, gain_db = ? WHERE id = ?',
-        [cleanLabel, nextColor, merged.sourceType, sid, JSON.stringify(nextIds), n, nextGain, bid],
+        'UPDATE audio_soundboard SET label = ?, color = ?, source_type = ?, source_id = ?, camera_ids = ?, device_ids = ?, loop = ?, gain_db = ? WHERE id = ?',
+        [cleanLabel, nextColor, merged.sourceType, sid, JSON.stringify(nextIds), JSON.stringify(nextDev), n, nextGain, bid],
     );
     return decorate(queryOne('SELECT * FROM audio_soundboard WHERE id = ?', [bid]));
 }

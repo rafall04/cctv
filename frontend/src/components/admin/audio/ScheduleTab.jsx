@@ -15,6 +15,7 @@ import { useNotification } from '../../../contexts/NotificationContext';
 import { useConfirm } from '../../../contexts/ConfirmContext';
 import { Button, Modal, Field, EmptyState } from '../../ui';
 import CameraMultiSelect from './CameraMultiSelect';
+import DeviceMultiSelect from './DeviceMultiSelect';
 import { DAYS, MASK_DAILY, MASK_WEEKDAYS, MASK_WEEKEND, describeDays } from './audioFormatting';
 
 function DayPicker({ mask, onChange }) {
@@ -74,6 +75,7 @@ function ScheduleForm({ initial, clips, playlists, cameras, onSubmit, groups, on
     const [sourceType, setSourceType] = useState(initial?.source_type || 'clip');
     const [sourceId, setSourceId] = useState(initial?.source_id ? String(initial.source_id) : '');
     const [cameraIds, setCameraIds] = useState(initial?.camera_ids || []);
+    const [deviceIds, setDeviceIds] = useState(initial?.device_ids || []);
     const [timeHHmm, setTimeHHmm] = useState(initial?.time_hhmm || '07:00');
     const [daysMask, setDaysMask] = useState(initial?.days_mask ?? MASK_DAILY);
     const [loopCount, setLoopCount] = useState(initial?.loop_count || 1);
@@ -94,6 +96,7 @@ function ScheduleForm({ initial, clips, playlists, cameras, onSubmit, groups, on
                     sourceType,
                     sourceId: Number(sourceId),
                     cameraIds,
+                    deviceIds,
                     timeHHmm,
                     daysMask,
                     loopCount,
@@ -179,6 +182,8 @@ function ScheduleForm({ initial, clips, playlists, cameras, onSubmit, groups, on
                 onSaveGroup={onSaveGroup}
                 onDeleteGroup={onDeleteGroup}
             />
+
+            <DeviceMultiSelect value={deviceIds} onChange={setDeviceIds} hint="Titik speaker di area kamera terpilih sudah ikut otomatis; ini menambah/menargetkan titik spesifik (boleh tanpa kamera)." />
         </form>
     );
 }
@@ -192,7 +197,7 @@ export default function ScheduleTab({ schedules, clips, playlists, cameras, load
     const handleSubmit = async (payload) => {
         if (!payload.name) { showNotification({ type: 'error', title: 'Nama jadwal wajib diisi' }); return; }
         if (!payload.sourceId) { showNotification({ type: 'error', title: 'Pilih audio atau playlist' }); return; }
-        if (!payload.cameraIds.length) { showNotification({ type: 'error', title: 'Pilih minimal satu kamera' }); return; }
+        if (!payload.cameraIds.length && !(payload.deviceIds || []).length) { showNotification({ type: 'error', title: 'Pilih minimal satu kamera atau titik speaker' }); return; }
         setSaving(true);
         const result = editing?.id
             ? await updateSchedule(editing.id, payload)
@@ -259,7 +264,7 @@ export default function ScheduleTab({ schedules, clips, playlists, cameras, load
                             <div className="min-w-0 flex-1">
                                 <p className="truncate text-sm font-semibold text-content">{s.name}</p>
                                 <p className="truncate text-xs text-content-subtle">
-                                    {describeSchedule(s)} · {s.source_name || (s.source_type === 'clip' ? 'audio' : 'playlist')} · {(s.camera_ids || []).length} kamera
+                                    {describeSchedule(s)} · {s.source_name || (s.source_type === 'clip' ? 'audio' : 'playlist')} · {(s.camera_ids || []).length} kamera{(s.device_ids || []).length ? ` + ${s.device_ids.length} titik` : ''}
                                     {s.loop_count > 1 ? ` · ${s.loop_count}×` : ''}
                                 </p>
                             </div>

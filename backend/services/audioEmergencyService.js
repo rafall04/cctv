@@ -12,7 +12,7 @@ SideEffects: writes audio_emergency_presets; spawns preempting broadcasts on fir
 import { query, queryOne, execute } from '../database/connectionPool.js';
 import { listBroadcastTargets } from './audioTargetService.js';
 import { playToCameras } from './audioCastService.js';
-import { enabledDeviceIdsInAreas, enabledDeviceIdsForCameras, castClipToDevices } from './audioDeviceService.js';
+import { enabledDeviceIdsInAreas, enabledDeviceIdsForCameras, castToDevices } from './audioDeviceService.js';
 import { triggerCameraSiren } from './imouCloudService.js';
 
 const MAX_EMERGENCY_CAMERAS = Math.max(1, parseInt(process.env.AUDIO_MAX_EMERGENCY || '12', 10));
@@ -22,7 +22,7 @@ function sanitizeIds(cameraIds) {
     return [...new Set(cameraIds.map((x) => parseInt(x, 10)).filter((n) => Number.isInteger(n) && n > 0))];
 }
 
-function validate({ label, sourceType, sourceId, targetKind, areaId, cameraIds, loop }) {
+function validate({ label, sourceType, sourceId, targetKind, areaId, cameraIds, deviceIds, loop }) {
     const cleanLabel = typeof label === 'string' ? label.trim() : '';
     if (!cleanLabel) { const e = new Error('Label wajib diisi'); e.statusCode = 400; throw e; }
     if (!['clip', 'playlist'].includes(sourceType)) { const e = new Error('sourceType harus clip atau playlist'); e.statusCode = 400; throw e; }
@@ -32,8 +32,10 @@ function validate({ label, sourceType, sourceId, targetKind, areaId, cameraIds, 
     const aid = kind === 'area' ? parseInt(areaId, 10) : null;
     if (kind === 'area' && (!Number.isInteger(aid) || aid <= 0)) { const e = new Error('Pilih area target'); e.statusCode = 400; throw e; }
     const ids = kind === 'cameras' ? sanitizeIds(cameraIds) : [];
+    // Explicit Titik Speaker targets (optional, additive to the area's own devices). Valid in BOTH modes.
+    const devIds = sanitizeIds(deviceIds);
     const n = Math.min(Math.max(parseInt(loop, 10) || 3, 1), 20);
-    return { cleanLabel, sourceType, sid, kind, aid, ids, n };
+    return { cleanLabel, sourceType, sid, kind, aid, ids, devIds, n };
 }
 
 const clampGain = (v) => Math.max(-24, Math.min(24, Number(v) || 0));
@@ -41,7 +43,9 @@ const clampGain = (v) => Math.max(-24, Math.min(24, Number(v) || 0));
 function decorate(row) {
     let ids = [];
     try { ids = JSON.parse(row.camera_ids || '[]'); } catch { ids = []; }
-    return { ...row, camera_ids: Array.isArray(ids) ? ids : [] };
+    let dev = [];
+    try { dev = JSON.parse(row.device_ids || '[]'); } catch { dev = []; }
+    return { ...row, camera_ids: Array.isArray(ids) ? ids : [], device_ids: Array.isArray(dev) ? dev : [] };
 }
 
 export function listPresets() {
@@ -51,9 +55,9 @@ export function listPresets() {
 export function createPreset(data) {
     const v = validate(data);
     const info = execute(
-        `INSERT INTO audio_emergency_presets (label, source_type, source_id, target_kind, area_id, camera_ids, loop, gain_db, siren, created_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [v.cleanLabel, v.sourceType, v.sid, v.kind, v.aid, JSON.stringify(v.ids), v.n, clampGain(data.gain_db), data.siren ? 1 : 0, data.userId ?? null],
+        `INSERT INTO audio_emergency_presets (label, source_type, source_id, target_kind, area_id, camera_ids, device_ids, loop, gain_db, siren, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [v.cleanLabel, v.sourceType, v.sid, v.kind, v.aid, JSON.stringify(v.ids), JSON.stringify(v.devIds), v.n, clampGain(data.gain_db), data.siren ? 1 : 0, data.userId ?? null],
     );
     return decorate(queryOne('SELECT * FROM audio_emergency_presets WHERE id = ?', [info.lastInsertRowid]));
 }
@@ -69,14 +73,15 @@ export function updatePreset(id, data) {
         targetKind: data.targetKind !== undefined ? data.targetKind : existing.target_kind,
         areaId: data.areaId !== undefined ? data.areaId : existing.area_id,
         cameraIds: data.cameraIds !== undefined ? data.cameraIds : JSON.parse(existing.camera_ids || '[]'),
+        deviceIds: data.deviceIds !== undefined ? data.deviceIds : JSON.parse(existing.device_ids || '[]'),
         loop: data.loop !== undefined ? data.loop : existing.loop,
     };
     const v = validate(merged);
     const gain = data.gain_db !== undefined ? clampGain(data.gain_db) : existing.gain_db;
     const siren = data.siren !== undefined ? (data.siren ? 1 : 0) : existing.siren;
     execute(
-        'UPDATE audio_emergency_presets SET label = ?, source_type = ?, source_id = ?, target_kind = ?, area_id = ?, camera_ids = ?, loop = ?, gain_db = ?, siren = ? WHERE id = ?',
-        [v.cleanLabel, v.sourceType, v.sid, v.kind, v.aid, JSON.stringify(v.ids), v.n, gain, siren, pid],
+        'UPDATE audio_emergency_presets SET label = ?, source_type = ?, source_id = ?, target_kind = ?, area_id = ?, camera_ids = ?, device_ids = ?, loop = ?, gain_db = ?, siren = ? WHERE id = ?',
+        [v.cleanLabel, v.sourceType, v.sid, v.kind, v.aid, JSON.stringify(v.ids), JSON.stringify(v.devIds), v.n, gain, siren, pid],
     );
     return decorate(queryOne('SELECT * FROM audio_emergency_presets WHERE id = ?', [pid]));
 }
@@ -107,19 +112,18 @@ export function resolveTargets({ targetKind, areaId, cameraIds }) {
  * Fire an emergency: PREEMPT the resolved supported cameras and play the source now, bypassing quiet
  * hours + the governor cap. Returns { results, ids }. Throws 400 if nothing to target.
  */
-export async function fireEmergency({ sourceType = 'clip', sourceId, targetKind, areaId, cameraIds, loop = 3, gainDb = 0, siren = false }) {
+export async function fireEmergency({ sourceType = 'clip', sourceId, targetKind, areaId, cameraIds, deviceIds = [], loop = 3, gainDb = 0, siren = false }) {
     const ids = resolveTargets({ targetKind, areaId, cameraIds });
     const loopN = Math.min(Math.max(parseInt(loop, 10) || 3, 1), 20);
     const sid = parseInt(sourceId, 10);
-    // Titik Speaker (STB) in the target area(s) join the emergency and PREEMPT (take over the node now).
-    // Clip only (playlist->device fan-out is a follow-up). Resolved BEFORE the empty-target guard so a spot
-    // reachable only by an STB (no camera speaker) can still be alerted. Fire-and-forget, isolated.
+    // Titik Speaker (STB) join the emergency and PREEMPT (take over the node now): the target area's devices
+    // (area-membership) UNION any explicit device_ids on the preset. Resolved BEFORE the empty-target guard
+    // so a spot reachable only by an STB (no camera speaker) can still be alerted. Fire-and-forget, isolated.
     let devices = 0;
     try {
-        const devIds = (targetKind === 'cameras')
-            ? enabledDeviceIdsForCameras(cameraIds || [])
-            : enabledDeviceIdsInAreas([areaId]);
-        if ((sourceType || 'clip') === 'clip') devices = castClipToDevices(devIds, sid, loopN, { preempt: true });
+        const areaDev = (targetKind === 'cameras') ? enabledDeviceIdsForCameras(cameraIds || []) : enabledDeviceIdsInAreas([areaId]);
+        const devIds = [...new Set([...areaDev, ...sanitizeIds(deviceIds)])];
+        devices = castToDevices(devIds, sourceType, sid, loopN, { preempt: true });
     } catch (e) { console.error('[Darurat] enqueue titik speaker gagal:', e.message); }
 
     if (ids.length === 0 && devices === 0) { const e = new Error('Tak ada kamera/titik speaker untuk target darurat ini'); e.statusCode = 400; throw e; }

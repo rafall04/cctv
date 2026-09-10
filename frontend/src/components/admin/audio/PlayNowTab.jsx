@@ -8,17 +8,19 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { playNow, getActivePlays, stopPlay, getPlayHistory } from '../../../services/audioService';
+import { playNow, playDevices, getActivePlays, stopPlay, getPlayHistory } from '../../../services/audioService';
 import { useNotification } from '../../../contexts/NotificationContext';
 import { useConfirm } from '../../../contexts/ConfirmContext';
 import { Button, Field } from '../../ui';
 import CameraMultiSelect from './CameraMultiSelect';
+import DeviceMultiSelect from './DeviceMultiSelect';
 import { formatDuration } from './audioFormatting';
 
 export default function PlayNowTab({ clips, playlists, cameras, preselect, groups, onSaveGroup, onDeleteGroup }) {
     const [sourceType, setSourceType] = useState('clip');
     const [sourceId, setSourceId] = useState('');
     const [cameraIds, setCameraIds] = useState([]);
+    const [deviceIds, setDeviceIds] = useState([]);
     const [loop, setLoop] = useState(1);
     const [playing, setPlaying] = useState(false);
     const [results, setResults] = useState(null);
@@ -81,36 +83,45 @@ export default function PlayNowTab({ clips, playlists, cameras, preselect, group
             showNotification({ type: 'error', title: 'Pilih audio atau playlist dulu' });
             return;
         }
-        if (cameraIds.length === 0) {
-            showNotification({ type: 'error', title: 'Pilih minimal satu kamera' });
+        if (cameraIds.length === 0 && deviceIds.length === 0) {
+            showNotification({ type: 'error', title: 'Pilih minimal satu kamera atau titik speaker' });
             return;
         }
         setPlaying(true);
         setResults(null);
-        // Wide blast / quiet-hours broadcasts come back as requiresConfirm — ask, then re-send with confirm.
-        let result = await playNow({ cameraIds, sourceType, sourceId: Number(sourceId), loop });
-        if (result.requiresConfirm) {
-            const ok = await confirm({
-                title: 'Konfirmasi siaran',
-                message: result.message || 'Siaran ini butuh konfirmasi.',
-                confirmLabel: 'Siarkan sekarang',
-                cancelLabel: 'Batal',
-                tone: 'default',
-            });
-            if (!ok) { setPlaying(false); return; }
-            result = await playNow({ cameraIds, sourceType, sourceId: Number(sourceId), loop, confirm: true });
+        let camOk = 0;
+        if (cameraIds.length > 0) {
+            // Wide blast / quiet-hours broadcasts come back as requiresConfirm — ask, then re-send with confirm.
+            let result = await playNow({ cameraIds, sourceType, sourceId: Number(sourceId), loop });
+            if (result.requiresConfirm) {
+                const ok = await confirm({
+                    title: 'Konfirmasi siaran',
+                    message: result.message || 'Siaran ini butuh konfirmasi.',
+                    confirmLabel: 'Siarkan sekarang',
+                    cancelLabel: 'Batal',
+                    tone: 'default',
+                });
+                if (!ok) { setPlaying(false); return; } // cancelled -> nothing fires (Titik Speaker included)
+                result = await playNow({ cameraIds, sourceType, sourceId: Number(sourceId), loop, confirm: true });
+            }
+            if (!result.success) {
+                setPlaying(false);
+                showNotification({ type: 'error', title: 'Gagal memutar', message: result.message });
+                return;
+            }
+            setResults(result.data?.results || []);
+            camOk = (result.data?.results || []).filter((r) => r.ok).length;
+        }
+        let devN = 0;
+        if (deviceIds.length > 0) {
+            const dr = await playDevices({ deviceIds, sourceId: Number(sourceId), loop, sourceType });
+            if (dr.success) devN = dr.data?.queued ?? deviceIds.length;
         }
         setPlaying(false);
-        if (!result.success) {
-            showNotification({ type: 'error', title: 'Gagal memutar', message: result.message });
-            return;
-        }
-        setResults(result.data?.results || []);
-        const ok = (result.data?.results || []).filter((r) => r.ok).length;
-        showNotification({
-            type: ok > 0 ? 'success' : 'error',
-            title: result.message || 'Selesai',
-        });
+        const parts = [];
+        if (cameraIds.length) parts.push(`${camOk} kamera`);
+        if (devN) parts.push(`${devN} titik speaker`);
+        showNotification({ type: (camOk > 0 || devN > 0) ? 'success' : 'error', title: parts.length ? `Diputar ke ${parts.join(' + ')}` : 'Tak ada target aktif' });
         loadActive();
         loadHistory();
     };
@@ -177,6 +188,8 @@ export default function PlayNowTab({ clips, playlists, cameras, preselect, group
                     onSaveGroup={onSaveGroup}
                     onDeleteGroup={onDeleteGroup}
                 />
+
+                <DeviceMultiSelect value={deviceIds} onChange={setDeviceIds} disabled={playing} hint="Titik Speaker (STB) tujuan siaran ini (boleh tanpa kamera)." />
 
                 <Button variant="primary" onClick={handlePlay} loading={playing} className="w-full">
                     {playing ? 'Menyiarkan…' : 'Putar sekarang'}

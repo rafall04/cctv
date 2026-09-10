@@ -11,14 +11,15 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import {
-    getSoundboard, createSoundboardButton, updateSoundboardButton, deleteSoundboardButton, playNow,
+    getSoundboard, createSoundboardButton, updateSoundboardButton, deleteSoundboardButton, playNow, playDevices,
 } from '../../../services/audioService';
 import { useNotification } from '../../../contexts/NotificationContext';
 import { useConfirm } from '../../../contexts/ConfirmContext';
 import { Button, Field, EmptyState } from '../../ui';
 import CameraMultiSelect from './CameraMultiSelect';
+import DeviceMultiSelect from './DeviceMultiSelect';
 
-const BLANK = { id: null, label: '', sourceType: 'clip', sourceId: '', cameraIds: [], loop: 1, gain_db: 0 };
+const BLANK = { id: null, label: '', sourceType: 'clip', sourceId: '', cameraIds: [], deviceIds: [], loop: 1, gain_db: 0 };
 
 export default function SoundboardTab({ clips, playlists, cameras }) {
     const [buttons, setButtons] = useState([]);
@@ -41,26 +42,39 @@ export default function SoundboardTab({ clips, playlists, cameras }) {
         return list.find((o) => o.id === btn.source_id)?.name || `#${btn.source_id}`;
     };
 
-    // Fire a button — same wide/quiet confirm flow as Putar Sekarang.
+    // Fire a button — cameras go through the wide/quiet confirm flow; Titik Speaker fire alongside. A button
+    // may target cameras, Titik Speaker, or both. Cancelling the camera confirm fires NOTHING.
     const fire = async (btn) => {
-        if (!btn.camera_ids || btn.camera_ids.length === 0) {
-            showNotification({ type: 'error', title: 'Tombol belum punya kamera', message: 'Ubah tombol & pilih kamera.' });
+        const hasCam = (btn.camera_ids || []).length > 0;
+        const devIds = btn.device_ids || [];
+        if (!hasCam && devIds.length === 0) {
+            showNotification({ type: 'error', title: 'Tombol belum punya target', message: 'Ubah tombol & pilih kamera atau titik speaker.' });
             return;
         }
         setFiring(btn.id);
         // gainDb intentionally omitted: runtime volume is not controllable on the deployed cameras (loudness is
         // locked in firmware), so the whole gain path is dormant and playNow drops it anyway.
-        const req = { cameraIds: btn.camera_ids, sourceType: btn.source_type, sourceId: btn.source_id, loop: btn.loop };
-        let result = await playNow(req);
-        if (result.requiresConfirm) {
-            const ok = await confirm({ title: 'Konfirmasi siaran', message: result.message, confirmLabel: 'Siarkan sekarang', cancelLabel: 'Batal', tone: 'default' });
-            if (!ok) { setFiring(null); return; }
-            result = await playNow({ ...req, confirm: true });
+        let camOk = 0;
+        if (hasCam) {
+            const req = { cameraIds: btn.camera_ids, sourceType: btn.source_type, sourceId: btn.source_id, loop: btn.loop };
+            let result = await playNow(req);
+            if (result.requiresConfirm) {
+                const ok = await confirm({ title: 'Konfirmasi siaran', message: result.message, confirmLabel: 'Siarkan sekarang', cancelLabel: 'Batal', tone: 'default' });
+                if (!ok) { setFiring(null); return; } // cancelled -> nothing fires (devices included)
+                result = await playNow({ ...req, confirm: true });
+            }
+            camOk = (result.data?.results || []).filter((r) => r.ok).length;
+        }
+        let devN = 0;
+        if (devIds.length) {
+            const dr = await playDevices({ deviceIds: devIds, sourceId: btn.source_id, loop: btn.loop, sourceType: btn.source_type });
+            if (dr.success) devN = dr.data?.queued ?? devIds.length;
         }
         setFiring(null);
-        if (!result.success) { showNotification({ type: 'error', title: 'Gagal', message: result.message }); return; }
-        const ok = (result.data?.results || []).filter((r) => r.ok).length;
-        showNotification({ type: ok > 0 ? 'success' : 'error', title: `${btn.label}: ${result.message || 'Selesai'}` });
+        const parts = [];
+        if (hasCam) parts.push(`${camOk} kamera`);
+        if (devN) parts.push(`${devN} titik`);
+        showNotification({ type: (camOk > 0 || devN > 0) ? 'success' : 'error', title: `${btn.label}: ${parts.join(' + ') || 'tak ada target aktif'}` });
     };
 
     const save = async () => {
@@ -69,7 +83,7 @@ export default function SoundboardTab({ clips, playlists, cameras }) {
         setSaving(true);
         const payload = {
             label: form.label.trim(), sourceType: form.sourceType, sourceId: Number(form.sourceId),
-            cameraIds: form.cameraIds, loop: form.loop, gain_db: form.gain_db,
+            cameraIds: form.cameraIds, deviceIds: form.deviceIds, loop: form.loop, gain_db: form.gain_db,
         };
         const r = form.id ? await updateSoundboardButton(form.id, payload) : await createSoundboardButton(payload);
         setSaving(false);
@@ -120,6 +134,7 @@ export default function SoundboardTab({ clips, playlists, cameras }) {
                     </div>
                     <Field type="number" label="Ulang berapa kali" min={1} max={20} value={form.loop} onChange={(e) => setForm({ ...form, loop: Math.min(20, Math.max(1, parseInt(e.target.value, 10) || 1)) })} />
                     <CameraMultiSelect cameras={cameras} value={form.cameraIds} onChange={(ids) => setForm({ ...form, cameraIds: ids })} />
+                    <DeviceMultiSelect value={form.deviceIds} onChange={(ids) => setForm({ ...form, deviceIds: ids })} hint="Titik speaker yang dibunyikan tombol ini (boleh tanpa kamera)." />
                     <div className="flex justify-end gap-2">
                         <button type="button" onClick={() => setForm(null)} className="rounded-control border border-edge px-3 py-1.5 text-sm font-medium text-content-muted">Batal</button>
                         <Button variant="primary" loading={saving} onClick={save}>Simpan</Button>
@@ -140,11 +155,11 @@ export default function SoundboardTab({ clips, playlists, cameras }) {
                                 className="flex min-h-24 w-full flex-col items-center justify-center gap-1 rounded-card border-2 border-primary bg-primary/10 p-3 text-center transition-colors hover:bg-primary/20 disabled:opacity-60"
                             >
                                 <span className="break-words text-sm font-semibold text-primary">{firing === btn.id ? 'Menyiarkan…' : btn.label}</span>
-                                <span className="text-xs text-content-subtle">{sourceName(btn)} · {btn.camera_ids.length} kamera{btn.loop > 1 ? ` · ${btn.loop}×` : ''}</span>
+                                <span className="text-xs text-content-subtle">{sourceName(btn)} · {btn.camera_ids.length} kamera{(btn.device_ids || []).length ? ` + ${btn.device_ids.length} titik` : ''}{btn.loop > 1 ? ` · ${btn.loop}×` : ''}</span>
                             </button>
                             {manage && (
                                 <div className="mt-1 flex justify-center gap-2">
-                                    <button type="button" onClick={() => setForm({ id: btn.id, label: btn.label, sourceType: btn.source_type, sourceId: String(btn.source_id), cameraIds: btn.camera_ids, loop: btn.loop, gain_db: btn.gain_db })} className="text-xs font-medium text-content-muted hover:underline">Ubah</button>
+                                    <button type="button" onClick={() => setForm({ id: btn.id, label: btn.label, sourceType: btn.source_type, sourceId: String(btn.source_id), cameraIds: btn.camera_ids, deviceIds: btn.device_ids || [], loop: btn.loop, gain_db: btn.gain_db })} className="text-xs font-medium text-content-muted hover:underline">Ubah</button>
                                     <button type="button" onClick={() => remove(btn)} className="text-xs font-medium text-status-fault hover:underline">Hapus</button>
                                 </div>
                             )}

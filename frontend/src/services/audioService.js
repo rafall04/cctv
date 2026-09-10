@@ -361,9 +361,9 @@ export const testDevice = async (id, sourceId) => {
     try { return (await apiClient.post(`${BASE}/devices/${id}/test`, { sourceId })).data; }
     catch (error) { return failure(error, 'Gagal mengirim uji'); }
 };
-/** Broadcast a clip to one or more nodes now. */
-export const playDevices = async ({ deviceIds, sourceId, loop = 1 }) => {
-    try { return (await apiClient.post(`${BASE}/devices/play`, { deviceIds, sourceId, loop })).data; }
+/** Broadcast a clip or playlist to one or more nodes now. */
+export const playDevices = async ({ deviceIds, sourceId, loop = 1, sourceType = 'clip' }) => {
+    try { return (await apiClient.post(`${BASE}/devices/play`, { deviceIds, sourceId, loop, sourceType })).data; }
     catch (error) { return failure(error, 'Gagal menyiarkan ke titik speaker'); }
 };
 
