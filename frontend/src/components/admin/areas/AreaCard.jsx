@@ -153,7 +153,6 @@ export default function AreaCard({
                     type="button"
                     role="switch"
                     aria-checked={gridDefaultEnabled}
-                    aria-label="Grid Default"
                     onClick={() => onToggleGridDefault(area)}
                     disabled={gridDefaultBusy}
                     className={`w-full rounded-2xl border px-4 py-3 text-left transition-colors ${

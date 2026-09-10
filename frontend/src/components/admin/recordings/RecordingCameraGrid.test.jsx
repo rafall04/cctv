@@ -33,7 +33,7 @@ describe('RecordingCameraGrid', () => {
         expect(screen.getByText('Dander').className).toMatch(/text-content/);
         expect(screen.getByText('Duration:').className).toMatch(/text-content/);
         expect(screen.getByText('Recording Enabled:')).toBeTruthy();
-        expect(screen.getByTestId('recording-status-7').className).toContain('dark:text-red-100');
+        expect(screen.getByTestId('recording-status-7').className).toContain('text-status-live');
     });
 
     it('does NOT show a red Recording badge when the DB column says recording but no live process exists', () => {
@@ -88,7 +88,7 @@ describe('RecordingCameraGrid', () => {
 
         fireEvent.click(screen.getByRole('button', { name: /Pengaturan Rekaman/i }));
         fireEvent.change(screen.getByLabelText('Durasi Penyimpanan'), { target: { value: '24' } });
-        fireEvent.click(screen.getByRole('button', { name: /Aktifkan Rekaman/i }));
+        fireEvent.click(screen.getByRole('switch', { name: /Aktifkan Rekaman/i }));
         await act(async () => {
             fireEvent.click(screen.getByRole('button', { name: 'Simpan' }));
         });

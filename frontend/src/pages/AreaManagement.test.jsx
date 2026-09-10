@@ -226,9 +226,9 @@ describe('AreaManagement', () => {
 
         await screen.findByText('Grid View Default');
         expect(screen.getByText('Area aktif')).toBeTruthy();
-        expect(screen.getByRole('button', { name: /Grid Default Aktif/i })).toBeTruthy();
+        expect(screen.getByRole('switch', { name: /Grid Default Aktif/i })).toBeTruthy();
 
-        fireEvent.click(screen.getByRole('button', { name: /Grid Default Aktif/i }));
+        fireEvent.click(screen.getByRole('switch', { name: /Grid Default Aktif/i }));
 
         await waitFor(() => {
             expect(updateArea).toHaveBeenCalledWith(1, expect.objectContaining({
