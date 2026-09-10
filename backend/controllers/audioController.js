@@ -455,9 +455,10 @@ export async function talkTicket(request, reply) {
     try {
         const body = request.body || {};
         const ids = Array.isArray(body.cameraIds) ? body.cameraIds : (body.cameraId ? [body.cameraId] : []);
-        if (ids.length === 0) return reply.code(400).send({ success: false, message: 'Pilih minimal satu kamera' });
-        const t = mintTicket(ids, request.user?.id ?? null);
-        logAdminAction({ action: 'audio_talk_ticket', targetType: 'camera', targetId: parseId(ids[0]), count: t.cameraCount, ...adminContext(request) }, request);
+        const devIds = Array.isArray(body.deviceIds) ? body.deviceIds : [];
+        if (ids.length === 0 && devIds.length === 0) return reply.code(400).send({ success: false, message: 'Pilih minimal satu kamera atau titik speaker' });
+        const t = mintTicket(ids, request.user?.id ?? null, devIds);
+        logAdminAction({ action: 'audio_talk_ticket', targetType: 'camera', count: t.cameraCount, devices: t.deviceCount, ...adminContext(request) }, request);
         return reply.send({ success: true, data: t });
     } catch (error) { return fail(reply, error); }
 }

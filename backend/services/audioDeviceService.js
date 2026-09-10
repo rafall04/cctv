@@ -82,10 +82,11 @@ export function authDevice(token) {
  * Enqueue a command to one or more ENABLED devices. 'play' needs clip_id; 'stop' clears the device's queue.
  * @returns {number} how many devices the command was enqueued to.
  */
+const ALLOWED_COMMANDS = ['play', 'stop', 'talk_start', 'talk_end'];
 export function enqueueCommand(deviceIds, command, clipId = null, loop = 1) {
     const ids = [...new Set((deviceIds || []).map((x) => parseInt(x, 10)).filter(Number.isInteger))];
     if (ids.length === 0) return 0;
-    const cmd = command === 'stop' ? 'stop' : 'play';
+    const cmd = ALLOWED_COMMANDS.includes(command) ? command : 'play';
     const cid = cmd === 'play' ? (parseInt(clipId, 10) || null) : null;
     if (cmd === 'play' && !cid) { const e = new Error('clip_id wajib untuk play'); e.statusCode = 400; throw e; }
     const n = Math.min(Math.max(parseInt(loop, 10) || 1, 1), 20);
@@ -93,7 +94,8 @@ export function enqueueCommand(deviceIds, command, clipId = null, loop = 1) {
     for (const id of ids) {
         const dev = queryOne('SELECT id FROM audio_devices WHERE id = ? AND enabled = 1', [id]);
         if (!dev) continue;
-        if (cmd === 'stop') execute('DELETE FROM audio_device_commands WHERE device_id = ?', [id]);
+        // 'stop'/'talk_start' supersede anything pending (drop stale queue first) so a live action is immediate.
+        if (cmd === 'stop' || cmd === 'talk_start') execute('DELETE FROM audio_device_commands WHERE device_id = ?', [id]);
         execute('INSERT INTO audio_device_commands (device_id, command, clip_id, loop) VALUES (?, ?, ?, ?)', [id, cmd, cid, n]);
         count += 1;
     }

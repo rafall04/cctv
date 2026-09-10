@@ -27,7 +27,7 @@ import {
     listTtsEngines, createTts, previewTts, getTtsConfig, setTtsConfig,
 } from '../controllers/audioController.js';
 import {
-    listDevices, createDevice, updateDevice, deleteDevice, regenDeviceToken, testDevice, playDevices, nodePoll, nodeClip,
+    listDevices, createDevice, updateDevice, deleteDevice, regenDeviceToken, testDevice, playDevices, nodePoll, nodeClip, nodeStream,
 } from '../controllers/audioDeviceController.js';
 import fastifyWebsocket from '@fastify/websocket';
 import { authMiddleware, requireAdmin } from '../middleware/authMiddleware.js';
@@ -134,8 +134,9 @@ export default async function audioRoutes(fastify) {
     fastify.post('/devices/:id/token', admin, regenDeviceToken);
     fastify.post('/devices/:id/test', admin, testDevice);
     fastify.post('/devices/play', admin, playDevices);    // siarkan klip ke titik speaker terpilih
-    fastify.get('/node/poll', nodePoll);       // STB agent short-poll (x-device-token header) — NOT admin
+    fastify.get('/node/poll', nodePoll);       // STB agent long-poll (x-device-token header) — NOT admin
     fastify.get('/node/clip/:id', nodeClip);   // STB agent downloads the clip (WAV) — token-gated in-handler
+    fastify.get('/node/stream', nodeStream);   // STB agent live-talk audio stream (raw u-law) — token-gated
 
     // Motion -> deterrent audio (armed per camera; heavily guarded)
     fastify.get('/motion/arms', admin, listMotionArms);

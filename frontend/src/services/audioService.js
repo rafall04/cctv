@@ -497,9 +497,12 @@ export const deleteGroup = async (id) => {
 };
 
 /** Mint a single-use ticket for a live push-to-talk WebSocket to one or more cameras (zone paging). */
-export const talkTicket = async (cameraIds) => {
+export const talkTicket = async (cameraIds, deviceIds = []) => {
     try {
-        const payload = Array.isArray(cameraIds) ? { cameraIds } : { cameraId: cameraIds };
+        const payload = {
+            cameraIds: Array.isArray(cameraIds) ? cameraIds : (cameraIds ? [cameraIds] : []),
+            deviceIds: Array.isArray(deviceIds) ? deviceIds : [],
+        };
         return (await apiClient.post(`${BASE}/talk/ticket`, payload)).data;
     } catch (error) { return failure(error, 'Gagal memulai bicara'); }
 };

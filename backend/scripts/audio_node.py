@@ -99,6 +99,47 @@ def play_wav(data, loop):
         print('play error:', e, file=sys.stderr)
 
 
+def play_stream(path):
+    """Live push-to-talk: play the Hub's raw u-law 16k stream via `aplay -f MU_LAW` until EOF/idle.
+    A ~12s per-read timeout self-heals a stale stream (no audio) so the agent resumes polling."""
+    global _current
+    stop_playback()
+    try:
+        resp = http_get(path, timeout=12)
+    except Exception:
+        return
+    try:
+        p = subprocess.Popen(['aplay', '-q', '-t', 'raw', '-f', 'MU_LAW', '-c', '1', '-r', '16000'], stdin=subprocess.PIPE)  # noqa: S603,S607
+    except Exception as e:
+        print('aplay error:', e, file=sys.stderr)
+        try:
+            resp.close()
+        except Exception:
+            pass
+        return
+    _current = p
+    try:
+        while True:
+            chunk = resp.read(320)  # ~20ms u-law frame
+            if not chunk:
+                break  # talk ended (Hub closed the stream)
+            try:
+                p.stdin.write(chunk)
+            except Exception:
+                break
+    except Exception:
+        pass  # idle timeout / network drop -> end this talk, go back to polling
+    finally:
+        try:
+            p.stdin.close()
+        except Exception:
+            pass
+        try:
+            resp.close()
+        except Exception:
+            pass
+
+
 def main():
     print('[Titik Speaker] agent up -> %s (player=%s)' % (HUB, PLAYER))
     while True:
@@ -112,6 +153,8 @@ def main():
             if cmd == 'play' and data.get('clip_url'):
                 audio = http_get(data['clip_url'], timeout=30).read()
                 play_wav(audio, data.get('loop') or 1)
+            elif cmd == 'talk_start' and data.get('stream_url'):
+                play_stream(data['stream_url'])  # blocks (plays live) until talk ends, then resume polling
             elif cmd == 'stop':
                 stop_playback()
             time.sleep(0.3)  # small floor; the server long-poll provides the real pacing

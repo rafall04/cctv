@@ -12,7 +12,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { talkTicket } from '../../../services/audioService';
+import { talkTicket, getDevices } from '../../../services/audioService';
 import { getApiUrl } from '../../../config/config.js';
 import { useNotification } from '../../../contexts/NotificationContext';
 import CameraMultiSelect from './CameraMultiSelect';
@@ -42,10 +42,21 @@ registerProcessor('ptt', PTT);
 
 export default function TalkTab({ cameras }) {
     const [cameraIds, setCameraIds] = useState([]);
+    const [devices, setDevices] = useState([]);
+    const [deviceIds, setDeviceIds] = useState([]);
     const [state, setState] = useState('idle'); // idle | connecting | onair
     const [level, setLevel] = useState(0);
     const [micGain, setMicGain] = useState(1.6); // mic sensitivity (soft-limited in the worklet)
     const { showNotification } = useNotification();
+
+    // Load speaker nodes (Titik Speaker) so paging can also target them, not just cameras.
+    useEffect(() => {
+        let cancelled = false;
+        const load = async () => { const r = await getDevices(); if (!cancelled && r.success) setDevices(r.data || []); };
+        load();
+        const t = setInterval(load, 10000);
+        return () => { cancelled = true; clearInterval(t); };
+    }, []);
 
     const refs = useRef({ ws: null, ctx: null, node: null, stream: null, active: false, workletUrl: null });
     const gainRef = useRef(1.6);
@@ -75,7 +86,7 @@ export default function TalkTab({ cameras }) {
 
     const start = useCallback(async () => {
         if (refs.current.active) return;
-        if (cameraIds.length === 0) { showNotification({ type: 'error', title: 'Pilih kamera dulu' }); return; }
+        if (cameraIds.length === 0 && deviceIds.length === 0) { showNotification({ type: 'error', title: 'Pilih kamera atau titik speaker dulu' }); return; }
         if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
             showNotification({ type: 'error', title: 'Mic tidak tersedia', message: 'Butuh HTTPS + browser asli (bukan in-app).' });
             return;
@@ -84,7 +95,7 @@ export default function TalkTab({ cameras }) {
         setState('connecting');
         try {
             // 1) ticket (authed) -> WS URL on the API origin.
-            const tk = await talkTicket(cameraIds);
+            const tk = await talkTicket(cameraIds, deviceIds);
             if (!tk.success) throw new Error(tk.message || 'Gagal tiket');
             if (!refs.current.active) return;
             const apiBase = getApiUrl() || window.location.origin;
@@ -143,7 +154,7 @@ export default function TalkTab({ cameras }) {
             if (refs.current.active) showNotification({ type: 'error', title: 'Gagal bicara', message: error.message });
             cleanup();
         }
-    }, [cameraIds, showNotification, stop, cleanup]);
+    }, [cameraIds, deviceIds, showNotification, stop, cleanup]);
 
     // Safety: releasing focus / leaving must stop a hot mic. Also clean up on unmount.
     useEffect(() => {
@@ -170,10 +181,33 @@ export default function TalkTab({ cameras }) {
                 </p>
             </div>
 
+            {/* Titik Speaker (STB) — paging bisa ke node juga, bukan cuma kamera. */}
+            {devices.length > 0 && (
+                <div className="rounded-card border border-edge bg-surface p-4 shadow-e1">
+                    <span className="mb-2 block text-xs font-semibold text-content-muted">Titik Speaker (STB) — {deviceIds.length} dipilih</span>
+                    <div className="flex flex-wrap gap-1.5">
+                        {devices.filter((d) => d.enabled).map((d) => {
+                            const on = deviceIds.includes(d.id);
+                            return (
+                                <button
+                                    key={d.id} type="button" disabled={held}
+                                    onClick={() => setDeviceIds((s) => (s.includes(d.id) ? s.filter((x) => x !== d.id) : [...s, d.id]))}
+                                    className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-50 ${on ? 'border-primary bg-primary/10 text-primary' : 'border-edge bg-surface text-content-muted hover:border-edge-strong'}`}
+                                >
+                                    <span className={`h-1.5 w-1.5 rounded-full ${d.online ? 'bg-status-live' : 'bg-edge-strong'}`} aria-hidden="true" />
+                                    {d.name}
+                                </button>
+                            );
+                        })}
+                    </div>
+                    <p className="mt-2 text-xs text-content-subtle">Bicara live ke STB: awal ~1–2 detik untuk tersambung; hanya titik online yang berbunyi.</p>
+                </div>
+            )}
+
             <div className="flex flex-col items-center gap-4 rounded-card border border-edge bg-surface p-6 shadow-e1">
                 <button
                     type="button"
-                    disabled={cameraIds.length === 0}
+                    disabled={cameraIds.length === 0 && deviceIds.length === 0}
                     onPointerDown={(e) => { e.preventDefault(); start(); }}
                     onPointerUp={stop}
                     onPointerCancel={stop}

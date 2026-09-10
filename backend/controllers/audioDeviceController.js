@@ -15,7 +15,10 @@ import {
     enqueueCommand as deviceEnqueue, touchDevice as deviceTouch, claimNextCommand as deviceClaim,
 } from '../services/audioDeviceService.js';
 import { getClipWav } from '../services/audioClipService.js';
+import { addSink, removeSink } from '../services/audioDeviceTalk.js';
 import { logAdminAction } from '../services/securityAuditLogger.js';
+
+const TALK_STREAM_CAP_MS = 6 * 60 * 1000; // a talk stream can never stay open longer than this
 
 const sleep = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
 const POLL_HOLD_MS = 25000; // how long a node poll is held open (< Cloudflare's ~100s proxy timeout)
@@ -124,6 +127,7 @@ export async function nodePoll(request, reply) {
             if (cmd) {
                 const out = { command: cmd.command, loop: cmd.loop };
                 if (cmd.command === 'play' && cmd.clip_id) out.clip_url = `/api/admin/audio/node/clip/${cmd.clip_id}`;
+                if (cmd.command === 'talk_start') out.stream_url = '/api/admin/audio/node/stream';
                 return reply.send({ success: true, data: out });
             }
             if (Date.now() >= deadline || request.raw.destroyed) break; // window elapsed / client gone
@@ -146,4 +150,29 @@ export async function nodeClip(request, reply) {
         reply.header('Cache-Control', 'no-store');
         return reply.send(wav.buffer);
     } catch (error) { return fail(reply, error); }
+}
+
+// Live push-to-talk SINK: the node opens this after a 'talk_start' command; the browser's mic frames
+// (u-law 16k) are streamed to it as RAW bytes, played by `aplay -f MU_LAW`. Held open until talk ends
+// (sink.end -> EOF), the node disconnects, or a hard cap. Token-gated; half-duplex (node only receives).
+export async function nodeStream(request, reply) {
+    const dev = deviceAuth(deviceTokenFrom(request));
+    if (!dev) return reply.code(401).send({ success: false, message: 'token tidak valid' });
+    reply.hijack(); // we own reply.raw now — do NOT use reply.send
+    const res = reply.raw;
+    try {
+        res.writeHead(200, { 'Content-Type': 'audio/basic', 'Cache-Control': 'no-store', Connection: 'keep-alive' });
+    } catch { return undefined; }
+    let closed = false;
+    const sink = {
+        write: (buf) => { if (!closed) res.write(buf); },
+        end: () => { if (!closed) { closed = true; try { res.end(); } catch { /* gone */ } } },
+    };
+    addSink(dev.id, sink);
+    let cap = null;
+    const cleanup = () => { closed = true; removeSink(dev.id, sink); if (cap) clearTimeout(cap); try { res.end(); } catch { /* gone */ } };
+    cap = setTimeout(cleanup, TALK_STREAM_CAP_MS);
+    res.on('close', cleanup);
+    res.on('error', cleanup);
+    return undefined;
 }

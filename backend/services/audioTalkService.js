@@ -23,6 +23,8 @@ import { randomBytes } from 'crypto';
 import { queryOne } from '../database/connectionPool.js';
 import { parseRtsp } from './audioCastService.js';
 import { acquire, release, holderKind } from './cameraAudioLock.js';
+import { enqueueCommand as deviceEnqueue } from './audioDeviceService.js';
+import { writeToDevice, endDeviceTalk } from './audioDeviceTalk.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SCRIPT = join(__dirname, '..', 'scripts', 'audio_talk.py');
@@ -54,7 +56,7 @@ export function stopAllTalk() {
  * Mint a single-use talk ticket for one OR MORE cameras (zone paging). Filters to eligible cameras
  * (internal + has RTSP + NOT blocked) and caps the fan-out. Throws 400 if none are eligible.
  */
-export function mintTicket(cameraIds, adminUserId) {
+export function mintTicket(cameraIds, adminUserId, deviceIds = []) {
     sweepTickets();
     const raw = Array.isArray(cameraIds) ? cameraIds : [cameraIds];
     const ids = [...new Set(raw.map((x) => parseInt(x, 10)).filter((n) => Number.isInteger(n) && n > 0))].slice(0, MAX_TALK_CAMERAS);
@@ -63,10 +65,17 @@ export function mintTicket(cameraIds, adminUserId) {
         const cam = queryOne('SELECT id, name, private_rtsp_url, stream_source, audio_out_blocked FROM cameras WHERE id = ? AND enabled = 1', [id]);
         if (cam && cam.stream_source === 'internal' && cam.private_rtsp_url && !cam.audio_out_blocked) eligible.push(cam.id);
     }
-    if (eligible.length === 0) { const e = new Error('Tak ada kamera yang bisa menerima audio'); e.statusCode = 400; throw e; }
+    // Titik Speaker (STB) targets — validated to enabled devices. Paging can go to cameras AND/OR nodes.
+    const devRaw = Array.isArray(deviceIds) ? deviceIds : [deviceIds];
+    const devIds = [...new Set(devRaw.map((x) => parseInt(x, 10)).filter((n) => Number.isInteger(n) && n > 0))].slice(0, MAX_TALK_CAMERAS);
+    const eligibleDevices = [];
+    for (const id of devIds) {
+        if (queryOne('SELECT id FROM audio_devices WHERE id = ? AND enabled = 1', [id])) eligibleDevices.push(id);
+    }
+    if (eligible.length === 0 && eligibleDevices.length === 0) { const e = new Error('Tak ada tujuan yang bisa menerima audio'); e.statusCode = 400; throw e; }
     const ticket = randomBytes(24).toString('base64url');
-    tickets.set(ticket, { cameraIds: eligible, adminUserId, expiresAt: Date.now() + TICKET_TTL_MS });
-    return { ticket, wsPath: `/api/admin/audio/talk?ticket=${ticket}`, expiresInMs: TICKET_TTL_MS, cameraCount: eligible.length };
+    tickets.set(ticket, { cameraIds: eligible, deviceIds: eligibleDevices, adminUserId, expiresAt: Date.now() + TICKET_TTL_MS });
+    return { ticket, wsPath: `/api/admin/audio/talk?ticket=${ticket}`, expiresInMs: TICKET_TTL_MS, cameraCount: eligible.length, deviceCount: eligibleDevices.length };
 }
 
 function sameSiteOrigin(req) {
@@ -114,8 +123,13 @@ export function talkHandler(socket, req) {
         sessions.push(s);
     }
 
-    if (sessions.length === 0) {
-        try { socket.send(JSON.stringify({ type: 'error', message: 'Semua kamera tujuan sedang dipakai audio lain' })); } catch { /* */ }
+    // Titik Speaker targets: tell each node a talk session is starting so it opens its live audio stream
+    // (GET /node/stream). Enqueued now so the node connects during the ready grace below.
+    const deviceTargets = t.deviceIds || [];
+    for (const d of deviceTargets) { try { deviceEnqueue([d], 'talk_start'); } catch { /* */ } }
+
+    if (sessions.length === 0 && deviceTargets.length === 0) {
+        try { socket.send(JSON.stringify({ type: 'error', message: 'Semua tujuan sedang dipakai audio lain' })); } catch { /* */ }
         close(1013, 'busy');
         return;
     }
@@ -146,6 +160,7 @@ export function talkHandler(socket, req) {
             release(s.id, s.token);
         }
         sessions.length = 0;
+        for (const d of deviceTargets) { try { endDeviceTalk(d); } catch { /* */ } } // close node streams -> aplay EOF
         console.log(`[AudioTalk] Session end (${reason}) by admin ${t.adminUserId}`);
         try { socket.send(JSON.stringify({ type: 'ended' })); } catch { /* */ }
         close(1000, reason);
@@ -156,6 +171,7 @@ export function talkHandler(socket, req) {
             if (data.length === 0 || data.length > MAX_FRAME_BYTES) return;
             lastFrame = Date.now();
             for (const s of sessions) { try { s.child.stdin.write(data); } catch { /* child gone */ } }
+            for (const d of deviceTargets) writeToDevice(d, data); // fan the same u-law frame to speaker nodes
         } else {
             try { const m = JSON.parse(data.toString()); if (m.type === 'stop') stopAll('client-stop'); } catch { /* ignore non-JSON */ }
         }
