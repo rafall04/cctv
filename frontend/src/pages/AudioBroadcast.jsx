@@ -32,6 +32,7 @@ import PrayerConfig from '../components/admin/audio/PrayerConfig';
 import MotionArms from '../components/admin/audio/MotionArms';
 import SirenControl from '../components/admin/audio/SirenControl';
 import HistoryTab from '../components/admin/audio/HistoryTab';
+import SpeakerNodesTab from '../components/admin/audio/SpeakerNodesTab';
 
 const TABS = [
     { id: 'play', label: 'Putar Sekarang' },
@@ -42,6 +43,7 @@ const TABS = [
     { id: 'groups', label: 'Grup' },
     { id: 'schedules', label: 'Jadwal' },
     { id: 'targets', label: 'Kamera & Area' },
+    { id: 'devices', label: 'Titik Speaker' },
     { id: 'history', label: 'Riwayat' },
 ];
 
@@ -211,6 +213,11 @@ export default function AudioBroadcast() {
                         onSaveGroup={handleSaveGroup}
                     />
                   </div>
+                </TabPanel>
+            )}
+            {active === 'devices' && (
+                <TabPanel id="devices" idPrefix="audio">
+                    <SpeakerNodesTab clips={clips} areas={areas} />
                 </TabPanel>
             )}
             {active === 'history' && (

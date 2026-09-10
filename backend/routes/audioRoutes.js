@@ -26,6 +26,9 @@ import {
     getImouConfig, setImouConfig, testImou, listImouDevices, setCameraImouSn, cameraSiren, listSirens, stopSirens,
     listTtsEngines, createTts, previewTts, getTtsConfig, setTtsConfig,
 } from '../controllers/audioController.js';
+import {
+    listDevices, createDevice, updateDevice, deleteDevice, regenDeviceToken, testDevice, playDevices, nodePoll, nodeClip,
+} from '../controllers/audioDeviceController.js';
 import fastifyWebsocket from '@fastify/websocket';
 import { authMiddleware, requireAdmin } from '../middleware/authMiddleware.js';
 import { MAX_AUDIO_UPLOAD_BYTES } from '../services/audioClipService.js';
@@ -122,6 +125,17 @@ export default async function audioRoutes(fastify) {
     fastify.post('/cameras/:id/siren', admin, cameraSiren);
     fastify.get('/imou/sirens', admin, listSirens);       // sirene yang sedang menyala
     fastify.post('/imou/sirens/stop', admin, stopSirens); // matikan semua sirene
+
+    // Titik Speaker (network speaker nodes: STB + amp + TOA). Admin CRUD + token-gated node endpoints.
+    fastify.get('/devices', admin, listDevices);
+    fastify.post('/devices', admin, createDevice);
+    fastify.put('/devices/:id', admin, updateDevice);
+    fastify.delete('/devices/:id', admin, deleteDevice);
+    fastify.post('/devices/:id/token', admin, regenDeviceToken);
+    fastify.post('/devices/:id/test', admin, testDevice);
+    fastify.post('/devices/play', admin, playDevices);    // siarkan klip ke titik speaker terpilih
+    fastify.get('/node/poll', nodePoll);       // STB agent short-poll (x-device-token header) — NOT admin
+    fastify.get('/node/clip/:id', nodeClip);   // STB agent downloads the clip (WAV) — token-gated in-handler
 
     // Motion -> deterrent audio (armed per camera; heavily guarded)
     fastify.get('/motion/arms', admin, listMotionArms);

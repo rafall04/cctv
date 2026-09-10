@@ -1,0 +1,132 @@
+/*
+Purpose: HTTP handlers for "Titik Speaker" — network speaker nodes (STB + amp + TOA horn). Split out of
+         audioController.js to keep that file under the size ratchet. Two audiences: ADMIN CRUD/broadcast
+         (JWT-gated at the route) and the NODE agent (device TOKEN in a header, NOT an admin JWT).
+Caller: backend/routes/audioRoutes.js (device + node routes).
+Deps: audioDeviceService, audioClipService.getClipWav, securityAuditLogger.
+MainFuncs: listDevices, createDevice, updateDevice, deleteDevice, regenDeviceToken, testDevice, playDevices,
+           nodePoll, nodeClip.
+SideEffects: writes device rows + command queue; serves clip audio to authenticated nodes.
+*/
+
+import {
+    listDevices as deviceList, createDevice as deviceCreate, updateDevice as deviceUpdate,
+    deleteDevice as deviceDelete, regenToken as deviceRegen, authDevice as deviceAuth,
+    enqueueCommand as deviceEnqueue, pollDevice as devicePoll,
+} from '../services/audioDeviceService.js';
+import { getClipWav } from '../services/audioClipService.js';
+import { logAdminAction } from '../services/securityAuditLogger.js';
+
+// Tiny local copies (kept in step with audioController.js) so this module stands alone.
+function parseId(value) {
+    const id = parseInt(value, 10);
+    return Number.isInteger(id) && id > 0 ? id : null;
+}
+function fail(reply, error, fallback = 'Internal server error') {
+    const code = error.statusCode || 500;
+    if (code === 500) console.error('Audio device error:', error);
+    return reply.code(code).send({ success: false, message: code === 500 ? fallback : error.message });
+}
+function adminContext(request) {
+    return { adminUserId: request.user?.id, adminUsername: request.user?.username };
+}
+
+/* -------------------------------------------- admin CRUD + broadcast (JWT-gated) */
+
+export async function listDevices(request, reply) {
+    try { return reply.send({ success: true, data: deviceList() }); }
+    catch (error) { return fail(reply, error); }
+}
+
+export async function createDevice(request, reply) {
+    try {
+        const d = deviceCreate(request.body || {});
+        logAdminAction({ action: 'audio_device_create', targetType: 'audio_device', targetId: d.id, ...adminContext(request) }, request);
+        return reply.send({ success: true, message: 'Titik speaker dibuat', data: d }); // data carries the token ONCE
+    } catch (error) { return fail(reply, error, 'Gagal membuat titik speaker'); }
+}
+
+export async function updateDevice(request, reply) {
+    try {
+        const id = parseId(request.params.id);
+        if (!id) return reply.code(400).send({ success: false, message: 'ID tidak valid' });
+        return reply.send({ success: true, data: deviceUpdate(id, request.body || {}) });
+    } catch (error) { return fail(reply, error, 'Gagal memperbarui titik speaker'); }
+}
+
+export async function deleteDevice(request, reply) {
+    try {
+        const id = parseId(request.params.id);
+        if (!id) return reply.code(400).send({ success: false, message: 'ID tidak valid' });
+        const r = deviceDelete(id);
+        logAdminAction({ action: 'audio_device_delete', targetType: 'audio_device', targetId: id, ...adminContext(request) }, request);
+        return reply.send({ success: true, message: 'Titik speaker dihapus', data: r });
+    } catch (error) { return fail(reply, error); }
+}
+
+export async function regenDeviceToken(request, reply) {
+    try {
+        const id = parseId(request.params.id);
+        if (!id) return reply.code(400).send({ success: false, message: 'ID tidak valid' });
+        const r = deviceRegen(id);
+        logAdminAction({ action: 'audio_device_regen_token', targetType: 'audio_device', targetId: id, ...adminContext(request) }, request);
+        return reply.send({ success: true, message: 'Token baru dibuat', data: r }); // token ONCE
+    } catch (error) { return fail(reply, error); }
+}
+
+export async function testDevice(request, reply) {
+    try {
+        const id = parseId(request.params.id);
+        const sid = parseId(request.body?.sourceId);
+        if (!id) return reply.code(400).send({ success: false, message: 'ID tidak valid' });
+        if (!sid) return reply.code(400).send({ success: false, message: 'Pilih audio uji dulu' });
+        const n = deviceEnqueue([id], 'play', sid, 1);
+        return reply.send({ success: true, message: n ? 'Uji dikirim — titik speaker memutarnya saat poll berikutnya' : 'Titik speaker nonaktif', data: { queued: n } });
+    } catch (error) { return fail(reply, error, 'Gagal mengirim uji'); }
+}
+
+// Broadcast a clip to one or more Titik Speaker now (enqueue; nodes play it on their next poll).
+export async function playDevices(request, reply) {
+    try {
+        const { deviceIds, sourceId, loop } = request.body || {};
+        const sid = parseId(sourceId);
+        if (!sid) return reply.code(400).send({ success: false, message: 'Pilih audio dulu' });
+        const ids = Array.isArray(deviceIds) ? deviceIds : [];
+        if (ids.length === 0) return reply.code(400).send({ success: false, message: 'Pilih titik speaker' });
+        const n = deviceEnqueue(ids, 'play', sid, loop || 1);
+        logAdminAction({ action: 'audio_device_play', targetType: 'audio_device', devices: n, sourceId: sid, ...adminContext(request) }, request);
+        return reply.send({ success: true, message: n ? `Dikirim ke ${n} titik speaker` : 'Tak ada titik speaker aktif terpilih', data: { queued: n } });
+    } catch (error) { return fail(reply, error, 'Gagal menyiarkan ke titik speaker'); }
+}
+
+/* ---- NODE endpoints: the STB agent (device TOKEN auth, NOT an admin JWT) ---- */
+function deviceTokenFrom(request) {
+    return request.headers['x-device-token'] || request.query?.token || '';
+}
+
+// The agent short-polls for its next command. Returns { command:null } when idle, or a play/stop + clip url.
+export async function nodePoll(request, reply) {
+    try {
+        const ip = String(request.headers['x-forwarded-for'] || '').split(',')[0].trim() || request.ip;
+        const { device, command } = devicePoll(deviceTokenFrom(request), ip);
+        if (!device) return reply.code(401).send({ success: false, message: 'token tidak valid' });
+        if (!command) return reply.send({ success: true, data: { command: null } });
+        const out = { command: command.command, loop: command.loop };
+        if (command.command === 'play' && command.clip_id) out.clip_url = `/api/admin/audio/node/clip/${command.clip_id}`;
+        return reply.send({ success: true, data: out });
+    } catch (error) { return fail(reply, error); }
+}
+
+// The agent downloads the clip to play (WAV, decoded from .ulaw). Token-gated like the poll.
+export async function nodeClip(request, reply) {
+    try {
+        if (!deviceAuth(deviceTokenFrom(request))) return reply.code(401).send({ success: false, message: 'token tidak valid' });
+        const id = parseId(request.params.id);
+        let wav = null;
+        try { wav = getClipWav(id); } catch { wav = null; }
+        if (!wav || !wav.buffer) return reply.code(404).send({ success: false, message: 'Audio tidak ditemukan' });
+        reply.header('Content-Type', 'audio/wav');
+        reply.header('Cache-Control', 'no-store');
+        return reply.send(wav.buffer);
+    } catch (error) { return fail(reply, error); }
+}

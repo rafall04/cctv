@@ -333,6 +333,40 @@ export const stopAllSirens = async () => {
     catch (error) { return failure(error, 'Gagal mematikan sirene'); }
 };
 
+/* ------------------------------------------------- Titik Speaker (network nodes) */
+
+export const getDevices = async () => {
+    try { return (await apiClient.get(`${BASE}/devices`)).data; }
+    catch (error) { return failure(error, 'Gagal memuat titik speaker'); }
+};
+/** Create a node — the response carries the device token ONCE (show it to the operator). */
+export const createDevice = async ({ name, areaId }) => {
+    try { return (await apiClient.post(`${BASE}/devices`, { name, areaId })).data; }
+    catch (error) { return failure(error, 'Gagal membuat titik speaker'); }
+};
+export const updateDevice = async (id, payload) => {
+    try { return (await apiClient.put(`${BASE}/devices/${id}`, payload)).data; }
+    catch (error) { return failure(error, 'Gagal memperbarui titik speaker'); }
+};
+export const deleteDevice = async (id) => {
+    try { return (await apiClient.delete(`${BASE}/devices/${id}`)).data; }
+    catch (error) { return failure(error, 'Gagal menghapus titik speaker'); }
+};
+/** Regenerate a node's token — response carries the NEW token once. */
+export const regenDeviceToken = async (id) => {
+    try { return (await apiClient.post(`${BASE}/devices/${id}/token`)).data; }
+    catch (error) { return failure(error, 'Gagal membuat token baru'); }
+};
+export const testDevice = async (id, sourceId) => {
+    try { return (await apiClient.post(`${BASE}/devices/${id}/test`, { sourceId })).data; }
+    catch (error) { return failure(error, 'Gagal mengirim uji'); }
+};
+/** Broadcast a clip to one or more nodes now. */
+export const playDevices = async ({ deviceIds, sourceId, loop = 1 }) => {
+    try { return (await apiClient.post(`${BASE}/devices/play`, { deviceIds, sourceId, loop })).data; }
+    catch (error) { return failure(error, 'Gagal menyiarkan ke titik speaker'); }
+};
+
 /* ----------------------------------------------------- motion -> deter audio */
 
 export const getMotionArms = async () => {
