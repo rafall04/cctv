@@ -121,8 +121,8 @@ function RecordingQuickEditCard({
                     data-testid={`recording-status-${cameraId}`}
                     className={`inline-flex shrink-0 self-start rounded-full px-3 py-1 text-xs font-semibold ${
                         isRecording
-                            ? 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-100'
-                            : 'bg-gray-100 text-content dark:bg-gray-700/90'
+                            ? 'bg-status-live/15 text-status-live'
+                            : 'bg-surface-sunken text-content-muted'
                     }`}
                 >
                     {isRecording ? 'Recording' : 'Stopped'}
@@ -177,6 +177,8 @@ function RecordingQuickEditCard({
                                 <span className="text-sm text-content-muted">Aktifkan Rekaman</span>
                                 <button
                                     type="button"
+                                    role="switch"
+                                    aria-checked={draft.enable_recording}
                                     onClick={() => handleDraftChange('enable_recording', !draft.enable_recording)}
                                     disabled={isSaving}
                                     aria-label="Aktifkan Rekaman"

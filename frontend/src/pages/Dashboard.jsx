@@ -38,7 +38,7 @@ function formatLastUpdate(date) {
     const diff = Math.floor((now - date) / 1000);
     if (diff < 60) return 'Baru saja';
     if (diff < 3600) return `${Math.floor(diff / 60)} menit lalu`;
-    return date.toLocaleTimeString();
+    return date.toLocaleTimeString('id-ID');
 }
 
 /*

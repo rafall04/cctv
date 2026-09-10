@@ -494,8 +494,8 @@ function SponsorManagement() {
                                             </td>
                                             <td className="px-4 py-3">
                                                 <span className={`px-2 py-1 rounded text-xs font-medium ${(sponsor.active === 1 || sponsor.active === true)
-                                                    ? 'bg-green-500/20 text-green-400'
-                                                    : 'bg-red-500/20 text-red-400'
+                                                    ? 'bg-status-live/10 text-status-live'
+                                                    : 'bg-surface-sunken text-content-muted'
                                                     }`}>
                                                     {(sponsor.active === 1 || sponsor.active === true) ? 'Aktif' : 'Nonaktif'}
                                                 </span>

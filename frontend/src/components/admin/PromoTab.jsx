@@ -130,7 +130,7 @@ export default function PromoTab() {
                                         <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${p.active === 1 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-surface-sunken text-content-muted'}`}>
                                             {p.active === 1 ? 'Aktif' : 'Nonaktif'}
                                         </span>
-                                        <span className="rounded-full bg-primary-100 px-2 py-0.5 text-[10px] font-medium text-primary dark:bg-sky-900/40 text-primary">{p.type}</span>
+                                        <span className="rounded-full bg-primary-100 px-2 py-0.5 text-xs font-medium text-primary dark:bg-sky-900/40">{{ percent: 'Persen', flat: 'Flat', gift: 'Hadiah' }[p.type] || p.type}</span>
                                     </div>
                                     <p className="mt-0.5 text-sm text-content-muted">{promoValueLabel(p)}</p>
                                     <p className="text-xs text-content-subtle">

@@ -36,6 +36,9 @@ export default function CameraRecordingSection({ formData, isSubmitting, onChang
                 <span className="text-sm text-content-muted">Aktifkan Rekaman</span>
                 <button
                     type="button"
+                    role="switch"
+                    aria-checked={formData.enable_recording}
+                    aria-label="Aktifkan Rekaman"
                     onClick={() => onChange({ target: { name: 'enable_recording', value: !formData.enable_recording, type: 'checkbox', checked: !formData.enable_recording } })}
                     disabled={isSubmitting}
                     className={`relative w-11 h-6 rounded-full transition-colors disabled:opacity-50 shrink-0 ${formData.enable_recording ? 'bg-red-500' : 'bg-gray-300 dark:bg-gray-600'}`}

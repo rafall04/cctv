@@ -23,8 +23,11 @@ export default function FeedbackListPanel({
                     feedbacks.map((feedback) => (
                         <div
                             key={feedback.id}
+                            role="button"
+                            tabIndex={0}
                             onClick={() => onSelect(feedback)}
-                            className={`p-4 cursor-pointer hover:bg-gray-50 transition-colors ${
+                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(feedback); } }}
+                            className={`p-4 cursor-pointer hover:bg-surface-raised transition-colors ${
                                 selectedFeedback?.id === feedback.id ? 'bg-primary-100 dark:bg-sky-900/20' : ''
                             }`}
                         >
@@ -60,9 +63,11 @@ export default function FeedbackListPanel({
             {pagination.totalPages > 1 && (
                 <div className="flex items-center justify-between px-4 py-3 border-t border-edge">
                     <button
+                        type="button"
                         onClick={onPreviousPage}
                         disabled={pagination.page === 1}
-                        className="p-2 rounded-lg hover:bg-surface-sunken disabled:opacity-50"
+                        aria-label="Halaman sebelumnya"
+                        className="p-2 rounded-lg hover:bg-surface-sunken disabled:opacity-50 min-h-[40px] min-w-[40px] sm:min-h-0 sm:min-w-0"
                     >
                         <FeedbackIcons.ChevronLeft />
                     </button>
@@ -70,9 +75,11 @@ export default function FeedbackListPanel({
                         {pagination.page} / {pagination.totalPages}
                     </span>
                     <button
+                        type="button"
                         onClick={onNextPage}
                         disabled={pagination.page === pagination.totalPages}
-                        className="p-2 rounded-lg hover:bg-surface-sunken disabled:opacity-50"
+                        aria-label="Halaman berikutnya"
+                        className="p-2 rounded-lg hover:bg-surface-sunken disabled:opacity-50 min-h-[40px] min-w-[40px] sm:min-h-0 sm:min-w-0"
                     >
                         <FeedbackIcons.ChevronRight />
                     </button>

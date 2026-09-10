@@ -155,7 +155,7 @@ function CameraCard({
         },
         camera.status === 'maintenance' && {
             label: 'Perbaikan',
-            className: 'bg-red-500/90 text-white',
+            className: 'bg-slate-600/90 text-white',
             title: 'Dalam Perbaikan',
         },
         camera.is_tunnel === 1 && camera.status !== 'maintenance' && {
@@ -217,7 +217,7 @@ function CameraCard({
                         {DELIVERY_LABEL[camera.delivery_type] || camera.delivery_type}
                     </CameraBadge>
                     <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold shadow-sm ${availabilityTone}`}>
-                        {camera.availability_state || (camera.enabled ? 'online' : 'offline')}
+                        {{ online: 'Online', degraded: 'Menurun', offline: 'Offline', maintenance: 'Perbaikan' }[camera.availability_state] || (camera.enabled ? 'Online' : 'Offline')}
                     </span>
                 </div>
                 <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/80 to-transparent">

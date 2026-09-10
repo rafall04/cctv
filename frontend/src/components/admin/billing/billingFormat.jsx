@@ -48,6 +48,15 @@ export const PAY_STATUS_BADGES = {
     cancelled: 'bg-surface-sunken text-content-muted',
 };
 
+// Indonesian labels for the raw backend enums — the badges must not print 'paid'/'active' to the operator
+// while the filter chips next to them say 'Berhasil'/'Aktif'.
+export const PAY_STATUS_LABEL = {
+    pending: 'Menunggu', paid: 'Berhasil', failed: 'Gagal', expired: 'Kedaluwarsa', cancelled: 'Dibatalkan',
+};
+export const SUB_STATUS_LABEL = {
+    active: 'Aktif', suspended: 'Ditangguhkan', cancelled: 'Dihentikan',
+};
+
 export function StatusBadge({ className = '', children }) {
     return (
         <span className={`inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold ${className}`}>

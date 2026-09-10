@@ -493,7 +493,7 @@ export default function PlaybackAnalytics() {
                                                 <div className="text-xs text-content-muted">{session.segment_filename || session.segmentFilename}</div>
                                             </div>
                                             <span className="rounded-full bg-surface-sunken px-2.5 py-1 text-xs font-medium text-content">
-                                                {session.playback_access_mode || session.playbackAccessMode}
+                                                {ACCESS_MODE_LABELS[session.playback_access_mode || session.playbackAccessMode]?.label || session.playback_access_mode || session.playbackAccessMode}
                                             </span>
                                         </div>
                                         <div className="mt-3 grid gap-1 text-sm text-content-muted">
@@ -615,7 +615,7 @@ export default function PlaybackAnalytics() {
                                     <div className="font-semibold text-content">{segment.camera_name}</div>
                                     <div className="text-xs text-content-muted">{segment.segment_filename}</div>
                                     <div className="mt-1 text-sm text-content-muted">
-                                        {segment.playback_access_mode} • {segment.total_sessions} sesi • {formatWatchTime(segment.total_watch_time)}
+                                        {ACCESS_MODE_LABELS[segment.playback_access_mode]?.label || segment.playback_access_mode} • {segment.total_sessions} sesi • {formatWatchTime(segment.total_watch_time)}
                                     </div>
                                 </div>
                             ))}
@@ -626,7 +626,7 @@ export default function PlaybackAnalytics() {
                         <div className="space-y-3">
                             {accessBreakdown.map((item) => (
                                 <div key={item.playback_access_mode} className="rounded-xl bg-surface-sunken px-4 py-3">
-                                    <div className="font-semibold text-content">{item.playback_access_mode}</div>
+                                    <div className="font-semibold text-content">{ACCESS_MODE_LABELS[item.playback_access_mode]?.label || item.playback_access_mode}</div>
                                     <div className="mt-1 text-sm text-content-muted">{item.count} sesi</div>
                                 </div>
                             ))}

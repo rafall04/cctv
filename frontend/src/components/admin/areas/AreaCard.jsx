@@ -70,12 +70,12 @@ export default function AreaCard({
                             <line x1="3" y1="3" x2="21" y2="21" strokeWidth={2} strokeLinecap="round" />
                         </svg>
                     </button>
-                    <button type="button" onClick={() => onEdit(area)} className="p-2 rounded-lg bg-surface-sunken text-content-muted hover:text-primary hover:bg-primary-100 dark:hover:bg-primary/10 transition-all">
+                    <button type="button" onClick={() => onEdit(area)} title="Edit area" aria-label="Edit area" className="p-2 rounded-lg bg-surface-sunken text-content-muted hover:text-primary hover:bg-primary-100 dark:hover:bg-primary/10 transition-all">
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                         </svg>
                     </button>
-                    <button type="button" onClick={() => onDelete(area)} className="p-2 rounded-lg bg-surface-sunken text-content-muted hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all">
+                    <button type="button" onClick={() => onDelete(area)} title="Hapus area" aria-label="Hapus area" className="p-2 rounded-lg bg-surface-sunken text-content-muted hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all">
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                         </svg>
@@ -151,6 +151,9 @@ export default function AreaCard({
             <div className="mb-4 grid gap-3">
                 <button
                     type="button"
+                    role="switch"
+                    aria-checked={gridDefaultEnabled}
+                    aria-label="Grid Default"
                     onClick={() => onToggleGridDefault(area)}
                     disabled={gridDefaultBusy}
                     className={`w-full rounded-2xl border px-4 py-3 text-left transition-colors ${

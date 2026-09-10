@@ -163,8 +163,13 @@ export function InteractiveBarChart({ data, maxValue, onBarClick, selectedDate }
             {data.map((item, index) => (
                 <div
                     key={`${item.rawDate}-${index}`}
+                    role="button"
+                    tabIndex={0}
+                    aria-pressed={selectedDate === item.rawDate}
+                    aria-label={`Detail ${item.label}`}
                     className={`flex items-center gap-3 p-1 rounded-lg cursor-pointer transition-all hover:bg-surface-sunken ${selectedDate === item.rawDate ? 'bg-primary-100 dark:bg-primary/10 ring-1 ring-primary/30' : ''}`}
                     onClick={() => onBarClick(item)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onBarClick(item); } }}
                 >
                     <span className="text-xs text-content-muted w-16 text-right truncate">{item.label}</span>
                     <div className="flex-1 h-6 bg-surface-sunken rounded-lg overflow-hidden">
@@ -222,8 +227,8 @@ export function Pagination({ currentPage, totalPages, onPageChange }) {
 
     return (
         <div className="flex items-center justify-center gap-1 mt-4">
-            <button onClick={() => onPageChange(currentPage - 1)} disabled={currentPage === 1} className="p-2 rounded-lg text-content-muted hover:bg-surface-sunken disabled:opacity-50 disabled:cursor-not-allowed">
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+            <button type="button" aria-label="Halaman sebelumnya" onClick={() => onPageChange(currentPage - 1)} disabled={currentPage === 1} className="p-2 rounded-lg text-content-muted hover:bg-surface-sunken disabled:opacity-50 disabled:cursor-not-allowed">
+                <svg aria-hidden="true" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
             </button>
             {start > 1 && (
                 <>
@@ -246,8 +251,8 @@ export function Pagination({ currentPage, totalPages, onPageChange }) {
                     <button onClick={() => onPageChange(totalPages)} className="px-3 py-1 rounded-lg text-sm text-content-muted hover:bg-surface-sunken">{totalPages}</button>
                 </>
             )}
-            <button onClick={() => onPageChange(currentPage + 1)} disabled={currentPage === totalPages} className="p-2 rounded-lg text-content-muted hover:bg-surface-sunken disabled:opacity-50 disabled:cursor-not-allowed">
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+            <button type="button" aria-label="Halaman berikutnya" onClick={() => onPageChange(currentPage + 1)} disabled={currentPage === totalPages} className="p-2 rounded-lg text-content-muted hover:bg-surface-sunken disabled:opacity-50 disabled:cursor-not-allowed">
+                <svg aria-hidden="true" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
             </button>
         </div>
     );

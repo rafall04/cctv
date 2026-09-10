@@ -7,7 +7,7 @@
 
 import { useMemo, useState } from 'react';
 import billingAdminService from '../../../services/billingAdminService';
-import { formatRupiah, StatusBadge, SUB_STATUS_BADGES } from './billingFormat';
+import { formatRupiah, StatusBadge, SUB_STATUS_BADGES, SUB_STATUS_LABEL } from './billingFormat';
 import { Card } from '../../ui/Card';
 import { TableShell } from '../../ui/DataTable';
 import { inputClasses } from '../../ui/Field';
@@ -152,7 +152,7 @@ export default function SubscriptionsTab({ subscriptions, assignableCameras, cus
                                                 {sub.customer_username}<span className="ml-1 text-xs text-content-subtle">({formatRupiah(sub.wallet_balance || 0)})</span>
                                             </td>
                                             <td className="px-3 py-2 text-right">{formatRupiah(sub.monthly_price)}</td>
-                                            <td className="px-3 py-2 text-center"><StatusBadge className={SUB_STATUS_BADGES[sub.status] || ''}>{sub.status}</StatusBadge></td>
+                                            <td className="px-3 py-2 text-center"><StatusBadge className={SUB_STATUS_BADGES[sub.status] || ''}>{SUB_STATUS_LABEL[sub.status] || sub.status}</StatusBadge></td>
                                             <td className="px-3 py-2"><Actions sub={sub} busy={busy} onToggleStatus={toggleStatus} onCancel={cancelSub} /></td>
                                         </tr>
                                     ))}
@@ -174,7 +174,7 @@ export default function SubscriptionsTab({ subscriptions, assignableCameras, cus
                                                 {sub.customer_username} · {formatRupiah(sub.wallet_balance || 0)}
                                             </p>
                                         </div>
-                                        <StatusBadge className={SUB_STATUS_BADGES[sub.status] || ''}>{sub.status}</StatusBadge>
+                                        <StatusBadge className={SUB_STATUS_BADGES[sub.status] || ''}>{SUB_STATUS_LABEL[sub.status] || sub.status}</StatusBadge>
                                     </div>
                                     <p className="mt-2 text-sm text-content-muted">{formatRupiah(sub.monthly_price)}/bulan</p>
                                     {sub.status !== 'cancelled' && <div className="mt-3"><Actions sub={sub} full busy={busy} onToggleStatus={toggleStatus} onCancel={cancelSub} /></div>}

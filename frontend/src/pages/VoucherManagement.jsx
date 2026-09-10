@@ -414,7 +414,7 @@ export default function VoucherManagement() {
                                         </td>
                                         <td className="px-4 py-3">
                                             <div className="flex flex-wrap gap-1">
-                                                <span className={`px-2 py-0.5 rounded text-xs font-medium ${p.active ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500'}`}>
+                                                <span className={`px-2 py-0.5 rounded text-xs font-medium ${p.active ? 'bg-status-live/10 text-status-live' : 'bg-surface-sunken text-content-muted'}`}>
                                                     {p.active ? 'Aktif' : 'Nonaktif'}
                                                 </span>
                                                 {p.online_purchasable

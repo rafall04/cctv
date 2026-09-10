@@ -33,7 +33,7 @@ function StatusCell({ customer }) {
     if (customer.suspended_subscriptions > 0) {
         return <StatusBadge className={SUB_STATUS_BADGES.suspended}>{customer.suspended_subscriptions} ditangguhkan</StatusBadge>;
     }
-    return <StatusBadge className={SUB_STATUS_BADGES.active}>OK</StatusBadge>;
+    return null; // healthy = no badge (a label on ~100% of rows is decoration, not information)
 }
 
 export default function CustomersTab({ customers, plans, run, busy }) {

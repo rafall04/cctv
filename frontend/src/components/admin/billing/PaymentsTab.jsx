@@ -9,7 +9,7 @@
 
 import { useMemo, useState } from 'react';
 import billingAdminService from '../../../services/billingAdminService';
-import { formatRupiah, formatDateTime, StatusBadge, PAY_STATUS_BADGES } from './billingFormat';
+import { formatRupiah, formatDateTime, StatusBadge, PAY_STATUS_BADGES, PAY_STATUS_LABEL } from './billingFormat';
 import { TableShell } from '../../ui/DataTable';
 import { useConfirm } from '../../../contexts/ConfirmContext';
 import { useTimezone } from '../../../contexts/TimezoneContext';
@@ -133,7 +133,7 @@ export default function PaymentsTab({ payments, run, busy }) {
                                 </td>
                                 <td className="px-3 py-2 text-content-muted">{payment.gateway}</td>
                                 <td className="px-3 py-2 text-right font-semibold">{formatRupiah(payment.amount)}</td>
-                                <td className="px-3 py-2 text-center"><StatusBadge className={PAY_STATUS_BADGES[payment.status] || ''}>{payment.status}</StatusBadge></td>
+                                <td className="px-3 py-2 text-center"><StatusBadge className={PAY_STATUS_BADGES[payment.status] || ''}>{PAY_STATUS_LABEL[payment.status] || payment.status}</StatusBadge></td>
                                 <td className="px-3 py-2 whitespace-nowrap text-content-muted">{formatDateTime(payment.created_at, timezone)}</td>
                                 <td className="px-3 py-2 text-right"><ConfirmBtn payment={payment} busy={busy} onConfirm={confirmPaid} /></td>
                             </tr>
@@ -151,7 +151,7 @@ export default function PaymentsTab({ payments, run, busy }) {
                                 <p className="truncate font-semibold text-content">{payment.username || payment.user_id}</p>
                                 <p className="text-xs text-content-subtle">#{payment.id} · {payment.gateway} · {formatDateTime(payment.created_at, timezone)}</p>
                             </div>
-                            <StatusBadge className={PAY_STATUS_BADGES[payment.status] || ''}>{payment.status}</StatusBadge>
+                            <StatusBadge className={PAY_STATUS_BADGES[payment.status] || ''}>{PAY_STATUS_LABEL[payment.status] || payment.status}</StatusBadge>
                         </div>
                         {payment.failure_reason && (
                             <p className="mt-2 rounded-lg bg-red-50 px-2 py-1 text-[11px] text-red-600 dark:bg-red-900/20 dark:text-red-400">

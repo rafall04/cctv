@@ -28,7 +28,7 @@ const ITEMS = [
     {
         key: 'recent_gap_cameras',
         label: 'Recent Gaps',
-        tone: 'border-primary-300 bg-primary-100 text-primary border-primary-300 dark:bg-primary/10 text-primary',
+        tone: 'border-primary-300 bg-primary-100 text-primary dark:bg-primary/10',
         caption: 'Ada gap segmen terbaru',
     },
 ];
@@ -40,16 +40,19 @@ export default function RecordingAssuranceSummary({ summary }) {
 
     return (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {ITEMS.map((item) => (
-                <div
-                    key={item.key}
-                    className={`rounded-2xl border p-5 shadow-sm ${item.tone}`}
-                >
-                    <p className="text-sm font-semibold">{item.label}</p>
-                    <p className="mt-3 text-3xl font-bold">{summary[item.key] ?? 0}</p>
-                    <p className="mt-2 text-xs font-medium opacity-80">{item.caption}</p>
-                </div>
-            ))}
+            {ITEMS.map((item) => {
+                // A zero-count card must NOT stay coloured (red/amber/orange on "0" reads as a false alarm on
+                // a perfectly healthy fleet). Neutral surface when the count is 0; the alert tone only when >0.
+                const count = summary[item.key] ?? 0;
+                const tone = count > 0 ? item.tone : 'border-edge bg-surface text-content';
+                return (
+                    <div key={item.key} className={`rounded-2xl border p-5 shadow-sm ${tone}`}>
+                        <p className="text-sm font-semibold">{item.label}</p>
+                        <p className="mt-3 text-3xl font-bold tabular-nums">{count}</p>
+                        <p className="mt-2 text-xs font-medium opacity-80">{item.caption}</p>
+                    </div>
+                );
+            })}
         </div>
     );
 }

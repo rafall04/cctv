@@ -158,7 +158,7 @@ function PasswordRequirementsDisplay({ password, username = '' }) {
 
     return (
         <div className="mt-2 space-y-1">
-            <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Password requirements:</p>
+            <p className="text-xs font-medium text-content-muted">Syarat kata sandi:</p>
             <ul className="space-y-1">
                 {items.map(item => (
                     <li key={item.key} className="flex items-center gap-2 text-xs">

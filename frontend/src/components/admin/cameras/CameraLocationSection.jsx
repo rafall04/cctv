@@ -52,6 +52,9 @@ export default function CameraLocationSection({
                 </div>
                 <button
                     type="button"
+                    role="switch"
+                    aria-checked={isTunnel}
+                    aria-label="Koneksi Tunnel"
                     onClick={onTunnelToggle}
                     disabled={isSubmitting}
                     className={`relative w-11 h-6 rounded-full transition-colors disabled:opacity-50 shrink-0 ${isTunnel ? 'bg-amber-500' : 'bg-gray-300 dark:bg-gray-600'}`}

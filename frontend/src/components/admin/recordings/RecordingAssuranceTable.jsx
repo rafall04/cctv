@@ -96,8 +96,8 @@ export default function RecordingAssuranceTable({ cameras = [] }) {
                                     <div className="text-xs text-content-muted">ID {camera.id}</div>
                                 </td>
                                 <td className="px-4 py-3">
-                                    <span className={`rounded px-2 py-1 text-xs font-medium capitalize ${getHealthTone(camera.health)}`}>
-                                        {camera.health}
+                                    <span className={`rounded px-2 py-1 text-xs font-medium ${getHealthTone(camera.health)}`}>
+                                        {{ healthy: 'Sehat', warning: 'Perlu Perhatian', critical: 'Kritis' }[camera.health] || camera.health}
                                     </span>
                                 </td>
                                 <td className="px-4 py-3">

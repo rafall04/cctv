@@ -37,13 +37,13 @@ export function CameraManagementErrorState({ error, onRetry }) {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
             </div>
-            <h3 className="text-lg font-semibold text-content mb-2">Failed to Load Cameras</h3>
+            <h3 className="text-lg font-semibold text-content mb-2">Gagal Memuat Kamera</h3>
             <p className="text-content-muted mb-6">{error}</p>
             <button
                 onClick={onRetry}
                 className="px-6 py-2.5 bg-gradient-to-r from-primary to-primary-600 hover:from-primary-600 hover:to-blue-700 text-white font-semibold rounded-xl shadow-lg shadow-primary/25 transition-all"
             >
-                Try Again
+                Coba Lagi
             </button>
         </div>
     );
