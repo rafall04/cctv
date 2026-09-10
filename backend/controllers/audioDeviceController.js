@@ -123,14 +123,21 @@ export async function nodePoll(request, reply) {
         deviceTouch(dev.id, ip);
         const deadline = Date.now() + POLL_HOLD_MS;
         for (;;) {
+            // Check the socket BEFORE claiming: claimNextCommand DELETES the command, so claiming onto a dead
+            // socket (client dropped during the hold) would lose an adzan/emergency the node never received.
+            if (request.raw.destroyed) break;
             const cmd = deviceClaim(dev.id);
             if (cmd) {
+                if (request.raw.destroyed) { // raced: socket died between the check and the claim -> put it back
+                    try { deviceEnqueue([dev.id], cmd.command, cmd.clip_id, cmd.loop); } catch { /* device gone */ }
+                    break;
+                }
                 const out = { command: cmd.command, loop: cmd.loop };
                 if (cmd.command === 'play' && cmd.clip_id) out.clip_url = `/api/admin/audio/node/clip/${cmd.clip_id}`;
                 if (cmd.command === 'talk_start') out.stream_url = '/api/admin/audio/node/stream';
                 return reply.send({ success: true, data: out });
             }
-            if (Date.now() >= deadline || request.raw.destroyed) break; // window elapsed / client gone
+            if (Date.now() >= deadline) break; // window elapsed
             // eslint-disable-next-line no-await-in-loop
             await sleep(POLL_STEP_MS);
         }

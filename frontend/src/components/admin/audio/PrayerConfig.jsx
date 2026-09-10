@@ -33,6 +33,8 @@ export default function PrayerConfig({ clips, areas }) {
     const [times, setTimes] = useState(null);
     const [saving, setSaving] = useState(false);
     const [advanced, setAdvanced] = useState(false);
+    const [dirty, setDirty] = useState(false); // unsaved edits — the sub-toggles (Qori/Ramadan/Sahur) look like
+    //                                             the auto-saving master switch but only commit on Simpan.
     const { showNotification } = useNotification();
 
     // Preview reflects the EDITED (possibly unsaved) form — pass its location/params so times update the
@@ -65,7 +67,7 @@ export default function PrayerConfig({ clips, areas }) {
 
     if (!cfg) return <p className="text-sm text-content-muted">Memuat pengaturan adzan…</p>;
 
-    const set = (patch) => setCfg((c) => ({ ...c, ...patch }));
+    const set = (patch) => { setDirty(true); setCfg((c) => ({ ...c, ...patch })); };
 
     // "Adzan berikutnya" — the next enabled prayer after the current local minute (in the config tz).
     const hhmmToMin = (s) => { const m = /^(\d{2}):(\d{2})$/.exec(String(s || '')); return m ? (Number(m[1]) * 60 + Number(m[2])) : null; };
@@ -108,6 +110,7 @@ export default function PrayerConfig({ clips, areas }) {
             return;
         }
         setCfg(r.data);
+        setDirty(false); // toggling enable persists the WHOLE form (next = {...cfg, enabled}), so edits are saved too
         reloadTimes(r.data);
         showNotification({ type: turningOn ? 'success' : 'info', title: turningOn ? 'Jadwal sholat aktif' : 'Jadwal sholat nonaktif', message: turningOn ? 'Tersimpan — adzan dan/atau qori berbunyi sesuai pengaturan.' : 'Tersimpan.' });
     };
@@ -126,6 +129,7 @@ export default function PrayerConfig({ clips, areas }) {
         setSaving(false);
         if (!r.success) { showNotification({ type: 'error', title: 'Gagal', message: r.message }); return; }
         setCfg(r.data);
+        setDirty(false);
         showNotification({ type: 'success', title: 'Pengaturan adzan disimpan' });
         reloadTimes(r.data);
     };
@@ -408,9 +412,12 @@ export default function PrayerConfig({ clips, areas }) {
 
             <div className="flex items-center justify-between gap-2">
                 <p className="text-xs text-content-subtle">Adzan &amp; qori mengabaikan jam tenang (memang harus berbunyi). Hanya kamera &quot;Didukung&quot; di area yang berbunyi.</p>
-                <button type="button" onClick={save} disabled={saving} className="shrink-0 rounded-control bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary/90 disabled:opacity-50">
-                    {saving ? 'Menyimpan…' : 'Simpan'}
-                </button>
+                <div className="flex shrink-0 items-center gap-2">
+                    {dirty && <span className="text-xs font-medium text-status-warn">● Belum disimpan</span>}
+                    <button type="button" onClick={save} disabled={saving} className={`rounded-control px-4 py-2 text-sm font-semibold text-white transition-colors disabled:opacity-50 ${dirty ? 'bg-status-warn hover:bg-status-warn/90' : 'bg-primary hover:bg-primary/90'}`}>
+                        {saving ? 'Menyimpan…' : 'Simpan'}
+                    </button>
+                </div>
             </div>
         </section>
     );

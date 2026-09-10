@@ -77,7 +77,7 @@ export default function TalkTab({ cameras }) {
         try { r.ctx && r.ctx.state !== 'closed' && r.ctx.close(); } catch { /* */ }
         try { if (r.ws && r.ws.readyState <= 1) { r.ws.send(JSON.stringify({ type: 'stop' })); r.ws.close(); } } catch { /* */ }
         if (r.workletUrl) { try { URL.revokeObjectURL(r.workletUrl); } catch { /* */ } }
-        refs.current = { ws: null, ctx: null, node: null, stream: null, active: false, workletUrl: null };
+        refs.current = { ws: null, ctx: null, node: null, stream: null, active: false, onair: false, workletUrl: null };
         setLevel(0);
         setState('idle');
     }, []);
@@ -104,6 +104,7 @@ export default function TalkTab({ cameras }) {
             refs.current.ws = ws;
 
             ws.onmessage = (ev) => {
+                if (!refs.current.active) return; // button already released -> ignore a late 'ready' (would bounce UI back to onair)
                 try {
                     const m = JSON.parse(ev.data);
                     if (m.type === 'ready') {
@@ -159,11 +160,13 @@ export default function TalkTab({ cameras }) {
     // Safety: releasing focus / leaving must stop a hot mic. Also clean up on unmount.
     useEffect(() => {
         const onLeave = () => stop();
+        const onVisibility = () => { if (document.hidden) stop(); };
         window.addEventListener('blur', onLeave);
-        document.addEventListener('visibilitychange', () => { if (document.hidden) stop(); });
+        document.addEventListener('visibilitychange', onVisibility);
         window.addEventListener('pagehide', onLeave);
         return () => {
             window.removeEventListener('blur', onLeave);
+            document.removeEventListener('visibilitychange', onVisibility); // was leaking: added anonymously, never removed
             window.removeEventListener('pagehide', onLeave);
             cleanup();
         };

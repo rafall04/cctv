@@ -112,12 +112,14 @@ export async function fireEmergency({ sourceType = 'clip', sourceId, targetKind,
     const { results } = await playToCameras(ids, sourceType, parseInt(sourceId, 10),
         Math.min(Math.max(parseInt(loop, 10) || 3, 1), 20), { preempt: true, gainDb: clampGain(gainDb) });
     // One-tap panic: also raise the built-in siren on any target that has an IMOU SN (auto-off protects it).
+    // Fire them in PARALLEL: each is a cloud RPC with a 15s timeout, so a serial await-loop could hang the
+    // emergency HTTP response up to ~cap×15s when the cloud is slow. Different SN each -> parallel is safe.
     let sirens = 0;
     if (siren) {
         const sirenCams = query(`SELECT id FROM cameras WHERE id IN (${ids.map(() => '?').join(',')}) AND imou_sn IS NOT NULL AND imou_sn != ''`, ids);
-        for (const c of sirenCams) {
-            try { await triggerCameraSiren(c.id, true); sirens += 1; } catch (e) { console.error('[Darurat] sirene gagal:', e.message); }
-        }
+        const outcomes = await Promise.allSettled(sirenCams.map((c) => triggerCameraSiren(c.id, true)));
+        sirens = outcomes.filter((o) => o.status === 'fulfilled').length;
+        outcomes.filter((o) => o.status === 'rejected').forEach((o) => console.error('[Darurat] sirene gagal:', o.reason?.message));
     }
     return { results, ids, sirens };
 }

@@ -160,6 +160,10 @@ export function talkHandler(socket, req) {
             release(s.id, s.token);
         }
         sessions.length = 0;
+        // Clear any talk_start a node hasn't claimed yet (enqueue 'stop' drops its queue first) BEFORE closing
+        // the live sinks — otherwise a node that polls just after we end opens a stream nobody feeds (ghost
+        // ~12s until its idle self-heal). endDeviceTalk then EOFs the sinks of nodes already streaming.
+        for (const d of deviceTargets) { try { deviceEnqueue([d], 'stop'); } catch { /* */ } }
         for (const d of deviceTargets) { try { endDeviceTalk(d); } catch { /* */ } } // close node streams -> aplay EOF
         console.log(`[AudioTalk] Session end (${reason}) by admin ${t.adminUserId}`);
         try { socket.send(JSON.stringify({ type: 'ended' })); } catch { /* */ }

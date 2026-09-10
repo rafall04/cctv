@@ -77,6 +77,7 @@ export default function EmergencyPanel({ clips, playlists, cameras, areas }) {
         if (!form.label.trim()) { showNotification({ type: 'error', title: 'Isi label dulu' }); return; }
         if (!form.sourceId) { showNotification({ type: 'error', title: 'Pilih audio dulu' }); return; }
         if (form.targetKind === 'area' && !form.areaId) { showNotification({ type: 'error', title: 'Pilih area target' }); return; }
+        if (form.targetKind === 'cameras' && form.cameraIds.length === 0) { showNotification({ type: 'error', title: 'Pilih minimal satu kamera' }); return; }
         setSaving(true);
         const payload = {
             label: form.label.trim(), sourceType: form.sourceType, sourceId: Number(form.sourceId),

@@ -115,36 +115,64 @@ async function setSiren(sn, on) {
 // leave a siren wailing forever; (2) a global STOP / "matikan semua sirene" can silence them all at once.
 const activeSirens = new Map(); // cameraId -> { sn, name, since, timer }
 const SIREN_AUTO_OFF_MS = Math.max(5, parseInt(process.env.AUDIO_SIREN_AUTO_OFF_SEC || '60', 10)) * 1000;
+const SIREN_AUTO_OFF_RETRY_MS = 10000; // a failed auto-off (cloud unreachable) is retried this often until OFF lands
+
+// Arm (or re-arm) a camera's auto-off. The entry is ALWAYS left in activeSirens with a LIVE timer, and is
+// removed ONLY on positive evidence the cloud accepted OFF — so a failed OFF (box offline, the frequent case)
+// stays tracked + keeps retrying + is still reachable by stopAllSirens/listActiveSirens, never "silently off".
+function scheduleAutoOff(cameraId, delay) {
+    const timer = setTimeout(async () => {
+        const entry = activeSirens.get(cameraId);
+        if (!entry) return; // already stopped elsewhere
+        try {
+            await setSiren(entry.sn, false);
+            if (activeSirens.get(cameraId) === entry) activeSirens.delete(cameraId); // confirmed OFF -> forget
+        } catch (e) {
+            console.error('[IMOU] sirene auto-off gagal — tetap terlacak, dicoba lagi:', e.message);
+            const cur = activeSirens.get(cameraId);
+            if (cur === entry) cur.timer = scheduleAutoOff(cameraId, SIREN_AUTO_OFF_RETRY_MS);
+        }
+    }, delay);
+    if (timer.unref) timer.unref();
+    return timer;
+}
 
 /** Turn a camera's built-in siren on/off by our camera id (resolves its IMOU SN). ON schedules auto-off. */
 export async function triggerCameraSiren(cameraId, on) {
     const cam = queryOne('SELECT id, name, imou_sn FROM cameras WHERE id = ?', [parseInt(cameraId, 10)]);
     if (!cam) { const e = new Error('Kamera tidak ditemukan'); e.statusCode = 404; throw e; }
     if (!cam.imou_sn) { const e = new Error('Kamera belum dipetakan ke SN IMOU'); e.statusCode = 400; throw e; }
+    // Mutate the tracker ONLY after the cloud call succeeds. If setSiren throws (cloud 502/timeout), the
+    // PREVIOUS auto-off timer must stay armed — clearing it first (the old bug) could leave a siren wailing
+    // forever on a failed re-ON. Doing the swap after the await also removes the double-ON race (a second
+    // concurrent ON now always sees the first entry and clears its timer before replacing it).
+    await setSiren(cam.imou_sn, on);
     const prev = activeSirens.get(cam.id);
     if (prev && prev.timer) clearTimeout(prev.timer);
-    await setSiren(cam.imou_sn, on);
     if (on) {
-        const timer = setTimeout(() => {
-            setSiren(cam.imou_sn, false).catch((e) => console.error('[IMOU] sirene auto-off gagal:', e.message));
-            activeSirens.delete(cam.id);
-        }, SIREN_AUTO_OFF_MS);
-        if (timer.unref) timer.unref();
-        activeSirens.set(cam.id, { sn: cam.imou_sn, name: cam.name, since: Date.now(), timer });
+        activeSirens.set(cam.id, { sn: cam.imou_sn, name: cam.name, since: Date.now(), timer: null });
+        activeSirens.get(cam.id).timer = scheduleAutoOff(cam.id, SIREN_AUTO_OFF_MS);
     } else {
         activeSirens.delete(cam.id);
     }
     return { id: cam.id, name: cam.name, siren: Boolean(on), autoOffSec: on ? SIREN_AUTO_OFF_MS / 1000 : null };
 }
 
-/** Silence every siren currently ON. Returns how many were turned off. */
+/** Silence every siren currently ON. Returns how many were CONFIRMED off. */
 export async function stopAllSirens() {
-    const list = [...activeSirens.values()];
-    activeSirens.clear();
     let n = 0;
-    for (const s of list) {
-        if (s.timer) clearTimeout(s.timer);
-        try { await setSiren(s.sn, false); n += 1; } catch (e) { console.error('[IMOU] stop-all sirene gagal:', e.message); }
+    // Positive-evidence only: forget a siren after the cloud confirms OFF. A failed OFF stays tracked (its
+    // auto-off retry timer keeps trying) instead of being cleared up front and lost — so the operator is
+    // never told "3 dimatikan" while one is still physically wailing untracked.
+    for (const [id, s] of [...activeSirens.entries()]) {
+        try {
+            await setSiren(s.sn, false);
+            if (s.timer) clearTimeout(s.timer);
+            activeSirens.delete(id);
+            n += 1;
+        } catch (e) {
+            console.error('[IMOU] stop-all sirene gagal (tetap terlacak, auto-off akan mencoba lagi):', e.message);
+        }
     }
     return n;
 }

@@ -90,7 +90,15 @@ export default function SpeakerNodesTab({ clips = [], areas = [] }) {
         showNotification({ type: r.success ? 'success' : 'error', title: 'Siaran', message: r.message });
     };
 
-    const copy = (text) => { try { navigator.clipboard.writeText(text); showNotification({ type: 'success', title: 'Disalin' }); } catch { /* clipboard blocked */ } };
+    const copy = (text) => {
+        // writeText returns a Promise — a sync try/catch misses its rejection (blocked/insecure context) and
+        // would show a false "Disalin". Confirm only on resolve; tell the operator to copy manually on failure.
+        const fail = () => showNotification({ type: 'error', title: 'Gagal menyalin', message: 'Salin manual dari kotak di atas.' });
+        if (!navigator.clipboard?.writeText) { fail(); return; }
+        navigator.clipboard.writeText(text)
+            .then(() => showNotification({ type: 'success', title: 'Disalin' }))
+            .catch(fail);
+    };
     const toggleSel = (id) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
 
     const confSnippet = (token) => `HUB_URL=${hubOrigin}\nTOKEN=${token}\nPLAYER=aplay`;

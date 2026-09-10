@@ -207,12 +207,19 @@ export function runDueSchedules(nowMs = Date.now()) {
         // whose area was later turned off stops sounding there without needing to be edited.
         playToCameras(active, s.source_type, s.source_id, s.loop_count, { gainDb: s.gain_db })
             .then((r) => {
-                const ok = r.results.filter((x) => x.ok).length;
-                console.log(`[Audio] Schedule "${s.name}": ${ok}/${r.results.length} kamera OK`);
+                // Drop cameras that weren't targets (area later turned off -> `skipped`), so a schedule whose
+                // whole area is disabled doesn't log a phantom receipt or fire a false "GAGAL 0/N" alert.
+                const targeted = r.results.filter((x) => !x.skipped);
+                if (targeted.length === 0) {
+                    console.log(`[Audio] Schedule "${s.name}": semua kamera area nonaktif — tak ada target`);
+                    return;
+                }
+                const ok = targeted.filter((x) => x.ok).length;
+                console.log(`[Audio] Schedule "${s.name}": ${ok}/${targeted.length} kamera OK`);
                 // Scheduled broadcasts left NO trace before — the most routine, least-watched path. Record a
                 // receipt like every other play, and alert if it reached nobody.
-                logPlay({ sourceType: s.source_type, sourceId: s.source_id, sourceName: `JADWAL: ${s.name}`, cameraIds: active, results: r.results, operatorName: 'jadwal' });
-                alertBroadcastResult({ label: `Jadwal "${s.name}"`, okCount: ok, total: r.results.length });
+                logPlay({ sourceType: s.source_type, sourceId: s.source_id, sourceName: `JADWAL: ${s.name}`, cameraIds: targeted.map((x) => x.cameraId), results: targeted, operatorName: 'jadwal' });
+                alertBroadcastResult({ label: `Jadwal "${s.name}"`, okCount: ok, total: targeted.length });
             })
             .catch((e) => console.error(`[Audio] Schedule "${s.name}" gagal:`, e.message));
     }

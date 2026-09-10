@@ -196,10 +196,14 @@ async function playPrayerClip(cfg, clipId, loop, { preempt, label, operator }) {
     try {
         const { results } = await playToCameras(ids, 'clip', clipId, loop || 1, { gainDb: cfg.gain_db, preempt });
         const name = getClip(clipId)?.name;
-        logPlay({ sourceType: 'clip', sourceId: clipId, sourceName: `${label}: ${name || ''}`.trim(), cameraIds: ids, results, operatorName: operator });
-        const ok = results.filter((r) => r.ok).length;
-        console.log(`[${label}] -> ${ok}/${results.length} kamera`);
-        alertBroadcastResult({ label, okCount: ok, total: results.length }); // notify if adzan/qori reached nobody
+        // Exclude cameras dropped for a disabled area (`skipped`) so a wrong-area target can't log a phantom
+        // receipt or trigger a false "adzan GAGAL 0/N" alert. If none were real targets, stay silent.
+        const targeted = results.filter((r) => !r.skipped);
+        if (targeted.length === 0) { console.log(`[${label}] -> tak ada kamera target (area nonaktif)`); return; }
+        logPlay({ sourceType: 'clip', sourceId: clipId, sourceName: `${label}: ${name || ''}`.trim(), cameraIds: targeted.map((r) => r.cameraId), results: targeted, operatorName: operator });
+        const ok = targeted.filter((r) => r.ok).length;
+        console.log(`[${label}] -> ${ok}/${targeted.length} kamera`);
+        alertBroadcastResult({ label, okCount: ok, total: targeted.length }); // notify if adzan/qori reached nobody
 
     } catch (e) {
         console.error(`[${label}] play error:`, e.message);
@@ -225,8 +229,11 @@ export async function runDuePrayer(nowMs = Date.now()) {
         const prayerHHMM = times[p];
         if (!prayerHHMM) continue;
 
-        // Qori/murottal BEFORE the adzan (normal mode — yields to the adzan that follows).
-        if (cfg.qori_enabled) {
+        // Qori/murottal BEFORE the adzan (normal mode — yields to the adzan that follows). On Friday Dzuhur
+        // set to 'skip' (the mosque calls the Jumat adzan live), the pre-Dzuhur qori is skipped too — else
+        // CCTV murottal would still play into a prayer the operator explicitly handed to the mosque.
+        const jumatSkip = p === 'dhuhr' && now.weekday === 5 && (cfg.jumat_dhuhr_mode || 'normal') === 'skip';
+        if (cfg.qori_enabled && !jumatSkip) {
             const lead = qoriLead(cfg, p);
             const qClip = (p === 'fajr' && cfg.qori_clip_id_fajr) ? cfg.qori_clip_id_fajr : cfg.qori_clip_id;
             if (lead > 0 && qClip && minutesBefore(prayerHHMM, lead) === now.hhmm) {

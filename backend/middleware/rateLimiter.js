@@ -43,7 +43,9 @@ export const RATE_LIMIT_CONFIG = {
         '/api/stream',
         '/api/viewer/heartbeat',  // Viewer heartbeat needs frequent calls (every 10s)
         '/hls',                   // HLS proxy - high frequency segment requests
-        '/api/internal'           // MediaMTX push hooks - bursty on restart; self-bounded (debounce + in-flight cap)
+        '/api/internal',          // MediaMTX push hooks - bursty on restart; self-bounded (debounce + in-flight cap)
+        '/api/admin/audio/node'   // Titik Speaker agents: device-token long-poll (held ~25s) — NOT an admin JWT.
+                                  // Would otherwise fall under adminPrefixes (60/min per CF-IP) and 429 adzan/emergency.
     ],
     // Auth endpoint prefixes
     authPrefixes: [

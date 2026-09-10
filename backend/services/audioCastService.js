@@ -172,7 +172,8 @@ export async function playToCameras(cameraIds, sourceType, sourceId, loop = 1, o
         // Hard safety stop: a blocked camera (V380-class) is never opened — a backchannel can hang it.
         if (row.audio_out_blocked) return { cameraId: id, name: row.name, ok: false, message: 'diblokir (perangkat rawan hang)' };
         // Area allowlist: a camera whose area is not audio-enabled (or has no area) is not a broadcast target.
-        if (enforceAreaScope && row.audio_broadcast_enabled !== 1) return { cameraId: id, name: row.name, ok: false, message: 'area siaran nonaktif' };
+        // `skipped` marks "not a target" (vs a genuine delivery failure) so callers don't count it as 0/N failed.
+        if (enforceAreaScope && row.audio_broadcast_enabled !== 1) return { cameraId: id, name: row.name, ok: false, skipped: true, message: 'area siaran nonaktif' };
         const cam = parseRtsp(row.private_rtsp_url);
         if (!cam) return { cameraId: id, name: row.name, ok: false, message: 'kamera tanpa RTSP internal' };
         // The stop callback lets a later higher-priority broadcast preempt THIS play (kill its child cleanly).
@@ -185,7 +186,9 @@ export async function playToCameras(cameraIds, sourceType, sourceId, loop = 1, o
             if (!token) return { cameraId: id, name: row.name, ok: false, message: busyReason(id) };
         }
         // Per-area loop ceiling (plafon) caps repeats on this camera's area; falls back to the requested loop.
-        const camLoop = row.max_loop ? Math.min(loopN, row.max_loop) : loopN;
+        // Emergency/adzan (preemptMode) bypasses the cap — like it already bypasses quiet hours + the governor —
+        // so a panic set to 5× can't be silently trimmed to an area's max_loop of 1.
+        const camLoop = (!preemptMode && row.max_loop) ? Math.min(loopN, row.max_loop) : loopN;
         // Lock is released by runPusher's onDone when the child ACTUALLY exits — token-guarded so a play that
         // was preempted mid-flight can't release the emergency holder that replaced it.
         const r = await runPusher(cam, files, camLoop, { id, name: row.name, source: sourceType, gainDb, onDone: () => release(id, token) });

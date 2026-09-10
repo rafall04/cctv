@@ -12,7 +12,10 @@ SideEffects: writes audio_devices + audio_device_commands (parameterized).
 import { query, queryOne, execute } from '../database/connectionPool.js';
 import { randomBytes } from 'crypto';
 
-const ONLINE_WINDOW_MS = 20000; // last_seen within this = "online" (the agent polls every couple seconds)
+// last_seen within this = "online". MUST exceed the node long-poll hold (POLL_HOLD_MS=25s): last_seen is
+// stamped when a poll STARTS, so a node quietly holding a 25s long-poll would otherwise flip to "offline"
+// mid-hold and blink in the UI. 40s = one full hold + margin.
+const ONLINE_WINDOW_MS = 40000;
 
 function isOnline(lastSeen) {
     if (!lastSeen) return false;
