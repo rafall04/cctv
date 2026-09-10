@@ -17,6 +17,16 @@ import { PRAYER_LOCATIONS, PRAYER_LOCATION_GROUPS, matchLocation } from './praye
 
 const PRAYERS = [['fajr', 'Subuh'], ['dhuhr', 'Dzuhur'], ['asr', 'Ashar'], ['maghrib', 'Maghrib'], ['isha', 'Isya']];
 const TZ_LABEL = { 7: 'WIB (+7)', 8: 'WITA (+8)', 9: 'WIT (+9)' };
+const QORI_QUICK = [5, 10, 15, 20, 30];
+
+// "HH:MM" minus `lead` minutes → "HH:MM" (wraps midnight) — mirrors the backend so the preview shows the
+// EXACT qori start time the scheduler will use. null for a missing/invalid time.
+const minusMinutes = (hhmm, lead) => {
+    const m = /^(\d{2}):(\d{2})$/.exec(String(hhmm || ''));
+    if (!m) return null;
+    const t = (((parseInt(m[1], 10) * 60 + parseInt(m[2], 10) - (parseInt(lead, 10) || 0)) % 1440) + 1440) % 1440;
+    return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
+};
 
 export default function PrayerConfig({ clips, areas }) {
     const [cfg, setCfg] = useState(null);
@@ -216,6 +226,80 @@ export default function PrayerConfig({ clips, areas }) {
                         <span className="text-xs text-content-subtle">mnt</span>
                     </div>
                 ))}
+            </div>
+
+            {/* Qori / murottal sebelum adzan */}
+            <div className="space-y-3 rounded-control border border-edge bg-surface-sunken p-3">
+                <label className="flex cursor-pointer items-start justify-between gap-3">
+                    <span className="min-w-0">
+                        <span className="text-sm font-semibold text-content">🎧 Qori (murottal) sebelum adzan</span>
+                        <span className="mt-0.5 block text-xs text-content-muted">Putar tilawah beberapa menit sebelum tiap adzan. Saat waktu adzan tiba, qori otomatis dihentikan dan adzan mengambil alih.</span>
+                    </span>
+                    <span
+                        role="switch" aria-checked={Boolean(cfg.qori_enabled)}
+                        onClick={() => set({ qori_enabled: cfg.qori_enabled ? 0 : 1 })}
+                        className={`relative mt-0.5 h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors ${cfg.qori_enabled ? 'bg-status-live' : 'bg-edge-strong'}`}
+                    >
+                        <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-surface shadow transition-all ${cfg.qori_enabled ? 'left-[22px]' : 'left-0.5'}`} />
+                    </span>
+                </label>
+
+                {Boolean(cfg.qori_enabled) && (
+                    <>
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <Field as="select" label="Audio qori (murottal)" value={cfg.qori_clip_id || ''} onChange={(e) => set({ qori_clip_id: e.target.value })}>
+                                <option value="">— pilih murottal —</option>
+                                {clips.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                            </Field>
+                            <Field as="select" label="Qori Subuh (opsional)" value={cfg.qori_clip_id_fajr || ''} onChange={(e) => set({ qori_clip_id_fajr: e.target.value })}>
+                                <option value="">— sama dengan di atas —</option>
+                                {clips.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                            </Field>
+                        </div>
+
+                        {!cfg.qori_clip_id && (
+                            <p className="text-xs text-status-warn">Pilih audio murottal dulu — qori tak akan berbunyi tanpa audio. Belum punya? Unggah/impor di tab Pustaka.</p>
+                        )}
+
+                        {/* Quick-fill lead for all prayers */}
+                        <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-xs text-content-muted">Terapkan ke semua:</span>
+                            {QORI_QUICK.map((n) => (
+                                <button key={n} type="button" onClick={() => set({ qori_lead_fajr: n, qori_lead_dhuhr: n, qori_lead_asr: n, qori_lead_maghrib: n, qori_lead_isha: n })}
+                                    className="rounded-control border border-edge bg-surface px-2.5 py-1 text-xs font-medium text-content-muted hover:border-edge-strong">{n} mnt</button>
+                            ))}
+                            <button type="button" onClick={() => set({ qori_lead_fajr: 0, qori_lead_dhuhr: 0, qori_lead_asr: 0, qori_lead_maghrib: 0, qori_lead_isha: 0 })}
+                                className="rounded-control border border-edge bg-surface px-2.5 py-1 text-xs font-medium text-content-subtle hover:border-edge-strong">matikan semua</button>
+                        </div>
+
+                        {/* Per-prayer lead + computed start time (precision) */}
+                        <div className="space-y-1.5">
+                            <span className="text-xs font-semibold text-content-muted">Menit sebelum tiap adzan (0 = tanpa qori)</span>
+                            {PRAYERS.map(([key, label]) => {
+                                const lead = Number(cfg[`qori_lead_${key}`]) || 0;
+                                const adzan = times?.times?.[key];
+                                const start = lead > 0 && adzan ? minusMinutes(adzan, lead) : null;
+                                const adzanOff = !cfg[`enable_${key}`];
+                                return (
+                                    <div key={key} className={`flex items-center gap-2 rounded-control border border-edge px-3 py-1.5 ${adzanOff ? 'opacity-50' : ''}`}>
+                                        <span className="flex-1 truncate text-sm text-content">{label}{adzanOff ? ' — adzan nonaktif' : ''}</span>
+                                        <input type="number" min={0} max={120} value={cfg[`qori_lead_${key}`] ?? 0} onChange={(e) => set({ [`qori_lead_${key}`]: e.target.value })} className="w-16 rounded-control border border-edge bg-surface px-2 py-1 text-sm text-content" />
+                                        <span className="text-xs text-content-subtle">mnt</span>
+                                        <span className="w-24 text-right font-mono text-xs tabular-nums text-content-muted">
+                                            {adzanOff ? '—' : start ? `${start}→${adzan}` : 'tanpa qori'}
+                                        </span>
+                                    </div>
+                                );
+                            })}
+                            <p className="text-xs text-content-subtle">Kolom kanan = jam qori mulai → jam adzan. Qori hanya berbunyi untuk waktu yang adzannya aktif.</p>
+                        </div>
+
+                        <div className="flex items-end gap-3">
+                            <Field type="number" label="Ulang qori" min={1} max={20} value={cfg.qori_loop ?? 1} onChange={(e) => set({ qori_loop: e.target.value })} />
+                            <p className="flex-1 pb-2 text-xs text-content-subtle">Qori memakai target area yang sama dengan adzan. Ulang bila murottal selesai sebelum adzan.</p>
+                        </div>
+                    </>
+                )}
             </div>
 
             {/* Advanced params */}
