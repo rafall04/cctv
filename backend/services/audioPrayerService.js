@@ -43,6 +43,7 @@ function localNow(nowMs = Date.now(), tz = 7) {
         year: w.getUTCFullYear(), month: w.getUTCMonth() + 1, day: w.getUTCDate(),
         hhmm: `${p2(w.getUTCHours())}:${p2(w.getUTCMinutes())}`,
         dateKey: `${w.getUTCFullYear()}-${p2(w.getUTCMonth() + 1)}-${p2(w.getUTCDate())}`,
+        weekday: w.getUTCDay(), // 0=Minggu … 5=Jumat
     };
 }
 
@@ -78,7 +79,8 @@ export function setConfig(fields = {}) {
             enable_fajr=?, enable_dhuhr=?, enable_asr=?, enable_maghrib=?, enable_isha=?,
             clip_id=?, clip_id_fajr=?, target_kind=?, area_id=?, camera_ids=?, loop=?, gain_db=?,
             qori_enabled=?, qori_clip_id=?, qori_clip_id_fajr=?, qori_loop=?,
-            qori_lead_fajr=?, qori_lead_dhuhr=?, qori_lead_asr=?, qori_lead_maghrib=?, qori_lead_isha=?
+            qori_lead_fajr=?, qori_lead_dhuhr=?, qori_lead_asr=?, qori_lead_maghrib=?, qori_lead_isha=?,
+            jumat_dhuhr_mode=?, jumat_dhuhr_clip_id=?, imsak_offset=?
          WHERE id = 1`,
         [
             fields.enabled !== undefined ? (fields.enabled ? 1 : 0) : cur.enabled,
@@ -106,6 +108,10 @@ export function setConfig(fields = {}) {
             Math.round(numOr(f.qori_lead_asr, cur.qori_lead_asr ?? 10, 0, 120)),
             Math.round(numOr(f.qori_lead_maghrib, cur.qori_lead_maghrib ?? 10, 0, 120)),
             Math.round(numOr(f.qori_lead_isha, cur.qori_lead_isha ?? 10, 0, 120)),
+            // Jumat Dzuhur + Imsak
+            ['normal', 'skip', 'custom'].includes(f.jumat_dhuhr_mode) ? f.jumat_dhuhr_mode : (cur.jumat_dhuhr_mode || 'normal'),
+            fields.jumat_dhuhr_clip_id !== undefined ? (parseInt(fields.jumat_dhuhr_clip_id, 10) || null) : (cur.jumat_dhuhr_clip_id ?? null),
+            Math.round(numOr(f.imsak_offset, cur.imsak_offset ?? 10, 0, 60)),
         ],
     );
     return getConfig();
@@ -139,6 +145,9 @@ export function todayTimes(nowMs = Date.now(), overrides = null) {
     const eff = overrides && typeof overrides === 'object' ? { ...cfg, ...overrides } : cfg;
     const now = localNow(nowMs, Number(eff.timezone ?? 7));
     const times = computePrayerTimes({ year: now.year, month: now.month, day: now.day }, cfgToParams(eff));
+    // Imsak = Subuh − imsak_offset (for matching the Kemenag jadwal + a future Ramadan announce). Syuruq
+    // (times.sunrise) is already computed. minutesBefore returns null if fajr is uncomputable.
+    times.imsak = minutesBefore(times.fajr, Math.round(numOr(eff.imsak_offset, 10, 0, 60)));
     // Tell the UI when the (effective) location is still unset so it can warn instead of showing wrong times.
     return { date: now.dateKey, times, cfg, locationSet: hasValidLocation(eff) };
 }
@@ -211,14 +220,24 @@ export async function runDuePrayer(nowMs = Date.now()) {
         }
 
         // Adzan at the prayer minute — PREEMPTS so it cleanly takes over from a still-playing qori.
-        if (cfg.clip_id && prayerHHMM === now.hhmm) {
+        if (prayerHHMM === now.hhmm) {
             const key = `${now.dateKey} ${p}`;
             if (cfg.last_fired !== key) {
-                execute('UPDATE audio_prayer_config SET last_fired = ? WHERE id = 1', [key]);
-                const clipId = (p === 'fajr' && cfg.clip_id_fajr) ? cfg.clip_id_fajr : cfg.clip_id;
-                // eslint-disable-next-line no-await-in-loop
-                await playPrayerClip(cfg, clipId, cfg.loop, { preempt: true, label: `Adzan ${LABELS[p]} ${times[p]}`, operator: 'jadwal-adzan' });
-                fired = true;
+                // Resolve the adzan clip (per-prayer), with Friday-Dzuhur handling. null = no adzan (either
+                // qori-only mode, or Friday 'skip' because the mosque calls the Jumat adzan live).
+                let adzanClipId = (p === 'fajr' && cfg.clip_id_fajr) ? cfg.clip_id_fajr : cfg.clip_id;
+                const isJumatDhuhr = p === 'dhuhr' && now.weekday === 5;
+                if (isJumatDhuhr) {
+                    const mode = cfg.jumat_dhuhr_mode || 'normal';
+                    if (mode === 'skip') adzanClipId = null;
+                    else if (mode === 'custom') adzanClipId = cfg.jumat_dhuhr_clip_id || adzanClipId;
+                }
+                if (adzanClipId) {
+                    execute('UPDATE audio_prayer_config SET last_fired = ? WHERE id = 1', [key]);
+                    // eslint-disable-next-line no-await-in-loop
+                    await playPrayerClip(cfg, adzanClipId, cfg.loop, { preempt: true, label: `Adzan ${LABELS[p]}${isJumatDhuhr ? ' (Jumat)' : ''} ${times[p]}`, operator: 'jadwal-adzan' });
+                    fired = true;
+                }
             }
         }
     }

@@ -41,6 +41,7 @@ export default function PrayerConfig({ clips, areas }) {
         const params = c ? {
             latitude: c.latitude, longitude: c.longitude, timezone: c.timezone,
             fajr_angle: c.fajr_angle, isha_angle: c.isha_angle, asr_factor: c.asr_factor, ikhtiyati: c.ikhtiyati,
+            imsak_offset: c.imsak_offset,
             offset_fajr: c.offset_fajr, offset_dhuhr: c.offset_dhuhr, offset_asr: c.offset_asr,
             offset_maghrib: c.offset_maghrib, offset_isha: c.offset_isha,
         } : undefined;
@@ -161,6 +162,12 @@ export default function PrayerConfig({ clips, areas }) {
                             </div>
                         ))}
                     </div>
+                    {/* Imsak (Subuh−N) + Syuruq — untuk mencocokkan jadwal Kemenag yang selalu memuat keduanya. */}
+                    <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-content-subtle">
+                        <span>Imsak <span className="font-mono font-semibold text-content-muted">{times.times?.imsak || '—'}</span></span>
+                        <span>Terbit/Syuruq <span className="font-mono font-semibold text-content-muted">{times.times?.sunrise || '—'}</span></span>
+                        <span>Cocokkan dengan jadwal Kemenag setempat.</span>
+                    </div>
                 </div>
             )}
 
@@ -210,6 +217,28 @@ export default function PrayerConfig({ clips, areas }) {
                     sebagai pengingat sebelum waktu sholat — adzan tetap dari masjid. Aktifkan &amp; atur qori di bagian bawah.
                 </div>
             )}
+
+            {/* Khusus Jumat: adzan Dzuhur otomatis sering menimpa adzan Jumat yang live di masjid. */}
+            <div className="space-y-2 rounded-control border border-edge bg-surface-sunken p-3">
+                <span className="text-xs font-semibold text-content-muted">Khusus Jumat — adzan Dzuhur</span>
+                <div className="flex flex-wrap items-center gap-2">
+                    {[['normal', 'Seperti biasa'], ['skip', 'Lewati (dari masjid)'], ['custom', 'Klip khusus Jumat']].map(([val, lbl]) => (
+                        <button
+                            key={val} type="button" onClick={() => set({ jumat_dhuhr_mode: val })}
+                            className={`rounded-control border px-2.5 py-1.5 text-xs font-medium transition-colors ${(cfg.jumat_dhuhr_mode || 'normal') === val ? 'border-primary bg-primary/10 text-primary' : 'border-edge bg-surface text-content-muted hover:border-edge-strong'}`}
+                        >
+                            {lbl}
+                        </button>
+                    ))}
+                </div>
+                {cfg.jumat_dhuhr_mode === 'custom' && (
+                    <Field as="select" label="Klip Dzuhur khusus Jumat" value={cfg.jumat_dhuhr_clip_id || ''} onChange={(e) => set({ jumat_dhuhr_clip_id: e.target.value })}>
+                        <option value="">— pilih klip (mis. sholawat / adzan Jumat) —</option>
+                        {clips.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </Field>
+                )}
+                <p className="text-xs text-content-subtle">Agar adzan Dzuhur CCTV tidak menimpa adzan Jumat yang dikumandangkan langsung di masjid.</p>
+            </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field as="select" label="Area target" value={cfg.area_id || ''} onChange={(e) => set({ area_id: e.target.value, target_kind: 'area' })}>
                     <option value="">— pilih area —</option>
@@ -312,10 +341,11 @@ export default function PrayerConfig({ clips, areas }) {
             <div>
                 <button type="button" onClick={() => setAdvanced((v) => !v)} className="text-xs font-medium text-primary hover:underline">{advanced ? 'Sembunyikan' : 'Parameter lanjutan'}</button>
                 {advanced && (
-                    <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                         <Field type="number" label="Sudut Subuh (°)" value={cfg.fajr_angle} onChange={(e) => set({ fajr_angle: e.target.value })} hint="Kemenag 20" />
                         <Field type="number" label="Sudut Isya (°)" value={cfg.isha_angle} onChange={(e) => set({ isha_angle: e.target.value })} hint="Kemenag 18" />
                         <Field type="number" label="Ikhtiyati (mnt)" value={cfg.ikhtiyati} onChange={(e) => set({ ikhtiyati: e.target.value })} hint="pengaman, mis. 2" />
+                        <Field type="number" label="Imsak (mnt sblm Subuh)" min={0} max={60} value={cfg.imsak_offset ?? 10} onChange={(e) => set({ imsak_offset: e.target.value })} hint="lazim 10" />
                     </div>
                 )}
             </div>

@@ -643,7 +643,7 @@ export async function getPrayerTimes(request, reply) {
         const q = request.query || {};
         const ov = {};
         for (const k of ['latitude', 'longitude', 'timezone', 'fajr_angle', 'isha_angle', 'asr_factor',
-            'ikhtiyati', 'offset_fajr', 'offset_dhuhr', 'offset_asr', 'offset_maghrib', 'offset_isha']) {
+            'ikhtiyati', 'imsak_offset', 'offset_fajr', 'offset_dhuhr', 'offset_asr', 'offset_maghrib', 'offset_isha']) {
             if (q[k] !== undefined && q[k] !== '' && Number.isFinite(Number(q[k]))) ov[k] = Number(q[k]);
         }
         const overrides = Object.keys(ov).length ? ov : null;
