@@ -24,7 +24,7 @@ import {
     getPrayerConfig, updatePrayerConfig, getPrayerTimes,
     listMotionArms, setMotionArmHandler, disarmMotionHandler,
     getImouConfig, setImouConfig, testImou, listImouDevices, setCameraImouSn, cameraSiren,
-    listTtsEngines, createTts, getTtsConfig, setTtsConfig,
+    listTtsEngines, createTts, previewTts, getTtsConfig, setTtsConfig,
 } from '../controllers/audioController.js';
 import fastifyWebsocket from '@fastify/websocket';
 import { authMiddleware, requireAdmin } from '../middleware/authMiddleware.js';
@@ -53,6 +53,7 @@ export default async function audioRoutes(fastify) {
     fastify.get('/tts/engines', admin, listTtsEngines);
     fastify.get('/tts/config', admin, getTtsConfig);    // cloud-TTS (Gemini) key status (masked)
     fastify.put('/tts/config', admin, setTtsConfig);    // save Gemini API key from the UI
+    fastify.post('/tts/preview', admin, previewTts);    // synchronous short sample for "Coba suara"
     fastify.post('/clips/tts', admin, createTts);       // typed text -> spoken clip (async job)
     fastify.patch('/clips/:id', admin, updateClipMeta);  // category / favourite / tags
     fastify.delete('/clips/:id', admin, deleteClip);

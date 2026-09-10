@@ -25,8 +25,16 @@ export default function PrayerConfig({ clips, areas }) {
     const [advanced, setAdvanced] = useState(false);
     const { showNotification } = useNotification();
 
-    const reloadTimes = useCallback(async () => {
-        const r = await getPrayerTimes();
+    // Preview reflects the EDITED (possibly unsaved) form — pass its location/params so times update the
+    // instant the operator picks a kabupaten, instead of only after saving.
+    const reloadTimes = useCallback(async (c) => {
+        const params = c ? {
+            latitude: c.latitude, longitude: c.longitude, timezone: c.timezone,
+            fajr_angle: c.fajr_angle, isha_angle: c.isha_angle, asr_factor: c.asr_factor, ikhtiyati: c.ikhtiyati,
+            offset_fajr: c.offset_fajr, offset_dhuhr: c.offset_dhuhr, offset_asr: c.offset_asr,
+            offset_maghrib: c.offset_maghrib, offset_isha: c.offset_isha,
+        } : undefined;
+        const r = await getPrayerTimes(params);
         if (r.success) setTimes(r.data);
     }, []);
 
@@ -34,9 +42,15 @@ export default function PrayerConfig({ clips, areas }) {
         (async () => {
             const r = await getPrayerConfig();
             if (r.success) setCfg(r.data);
-            reloadTimes();
         })();
-    }, [reloadTimes]);
+    }, []);
+
+    // Live preview: recompute (debounced) whenever any calc input changes, using the current form values.
+    useEffect(() => {
+        if (!cfg) return undefined;
+        const t = setTimeout(() => reloadTimes(cfg), 300);
+        return () => clearTimeout(t);
+    }, [cfg, reloadTimes]);
 
     if (!cfg) return <p className="text-sm text-content-muted">Memuat pengaturan adzan…</p>;
 
@@ -76,7 +90,7 @@ export default function PrayerConfig({ clips, areas }) {
         if (!r.success) { showNotification({ type: 'error', title: 'Gagal', message: r.message }); return; }
         setCfg(r.data);
         showNotification({ type: 'success', title: 'Pengaturan adzan disimpan' });
-        reloadTimes();
+        reloadTimes(r.data);
     };
 
     return (
@@ -111,7 +125,7 @@ export default function PrayerConfig({ clips, areas }) {
                             Waktu sholat hari ini ({times.date})
                             {times.locationSet === false && <span className="ml-1 font-normal text-status-warn">— lokasi belum diatur, belum akurat</span>}
                         </span>
-                        <button type="button" onClick={reloadTimes} className="text-xs font-medium text-primary hover:underline">Muat ulang</button>
+                        <button type="button" onClick={() => reloadTimes(cfg)} className="text-xs font-medium text-primary hover:underline">Muat ulang</button>
                     </div>
                     <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
                         {PRAYERS.map(([key, label]) => (

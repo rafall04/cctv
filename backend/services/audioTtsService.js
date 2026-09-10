@@ -16,7 +16,8 @@ edge-tts via argv (execFile, no shell — no injection).
 
 import { spawn, execFile } from 'child_process';
 import { promisify } from 'util';
-import { existsSync, statSync, writeFileSync } from 'fs';
+import { existsSync, statSync, writeFileSync, readFileSync, unlinkSync } from 'fs';
+import { randomBytes } from 'crypto';
 import { dirname, join } from 'path';
 import { queryOne, execute } from '../database/connectionPool.js';
 import { AUDIO_DIR, ensureAudioDir } from './audioClipService.js';
@@ -256,6 +257,25 @@ export async function synthTtsToTemp({ text, engine = 'piper', voice, prefix }) 
     return { path: outPath, bytes: statSync(outPath).size };
 }
 
+/**
+ * Synchronously synthesize a SHORT sample and return the audio bytes for an in-browser voice preview
+ * ("Coba suara") — so the operator hears the engine/voice BEFORE creating a clip or broadcasting.
+ * Text is capped short to stay fast + cheap (Gemini quota / piper CPU). Temp file is removed after read.
+ * @returns {Promise<{buffer: Buffer, mime: string}>}
+ */
+export async function previewTts({ text, engine = 'piper', voice }) {
+    const sample = String(text || '').trim().slice(0, 240) || 'Ini contoh suara pengumuman untuk warga.';
+    const prefix = `preview-${randomBytes(6).toString('hex')}`;
+    const { path } = await synthTtsToTemp({ text: sample, engine, voice, prefix });
+    try {
+        const buffer = readFileSync(path);
+        const mime = path.endsWith('.mp3') ? 'audio/mpeg' : 'audio/wav';
+        return { buffer, mime };
+    } finally {
+        try { unlinkSync(path); } catch { /* already gone */ }
+    }
+}
+
 /** Validate + enqueue a TTS job (processed by audioImportService's worker). Returns the queued job. */
 export async function createTtsJob({ text, engine = 'piper', voice, name, userId = null }) {
     const clean = cleanText(text);
@@ -305,4 +325,4 @@ export function setTtsConfig({ geminiApiKey } = {}) {
     return ttsConfigStatus();
 }
 
-export default { synthTtsToTemp, createTtsJob, listTtsEngines, ttsEngineAvailable, ttsConfigStatus, setTtsConfig, MAX_TTS_CHARS };
+export default { synthTtsToTemp, previewTts, createTtsJob, listTtsEngines, ttsEngineAvailable, ttsConfigStatus, setTtsConfig, MAX_TTS_CHARS };

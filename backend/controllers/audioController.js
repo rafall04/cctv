@@ -29,7 +29,7 @@ import {
 } from '../services/audioTemplateService.js';
 import { listCapabilities, recheckAll, probeCamera, setCameraBlocked } from '../services/audioCapabilityService.js';
 import { createImportJob, listJobs as listImportRows } from '../services/audioImportService.js';
-import { createTtsJob, listTtsEngines as listTtsEngineRows, ttsConfigStatus, setTtsConfig as setTtsConfigRow } from '../services/audioTtsService.js';
+import { createTtsJob, previewTts as previewTtsRow, listTtsEngines as listTtsEngineRows, ttsConfigStatus, setTtsConfig as setTtsConfigRow } from '../services/audioTtsService.js';
 import {
     listGroups as listGroupRows, createGroup as createGroupRow,
     updateGroup as updateGroupRow, deleteGroup as deleteGroupRow,
@@ -180,6 +180,18 @@ export async function setTtsConfig(request, reply) {
         const status = setTtsConfigRow({ geminiApiKey: request.body?.geminiApiKey });
         logAdminAction({ action: 'audio_tts_config_updated', targetType: 'audio_tts', configured: status.gemini_configured, ...adminContext(request) }, request);
         return reply.send({ success: true, message: 'Kunci Gemini disimpan', data: status });
+    } catch (error) { return fail(reply, error); }
+}
+
+// Synchronous voice preview ("Coba suara") — returns audio bytes so the SPA can play the sample inline.
+export async function previewTts(request, reply) {
+    try {
+        const { text, engine, voice } = request.body || {};
+        const { buffer, mime } = await previewTtsRow({ text, engine, voice });
+        reply.header('Content-Type', mime);
+        reply.header('Content-Length', String(buffer.length));
+        reply.header('Cache-Control', 'no-store');
+        return reply.send(buffer);
     } catch (error) { return fail(reply, error); }
 }
 
@@ -627,7 +639,15 @@ export async function updatePrayerConfig(request, reply) {
 // Today's computed prayer times (WIB) for the preview — operator verifies vs local Kemenag.
 export async function getPrayerTimes(request, reply) {
     try {
-        return reply.send({ success: true, data: prayerTodayTimes() });
+        // Optional query overrides let the UI preview an edited-but-unsaved location instantly.
+        const q = request.query || {};
+        const ov = {};
+        for (const k of ['latitude', 'longitude', 'timezone', 'fajr_angle', 'isha_angle', 'asr_factor',
+            'ikhtiyati', 'offset_fajr', 'offset_dhuhr', 'offset_asr', 'offset_maghrib', 'offset_isha']) {
+            if (q[k] !== undefined && q[k] !== '' && Number.isFinite(Number(q[k]))) ov[k] = Number(q[k]);
+        }
+        const overrides = Object.keys(ov).length ? ov : null;
+        return reply.send({ success: true, data: prayerTodayTimes(Date.now(), overrides) });
     } catch (error) { return fail(reply, error); }
 }
 

@@ -90,6 +90,21 @@ export const setTtsConfig = async (payload) => {
     } catch (error) { return failure(error, 'Gagal menyimpan kunci'); }
 };
 
+/** Synthesize a short sample synchronously and return a playable object URL (voice preview). */
+export const previewTtsVoice = async ({ text, engine, voice }) => {
+    try {
+        const res = await apiClient.post(`${BASE}/tts/preview`, { text, engine, voice }, { responseType: 'blob' });
+        return { success: true, url: URL.createObjectURL(res.data) };
+    } catch (error) {
+        let message = 'Gagal membuat pratinjau suara';
+        try {
+            const t = await error.response?.data?.text?.();
+            if (t) { const j = JSON.parse(t); if (j.message) message = j.message; }
+        } catch { /* keep default */ }
+        return { success: false, message };
+    }
+};
+
 /** Generate a spoken clip from typed text (async job — poll getImportJobs). */
 export const createTts = async ({ text, engine, voice, name }) => {
     try {
@@ -335,9 +350,10 @@ export const updatePrayerConfig = async (payload) => {
     } catch (error) { return failure(error, 'Gagal menyimpan adzan'); }
 };
 
-export const getPrayerTimes = async () => {
+/** Today's computed prayer times. Pass an edited location/params object to PREVIEW it before saving. */
+export const getPrayerTimes = async (params) => {
     try {
-        return (await apiClient.get(`${BASE}/prayer/times`)).data;
+        return (await apiClient.get(`${BASE}/prayer/times`, params ? { params } : undefined)).data;
     } catch (error) { return failure(error, 'Gagal memuat waktu sholat'); }
 };
 

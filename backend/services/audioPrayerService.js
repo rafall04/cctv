@@ -20,8 +20,11 @@ import { logPlay } from './audioHistoryService.js';
 const PRAYERS = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
 const LABELS = { fajr: 'Subuh', dhuhr: 'Dzuhur', asr: 'Ashar', maghrib: 'Maghrib', isha: 'Isya' };
 
-function wibNow(nowMs = Date.now()) {
-    const w = new Date(nowMs + 7 * 3600 * 1000);
+// Local wall-clock at a given UTC offset (tz hours). Prod Node runs in UTC, so we derive the location's
+// local date + HH:MM by shifting. tz MUST match the prayer config's timezone (WIB 7 / WITA 8 / WIT 9) —
+// using a fixed +7 made non-WIB locations fire an hour off and roll the date wrong near midnight.
+function localNow(nowMs = Date.now(), tz = 7) {
+    const w = new Date(nowMs + tz * 3600 * 1000);
     const p2 = (n) => String(n).padStart(2, '0');
     return {
         year: w.getUTCFullYear(), month: w.getUTCMonth() + 1, day: w.getUTCDate(),
@@ -100,13 +103,19 @@ function hasValidLocation(cfg) {
     return Number.isFinite(lat) && Number.isFinite(lon) && !(lat === 0 && lon === 0);
 }
 
-/** Today's computed prayer times (WIB) + which are enabled, for the preview + scheduler. */
-export function todayTimes(nowMs = Date.now()) {
+/**
+ * Today's computed prayer times + which are enabled, for the preview + scheduler.
+ * `overrides` (optional) lets the UI PREVIEW an edited-but-unsaved location/params so the operator sees
+ * the times update the instant they pick a kabupaten — without saving first. The stored config is used
+ * for anything not overridden, and `cfg` returned is always the stored row (unchanged).
+ */
+export function todayTimes(nowMs = Date.now(), overrides = null) {
     const cfg = getConfig();
-    const now = wibNow(nowMs);
-    const times = computePrayerTimes({ year: now.year, month: now.month, day: now.day }, cfgToParams(cfg));
-    // Tell the UI when the location is still unset so it can warn instead of showing ~7h-off times as real.
-    return { date: now.dateKey, times, cfg, locationSet: hasValidLocation(cfg) };
+    const eff = overrides && typeof overrides === 'object' ? { ...cfg, ...overrides } : cfg;
+    const now = localNow(nowMs, Number(eff.timezone ?? 7));
+    const times = computePrayerTimes({ year: now.year, month: now.month, day: now.day }, cfgToParams(eff));
+    // Tell the UI when the (effective) location is still unset so it can warn instead of showing wrong times.
+    return { date: now.dateKey, times, cfg, locationSet: hasValidLocation(eff) };
 }
 
 function resolveTargets(cfg) {
@@ -125,7 +134,7 @@ export async function runDuePrayer(nowMs = Date.now()) {
     // Never broadcast adzan at a wrong time: if the location was never set (lat=lon=0), the computed
     // times are ~7h off. Skip loudly rather than blast the mosque call at the wrong hour.
     if (!hasValidLocation(cfg)) { console.warn('[Adzan] enabled but location unset (lat=lon=0) — skipping; set kabupaten/koordinat first'); return false; }
-    const now = wibNow(nowMs);
+    const now = localNow(nowMs, Number(cfg.timezone ?? 7));
     const { times } = todayTimes(nowMs);
     for (const p of PRAYERS) {
         if (!cfg[`enable_${p}`]) continue;

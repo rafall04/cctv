@@ -8,7 +8,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { uploadClip, deleteClip, updateClipMeta, importClip, getImportJobs, getTtsEngines, createTts, getTemplates, createTemplate, deleteTemplate, fetchClipPreview, getTtsConfig, setTtsConfig } from '../../../services/audioService';
+import { uploadClip, deleteClip, updateClipMeta, importClip, getImportJobs, getTtsEngines, createTts, getTemplates, createTemplate, deleteTemplate, fetchClipPreview, getTtsConfig, setTtsConfig, previewTtsVoice } from '../../../services/audioService';
 import { useNotification } from '../../../contexts/NotificationContext';
 import { useConfirm } from '../../../contexts/ConfirmContext';
 import { Button, Field, EmptyState } from '../../ui';
@@ -36,6 +36,7 @@ export default function LibraryTab({ clips, loading, reload, onPlayClip }) {
     const [ttsCfg, setTtsCfg] = useState(null);       // { gemini_configured, gemini_source, gemini_hint }
     const [geminiKey, setGeminiKey] = useState('');
     const [savingKey, setSavingKey] = useState(false);
+    const [voicePreviewBusy, setVoicePreviewBusy] = useState(false);
     const [templates, setTemplates] = useState([]);
     const [templateId, setTemplateId] = useState('');
     const [tplBody, setTplBody] = useState('');
@@ -110,6 +111,22 @@ export default function LibraryTab({ clips, loading, reload, onPlayClip }) {
         a.src = r.url;
         setPreviewId(clip.id);
         try { await a.play(); } catch { /* a user gesture triggered this, so autoplay is allowed */ }
+    };
+
+    // "Coba suara": synthesize a short sample with the chosen engine/voice and play it inline, so the
+    // operator hears the voice BEFORE creating a clip or broadcasting to the cameras.
+    const previewVoice = async () => {
+        const a = audioRef.current;
+        if (!a) return;
+        setVoicePreviewBusy(true);
+        stopPreview();
+        const r = await previewTtsVoice({ text: ttsText.trim(), engine: ttsEngine, voice: ttsVoice });
+        setVoicePreviewBusy(false);
+        if (!r.success) { showNotification({ type: 'error', title: 'Gagal coba suara', message: r.message }); return; }
+        previewUrlRef.current = r.url;
+        a.src = r.url;
+        setPreviewId('voice-preview');
+        try { await a.play(); } catch { /* user gesture present */ }
     };
 
     const loadTemplates = useCallback(async () => {
@@ -484,9 +501,14 @@ export default function LibraryTab({ clips, loading, reload, onPlayClip }) {
                         {currentEngine?.id === 'gemini' ? 'Suara cloud paling natural — dibuat sekali lalu tersimpan (main offline).'
                             : currentEngine?.online ? 'Suara cloud gratis (butuh internet), natural.' : 'Suara offline di server, natural (bukan robot).'}
                     </p>
-                    <Button type="submit" variant="secondary" loading={ttsBusy} disabled={!ttsText.trim() || !currentEngine?.available}>
-                        {ttsBusy ? 'Membuat…' : 'Buat suara'}
-                    </Button>
+                    <div className="flex shrink-0 items-center gap-2">
+                        <Button type="button" variant="ghost" loading={voicePreviewBusy} disabled={!currentEngine?.available} onClick={previewVoice} title="Dengar contoh suara sebelum dibuat/disiarkan">
+                            {voicePreviewBusy ? 'Menyiapkan…' : '🔊 Coba suara'}
+                        </Button>
+                        <Button type="submit" variant="secondary" loading={ttsBusy} disabled={!ttsText.trim() || !currentEngine?.available}>
+                            {ttsBusy ? 'Membuat…' : 'Buat suara'}
+                        </Button>
+                    </div>
                 </div>
                 {engines.length > 0 && !engines.some((e) => e.available) && (
                     <p className="text-xs text-status-warn">Belum ada mesin TTS terpasang di server. Hubungi admin untuk memasang Piper/edge-tts.</p>
