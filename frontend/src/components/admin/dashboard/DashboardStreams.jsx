@@ -145,6 +145,10 @@ function StreamViewerButton({ stream, onOpen }) {
     );
 }
 
+// Indonesian labels for the raw backend stream enums (shown only when abnormal).
+const STREAM_OP_LABEL = { online: 'Online', offline: 'Offline' };
+const STREAM_STATE_LABEL = { buffering: 'Buffering', ready: 'Siap', maintenance: 'Perbaikan', invalid: 'Tidak valid' };
+
 function ActiveStreamRow({ stream, formatBytes, getOperationalTone, getStreamTransportTone, onOpenViewer }) {
     return (
         <div className="flex items-center gap-3 rounded-card border border-edge bg-surface p-3 transition-colors hover:border-edge-strong">
@@ -157,12 +161,25 @@ function ActiveStreamRow({ stream, formatBytes, getOperationalTone, getStreamTra
             <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold text-content">{stream.name}</p>
                 <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                    <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${getOperationalTone(stream.operationalState)}`}>
-                        {stream.operationalState || 'offline'}
-                    </span>
-                    <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${getStreamTransportTone(stream.state)}`}>
-                        {stream.state}
-                    </span>
+                    {stream.operationalState === 'online' && (!stream.state || stream.state === 'ready') ? (
+                        <span className="inline-flex items-center gap-1">
+                            <span className="h-2 w-2 rounded-full bg-status-live" aria-hidden="true" />
+                            <span className="sr-only">Online, siap</span>
+                        </span>
+                    ) : (
+                        <>
+                            {stream.operationalState !== 'online' && (
+                                <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${getOperationalTone(stream.operationalState)}`}>
+                                    {STREAM_OP_LABEL[stream.operationalState] || stream.operationalState || 'Offline'}
+                                </span>
+                            )}
+                            {stream.state && stream.state !== 'ready' && (
+                                <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${getStreamTransportTone(stream.state)}`}>
+                                    {STREAM_STATE_LABEL[stream.state] || stream.state}
+                                </span>
+                            )}
+                        </>
+                    )}
                 </div>
             </div>
 
@@ -247,13 +264,26 @@ function DashboardStreamTableRow({ stream, index, formatBytes, getOperationalTon
                 </div>
             </TD>
             <TD>
-                <div className="flex flex-wrap gap-1.5">
-                    <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${getOperationalTone(stream.operationalState)}`}>
-                        {stream.operationalState || 'offline'}
-                    </span>
-                    <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${getStreamTransportTone(stream.state)}`}>
-                        {stream.state}
-                    </span>
+                <div className="flex flex-wrap items-center gap-1.5">
+                    {stream.operationalState === 'online' && (!stream.state || stream.state === 'ready') ? (
+                        <span className="inline-flex items-center gap-1">
+                            <span className="h-2 w-2 rounded-full bg-status-live" aria-hidden="true" />
+                            <span className="sr-only">Online, siap</span>
+                        </span>
+                    ) : (
+                        <>
+                            {stream.operationalState !== 'online' && (
+                                <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${getOperationalTone(stream.operationalState)}`}>
+                                    {STREAM_OP_LABEL[stream.operationalState] || stream.operationalState || 'Offline'}
+                                </span>
+                            )}
+                            {stream.state && stream.state !== 'ready' && (
+                                <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${getStreamTransportTone(stream.state)}`}>
+                                    {STREAM_STATE_LABEL[stream.state] || stream.state}
+                                </span>
+                            )}
+                        </>
+                    )}
                 </div>
             </TD>
             <TD align="right">

@@ -55,21 +55,21 @@ export default function CameraFormModal({
 
     return (
         <Modal
-            title={editingCamera ? 'Edit Camera' : 'Add Camera'}
-            description="Configure stream source"
+            title={editingCamera ? 'Ubah Kamera' : 'Tambah Kamera'}
+            description="Atur sumber stream"
             size="md"
             onClose={onClose}
             dismissible={false}
             footer={(
                 <>
-                    <Button onClick={onClose} disabled={isSubmitting}>Cancel</Button>
+                    <Button onClick={onClose} disabled={isSubmitting}>Batal</Button>
                     <Button
                         type="submit"
                         form="camera-form"
                         variant="primary"
                         loading={submitDisabled}
                     >
-                        {isSubmitting ? 'Saving...' : (loadingDetail ? 'Memuat...' : (editingCamera ? 'Update' : 'Create'))}
+                        {isSubmitting ? 'Menyimpan...' : (loadingDetail ? 'Memuat...' : (editingCamera ? 'Perbarui' : 'Buat'))}
                     </Button>
                 </>
             )}
