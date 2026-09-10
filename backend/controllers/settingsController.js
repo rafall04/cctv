@@ -10,6 +10,45 @@ import settingsService from '../services/settingsService.js';
 import { getTimezone, TIMEZONE_MAP } from '../services/timezoneService.js';
 import { logAdminAction } from '../services/securityAuditLogger.js';
 
+/*
+ * `settings` is a credential-bearing table (bot tokens, gateway keys). The generic reads — GET
+ * /api/settings and GET /api/settings/:key — used to return `SELECT *` verbatim, so any admin (or
+ * anything holding an admin token) could read every secret it was never meant to see. These helpers
+ * mask a secret-looking KEY, or a secret-looking FIELD nested inside a value (telegram_config.botToken),
+ * before it leaves the server; an unset secret stays null/'' so a UI can still tell configured from empty.
+ * The SAME pattern drives audit redaction below, so a secret leaks through neither the API nor the log.
+ *
+ * The pattern deliberately over-matches (any `*_key` suffix) rather than under-matches: no legitimate
+ * consumer of these GENERIC endpoints needs a secret value (the ads panel reads ads_* keys; recording
+ * toggles read recording_* keys; the payment/telegram editors have their own masked endpoints), so a
+ * masked public key here costs nothing while a missed secret is a leak — `midtrans_server_key` used to
+ * slip through because it has no "api" before "key".
+ */
+const SECRET_NAME_PATTERN = /token|secret|password|passwd|api[_-]?key|private|credential|[_-]key$/i;
+const MASKED = '••••••';
+
+// A present secret becomes an opaque marker; an empty/unset value stays as-is so "not configured" shows.
+const maskLeaf = (v) => (v === null || v === undefined || v === '' ? v : MASKED);
+
+// Recursively mask any object FIELD whose name looks secret, leaving non-secret siblings intact so a
+// consumer reading (e.g.) telegram_config.enabled still works.
+function maskSecretsDeep(value) {
+    if (Array.isArray(value)) return value.map(maskSecretsDeep);
+    if (value && typeof value === 'object') {
+        const out = {};
+        for (const [field, inner] of Object.entries(value)) {
+            out[field] = SECRET_NAME_PATTERN.test(field) ? maskLeaf(inner) : maskSecretsDeep(inner);
+        }
+        return out;
+    }
+    return value;
+}
+
+// Mask one top-level setting: a secret KEY masks the whole value; otherwise recurse into object values.
+function maskSetting(key, value) {
+    return SECRET_NAME_PATTERN.test(String(key)) ? maskLeaf(value) : maskSecretsDeep(value);
+}
+
 function getTimezonePayload() {
     const timezone = getTimezone();
     // Prefer the friendly Indonesian alias (WIB/WITA/WIT); for any other IANA zone derive a label
@@ -33,10 +72,13 @@ function getTimezonePayload() {
 export async function getAllSettings(request, reply) {
     try {
         const settingsObj = settingsService.getAllSettings();
+        // Mask secrets before they leave the server — this is a full `SELECT *` of a credential-bearing table.
+        const masked = {};
+        for (const [key, value] of Object.entries(settingsObj)) masked[key] = maskSetting(key, value);
 
         return reply.send({
             success: true,
-            data: settingsObj,
+            data: masked,
         });
     } catch (error) {
         console.error('Get settings error:', error);
@@ -51,10 +93,12 @@ export async function getSetting(request, reply) {
     try {
         const { key } = request.params;
         const data = settingsService.getSetting(key);
+        // `/:key` is the sharper edge — a caller can name `telegram_config` directly — so mask here too.
+        const safe = { ...data, value: maskSetting(data.key ?? key, data.value) };
 
         return reply.send({
             success: true,
-            data,
+            data: safe,
         });
     } catch (error) {
         if (error.statusCode === 404) {
@@ -71,17 +115,16 @@ export async function getSetting(request, reply) {
 /*
  * Settings hold secrets (bot tokens, gateway keys). An audit trail that copies values verbatim
  * turns the log itself into a place credentials leak, so anything whose key OR nested field name
- * looks secret is recorded as changed/unchanged, never quoted.
+ * looks secret is recorded as changed/unchanged, never quoted. Uses the SAME SECRET_NAME_PATTERN as
+ * the API masking above, so widening it (e.g. to catch `midtrans_server_key`) closes both leaks at once.
  */
-const SECRET_KEY_PATTERN = /token|secret|password|passwd|api[_-]?key|private|credential/i;
-
 function redactForAudit(key, value) {
-    if (SECRET_KEY_PATTERN.test(String(key))) return '[disunting]';
+    if (SECRET_NAME_PATTERN.test(String(key))) return '[disunting]';
     if (value === null || value === undefined) return null;
     if (typeof value === 'object') {
         const out = {};
         for (const [field, inner] of Object.entries(value)) {
-            out[field] = SECRET_KEY_PATTERN.test(field)
+            out[field] = SECRET_NAME_PATTERN.test(field)
                 ? (inner ? '[disunting]' : null)
                 : (typeof inner === 'object' ? '[objek]' : inner);
         }

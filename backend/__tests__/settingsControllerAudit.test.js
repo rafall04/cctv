@@ -18,11 +18,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const getSettingMock = vi.fn();
+const getAllSettingsMock = vi.fn();
 const updateSettingMock = vi.fn();
 const logAdminActionMock = vi.fn();
 
 vi.mock('../services/settingsService.js', () => ({
-    default: { getSetting: getSettingMock, updateSetting: updateSettingMock },
+    default: { getSetting: getSettingMock, getAllSettings: getAllSettingsMock, updateSetting: updateSettingMock },
 }));
 vi.mock('../services/timezoneService.js', () => ({
     getTimezone: () => 'Asia/Jakarta',
@@ -32,7 +33,7 @@ vi.mock('../services/securityAuditLogger.js', () => ({
     logAdminAction: logAdminActionMock,
 }));
 
-const { updateSetting } = await import('../controllers/settingsController.js');
+const { updateSetting, getAllSettings, getSetting } = await import('../controllers/settingsController.js');
 
 function makeReply() {
     return {
@@ -125,5 +126,59 @@ describe('updateSetting audit trail', () => {
 
         expect(reply.statusCode).toBe(400);
         expect(logAdminActionMock).not.toHaveBeenCalled();
+    });
+});
+
+describe('GET /api/settings — the generic dump never leaks a secret', () => {
+    it('masks secret keys + nested tokens, but leaves non-secret values readable', async () => {
+        getAllSettingsMock.mockReturnValue({
+            ads_enabled: true,
+            ipaymu_api_key: 'RAHASIA-IPAYMU',
+            midtrans_server_key: 'RAHASIA-MIDTRANS', // used to slip past the pattern (no "api" before "key")
+            telegram_config: { botToken: 'RAHASIA-BOT', monitoringChatId: '-100', enabled: true },
+        });
+
+        const reply = makeReply();
+        await getAllSettings({}, reply);
+
+        const serialised = JSON.stringify(reply.body.data);
+        expect(serialised).not.toContain('RAHASIA-IPAYMU');
+        expect(serialised).not.toContain('RAHASIA-MIDTRANS');
+        expect(serialised).not.toContain('RAHASIA-BOT');
+        // Non-secret data still flows through — the ads panel + telegram routing depend on it.
+        expect(reply.body.data.ads_enabled).toBe(true);
+        expect(reply.body.data.telegram_config.monitoringChatId).toBe('-100');
+        expect(reply.body.data.telegram_config.enabled).toBe(true);
+    });
+
+    it('keeps an UNSET secret empty so configured-vs-empty stays visible', async () => {
+        getAllSettingsMock.mockReturnValue({ ipaymu_api_key: '', midtrans_server_key: null });
+
+        const reply = makeReply();
+        await getAllSettings({}, reply);
+
+        expect(reply.body.data.ipaymu_api_key).toBe('');
+        expect(reply.body.data.midtrans_server_key).toBeNull();
+    });
+});
+
+describe('GET /api/settings/:key — the sharper edge is masked too', () => {
+    it('masks a directly-named secret value', async () => {
+        getSettingMock.mockReturnValue({ key: 'ipaymu_api_key', value: 'RAHASIA-LANGSUNG', description: null });
+
+        const reply = makeReply();
+        await getSetting(request('ipaymu_api_key'), reply);
+
+        expect(JSON.stringify(reply.body.data.value)).not.toContain('RAHASIA-LANGSUNG');
+    });
+
+    it('masks a nested bot token but keeps non-secret siblings', async () => {
+        getSettingMock.mockReturnValue({ key: 'telegram_config', value: { botToken: 'RAHASIA-BOT', enabled: true }, description: null });
+
+        const reply = makeReply();
+        await getSetting(request('telegram_config'), reply);
+
+        expect(JSON.stringify(reply.body.data.value)).not.toContain('RAHASIA-BOT');
+        expect(reply.body.data.value.enabled).toBe(true);
     });
 });
