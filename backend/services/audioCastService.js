@@ -150,6 +150,10 @@ function runPusher(cam, files, loop, ctx) {
 export async function playToCameras(cameraIds, sourceType, sourceId, loop = 1, opts = {}) {
     const preemptMode = opts.preempt === true; // emergency: displace whatever is playing + bypass the governor cap
     const gainDb = Math.max(-24, Math.min(24, Number(opts.gainDb) || 0)); // runtime loudness (dB)
+    // Enforce the area allowlist at the single choke point every broadcast path funnels through, so a
+    // schedule or soundboard button whose area was later turned OFF stops sounding there (its saved
+    // camera_ids are otherwise raw + un-scoped). Default ON; a one-camera speaker test opts out.
+    const enforceAreaScope = opts.enforceAreaScope !== false;
     const { files } = resolveSourceFiles(sourceType, sourceId);
     if (files.length === 0) {
         const err = new Error('Tidak ada audio untuk diputar (clip/playlist kosong atau berkas hilang)');
@@ -161,12 +165,14 @@ export async function playToCameras(cameraIds, sourceType, sourceId, loop = 1, o
 
     const results = await Promise.all(ids.map(async (id) => {
         const row = queryOne(
-            'SELECT c.id, c.name, c.private_rtsp_url, c.audio_out_blocked, a.max_loop FROM cameras c LEFT JOIN areas a ON a.id = c.area_id WHERE c.id = ?',
+            'SELECT c.id, c.name, c.private_rtsp_url, c.audio_out_blocked, a.max_loop, a.audio_broadcast_enabled FROM cameras c LEFT JOIN areas a ON a.id = c.area_id WHERE c.id = ?',
             [id],
         );
         if (!row) return { cameraId: id, name: `#${id}`, ok: false, message: 'kamera tidak ada' };
         // Hard safety stop: a blocked camera (V380-class) is never opened — a backchannel can hang it.
         if (row.audio_out_blocked) return { cameraId: id, name: row.name, ok: false, message: 'diblokir (perangkat rawan hang)' };
+        // Area allowlist: a camera whose area is not audio-enabled (or has no area) is not a broadcast target.
+        if (enforceAreaScope && row.audio_broadcast_enabled !== 1) return { cameraId: id, name: row.name, ok: false, message: 'area siaran nonaktif' };
         const cam = parseRtsp(row.private_rtsp_url);
         if (!cam) return { cameraId: id, name: row.name, ok: false, message: 'kamera tanpa RTSP internal' };
         // The stop callback lets a later higher-priority broadcast preempt THIS play (kill its child cleanly).
@@ -190,7 +196,9 @@ export async function playToCameras(cameraIds, sourceType, sourceId, loop = 1, o
 
 /** One-camera speaker test: plays whatever source is given (used with a short built-in test clip). */
 export async function testCamera(cameraId, sourceType, sourceId) {
-    const { results } = await playToCameras([cameraId], sourceType, sourceId, 1);
+    // A deliberate single-camera speaker test bypasses the area allowlist — testing is a setup step that
+    // can legitimately precede enabling the area.
+    const { results } = await playToCameras([cameraId], sourceType, sourceId, 1, { enforceAreaScope: false });
     return results[0];
 }
 

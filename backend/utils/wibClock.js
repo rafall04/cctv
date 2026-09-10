@@ -1,17 +1,18 @@
 /*
-Purpose: Tiny WIB (UTC+7) wall-clock helpers for Audio Broadcast quiet-hours. Production Node runs in
-         UTC, so "now" in WIB is Date.now() + 7h. Kept separate + pure so it's trivially testable.
-Caller: audioTargetService / audioController (quiet-hours check).
+Purpose: Tiny local wall-clock helpers for Audio Broadcast quiet-hours. Production Node runs in UTC, so
+         "now" locally is Date.now() + the app UTC offset. Kept separate + pure so it's trivially testable —
+         the offset is INJECTED (defaults to +7h/WIB for back-compat), never read from the DB here.
+Caller: audioTargetService / audioController (quiet-hours check) — they resolve the app offset and pass it.
 Deps: none.
-MainFuncs: wibNowMinutes, hhmmToMinutes, isWithinWindow.
+MainFuncs: wibNowMinutes, hhmmToMinutes, isWithinWindow, isAreaQuietNow.
 SideEffects: none.
 */
 
-const WIB_OFFSET_MS = 7 * 60 * 60 * 1000;
+const WIB_OFFSET_MIN = 7 * 60; // default offset (WIB) when a caller does not inject one
 
-/** Minutes since WIB midnight for "now" (0..1439). */
-export function wibNowMinutes(now = Date.now()) {
-    const w = new Date(now + WIB_OFFSET_MS);
+/** Minutes since local midnight for "now" (0..1439). offsetMinutes defaults to WIB (+420). */
+export function wibNowMinutes(now = Date.now(), offsetMinutes = WIB_OFFSET_MIN) {
+    const w = new Date(now + offsetMinutes * 60000);
     return w.getUTCHours() * 60 + w.getUTCMinutes();
 }
 
@@ -35,12 +36,12 @@ export function isWithinWindow(nowMin, startMin, endMin) {
     return nowMin >= startMin || nowMin < endMin;                             // crosses midnight
 }
 
-/** Convenience: is an area (with quiet_start/quiet_end HH:MM) in quiet hours right now? */
-export function isAreaQuietNow(area, now = Date.now()) {
+/** Convenience: is an area (with quiet_start/quiet_end HH:MM) in quiet hours right now? offsetMinutes = app tz. */
+export function isAreaQuietNow(area, now = Date.now(), offsetMinutes = WIB_OFFSET_MIN) {
     const start = hhmmToMinutes(area && area.quiet_start);
     const end = hhmmToMinutes(area && area.quiet_end);
     if (start == null || end == null) return false;
-    return isWithinWindow(wibNowMinutes(now), start, end);
+    return isWithinWindow(wibNowMinutes(now, offsetMinutes), start, end);
 }
 
 export default { wibNowMinutes, hhmmToMinutes, isWithinWindow, isAreaQuietNow };

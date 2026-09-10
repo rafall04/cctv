@@ -48,7 +48,9 @@ export default function SoundboardTab({ clips, playlists, cameras }) {
             return;
         }
         setFiring(btn.id);
-        const req = { cameraIds: btn.camera_ids, sourceType: btn.source_type, sourceId: btn.source_id, loop: btn.loop, gainDb: btn.gain_db };
+        // gainDb intentionally omitted: runtime volume is not controllable on the deployed cameras (loudness is
+        // locked in firmware), so the whole gain path is dormant and playNow drops it anyway.
+        const req = { cameraIds: btn.camera_ids, sourceType: btn.source_type, sourceId: btn.source_id, loop: btn.loop };
         let result = await playNow(req);
         if (result.requiresConfirm) {
             const ok = await confirm({ title: 'Konfirmasi siaran', message: result.message, confirmLabel: 'Siarkan sekarang', cancelLabel: 'Batal', tone: 'default' });

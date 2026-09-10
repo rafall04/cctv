@@ -40,6 +40,8 @@ function resetSchema() {
         DROP TABLE IF EXISTS audio_schedules;
         DROP TABLE IF EXISTS audio_playlists;
         DROP TABLE IF EXISTS audio_clips;
+        DROP TABLE IF EXISTS cameras;
+        DROP TABLE IF EXISTS areas;
         CREATE TABLE audio_clips (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, base_filename TEXT UNIQUE, duration_sec REAL DEFAULT 0, source_bytes INTEGER DEFAULT 0, created_by INTEGER, created_at TEXT DEFAULT (datetime('now')));
         CREATE TABLE audio_playlists (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, created_at TEXT DEFAULT (datetime('now')));
         CREATE TABLE audio_schedules (
@@ -49,6 +51,10 @@ function resetSchema() {
             enabled INTEGER NOT NULL DEFAULT 1, last_run_at TEXT, created_at TEXT DEFAULT (datetime('now')),
             schedule_kind TEXT NOT NULL DEFAULT 'recurring', run_date TEXT, start_date TEXT, end_date TEXT,
             gain_db INTEGER NOT NULL DEFAULT 0);
+        -- cameras + areas exist so quietTargets (the scheduler's quiet-hours gate) can run; empty by default
+        -- so the existing firing tests see no quiet cameras and fire the full [1,2] set.
+        CREATE TABLE areas (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, audio_broadcast_enabled INTEGER DEFAULT 0, quiet_start TEXT, quiet_end TEXT, max_loop INTEGER);
+        CREATE TABLE cameras (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, area_id INTEGER);
     `);
     db.prepare("INSERT INTO audio_clips (name, base_filename) VALUES ('Clip', 'clip-aaaaaaaa')").run();
 }
@@ -140,6 +146,37 @@ describe('audioScheduleService — runDueSchedules firing rules', () => {
         const s = createSchedule(baseFields);
         deleteSchedule(s.id);
         expect(runDueSchedules(TUE_1730_WIB)).toBe(0);
+    });
+});
+
+describe('audioScheduleService — area quiet-hours gate (B3)', () => {
+    // TUE_1730_WIB is 17:30 WIB. An area whose quiet window covers 17:00–18:00 is quiet now.
+    it('skips cameras whose area is in quiet hours, firing only the rest', () => {
+        db.prepare("INSERT INTO areas (id, name, quiet_start, quiet_end) VALUES (1, 'Malam', '17:00', '18:00')").run();
+        db.prepare("INSERT INTO areas (id, name, quiet_start, quiet_end) VALUES (2, 'Siang', NULL, NULL)").run();
+        db.prepare("INSERT INTO cameras (id, name, area_id) VALUES (1, 'Cam Malam', 1)").run();
+        db.prepare("INSERT INTO cameras (id, name, area_id) VALUES (2, 'Cam Siang', 2)").run();
+        createSchedule({ ...baseFields, cameraIds: [1, 2] });
+        expect(runDueSchedules(TUE_1730_WIB)).toBe(1);
+        // camera 1 (quiet) dropped; only camera 2 is broadcast.
+        expect(playToCameras).toHaveBeenCalledWith([2], 'clip', 1, 1, { gainDb: 0 });
+    });
+
+    it('does not play at all when every target camera is in quiet hours', () => {
+        db.prepare("INSERT INTO areas (id, name, quiet_start, quiet_end) VALUES (1, 'Malam', '17:00', '18:00')").run();
+        db.prepare("INSERT INTO cameras (id, name, area_id) VALUES (1, 'Cam Malam', 1)").run();
+        createSchedule({ ...baseFields, cameraIds: [1] });
+        expect(runDueSchedules(TUE_1730_WIB)).toBe(1); // still counted as due...
+        expect(playToCameras).not.toHaveBeenCalled();   // ...but nothing is broadcast
+    });
+
+    it('fires normally when the area has no quiet window set', () => {
+        db.prepare("INSERT INTO areas (id, name) VALUES (1, 'Siang')").run();
+        db.prepare("INSERT INTO cameras (id, name, area_id) VALUES (1, 'Cam', 1)").run();
+        db.prepare("INSERT INTO cameras (id, name, area_id) VALUES (2, 'Cam2', 1)").run();
+        createSchedule({ ...baseFields, cameraIds: [1, 2] });
+        expect(runDueSchedules(TUE_1730_WIB)).toBe(1);
+        expect(playToCameras).toHaveBeenCalledWith([1, 2], 'clip', 1, 1, { gainDb: 0 });
     });
 });
 

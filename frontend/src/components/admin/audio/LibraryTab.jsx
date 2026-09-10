@@ -444,8 +444,12 @@ export default function LibraryTab({ clips, loading, reload, onPlayClip }) {
                             className="w-full min-h-11 rounded-control border border-edge bg-surface px-3 py-2 text-sm text-content focus:border-primary focus:outline-none"
                         >
                             {engines.map((e) => (
-                                <option key={e.id} value={e.id} disabled={!e.available}>
-                                    {e.label}{e.available ? '' : ' — belum terpasang'}
+                                // NOT disabled even when unavailable: Gemini becomes available only AFTER a key
+                                // is pasted, and the key box below only shows when Gemini is selected — disabling
+                                // the option made entering the key impossible. Selecting an unavailable engine
+                                // just reveals its activation hint; the synth buttons stay disabled until ready.
+                                <option key={e.id} value={e.id}>
+                                    {e.label}{e.available ? '' : (e.id === 'gemini' ? ' — belum aktif (butuh kunci)' : ' — belum terpasang')}
                                 </option>
                             ))}
                         </select>

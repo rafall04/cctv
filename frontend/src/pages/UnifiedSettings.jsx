@@ -44,7 +44,7 @@ const TABS = [
     { id: 'telegram', label: 'Bot Telegram', Panel: TelegramSettingsPanel },
     { id: 'saweria', label: 'Saweria', Panel: SaweriaSettingsPanel },
     { id: 'branding', label: 'Branding', Panel: BrandingSettingsPanel },
-    { id: 'apikey', label: 'Kunci API', Panel: ApiKeySettings },
+    { id: 'apikey', label: 'Integrasi & Kunci API', Panel: ApiKeySettings },
 ];
 
 export default function UnifiedSettings() {

@@ -64,6 +64,31 @@ export function setTimezone(timezone) {
     );
 }
 
+/**
+ * The app display timezone's current UTC offset in MINUTES (e.g. Asia/Jakarta -> 420).
+ * Indonesia has no DST so this is stable, but we derive it from the configured zone so a WITA/WIT (or any
+ * IANA) deployment is correct too — used by the Audio Broadcast scheduler + quiet-hours, which historically
+ * hard-coded WIB (+7). RESILIENT BY DESIGN: any failure (missing settings row/table in a unit env, an
+ * unknown zone) falls back to +7h so behaviour is identical to the old hard-coded value.
+ */
+export function getAppOffsetMinutes(now = Date.now()) {
+    try {
+        return zoneOffsetMinutes(getTimezone(), now);
+    } catch { return 420; }
+}
+
+function zoneOffsetMinutes(timeZone, now) {
+    const d = new Date(now);
+    const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone, hour12: false,
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit',
+    }).formatToParts(d).reduce((acc, p) => { acc[p.type] = p.value; return acc; }, {});
+    const hour = parseInt(parts.hour, 10) % 24; // some engines render midnight as '24'
+    const asUTC = Date.UTC(+parts.year, +parts.month - 1, +parts.day, hour, +parts.minute, +parts.second);
+    return Math.round((asUTC - d.getTime()) / 60000);
+}
+
 export function formatDateTime(date, timezone = null) {
     const tz = timezone || getTimezone();
     return new Intl.DateTimeFormat('id-ID', {

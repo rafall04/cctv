@@ -15,12 +15,16 @@ the same minute while still letting it fire again the next day.
 
 import { query, queryOne, execute } from '../database/connectionPool.js';
 import { playToCameras } from './audioCastService.js';
+import { getAppOffsetMinutes } from './timezoneService.js';
+import { quietTargets } from './audioTargetService.js';
 
-const WIB_OFFSET_MS = 7 * 3600 * 1000;
 const HHMM_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
-function wibParts(nowMs = Date.now()) {
-    const d = new Date(nowMs + WIB_OFFSET_MS);
+// Wall-clock parts in the app's configured timezone. Historically this was a hard +7 (WIB); it now follows
+// the app timezone so a WITA/WIT deployment fires at the right local minute. getAppOffsetMinutes falls back
+// to +7 on any error, so a WIB box is unchanged.
+function localParts(nowMs = Date.now()) {
+    const d = new Date(nowMs + getAppOffsetMinutes(nowMs) * 60000);
     const hh = String(d.getUTCHours()).padStart(2, '0');
     const mm = String(d.getUTCMinutes()).padStart(2, '0');
     const dateKey = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
@@ -172,9 +176,9 @@ function dueOnDay(s, dateKey, dayBit) {
     return Boolean(s.days_mask & dayBit);
 }
 
-/** One scheduler tick: fire any enabled schedule due this WIB minute (guarded against double-firing). */
+/** One scheduler tick: fire any enabled schedule due this local minute (guarded against double-firing). */
 export function runDueSchedules(nowMs = Date.now()) {
-    const { hhmm, dayBit, dateKey, minuteKey } = wibParts(nowMs);
+    const { hhmm, dayBit, dateKey, minuteKey } = localParts(nowMs);
     const due = query('SELECT * FROM audio_schedules WHERE enabled = 1 AND time_hhmm = ?', [hhmm])
         .filter((s) => s.last_run_at !== minuteKey && dueOnDay(s, dateKey, dayBit));
     for (const s of due) {
@@ -185,8 +189,21 @@ export function runDueSchedules(nowMs = Date.now()) {
             execute('UPDATE audio_schedules SET last_run_at = ? WHERE id = ?', [minuteKey, s.id]);
         }
         const cams = parseCameraIds(s.camera_ids);
-        console.log(`[Audio] Schedule "${s.name}" fired ${hhmm} WIB -> ${cams.length} kamera`);
-        playToCameras(cams, s.source_type, s.source_id, s.loop_count, { gainDb: s.gain_db })
+        // Honour the SAME per-area quiet hours a manual play must confirm past: a scheduled blast at 23:00
+        // into an area whose quiet window is 22:00–05:00 must NOT fire there. Fail-OPEN — if the quiet
+        // lookup errors (e.g. tables absent in a unit env) we broadcast rather than silently drop.
+        let quietSkip = new Set();
+        try { quietSkip = new Set(quietTargets(cams, nowMs).map((c) => c.id)); } catch { /* no quiet gate */ }
+        const active = cams.filter((id) => !quietSkip.has(id));
+        if (active.length === 0) {
+            console.log(`[Audio] Schedule "${s.name}" ${hhmm}: semua ${cams.length} kamera dalam jam tenang — dilewati`);
+            continue;
+        }
+        const skipped = cams.length - active.length;
+        console.log(`[Audio] Schedule "${s.name}" fired ${hhmm} -> ${active.length} kamera${skipped ? ` (${skipped} dilewati: jam tenang)` : ''}`);
+        // Area-disabled cameras are dropped inside playToCameras (enforceAreaScope default), so a schedule
+        // whose area was later turned off stops sounding there without needing to be edited.
+        playToCameras(active, s.source_type, s.source_id, s.loop_count, { gainDb: s.gain_db })
             .then((r) => {
                 const ok = r.results.filter((x) => x.ok).length;
                 console.log(`[Audio] Schedule "${s.name}": ${ok}/${r.results.length} kamera OK`);
@@ -201,7 +218,7 @@ export function startScheduler() {
         try { runDueSchedules(); } catch (e) { console.error('[Audio] Scheduler tick error:', e.message); }
     }, 30000);
     if (t.unref) t.unref();
-    console.log('[Audio] Broadcast scheduler started (30s tick, WIB)');
+    console.log('[Audio] Broadcast scheduler started (30s tick, zona app)');
     return t;
 }
 

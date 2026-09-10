@@ -15,6 +15,7 @@ any probe runs.
 import { query, queryOne, execute } from '../database/connectionPool.js';
 import { triggerBackgroundRecheck } from './audioCapabilityService.js';
 import { isAreaQuietNow, hhmmToMinutes } from '../utils/wibClock.js';
+import { getAppOffsetMinutes } from './timezoneService.js';
 
 /**
  * Cameras that can be audio-broadcast targets, scoped to audio-enabled areas.
@@ -72,8 +73,12 @@ export function setAreaPolicy(areaId, { quiet_start, quiet_end, max_loop } = {})
     return queryOne('SELECT id, name, quiet_start, quiet_end, max_loop FROM areas WHERE id = ?', [id]);
 }
 
-/** Which of the given target cameras sit in an area that is in quiet hours right now (for confirm UX). */
-export function quietTargets(cameraIds) {
+/**
+ * Which of the given target cameras sit in an area that is in quiet hours at `now` (for confirm UX + the
+ * scheduler's quiet gate). `now` defaults to Date.now() but is passed explicitly by the scheduler so the
+ * quiet check uses the SAME instant the schedule is evaluated at (and so it is unit-testable).
+ */
+export function quietTargets(cameraIds, now = Date.now()) {
     const ids = [...new Set((cameraIds || []).map((x) => parseInt(x, 10)).filter(Number.isInteger))];
     if (ids.length === 0) return [];
     const placeholders = ids.map(() => '?').join(',');
@@ -82,7 +87,8 @@ export function quietTargets(cameraIds) {
          FROM cameras c JOIN areas a ON a.id = c.area_id WHERE c.id IN (${placeholders})`,
         ids,
     );
-    return rows.filter((r) => isAreaQuietNow(r)).map((r) => ({ id: r.id, name: r.name, area_name: r.area_name }));
+    const off = getAppOffsetMinutes(now); // WIB/WITA/WIT per app timezone (falls back to +7)
+    return rows.filter((r) => isAreaQuietNow(r, now, off)).map((r) => ({ id: r.id, name: r.name, area_name: r.area_name }));
 }
 
 /** Turn an area's audio-broadcast allowlist flag on/off. */

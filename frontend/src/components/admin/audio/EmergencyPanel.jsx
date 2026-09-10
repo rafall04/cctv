@@ -39,7 +39,16 @@ export default function EmergencyPanel({ clips, playlists, cameras, areas }) {
         ? (areas.find((a) => a.id === p.area_id)?.name || `area #${p.area_id}`)
         : `${p.camera_ids.length} kamera`);
 
+    // Emergency resolves to SUPPORTED cameras only (a "needs test" camera is dropped). Catch a preset that
+    // would resolve to zero BEFORE the operator commits to the big red confirm, instead of failing after.
+    const isSupported = (id) => cameras.find((c) => c.id === id)?.supports_audio_out === 1;
+    const selectedSupported = form && form.targetKind === 'cameras' ? form.cameraIds.filter(isSupported).length : null;
+
     const fire = async (p) => {
+        if (p.target_kind === 'cameras' && p.camera_ids.filter(isSupported).length === 0) {
+            showNotification({ type: 'error', title: 'Tak ada kamera didukung', message: 'Preset ini tak punya kamera yang terbukti bersuara. Ubah preset atau uji kameranya dulu di tab Kamera & Area.' });
+            return;
+        }
         const ok = await confirm({
             title: '🚨 Siaran DARURAT',
             message: `Siarkan "${p.label}" ke ${targetLabel(p)} SEKARANG? Ini menghentikan siaran lain & mengabaikan jam tenang.`,
@@ -144,7 +153,15 @@ export default function EmergencyPanel({ clips, playlists, cameras, areas }) {
                             {areas.filter((a) => a.audio_broadcast_enabled).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
                         </Field>
                     ) : (
-                        <CameraMultiSelect cameras={cameras} value={form.cameraIds} onChange={(ids) => setForm({ ...form, cameraIds: ids })} />
+                        <div className="space-y-1.5">
+                            <CameraMultiSelect cameras={cameras} value={form.cameraIds} onChange={(ids) => setForm({ ...form, cameraIds: ids })} />
+                            {form.cameraIds.length > 0 && selectedSupported === 0 && (
+                                <p className="text-xs text-status-warn">⚠ Tak ada kamera yang terbukti bersuara di pilihan ini — darurat akan gagal. Pilih kamera berstatus “didukung”, atau uji dulu di tab Kamera &amp; Area.</p>
+                            )}
+                            {form.cameraIds.length > 0 && selectedSupported > 0 && selectedSupported < form.cameraIds.length && (
+                                <p className="text-xs text-content-subtle">{selectedSupported}/{form.cameraIds.length} kamera terbukti bersuara; sisanya akan dilewati saat darurat.</p>
+                            )}
+                        </div>
                     )}
                     <div className="flex justify-end gap-2">
                         <button type="button" onClick={() => setForm(null)} className="rounded-control border border-edge px-3 py-1.5 text-sm font-medium text-content-muted">Batal</button>

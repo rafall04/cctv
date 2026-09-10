@@ -67,12 +67,28 @@ export default function PrayerConfig({ clips, areas }) {
         set({ latitude: loc.lat, longitude: loc.lon, timezone: loc.tz });
     };
 
-    const toggleEnabled = () => {
-        if (!cfg.enabled && locationUnset) {
+    // The enable switch SAVES immediately (like the Area/Jadwal switches) — the old version only flipped
+    // local state, so an operator who toggled "on" and left without pressing Simpan never actually armed
+    // the adzan. Turning on commits the current form (including the picked kabupaten).
+    const toggleEnabled = async () => {
+        const turningOn = !cfg.enabled;
+        if (turningOn && locationUnset) {
             showNotification({ type: 'error', title: 'Lokasi belum diatur', message: 'Pilih kabupaten/kota dulu agar waktu sholat benar.' });
             return;
         }
-        set({ enabled: cfg.enabled ? 0 : 1 });
+        const next = { ...cfg, enabled: turningOn ? 1 : 0 };
+        setCfg(next); // optimistic
+        setSaving(true);
+        const r = await updatePrayerConfig(next);
+        setSaving(false);
+        if (!r.success) {
+            setCfg((c) => ({ ...c, enabled: turningOn ? 0 : 1 })); // revert
+            showNotification({ type: 'error', title: 'Gagal', message: r.message });
+            return;
+        }
+        setCfg(r.data);
+        reloadTimes(r.data);
+        showNotification({ type: turningOn ? 'success' : 'info', title: turningOn ? 'Adzan otomatis aktif' : 'Adzan otomatis nonaktif', message: turningOn ? 'Tersimpan — akan berkumandang otomatis.' : 'Tersimpan.' });
     };
 
     const useGps = () => {

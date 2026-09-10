@@ -133,6 +133,15 @@ function resolveVoice(engine, voiceId) {
     return e.voices.find((v) => v.id === voiceId) || e.voices[0] || null;
 }
 
+// One correct "not ready" message per engine — Gemini's is a missing API KEY (not a missing binary), so it
+// must NOT read "Edge belum terpasang". Points the operator to where the key is entered.
+function engineNotReady(engine) {
+    const msg = engine === 'piper' ? 'TTS Piper belum terpasang di server.'
+        : engine === 'gemini' ? 'Gemini belum aktif — masukkan kunci API di Pengaturan → Integrasi & Kunci API.'
+            : 'TTS Edge (edge-tts) belum terpasang di server.';
+    const e = new Error(msg); e.statusCode = 501; return e;
+}
+
 // Make written PA text SPEAK naturally (piper/edge read symbols literally otherwise):
 //  - drop any unfilled {placeholder} so it is never read aloud as "nama" (belt-and-suspenders; the fill-in
 //    UI already substitutes them),
@@ -223,12 +232,7 @@ async function geminiSynth(text, voiceName) {
 export async function synthTtsToTemp({ text, engine = 'piper', voice, prefix }) {
     const clean = cleanText(text);
     if (!ENGINES[engine]) { const e = new Error('Mesin TTS tidak dikenal'); e.statusCode = 400; throw e; }
-    if (!(await ttsEngineAvailable(engine))) {
-        const e = new Error(engine === 'piper'
-            ? 'TTS Piper belum terpasang di server.'
-            : 'TTS Edge (edge-tts) belum terpasang di server.');
-        e.statusCode = 501; throw e;
-    }
+    if (!(await ttsEngineAvailable(engine))) throw engineNotReady(engine);
     const v = resolveVoice(engine, voice);
     if (!v) { const e = new Error('Suara tidak valid'); e.statusCode = 400; throw e; }
 
@@ -280,10 +284,7 @@ export async function previewTts({ text, engine = 'piper', voice }) {
 export async function createTtsJob({ text, engine = 'piper', voice, name, userId = null }) {
     const clean = cleanText(text);
     if (!ENGINES[engine]) { const e = new Error('Mesin TTS tidak dikenal'); e.statusCode = 400; throw e; }
-    if (!(await ttsEngineAvailable(engine))) {
-        const e = new Error(engine === 'piper' ? 'TTS Piper belum terpasang di server.' : 'TTS Edge belum terpasang di server.');
-        e.statusCode = 501; throw e;
-    }
+    if (!(await ttsEngineAvailable(engine))) throw engineNotReady(engine);
     const v = resolveVoice(engine, voice);
     if (!v) { const e = new Error('Suara tidak valid'); e.statusCode = 400; throw e; }
     // Read back by the INSERT's own lastInsertRowid — NOT `last_insert_rowid()` via queryOne, which
