@@ -16,6 +16,7 @@ import { listBroadcastTargets } from './audioTargetService.js';
 import { playToCameras } from './audioCastService.js';
 import { getClip } from './audioClipService.js';
 import { logPlay } from './audioHistoryService.js';
+import { alertBroadcastResult } from './audioAlertService.js';
 
 const PRAYERS = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
 const LABELS = { fajr: 'Subuh', dhuhr: 'Dzuhur', asr: 'Ashar', maghrib: 'Maghrib', isha: 'Isya' };
@@ -180,6 +181,8 @@ async function playPrayerClip(cfg, clipId, loop, { preempt, label, operator }) {
         logPlay({ sourceType: 'clip', sourceId: clipId, sourceName: `${label}: ${name || ''}`.trim(), cameraIds: ids, results, operatorName: operator });
         const ok = results.filter((r) => r.ok).length;
         console.log(`[${label}] -> ${ok}/${results.length} kamera`);
+        alertBroadcastResult({ label, okCount: ok, total: results.length }); // notify if adzan/qori reached nobody
+
     } catch (e) {
         console.error(`[${label}] play error:`, e.message);
     }

@@ -36,6 +36,18 @@ export function listBroadcastTargets({ includeUnknown = true } = {}) {
           AND c.audio_out_blocked = 0
           AND ${capClause}
         ORDER BY (c.supports_audio_out = 1) DESC, a.name ASC, c.name ASC`);
+    // Attach right-now online state so the picker can warn before broadcasting to a dead speaker.
+    // supports_audio_out is "ever had a working backchannel", NOT liveness — a camera whose modem is down
+    // looks identical without this. Done as a separate best-effort query (camera_runtime_state may be
+    // absent in a unit env) so a missing table degrades to online=null, never breaks the target list.
+    if (cameras.length) {
+        try {
+            const ids = cameras.map((c) => c.id);
+            const rows = query(`SELECT camera_id, is_online FROM camera_runtime_state WHERE camera_id IN (${ids.map(() => '?').join(',')})`, ids);
+            const map = new Map(rows.map((r) => [r.camera_id, r.is_online]));
+            for (const c of cameras) c.online = map.has(c.id) ? (map.get(c.id) ? 1 : 0) : null;
+        } catch { for (const c of cameras) c.online = null; }
+    }
     return cameras;
 }
 

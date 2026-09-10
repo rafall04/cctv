@@ -246,7 +246,15 @@ export default function CameraMultiSelect({
                                                     {cam.name}
                                                 </span>
                                                 {'supports_audio_out' in cam && (
-                                                    <span className="mt-0.5 flex text-xs"><CapabilityTag supports={cam.supports_audio_out} /></span>
+                                                    <span className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs">
+                                                        <CapabilityTag supports={cam.supports_audio_out} />
+                                                        {cam.online === 0 && (
+                                                            <span className="inline-flex items-center gap-1 text-status-fault" title="Kamera sedang offline — siaran bisa gagal">
+                                                                <span className="h-1.5 w-1.5 rounded-full bg-status-fault" aria-hidden="true" />
+                                                                offline
+                                                            </span>
+                                                        )}
+                                                    </span>
                                                 )}
                                             </span>
                                         </label>

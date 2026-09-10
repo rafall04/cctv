@@ -17,6 +17,8 @@ import { query, queryOne, execute } from '../database/connectionPool.js';
 import { playToCameras } from './audioCastService.js';
 import { getAppOffsetMinutes } from './timezoneService.js';
 import { quietTargets } from './audioTargetService.js';
+import { logPlay } from './audioHistoryService.js';
+import { alertBroadcastResult } from './audioAlertService.js';
 
 const HHMM_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
@@ -207,6 +209,10 @@ export function runDueSchedules(nowMs = Date.now()) {
             .then((r) => {
                 const ok = r.results.filter((x) => x.ok).length;
                 console.log(`[Audio] Schedule "${s.name}": ${ok}/${r.results.length} kamera OK`);
+                // Scheduled broadcasts left NO trace before — the most routine, least-watched path. Record a
+                // receipt like every other play, and alert if it reached nobody.
+                logPlay({ sourceType: s.source_type, sourceId: s.source_id, sourceName: `JADWAL: ${s.name}`, cameraIds: active, results: r.results, operatorName: 'jadwal' });
+                alertBroadcastResult({ label: `Jadwal "${s.name}"`, okCount: ok, total: r.results.length });
             })
             .catch((e) => console.error(`[Audio] Schedule "${s.name}" gagal:`, e.message));
     }
