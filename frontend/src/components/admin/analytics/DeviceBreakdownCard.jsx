@@ -10,23 +10,23 @@ export default function DeviceBreakdownCard({ deviceBreakdown }) {
                     {deviceBreakdown.map((device) => (
                         <div key={device.device_type} className="flex items-center gap-4">
                             <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                                device.device_type === 'mobile' ? 'bg-blue-100 dark:bg-primary/20 text-primary' :
-                                device.device_type === 'tablet' ? 'bg-purple-100 dark:bg-purple-500/20 text-purple-500' :
+                                device.device_type === 'mobile' ? 'bg-primary/15 text-primary' :
+                                device.device_type === 'tablet' ? 'bg-primary/15 text-primary' :
                                 'bg-surface-sunken text-content-muted'
                             }`}>
                                 <DeviceIcon type={device.device_type} className="w-6 h-6" />
                             </div>
                             <div className="flex-1">
                                 <div className="flex items-center justify-between mb-1">
-                                    <span className="font-semibold text-content capitalize">{device.device_type || 'Unknown'}</span>
+                                    <span className="font-semibold text-content capitalize">{device.device_type || 'Tidak dikenal'}</span>
                                     <span className="text-sm text-content-muted">{device.count} ({device.percentage || 0}%)</span>
                                 </div>
                                 <div className="h-2 bg-surface-sunken rounded-full overflow-hidden">
                                     <div
                                         className={`h-full rounded-full transition-all duration-500 ${
                                             device.device_type === 'mobile' ? 'bg-primary' :
-                                            device.device_type === 'tablet' ? 'bg-purple-500' :
-                                            'bg-gray-500'
+                                            device.device_type === 'tablet' ? 'bg-primary' :
+                                            'bg-content-subtle'
                                         }`}
                                         style={{ width: `${device.percentage || 0}%` }}
                                     />

@@ -61,7 +61,7 @@ export default function CameraGrid({
             </div>
 
             {totalPages > 1 && (
-                <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-edge bg-white px-4 py-3 text-sm shadow-sm dark:bg-gray-800/60">
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-edge bg-surface px-4 py-3 text-sm shadow-sm">
                     <span className="text-content-muted">
                         Halaman {page} dari {totalPages} · {cameras.length} kamera
                     </span>
@@ -70,7 +70,7 @@ export default function CameraGrid({
                             type="button"
                             onClick={() => setPage((current) => Math.max(1, current - 1))}
                             disabled={page <= 1}
-                            className="rounded-lg border border-edge-strong px-3 py-1.5 text-content transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-gray-700/60"
+                            className="rounded-control border border-edge-strong px-3 py-1.5 text-content transition-colors hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-40"
                         >
                             ← Sebelumnya
                         </button>
@@ -78,7 +78,7 @@ export default function CameraGrid({
                             type="button"
                             onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
                             disabled={page >= totalPages}
-                            className="rounded-lg border border-edge-strong px-3 py-1.5 text-content transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-gray-700/60"
+                            className="rounded-control border border-edge-strong px-3 py-1.5 text-content transition-colors hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-40"
                         >
                             Berikutnya →
                         </button>

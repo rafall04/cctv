@@ -17,7 +17,7 @@ import { TableSkeleton } from '../components/ui/Skeleton';
 import { Button, Field, Modal, PageHeader } from '../components/ui';
 
 const inputClass =
-    'w-full bg-surface border border-edge-strong rounded-lg px-3 py-2 text-content text-sm focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary';
+    'w-full bg-surface border border-edge-strong rounded-control px-3 py-2 text-content text-sm focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary';
 
 const PROFILE_FORM_DEFAULT = {
     name: '',
@@ -334,14 +334,14 @@ export default function VoucherManagement() {
             />
 
             {!enabled && (
-                <div className="rounded-xl border border-amber-300 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
+                <div className="rounded-card border border-status-warn/30 bg-status-warn/10 px-4 py-3 text-sm text-status-warn">
                     Fitur masih <b>non-aktif</b> — kamera tetap publik untuk semua orang. Tandai area
                     + buat profil dulu, lalu aktifkan fitur saat siap.
                 </div>
             )}
 
             {/* Area gating */}
-            <div className="bg-surface rounded-xl border border-edge overflow-hidden">
+            <div className="bg-surface rounded-card border border-edge overflow-hidden">
                 <div className="p-4 border-b border-edge">
                     <h2 className="text-lg font-semibold text-content">Area Berbayar</h2>
                     <p className="text-xs text-content-muted mt-1">
@@ -363,9 +363,9 @@ export default function VoucherManagement() {
                                     <button
                                         onClick={() => toggleAreaGated(area)}
                                         disabled={areaBusyId === area.id}
-                                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50 ${
+                                        className={`px-3 py-1.5 rounded-control text-xs font-semibold transition-colors disabled:opacity-50 ${
                                             gated ? 'bg-primary-600 text-white hover:bg-primary-700'
-                                                  : 'bg-surface-sunken text-content-muted hover:bg-surface-sunken'
+                                                  : 'bg-surface-sunken text-content-muted hover:bg-surface-raised'
                                         }`}
                                     >
                                         {gated ? '🔒 Berbayar' : 'Gratis'}
@@ -378,10 +378,10 @@ export default function VoucherManagement() {
             </div>
 
             {/* Profiles */}
-            <div className="bg-surface rounded-xl border border-edge overflow-hidden">
+            <div className="bg-surface rounded-card border border-edge overflow-hidden">
                 <div className="p-4 border-b border-edge flex items-center justify-between">
                     <h2 className="text-lg font-semibold text-content">Profil Voucher</h2>
-                    <button onClick={openCreateProfile} className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm transition-colors">
+                    <button onClick={openCreateProfile} className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-control text-sm transition-colors">
                         + Tambah Profil
                     </button>
                 </div>
@@ -390,7 +390,7 @@ export default function VoucherManagement() {
                 ) : (
                     <div className="overflow-x-auto">
                         <table className="w-full">
-                            <thead className="bg-gray-100 dark:bg-gray-900/50">
+                            <thead className="bg-surface-sunken">
                                 <tr>
                                     {['Nama', 'Durasi', 'Harga', 'Maks/Kode', 'Area', 'Status', 'Aksi'].map((h) => (
                                         <th key={h} className="px-4 py-3 text-left text-xs font-medium text-content-muted uppercase">{h}</th>
@@ -399,7 +399,7 @@ export default function VoucherManagement() {
                             </thead>
                             <tbody className="divide-y divide-edge">
                                 {profiles.map((p) => (
-                                    <tr key={p.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                                    <tr key={p.id} className="hover:bg-surface-raised">
                                         <td className="px-4 py-3">
                                             <p className="text-sm font-medium text-content">{p.name}</p>
                                             {p.description && <p className="text-xs text-content-muted">{p.description}</p>}
@@ -419,14 +419,14 @@ export default function VoucherManagement() {
                                                 </span>
                                                 {p.online_purchasable
                                                     ? <span className="px-2 py-0.5 rounded text-xs font-medium bg-primary/15 text-primary">Online</span>
-                                                    : <span className="px-2 py-0.5 rounded text-xs font-medium bg-gray-200 dark:bg-gray-700/50 text-content-muted">Khusus admin</span>}
+                                                    : <span className="px-2 py-0.5 rounded text-xs font-medium bg-surface-sunken text-content-muted">Khusus admin</span>}
                                             </div>
                                         </td>
                                         <td className="px-4 py-3">
                                             <div className="flex items-center gap-2">
-                                                <button onClick={() => openGenerate(p)} className="text-emerald-500 hover:text-emerald-400 text-sm">Generate</button>
-                                                <button onClick={() => openEditProfile(p)} className="text-primary-500 hover:text-primary-400 text-sm">Edit</button>
-                                                <button onClick={() => deleteProfile(p)} className="text-red-500 hover:text-red-400 text-sm">Hapus</button>
+                                                <button onClick={() => openGenerate(p)} className="text-status-live hover:text-status-live/80 text-sm">Generate</button>
+                                                <button onClick={() => openEditProfile(p)} className="text-primary hover:text-primary-600 text-sm">Edit</button>
+                                                <button onClick={() => deleteProfile(p)} className="text-status-fault hover:text-status-fault/80 text-sm">Hapus</button>
                                             </div>
                                         </td>
                                     </tr>
@@ -438,7 +438,7 @@ export default function VoucherManagement() {
             </div>
 
             {/* Codes */}
-            <div className="bg-surface rounded-xl border border-edge overflow-hidden">
+            <div className="bg-surface rounded-card border border-edge overflow-hidden">
                 <div className="p-4 border-b border-edge flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <h2 className="text-lg font-semibold text-content">Kode Voucher</h2>
                     <div className="flex gap-2">
@@ -457,7 +457,7 @@ export default function VoucherManagement() {
                 ) : (
                     <div className="overflow-x-auto max-h-96 overflow-y-auto">
                         <table className="w-full">
-                            <thead className="bg-gray-100 dark:bg-gray-900/50 sticky top-0">
+                            <thead className="bg-surface-sunken sticky top-0">
                                 <tr>
                                     {['Kode', 'Profil', 'Status', 'Pemakai', 'Berakhir', 'Pembeli', 'Aksi'].map((h) => (
                                         <th key={h} className="px-4 py-3 text-left text-xs font-medium text-content-muted uppercase">{h}</th>
@@ -466,7 +466,7 @@ export default function VoucherManagement() {
                             </thead>
                             <tbody className="divide-y divide-edge">
                                 {filteredCodes.map((c) => (
-                                    <tr key={c.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                                    <tr key={c.id} className="hover:bg-surface-raised">
                                         <td className="px-4 py-3 font-mono text-sm text-content">{c.code}</td>
                                         <td className="px-4 py-3 text-xs text-content-muted">{profilesById[c.profile_id]?.name || `#${c.profile_id}`}</td>
                                         <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded text-xs font-medium ${codeStatusBadge(c.status)}`}>{{ unused: 'Belum dipakai', active: 'Aktif', expired: 'Kedaluwarsa', revoked: 'Dicabut' }[c.status] || c.status}</span></td>
@@ -475,7 +475,7 @@ export default function VoucherManagement() {
                                         <td className="px-4 py-3 text-xs text-content-muted">{c.buyer_name || c.buyer_phone || '—'}</td>
                                         <td className="px-4 py-3">
                                             {c.status !== 'revoked' && c.status !== 'expired' && (
-                                                <button onClick={() => revokeCode(c)} className="text-red-500 hover:text-red-400 text-sm">Cabut</button>
+                                                <button onClick={() => revokeCode(c)} className="text-status-fault hover:text-status-fault/80 text-sm">Cabut</button>
                                             )}
                                         </td>
                                     </tr>

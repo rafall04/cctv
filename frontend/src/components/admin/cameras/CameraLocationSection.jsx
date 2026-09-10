@@ -12,7 +12,7 @@ export default function CameraLocationSection({
 }) {
     return (
         <>
-            <div className="rounded-xl border border-gray-200/80 bg-surface p-4 dark:border-gray-700/70">
+            <div className="rounded-card border border-edge bg-surface p-4">
                 <div className="mb-3">
                     <div className="flex items-center gap-2">
                         <div className="w-7 h-7 rounded-lg bg-primary-100 dark:bg-primary/20 flex items-center justify-center text-primary-600 dark:text-primary-400 shrink-0">
@@ -27,8 +27,8 @@ export default function CameraLocationSection({
                         Pilih lokasi dengan GPS atau buka peta untuk menentukan titik kamera.
                     </p>
                 </div>
-                <div className="border-t border-gray-200/70 pt-3 dark:border-gray-700/70">
-                    <Suspense fallback={<div className="h-10 rounded-lg bg-surface-sunken flex items-center justify-center"><span className="text-content-muted text-xs">Loading...</span></div>}>
+                <div className="border-t border-edge pt-3">
+                    <Suspense fallback={<div className="h-10 rounded-control bg-surface-sunken flex items-center justify-center"><span className="text-content-muted text-xs">Memuat...</span></div>}>
                     <LocationPicker
                         latitude={latitude}
                         longitude={longitude}
@@ -38,7 +38,7 @@ export default function CameraLocationSection({
                 </div>
             </div>
 
-            <div className="flex items-center justify-between p-3 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-xl">
+            <div className="flex items-center justify-between p-3 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-card">
                 <div className="flex items-center gap-2">
                     <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-500/20 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -57,7 +57,7 @@ export default function CameraLocationSection({
                     aria-label="Koneksi Tunnel"
                     onClick={onTunnelToggle}
                     disabled={isSubmitting}
-                    className={`relative w-11 h-6 rounded-full transition-colors disabled:opacity-50 shrink-0 ${isTunnel ? 'bg-amber-500' : 'bg-gray-300 dark:bg-gray-600'}`}
+                    className={`relative w-11 h-6 rounded-full transition-colors disabled:opacity-50 shrink-0 ${isTunnel ? 'bg-amber-500' : 'bg-edge-strong'}`}
                 >
                     <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${isTunnel ? 'left-5' : 'left-0.5'}`}></div>
                 </button>

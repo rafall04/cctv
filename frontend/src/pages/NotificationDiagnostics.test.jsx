@@ -134,7 +134,7 @@ describe('NotificationDiagnostics', () => {
         fireEvent.click(await screen.findByRole('button', { name: /Kirim Drill Offline/i }));
 
         await waitFor(() => expect(adminService.runNotificationDiagnosticsDrill).toHaveBeenCalledWith({ cameraId: 5, eventType: 'offline' }));
-        expect(await screen.findByText('Sent')).toBeTruthy();
+        expect(await screen.findByText('Terkirim')).toBeTruthy();
     });
 
     it('standardizes runtime and audit timestamps with explicit storage modes', async () => {

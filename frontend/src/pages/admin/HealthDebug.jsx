@@ -24,13 +24,13 @@ export default function HealthDebug() {
                     admin h1 — plus a `text-sm` eyebrow that read as one block with the description
                     below it. Both now come from the primitive. */}
                 <PageHeader
-                    eyebrow="Operations"
+                    eyebrow="Operasi"
                     title="Diagnostik Kesehatan"
-                    description="Diagnostik internal backend health, runtime evidence, dan status publik playable."
+                    description="Diagnostik internal kesehatan backend, bukti runtime, dan status dapat-diputar publik."
                     actions={<Button variant="primary" onClick={refresh}>Refresh</Button>}
                 />
                 {refreshError ? (
-                    <p className="text-sm text-amber-600 dark:text-amber-300">
+                    <p className="text-sm text-status-warn">
                         Refresh background terakhir gagal. Data yang tampil masih hasil fetch sukses sebelumnya.
                     </p>
                 ) : null}

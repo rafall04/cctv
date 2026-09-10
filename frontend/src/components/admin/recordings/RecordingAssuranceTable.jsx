@@ -23,14 +23,14 @@ function formatReason(reason) {
 
 function getHealthTone(health) {
     if (health === 'critical') {
-        return 'bg-red-500/15 text-red-700 dark:bg-red-500/20 dark:text-red-100';
+        return 'bg-status-fault/15 text-status-fault';
     }
 
     if (health === 'warning') {
-        return 'bg-amber-500/15 text-amber-700 dark:bg-amber-500/20 dark:text-amber-100';
+        return 'bg-status-warn/15 text-status-warn';
     }
 
-    return 'bg-emerald-500/15 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-100';
+    return 'bg-status-live/15 text-status-live';
 }
 
 function formatSeconds(seconds) {
@@ -89,7 +89,7 @@ export default function RecordingAssuranceTable({ cameras = [] }) {
                         {cameras.map((camera) => (
                             <tr
                                 key={camera.id}
-                                className="border-b border-edge dark:hover:bg-gray-700/40"
+                                className="border-b border-edge hover:bg-surface-raised"
                             >
                                 <td className="px-4 py-3">
                                     <div className="font-medium text-content">{camera.name}</div>
@@ -105,7 +105,7 @@ export default function RecordingAssuranceTable({ cameras = [] }) {
                                         {(camera.reasons?.length ? camera.reasons : ['healthy']).map((reason) => (
                                             <span
                                                 key={`${camera.id}-${reason}`}
-                                                className="rounded bg-gray-100 px-2 py-1 text-xs text-content dark:bg-gray-700/80"
+                                                className="rounded bg-surface-sunken px-2 py-1 text-xs text-content"
                                             >
                                                 {formatReason(reason)}
                                             </span>

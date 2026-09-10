@@ -36,7 +36,7 @@ function renderTarget(label, value) {
 
 function SummaryCard({ label, value, tone = 'default' }) {
     const toneClassName = {
-        default: 'border-edge bg-white dark:bg-gray-900/40',
+        default: 'border-edge bg-surface',
         success: 'border-emerald-200 bg-emerald-50 dark:border-emerald-500/20 dark:bg-emerald-500/10',
         warning: 'border-amber-200 bg-amber-50 dark:border-amber-500/20 dark:bg-amber-500/10',
         danger: 'border-red-200 bg-red-50 dark:border-red-500/20 dark:bg-red-500/10',
@@ -84,11 +84,11 @@ export default function CameraHealthDebugPanel({
     return (
         <div className="space-y-6">
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-                <SummaryCard label="Total Cameras" value={summary?.total ?? 0} />
-                <SummaryCard label="Healthy" value={summary?.healthy ?? 0} tone="success" />
-                <SummaryCard label="Degraded" value={summary?.degraded ?? 0} tone="warning" />
+                <SummaryCard label="Total Kamera" value={summary?.total ?? 0} />
+                <SummaryCard label="Sehat" value={summary?.healthy ?? 0} tone="success" />
+                <SummaryCard label="Menurun" value={summary?.degraded ?? 0} tone="warning" />
                 <SummaryCard label="Offline" value={summary?.offline ?? 0} tone="danger" />
-                <SummaryCard label="Unresolved" value={summary?.unresolved ?? 0} tone="info" />
+                <SummaryCard label="Belum Terpetakan" value={summary?.unresolved ?? 0} tone="info" />
             </div>
 
             <div className="rounded-2xl border border-edge bg-surface p-5 shadow-sm">
@@ -101,7 +101,7 @@ export default function CameraHealthDebugPanel({
                         </p>
                     </div>
                     <div className="text-xs text-content-subtle">
-                        Last updated: {lastUpdated ? formatTimestamp(lastUpdated, timezone) : '-'}
+                        Terakhir diperbarui: {lastUpdated ? formatTimestamp(lastUpdated, timezone) : '-'}
                     </div>
                 </div>
 
@@ -113,13 +113,13 @@ export default function CameraHealthDebugPanel({
                             onChange={(event) => onFilterChange('state', event.target.value)}
                             className="w-full rounded-xl border border-edge bg-surface px-3 py-2 text-sm text-content shadow-sm focus:border-primary focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                         >
-                            <option value="problem">Problem only</option>
-                            <option value="all">All states</option>
-                            <option value="healthy">Healthy</option>
-                            <option value="degraded">Degraded</option>
-                            <option value="suspect">Suspect</option>
+                            <option value="problem">Hanya bermasalah</option>
+                            <option value="all">Semua status</option>
+                            <option value="healthy">Sehat</option>
+                            <option value="degraded">Menurun</option>
+                            <option value="suspect">Dicurigai</option>
                             <option value="offline">Offline</option>
-                            <option value="unresolved">Unresolved</option>
+                            <option value="unresolved">Belum terpetakan</option>
                         </select>
                     </label>
 
@@ -157,7 +157,7 @@ export default function CameraHealthDebugPanel({
                     </label>
 
                     <label className="space-y-1 text-sm">
-                        <span className="font-medium text-content">Search</span>
+                        <span className="font-medium text-content">Cari</span>
                         <input
                             value={query.search}
                             onChange={(event) => onFilterChange('search', event.target.value)}
@@ -190,26 +190,26 @@ export default function CameraHealthDebugPanel({
                     </label>
 
                     <label className="space-y-1 text-sm">
-                        <span className="font-medium text-content">Sort</span>
+                        <span className="font-medium text-content">Urutkan</span>
                         <select
                             value={query.sort}
                             onChange={(event) => onFilterChange('sort', event.target.value)}
                             className="w-full rounded-xl border border-edge bg-surface px-3 py-2 text-sm text-content shadow-sm focus:border-primary focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
                         >
-                            <option value="severity">Severity</option>
+                            <option value="severity">Keparahan</option>
                             <option value="confidence">Confidence</option>
-                            <option value="camera">Camera</option>
+                            <option value="camera">Kamera</option>
                         </select>
                     </label>
                 </div>
 
                 {loading ? (
                     <div className="mt-6 rounded-2xl border border-edge bg-surface-sunken p-5 text-sm text-content-muted">
-                        Loading health diagnostics...
+                        Memuat diagnostik health...
                     </div>
                 ) : error ? (
                     <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
-                        Health diagnostics unavailable: {error}
+                        Diagnostik health tidak tersedia: {error}
                     </div>
                 ) : !hasItems ? (
                     <div className="mt-6 rounded-2xl border border-dashed border-edge-strong bg-surface-sunken p-6 text-sm text-content-muted">
@@ -221,19 +221,19 @@ export default function CameraHealthDebugPanel({
                             <table className="min-w-full text-sm">
                                 <thead>
                                     <tr className="border-b border-edge text-left text-xs uppercase tracking-wide text-content-muted">
-                                        <th className="px-3 py-2">Camera</th>
-                                        <th className="px-3 py-2">Internal State</th>
-                                        <th className="px-3 py-2">Public State</th>
+                                        <th className="px-3 py-2">Kamera</th>
+                                        <th className="px-3 py-2">State Internal</th>
+                                        <th className="px-3 py-2">State Publik</th>
                                         <th className="px-3 py-2">Monitoring</th>
                                         <th className="px-3 py-2">Delivery</th>
-                                        <th className="px-3 py-2">Reason</th>
-                                        <th className="px-3 py-2">Diagnostics</th>
-                                        <th className="px-3 py-2">Timing</th>
+                                        <th className="px-3 py-2">Alasan</th>
+                                        <th className="px-3 py-2">Diagnostik</th>
+                                        <th className="px-3 py-2">Waktu</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {items.map((item) => (
-                                        <tr key={item.cameraId} className="border-b border-gray-100 align-top text-content dark:border-gray-700/40">
+                                        <tr key={item.cameraId} className="border-b border-edge align-top text-content">
                                             <td className="px-3 py-3">
                                                 <div className="font-medium">{item.cameraName}</div>
                                                 <div className="text-xs text-content-subtle">
@@ -345,27 +345,27 @@ export default function CameraHealthDebugPanel({
 
                         <div className="mt-5 flex flex-col gap-3 border-t border-edge pt-4 text-sm md:flex-row md:items-center md:justify-between">
                             <div className="text-content-muted">
-                                Menampilkan {items.length} dari {pagination?.totalItems ?? items.length} camera(s)
+                                Menampilkan {items.length} dari {pagination?.totalItems ?? items.length} kamera
                             </div>
                             <div className="flex flex-wrap items-center gap-2">
                                 <button
                                     type="button"
                                     onClick={() => onPageChange(Math.max(1, (pagination?.page || 1) - 1))}
                                     disabled={!pagination?.hasPreviousPage}
-                                    className="rounded-xl border border-edge px-3 py-2 text-sm font-medium text-content transition disabled:cursor-not-allowed disabled:opacity-50"
+                                    className="rounded-control border border-edge px-3 py-2 text-sm font-medium text-content transition disabled:cursor-not-allowed disabled:opacity-50"
                                 >
-                                    Previous
+                                    Sebelumnya
                                 </button>
                                 <span className="text-content-muted">
-                                    Page {pagination?.page ?? 1} / {pagination?.totalPages ?? 1}
+                                    Halaman {pagination?.page ?? 1} / {pagination?.totalPages ?? 1}
                                 </span>
                                 <button
                                     type="button"
                                     onClick={() => onPageChange((pagination?.page || 1) + 1)}
                                     disabled={!pagination?.hasNextPage}
-                                    className="rounded-xl border border-edge px-3 py-2 text-sm font-medium text-content transition disabled:cursor-not-allowed disabled:opacity-50"
+                                    className="rounded-control border border-edge px-3 py-2 text-sm font-medium text-content transition disabled:cursor-not-allowed disabled:opacity-50"
                                 >
-                                    Next
+                                    Berikutnya
                                 </button>
                             </div>
                         </div>

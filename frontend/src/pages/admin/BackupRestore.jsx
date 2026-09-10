@@ -202,15 +202,15 @@ export default function BackupRestore() {
                 )}
             />
 
-            <div className="rounded-2xl border border-blue-200 bg-blue-50/80 dark:bg-blue-500/10 dark:border-blue-500/20 p-5">
-                <p className="font-semibold text-blue-900 dark:text-blue-200">Gunakan restore untuk kamera unresolved</p>
-                <p className="mt-2 text-sm text-blue-800 dark:text-blue-300">
+            <div className="rounded-card border border-primary/20 bg-primary/5 p-5">
+                <p className="font-semibold text-content">Gunakan restore untuk kamera unresolved</p>
+                <p className="mt-2 text-sm text-content-muted">
                     Import biasa tetap khusus untuk ingest per-area. Restore ini dipakai untuk memperbaiki kamera existing yang kehilangan `external_hls_url`, `external_stream_url`, atau metadata source lain.
                 </p>
             </div>
 
             <div className="grid grid-cols-1 xl:grid-cols-[1.2fr_0.8fr] gap-6">
-                <section className="bg-surface border border-edge rounded-2xl p-6 space-y-5">
+                <section className="bg-surface border border-edge rounded-card p-6 space-y-5">
                     <div>
                         <h2 className="text-lg font-semibold text-content">1. Unggah Backup JSON</h2>
                         <p className="text-sm text-content-muted mt-1">File backup lama akan dibaca di browser lalu dikirim ke backend untuk preview restore.</p>
@@ -222,34 +222,34 @@ export default function BackupRestore() {
                             type="file"
                             accept=".json,application/json"
                             onChange={handleFileUpload}
-                            className="block w-full text-sm text-content file:mr-4 file:rounded-xl file:border-0 file:bg-primary file:px-4 file:py-2.5 file:font-semibold file:text-white hover:file:bg-primary-600"
+                            className="block w-full text-sm text-content file:mr-4 file:rounded-control file:border-0 file:bg-primary file:px-4 file:py-2.5 file:font-semibold file:text-white hover:file:bg-primary-600"
                         />
                         <button
                             type="button"
                             onClick={clearBackup}
-                            className="px-4 py-2.5 rounded-xl bg-surface-sunken text-content-muted hover:bg-surface-sunken"
+                            className="px-4 py-2.5 rounded-control bg-surface-sunken text-content-muted hover:bg-surface-raised"
                         >
                             Bersihkan
                         </button>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="rounded-xl border border-edge p-4">
+                        <div className="rounded-card border border-edge p-4">
                             <p className="text-sm text-content-muted">File</p>
                             <p className="mt-1 font-semibold text-content">{fileName || 'Belum ada file'}</p>
                         </div>
-                        <div className="rounded-xl border border-edge p-4">
+                        <div className="rounded-card border border-edge p-4">
                             <p className="text-sm text-content-muted">Total Item Backup</p>
                             <p className="mt-1 font-semibold text-content">{backupItems.length}</p>
                         </div>
-                        <div className="rounded-xl border border-edge p-4">
+                        <div className="rounded-card border border-edge p-4">
                             <p className="text-sm text-content-muted">Mode Restore</p>
                             <p className="mt-1 font-semibold text-content">Repair Existing</p>
                         </div>
                     </div>
                 </section>
 
-                <section className="bg-surface border border-edge rounded-2xl p-6 space-y-5">
+                <section className="bg-surface border border-edge rounded-card p-6 space-y-5">
                     <div>
                         <h2 className="text-lg font-semibold text-content">2. Scope & Matching</h2>
                         <p className="text-sm text-content-muted mt-1">Default pencocokan menggunakan ID lalu fallback `name + area_name`.</p>
@@ -261,7 +261,7 @@ export default function BackupRestore() {
                             <select
                                 value={scopeMode}
                                 onChange={(event) => updateQuickScope(event.target.value, selectedAreaId)}
-                                className="mt-2 w-full rounded-xl border border-edge bg-surface px-4 py-2.5 text-base sm:text-sm text-content"
+                                className="mt-2 w-full rounded-control border border-edge bg-surface px-4 py-2.5 text-base sm:text-sm text-content"
                             >
                                 <option value="all">Semua kamera existing</option>
                                 <option value="unresolved_only">Hanya kamera unresolved</option>
@@ -275,7 +275,7 @@ export default function BackupRestore() {
                                 value={selectedAreaId}
                                 disabled={scopeMode !== 'area_ids' || loadingAreas}
                                 onChange={(event) => updateQuickScope('area_ids', event.target.value)}
-                                className="mt-2 w-full rounded-xl border border-edge bg-surface px-4 py-2.5 text-base sm:text-sm text-content disabled:opacity-60"
+                                className="mt-2 w-full rounded-control border border-edge bg-surface px-4 py-2.5 text-base sm:text-sm text-content disabled:opacity-60"
                             >
                                 <option value="">Pilih area</option>
                                 {areas.map((area) => (
@@ -289,7 +289,7 @@ export default function BackupRestore() {
                         type="button"
                         onClick={handlePreview}
                         disabled={previewLoading || !backupItems.length || (scopeMode === 'area_ids' && !selectedAreaId)}
-                        className="w-full px-4 py-3 rounded-xl bg-primary hover:bg-primary-600 text-white font-semibold disabled:opacity-60"
+                        className="w-full px-4 py-3 rounded-control bg-primary hover:bg-primary-600 text-white font-semibold disabled:opacity-60"
                     >
                         {previewLoading ? 'Membuat Preview...' : 'Buat Preview Restore'}
                     </button>
@@ -299,39 +299,39 @@ export default function BackupRestore() {
             {preview && (
                 <section className="space-y-6">
                     <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-                        <div className="rounded-xl border border-edge bg-surface p-4">
+                        <div className="rounded-card border border-edge bg-surface p-4">
                             <p className="text-sm text-content-muted">Repairable</p>
-                            <p className="mt-1 text-2xl font-bold text-emerald-600">{preview.counts?.matched_repairable || 0}</p>
+                            <p className="mt-1 text-2xl font-bold text-status-live">{preview.counts?.matched_repairable || 0}</p>
                         </div>
-                        <div className="rounded-xl border border-edge bg-surface p-4">
+                        <div className="rounded-card border border-edge bg-surface p-4">
                             <p className="text-sm text-content-muted">Sudah Sinkron</p>
                             <p className="mt-1 text-2xl font-bold text-content">{preview.counts?.matched_no_changes || 0}</p>
                         </div>
-                        <div className="rounded-xl border border-edge bg-surface p-4">
+                        <div className="rounded-card border border-edge bg-surface p-4">
                             <p className="text-sm text-content-muted">Ambigu</p>
-                            <p className="mt-1 text-2xl font-bold text-amber-500">{preview.counts?.ambiguous_matches || 0}</p>
+                            <p className="mt-1 text-2xl font-bold text-status-warn">{preview.counts?.ambiguous_matches || 0}</p>
                         </div>
-                        <div className="rounded-xl border border-edge bg-surface p-4">
+                        <div className="rounded-card border border-edge bg-surface p-4">
                             <p className="text-sm text-content-muted">Target Hilang</p>
-                            <p className="mt-1 text-2xl font-bold text-rose-500">{preview.counts?.missing_target || 0}</p>
+                            <p className="mt-1 text-2xl font-bold text-status-fault">{preview.counts?.missing_target || 0}</p>
                         </div>
-                        <div className="rounded-xl border border-edge bg-surface p-4">
+                        <div className="rounded-card border border-edge bg-surface p-4">
                             <p className="text-sm text-content-muted">Backup Invalid</p>
-                            <p className="mt-1 text-2xl font-bold text-rose-500">{preview.counts?.invalid_backup_row || 0}</p>
+                            <p className="mt-1 text-2xl font-bold text-status-fault">{preview.counts?.invalid_backup_row || 0}</p>
                         </div>
                     </div>
 
-                    <div className="bg-surface border border-edge rounded-2xl p-6 space-y-4">
+                    <div className="bg-surface border border-edge rounded-card p-6 space-y-4">
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
                             <div>
                                 <h2 className="text-lg font-semibold text-content">3. Review Hasil Preview</h2>
                                 <p className="text-sm text-content-muted">Tinjau kamera yang cocok, butuh perbaikan, atau masih ambigu.</p>
                             </div>
                             <div className="flex flex-wrap gap-2">
-                                <button type="button" onClick={() => setRowFilter('all')} className={`px-3 py-2 rounded-xl text-sm ${rowFilter === 'all' ? 'bg-primary text-white' : 'bg-surface-sunken text-content-muted'}`}>Semua</button>
-                                <button type="button" onClick={() => setRowFilter('repairable')} className={`px-3 py-2 rounded-xl text-sm ${rowFilter === 'repairable' ? 'bg-primary text-white' : 'bg-surface-sunken text-content-muted'}`}>Repairable</button>
-                                <button type="button" onClick={() => setRowFilter('external_only')} className={`px-3 py-2 rounded-xl text-sm ${rowFilter === 'external_only' ? 'bg-primary text-white' : 'bg-surface-sunken text-content-muted'}`}>External Only</button>
-                                <button type="button" onClick={() => setRowFilter('issues')} className={`px-3 py-2 rounded-xl text-sm ${rowFilter === 'issues' ? 'bg-primary text-white' : 'bg-surface-sunken text-content-muted'}`}>Isu</button>
+                                <button type="button" onClick={() => setRowFilter('all')} className={`px-3 py-2 rounded-control text-sm ${rowFilter === 'all' ? 'bg-primary text-white' : 'bg-surface-sunken text-content-muted'}`}>Semua</button>
+                                <button type="button" onClick={() => setRowFilter('repairable')} className={`px-3 py-2 rounded-control text-sm ${rowFilter === 'repairable' ? 'bg-primary text-white' : 'bg-surface-sunken text-content-muted'}`}>Repairable</button>
+                                <button type="button" onClick={() => setRowFilter('external_only')} className={`px-3 py-2 rounded-control text-sm ${rowFilter === 'external_only' ? 'bg-primary text-white' : 'bg-surface-sunken text-content-muted'}`}>External Only</button>
+                                <button type="button" onClick={() => setRowFilter('issues')} className={`px-3 py-2 rounded-control text-sm ${rowFilter === 'issues' ? 'bg-primary text-white' : 'bg-surface-sunken text-content-muted'}`}>Isu</button>
                             </div>
                         </div>
 
@@ -362,10 +362,10 @@ export default function BackupRestore() {
                                             <td className="py-3 pr-4">
                                                 <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
                                                     row.status === 'matched_repairable'
-                                                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300'
+                                                        ? 'bg-status-live/10 text-status-live'
                                                         : row.status === 'matched_no_changes'
                                                             ? 'bg-surface-sunken text-content-muted'
-                                                            : 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300'
+                                                            : 'bg-status-fault/10 text-status-fault'
                                                 }`}>
                                                     {row.status}
                                                 </span>
@@ -391,7 +391,7 @@ export default function BackupRestore() {
                                 type="button"
                                 onClick={handleApply}
                                 disabled={applying || !preview.canApply}
-                                className="px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold disabled:opacity-60"
+                                className="px-5 py-3 rounded-control bg-status-live hover:bg-status-live/90 text-white font-semibold disabled:opacity-60"
                             >
                                 {applying ? 'Menerapkan Restore...' : 'Terapkan Backup Restore'}
                             </button>

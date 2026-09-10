@@ -103,11 +103,11 @@ function RecordingQuickEditCard({
                         <h3 className="text-lg font-semibold leading-tight text-content">
                             {recording.name || recording.camera_name}
                         </h3>
-                        <span className="inline-flex rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-content dark:bg-gray-700/90">
+                        <span className="inline-flex rounded-full bg-surface-sunken px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-content">
                             {recording.stream_source || 'internal'}
                         </span>
                         {(recording.enabled === 0 || recording.enabled === false) && (
-                            <span className="inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-amber-700 dark:bg-amber-500/20 dark:text-amber-200">
+                            <span className="inline-flex rounded-full bg-status-warn/15 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-status-warn">
                                 Disabled
                             </span>
                         )}
@@ -284,7 +284,7 @@ export default function RecordingCameraGrid({
 }) {
     if (recordings.length === 0) {
         return (
-            <div className="rounded-2xl border border-edge bg-white p-12 text-center shadow-sm dark:bg-gray-800/60">
+            <div className="rounded-2xl border border-edge bg-surface p-12 text-center shadow-sm">
                 <p className="text-content-muted">Tidak ada kamera yang cocok</p>
             </div>
         );

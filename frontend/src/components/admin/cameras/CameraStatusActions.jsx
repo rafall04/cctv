@@ -34,7 +34,7 @@ export default function CameraStatusActions({
                         disabled={togglingId === camera.id}
                         className="inline-flex h-6 w-11 items-center justify-center rounded-control transition-colors disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                     >
-                        <span className={`relative block w-10 h-5 rounded-full transition-colors ${camera.enabled ? 'bg-primary' : 'bg-gray-300'}`}>
+                        <span className={`relative block w-10 h-5 rounded-full transition-colors ${camera.enabled ? 'bg-primary' : 'bg-edge-strong'}`}>
                             <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${camera.enabled ? 'left-5' : 'left-0.5'}`}></span>
                         </span>
                     </button>
@@ -51,7 +51,7 @@ export default function CameraStatusActions({
                     title="Refresh stream source tanpa disable/enable"
                 >
                     <RefreshCw className={`h-3.5 w-3.5 ${isRefreshingStream ? 'animate-spin' : ''}`} />
-                    {isRefreshingStream ? 'Refreshing...' : 'Refresh Stream'}
+                    {isRefreshingStream ? 'Menyegarkan...' : 'Segarkan Stream'}
                 </button>
             </div>
 
@@ -74,7 +74,7 @@ export default function CameraStatusActions({
                     className="inline-flex h-6 w-11 items-center justify-center rounded-control transition-colors disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                     title={camera.status === 'maintenance' ? 'Matikan mode perbaikan' : 'Aktifkan mode perbaikan'}
                 >
-                    <span className={`relative block w-10 h-5 rounded-full transition-colors ${camera.status === 'maintenance' ? 'bg-red-500' : 'bg-gray-300 dark:bg-gray-600'}`}>
+                    <span className={`relative block w-10 h-5 rounded-full transition-colors ${camera.status === 'maintenance' ? 'bg-red-500' : 'bg-edge-strong'}`}>
                         <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${camera.status === 'maintenance' ? 'left-5' : 'left-0.5'}`}></span>
                     </span>
                 </button>

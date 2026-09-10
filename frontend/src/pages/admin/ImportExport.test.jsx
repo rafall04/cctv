@@ -110,9 +110,9 @@ describe('ImportExport', () => {
         );
 
         expect(screen.getByDisplayValue('Jombang')).toBeTruthy();
-        expect(screen.getByRole('button', { name: 'Commit Import to DB' }).disabled).toBe(true);
+        expect(screen.getByRole('button', { name: 'Commit Import ke DB' }).disabled).toBe(true);
 
-        fireEvent.click(screen.getByRole('button', { name: 'Remote Source Preset' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Preset Source Remote' }));
         fireEvent.click(screen.getByRole('button', { name: 'Preview Import' }));
 
         await waitFor(() => {
@@ -128,7 +128,7 @@ describe('ImportExport', () => {
         });
 
         await screen.findByText('Perempatan A');
-        expect(screen.getByRole('button', { name: 'Commit Import to DB' }).disabled).toBe(false);
+        expect(screen.getByRole('button', { name: 'Commit Import ke DB' }).disabled).toBe(false);
     });
 
     it('menandai profile private RTSP sebagai internal live-only saat preview upload JSON', async () => {
@@ -177,11 +177,11 @@ describe('ImportExport', () => {
             </TestRouter>
         );
 
-        fireEvent.change(screen.getByLabelText('Import Profile'), {
+        fireEvent.change(screen.getByLabelText('Profil Impor'), {
             target: { value: 'internal_rtsp_live_only' },
         });
 
-        fireEvent.change(screen.getByLabelText('Upload JSON'), {
+        fireEvent.change(screen.getByLabelText('Unggah JSON'), {
             target: {
                 files: [new File(['{}'], 'surabaya-private.json', { type: 'application/json' })],
             },
@@ -199,6 +199,6 @@ describe('ImportExport', () => {
         });
 
         expect(screen.getByText(/private rtsp seperti surabaya/i)).toBeTruthy();
-        expect(screen.getByText(/internal • live only/i)).toBeTruthy();
+        expect(screen.getByText(/internal • live saja/i)).toBeTruthy();
     });
 });

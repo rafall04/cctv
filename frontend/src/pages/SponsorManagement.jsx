@@ -29,7 +29,7 @@ function badgeClass(color) {
         case 'emerald': return 'bg-emerald-500/20 text-emerald-400';
         case 'rose': return 'bg-rose-500/20 text-rose-400';
         case 'purple': return 'bg-purple-500/20 text-purple-400';
-        default: return 'bg-gray-100 dark:bg-gray-700/40 text-content-muted';
+        default: return 'bg-surface-sunken text-content-muted';
     }
 }
 
@@ -408,7 +408,7 @@ function SponsorManagement() {
             <SponsorPackagePanel packages={packages} onChanged={loadData} />
 
             {/* Sponsor list */}
-            <div className="bg-surface rounded-xl border border-edge overflow-hidden">
+            <div className="bg-surface rounded-card border border-edge overflow-hidden">
                 <div className="p-4 border-b border-edge">
                     <h2 className="text-lg font-semibold text-content">Daftar Sponsor</h2>
                 </div>
@@ -416,7 +416,7 @@ function SponsorManagement() {
                     <div className="p-8 text-center text-content-muted">
                         <p>Belum ada sponsor</p>
                         <button onClick={openCreate} disabled={packages.length === 0}
-                            className="mt-4 text-primary-400 hover:text-primary-300 disabled:opacity-50">
+                            className="mt-4 text-primary hover:text-primary-600 disabled:opacity-50">
                             Tambah sponsor pertama
                         </button>
                     </div>
@@ -456,7 +456,7 @@ function SponsorManagement() {
                                                         <p className="text-content font-medium">{sponsor.name}</p>
                                                         {sponsor.url && (
                                                             <a href={sponsor.url} target="_blank" rel="noopener noreferrer"
-                                                                className="text-xs text-primary-400 hover:text-primary-300">
+                                                                className="text-xs text-primary hover:text-primary-600">
                                                                 {sponsor.url}
                                                             </a>
                                                         )}
@@ -479,10 +479,10 @@ function SponsorManagement() {
                                             </td>
                                             <td className="px-4 py-3 text-sm">
                                                 <span className={`px-2 py-0.5 rounded text-xs font-medium ${over
-                                                    ? 'bg-red-500/20 text-red-400'
+                                                    ? 'bg-status-fault/15 text-status-fault'
                                                     : used > 0
-                                                        ? 'bg-primary-500/15 text-primary-300'
-                                                        : 'bg-gray-100 dark:bg-gray-700/40 text-gray-500'
+                                                        ? 'bg-primary/15 text-primary'
+                                                        : 'bg-surface-sunken text-content-subtle'
                                                     }`}>
                                                     {used}/{cap}
                                                 </span>
@@ -502,8 +502,8 @@ function SponsorManagement() {
                                             </td>
                                             <td className="px-4 py-3">
                                                 <div className="flex items-center justify-end gap-2">
-                                                    <button onClick={() => openEdit(sponsor)} className="text-primary-400 hover:text-primary-300 text-sm">Edit</button>
-                                                    <button onClick={() => handleDelete(sponsor)} className="text-red-400 hover:text-red-300 text-sm">Hapus</button>
+                                                    <button onClick={() => openEdit(sponsor)} className="text-primary hover:text-primary-600 text-sm">Edit</button>
+                                                    <button onClick={() => handleDelete(sponsor)} className="text-status-fault hover:text-status-fault/80 text-sm">Hapus</button>
                                                 </div>
                                             </td>
                                         </tr>
@@ -516,10 +516,10 @@ function SponsorManagement() {
             </div>
 
             {/* Penugasan Kamera quick swap */}
-            <div className="bg-surface rounded-xl border border-edge overflow-hidden">
+            <div className="bg-surface rounded-card border border-edge overflow-hidden">
                 <div className="p-4 border-b border-edge flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <div>
-                        <h2 className="text-lg font-semibold text-content dark:text-white">Penugasan Kamera (Quick Swap)</h2>
+                        <h2 className="text-lg font-semibold text-content">Penugasan Kamera (Quick Swap)</h2>
                         <p className="text-xs text-content-muted mt-1">
                             Mode cepat untuk ganti / lepas sponsor per kamera. Penugasan utama disarankan lewat form sponsor (centang banyak kamera sekaligus).
                         </p>
@@ -529,7 +529,7 @@ function SponsorManagement() {
                         value={assignmentSearch}
                         onChange={(e) => setAssignmentSearch(e.target.value)}
                         placeholder="Cari kamera / area / sponsor"
-                        className="bg-surface border border-edge-strong rounded-lg px-3 py-2 text-base sm:text-sm text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary md:w-72"
+                        className="bg-surface border border-edge-strong rounded-control px-3 py-2 text-base sm:text-sm text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary md:w-72"
                     />
                 </div>
                 {recordingCameras.length === 0 ? (
@@ -555,7 +555,7 @@ function SponsorManagement() {
                                         <tr key={camera.id} className="hover:bg-surface-sunken transition-colors">
                                             <td className="px-4 py-3 text-content text-sm">
                                                 <p className="font-medium">{camera.name || `Kamera ${camera.id}`}</p>
-                                                <p className="text-xs text-gray-500">#{camera.id}</p>
+                                                <p className="text-xs text-content-subtle">#{camera.id}</p>
                                             </td>
                                             <td className="px-4 py-3 text-content-muted text-sm">{camera.location || camera.area_name || '—'}</td>
                                             <td className="px-4 py-3 text-sm">
@@ -578,7 +578,7 @@ function SponsorManagement() {
                                                         if (target === camera.sponsor_name) return;
                                                         handleQuickAssign(camera.id, target);
                                                     }}
-                                                    className="bg-surface border border-edge-strong rounded-lg px-3 py-1.5 text-base sm:text-sm text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50"
+                                                    className="bg-surface border border-edge-strong rounded-control px-3 py-1.5 text-base sm:text-sm text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50"
                                                 >
                                                     <option value="">— Tanpa sponsor —</option>
                                                     {activeSponsorOptions.map((sponsor) => (
@@ -592,7 +592,7 @@ function SponsorManagement() {
                                                 {camera.sponsor_name && (
                                                     <button onClick={() => handleQuickUnassign(camera.id, camera.name || `#${camera.id}`)}
                                                         disabled={isBusy}
-                                                        className="text-red-400 hover:text-red-300 text-sm disabled:opacity-50">
+                                                        className="text-status-fault hover:text-status-fault/80 text-sm disabled:opacity-50">
                                                         Lepas
                                                     </button>
                                                 )}
@@ -724,13 +724,13 @@ function SponsorManagement() {
                             </div>
 
                             {/* Camera picker */}
-                            <div className="bg-surface-sunken rounded-lg p-4 space-y-3">
+                            <div className="bg-surface-sunken rounded-card p-4 space-y-3">
                                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
                                     <div>
                                         <p className="text-sm font-medium text-content">Tugaskan ke Kamera</p>
                                         <p className="text-xs text-content-muted">
                                             Pilih kamera yang akan menampilkan logo sponsor ini.{' '}
-                                            <span className={overCameraLimit ? 'text-red-400' : 'text-gray-500'}>
+                                            <span className={overCameraLimit ? 'text-status-fault' : 'text-content-subtle'}>
                                                 {selectedCameraIds.size}{cameraLimitValue === null ? '' : ` / ${cameraLimitValue}`} dipilih
                                             </span>
                                         </p>
@@ -740,15 +740,15 @@ function SponsorManagement() {
                                         value={cameraSearch}
                                         onChange={(e) => setCameraSearch(e.target.value)}
                                         placeholder="Cari kamera"
-                                        className="bg-surface border border-edge-strong rounded-lg px-3 py-1.5 text-base sm:text-sm text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary md:w-60"
+                                        className="bg-surface border border-edge-strong rounded-control px-3 py-1.5 text-base sm:text-sm text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary md:w-60"
                                     />
                                 </div>
                                 {overCameraLimit && (
-                                    <p className="text-xs text-red-400">
+                                    <p className="text-xs text-status-fault">
                                         Melebihi limit paket. Naikkan limit kamera atau hapus pilihan.
                                     </p>
                                 )}
-                                <div className="max-h-64 overflow-y-auto border border-edge rounded-lg divide-y divide-gray-200 dark:divide-gray-700/40">
+                                <div className="max-h-64 overflow-y-auto border border-edge rounded-control divide-y divide-edge">
                                     {camerasForModal.length === 0 ? (
                                         <p className="text-xs text-content-muted p-3">Tidak ada kamera cocok.</p>
                                     ) : (
@@ -772,7 +772,7 @@ function SponsorManagement() {
                                                         <p className="text-xs text-content-muted truncate">
                                                             {camera.location || camera.area_name || `#${camera.id}`}
                                                             {heldByOtherSponsor && (
-                                                                <span className="ml-2 text-amber-400">
+                                                                <span className="ml-2 text-status-warn">
                                                                     Saat ini disponsori {camera.sponsor_name} — centang untuk override
                                                                 </span>
                                                             )}

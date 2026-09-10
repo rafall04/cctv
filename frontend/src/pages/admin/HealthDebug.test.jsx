@@ -86,7 +86,7 @@ describe('HealthDebug page', () => {
         render(<HealthDebug />);
         await screen.findByText('Jombang MJPEG');
 
-        fireEvent.change(screen.getByDisplayValue('Problem only'), { target: { value: 'offline' } });
+        fireEvent.change(screen.getByDisplayValue('Hanya bermasalah'), { target: { value: 'offline' } });
 
         await waitFor(() => {
             expect(getCameraHealthDebug).toHaveBeenLastCalledWith(

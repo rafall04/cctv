@@ -18,7 +18,7 @@ export default function BrandingSettingsPanel() {
             setLoading(true);
             const response = await brandingService.getAdminBranding();
             if (!response.success) {
-                showError('Gagal Memuat', response.message || 'Failed to load branding settings');
+                showError('Gagal Memuat', response.message || 'Gagal memuat pengaturan branding');
                 return;
             }
 
@@ -29,7 +29,7 @@ export default function BrandingSettingsPanel() {
             });
             setFormData(nextFormData);
         } catch (requestError) {
-            showError('Gagal Memuat', 'Failed to load branding settings');
+            showError('Gagal Memuat', 'Gagal memuat pengaturan branding');
         } finally {
             setLoading(false);
         }
@@ -51,15 +51,15 @@ export default function BrandingSettingsPanel() {
             setSaving(true);
             const response = await brandingService.bulkUpdate(formData);
             if (!response.success) {
-                showError('Gagal Menyimpan', response.message || 'Failed to update branding settings');
+                showError('Gagal Menyimpan', response.message || 'Gagal memperbarui pengaturan branding');
                 return;
             }
 
-            success('Branding Tersimpan', 'Branding settings updated successfully.');
+            success('Branding Tersimpan', 'Pengaturan branding berhasil diperbarui.');
             await refreshBranding();
             await loadSettings();
         } catch (requestError) {
-            showError('Gagal Menyimpan', 'Failed to update branding settings');
+            showError('Gagal Menyimpan', 'Gagal memperbarui pengaturan branding');
         } finally {
             setSaving(false);
         }
@@ -74,15 +74,15 @@ export default function BrandingSettingsPanel() {
             setSaving(true);
             const response = await brandingService.resetToDefaults();
             if (!response.success) {
-                showError('Gagal Reset', response.message || 'Failed to reset branding settings');
+                showError('Gagal Reset', response.message || 'Gagal mereset pengaturan branding');
                 return;
             }
 
-            success('Branding Direset', 'Branding reset to defaults.');
+            success('Branding Direset', 'Branding dikembalikan ke default.');
             await refreshBranding();
             await loadSettings();
         } catch (requestError) {
-            showError('Gagal Reset', 'Failed to reset branding settings');
+            showError('Gagal Reset', 'Gagal mereset pengaturan branding');
         } finally {
             setSaving(false);
         }
@@ -97,10 +97,10 @@ export default function BrandingSettingsPanel() {
     }
 
     const groupedSettings = {
-        'Company Information': ['company_name', 'company_tagline', 'company_description', 'city_name', 'province_name', 'whatsapp_number', 'whatsapp_message_template'],
-        'Hero Section': ['hero_title', 'hero_subtitle'],
+        'Informasi Perusahaan': ['company_name', 'company_tagline', 'company_description', 'city_name', 'province_name', 'whatsapp_number', 'whatsapp_message_template'],
+        'Bagian Hero': ['hero_title', 'hero_subtitle'],
         Footer: ['footer_text', 'copyright_text'],
-        'SEO Meta Tags': ['meta_title', 'meta_description', 'meta_keywords'],
+        'Meta Tag SEO': ['meta_title', 'meta_description', 'meta_keywords'],
         Visual: ['logo_text', 'primary_color', 'show_powered_by'],
         Watermark: ['watermark_enabled', 'watermark_text', 'watermark_position', 'watermark_opacity'],
     };
@@ -109,30 +109,30 @@ export default function BrandingSettingsPanel() {
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <div>
-                    <h2 className="text-2xl font-bold text-content">Branding Settings</h2>
-                    <p className="text-content-muted mt-1">Customize your CCTV system branding and appearance.</p>
+                    <h2 className="text-2xl font-bold text-content">Pengaturan Branding</h2>
+                    <p className="text-content-muted mt-1">Sesuaikan branding dan tampilan sistem CCTV Anda.</p>
                 </div>
                 <div className="flex gap-3">
                     <button
                         onClick={handleReset}
                         disabled={saving}
-                        className="px-4 py-2 border border-edge-strong rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
+                        className="px-4 py-2 border border-edge-strong rounded-control hover:bg-surface-raised disabled:opacity-50"
                     >
-                        Reset to Defaults
+                        Reset ke Default
                     </button>
                     <button
                         onClick={handleSave}
                         disabled={saving}
                         className="px-4 py-2 bg-primary text-white rounded-control hover:bg-primary-600 disabled:opacity-50"
                     >
-                        {saving ? 'Saving...' : 'Save Changes'}
+                        {saving ? 'Menyimpan...' : 'Simpan Perubahan'}
                     </button>
                 </div>
             </div>
 
             <div className="space-y-6">
                 {Object.entries(groupedSettings).map(([groupName, keys]) => (
-                    <div key={groupName} className="bg-surface rounded-lg shadow p-6">
+                    <div key={groupName} className="bg-surface rounded-card shadow-e1 p-6">
                         <h3 className="text-lg font-semibold text-content mb-4">{groupName}</h3>
                         <div className="space-y-4">
                             {keys.map((key) => {
@@ -155,20 +155,22 @@ export default function BrandingSettingsPanel() {
 
                                 return (
                                     <div key={key}>
-                                        <label className="block text-sm font-medium text-content-muted mb-1">{setting.description || key}</label>
+                                        <label htmlFor={`branding-${key}`} className="block text-sm font-medium text-content-muted mb-1">{setting.description || key}</label>
                                         {placeholderHint && (
                                             <p className="text-xs text-content-muted mb-2">{placeholderHint}</p>
                                         )}
                                         {isTextarea ? (
                                             <textarea
+                                                id={`branding-${key}`}
                                                 value={formData[key] || ''}
                                                 onChange={(event) => handleChange(key, event.target.value)}
                                                 rows={3}
-                                                className="w-full px-3 py-2 border border-edge-strong rounded-lg bg-surface text-content"
+                                                className="w-full px-3 py-2 border border-edge-strong rounded-control bg-surface text-content"
                                             />
                                         ) : isColor ? (
                                             <div className="flex gap-3 items-center">
                                                 <input
+                                                    id={`branding-${key}`}
                                                     type="color"
                                                     value={formData[key] || '#0ea5e9'}
                                                     onChange={(event) => handleChange(key, event.target.value)}
@@ -179,38 +181,41 @@ export default function BrandingSettingsPanel() {
                                                     value={formData[key] || ''}
                                                     onChange={(event) => handleChange(key, event.target.value)}
                                                     placeholder="#0ea5e9"
-                                                    className="flex-1 px-3 py-2 border border-edge-strong rounded-lg bg-surface text-content"
+                                                    className="flex-1 px-3 py-2 border border-edge-strong rounded-control bg-surface text-content"
                                                 />
                                             </div>
                                         ) : isBoolean ? (
                                             <label className="flex items-center gap-2">
                                                 <input
+                                                    id={`branding-${key}`}
                                                     type="checkbox"
                                                     checked={formData[key] === 'true'}
                                                     onChange={(event) => handleChange(key, event.target.checked ? 'true' : 'false')}
                                                     className="rounded border-edge-strong"
                                                 />
                                                 <span className="text-sm text-content-muted">
-                                                    {key === 'show_powered_by' ? `Show "Powered by ${formData.company_name || 'Company'}" badge` : 'Enable watermark on snapshots'}
+                                                    {key === 'show_powered_by' ? `Tampilkan badge "Powered by ${formData.company_name || 'Company'}"` : 'Aktifkan watermark pada snapshot'}
                                                 </span>
                                             </label>
                                         ) : isSelect ? (
                                             <select
+                                                id={`branding-${key}`}
                                                 value={formData[key] || 'bottom-right'}
                                                 onChange={(event) => handleChange(key, event.target.value)}
-                                                className="w-full px-3 py-2 border border-edge-strong rounded-lg bg-surface text-content"
+                                                className="w-full px-3 py-2 border border-edge-strong rounded-control bg-surface text-content"
                                             >
-                                                <option value="bottom-right">Bottom Right</option>
-                                                <option value="bottom-left">Bottom Left</option>
-                                                <option value="top-right">Top Right</option>
-                                                <option value="top-left">Top Left</option>
+                                                <option value="bottom-right">Kanan Bawah</option>
+                                                <option value="bottom-left">Kiri Bawah</option>
+                                                <option value="top-right">Kanan Atas</option>
+                                                <option value="top-left">Kiri Atas</option>
                                             </select>
                                         ) : (
                                             <input
+                                                id={`branding-${key}`}
                                                 type={isNumber ? 'number' : 'text'}
                                                 value={formData[key] || ''}
                                                 onChange={(event) => handleChange(key, event.target.value)}
-                                                className="w-full px-3 py-2 border border-edge-strong rounded-lg bg-surface text-content"
+                                                className="w-full px-3 py-2 border border-edge-strong rounded-control bg-surface text-content"
                                             />
                                         )}
                                     </div>

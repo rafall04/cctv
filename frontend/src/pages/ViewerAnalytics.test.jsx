@@ -186,7 +186,7 @@ describe('ViewerAnalytics', () => {
         render(<ViewerAnalytics />);
 
         await screen.findByText('Statistik Penonton');
-        fireEvent.click(screen.getByRole('tab', { name: 'History' }));
+        fireEvent.click(screen.getByRole('tab', { name: 'Riwayat' }));
 
         await waitFor(() => {
             expect(screen.getByText('Riwayat Sesi Live')).toBeTruthy();
@@ -207,7 +207,7 @@ describe('ViewerAnalytics', () => {
         render(<ViewerAnalytics />);
 
         await screen.findByText('Statistik Penonton');
-        fireEvent.click(screen.getByRole('tab', { name: 'Active' }));
+        fireEvent.click(screen.getByRole('tab', { name: 'Aktif' }));
 
         await waitFor(() => {
             expect(screen.getByText('Viewer Aktif')).toBeTruthy();
@@ -220,7 +220,7 @@ describe('ViewerAnalytics', () => {
         render(<ViewerAnalytics />);
 
         await screen.findByText('Statistik Penonton');
-        fireEvent.click(screen.getByRole('tab', { name: 'History' }));
+        fireEvent.click(screen.getByRole('tab', { name: 'Riwayat' }));
 
         await screen.findByText('Riwayat Sesi Live');
         fireEvent.click(screen.getByRole('button', { name: '2' }));

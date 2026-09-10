@@ -97,7 +97,7 @@ function getIngestBadge(camera) {
         className: policy === 'always_on'
             ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-200'
             : 'bg-primary/15 text-primary',
-        title: 'Resolved internal RTSP ingest policy',
+        title: 'Kebijakan ingest RTSP internal hasil resolusi',
     };
 }
 
@@ -129,7 +129,7 @@ function CameraCard({
         camera.stream_source === 'internal' && camera.internal_on_demand_close_after_seconds_override && {
             label: `${camera.internal_on_demand_close_after_seconds_override}s`,
             className: 'bg-slate-700/90 text-white',
-            title: 'Idle close timeout override',
+            title: 'Override waktu tutup idle',
         },
         camera.stream_source === 'internal' && camera.source_profile && {
             label: camera.source_profile,
@@ -171,8 +171,8 @@ function CameraCard({
     ].filter(Boolean);
 
     return (
-        <div className="bg-surface border border-edge rounded-2xl overflow-hidden hover:shadow-xl hover:border-primary/30 transition-all group">
-            <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 relative">
+        <div className="bg-surface border border-edge rounded-card overflow-hidden hover:shadow-xl hover:border-primary/30 transition-all group">
+            <div className="aspect-video bg-surface-sunken relative">
                 {/* Was a hardcoded grey camera glyph, so a 36-camera grid was 36 identical
                     tiles — the picture is the fastest way to tell them apart, and it was
                     already being captured and served. CameraThumbnail keeps the offline /
@@ -193,7 +193,7 @@ function CameraCard({
                         className="bg-amber-500/90 text-white"
                         title="Langganan ditangguhkan (saldo/trial habis)"
                     >
-                        Suspended
+                        Ditangguhkan
                     </CameraBadge>
                     <CameraBadge condition={camera.stream_source === 'internal'} className="bg-emerald-600/90 text-white" title="Stream internal melalui MediaMTX">
                         Internal
@@ -206,12 +206,12 @@ function CameraCard({
                         className="bg-slate-700/90 text-white"
                         title="Source internal live-only tanpa recording"
                     >
-                        Live Only
+                        Hanya Live
                     </CameraBadge>
                     <CameraBadge
                         condition={Boolean(camera.delivery_type)
                             && camera.delivery_type !== IMPLIED_DELIVERY[camera.stream_source]}
-                        className="bg-white/90 text-slate-700"
+                        className="bg-surface text-content"
                         title="Delivery type kamera"
                     >
                         {DELIVERY_LABEL[camera.delivery_type] || camera.delivery_type}
@@ -266,7 +266,7 @@ function CameraCard({
                         <button
                             onClick={() => onEdit(camera)}
                             className="p-2 rounded-lg bg-surface-sunken text-content-muted hover:text-primary hover:bg-primary-100 dark:hover:bg-primary/10 transition-all"
-                            title="Edit camera"
+                            title="Edit kamera"
                         >
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -276,7 +276,7 @@ function CameraCard({
                             onClick={() => onDelete(camera)}
                             disabled={deletingId === camera.id}
                             className="p-2 rounded-lg bg-surface-sunken text-content-muted hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                            title="Delete camera"
+                            title="Hapus kamera"
                         >
                             {deletingId === camera.id ? (
                                 <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">

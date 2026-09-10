@@ -136,9 +136,9 @@ describe('CameraManagement', () => {
         render(<CameraManagement />);
 
         fireEvent.click(await screen.findByRole('button', { name: 'Tambah Kamera' }));
-        fireEvent.change(screen.getByLabelText(/Name/i), { target: { value: 'Lobby Cam' } });
+        fireEvent.change(screen.getByLabelText(/Nama/i), { target: { value: 'Lobby Cam' } });
         // Create lives in the dialog FOOTER now, outside <form> — reach the form through a field.
-        fireEvent.submit(screen.getByLabelText(/Name/i).closest('form'));
+        fireEvent.submit(screen.getByLabelText(/Nama/i).closest('form'));
 
         await waitFor(() => {
             expect(screen.getByText('RTSP URL is required')).toBeTruthy();
@@ -151,14 +151,14 @@ describe('CameraManagement', () => {
         render(<CameraManagement />);
 
         fireEvent.click(await screen.findByRole('button', { name: 'Tambah Kamera' }));
-        fireEvent.change(screen.getByLabelText(/Name/i), { target: { value: 'Dishub Cam' } });
-        fireEvent.click(screen.getByRole('button', { name: /External HLS/i }));
-        fireEvent.change(screen.getByLabelText(/External Stream URL/i), {
+        fireEvent.change(screen.getByLabelText(/Nama/i), { target: { value: 'Dishub Cam' } });
+        fireEvent.click(screen.getByRole('button', { name: /HLS Eksternal/i }));
+        fireEvent.change(screen.getByLabelText(/URL Stream Eksternal/i), {
             target: { value: 'https://example.com/live.m3u8' },
         });
         expect(screen.getByLabelText(/Mode TLS/i)).toBeTruthy();
         expect(screen.getByLabelText(/Gunakan Proxy/i).disabled).toBe(false);
-        fireEvent.submit(screen.getByLabelText(/Name/i).closest('form'));
+        fireEvent.submit(screen.getByLabelText(/Nama/i).closest('form'));
 
         await waitFor(() => {
             expect(createCamera).toHaveBeenCalledTimes(1);
@@ -262,7 +262,7 @@ describe('CameraManagement', () => {
         expect(await screen.findByText('Lobby Cam')).toBeTruthy();
         expect(await screen.findByText('Reconnecting')).toBeTruthy();
 
-        fireEvent.click(screen.getByRole('button', { name: /Refresh Stream/i }));
+        fireEvent.click(screen.getByRole('button', { name: /Segarkan Stream/i }));
 
         await waitFor(() => {
             expect(refreshCameraStream).toHaveBeenCalledWith(1);
@@ -306,7 +306,7 @@ describe('CameraManagement', () => {
         render(<CameraManagement />);
 
         await screen.findByText('Surabaya Cam');
-        fireEvent.click(screen.getByTitle('Edit camera'));
+        fireEvent.click(screen.getByTitle('Edit kamera'));
 
         await waitFor(() => {
             expect(getCameraById).toHaveBeenCalledWith(7);

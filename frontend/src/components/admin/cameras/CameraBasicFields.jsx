@@ -11,7 +11,7 @@ export default function CameraBasicFields({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div>
                     <label htmlFor="camera-name" className="block text-sm font-medium text-content-muted mb-1">
-                        Name <span className="text-red-500">*</span>
+                        Nama <span className="text-red-500">*</span>
                     </label>
                     <input
                         id="camera-name"
@@ -21,8 +21,8 @@ export default function CameraBasicFields({
                         onChange={onChange}
                         onBlur={onBlur}
                         disabled={isSubmitting}
-                        className={`w-full px-3 py-2 bg-surface-sunken border rounded-xl text-content placeholder-content-subtle focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50 text-base sm:text-sm ${getFieldError('name') ? 'border-red-500 focus:ring-red-500' : 'border-edge'}`}
-                        placeholder="Front Entrance"
+                        className={`w-full px-3 py-2 bg-surface-sunken border rounded-control text-content placeholder-content-subtle focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50 text-base sm:text-sm ${getFieldError('name') ? 'border-red-500 focus:ring-red-500' : 'border-edge'}`}
+                        placeholder="Pintu Depan"
                     />
                     {getFieldError('name') && (
                         <p className="mt-1 text-xs text-red-500">{getFieldError('name')}</p>
@@ -37,9 +37,9 @@ export default function CameraBasicFields({
                         value={formData.area_id}
                         onChange={onChange}
                         disabled={isSubmitting}
-                        className="w-full px-3 py-2 bg-surface-sunken border border-edge rounded-xl text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50 text-base sm:text-sm"
+                        className="w-full px-3 py-2 bg-surface-sunken border border-edge rounded-control text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50 text-base sm:text-sm"
                     >
-                        <option value="">Select Area</option>
+                        <option value="">Pilih Area</option>
                         {areas.map((area) => (
                             <option key={area.id} value={area.id}>{area.name}</option>
                         ))}
@@ -49,7 +49,7 @@ export default function CameraBasicFields({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div>
-                    <label htmlFor="camera-location" className="block text-sm font-medium text-content-muted mb-1">Location</label>
+                    <label htmlFor="camera-location" className="block text-sm font-medium text-content-muted mb-1">Lokasi</label>
                     <input
                         id="camera-location"
                         type="text"
@@ -57,13 +57,13 @@ export default function CameraBasicFields({
                         value={formData.location}
                         onChange={onChange}
                         disabled={isSubmitting}
-                        className="w-full px-3 py-2 bg-surface-sunken border border-edge rounded-xl text-content placeholder-content-subtle focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50 text-base sm:text-sm"
-                        placeholder="Building A"
+                        className="w-full px-3 py-2 bg-surface-sunken border border-edge rounded-control text-content placeholder-content-subtle focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50 text-base sm:text-sm"
+                        placeholder="Gedung A"
                     />
                 </div>
 
                 <div>
-                    <label htmlFor="camera-group" className="block text-sm font-medium text-content-muted mb-1">Group</label>
+                    <label htmlFor="camera-group" className="block text-sm font-medium text-content-muted mb-1">Grup</label>
                     <input
                         id="camera-group"
                         type="text"
@@ -71,14 +71,14 @@ export default function CameraBasicFields({
                         value={formData.group_name}
                         onChange={onChange}
                         disabled={isSubmitting}
-                        className="w-full px-3 py-2 bg-surface-sunken border border-edge rounded-xl text-content placeholder-content-subtle focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50 text-base sm:text-sm"
-                        placeholder="Security"
+                        className="w-full px-3 py-2 bg-surface-sunken border border-edge rounded-control text-content placeholder-content-subtle focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50 text-base sm:text-sm"
+                        placeholder="Keamanan"
                     />
                 </div>
             </div>
 
             <div>
-                <label htmlFor="camera-description" className="block text-sm font-medium text-content-muted mb-1">Description</label>
+                <label htmlFor="camera-description" className="block text-sm font-medium text-content-muted mb-1">Deskripsi</label>
                 <textarea
                     id="camera-description"
                     name="description"
@@ -86,8 +86,8 @@ export default function CameraBasicFields({
                     onChange={onChange}
                     disabled={isSubmitting}
                     rows="2"
-                    className="w-full px-3 py-2 bg-surface-sunken border border-edge rounded-xl text-content placeholder-content-subtle focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary resize-none disabled:opacity-50 text-base sm:text-sm"
-                    placeholder="Optional notes..."
+                    className="w-full px-3 py-2 bg-surface-sunken border border-edge rounded-control text-content placeholder-content-subtle focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary resize-none disabled:opacity-50 text-base sm:text-sm"
+                    placeholder="Catatan opsional..."
                 />
             </div>
         </>

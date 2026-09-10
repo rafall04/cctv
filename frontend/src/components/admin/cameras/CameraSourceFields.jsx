@@ -9,13 +9,13 @@ SideEffects: Emits form change/blur callbacks only.
 import { getRtspFormatHint } from '../../../utils/validators';
 
 const DELIVERY_OPTIONS = [
-    { value: 'internal_hls', label: 'Internal HLS', description: 'RTSP privat -> MediaMTX -> HLS/WebRTC. Cocok untuk source private seperti Surabaya', group: 'internal' },
-    { value: 'external_hls', label: 'External HLS', description: 'URL .m3u8 publik/third-party', group: 'external' },
-    { value: 'external_flv', label: 'External FLV', description: 'HTTP-FLV live stream seperti Surakarta', group: 'external' },
-    { value: 'external_mjpeg', label: 'External MJPEG', description: 'Popup-only, cocok untuk ZoneMinder/HTTP MJPEG', group: 'external' },
-    { value: 'external_embed', label: 'External Embed', description: 'Popup-only via iframe/embed URL resmi', group: 'external' },
-    { value: 'external_jsmpeg', label: 'External JSMpeg', description: 'Popup-only, gunakan embed fallback bila tersedia', group: 'external' },
-    { value: 'external_custom_ws', label: 'Custom WebSocket', description: 'Tidak dijamin playable, default fallback ke sumber resmi', group: 'external' },
+    { value: 'internal_hls', label: 'HLS Internal', description: 'RTSP privat -> MediaMTX -> HLS/WebRTC. Cocok untuk source private seperti Surabaya', group: 'internal' },
+    { value: 'external_hls', label: 'HLS Eksternal', description: 'URL .m3u8 publik/third-party', group: 'external' },
+    { value: 'external_flv', label: 'FLV Eksternal', description: 'HTTP-FLV live stream seperti Surakarta', group: 'external' },
+    { value: 'external_mjpeg', label: 'MJPEG Eksternal', description: 'Popup-only, cocok untuk ZoneMinder/HTTP MJPEG', group: 'external' },
+    { value: 'external_embed', label: 'Embed Eksternal', description: 'Popup-only via iframe/embed URL resmi', group: 'external' },
+    { value: 'external_jsmpeg', label: 'JSMpeg Eksternal', description: 'Popup-only, gunakan embed fallback bila tersedia', group: 'external' },
+    { value: 'external_custom_ws', label: 'WebSocket Kustom', description: 'Tidak dijamin playable, default fallback ke sumber resmi', group: 'external' },
 ];
 
 const EXTERNAL_HEALTH_MODE_OPTIONS = [
@@ -47,13 +47,13 @@ const EXTERNAL_HEALTH_MODE_OPTIONS = [
 ];
 
 const INTERNAL_INGEST_POLICY_OPTIONS = [
-    { value: 'default', label: 'Use Area Default', description: 'Gunakan default policy internal dari area kamera ini.' },
-    { value: 'always_on', label: 'Always On', description: 'MediaMTX menjaga source tetap tersambung walau tidak ada viewer.' },
-    { value: 'on_demand', label: 'On Demand', description: 'Source hanya dibuka saat ada viewer lalu ditutup lagi saat idle.' },
+    { value: 'default', label: 'Pakai Default Area', description: 'Gunakan default policy internal dari area kamera ini.' },
+    { value: 'always_on', label: 'Selalu Aktif', description: 'MediaMTX menjaga source tetap tersambung walau tidak ada viewer.' },
+    { value: 'on_demand', label: 'Sesuai Permintaan', description: 'Source hanya dibuka saat ada viewer lalu ditutup lagi saat idle.' },
 ];
 
 const INTERNAL_RTSP_TRANSPORT_OPTIONS = [
-    { value: 'default', label: 'Use Area Default', description: 'Aman untuk existing camera: area default tetap TCP kecuali diubah.' },
+    { value: 'default', label: 'Pakai Default Area', description: 'Aman untuk existing camera: area default tetap TCP kecuali diubah.' },
     { value: 'tcp', label: 'TCP', description: 'Paksa RTSP over TCP. Ini default lama dan paling aman untuk kamera yang sudah berjalan.' },
     { value: 'udp', label: 'UDP', description: 'Gunakan jika FFmpeg gagal dengan Nonmatching transport tetapi VLC bisa play.' },
     { value: 'auto', label: 'Auto', description: 'Biarkan MediaMTX/FFmpeg negosiasi transport sendiri.' },
@@ -61,9 +61,9 @@ const INTERNAL_RTSP_TRANSPORT_OPTIONS = [
 
 const THUMBNAIL_STRATEGY_OPTIONS = [
     { value: 'default', label: 'Default', description: 'Pakai perilaku sistem saat ini: internal RTSP langsung jika tersedia.' },
-    { value: 'direct_rtsp', label: 'Direct RTSP', description: 'Paksa thumbnail langsung dari RTSP kamera.' },
-    { value: 'hls_fallback', label: 'HLS Fallback', description: 'Coba RTSP dulu, lalu MediaMTX HLS jika RTSP gagal.' },
-    { value: 'hls_only', label: 'HLS Only', description: 'Langsung ambil thumbnail dari MediaMTX HLS. Cocok untuk V380/Yoosee.' },
+    { value: 'direct_rtsp', label: 'RTSP Langsung', description: 'Paksa thumbnail langsung dari RTSP kamera.' },
+    { value: 'hls_fallback', label: 'Fallback HLS', description: 'Coba RTSP dulu, lalu MediaMTX HLS jika RTSP gagal.' },
+    { value: 'hls_only', label: 'HLS Saja', description: 'Langsung ambil thumbnail dari MediaMTX HLS. Cocok untuk V380/Yoosee.' },
 ];
 
 export default function CameraSourceFields({
@@ -99,7 +99,7 @@ export default function CameraSourceFields({
 
     return (
         <>
-            <div className="p-3 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-xl">
+            <div className="p-3 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-control">
                 <div className="flex items-center gap-2 mb-3">
                     <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-500/20 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -107,12 +107,12 @@ export default function CameraSourceFields({
                         </svg>
                     </div>
                     <div>
-                        <p className="text-sm font-medium text-content">Delivery Type</p>
+                        <p className="text-sm font-medium text-content">Jenis Distribusi</p>
                         <p className="text-xs text-content-muted">Pilih format distribusi stream yang benar-benar dipakai kamera.</p>
                     </div>
                 </div>
 
-                <div role="radiogroup" aria-label="Delivery Type" className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div role="radiogroup" aria-label="Jenis Distribusi" className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {DELIVERY_OPTIONS.map((option) => (
                         <button
                             key={option.value}
@@ -138,7 +138,7 @@ export default function CameraSourceFields({
                 <>
                     <div>
                         <label htmlFor="camera-rtsp-url" className="block text-sm font-medium text-content-muted mb-1">
-                            RTSP URL <span className="text-red-500">*</span>
+                            URL RTSP <span className="text-red-500">*</span>
                         </label>
                         <input
                             id="camera-rtsp-url"
@@ -148,7 +148,7 @@ export default function CameraSourceFields({
                             onChange={onChange}
                             onBlur={onBlur}
                             disabled={isSubmitting}
-                            className={`w-full px-3 py-2 bg-surface-sunken border rounded-xl text-content font-mono text-base sm:text-xs placeholder-content-subtle focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50 ${getFieldError('private_rtsp_url') ? 'border-red-500 focus:ring-red-500' : 'border-edge'}`}
+                            className={`w-full px-3 py-2 bg-surface-sunken border rounded-control text-content font-mono text-base sm:text-xs placeholder-content-subtle focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50 ${getFieldError('private_rtsp_url') ? 'border-red-500 focus:ring-red-500' : 'border-edge'}`}
                             placeholder="rtsp://user:pass@ip:port/path"
                         />
                         {getFieldError('private_rtsp_url') ? (
@@ -159,7 +159,7 @@ export default function CameraSourceFields({
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-content-muted mb-2">Video Codec</label>
+                        <label className="block text-sm font-medium text-content-muted mb-2">Codec Video</label>
                         <div className="flex gap-4">
                             <label className="flex items-center gap-2 cursor-pointer group">
                                 <input
@@ -183,13 +183,13 @@ export default function CameraSourceFields({
                                     disabled={isSubmitting}
                                     className="w-4 h-4 text-purple-600 focus:ring-purple-500 focus:ring-2 disabled:opacity-50"
                                 />
-                                <span className="text-sm text-content-muted group-hover:text-purple-600 dark:group-hover:text-purple-400">H.265 (Safari only)</span>
+                                <span className="text-sm text-content-muted group-hover:text-purple-600 dark:group-hover:text-purple-400">H.265 (Safari saja)</span>
                             </label>
                         </div>
                     </div>
 
-                    <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 p-4 dark:border-emerald-500/20 dark:bg-emerald-500/10">
-                        <p className="text-sm font-medium text-content">Internal RTSP / MediaMTX Policy</p>
+                    <div className="rounded-control border border-emerald-200 bg-emerald-50/80 p-4 dark:border-emerald-500/20 dark:bg-emerald-500/10">
+                        <p className="text-sm font-medium text-content">Kebijakan RTSP / MediaMTX Internal</p>
                         <p className="mt-1 text-xs text-content-muted">
                             Gunakan override ini jika kamera internal perlu berbeda dari default area, misalnya Surabaya harus on-demand dan mati saat idle.
                         </p>
@@ -198,7 +198,7 @@ export default function CameraSourceFields({
                     <div className="grid gap-4 md:grid-cols-2">
                         <div>
                             <label htmlFor="camera-internal-ingest-policy" className="block text-sm font-medium text-content-muted mb-1">
-                                Ingest Policy Override
+                                Override Kebijakan Ingest
                             </label>
                             <select
                                 id="camera-internal-ingest-policy"
@@ -206,7 +206,7 @@ export default function CameraSourceFields({
                                 value={formData.internal_ingest_policy_override || 'default'}
                                 onChange={onChange}
                                 disabled={isSubmitting}
-                                className="w-full px-3 py-2 bg-surface-sunken border rounded-xl text-content text-base sm:text-sm focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50 border-edge"
+                                className="w-full px-3 py-2 bg-surface-sunken border rounded-control text-content text-base sm:text-sm focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50 border-edge"
                             >
                                 {INTERNAL_INGEST_POLICY_OPTIONS.map((option) => (
                                     <option key={option.value} value={option.value}>{option.label}</option>
@@ -219,7 +219,7 @@ export default function CameraSourceFields({
 
                         <div>
                             <label htmlFor="camera-rtsp-transport" className="block text-sm font-medium text-content-muted mb-1">
-                                RTSP Transport Override
+                                Override Transport RTSP
                             </label>
                             <select
                                 id="camera-rtsp-transport"
@@ -227,7 +227,7 @@ export default function CameraSourceFields({
                                 value={formData.internal_rtsp_transport_override || 'default'}
                                 onChange={onChange}
                                 disabled={isSubmitting}
-                                className="w-full px-3 py-2 bg-surface-sunken border rounded-xl text-content text-base sm:text-sm focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50 border-edge"
+                                className="w-full px-3 py-2 bg-surface-sunken border rounded-control text-content text-base sm:text-sm focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50 border-edge"
                             >
                                 {INTERNAL_RTSP_TRANSPORT_OPTIONS.map((option) => (
                                     <option key={option.value} value={option.value}>{option.label}</option>
@@ -240,7 +240,7 @@ export default function CameraSourceFields({
 
                         <div>
                             <label htmlFor="camera-thumbnail-strategy" className="block text-sm font-medium text-content-muted mb-1">
-                                Thumbnail Strategy
+                                Strategi Thumbnail
                             </label>
                             <select
                                 id="camera-thumbnail-strategy"
@@ -248,7 +248,7 @@ export default function CameraSourceFields({
                                 value={formData.thumbnail_strategy || 'default'}
                                 onChange={onChange}
                                 disabled={isSubmitting}
-                                className="w-full px-3 py-2 bg-surface-sunken border rounded-xl text-content text-base sm:text-sm focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50 border-edge"
+                                className="w-full px-3 py-2 bg-surface-sunken border rounded-control text-content text-base sm:text-sm focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50 border-edge"
                             >
                                 {THUMBNAIL_STRATEGY_OPTIONS.map((option) => (
                                     <option key={option.value} value={option.value}>{option.label}</option>
@@ -261,7 +261,7 @@ export default function CameraSourceFields({
 
                         <div>
                             <label htmlFor="camera-close-after-seconds" className="block text-sm font-medium text-content-muted mb-1">
-                                Idle Close Timeout Override (detik)
+                                Override Timeout Tutup Idle (detik)
                             </label>
                             <input
                                 id="camera-close-after-seconds"
@@ -272,7 +272,7 @@ export default function CameraSourceFields({
                                 value={formData.internal_on_demand_close_after_seconds_override}
                                 onChange={onChange}
                                 disabled={isSubmitting}
-                                className="w-full px-3 py-2 bg-surface-sunken border rounded-xl text-content text-base sm:text-sm focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50 border-edge"
+                                className="w-full px-3 py-2 bg-surface-sunken border rounded-control text-content text-base sm:text-sm focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50 border-edge"
                                 placeholder="Kosong = ikuti area/default"
                             />
                             <p className="mt-1 text-xs text-content-muted">
@@ -283,7 +283,7 @@ export default function CameraSourceFields({
 
                     <div>
                         <label htmlFor="camera-source-profile" className="block text-sm font-medium text-content-muted mb-1">
-                            Source Profile
+                            Profil Source
                         </label>
                         <input
                             id="camera-source-profile"
@@ -292,7 +292,7 @@ export default function CameraSourceFields({
                             value={formData.source_profile}
                             onChange={onChange}
                             disabled={isSubmitting}
-                            className="w-full px-3 py-2 bg-surface-sunken border rounded-xl text-content text-base sm:text-sm focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50 border-edge"
+                            className="w-full px-3 py-2 bg-surface-sunken border rounded-control text-content text-base sm:text-sm focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50 border-edge"
                             placeholder="Contoh: surabaya_private_rtsp"
                         />
                         <p className="mt-1 text-xs text-content-muted">
@@ -307,7 +307,7 @@ export default function CameraSourceFields({
                     {usesStreamUrl && (
                         <div>
                             <label htmlFor="camera-external-stream-url" className="block text-sm font-medium text-content-muted mb-1">
-                                External Stream URL <span className="text-red-500">*</span>
+                                URL Stream Eksternal <span className="text-red-500">*</span>
                             </label>
                             <input
                                 id="camera-external-stream-url"
@@ -317,7 +317,7 @@ export default function CameraSourceFields({
                                 onChange={onChange}
                                 onBlur={onBlur}
                                 disabled={isSubmitting}
-                                className={`w-full px-3 py-2 bg-surface-sunken border rounded-xl text-content font-mono text-base sm:text-xs placeholder-content-subtle focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50 ${getFieldError('external_stream_url') ? 'border-red-500 focus:ring-red-500' : 'border-edge'}`}
+                                className={`w-full px-3 py-2 bg-surface-sunken border rounded-control text-content font-mono text-base sm:text-xs placeholder-content-subtle focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50 ${getFieldError('external_stream_url') ? 'border-red-500 focus:ring-red-500' : 'border-edge'}`}
                                 placeholder={deliveryType.includes('ws') || deliveryType.includes('jsmpeg') ? 'wss://example.com/stream' : 'https://example.com/live.m3u8'}
                             />
                             {getFieldError('external_stream_url') ? (
@@ -337,7 +337,7 @@ export default function CameraSourceFields({
                     {usesEmbedUrl && (
                         <div>
                             <label htmlFor="camera-external-embed-url" className="block text-sm font-medium text-content-muted mb-1">
-                                External Embed URL {deliveryType === 'external_embed' ? <span className="text-red-500">*</span> : null}
+                                URL Embed Eksternal {deliveryType === 'external_embed' ? <span className="text-red-500">*</span> : null}
                             </label>
                             <input
                                 id="camera-external-embed-url"
@@ -347,7 +347,7 @@ export default function CameraSourceFields({
                                 onChange={onChange}
                                 onBlur={onBlur}
                                 disabled={isSubmitting}
-                                className={`w-full px-3 py-2 bg-surface-sunken border rounded-xl text-content font-mono text-base sm:text-xs placeholder-content-subtle focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50 ${getFieldError('external_embed_url') ? 'border-red-500 focus:ring-red-500' : 'border-edge'}`}
+                                className={`w-full px-3 py-2 bg-surface-sunken border rounded-control text-content font-mono text-base sm:text-xs placeholder-content-subtle focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50 ${getFieldError('external_embed_url') ? 'border-red-500 focus:ring-red-500' : 'border-edge'}`}
                                 placeholder="https://source.example.com/player?id=cam-1"
                             />
                             {getFieldError('external_embed_url') ? (
@@ -362,7 +362,7 @@ export default function CameraSourceFields({
 
                     <div>
                         <label htmlFor="camera-external-snapshot-url" className="block text-sm font-medium text-content-muted mb-1">
-                            Snapshot / Thumbnail URL
+                            URL Snapshot / Thumbnail
                         </label>
                         <input
                             id="camera-external-snapshot-url"
@@ -372,7 +372,7 @@ export default function CameraSourceFields({
                             onChange={onChange}
                             onBlur={onBlur}
                             disabled={isSubmitting}
-                            className="w-full px-3 py-2 bg-surface-sunken border rounded-xl text-content font-mono text-base sm:text-xs placeholder-content-subtle focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50 border-edge"
+                            className="w-full px-3 py-2 bg-surface-sunken border rounded-control text-content font-mono text-base sm:text-xs placeholder-content-subtle focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50 border-edge"
                             placeholder="https://example.com/snapshot.jpg"
                         />
                         <p className="mt-1 text-xs text-content-muted">Dipakai untuk card/grid/map agar halaman utama tetap thumbnail-first dan tidak membebani server.</p>
@@ -380,7 +380,7 @@ export default function CameraSourceFields({
 
                     {isExternalHls && (
                         <>
-                            <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-4 dark:border-amber-500/20 dark:bg-amber-500/10">
+                            <div className="rounded-control border border-amber-200 bg-amber-50/80 p-4 dark:border-amber-500/20 dark:bg-amber-500/10">
                                 <div className="flex items-start justify-between gap-3">
                                     <div>
                                         <p className="text-sm font-medium text-content">Gunakan Proxy Backend</p>
@@ -416,7 +416,7 @@ export default function CameraSourceFields({
                                     onChange={onChange}
                                     onBlur={onBlur}
                                     disabled={isSubmitting}
-                                    className={`w-full px-3 py-2 bg-surface-sunken border rounded-xl text-content text-base sm:text-sm focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50 ${getFieldError('external_tls_mode') ? 'border-red-500 focus:ring-red-500' : 'border-edge'}`}
+                                    className={`w-full px-3 py-2 bg-surface-sunken border rounded-control text-content text-base sm:text-sm focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50 ${getFieldError('external_tls_mode') ? 'border-red-500 focus:ring-red-500' : 'border-edge'}`}
                                 >
                                     <option value="strict">Strict (Default)</option>
                                     <option value="insecure">Insecure (Darurat)</option>
@@ -426,10 +426,10 @@ export default function CameraSourceFields({
                     )}
 
                     {isExternalFlv && (
-                        <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-4 dark:border-amber-500/20 dark:bg-amber-500/10">
+                        <div className="rounded-control border border-amber-200 bg-amber-50/80 p-4 dark:border-amber-500/20 dark:bg-amber-500/10">
                             <div className="flex items-start gap-3">
                                 <div>
-                                    <p className="text-sm font-medium text-content">HTTP-FLV Live Only</p>
+                                    <p className="text-sm font-medium text-content">HTTP-FLV Live Saja</p>
                                     <p className="mt-1 text-xs text-content-muted">
                                         Type ini khusus live popup. Recording, playback, dan Multi-View belum didukung. Isi embed URL resmi bila ingin fallback aman di browser yang gagal memutar FLV.
                                     </p>
@@ -441,7 +441,7 @@ export default function CameraSourceFields({
                     {isExternal ? (
                         <div>
                             <label htmlFor="camera-external-health-mode" className="block text-sm font-medium text-content-muted mb-1">
-                                Health Mode
+                                Mode Health
                             </label>
                             <select
                                 id="camera-external-health-mode"
@@ -450,7 +450,7 @@ export default function CameraSourceFields({
                                 onChange={onChange}
                                 onBlur={onBlur}
                                 disabled={isSubmitting}
-                                className="w-full px-3 py-2 bg-surface-sunken border rounded-xl text-content text-base sm:text-sm focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50 border-edge"
+                                className="w-full px-3 py-2 bg-surface-sunken border rounded-control text-content text-base sm:text-sm focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary disabled:opacity-50 border-edge"
                             >
                                 {EXTERNAL_HEALTH_MODE_OPTIONS.map((option) => (
                                     <option key={option.value} value={option.value}>
@@ -464,7 +464,7 @@ export default function CameraSourceFields({
                         </div>
                     ) : null}
 
-                    <div className="rounded-xl border border-edge bg-surface-sunken p-4 text-xs text-content-muted">
+                    <div className="rounded-control border border-edge bg-surface-sunken p-4 text-xs text-content-muted">
                     {deliveryType === 'external_flv' && 'Type ini live-only. Tidak masuk playback, recording, atau Multi-View pada v1.'}
                     {deliveryType === 'external_mjpeg' && 'Type ini popup-only dan tidak masuk playback atau Multi-View.'}
                     {deliveryType === 'external_embed' && 'Type ini popup-only dan tidak masuk playback atau Multi-View.'}

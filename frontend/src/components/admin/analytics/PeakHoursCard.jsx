@@ -8,7 +8,7 @@ export default function PeakHoursCard({ peakHours }) {
                 <div className="space-y-3">
                     {peakHours.map((peak, index) => (
                         <div key={`${peak.hour}-${index}`} className="flex items-center gap-3 p-3 bg-surface-sunken rounded-xl">
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold ${index === 0 ? 'bg-gradient-to-br from-primary-400 to-primary-600 text-white' : 'bg-surface-sunken text-content-muted'}`}>
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold ${index === 0 ? 'bg-primary text-white' : 'bg-surface-sunken text-content-muted'}`}>
                                 {peak.hour}:00
                             </div>
                             <div className="flex-1">
@@ -16,7 +16,7 @@ export default function PeakHoursCard({ peakHours }) {
                                 <p className="text-xs text-content-muted">{peak.unique_visitors} pengunjung unik</p>
                             </div>
                             {index === 0 && (
-                                <span className="px-2 py-1 bg-primary-100 dark:bg-primary/20 text-primary-600 dark:text-primary-400 text-xs font-medium rounded-lg">Peak</span>
+                                <span className="px-2 py-1 bg-primary/15 text-primary text-xs font-medium rounded-lg">Puncak</span>
                             )}
                         </div>
                     ))}

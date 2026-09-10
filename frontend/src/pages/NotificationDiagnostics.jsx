@@ -26,7 +26,7 @@ const TIMEZONE_ABBR = {
 };
 
 function statusTone(success) {
-    return success ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-700 dark:text-red-300';
+    return success ? 'text-status-live' : 'text-status-fault';
 }
 
 export default function NotificationDiagnostics() {
@@ -107,9 +107,9 @@ export default function NotificationDiagnostics() {
         const response = await adminService.runNotificationDiagnosticsDrill({ cameraId: selectedCameraId, eventType });
         setDrilling(false);
         if (!response.success) {
-            setError(response.message || response.data?.skippedReason || 'Diagnostic drill failed');
+            setError(response.message || response.data?.skippedReason || 'Drill diagnostik gagal');
         } else {
-            setMessage('Diagnostic drill terkirim ke target Telegram yang match.');
+            setMessage('Drill diagnostik terkirim ke target Telegram yang cocok.');
         }
         await refreshRuns();
     }
@@ -121,7 +121,7 @@ export default function NotificationDiagnostics() {
                 description="Preview routing dan kirim drill Telegram untuk memastikan CCTV masuk ke grup yang tepat."
             />
 
-            <section className="rounded-lg border border-edge bg-surface p-4">
+            <section className="rounded-card border border-edge bg-surface p-4">
                 <div className="grid gap-4 md:grid-cols-[1fr_180px_auto_auto] md:items-end">
                     <label className="block">
                         <span className="text-sm font-semibold text-content-muted">CCTV</span>
@@ -132,7 +132,7 @@ export default function NotificationDiagnostics() {
                                 setCameraId(event.target.value);
                                 setPreview(null);
                             }}
-                            className="mt-1 w-full rounded-lg border border-edge-strong bg-surface px-3 py-2 text-base sm:text-sm text-content"
+                            className="mt-1 w-full rounded-control border border-edge-strong bg-surface px-3 py-2 text-base sm:text-sm text-content"
                         >
                             <option value="">Pilih CCTV</option>
                             {cameras.map((camera) => (
@@ -152,7 +152,7 @@ export default function NotificationDiagnostics() {
                                 setEventType(event.target.value);
                                 setPreview(null);
                             }}
-                            className="mt-1 w-full rounded-lg border border-edge-strong bg-surface px-3 py-2 text-base sm:text-sm text-content"
+                            className="mt-1 w-full rounded-control border border-edge-strong bg-surface px-3 py-2 text-base sm:text-sm text-content"
                         >
                             {EVENT_OPTIONS.map((option) => (
                                 <option key={option.value} value={option.value}>{option.label}</option>
@@ -164,45 +164,45 @@ export default function NotificationDiagnostics() {
                         type="button"
                         onClick={handlePreview}
                         disabled={!canPreview || loading}
-                        className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-gray-900"
+                        className="rounded-control bg-primary px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                        {loading ? 'Loading...' : 'Preview Routing'}
+                        {loading ? 'Memuat...' : 'Preview Routing'}
                     </button>
 
                     <button
                         type="button"
                         onClick={handleDrill}
                         disabled={!canDrill}
-                        className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                        className="rounded-control bg-primary px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
                     >
                         {drilling ? 'Mengirim...' : `Kirim Drill ${eventType === 'offline' ? 'Offline' : 'Online'}`}
                     </button>
                 </div>
             </section>
 
-            {error && <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">{error}</div>}
-            {message && <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300">{message}</div>}
+            {error && <div className="rounded-control border border-status-fault/30 bg-status-fault/10 p-3 text-sm text-status-fault">{error}</div>}
+            {message && <div className="rounded-control border border-status-live/30 bg-status-live/10 p-3 text-sm text-status-live">{message}</div>}
 
             {preview && (
                 <section className="grid gap-4 lg:grid-cols-3">
-                    <div className="rounded-lg border border-edge bg-surface p-4">
-                        <h2 className="text-sm font-bold text-content">Camera Health</h2>
+                    <div className="rounded-card border border-edge bg-surface p-4">
+                        <h2 className="text-sm font-bold text-content">Kesehatan Kamera</h2>
                         <dl className="mt-3 space-y-2 text-sm">
-                            <div className="flex justify-between gap-3"><dt className="text-content-muted">Camera</dt><dd className="font-semibold text-content">{preview.camera.name}</dd></div>
+                            <div className="flex justify-between gap-3"><dt className="text-content-muted">Kamera</dt><dd className="font-semibold text-content">{preview.camera.name}</dd></div>
                             <div className="flex justify-between gap-3"><dt className="text-content-muted">Area</dt><dd className="text-content">{preview.camera.areaName}</dd></div>
                             <div className="flex justify-between gap-3"><dt className="text-content-muted">Status</dt><dd className="text-content">{preview.health.status}</dd></div>
-                            <div className="flex justify-between gap-3"><dt className="text-content-muted">Last Check ({timezoneLabel})</dt><dd className="text-content">{formatRuntimeTimestamp(preview.health.lastCheckedAt)}</dd></div>
+                            <div className="flex justify-between gap-3"><dt className="text-content-muted">Cek Terakhir ({timezoneLabel})</dt><dd className="text-content">{formatRuntimeTimestamp(preview.health.lastCheckedAt)}</dd></div>
                         </dl>
                     </div>
 
-                    <div className="rounded-lg border border-edge bg-surface p-4">
-                        <h2 className="text-sm font-bold text-content">Matched Targets</h2>
+                    <div className="rounded-card border border-edge bg-surface p-4">
+                        <h2 className="text-sm font-bold text-content">Target Cocok</h2>
                         {preview.routing.matchedTargets.length === 0 ? (
-                            <p className="mt-3 text-sm text-red-600 dark:text-red-300">{preview.routing.skippedReason || 'Tidak ada target match'}</p>
+                            <p className="mt-3 text-sm text-status-fault">{preview.routing.skippedReason || 'Tidak ada target cocok'}</p>
                         ) : (
                             <ul className="mt-3 space-y-2">
                                 {preview.routing.matchedTargets.map((target) => (
-                                    <li key={target.id} className="rounded-md bg-surface-sunken p-2 text-sm">
+                                    <li key={target.id} className="rounded-control bg-surface-sunken p-2 text-sm">
                                         <span className="font-semibold text-content">{target.name}</span>
                                         <span className="ml-2 text-content-muted">{target.chatIdMasked}</span>
                                     </li>
@@ -211,30 +211,30 @@ export default function NotificationDiagnostics() {
                         )}
                     </div>
 
-                    <div className="rounded-lg border border-edge bg-surface p-4">
-                        <h2 className="text-sm font-bold text-content">Matched Rules</h2>
+                    <div className="rounded-card border border-edge bg-surface p-4">
+                        <h2 className="text-sm font-bold text-content">Aturan Cocok</h2>
                         <ul className="mt-3 space-y-2 text-sm">
                             {preview.routing.matchedRules.map((rule) => (
-                                <li key={rule.id} className="rounded-md bg-emerald-50 p-2 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
+                                <li key={rule.id} className="rounded-control bg-status-live/10 p-2 text-status-live">
                                     {rule.id} - {rule.targetName} - {rule.scope}
                                 </li>
                             ))}
-                            {preview.routing.matchedRules.length === 0 && <li className="text-content-muted">Tidak ada rule match.</li>}
+                            {preview.routing.matchedRules.length === 0 && <li className="text-content-muted">Tidak ada aturan cocok.</li>}
                         </ul>
                     </div>
                 </section>
             )}
 
-            <section className="rounded-lg border border-edge bg-surface p-4">
+            <section className="rounded-card border border-edge bg-surface p-4">
                 <h2 className="text-sm font-bold text-content">Riwayat Diagnostik Terakhir</h2>
                 <div className="mt-3 overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
+                    <table className="min-w-full divide-y divide-edge text-sm">
                         <thead>
                             <tr className="text-left text-xs uppercase text-content-muted">
-                                <th className="py-2 pr-4">Time ({timezoneLabel})</th>
-                                <th className="py-2 pr-4">Camera</th>
+                                <th className="py-2 pr-4">Waktu ({timezoneLabel})</th>
+                                <th className="py-2 pr-4">Kamera</th>
                                 <th className="py-2 pr-4">Event</th>
-                                <th className="py-2 pr-4">Targets</th>
+                                <th className="py-2 pr-4">Target</th>
                                 <th className="py-2 pr-4">Status</th>
                             </tr>
                         </thead>
@@ -246,13 +246,13 @@ export default function NotificationDiagnostics() {
                                     <td className="py-2 pr-4 text-content-muted">{run.eventType}</td>
                                     <td className="py-2 pr-4 text-content-muted">{run.sentCount}/{run.targetCount}</td>
                                     <td className={`py-2 pr-4 font-semibold ${statusTone(run.success)}`}>
-                                        {run.success ? 'Sent' : (run.skippedReason || 'Failed')}
+                                        {run.success ? 'Terkirim' : (run.skippedReason || 'Gagal')}
                                     </td>
                                 </tr>
                             ))}
                             {runs.length === 0 && (
                                 <tr>
-                                    <td colSpan={5} className="py-6 text-center text-content-muted">Belum ada diagnostic run.</td>
+                                    <td colSpan={5} className="py-6 text-center text-content-muted">Belum ada diagnostik dijalankan.</td>
                                 </tr>
                             )}
                         </tbody>

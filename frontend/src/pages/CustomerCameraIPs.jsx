@@ -14,12 +14,12 @@ import { useNotification } from '../contexts/NotificationContext';
 import { Button, Card, PageHeader, TableShell } from '../components/ui';
 
 const KIND_BADGE = {
-    public: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
-    cgnat: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
+    public: 'bg-status-live/10 text-status-live',
+    cgnat: 'bg-status-warn/10 text-status-warn',
     private: 'bg-surface-sunken text-content-muted',
-    hostname: 'bg-primary-100 text-primary dark:bg-sky-900/40 dark:text-primary-200',
-    unresolved: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
-    invalid: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
+    hostname: 'bg-primary/10 text-primary',
+    unresolved: 'bg-status-fault/10 text-status-fault',
+    invalid: 'bg-status-fault/10 text-status-fault',
 };
 
 const KIND_LABEL = {
@@ -99,11 +99,11 @@ export default function CustomerCameraIPs() {
                 <>
                     {data?.summary && (
                         <div className="flex flex-wrap gap-2 text-sm">
-                            <span className="rounded-xl bg-surface-sunken px-3 py-1.5 text-content-muted">Total: <b>{data.summary.total}</b></span>
-                            <span className="rounded-xl bg-emerald-100 px-3 py-1.5 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">Publik: <b>{data.summary.public_count}</b></span>
-                            <span className="rounded-xl bg-surface-sunken px-3 py-1.5 text-content-muted">Privat/CGNAT: <b>{data.summary.private_count}</b></span>
+                            <span className="rounded-card bg-surface-sunken px-3 py-1.5 text-content-muted">Total: <b>{data.summary.total}</b></span>
+                            <span className="rounded-card bg-status-live/10 px-3 py-1.5 text-status-live">Publik: <b>{data.summary.public_count}</b></span>
+                            <span className="rounded-card bg-surface-sunken px-3 py-1.5 text-content-muted">Privat/CGNAT: <b>{data.summary.private_count}</b></span>
                             {data.summary.unresolved_count > 0 && (
-                                <span className="rounded-xl bg-red-100 px-3 py-1.5 text-red-700 dark:bg-red-900/40 dark:text-red-300">Tak teresolve: <b>{data.summary.unresolved_count}</b></span>
+                                <span className="rounded-card bg-status-fault/10 px-3 py-1.5 text-status-fault">Tak teresolve: <b>{data.summary.unresolved_count}</b></span>
                             )}
                         </div>
                     )}
@@ -121,7 +121,7 @@ export default function CustomerCameraIPs() {
                                 readOnly
                                 value={publicIps.join('\n')}
                                 rows={Math.min(publicIps.length, 8)}
-                                className="mt-2 w-full resize-y rounded-lg border border-edge bg-surface-sunken p-2 font-mono text-xs text-content"
+                                className="mt-2 w-full resize-y rounded-control border border-edge bg-surface-sunken p-2 font-mono text-xs text-content"
                             />
                         )}
                         <p className="mt-2 text-xs text-content-subtle">IP DDNS bisa berubah sewaktu-waktu — muat ulang sebelum memperbarui rule.</p>
