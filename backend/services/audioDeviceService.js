@@ -16,6 +16,9 @@ import { randomBytes } from 'crypto';
 // stamped when a poll STARTS, so a node quietly holding a 25s long-poll would otherwise flip to "offline"
 // mid-hold and blink in the UI. 40s = one full hold + margin.
 const ONLINE_WINDOW_MS = 40000;
+// Queued commands older than this are dropped on the next poll: a device offline for a long time must NOT
+// replay a stale announcement (e.g. an adzan queued an hour ago) when it reconnects. Generous but bounded.
+const COMMAND_TTL_MS = Math.max(30, parseInt(process.env.AUDIO_DEVICE_CMD_TTL_SEC || '600', 10)) * 1000;
 
 function isOnline(lastSeen) {
     if (!lastSeen) return false;
@@ -113,9 +116,53 @@ export function touchDevice(deviceId, ip = null) {
 
 /** Claim (delete + return) the oldest queued command for a device, or null. Used by the long-poll loop. */
 export function claimNextCommand(deviceId) {
-    const cmd = queryOne('SELECT * FROM audio_device_commands WHERE device_id = ? ORDER BY id ASC LIMIT 1', [parseInt(deviceId, 10)]);
+    const did = parseInt(deviceId, 10);
+    // Drop stale commands first (offline-backlog guard) so a long-offline node doesn't replay old audio.
+    execute("DELETE FROM audio_device_commands WHERE device_id = ? AND created_at < datetime('now', ?)",
+        [did, `-${Math.round(COMMAND_TTL_MS / 1000)} seconds`]);
+    const cmd = queryOne('SELECT * FROM audio_device_commands WHERE device_id = ? ORDER BY id ASC LIMIT 1', [did]);
     if (cmd) execute('DELETE FROM audio_device_commands WHERE id = ?', [cmd.id]);
     return cmd || null;
+}
+
+/**
+ * Titik Speaker "belongs to an area": a device joins any broadcast that reaches its area. These resolve the
+ * ENABLED devices for a broadcast target, gated by the area's audio_broadcast_enabled (the SAME gate cameras
+ * use in playToCameras) — so a device in an audio-disabled area stays silent, and an unassigned (area_id
+ * NULL) device never auto-joins (reachable only via the explicit Titik Speaker broadcast).
+ */
+export function enabledDeviceIdsInAreas(areaIds) {
+    const ids = [...new Set((areaIds || []).map((x) => parseInt(x, 10)).filter(Number.isInteger))];
+    if (ids.length === 0) return [];
+    return query(`SELECT d.id FROM audio_devices d JOIN areas a ON a.id = d.area_id
+                  WHERE d.enabled = 1 AND a.audio_broadcast_enabled = 1 AND d.area_id IN (${ids.map(() => '?').join(',')})`, ids)
+        .map((r) => r.id);
+}
+
+/** Enabled devices that share an area with any of the given cameras (for camera-list broadcast targets). */
+export function enabledDeviceIdsForCameras(cameraIds) {
+    const ids = [...new Set((cameraIds || []).map((x) => parseInt(x, 10)).filter(Number.isInteger))];
+    if (ids.length === 0) return [];
+    return query(`SELECT DISTINCT d.id FROM audio_devices d JOIN areas a ON a.id = d.area_id
+                  WHERE d.enabled = 1 AND a.audio_broadcast_enabled = 1
+                    AND d.area_id IN (SELECT area_id FROM cameras WHERE id IN (${ids.map(() => '?').join(',')}) AND area_id IS NOT NULL)`, ids)
+        .map((r) => r.id);
+}
+
+/** Cast ONE clip to a set of devices. `preempt` (adzan/emergency) clears the node queue first so the
+ *  announcement takes over cleanly; otherwise it appends. Returns how many devices were enqueued. */
+export function castClipToDevices(deviceIds, clipId, loop = 1, { preempt = false } = {}) {
+    const ids = [...new Set((deviceIds || []).map((x) => parseInt(x, 10)).filter(Number.isInteger))];
+    const cid = parseInt(clipId, 10);
+    if (ids.length === 0 || !cid) return 0;
+    if (preempt) enqueueCommand(ids, 'stop'); // take over: clear the node's queue before the new clip
+    return enqueueCommand(ids, 'play', cid, loop);
+}
+
+/** Stop clip playback on every enabled device (kill-switch companion to stopAllPlaying). */
+export function stopAllDevices() {
+    const ids = query('SELECT id FROM audio_devices WHERE enabled = 1').map((r) => r.id);
+    return enqueueCommand(ids, 'stop');
 }
 
 /** One-shot poll: authenticate, mark seen, and claim the oldest command. Returns {device, command}. */
@@ -129,4 +176,5 @@ export function pollDevice(token, ip = null) {
 export default {
     listDevices, createDevice, updateDevice, deleteDevice, regenToken,
     authDevice, enqueueCommand, touchDevice, claimNextCommand, pollDevice,
+    enabledDeviceIdsInAreas, enabledDeviceIdsForCameras, castClipToDevices, stopAllDevices,
 };

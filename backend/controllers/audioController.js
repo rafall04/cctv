@@ -35,6 +35,7 @@ import {
     updateGroup as updateGroupRow, deleteGroup as deleteGroupRow,
 } from '../services/audioGroupService.js';
 import { mintTicket, stopAllTalk } from '../services/audioTalkService.js';
+import { stopAllDevices } from '../services/audioDeviceService.js';
 import { getConfig as getPrayerCfg, setConfig as setPrayerCfg, todayTimes as prayerTodayTimes } from '../services/audioPrayerService.js';
 import { listArms as listMotionRows, setArm as setMotionArm, disarm as disarmMotion } from '../services/audioMotionService.js';
 import {
@@ -534,12 +535,14 @@ export async function stopPlay(request, reply) {
             const talk = stopAllTalk();
             let sirens = 0;
             try { sirens = await stopAllSirens(); } catch (e) { console.error('[Audio] stop-all sirene gagal:', e.message); }
-            logAdminAction({ action: 'audio_play_stop', targetType: 'audio', all: true, stopped, talk, sirens, ...adminContext(request) }, request);
+            let devices = 0; try { devices = stopAllDevices(); } catch (e) { console.error('[Audio] stop-all titik speaker gagal:', e.message); }
+            logAdminAction({ action: 'audio_play_stop', targetType: 'audio', all: true, stopped, talk, sirens, devices, ...adminContext(request) }, request);
             const parts = [];
             if (stopped) parts.push(`${stopped} siaran`);
             if (talk) parts.push(`${talk} bicara`);
             if (sirens) parts.push(`${sirens} sirene`);
-            return reply.send({ success: true, message: parts.length ? `Dihentikan: ${parts.join(', ')}` : 'Tidak ada yang aktif', data: { stopped, talk, sirens } });
+            if (devices) parts.push(`${devices} titik speaker`);
+            return reply.send({ success: true, message: parts.length ? `Dihentikan: ${parts.join(', ')}` : 'Tidak ada yang aktif', data: { stopped, talk, sirens, devices } });
         }
         let stopped = 0;
         const ids = cameraId ? [cameraId] : (Array.isArray(cameraIds) ? cameraIds : []);

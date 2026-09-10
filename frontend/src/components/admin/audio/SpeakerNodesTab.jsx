@@ -108,6 +108,7 @@ export default function SpeakerNodesTab({ clips = [], areas = [] }) {
             <div>
                 <h3 className="text-sm font-semibold text-content">📻 Titik Speaker (STB + amp + TOA)</h3>
                 <p className="mt-0.5 text-xs text-content-muted">Speaker jaringan untuk tempat yang kameranya belum punya speaker. STB menjalankan agen <span className="font-mono">audio_node.py</span> dan menarik siaran dengan token-nya.</p>
+                <p className="mt-1 text-xs text-primary">ℹ️ Titik speaker <span className="font-semibold">otomatis ikut</span> siaran yang menyasar <span className="font-semibold">area</span>-nya: adzan/qori, jadwal, &amp; darurat. Pasang area di bawah agar ikut — kosongkan area bila hanya mau disiarkan manual dari tab ini.</p>
             </div>
 
             {/* Token reveal (shown ONCE) */}

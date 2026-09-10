@@ -14,6 +14,7 @@ import { queryOne, execute } from '../database/connectionPool.js';
 import { computePrayerTimes } from './prayerTimeService.js';
 import { listBroadcastTargets } from './audioTargetService.js';
 import { playToCameras } from './audioCastService.js';
+import { enabledDeviceIdsInAreas, enabledDeviceIdsForCameras, castClipToDevices } from './audioDeviceService.js';
 import { getClip } from './audioClipService.js';
 import { logPlay } from './audioHistoryService.js';
 import { alertBroadcastResult } from './audioAlertService.js';
@@ -192,17 +193,32 @@ function ramadanActive(cfg, dateKey) {
  */
 async function playPrayerClip(cfg, clipId, loop, { preempt, label, operator }) {
     const ids = resolveTargets(cfg);
-    if (ids.length === 0) { console.warn(`[${label}] due but no supported target camera`); return; }
+    // Titik Speaker (STB) in the same area/cameras join the SAME call — a spot with no camera speaker still
+    // gets the adzan/qori. Fire-and-forget (the node pulls it); wrapped so it can never affect the camera play.
+    let deviceCount = 0;
+    try {
+        const deviceIds = (cfg.target_kind || 'area') === 'area'
+            ? enabledDeviceIdsInAreas([cfg.area_id])
+            : enabledDeviceIdsForCameras(cfg.camera_ids || []);
+        deviceCount = castClipToDevices(deviceIds, clipId, cfg.loop || 1, { preempt });
+    } catch (e) { console.error(`[${label}] enqueue titik speaker gagal:`, e.message); }
+
+    if (ids.length === 0) {
+        if (deviceCount > 0) console.log(`[${label}] -> ${deviceCount} titik speaker (tanpa kamera target)`);
+        else console.warn(`[${label}] due but no supported target camera/device`);
+        return;
+    }
     try {
         const { results } = await playToCameras(ids, 'clip', clipId, loop || 1, { gainDb: cfg.gain_db, preempt });
         const name = getClip(clipId)?.name;
         // Exclude cameras dropped for a disabled area (`skipped`) so a wrong-area target can't log a phantom
-        // receipt or trigger a false "adzan GAGAL 0/N" alert. If none were real targets, stay silent.
+        // receipt or trigger a false "adzan GAGAL 0/N" alert. If none were real targets (but a device played),
+        // stay silent on the camera alert.
         const targeted = results.filter((r) => !r.skipped);
-        if (targeted.length === 0) { console.log(`[${label}] -> tak ada kamera target (area nonaktif)`); return; }
+        if (targeted.length === 0) { console.log(`[${label}] -> tak ada kamera target (area nonaktif)${deviceCount ? ` — ${deviceCount} titik speaker` : ''}`); return; }
         logPlay({ sourceType: 'clip', sourceId: clipId, sourceName: `${label}: ${name || ''}`.trim(), cameraIds: targeted.map((r) => r.cameraId), results: targeted, operatorName: operator });
         const ok = targeted.filter((r) => r.ok).length;
-        console.log(`[${label}] -> ${ok}/${targeted.length} kamera`);
+        console.log(`[${label}] -> ${ok}/${targeted.length} kamera${deviceCount ? ` + ${deviceCount} titik speaker` : ''}`);
         alertBroadcastResult({ label, okCount: ok, total: targeted.length }); // notify if adzan/qori reached nobody
 
     } catch (e) {

@@ -12,6 +12,7 @@ SideEffects: writes audio_emergency_presets; spawns preempting broadcasts on fir
 import { query, queryOne, execute } from '../database/connectionPool.js';
 import { listBroadcastTargets } from './audioTargetService.js';
 import { playToCameras } from './audioCastService.js';
+import { enabledDeviceIdsInAreas, enabledDeviceIdsForCameras, castClipToDevices } from './audioDeviceService.js';
 import { triggerCameraSiren } from './imouCloudService.js';
 
 const MAX_EMERGENCY_CAMERAS = Math.max(1, parseInt(process.env.AUDIO_MAX_EMERGENCY || '12', 10));
@@ -108,20 +109,33 @@ export function resolveTargets({ targetKind, areaId, cameraIds }) {
  */
 export async function fireEmergency({ sourceType = 'clip', sourceId, targetKind, areaId, cameraIds, loop = 3, gainDb = 0, siren = false }) {
     const ids = resolveTargets({ targetKind, areaId, cameraIds });
-    if (ids.length === 0) { const e = new Error('Tak ada kamera didukung untuk target darurat ini'); e.statusCode = 400; throw e; }
-    const { results } = await playToCameras(ids, sourceType, parseInt(sourceId, 10),
-        Math.min(Math.max(parseInt(loop, 10) || 3, 1), 20), { preempt: true, gainDb: clampGain(gainDb) });
+    const loopN = Math.min(Math.max(parseInt(loop, 10) || 3, 1), 20);
+    const sid = parseInt(sourceId, 10);
+    // Titik Speaker (STB) in the target area(s) join the emergency and PREEMPT (take over the node now).
+    // Clip only (playlist->device fan-out is a follow-up). Resolved BEFORE the empty-target guard so a spot
+    // reachable only by an STB (no camera speaker) can still be alerted. Fire-and-forget, isolated.
+    let devices = 0;
+    try {
+        const devIds = (targetKind === 'cameras')
+            ? enabledDeviceIdsForCameras(cameraIds || [])
+            : enabledDeviceIdsInAreas([areaId]);
+        if ((sourceType || 'clip') === 'clip') devices = castClipToDevices(devIds, sid, loopN, { preempt: true });
+    } catch (e) { console.error('[Darurat] enqueue titik speaker gagal:', e.message); }
+
+    if (ids.length === 0 && devices === 0) { const e = new Error('Tak ada kamera/titik speaker untuk target darurat ini'); e.statusCode = 400; throw e; }
+    let results = [];
+    if (ids.length > 0) ({ results } = await playToCameras(ids, sourceType, sid, loopN, { preempt: true, gainDb: clampGain(gainDb) }));
     // One-tap panic: also raise the built-in siren on any target that has an IMOU SN (auto-off protects it).
     // Fire them in PARALLEL: each is a cloud RPC with a 15s timeout, so a serial await-loop could hang the
     // emergency HTTP response up to ~cap×15s when the cloud is slow. Different SN each -> parallel is safe.
     let sirens = 0;
-    if (siren) {
+    if (siren && ids.length > 0) {
         const sirenCams = query(`SELECT id FROM cameras WHERE id IN (${ids.map(() => '?').join(',')}) AND imou_sn IS NOT NULL AND imou_sn != ''`, ids);
         const outcomes = await Promise.allSettled(sirenCams.map((c) => triggerCameraSiren(c.id, true)));
         sirens = outcomes.filter((o) => o.status === 'fulfilled').length;
         outcomes.filter((o) => o.status === 'rejected').forEach((o) => console.error('[Darurat] sirene gagal:', o.reason?.message));
     }
-    return { results, ids, sirens };
+    return { results, ids, sirens, devices };
 }
 
 export default { listPresets, createPreset, updatePreset, deletePreset, resolveTargets, fireEmergency, MAX_EMERGENCY_CAMERAS };

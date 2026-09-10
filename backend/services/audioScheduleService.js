@@ -15,6 +15,7 @@ the same minute while still letting it fire again the next day.
 
 import { query, queryOne, execute } from '../database/connectionPool.js';
 import { playToCameras } from './audioCastService.js';
+import { enabledDeviceIdsForCameras, castClipToDevices } from './audioDeviceService.js';
 import { getAppOffsetMinutes } from './timezoneService.js';
 import { quietTargets } from './audioTargetService.js';
 import { logPlay } from './audioHistoryService.js';
@@ -203,6 +204,14 @@ export function runDueSchedules(nowMs = Date.now()) {
         }
         const skipped = cams.length - active.length;
         console.log(`[Audio] Schedule "${s.name}" fired ${hhmm} -> ${active.length} kamera${skipped ? ` (${skipped} dilewati: jam tenang)` : ''}`);
+        // Titik Speaker (STB) in the same area(s) as the quiet-filtered target cameras join the broadcast —
+        // clip only for now (playlist->device fan-out is a follow-up). Fire-and-forget, isolated from cameras.
+        if (s.source_type === 'clip') {
+            try {
+                const dn = castClipToDevices(enabledDeviceIdsForCameras(active), s.source_id, s.loop_count, {});
+                if (dn) console.log(`[Audio] Schedule "${s.name}": + ${dn} titik speaker`);
+            } catch (e) { console.error(`[Audio] Schedule "${s.name}" titik speaker gagal:`, e.message); }
+        }
         // Area-disabled cameras are dropped inside playToCameras (enforceAreaScope default), so a schedule
         // whose area was later turned off stops sounding there without needing to be edited.
         playToCameras(active, s.source_type, s.source_id, s.loop_count, { gainDb: s.gain_db })
