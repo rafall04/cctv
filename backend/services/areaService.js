@@ -371,12 +371,6 @@ class AreaService {
             err.statusCode = 404;
             throw err;
         }
-
-        const previousInternalPolicy = {
-            ingest: normalizeInternalIngestPolicyDefault(area.internal_ingest_policy_default),
-            closeAfter: normalizeOnDemandCloseAfterSeconds(area.internal_on_demand_close_after_seconds, null),
-            transport: normalizeInternalRtspTransport(area.internal_rtsp_transport_default),
-        };
         return area;
     }
 
@@ -471,6 +465,15 @@ class AreaService {
             err.statusCode = 404;
             throw err;
         }
+
+        // Snapshot the internal-policy fields BEFORE the UPDATE so we can detect a real change afterwards and
+        // only then re-sync MediaMTX + the warm set. (This capture was previously mis-scoped into
+        // getAreaById, leaving `previousInternalPolicy` undefined here → a ReferenceError on every update.)
+        const previousInternalPolicy = {
+            ingest: normalizeInternalIngestPolicyDefault(area.internal_ingest_policy_default),
+            closeAfter: normalizeOnDemandCloseAfterSeconds(area.internal_on_demand_close_after_seconds, null),
+            transport: normalizeInternalRtspTransport(area.internal_rtsp_transport_default),
+        };
 
         try {
             execute(

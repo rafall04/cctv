@@ -69,6 +69,8 @@ export default function StreamHealthSettingsPanel() {
                     // Number(...) || 6: a stored 0/blank is not a valid confirm window, so fall to the default.
                     camera_source_dead_confirm_hours: Number(result.data.camera_source_dead_confirm_hours) || 6,
                 });
+            } else {
+                showError('Gagal Memuat', result.message || 'Tidak bisa memuat default health monitoring.');
             }
         } catch (error) {
             console.error('Load stream health defaults error:', error);

@@ -111,24 +111,29 @@ export default function VoucherManagement() {
 
     const loadData = useCallback(async () => {
         setLoading(true);
-        const [settingsRes, areasRes, profilesRes, codesRes] = await Promise.all([
-            voucherAdminService.getSettings(),
-            areaService.getAllAreas(),
-            voucherAdminService.getProfiles(),
-            voucherAdminService.getCodes({ limit: 300 }),
-        ]);
+        try {
+            const [settingsRes, areasRes, profilesRes, codesRes] = await Promise.all([
+                voucherAdminService.getSettings(),
+                areaService.getAllAreas(),
+                voucherAdminService.getProfiles(),
+                voucherAdminService.getCodes({ limit: 300 }),
+            ]);
 
-        if (settingsRes?.success) {
-            setEnabled(!!settingsRes.data.enabled);
-            setGatedAreaIds(settingsRes.data.gated_area_ids || []);
-        } else {
-            notifyError('Gagal memuat pengaturan voucher', settingsRes?.message);
+            if (settingsRes?.success) {
+                setEnabled(!!settingsRes.data.enabled);
+                setGatedAreaIds(settingsRes.data.gated_area_ids || []);
+            } else {
+                notifyError('Gagal memuat pengaturan voucher', settingsRes?.message);
+            }
+            if (areasRes?.success) setAreas(normalizeAreas(areasRes));
+            if (profilesRes?.success) setProfiles(Array.isArray(profilesRes.data) ? profilesRes.data : []);
+            if (codesRes?.success) setCodes(Array.isArray(codesRes.data) ? codesRes.data : []);
+        } catch (e) {
+            // A rejected request (offline / 500) must NOT leave the page stuck on the skeleton forever.
+            notifyError('Gagal memuat data voucher', e?.response?.data?.message || e?.message);
+        } finally {
+            setLoading(false);
         }
-        if (areasRes?.success) setAreas(normalizeAreas(areasRes));
-        if (profilesRes?.success) setProfiles(Array.isArray(profilesRes.data) ? profilesRes.data : []);
-        if (codesRes?.success) setCodes(Array.isArray(codesRes.data) ? codesRes.data : []);
-
-        setLoading(false);
     }, [notifyError]);
 
     useEffect(() => { loadData(); }, [loadData]);

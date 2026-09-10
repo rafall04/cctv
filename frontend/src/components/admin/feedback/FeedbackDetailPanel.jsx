@@ -20,8 +20,8 @@ export default function FeedbackDetailPanel({
                                 <p className="text-sm text-content-muted">{selectedFeedback.email}</p>
                             )}
                         </div>
-                        <span className={`px-3 py-1 rounded-full text-sm font-medium ${feedbackStatusConfig[selectedFeedback.status].color}`}>
-                            {feedbackStatusConfig[selectedFeedback.status].label}
+                        <span className={`px-3 py-1 rounded-full text-sm font-medium ${feedbackStatusConfig[selectedFeedback.status]?.color || 'bg-surface-sunken text-content-muted'}`}>
+                            {feedbackStatusConfig[selectedFeedback.status]?.label || selectedFeedback.status || 'Tidak diketahui'}
                         </span>
                     </div>
 

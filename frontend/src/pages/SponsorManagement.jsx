@@ -758,7 +758,7 @@ function SponsorManagement() {
                                             return (
                                                 <label
                                                     key={camera.id}
-                                                    className="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 dark:bg-gray-700/30 cursor-pointer"
+                                                    className="flex items-center gap-3 px-3 py-2 hover:bg-surface-sunken cursor-pointer"
                                                 >
                                                     <input
                                                         type="checkbox"

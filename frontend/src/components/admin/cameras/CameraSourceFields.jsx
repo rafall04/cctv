@@ -404,13 +404,6 @@ export default function CameraSourceFields({
                         </div>
                     </div>
 
-                    <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 p-4 dark:border-emerald-500/20 dark:bg-emerald-500/10">
-                        <p className="text-sm font-medium text-content">Internal RTSP Workflow</p>
-                        <p className="mt-1 text-xs text-content-muted">
-                            Gunakan mode ini untuk source private seperti Surabaya. Jalur yang dipakai adalah RTSP privat -&gt; MediaMTX -&gt; HLS/WebRTC. Jika recording dimatikan, kamera berjalan live-only tanpa playback.
-                        </p>
-                    </div>
-
                     <div>
                                 <label htmlFor="camera-external-tls-mode" className="block text-sm font-medium text-content-muted mb-1">
                                     Mode TLS

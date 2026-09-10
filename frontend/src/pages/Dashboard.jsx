@@ -171,7 +171,7 @@ export default function Dashboard() {
               */}
             <PageHeader
                 title="Dashboard"
-                description={`Memantau ${stats?.summary.totalCameras ?? 0} kamera di ${stats?.summary.totalAreas ?? 0} area`}
+                description={`Memantau ${stats?.summary?.totalCameras ?? 0} kamera di ${stats?.summary?.totalAreas ?? 0} area`}
                 actions={(
                     <Button
                         icon={<RefreshIcon spinning={isRetrying} />}

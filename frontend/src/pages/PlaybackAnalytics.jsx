@@ -182,6 +182,12 @@ export default function PlaybackAnalytics() {
     const [historyDeviceType, setHistoryDeviceType] = useState('');
     const [historySearch, setHistorySearch] = useState('');
     const [historySort, setHistorySort] = useState('started_at:desc');
+    // Debounce the search so typing doesn't fire a BLOCKING request (+ skeleton flicker) on every keystroke.
+    const [debouncedSearch, setDebouncedSearch] = useState('');
+    useEffect(() => {
+        const t = setTimeout(() => setDebouncedSearch(historySearch), 350);
+        return () => clearTimeout(t);
+    }, [historySearch]);
     const [selectedHistorySession, setSelectedHistorySession] = useState(null);
     const requestIdRef = useRef(0);
     const historyRequestIdRef = useRef(0);
@@ -247,7 +253,7 @@ export default function PlaybackAnalytics() {
                 cameraId: cameraId || undefined,
                 accessMode: accessMode || undefined,
                 deviceType: historyDeviceType || undefined,
-                search: historySearch || undefined,
+                search: debouncedSearch || undefined,
                 sortBy,
                 sortDirection,
             }, REQUEST_POLICY.BLOCKING);
@@ -272,7 +278,7 @@ export default function PlaybackAnalytics() {
                 setHistoryLoading(false);
             }
         }
-    }, [accessMode, cameraId, historyDeviceType, historySearch, historySort, period]);
+    }, [accessMode, cameraId, historyDeviceType, debouncedSearch, historySort, period]);
 
     useEffect(() => {
         let isMounted = true;
@@ -442,7 +448,7 @@ export default function PlaybackAnalytics() {
                                             {/* The filename encodes the recording time, but nobody
                                                 should have to decode 20260801_214001.mp4 by eye. */}
                                             <div className="text-xs text-content-muted">
-                                                Rekaman {formatDateTime(session.segment_started_at) || session.segment_filename}
+                                                {session.segment_started_at ? `Rekaman ${formatDateTime(session.segment_started_at)}` : session.segment_filename}
                                             </div>
                                         </div>
                                         <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${ACCESS_MODE_LABELS[session.playback_access_mode]?.tone || 'bg-surface-sunken text-content'}`}>

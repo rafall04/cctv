@@ -60,10 +60,15 @@ export default function CameraFeedbackPanel() {
 
     const close = useCallback(async (id) => {
         setClosingId(id);
-        const res = await adminService.updateCameraReport(id, 'selesai');
-        setClosingId(null);
-        if (res?.success) {
-            setReports((prev) => prev.map((r) => (r.id === id ? { ...r, status: 'selesai' } : r)));
+        try {
+            const res = await adminService.updateCameraReport(id, 'selesai');
+            if (res?.success) {
+                setReports((prev) => prev.map((r) => (r.id === id ? { ...r, status: 'selesai' } : r)));
+            }
+        } catch (e) {
+            console.error('Close report error:', e);
+        } finally {
+            setClosingId(null); // always release the button's loading state, even on network/500 error
         }
     }, []);
 

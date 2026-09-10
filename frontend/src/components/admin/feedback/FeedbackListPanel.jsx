@@ -48,8 +48,8 @@ export default function FeedbackListPanel({
                                         </span>
                                     </div>
                                 </div>
-                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${feedbackStatusConfig[feedback.status].color}`}>
-                                    {feedbackStatusConfig[feedback.status].label}
+                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${feedbackStatusConfig[feedback.status]?.color || 'bg-surface-sunken text-content-muted'}`}>
+                                    {feedbackStatusConfig[feedback.status]?.label || feedback.status || 'Tidak diketahui'}
                                 </span>
                             </div>
                         </div>
