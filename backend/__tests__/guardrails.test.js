@@ -44,7 +44,10 @@ describe('guardrail: file-size ratchet (anti-penumpukan)', () => {
         'middleware/schemaValidators.js': 952,
         'services/telegramService.js': 944,
         'services/externalStreamProxyService.js': 896,
-        'services/telegramBotService.js': 890,
+        // Bumped 890->898: the '/darurat' command + its confirm/exec callback delegation to
+        // telegramEmergencyCommand.js (the logic lives in that non-frozen module; only the hardcoded
+        // command/callback switches — which have no handler registry — are touched here).
+        'services/telegramBotService.js': 898,
         // Central billing engine. Pure date/money helpers already live in billingCalc.js; the
         // remainder is the charge/suspend/heal state machine, kept in one file on purpose. Frozen
         // here (visible decision) after the timezone/admin-hold/catch-up/atomicity correctness pass;

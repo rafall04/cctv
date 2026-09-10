@@ -20,6 +20,7 @@ import { logAdminAction } from './securityAuditLogger.js';
 import { formatDateTime } from './timezoneService.js';
 import { callTelegramApi, getBotRuntimeConfig, isCommandChat } from './telegramService.js';
 import * as presenter from './telegramBotPresenter.js';
+import emergencyCmd from './telegramEmergencyCommand.js';
 
 // SHORT-poll, not long-poll. Some hosting networks (e.g. the prod VPS) sever a
 // long-lived HTTPS connection to Telegram after a few seconds, so a 30s long-poll
@@ -486,6 +487,9 @@ class TelegramBotService {
             case 'plan':
             case 'paket':
                 return this.cmdPlan(chatId, parsed.args[0]);
+            case 'darurat':
+            case 'emergency':
+                return emergencyCmd.handleCommand(this, chatId);
             default:
                 return this.sendMessage(chatId, { text: 'Perintah tidak dikenali. Ketik /help untuk daftar perintah.' });
         }
@@ -537,8 +541,12 @@ class TelegramBotService {
             case A.DISMISS:
                 await this.answerCallback(cq.id, 'Dibatalkan');
                 return this.editMessage(chatId, messageId, presenter.buildResult('✖️', 'Dibatalkan.'));
-            default:
+            default: {
+                // Emergency broadcast taps ('efire'/'efix') live in a separate module (frozen-file budget).
+                const handled = await emergencyCmd.handleCallback(this, cq, chatId, messageId, action, params, actor);
+                if (handled !== undefined) return handled;
                 return this.answerCallback(cq.id, 'Aksi tidak dikenali.');
+            }
         }
     }
 

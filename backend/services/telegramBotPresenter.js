@@ -152,6 +152,9 @@ export function buildHelpMessage({ authorized, chatId, writeEnabled = {} } = {})
         }
         lines.push(
             '',
+            '<b>🚨 Darurat</b>',
+            '/darurat — siarkan preset darurat (banjir/kebakaran) ke kamera & titik speaker, dengan konfirmasi',
+            '',
             'Persetujuan & aksi lain juga tersedia lewat tombol di bawah pesan.',
         );
     }
