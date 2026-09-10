@@ -120,7 +120,7 @@ describe('CameraManagement', () => {
         expect(dialog.getAttribute('aria-modal')).toBe('true');
 
         const form = dialog.querySelector('form');
-        const create = within(dialog).getByRole('button', { name: 'Create' });
+        const create = within(dialog).getByRole('button', { name: 'Buat' });
         expect(form.contains(create)).toBe(false);
         expect(create.form).toBe(form);
 
@@ -128,7 +128,7 @@ describe('CameraManagement', () => {
         fireEvent.keyDown(dialog, { key: 'Escape' });
         expect(screen.getByRole('dialog')).not.toBeNull();
 
-        fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Batal' }));
         await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     });
 
