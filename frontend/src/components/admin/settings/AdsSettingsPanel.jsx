@@ -424,7 +424,7 @@ export default function AdsSettingsPanel() {
                         />
                     </div>
 
-                    <div className="rounded-xl border border-primary-300 bg-primary-100 px-4 py-3 text-sm text-primary border-primary-300 dark:bg-primary/10 text-primary">
+                    <div className="rounded-xl border border-primary-300 bg-primary-100 px-4 py-3 text-sm text-primary dark:bg-primary/10">
                         Gunakan creative compact atau vertikal untuk slot popup. Pada desktop, hanya satu slot popup yang diprioritaskan agar player tetap terbaca.
                     </div>
                 </SectionCard>
@@ -548,7 +548,7 @@ export default function AdsSettingsPanel() {
                         type="button"
                         onClick={fetchSettings}
                         disabled={saving}
-                        className="rounded-xl bg-surface-sunken px-4 py-2.5 text-content-muted transition-colors hover:bg-surface-sunken"
+                        className="rounded-xl bg-surface-sunken px-4 py-2.5 text-content-muted transition-colors hover:bg-surface-raised"
                     >
                         Reset Form
                     </button>

@@ -14,10 +14,7 @@ import { settingsService as appSettingsService } from '../../services/settingsSe
 import { Card } from '../ui/Card';
 import { TableShell } from '../ui/DataTable';
 import { inputClasses } from '../ui/Field';
-
-function formatRupiah(value) {
-    return `Rp${Number(value || 0).toLocaleString('id-ID')}`;
-}
+import { formatRupiah } from './billing/billingFormat';
 
 const EMPTY_PLAN = {
     key: '', name: '', description: '',

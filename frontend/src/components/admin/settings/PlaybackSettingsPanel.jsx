@@ -224,7 +224,7 @@ export default function PlaybackSettingsPanel() {
                     <button
                         type="submit"
                         disabled={saving}
-                        className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary disabled:opacity-60"
+                        className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-600 disabled:opacity-60"
                     >
                         {saving ? 'Menyimpan...' : 'Simpan Pengaturan Playback'}
                     </button>

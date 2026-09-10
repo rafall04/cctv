@@ -337,7 +337,7 @@ export default function TelegramSettingsPanel() {
                                 </Link>
                                 <button
                                     onClick={() => setIsEditing(true)}
-                                    className="px-4 py-2 bg-surface-sunken hover:bg-surface-sunken text-content-muted font-medium rounded-xl transition-colors"
+                                    className="px-4 py-2 bg-surface-sunken hover:bg-surface-raised text-content-muted font-medium rounded-xl transition-colors"
                                 >
                                     Edit
                                 </button>
@@ -614,7 +614,7 @@ export default function TelegramSettingsPanel() {
                                 <button onClick={handleSave} disabled={saving} className="px-6 py-2.5 bg-primary hover:bg-primary-600 disabled:bg-blue-400 text-white font-medium rounded-xl transition-colors">
                                     {saving ? 'Menyimpan...' : 'Simpan'}
                                 </button>
-                                <button onClick={handleCancel} disabled={saving} className="px-6 py-2.5 bg-surface-sunken hover:bg-surface-sunken text-content-muted font-medium rounded-xl transition-colors">
+                                <button onClick={handleCancel} disabled={saving} className="px-6 py-2.5 bg-surface-sunken hover:bg-surface-raised text-content-muted font-medium rounded-xl transition-colors">
                                     Batal
                                 </button>
                             </div>

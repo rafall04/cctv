@@ -96,7 +96,7 @@ function getIngestBadge(camera) {
         label: policy === 'always_on' ? 'Ingest: Always On' : 'Ingest: On Demand',
         className: policy === 'always_on'
             ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-200'
-            : 'bg-primary/15 text-primary text-primary',
+            : 'bg-primary/15 text-primary',
         title: 'Resolved internal RTSP ingest policy',
     };
 }

@@ -198,7 +198,7 @@ export default function StreamHealthSettingsPanel() {
                     </label>
                 </div>
 
-                <div className="rounded-2xl border border-primary-300 bg-primary-100 px-4 py-3 text-sm text-primary border-primary-300 dark:bg-primary/10 text-primary">
+                <div className="rounded-2xl border border-primary-300 bg-primary-100 px-4 py-3 text-sm text-primary dark:bg-primary/10">
                     Gunakan area override untuk kebijakan steady-state per lokasi, lalu pakai camera override hanya untuk kamera khusus yang memang perlu perlakuan berbeda.
                 </div>
 
@@ -206,7 +206,7 @@ export default function StreamHealthSettingsPanel() {
                     <button
                         type="submit"
                         disabled={saving}
-                        className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-primary disabled:cursor-not-allowed disabled:opacity-60"
+                        className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-600 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                         {saving ? 'Menyimpan...' : 'Simpan Default'}
                     </button>

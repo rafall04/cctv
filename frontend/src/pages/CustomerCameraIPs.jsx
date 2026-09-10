@@ -17,7 +17,7 @@ const KIND_BADGE = {
     public: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
     cgnat: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
     private: 'bg-surface-sunken text-content-muted',
-    hostname: 'bg-primary-100 text-primary dark:bg-sky-900/40 text-primary',
+    hostname: 'bg-primary-100 text-primary dark:bg-sky-900/40 dark:text-primary-200',
     unresolved: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
     invalid: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
 };
@@ -112,13 +112,7 @@ export default function CustomerCameraIPs() {
                     <Card>
                         <div className="flex items-center justify-between gap-2">
                             <h2 className="font-semibold text-content">IP Publik unik untuk routing broadband ({publicIps.length})</h2>
-                            <button
-                                onClick={copyIps}
-                                disabled={publicIps.length === 0}
-                                className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-600 disabled:opacity-50"
-                            >
-                                Salin
-                            </button>
+                            <Button size="sm" onClick={copyIps} disabled={publicIps.length === 0}>Salin</Button>
                         </div>
                         {publicIps.length === 0 ? (
                             <p className="mt-2 text-sm text-content-muted">Belum ada IP publik (semua privat/CGNAT atau belum ada kamera pelanggan).</p>

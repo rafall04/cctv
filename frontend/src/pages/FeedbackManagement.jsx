@@ -94,7 +94,7 @@ export default function FeedbackManagement() {
                 description="Kelola feedback dari pengunjung"
                 actions={(
                     <Button onClick={refreshAll} icon={<FeedbackIcons.Refresh />}>
-                        Refresh
+                        Muat ulang
                     </Button>
                 )}
             />

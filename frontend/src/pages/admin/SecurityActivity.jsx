@@ -34,7 +34,7 @@ function eventTone(eventType) {
         return 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300';
     }
     if (ADMIN_EVENTS.includes(eventType)) {
-        return 'bg-primary-100 text-primary dark:bg-primary/15 text-primary';
+        return 'bg-primary-100 text-primary dark:bg-primary/15';
     }
     return 'bg-surface-sunken text-content-muted';
 }

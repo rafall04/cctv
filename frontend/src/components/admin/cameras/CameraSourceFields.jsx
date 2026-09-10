@@ -120,13 +120,13 @@ export default function CameraSourceFields({
                             aria-pressed={deliveryType === option.value}
                             onClick={() => setDeliveryType(option.value)}
                             disabled={isSubmitting}
-                            className={`rounded-xl border px-3 py-3 text-left transition-colors ${deliveryType === option.value
-                                ? 'border-blue-500 bg-blue-500 text-white'
-                                : 'border-blue-200 bg-surface text-content-muted hover:bg-blue-50 dark:border-blue-500/30 dark:hover:bg-blue-500/10'
+                            className={`rounded-control border px-3 py-3 text-left transition-colors ${deliveryType === option.value
+                                ? 'border-primary bg-primary text-white'
+                                : 'border-edge bg-surface text-content-muted hover:bg-surface-sunken'
                                 }`}
                         >
                             <div className="text-xs font-semibold">{option.label}</div>
-                            <div className={`mt-1 text-[11px] ${deliveryType === option.value ? 'text-blue-50/90' : 'text-content-muted'}`}>
+                            <div className={`mt-1 text-xs ${deliveryType === option.value ? 'text-white/90' : 'text-content-muted'}`}>
                                 {option.description}
                             </div>
                         </button>

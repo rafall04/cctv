@@ -469,7 +469,7 @@ export default function ImportExport() {
                                             if (option.value === 'remote_preset') setSourceProfile('jombang_mjpeg');
                                             setPreviewResult(null);
                                         }}
-                                        className={`rounded-xl px-3 py-2 text-sm font-medium transition ${importMode === option.value ? 'bg-primary text-white' : 'bg-surface-sunken text-content-muted hover:bg-surface-sunken'}`}
+                                        className={`rounded-xl px-3 py-2 text-sm font-medium transition ${importMode === option.value ? 'bg-primary text-white' : 'bg-surface-sunken text-content-muted hover:bg-surface-raised'}`}
                                     >
                                         {option.label}
                                     </button>
@@ -490,7 +490,7 @@ export default function ImportExport() {
                                     {rawPayload.length > 0 && <p className="mt-3 text-sm text-green-600 dark:text-green-400 font-medium">Loaded {rawPayload.length} rows from {rawFileName || 'JSON'}.</p>}
                                 </div>
                             ) : (
-                                <div className="rounded-xl border border-primary-300 bg-primary-100 p-3 text-sm text-primary border-primary-300 dark:bg-primary/10 text-primary">
+                                <div className="rounded-xl border border-primary-300 bg-primary-100 p-3 text-sm text-primary dark:bg-primary/10">
                                     Backend akan fetch source preset saat preview. Saat ini preset remote yang aktif adalah Jombang v2 dan Surakarta FLV.
                                 </div>
                             )}
@@ -568,7 +568,7 @@ export default function ImportExport() {
                         </div>
 
                         <div className="space-y-3">
-                            <button onClick={handlePreview} disabled={previewLoading} className="w-full bg-primary text-white py-3 px-4 rounded-xl shadow font-medium hover:bg-primary transition disabled:opacity-50">
+                            <button onClick={handlePreview} disabled={previewLoading} className="w-full bg-primary text-white py-3 px-4 rounded-xl shadow font-medium hover:bg-primary-600 transition disabled:opacity-50">
                                 {previewLoading ? 'Generating Preview...' : 'Preview Import'}
                             </button>
                             <button onClick={handleImportSubmit} disabled={isProcessing || !previewResult?.canImport} className="w-full bg-primary text-white py-3 px-4 rounded-xl shadow font-medium hover:bg-primary-600 transition disabled:opacity-50">

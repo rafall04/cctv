@@ -227,8 +227,9 @@ export default function SponsorPackagePanel({ packages = [], onChanged }) {
 
             {showModal && (
                 <Modal
-                    title={editingId ? 'Edit Profil Paket' : 'Tambah Profil Paket'}
+                    title={editingId ? 'Ubah Profil Paket' : 'Tambah Profil Paket'}
                     size="lg"
+                    dismissible={false}
                     onClose={() => setShowModal(false)}
                     footer={(
                         <>

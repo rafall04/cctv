@@ -609,8 +609,9 @@ function SponsorManagement() {
             {/* Sponsor Modal */}
             {showModal && (
                 <Modal
-                    title={editingId ? 'Edit Sponsor' : 'Tambah Sponsor Baru'}
+                    title={editingId ? 'Ubah Sponsor' : 'Tambah Sponsor Baru'}
                     size="xl"
+                    dismissible={false}
                     onClose={() => { setShowModal(false); resetForm(); }}
                     footer={(
                         <>
