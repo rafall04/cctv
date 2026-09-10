@@ -67,6 +67,16 @@ export default function PrayerConfig({ clips, areas }) {
 
     const set = (patch) => setCfg((c) => ({ ...c, ...patch }));
 
+    // "Adzan berikutnya" — the next enabled prayer after the current local minute (in the config tz).
+    const hhmmToMin = (s) => { const m = /^(\d{2}):(\d{2})$/.exec(String(s || '')); return m ? (Number(m[1]) * 60 + Number(m[2])) : null; };
+    const tzNow = new Date(Date.now() + Number(cfg.timezone ?? 7) * 3600000);
+    const nowMin = tzNow.getUTCHours() * 60 + tzNow.getUTCMinutes();
+    const nextPrayer = times?.times ? PRAYERS
+        .map(([key, label]) => ({ key, label, min: hhmmToMin(times.times[key]), time: times.times[key] }))
+        .filter((p) => cfg[`enable_${p.key}`] && p.min != null)
+        .sort((a, b) => a.min - b.min)
+        .find((p) => p.min > nowMin) : null;
+
     // Lokasi belum diatur = lintang & bujur masih 0 (default). Dengan 0,0 semua waktu geser ~7 jam
     // (koreksi bujur hilang), jadi ini WAJIB ditangani sebelum adzan diaktifkan.
     const locationUnset = !(Number(cfg.latitude) || Number(cfg.longitude));
@@ -166,6 +176,7 @@ export default function PrayerConfig({ clips, areas }) {
                     <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-content-subtle">
                         <span>Imsak <span className="font-mono font-semibold text-content-muted">{times.times?.imsak || '—'}</span></span>
                         <span>Terbit/Syuruq <span className="font-mono font-semibold text-content-muted">{times.times?.sunrise || '—'}</span></span>
+                        {nextPrayer && <span className="text-primary">Berikutnya: <span className="font-semibold">{nextPrayer.label} {nextPrayer.time}</span></span>}
                         <span>Cocokkan dengan jadwal Kemenag setempat.</span>
                     </div>
                 </div>

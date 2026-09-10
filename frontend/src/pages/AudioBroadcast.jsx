@@ -31,6 +31,7 @@ import EmergencyPanel from '../components/admin/audio/EmergencyPanel';
 import PrayerConfig from '../components/admin/audio/PrayerConfig';
 import MotionArms from '../components/admin/audio/MotionArms';
 import SirenControl from '../components/admin/audio/SirenControl';
+import HistoryTab from '../components/admin/audio/HistoryTab';
 
 const TABS = [
     { id: 'play', label: 'Putar Sekarang' },
@@ -41,6 +42,7 @@ const TABS = [
     { id: 'groups', label: 'Grup' },
     { id: 'schedules', label: 'Jadwal' },
     { id: 'targets', label: 'Kamera & Area' },
+    { id: 'history', label: 'Riwayat' },
 ];
 
 export default function AudioBroadcast() {
@@ -209,6 +211,11 @@ export default function AudioBroadcast() {
                         onSaveGroup={handleSaveGroup}
                     />
                   </div>
+                </TabPanel>
+            )}
+            {active === 'history' && (
+                <TabPanel id="history" idPrefix="audio">
+                    <HistoryTab />
                 </TabPanel>
             )}
             {active === 'targets' && (
