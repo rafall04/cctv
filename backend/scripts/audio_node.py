@@ -103,7 +103,9 @@ def main():
     print('[Titik Speaker] agent up -> %s (player=%s)' % (HUB, PLAYER))
     while True:
         try:
-            resp = http_get('/api/admin/audio/node/poll', timeout=30)
+            # LONG-poll: the Hub holds this up to ~25s and returns the instant a command is queued, so a
+            # clip/adzan/emergency fires in <1s. timeout must exceed the hold window.
+            resp = http_get('/api/admin/audio/node/poll', timeout=35)
             body = json.loads(resp.read().decode('utf-8'))
             data = body.get('data') or {}
             cmd = data.get('command')
@@ -112,7 +114,7 @@ def main():
                 play_wav(audio, data.get('loop') or 1)
             elif cmd == 'stop':
                 stop_playback()
-            time.sleep(1.5)
+            time.sleep(0.3)  # small floor; the server long-poll provides the real pacing
         except urllib.error.HTTPError as e:
             if e.code == 401:
                 print('token ditolak — cek TOKEN', file=sys.stderr)

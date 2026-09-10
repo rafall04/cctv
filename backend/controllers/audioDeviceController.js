@@ -12,10 +12,14 @@ SideEffects: writes device rows + command queue; serves clip audio to authentica
 import {
     listDevices as deviceList, createDevice as deviceCreate, updateDevice as deviceUpdate,
     deleteDevice as deviceDelete, regenToken as deviceRegen, authDevice as deviceAuth,
-    enqueueCommand as deviceEnqueue, pollDevice as devicePoll,
+    enqueueCommand as deviceEnqueue, touchDevice as deviceTouch, claimNextCommand as deviceClaim,
 } from '../services/audioDeviceService.js';
 import { getClipWav } from '../services/audioClipService.js';
 import { logAdminAction } from '../services/securityAuditLogger.js';
+
+const sleep = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
+const POLL_HOLD_MS = 25000; // how long a node poll is held open (< Cloudflare's ~100s proxy timeout)
+const POLL_STEP_MS = 300;   // how often the held poll checks the queue
 
 // Tiny local copies (kept in step with audioController.js) so this module stands alone.
 function parseId(value) {
@@ -104,16 +108,29 @@ function deviceTokenFrom(request) {
     return request.headers['x-device-token'] || request.query?.token || '';
 }
 
-// The agent short-polls for its next command. Returns { command:null } when idle, or a play/stop + clip url.
+// The agent LONG-polls for its next command: the request is held open and returns the INSTANT a command is
+// queued (trigger <1s — matters for adzan/emergency), or { command:null } after the hold window so the
+// agent re-polls. A held GET (not an idle connection) survives Cloudflare; the await-loop doesn't block the
+// event loop, so many nodes hold concurrently.
 export async function nodePoll(request, reply) {
     try {
         const ip = String(request.headers['x-forwarded-for'] || '').split(',')[0].trim() || request.ip;
-        const { device, command } = devicePoll(deviceTokenFrom(request), ip);
-        if (!device) return reply.code(401).send({ success: false, message: 'token tidak valid' });
-        if (!command) return reply.send({ success: true, data: { command: null } });
-        const out = { command: command.command, loop: command.loop };
-        if (command.command === 'play' && command.clip_id) out.clip_url = `/api/admin/audio/node/clip/${command.clip_id}`;
-        return reply.send({ success: true, data: out });
+        const dev = deviceAuth(deviceTokenFrom(request));
+        if (!dev) return reply.code(401).send({ success: false, message: 'token tidak valid' });
+        deviceTouch(dev.id, ip);
+        const deadline = Date.now() + POLL_HOLD_MS;
+        for (;;) {
+            const cmd = deviceClaim(dev.id);
+            if (cmd) {
+                const out = { command: cmd.command, loop: cmd.loop };
+                if (cmd.command === 'play' && cmd.clip_id) out.clip_url = `/api/admin/audio/node/clip/${cmd.clip_id}`;
+                return reply.send({ success: true, data: out });
+            }
+            if (Date.now() >= deadline || request.raw.destroyed) break; // window elapsed / client gone
+            // eslint-disable-next-line no-await-in-loop
+            await sleep(POLL_STEP_MS);
+        }
+        return reply.send({ success: true, data: { command: null } });
     } catch (error) { return fail(reply, error); }
 }
 

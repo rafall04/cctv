@@ -100,17 +100,28 @@ export function enqueueCommand(deviceIds, command, clipId = null, loop = 1) {
     return count;
 }
 
-/** A node polls: mark it seen (+ip) and claim the oldest queued command (deleting it). Returns {device, command}. */
+/** Mark a device as seen now (+ its source IP). Cheap; called every poll so liveness stays fresh. */
+export function touchDevice(deviceId, ip = null) {
+    execute("UPDATE audio_devices SET last_seen = datetime('now'), last_ip = COALESCE(?, last_ip) WHERE id = ?",
+        [ip ? String(ip).slice(0, 64) : null, parseInt(deviceId, 10)]);
+}
+
+/** Claim (delete + return) the oldest queued command for a device, or null. Used by the long-poll loop. */
+export function claimNextCommand(deviceId) {
+    const cmd = queryOne('SELECT * FROM audio_device_commands WHERE device_id = ? ORDER BY id ASC LIMIT 1', [parseInt(deviceId, 10)]);
+    if (cmd) execute('DELETE FROM audio_device_commands WHERE id = ?', [cmd.id]);
+    return cmd || null;
+}
+
+/** One-shot poll: authenticate, mark seen, and claim the oldest command. Returns {device, command}. */
 export function pollDevice(token, ip = null) {
     const dev = authDevice(token);
     if (!dev) return { device: null, command: null };
-    execute("UPDATE audio_devices SET last_seen = datetime('now'), last_ip = ? WHERE id = ?", [ip ? String(ip).slice(0, 64) : dev.last_ip, dev.id]);
-    const cmd = queryOne('SELECT * FROM audio_device_commands WHERE device_id = ? ORDER BY id ASC LIMIT 1', [dev.id]);
-    if (cmd) execute('DELETE FROM audio_device_commands WHERE id = ?', [cmd.id]);
-    return { device: dev, command: cmd || null };
+    touchDevice(dev.id, ip);
+    return { device: dev, command: claimNextCommand(dev.id) };
 }
 
 export default {
     listDevices, createDevice, updateDevice, deleteDevice, regenToken,
-    authDevice, enqueueCommand, pollDevice,
+    authDevice, enqueueCommand, touchDevice, claimNextCommand, pollDevice,
 };
