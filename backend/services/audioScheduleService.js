@@ -16,6 +16,8 @@ the same minute while still letting it fire again the next day.
 import { query, queryOne, execute } from '../database/connectionPool.js';
 import { playToCameras } from './audioCastService.js';
 import { enabledDeviceIdsForCameras, castToDevices } from './audioDeviceService.js';
+import { getClip, deleteClip } from './audioClipService.js';
+import { renderTtsClipNow } from './audioScheduledTtsService.js';
 import { getAppOffsetMinutes } from './timezoneService.js';
 import { quietTargets } from './audioTargetService.js';
 import { logPlay } from './audioHistoryService.js';
@@ -61,11 +63,22 @@ function validate(f, partial = false) {
     }
     if (!partial || f.sourceType !== undefined) {
         out.source_type = f.sourceType;
-        if (!['clip', 'playlist'].includes(out.source_type)) { const e = new Error('sourceType harus clip atau playlist'); e.statusCode = 400; throw e; }
+        if (!['clip', 'playlist', 'tts'].includes(out.source_type)) { const e = new Error('sourceType harus clip, playlist, atau tts'); e.statusCode = 400; throw e; }
     }
+    // TTS template fields (spoken text synthesized with the CURRENT time AT FIRE). source_id is unused for tts.
+    if (f.ttsText !== undefined) out.tts_text = String(f.ttsText || '').trim().slice(0, 1500);
+    if (f.ttsEngine !== undefined) out.tts_engine = (String(f.ttsEngine || '').trim().slice(0, 20)) || null;
+    if (f.ttsVoice !== undefined) out.tts_voice = (String(f.ttsVoice || '').trim().slice(0, 60)) || null;
     if (!partial || f.sourceId !== undefined) {
-        out.source_id = parseInt(f.sourceId, 10);
-        if (!Number.isInteger(out.source_id)) { const e = new Error('sourceId tidak valid'); e.statusCode = 400; throw e; }
+        if ((out.source_type || '') === 'tts') {
+            out.source_id = 0; // unused — the clip is rendered at fire
+        } else {
+            out.source_id = parseInt(f.sourceId, 10);
+            if (!Number.isInteger(out.source_id)) { const e = new Error('sourceId tidak valid'); e.statusCode = 400; throw e; }
+        }
+    }
+    if (!partial && out.source_type === 'tts' && !(out.tts_text || '').trim()) {
+        const e = new Error('Teks pengumuman wajib diisi untuk jadwal suara'); e.statusCode = 400; throw e;
     }
     if (!partial || f.cameraIds !== undefined) {
         const ids = (f.cameraIds || []).map((x) => parseInt(x, 10)).filter(Number.isInteger);
@@ -138,10 +151,11 @@ export function createSchedule(fields) {
     // pool connection (returns 0), which would read back id=0 → undefined.
     const info = execute(`INSERT INTO audio_schedules
              (name, camera_ids, device_ids, source_type, source_id, time_hhmm, days_mask, loop_count, enabled,
-              schedule_kind, run_date, start_date, end_date, gain_db)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              schedule_kind, run_date, start_date, end_date, gain_db, tts_text, tts_engine, tts_voice)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [v.name, v.camera_ids, v.device_ids ?? '[]', v.source_type, v.source_id, v.time_hhmm, v.days_mask, v.loop_count, v.enabled ?? 1,
-            v.schedule_kind ?? 'recurring', v.run_date ?? null, v.start_date ?? null, v.end_date ?? null, v.gain_db ?? 0]);
+            v.schedule_kind ?? 'recurring', v.run_date ?? null, v.start_date ?? null, v.end_date ?? null, v.gain_db ?? 0,
+            v.tts_text ?? null, v.tts_engine ?? null, v.tts_voice ?? null]);
     return queryOne('SELECT * FROM audio_schedules WHERE id = ?', [info.lastInsertRowid]);
 }
 
@@ -189,6 +203,33 @@ function dueOnDay(s, dateKey, dayBit) {
     return Boolean(s.days_mask & dayBit);
 }
 
+/** Render a TTS schedule's text at fire time (current-time placeholders) and broadcast the rendered clip to
+ *  cameras + Titik Speaker. Async (not awaited by the tick) so a slow synth never blocks other schedules. */
+async function fireTtsSchedule(s, active, deviceTargets) {
+    try {
+        const clipId = await renderTtsClipNow(s);
+        if (!clipId) { console.warn(`[Audio] Jadwal TTS "${s.name}": teks kosong / render gagal`); return; }
+        let dn = 0;
+        try { dn = castToDevices(deviceTargets, 'clip', clipId, s.loop_count, {}); } catch (e) { console.error(`[Audio] Jadwal TTS "${s.name}" titik speaker:`, e.message); }
+        let targeted = [];
+        if (active.length > 0) {
+            const r = await playToCameras(active, 'clip', clipId, s.loop_count, { gainDb: s.gain_db });
+            targeted = r.results.filter((x) => !x.skipped);
+        }
+        const ok = targeted.filter((x) => x.ok).length;
+        console.log(`[Audio] Jadwal TTS "${s.name}" -> ${ok}/${targeted.length} kamera${dn ? ` + ${dn} titik speaker` : ''}`);
+        if (targeted.length > 0) {
+            logPlay({ sourceType: 'tts', sourceId: clipId, sourceName: `JADWAL: ${s.name}`, cameraIds: targeted.map((x) => x.cameraId), results: targeted, operatorName: 'jadwal-tts' });
+            alertBroadcastResult({ label: `Jadwal "${s.name}"`, okCount: ok, total: targeted.length });
+        }
+        // Delete the rendered clip after playback finishes (+margin); also cleaned on the next fire (restart-safe).
+        const clip = getClip(clipId);
+        const ttlSec = Math.min(Math.round((clip?.duration_sec || 30) * (s.loop_count || 1)) + 30, 1800);
+        const t = setTimeout(() => { try { deleteClip(clipId); } catch { /* already gone */ } }, ttlSec * 1000);
+        if (t.unref) t.unref();
+    } catch (e) { console.error(`[Audio] Jadwal TTS "${s.name}" gagal:`, e.message); }
+}
+
 /** One scheduler tick: fire any enabled schedule due this local minute (guarded against double-firing). */
 export function runDueSchedules(nowMs = Date.now()) {
     const { hhmm, dayBit, dateKey, minuteKey } = localParts(nowMs);
@@ -213,6 +254,9 @@ export function runDueSchedules(nowMs = Date.now()) {
         // device_ids (explicit ones fire regardless of camera quiet). Clip or playlist. Fire-and-forget,
         // isolated — this fires even when there are no cameras (a device-only schedule) or all are quiet.
         const deviceTargets = [...new Set([...enabledDeviceIdsForCameras(active), ...explicitDev])];
+        // TTS schedule: render the spoken text NOW (current-time placeholders filled at synth) and broadcast
+        // the rendered clip. Fully async so a slow synth (piper/gemini) can't block other schedules this tick.
+        if (s.source_type === 'tts') { fireTtsSchedule(s, active, deviceTargets); continue; }
         let dn = 0;
         try { dn = castToDevices(deviceTargets, s.source_type, s.source_id, s.loop_count, {}); }
         catch (e) { console.error(`[Audio] Schedule "${s.name}" titik speaker gagal:`, e.message); }

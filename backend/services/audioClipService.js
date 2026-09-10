@@ -157,7 +157,9 @@ export async function finalizeClipFromFile({ name, tempPath, sourceBytes = 0, so
 }
 
 export function listClips() {
-    return query('SELECT id, name, base_filename, duration_sec, source_bytes, source_type, category, is_favorite, tags, created_at FROM audio_clips ORDER BY is_favorite DESC, created_at DESC, id DESC');
+    // Hide ephemeral scheduled-TTS auto-renders (category '_jadwal', written by audioScheduledTtsService) from
+    // the library + source pickers — they are rendered at fire and deleted after playback, not operator assets.
+    return query("SELECT id, name, base_filename, duration_sec, source_bytes, source_type, category, is_favorite, tags, created_at FROM audio_clips WHERE category IS NULL OR category != '_jadwal' ORDER BY is_favorite DESC, created_at DESC, id DESC");
 }
 
 /** Set a clip's organisation meta (category / favourite / tags). Any field omitted is left as-is. */

@@ -7,9 +7,9 @@
  * SideEffects: creates/updates/toggles/deletes schedules via the API.
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
-    createSchedule, updateSchedule, toggleSchedule, deleteSchedule,
+    createSchedule, updateSchedule, toggleSchedule, deleteSchedule, getTtsEngines,
 } from '../../../services/audioService';
 import { useNotification } from '../../../contexts/NotificationContext';
 import { useConfirm } from '../../../contexts/ConfirmContext';
@@ -76,7 +76,27 @@ function ScheduleForm({ initial, clips, playlists, cameras, onSubmit, groups, on
     const [sourceId, setSourceId] = useState(initial?.source_id ? String(initial.source_id) : '');
     const [cameraIds, setCameraIds] = useState(initial?.camera_ids || []);
     const [deviceIds, setDeviceIds] = useState(initial?.device_ids || []);
+    const [ttsText, setTtsText] = useState(initial?.tts_text || '');
+    const [ttsEngine, setTtsEngine] = useState(initial?.tts_engine || '');
+    const [ttsVoice, setTtsVoice] = useState(initial?.tts_voice || '');
+    const [engines, setEngines] = useState([]);
     const [timeHHmm, setTimeHHmm] = useState(initial?.time_hhmm || '07:00');
+
+    // Load TTS engines/voices once (for the "Teks suara" source). Default to the first AVAILABLE engine.
+    useEffect(() => {
+        let cancelled = false;
+        getTtsEngines().then((r) => {
+            if (cancelled || !r.success) return;
+            const list = r.data || [];
+            setEngines(list);
+            if (!initial?.tts_engine) {
+                const def = list.find((e) => e.available) || list[0];
+                if (def) { setTtsEngine(def.id); setTtsVoice(def.voices?.[0]?.id || ''); }
+            }
+        });
+        return () => { cancelled = true; };
+    }, [initial]);
+    const engineVoices = engines.find((e) => e.id === ttsEngine)?.voices || [];
     const [daysMask, setDaysMask] = useState(initial?.days_mask ?? MASK_DAILY);
     const [loopCount, setLoopCount] = useState(initial?.loop_count || 1);
     const [scheduleKind, setScheduleKind] = useState(initial?.schedule_kind || 'recurring');
@@ -94,7 +114,10 @@ function ScheduleForm({ initial, clips, playlists, cameras, onSubmit, groups, on
                 onSubmit({
                     name: name.trim(),
                     sourceType,
-                    sourceId: Number(sourceId),
+                    sourceId: sourceType === 'tts' ? 0 : Number(sourceId),
+                    ttsText: sourceType === 'tts' ? ttsText.trim() : undefined,
+                    ttsEngine: sourceType === 'tts' ? ttsEngine : undefined,
+                    ttsVoice: sourceType === 'tts' ? ttsVoice : undefined,
                     cameraIds,
                     deviceIds,
                     timeHHmm,
@@ -114,7 +137,7 @@ function ScheduleForm({ initial, clips, playlists, cameras, onSubmit, groups, on
                 <div className="space-y-2">
                     <span className="text-xs font-semibold text-content-muted">Sumber</span>
                     <div className="flex gap-2">
-                        {[['clip', 'Audio'], ['playlist', 'Playlist']].map(([val, label]) => (
+                        {[['clip', 'Audio'], ['playlist', 'Playlist'], ['tts', 'Teks suara']].map(([val, label]) => (
                             <button
                                 key={val}
                                 type="button"
@@ -128,11 +151,35 @@ function ScheduleForm({ initial, clips, playlists, cameras, onSubmit, groups, on
                         ))}
                     </div>
                 </div>
-                <Field as="select" label={sourceType === 'clip' ? 'Pilih audio' : 'Pilih playlist'} value={sourceId} onChange={(e) => setSourceId(e.target.value)} required>
-                    <option value="">— pilih —</option>
-                    {options.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
-                </Field>
+                {sourceType !== 'tts' && (
+                    <Field as="select" label={sourceType === 'clip' ? 'Pilih audio' : 'Pilih playlist'} value={sourceId} onChange={(e) => setSourceId(e.target.value)} required>
+                        <option value="">— pilih —</option>
+                        {options.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+                    </Field>
+                )}
             </div>
+
+            {sourceType === 'tts' && (
+                <div className="space-y-2 rounded-control border border-edge bg-surface-sunken p-3">
+                    <label className="block">
+                        <span className="mb-1 block text-xs font-semibold text-content-muted">Teks pengumuman (diucapkan saat jadwal berbunyi)</span>
+                        <textarea
+                            value={ttsText} onChange={(e) => setTtsText(e.target.value)} rows={3} maxLength={1500}
+                            placeholder="mis. Assalamualaikum warga, saat ini pukul {jam}, diinformasikan..."
+                            className="w-full rounded-control border border-edge bg-surface px-3 py-2 text-sm text-content"
+                        />
+                    </label>
+                    <p className="text-xs text-primary">Variabel <span className="font-mono">{'{jam}'} {'{hari}'} {'{tanggal}'}</span> diisi OTOMATIS dengan waktu saat jadwal berbunyi — disintesis segar tiap kali, bukan saat dibuat.</p>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <Field as="select" label="Mesin suara" value={ttsEngine} onChange={(e) => { setTtsEngine(e.target.value); const vs = engines.find((x) => x.id === e.target.value)?.voices || []; setTtsVoice(vs[0]?.id || ''); }}>
+                            {engines.map((e) => <option key={e.id} value={e.id} disabled={!e.available}>{e.label}{e.available ? '' : ' (belum aktif)'}</option>)}
+                        </Field>
+                        <Field as="select" label="Suara" value={ttsVoice} onChange={(e) => setTtsVoice(e.target.value)}>
+                            {engineVoices.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
+                        </Field>
+                    </div>
+                </div>
+            )}
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Field type="time" label="Jam (WIB)" value={timeHHmm} onChange={(e) => setTimeHHmm(e.target.value)} required />
@@ -196,7 +243,9 @@ export default function ScheduleTab({ schedules, clips, playlists, cameras, load
 
     const handleSubmit = async (payload) => {
         if (!payload.name) { showNotification({ type: 'error', title: 'Nama jadwal wajib diisi' }); return; }
-        if (!payload.sourceId) { showNotification({ type: 'error', title: 'Pilih audio atau playlist' }); return; }
+        if (payload.sourceType === 'tts') {
+            if (!payload.ttsText) { showNotification({ type: 'error', title: 'Isi teks pengumuman dulu' }); return; }
+        } else if (!payload.sourceId) { showNotification({ type: 'error', title: 'Pilih audio atau playlist' }); return; }
         if (!payload.cameraIds.length && !(payload.deviceIds || []).length) { showNotification({ type: 'error', title: 'Pilih minimal satu kamera atau titik speaker' }); return; }
         setSaving(true);
         const result = editing?.id
@@ -237,7 +286,7 @@ export default function ScheduleTab({ schedules, clips, playlists, cameras, load
         await reload();
     };
 
-    const canCreate = clips.length > 0 || playlists.length > 0;
+    const canCreate = true; // clip/playlist OR "Teks suara" (TTS) — TTS needs no pre-made clip
 
     return (
         <div className="space-y-4">
@@ -264,7 +313,7 @@ export default function ScheduleTab({ schedules, clips, playlists, cameras, load
                             <div className="min-w-0 flex-1">
                                 <p className="truncate text-sm font-semibold text-content">{s.name}</p>
                                 <p className="truncate text-xs text-content-subtle">
-                                    {describeSchedule(s)} · {s.source_name || (s.source_type === 'clip' ? 'audio' : 'playlist')} · {(s.camera_ids || []).length} kamera{(s.device_ids || []).length ? ` + ${s.device_ids.length} titik` : ''}
+                                    {describeSchedule(s)} · {s.source_type === 'tts' ? '🗣️ teks suara' : (s.source_name || (s.source_type === 'clip' ? 'audio' : 'playlist'))} · {(s.camera_ids || []).length} kamera{(s.device_ids || []).length ? ` + ${s.device_ids.length} titik` : ''}
                                     {s.loop_count > 1 ? ` · ${s.loop_count}×` : ''}
                                 </p>
                             </div>
