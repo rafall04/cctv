@@ -3,7 +3,7 @@ Purpose: "Import from link" for Audio Broadcast — turn a direct media URL (wor
          a YouTube link (via yt-dlp, if installed) into a stored clip. Extraction is slow (network +
          transcode), so it runs as a DURABLE ASYNC JOB off the request path (POST returns immediately).
 Caller: audioController (create job, list jobs), audioBroadcastBootstrap (start the worker).
-Deps: child_process (yt-dlp), global fetch, audioImportUrlPolicy (SSRF), audioClipService.finalizeClipFromFile.
+Deps: child_process (yt-dlp), node:https (IP-pinned, SSRF), audioImportUrlPolicy, audioClipService.finalizeClipFromFile.
 MainFuncs: createImportJob, listJobs, processNextJob, startImportWorker, failForwardStuckJobs.
 SideEffects: spawns yt-dlp / fetches external URLs to a temp file, then encodes via ffmpeg; writes audio_import_jobs.
 
@@ -18,8 +18,9 @@ import { promisify } from 'util';
 import { writeFileSync, unlinkSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
 import { randomBytes } from 'crypto';
+import https from 'https';
 import { query, queryOne, execute } from '../database/connectionPool.js';
-import { assertSafeImportUrl } from '../utils/audioImportUrlPolicy.js';
+import { assertSafeImportUrl, pinnedLookup } from '../utils/audioImportUrlPolicy.js';
 import { AUDIO_DIR, ensureAudioDir, MAX_CLIP_SECONDS, finalizeClipFromFile } from './audioClipService.js';
 import { synthTtsToTemp } from './audioTtsService.js';
 
@@ -71,30 +72,50 @@ function cleanupPrefix(prefix) {
     } catch { /* dir gone */ }
 }
 
+// GET `safe` over node:https with the socket PINNED to a pre-validated address (see pinnedLookup) so
+// there is no second, unchecked DNS resolution a rebinding server could poison. agent:false forces a
+// fresh connection per hop (the pinned lookup always applies). Accept-Encoding: identity because
+// node:https — unlike undici/fetch — does NOT auto-decompress, so a gzip'd body would be written
+// compressed and break ffmpeg. Timeout is bound to req.destroy (an AbortSignal cannot cancel a raw req).
+function httpsGetPinned(safe, addresses) {
+    return new Promise((resolve, reject) => {
+        const req = https.request(safe, {
+            method: 'GET',
+            agent: false,
+            lookup: pinnedLookup(addresses),
+            headers: { 'Accept-Encoding': 'identity' },
+        }, resolve);
+        req.on('error', reject);
+        req.setTimeout(FETCH_TIMEOUT_MS, () => req.destroy(new Error('Waktu habis mengunduh')));
+        req.end();
+    });
+}
+
 async function fetchUrlToTemp(url, outPath) {
     let current = url;
     for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
-        const { url: safe } = await assertSafeImportUrl(current); // re-validate EVERY hop (redirect SSRF)
         // eslint-disable-next-line no-await-in-loop
-        const res = await fetch(safe, { redirect: 'manual', signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
-        if (res.status >= 300 && res.status < 400 && res.headers.get('location')) {
-            current = new URL(res.headers.get('location'), safe).toString();
+        const { url: safe, addresses } = await assertSafeImportUrl(current); // re-validate + re-pin EVERY hop (redirect SSRF)
+        // eslint-disable-next-line no-await-in-loop
+        const res = await httpsGetPinned(safe, addresses);
+        const status = res.statusCode;
+        if (status >= 300 && status < 400 && res.headers.location) {
+            res.resume(); // drain the redirect body so the socket is released (fetch did this for us)
+            current = new URL(res.headers.location, safe).toString();
             continue;
         }
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const len = parseInt(res.headers.get('content-length') || '0', 10);
-        if (len && len > MAX_DOWNLOAD_BYTES) throw new Error('Berkas terlalu besar');
-        // Stream with a hard byte ceiling. res.arrayBuffer() would buffer the WHOLE body FIRST, so a source
-        // with an absent/lying Content-Length could OOM the weak box before the post-hoc size check ran.
-        // Count as we read and abort the instant we cross the cap.
+        if (status < 200 || status >= 300) { res.resume(); throw new Error(`HTTP ${status}`); }
+        const len = parseInt(res.headers['content-length'] || '0', 10);
+        if (len && len > MAX_DOWNLOAD_BYTES) { res.destroy(); throw new Error('Berkas terlalu besar'); }
+        // Stream with a hard byte ceiling. Buffering the WHOLE body first would let a source with an
+        // absent/lying Content-Length OOM the weak box before the post-hoc size check ran. Count as we
+        // read and abort the instant we cross the cap.
         const chunks = [];
         let total = 0;
-        if (res.body) {
-            for await (const chunk of res.body) {
-                total += chunk.length;
-                if (total > MAX_DOWNLOAD_BYTES) throw new Error('Berkas terlalu besar');
-                chunks.push(Buffer.from(chunk));
-            }
+        for await (const chunk of res) {
+            total += chunk.length;
+            if (total > MAX_DOWNLOAD_BYTES) { res.destroy(); throw new Error('Berkas terlalu besar'); }
+            chunks.push(chunk);
         }
         const buf = Buffer.concat(chunks);
         writeFileSync(outPath, buf);

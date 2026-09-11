@@ -16,6 +16,7 @@ import { findLiveSession } from '../services/playbackSessionReuseService.js';
 import { parseUtcSql } from '../services/timeService.js';
 import { isHttpsRequest } from '../utils/authCookieOptions.js';
 import { logControllerError } from '../utils/controllerErrorLog.js';
+import { resolveClientIp } from '../middleware/rateLimiter.js';
 
 function getPlaybackTokenCookieOptions(request, maxAge = 30 * 24 * 60 * 60) {
     const isHttps = isHttpsRequest(request);
@@ -51,7 +52,29 @@ function withPlayableCameras(tokenData) {
     if (!tokenData) {
         return tokenData;
     }
-    return { ...tokenData, allowed_cameras: listTokenPlayableCameras(tokenData) };
+    /*
+     * sanitizeTokenRow() builds the FULL admin shape (reused by listTokens + the admin token table).
+     * This response is HOLDER-facing (an anonymous share-link holder), so strip every admin-internal /
+     * cross-viewer field before it leaves: the admin's private customer note, the LAST session's IP /
+     * user-agent / seen-at (another viewer's PII on a shared link), the active-session count (leaks
+     * other viewers' concurrency), the raw credential prefixes, the admin share template, and the
+     * creating admin's id. Denylist (not allowlist) so every functional playback field — label,
+     * scope_type, camera_ids/rules, allowed_camera_ids, window, allow_live, date range, expiry, the
+     * effective_* overlay, default_camera_id — passes through untouched and the camera picker still renders.
+     */
+    const {
+        client_note,
+        latest_session_ip,
+        latest_session_user_agent,
+        latest_session_seen_at,
+        active_session_count,
+        share_template,
+        created_by,
+        token_prefix,
+        share_key_prefix,
+        ...holderSafe
+    } = tokenData;
+    return { ...holderSafe, allowed_cameras: listTokenPlayableCameras(holderSafe) };
 }
 
 // In-memory per-IP throttle for failed public activation attempts. Cheap
@@ -63,14 +86,6 @@ const ACTIVATION_FAILURE_WINDOW_MS = 60_000;
 const ACTIVATION_FAILURE_LIMIT = 10;
 const ACTIVATION_BUCKET_GC_THRESHOLD = 1000;
 const activationFailureBuckets = new Map();
-
-function getRequestClientIp(request) {
-    const forwardedFor = request?.headers?.['x-forwarded-for'];
-    if (typeof forwardedFor === 'string' && forwardedFor.trim()) {
-        return forwardedFor.split(',')[0].trim();
-    }
-    return request?.ip || request?.socket?.remoteAddress || '';
-}
 
 function checkActivationThrottle(ip) {
     if (!ip) {
@@ -214,7 +229,12 @@ export async function deletePlaybackTokenById(request, reply) {
 }
 
 export async function activatePlaybackToken(request, reply) {
-    const clientIp = getRequestClientIp(request);
+    // Key the brute-force throttle on the REAL client IP (CF-Connecting-IP), NOT the raw leftmost
+    // X-Forwarded-For hop — CF/nginx APPEND to XFF, so its first entry is attacker-supplied. Keying on
+    // it let an attacker rotate the header to land every share-key guess in a fresh bucket, so the
+    // ACTIVATION_FAILURE_LIMIT never tripped. resolveClientIp (the app-wide standard) is not spoofable
+    // through the CF -> nginx -> origin path.
+    const clientIp = resolveClientIp(request);
     const mode = request.body?.share_key ? 'activated_share' : 'activated_token';
 
     // Reject before validation when this IP has burned its failure budget.

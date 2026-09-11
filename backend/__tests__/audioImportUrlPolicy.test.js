@@ -5,8 +5,8 @@
  * Caller: Backend test gate (vitest, node env).
  */
 
-import { describe, expect, it } from 'vitest';
-import { assertSafeImportUrl } from '../utils/audioImportUrlPolicy.js';
+import { describe, expect, it, vi } from 'vitest';
+import { assertSafeImportUrl, pinnedLookup } from '../utils/audioImportUrlPolicy.js';
 
 describe('audioImportUrlPolicy — rejects unsafe URLs', () => {
     it('rejects non-https', async () => {
@@ -41,5 +41,33 @@ describe('audioImportUrlPolicy — allows + classifies public URLs', () => {
     it('a non-YouTube host stays kind=url; only YouTube hosts are kind=youtube', async () => {
         // 1.1.1.1 is public and not a YouTube host.
         expect((await assertSafeImportUrl('https://1.1.1.1/a.mp3')).kind).toBe('url');
+    });
+});
+
+describe('audioImportUrlPolicy — returns validated addresses for socket pinning (TOCTOU close)', () => {
+    it('returns the literal IP as the pinned address (family 4)', async () => {
+        // The socket is later pinned to exactly this, so a rebinding server cannot swap in a private IP
+        // between validation and connect (there is no second, unchecked DNS lookup).
+        const r = await assertSafeImportUrl('https://8.8.8.8/song.mp3');
+        expect(r.addresses).toEqual([{ address: '8.8.8.8', family: 4 }]);
+    });
+});
+
+describe('pinnedLookup — hands the connection ONLY pre-validated addresses', () => {
+    const addrs = [{ address: '8.8.8.8', family: 4 }, { address: '8.8.4.4', family: 4 }];
+    it('all:true returns the whole validated array', () => {
+        const cb = vi.fn();
+        pinnedLookup(addrs)('example.com', { all: true }, cb);
+        expect(cb).toHaveBeenCalledWith(null, addrs);
+    });
+    it('all:false returns the first address + family', () => {
+        const cb = vi.fn();
+        pinnedLookup(addrs)('example.com', { all: false }, cb);
+        expect(cb).toHaveBeenCalledWith(null, '8.8.8.8', 4);
+    });
+    it('supports the (hostname, callback) 2-arg form', () => {
+        const cb = vi.fn();
+        pinnedLookup(addrs)('example.com', cb);
+        expect(cb).toHaveBeenCalledWith(null, '8.8.8.8', 4);
     });
 });

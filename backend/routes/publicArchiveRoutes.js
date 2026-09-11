@@ -14,6 +14,17 @@
 
 import publicArchiveAccessService from '../services/publicArchiveAccessService.js';
 import archiveLibrary from '../services/telegramArchiveLibraryService.js';
+import { checkRateLimit } from '../middleware/rateLimiter.js';
+
+// Per-TOKEN anti-amplification ceiling. The generic limiter already caps this route at 100/min per
+// CF-Connecting-IP, but a single community share-link fanned across many IPs is not bounded per token.
+// This is a COARSE amplification ceiling, NOT a bandwidth control: reaching it needs ~50+ IPs (each
+// already ≤100/min), so a genuine viral crowd never trips it while a botnet turning one link into a
+// re-streaming service does. The real bandwidth limits remain the per-IP cap + the box→Telegram pipe.
+// Tunable via env; default deliberately high so legitimate use is never throttled.
+const ARCHIVE_TOKEN_MAX_PER_MIN = Number.parseInt(process.env.ARCHIVE_TOKEN_MAX_PER_MIN, 10) > 0
+    ? Number.parseInt(process.env.ARCHIVE_TOKEN_MAX_PER_MIN, 10)
+    : 5000;
 
 export default async function publicArchiveRoutes(fastify) {
     fastify.get('/:segmentId/stream', {
@@ -31,6 +42,20 @@ export default async function publicArchiveRoutes(fastify) {
                 request.params.segmentId,
                 request
             );
+
+            // Per-token backstop — AFTER the access gate on purpose: only a request bearing a valid
+            // token for this segment can fill that token's bucket, so nobody can grief a victim token
+            // by hammering the endpoint with a guessed id. Keyed by the token PK (not the IP), it is
+            // additive to the per-IP limiter — both must pass.
+            const tokenGate = checkRateLimit(`archive-token:${allowed.tokenId}`, ARCHIVE_TOKEN_MAX_PER_MIN, 60000);
+            if (!tokenGate.allowed) {
+                reply.header('Retry-After', tokenGate.retryAfter);
+                return reply.code(429).send({
+                    success: false,
+                    message: 'Terlalu banyak permintaan untuk tautan ini. Coba lagi sebentar lagi.',
+                    retryAfter: tokenGate.retryAfter,
+                });
+            }
 
             const requested = archiveLibrary.parseRange(request.headers.range, allowed.fileSize);
             const { stream, size, filename, range, totalSize } =

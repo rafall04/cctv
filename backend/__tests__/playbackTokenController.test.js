@@ -217,6 +217,87 @@ describe('playbackTokenController', () => {
         expect(logFailedActivationMock).toHaveBeenCalledTimes(10);
     });
 
+    it('strips admin-internal / cross-viewer fields from the holder-facing activation response', async () => {
+        // The validated token carries the FULL admin shape; a share-link holder must not receive the
+        // admin's private note, another viewer's session IP/UA/last-seen, the active-session count, the
+        // raw credential prefixes, the share template, or the creating admin id.
+        validateRawTokenForCameraMock.mockReturnValue({
+            id: 42,
+            expires_at: null,
+            scope_type: 'selected',
+            label: 'Warga',
+            allowed_camera_ids: [7],
+            camera_rules: [{ camera_id: 7, enabled: true, playback_window_hours: 24 }],
+            default_camera_id: 7,
+            playback_window_hours: 24,
+            client_note: 'Pak Budi 0812xxxx',
+            latest_session_ip: '203.0.113.9',
+            latest_session_user_agent: 'Mozilla/5.0 someone-else',
+            latest_session_seen_at: '2026-09-11 00:00:00',
+            active_session_count: 3,
+            share_template: 'Kode {{token}}',
+            created_by: 1,
+            token_prefix: 'rafpb_ab',
+            share_key_prefix: 'CLIENT',
+        });
+        createPlaybackSessionMock.mockReturnValue({ session_id: 's', timeout_seconds: 60 });
+
+        const reply = buildReply();
+        const payload = await activatePlaybackToken({
+            body: { token: 'rafpb_demo' },
+            query: {},
+            headers: { 'cf-connecting-ip': '198.51.100.20' },
+        }, reply);
+
+        // Functional playback fields survive so the picker still renders.
+        expect(payload.data).toMatchObject({
+            scope_type: 'selected',
+            allowed_camera_ids: [7],
+            default_camera_id: 7,
+            playback_window_hours: 24,
+            label: 'Warga',
+        });
+        // Every admin-internal / cross-viewer field is gone.
+        for (const leaked of [
+            'client_note', 'latest_session_ip', 'latest_session_user_agent', 'latest_session_seen_at',
+            'active_session_count', 'share_template', 'created_by', 'token_prefix', 'share_key_prefix',
+        ]) {
+            expect(payload.data).not.toHaveProperty(leaked);
+        }
+    });
+
+    it('keys the activation throttle on CF-Connecting-IP, so rotating X-Forwarded-For cannot evade it', async () => {
+        const invalidError = new Error('Token playback tidak valid');
+        invalidError.statusCode = 401;
+        validateRawTokenForCameraMock.mockImplementation(() => { throw invalidError; });
+
+        const cfIp = '198.51.100.77';
+        // 10 guesses, each with a DIFFERENT spoofed X-Forwarded-For but the same real (CF) IP.
+        for (let attempt = 0; attempt < 10; attempt += 1) {
+            const reply = buildReply();
+            // eslint-disable-next-line no-await-in-loop
+            await activatePlaybackToken({
+                body: { share_key: `GUESS${attempt}` },
+                query: {},
+                headers: { 'cf-connecting-ip': cfIp, 'x-forwarded-for': `10.0.0.${attempt}` },
+            }, reply);
+        }
+
+        // An 11th guess — new spoofed XFF again — must be throttled, proving all 10 shared ONE bucket
+        // keyed on the CF IP. Pre-fix (XFF-first keying) each guess got a fresh bucket and never tripped.
+        const blocked = buildReply();
+        const payload = await activatePlaybackToken({
+            body: { share_key: 'GUESS_LAST' },
+            query: {},
+            headers: { 'cf-connecting-ip': cfIp, 'x-forwarded-for': '10.0.0.250' },
+        }, blocked);
+
+        expect(blocked.code).toHaveBeenCalledWith(429);
+        expect(payload).toMatchObject({ success: false });
+        // The blocked call short-circuits before validation — only the 10 real guesses ran.
+        expect(validateRawTokenForCameraMock).toHaveBeenCalledTimes(10);
+    });
+
     it('clearPlaybackToken keeps returning 200 even when stopPlaybackSession throws', async () => {
         stopPlaybackSessionMock.mockImplementation(() => {
             throw new Error('database is locked');

@@ -127,6 +127,10 @@ class PublicArchiveAccessService {
             fileSize: row.file_size,
             recordedAt: row.recorded_at,
             windowHours: windowHours || null,
+            // Stable, non-sensitive token PK (never the raw token/hash) so the route can apply a
+            // per-token anti-amplification backstop. `access` is guaranteed truthy here (the !access
+            // guard above already threw), so access.id is always a positive integer.
+            tokenId: access.id,
         };
     }
 }

@@ -269,18 +269,6 @@ export function deleteSponsor(id) {
 }
 
 /**
- * Get cameras by sponsor package
- */
-export function getCamerasByPackage(pkg) {
-    return query(`
-        SELECT * FROM cameras 
-        WHERE sponsor_package = ? 
-        AND enabled = 1
-        ORDER BY id ASC
-    `, [pkg]);
-}
-
-/**
  * Get sponsor statistics
  */
 export function getSponsorStats() {
@@ -472,7 +460,6 @@ export default {
     createSponsor,
     updateSponsor,
     deleteSponsor,
-    getCamerasByPackage,
     getSponsorStats,
     getExpiringSponsorships,
     assignSponsorToCamera,

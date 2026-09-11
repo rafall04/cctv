@@ -57,8 +57,14 @@ export async function assertSafeImportUrl(raw) {
     const kind = YT_HOSTS.has(host) ? 'youtube' : 'url';
 
     // If the host is a literal IP, check it directly; else resolve ALL addresses and reject if any is private.
+    // The validated address(es) are RETURNED so the caller can PIN the socket to them (see pinnedLookup).
+    // Without pinning, the fetch re-resolves the hostname independently; a rebinding DNS server (public on
+    // THIS lookup, private on the connect lookup a moment later) would defeat the check (TOCTOU). Pinning
+    // the validated address into the connection closes that gap — it is the same resolution that validated.
+    let addresses;
     if (net.isIP(host)) {
         if (ipIsPrivate(host)) { const e = new Error('Alamat internal tidak diizinkan'); e.statusCode = 400; throw e; }
+        addresses = [{ address: host, family: net.isIP(host) }]; // net.isIP -> 4 | 6
     } else {
         let addrs;
         try { addrs = await dns.promises.lookup(host, { all: true }); }
@@ -66,8 +72,26 @@ export async function assertSafeImportUrl(raw) {
         if (addrs.length === 0 || addrs.some((a) => ipIsPrivate(a.address))) {
             const e = new Error('Host mengarah ke alamat internal'); e.statusCode = 400; throw e;
         }
+        addresses = addrs.map((a) => ({ address: a.address, family: a.family }));
     }
-    return { url: u.toString(), kind, host };
+    return { url: u.toString(), kind, host, addresses };
 }
 
-export default { assertSafeImportUrl };
+/**
+ * Build a Node dns-style lookup() that returns ONLY the pre-validated addresses. Pass it to
+ * https.request({ lookup }) to pin the TCP socket to an address already proven public by
+ * assertSafeImportUrl (the SAME resolution that validated it) — so there is no second, unchecked DNS
+ * lookup for a rebinding server to poison. TLS SNI + certificate identity still use the real hostname
+ * (lookup only decides the socket address), so pinning does NOT weaken cert validation. Build it
+ * PER-HOP from that hop's addresses: a redirect to another host must be re-validated and re-pinned.
+ */
+export function pinnedLookup(addresses) {
+    return function lookup(hostname, options, callback) {
+        if (typeof options === 'function') { callback = options; options = {}; }
+        if (options && options.all) return callback(null, addresses);
+        const first = addresses[0];
+        return callback(null, first.address, first.family);
+    };
+}
+
+export default { assertSafeImportUrl, pinnedLookup };
