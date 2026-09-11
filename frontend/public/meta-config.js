@@ -189,10 +189,14 @@
   // Fetch branding data from API
   fetch(buildApiUrl('/api/branding/public'))
     .then(response => response.json())
-    .then(data => {
+    .then(payload => {
+      // The API wraps the payload as { success, data }. Unwrap it: passing the envelope made every
+      // branding.* read undefined, so title/description/OG/Twitter/JSON-LD silently kept the static
+      // index.html defaults (and the success log printed "undefined"). Tolerate a bare object too.
+      const data = payload && payload.data ? payload.data : payload;
       if (data) {
         updateMetaTags(data);
-        
+
         // Update theme color if primary_color is set
         if (data.primary_color) {
           const themeColorMeta = document.querySelector('meta[name="theme-color"]');

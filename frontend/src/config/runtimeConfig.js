@@ -168,7 +168,10 @@ export const loadRuntimeConfig = async () => {
  */
 export const getApiUrl = () => {
     if (!runtimeConfig) {
-        if (import.meta.env.MODE !== 'test') {
+        // DEV-only: bootstrap() deliberately does NOT await loadRuntimeConfig() (first paint is not
+        // blocked on the round-trip), so early callers hitting the same-origin relative fallback is the
+        // intended path in production — warning about it there is pure console noise for end users.
+        if (import.meta.env.DEV) {
             console.warn('⚠️ Runtime config not loaded yet! Call loadRuntimeConfig() first');
         }
         return getFallbackApiUrl();
