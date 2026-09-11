@@ -474,4 +474,16 @@ describe('externalStreamProxyRoutes — Cache-Control follows the camera class, 
         expect(response.statusCode).toBe(402);
         expect(response.headers['cache-control']).toBe('no-store');
     });
+
+    it('fails CLOSED when the camera row is gone (null access-info must reach the gate, not serve)', async () => {
+        // Regression for the fail-OPEN early return (`if (!info) return false`): a deleted/class-changed
+        // camera MediaMTX still serves must be DENIED, not handed out gate-free. With info=null the code
+        // must fall through to canViewLive (which denies a null row in prod, 404) — never short-circuit
+        // to "not denied". Mirrors the /hls sibling tenancy gate.
+        gate.info = null;
+        gate.decision = { allowed: false, statusCode: 404 };
+        const response = await inject('/api/stream/7/external-segment/chunk_001.ts', { preCached: 'chunk_001.ts' });
+        expect(response.statusCode).toBe(403);
+        expect(response.headers['cache-control']).toBe('no-store');
+    });
 });

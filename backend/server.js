@@ -499,7 +499,6 @@ const start = async () => {
         console.log('    GET    /api/auth/csrf');
         console.log('    POST   /api/auth/login');
         console.log('    GET    /api/cameras/active');
-        console.log('    GET    /api/stream');
         console.log('    GET    /api/stream/:cameraId');
         console.log('    POST   /api/viewer/start');
         console.log('    POST   /api/viewer/heartbeat');

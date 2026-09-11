@@ -18,6 +18,7 @@ import {
 import { getClipWav } from '../services/audioClipService.js';
 import { addSink, removeSink } from '../services/audioDeviceTalk.js';
 import { logAdminAction } from '../services/securityAuditLogger.js';
+import { resolveClientIp } from '../middleware/rateLimiter.js';
 
 const TALK_STREAM_CAP_MS = 6 * 60 * 1000; // a talk stream can never stay open longer than this
 
@@ -109,7 +110,9 @@ export async function playDevices(request, reply) {
 
 /* ---- NODE endpoints: the STB agent (device TOKEN auth, NOT an admin JWT) ---- */
 function deviceTokenFrom(request) {
-    return request.headers['x-device-token'] || request.query?.token || '';
+    // Header-only: a token in the query string (?token=) lands in Cloudflare/nginx access logs,
+    // upstream proxy logs, and Referer headers. The node agent (audio_node.py) sends it via header.
+    return request.headers['x-device-token'] || '';
 }
 
 // The agent LONG-polls for its next command: the request is held open and returns the INSTANT a command is
@@ -118,7 +121,7 @@ function deviceTokenFrom(request) {
 // event loop, so many nodes hold concurrently.
 export async function nodePoll(request, reply) {
     try {
-        const ip = String(request.headers['x-forwarded-for'] || '').split(',')[0].trim() || request.ip;
+        const ip = resolveClientIp(request);
         const dev = deviceAuth(deviceTokenFrom(request));
         if (!dev) return reply.code(401).send({ success: false, message: 'token tidak valid' });
         deviceTouch(dev.id, ip);

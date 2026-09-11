@@ -175,9 +175,9 @@ function denyIfNotViewable(request, reply, cameraId) {
     // shared/edge cache. And no community short-circuit — a community camera in a voucher-gated
     // area must still pass the gate below, and canViewLive reports voucherGated so we mark it too.
     request.streamGated = info?.camera_class !== 'community';
-    if (!info) {
-        return false;
-    }
+    // Fail CLOSED on a null row: a deleted/class-changed camera MediaMTX still serves must reach the
+    // gate, not short-circuit to "not denied". canViewLive is null-safe (→404); null is terminal here
+    // (queryOne re-throws real DB errors → 500; the access cache stores only truthy). Mirrors /hls.
     const access = canViewLive({
         info,
         user: resolveHlsViewerUser(request),

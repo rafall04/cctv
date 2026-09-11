@@ -2,7 +2,7 @@
  * Purpose: Build public stream responses with delivery metadata, availability, thumbnails, and lightweight viewer stats.
  * Caller: streamController public stream endpoints and stream service tests.
  * Deps: connectionPool, config, jsonwebtoken, thumbnailPathService, cameraHealthService, cameraViewStatsService, camera delivery/projection utils.
- * MainFuncs: buildCameraResponse, buildStreamUrls, getStreamUrls, getAllActiveStreams, generateStreamToken.
+ * MainFuncs: buildCameraResponse, buildStreamUrls, getStreamUrls, generateStreamToken.
  * SideEffects: Reads camera rows and active viewer aggregates; no writes.
  */
 
@@ -94,15 +94,15 @@ class StreamService {
         let extStreamUrl = sanitizedExternalStreamUrl;
 
         // Voucher area-gate, read-model side: a gated camera must NEVER hand out an ungated playable
-        // URL. WebRTC (/webrtc/*) goes straight to MediaMTX with no backend gate, and a raw external
+        // URL. WebRTC (/webrtc/*) has no backend canViewLive gate, and a raw external
         // direct-stream URL is played client-side — both bypass canViewLive. So for a gated camera we
         // only ever expose the GATED HLS proxy URL (internal /hls or /api/stream/:id/external, both of
         // which re-check the pass per segment) and drop webrtc; in the PUBLIC LIST (lockGatedStreams)
         // we expose nothing — the frontend renders a lock from GET /api/voucher/access and fetches the
         // gated URL per-device via GET /api/stream/:id only once the viewer holds a pass.
-        // NOTE: WebRTC remains ungated at the infra layer (nginx → MediaMTX); a determined holder can
-        // still derive the stream key — closing that fully requires gating /webrtc at nginx/MediaMTX
-        // (Phase-5 activation blocker, see the design spec).
+        // NOTE: this drop is now defense-in-depth. MediaMTX binds 127.0.0.1:8889 (loopback), so /webrtc
+        // has no public path to it in ANY deployment; this operator's nginx additionally returns 403 on
+        // /webrtc (both server blocks, verified live). Re-gate (auth_request → canViewLive) before proxying it.
         const voucherGated = !!camera.area_id && voucherService.isAreaAccessGated(camera.area_id);
         if (voucherGated) {
             if (lockGatedStreams) {
@@ -264,25 +264,6 @@ class StreamService {
             availability_reason: responseCamera.availability_reason,
             availability_confidence: responseCamera.availability_confidence,
         };
-    }
-
-    getAllActiveStreams(requestHost) {
-        const cameras = query(
-            `SELECT ${SHARED_CAMERA_STREAM_WITH_AREA_PROJECTION}
-             FROM cameras c
-             LEFT JOIN areas a ON c.area_id = a.id
-             WHERE c.enabled = 1 AND ${PUBLIC_LIVE_SQL}
-             ORDER BY c.is_tunnel ASC, c.id ASC`
-        );
-        const statsByCamera = cameraViewStatsService.getPublicStatsByCamera();
-
-        const camerasWithStreams = cameras.map((camera) => this.buildCameraResponse({
-            ...camera,
-            _requestHost: requestHost,
-            viewer_stats: resolveViewerStats(statsByCamera, camera.id),
-        }, { lockGatedStreams: true }));
-
-        return sanitizeCameraThumbnailList(camerasWithStreams);
     }
 
     generateStreamToken(cameraId, requestHost, user = null, voucherDeviceHash = null) {

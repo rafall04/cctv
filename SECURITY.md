@@ -14,7 +14,7 @@ This document outlines the security architecture and best practices for the RAF 
 - Camera RTSP URLs stored **server-side only** in SQLite database
 - Frontend **never** receives RTSP URLs
 - MediaMTX acts as a proxy, ingesting RTSP from private network
-- Only WebRTC/HLS endpoints exposed to public
+- Only HLS stream endpoints exposed to public (WebRTC closed: MediaMTX binds loopback; nginx 403s /webrtc)
 
 **Verification**:
 ```bash
@@ -30,7 +30,7 @@ This document outlines the security architecture and best practices for the RAF 
        ↓
 [MediaMTX Host] ← Only this server can access cameras
        ↓
-[Public Network] ← Users access WebRTC/HLS streams
+[Public Network] ← Users access HLS streams (WebRTC closed)
 ```
 
 **Configuration**:
@@ -133,13 +133,11 @@ server {
         add_header Access-Control-Allow-Methods 'GET, OPTIONS';
     }
 
-    # MediaMTX WebRTC
+    # MediaMTX WebRTC — CLOSED. MediaMTX binds 127.0.0.1:8889 (loopback) and the player is HLS-only,
+    # so /webrtc is never proxied. Re-enable ONLY behind a backend auth_request -> canViewLive gate;
+    # a raw proxy_pass to :8889 re-opens the paywall bypass (a pass-holder can share /webrtc/<key>).
     location /webrtc {
-        proxy_pass http://localhost:8889;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
+        return 403;
     }
 }
 ```

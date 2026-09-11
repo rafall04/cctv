@@ -106,6 +106,10 @@ dinyalakan sebagai paywall keras:
   gated), TAPI pemegang pass masih bisa menurunkan stream key dari URL HLS lalu share via
   `/webrtc/{key}`. Untuk paywall keras: **gate `/webrtc` di nginx/MediaMTX** (auth per-path) ATAU
   nonaktifkan WebRTC untuk deployment ini. Tanpa ini, gating bersifat "lunak" di lapisan app.
+  > RESOLVED 2026-09: WebRTC ditutup di infra — MediaMTX bind `127.0.0.1:8889` (loopback, tak ada
+  > jalur publik di deployment manapun) + nginx operator `return 403` pada `/webrtc/` (kedua server
+  > block, terverifikasi live). Drop URL webrtc di read-model kini defense-in-depth, bukan mitigasi
+  > tunggal. Blocker paywall WebRTC ini tidak lagi berlaku.
 - **Purge CDN saat pertama meng-gate sebuah area.** Segmen community yang sudah ter-cache Cloudflare
   `public, immutable` bisa terlayan ke non-pass-holder s/d TTL (~60s) habis. Purge `/hls` +
   `/external-segment` saat flag dinyalakan (runbook Phase 5).

@@ -24,16 +24,6 @@ export async function getStreamUrls(request, reply) {
     }
 }
 
-export async function getAllActiveStreams(request, reply) {
-    try {
-        const data = streamService.getAllActiveStreams(request.hostname);
-        return reply.send({ success: true, data });
-    } catch (error) {
-        console.error('Get all active streams error:', error);
-        return reply.code(500).send({ success: false, message: 'Internal server error' });
-    }
-}
-
 export async function generateStreamToken(request, reply) {
     try {
         const { cameraId } = request.params;

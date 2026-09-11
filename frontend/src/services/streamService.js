@@ -100,45 +100,6 @@ const makeStreamUrlsAbsolute = (streams) => {
 };
 
 export const streamService = {
-    async getAllActiveStreams(policy = REQUEST_POLICY.SILENT_PUBLIC, config = {}) {
-        try {
-            const response = await apiClient.get('/api/stream', getRequestPolicyConfig(policy, config));
-            if (response.data?.success && response.data?.data) {
-                response.data.data = response.data.data.map(camera => {
-                    let processedStreams = camera.streams;
-                    const deliveryType = camera.delivery_type || getEffectiveDeliveryType(camera);
-                    const rawExternalHlsUrl = deliveryType === 'external_hls'
-                        ? (camera.external_stream_url || camera.external_hls_url || null)
-                        : null;
-
-                    if (deliveryType === 'external_hls') {
-                        const useProxy = camera.external_use_proxy !== 0 && camera.external_use_proxy !== false;
-                        if (useProxy && processedStreams && processedStreams.hls) {
-                            processedStreams = {
-                                ...processedStreams,
-                                hls: convertToExternalProxyUrl(processedStreams.hls, camera.id)
-                            };
-                        }
-                    } else {
-                        processedStreams = makeStreamUrlsAbsolute(processedStreams);
-                    }
-
-                    return {
-                        ...camera,
-                        delivery_type: deliveryType,
-                        streams: processedStreams,
-                        _rawExternalHlsUrl: rawExternalHlsUrl,
-                        _rawExternalStreamUrl: camera.external_stream_url || camera.external_embed_url || rawExternalHlsUrl,
-                    };
-                });
-            }
-            return response.data;
-        } catch (error) {
-            console.error('Get all active streams error:', error);
-            throw error;
-        }
-    },
-
     async getStreamUrls(cameraId, policy = REQUEST_POLICY.BLOCKING, config = {}) {
         try {
             const response = await apiClient.get(
