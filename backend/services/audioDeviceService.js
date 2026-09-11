@@ -18,7 +18,35 @@ import { randomBytes } from 'crypto';
 const ONLINE_WINDOW_MS = 40000;
 // Queued commands older than this are dropped on the next poll: a device offline for a long time must NOT
 // replay a stale announcement (e.g. an adzan queued an hour ago) when it reconnects. Generous but bounded.
-const COMMAND_TTL_MS = Math.max(30, parseInt(process.env.AUDIO_DEVICE_CMD_TTL_SEC || '600', 10)) * 1000;
+export const COMMAND_TTL_MS = Math.max(30, parseInt(process.env.AUDIO_DEVICE_CMD_TTL_SEC || '600', 10)) * 1000;
+
+// Per-device authorization grants for clip downloads. When a poll hands a node a clip_url, we record that
+// (device -> clip) pairing here; nodeClip then refuses any clip the device was not actually told to fetch,
+// so one low-trust device token (an STB in a public spot) can't enumerate the whole clip library by id
+// (IDOR/BOLA). In-memory + single-process like the talk sink registry; a grant expires with the command TTL
+// (a node downloads its clip right after the poll that named it).
+const clipGrants = new Map(); // deviceId -> Map<clipId, expiresAtMs>
+
+/** Authorize a device to download a specific clip (called when a poll emits that clip's URL). */
+export function grantClip(deviceId, clipId) {
+    const did = parseInt(deviceId, 10);
+    const cid = parseInt(clipId, 10);
+    if (!Number.isInteger(did) || !Number.isInteger(cid)) return;
+    if (!clipGrants.has(did)) clipGrants.set(did, new Map());
+    clipGrants.get(did).set(cid, Date.now() + COMMAND_TTL_MS);
+}
+
+/** True if the device was told (recently) to fetch this clip. Prunes the grant when it has expired. */
+export function isClipGranted(deviceId, clipId) {
+    const did = parseInt(deviceId, 10);
+    const cid = parseInt(clipId, 10);
+    const m = clipGrants.get(did);
+    if (!m) return false;
+    const exp = m.get(cid);
+    if (!exp) return false;
+    if (Date.now() >= exp) { m.delete(cid); if (m.size === 0) clipGrants.delete(did); return false; }
+    return true;
+}
 
 function isOnline(lastSeen) {
     if (!lastSeen) return false;
@@ -117,12 +145,19 @@ export function touchDevice(deviceId, ip = null) {
 /** Claim (delete + return) the oldest queued command for a device, or null. Used by the long-poll loop. */
 export function claimNextCommand(deviceId) {
     const did = parseInt(deviceId, 10);
-    // Drop stale commands first (offline-backlog guard) so a long-offline node doesn't replay old audio.
+    // Fast path: an empty queue — the common case on the 300ms hot poll loop, for every held poll — must do
+    // ZERO writes. The old code fired an unconditional stale-DELETE every tick, hammering SQLite's single
+    // writer and contending with unrelated billing/recording writes even when nothing was queued.
+    let cmd = queryOne('SELECT * FROM audio_device_commands WHERE device_id = ? ORDER BY id ASC LIMIT 1', [did]);
+    if (!cmd) return null;
+    // Something is queued: drop any stale backlog first (a long-offline node must not replay old audio),
+    // then re-pick the oldest fresh command.
     execute("DELETE FROM audio_device_commands WHERE device_id = ? AND created_at < datetime('now', ?)",
         [did, `-${Math.round(COMMAND_TTL_MS / 1000)} seconds`]);
-    const cmd = queryOne('SELECT * FROM audio_device_commands WHERE device_id = ? ORDER BY id ASC LIMIT 1', [did]);
-    if (cmd) execute('DELETE FROM audio_device_commands WHERE id = ?', [cmd.id]);
-    return cmd || null;
+    cmd = queryOne('SELECT * FROM audio_device_commands WHERE device_id = ? ORDER BY id ASC LIMIT 1', [did]);
+    if (!cmd) return null;
+    execute('DELETE FROM audio_device_commands WHERE id = ?', [cmd.id]);
+    return cmd;
 }
 
 /**
@@ -187,4 +222,5 @@ export default {
     listDevices, createDevice, updateDevice, deleteDevice, regenToken,
     authDevice, enqueueCommand, touchDevice, claimNextCommand, pollDevice,
     enabledDeviceIdsInAreas, enabledDeviceIdsForCameras, castToDevices, stopAllDevices,
+    grantClip, isClipGranted,
 };

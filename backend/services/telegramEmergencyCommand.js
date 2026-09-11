@@ -19,6 +19,11 @@ const FIRE = 'efire'; // tapped a preset  -> show the confirm card
 const EXEC = 'efix';  // confirmed        -> actually fire
 export const EMERGENCY_ACTIONS = [FIRE, EXEC];
 
+// Guard a double-tap on '✅ YA, SIARKAN': fireEmergency can take ~15s when the IMOU cloud siren is slow, and
+// the confirm button stays live until the result edit lands — a second tap would fire a duplicate preempting
+// broadcast + re-arm the siren. Track the confirm message id while it fires and ignore re-taps.
+const firingMessages = new Set(); // messageId currently firing
+
 function targetLabel(p) {
     const base = p.target_kind === 'area' ? `area #${p.area_id}` : `${(p.camera_ids || []).length} kamera`;
     const dev = (p.device_ids || []).length ? ` + ${p.device_ids.length} titik speaker` : '';
@@ -61,6 +66,8 @@ export async function handleCallback(bot, cq, chatId, messageId, action, params,
         });
     }
     // EXEC — ack the tap first (Telegram expects a prompt answer), then fire, then edit with the result.
+    if (firingMessages.has(messageId)) return bot.answerCallback(cq.id, 'Sedang menyiarkan…');
+    firingMessages.add(messageId);
     await bot.answerCallback(cq.id, '🚨 Menyiarkan darurat…');
     let r;
     try {
@@ -70,6 +77,7 @@ export async function handleCallback(bot, cq, chatId, messageId, action, params,
             loop: preset.loop, gainDb: preset.gain_db, siren: Boolean(preset.siren),
         });
     } catch (error) {
+        firingMessages.delete(messageId);
         return bot.editMessage(chatId, messageId, buildResult('⚠️', 'Darurat GAGAL', [escapeHtml(error.message || 'Tak ada target')]));
     }
     const total = (r.results || []).length;
@@ -85,6 +93,7 @@ export async function handleCallback(bot, cq, chatId, messageId, action, params,
             adminUsername: `telegram:${actor?.name || '?'}`,
         }, bot.botRequest ? bot.botRequest(actor) : undefined);
     } catch { /* audit best-effort */ }
+    firingMessages.delete(messageId);
     return bot.editMessage(chatId, messageId, buildResult('🚨', 'DARURAT terkirim', lines));
 }
 

@@ -37,6 +37,8 @@ const TUE_1730_WIB = Date.parse('2026-09-08T10:30:00Z');
 
 function resetSchema() {
     db.exec(`
+        DROP TABLE IF EXISTS audio_device_commands;
+        DROP TABLE IF EXISTS audio_devices;
         DROP TABLE IF EXISTS audio_schedules;
         DROP TABLE IF EXISTS audio_playlists;
         DROP TABLE IF EXISTS audio_clips;
@@ -46,15 +48,21 @@ function resetSchema() {
         CREATE TABLE audio_playlists (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, created_at TEXT DEFAULT (datetime('now')));
         CREATE TABLE audio_schedules (
             id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, camera_ids TEXT NOT NULL DEFAULT '[]',
+            device_ids TEXT NOT NULL DEFAULT '[]',
             source_type TEXT NOT NULL, source_id INTEGER NOT NULL, time_hhmm TEXT NOT NULL,
             days_mask INTEGER NOT NULL DEFAULT 127, loop_count INTEGER NOT NULL DEFAULT 1,
             enabled INTEGER NOT NULL DEFAULT 1, last_run_at TEXT, created_at TEXT DEFAULT (datetime('now')),
             schedule_kind TEXT NOT NULL DEFAULT 'recurring', run_date TEXT, start_date TEXT, end_date TEXT,
-            gain_db INTEGER NOT NULL DEFAULT 0);
+            gain_db INTEGER NOT NULL DEFAULT 0,
+            tts_text TEXT, tts_engine TEXT, tts_voice TEXT);
         -- cameras + areas exist so quietTargets (the scheduler's quiet-hours gate) can run; empty by default
         -- so the existing firing tests see no quiet cameras and fire the full [1,2] set.
         CREATE TABLE areas (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, audio_broadcast_enabled INTEGER DEFAULT 0, quiet_start TEXT, quiet_end TEXT, max_loop INTEGER);
         CREATE TABLE cameras (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, area_id INTEGER);
+        -- audio_devices (Titik Speaker) so the scheduler's device-cast path (enabledDeviceIdsForCameras)
+        -- can run; empty by default so the existing camera-firing tests are unaffected.
+        CREATE TABLE audio_devices (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, area_id INTEGER, enabled INTEGER DEFAULT 1, token TEXT, last_seen TEXT, last_ip TEXT);
+        CREATE TABLE audio_device_commands (id INTEGER PRIMARY KEY AUTOINCREMENT, device_id INTEGER, command TEXT, clip_id INTEGER, loop INTEGER DEFAULT 1, created_at TEXT DEFAULT (datetime('now')));
     `);
     db.prepare("INSERT INTO audio_clips (name, base_filename) VALUES ('Clip', 'clip-aaaaaaaa')").run();
 }

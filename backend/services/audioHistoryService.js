@@ -21,7 +21,7 @@ export function logPlay({ sourceType, sourceId, sourceName, cameraIds, results, 
             [
                 String(sourceType || ''), parseInt(sourceId, 10) || 0, sourceName ? String(sourceName).slice(0, 120) : null,
                 JSON.stringify(Array.isArray(cameraIds) ? cameraIds : []),
-                JSON.stringify(list).slice(0, 20000), ok, list.length,
+                JSON.stringify(list.slice(0, 500)), ok, list.length,
                 operatorId ?? null, operatorName ? String(operatorName).slice(0, 80) : null,
             ],
         );

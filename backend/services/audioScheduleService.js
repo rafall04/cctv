@@ -15,7 +15,7 @@ the same minute while still letting it fire again the next day.
 
 import { query, queryOne, execute } from '../database/connectionPool.js';
 import { playToCameras } from './audioCastService.js';
-import { enabledDeviceIdsForCameras, castToDevices } from './audioDeviceService.js';
+import { enabledDeviceIdsForCameras, castToDevices, COMMAND_TTL_MS } from './audioDeviceService.js';
 import { getClip, deleteClip } from './audioClipService.js';
 import { renderTtsClipNow } from './audioScheduledTtsService.js';
 import { getAppOffsetMinutes } from './timezoneService.js';
@@ -224,7 +224,13 @@ async function fireTtsSchedule(s, active, deviceTargets) {
         }
         // Delete the rendered clip after playback finishes (+margin); also cleaned on the next fire (restart-safe).
         const clip = getClip(clipId);
-        const ttlSec = Math.min(Math.round((clip?.duration_sec || 30) * (s.loop_count || 1)) + 30, 1800);
+        const playSec = Math.round((clip?.duration_sec || 30) * (s.loop_count || 1));
+        // Cameras play at once (ONVIF backchannel), so they need only the playback margin. A Titik Speaker,
+        // though, may not CLAIM its queued command until up to the node command-TTL later, and only THEN
+        // downloads this clip — so when devices are targeted the rendered file must outlive that TTL (+ its own
+        // playback + a download margin), or a late-polling node 404s and the announcement is silently lost.
+        const deviceHoldSec = deviceTargets.length > 0 ? Math.round(COMMAND_TTL_MS / 1000) + 60 : 0;
+        const ttlSec = Math.min(Math.max(playSec + 30, deviceHoldSec + playSec), 3600);
         const t = setTimeout(() => { try { deleteClip(clipId); } catch { /* already gone */ } }, ttlSec * 1000);
         if (t.unref) t.unref();
     } catch (e) { console.error(`[Audio] Jadwal TTS "${s.name}" gagal:`, e.message); }

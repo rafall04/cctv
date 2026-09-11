@@ -200,7 +200,7 @@ async function playPrayerClip(cfg, clipId, loop, { preempt, label, operator }) {
         const deviceIds = (cfg.target_kind || 'area') === 'area'
             ? enabledDeviceIdsInAreas([cfg.area_id])
             : enabledDeviceIdsForCameras(cfg.camera_ids || []);
-        deviceCount = castToDevices(deviceIds, 'clip', clipId, cfg.loop || 1, { preempt });
+        deviceCount = castToDevices(deviceIds, 'clip', clipId, loop || 1, { preempt });
     } catch (e) { console.error(`[${label}] enqueue titik speaker gagal:`, e.message); }
 
     if (ids.length === 0) {

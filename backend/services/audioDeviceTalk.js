@@ -11,10 +11,23 @@ SideEffects: none beyond the in-memory map; writing pushes bytes to held HTTP re
 
 const sinks = new Map(); // deviceId -> Set<{ write(buf), end() }>
 
+// A node has ONE physical speaker, so it needs one live stream; a couple more tolerate reconnect races
+// (old connection not yet cleaned up when the new one opens). Bounding this stops a single valid device
+// token from pinning thousands of /node/stream connections open (each held up to the 6-min talk cap) and
+// exhausting sockets/FDs — the node endpoints are exempt from the rate limiter.
+const MAX_SINKS_PER_DEVICE = 3;
+
 export function addSink(deviceId, sink) {
     const id = parseInt(deviceId, 10);
     if (!sinks.has(id)) sinks.set(id, new Set());
-    sinks.get(id).add(sink);
+    const set = sinks.get(id);
+    // Evict the oldest sink(s) once over the cap (Set preserves insertion order — first is oldest).
+    while (set.size >= MAX_SINKS_PER_DEVICE) {
+        const oldest = set.values().next().value;
+        set.delete(oldest);
+        try { oldest.end(); } catch { /* already closed */ }
+    }
+    set.add(sink);
 }
 
 export function removeSink(deviceId, sink) {

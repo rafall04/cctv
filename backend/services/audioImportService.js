@@ -84,9 +84,19 @@ async function fetchUrlToTemp(url, outPath) {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const len = parseInt(res.headers.get('content-length') || '0', 10);
         if (len && len > MAX_DOWNLOAD_BYTES) throw new Error('Berkas terlalu besar');
-        // eslint-disable-next-line no-await-in-loop
-        const buf = Buffer.from(await res.arrayBuffer());
-        if (buf.length > MAX_DOWNLOAD_BYTES) throw new Error('Berkas terlalu besar');
+        // Stream with a hard byte ceiling. res.arrayBuffer() would buffer the WHOLE body FIRST, so a source
+        // with an absent/lying Content-Length could OOM the weak box before the post-hoc size check ran.
+        // Count as we read and abort the instant we cross the cap.
+        const chunks = [];
+        let total = 0;
+        if (res.body) {
+            for await (const chunk of res.body) {
+                total += chunk.length;
+                if (total > MAX_DOWNLOAD_BYTES) throw new Error('Berkas terlalu besar');
+                chunks.push(Buffer.from(chunk));
+            }
+        }
+        const buf = Buffer.concat(chunks);
         writeFileSync(outPath, buf);
         return { path: outPath, bytes: buf.length };
     }
@@ -161,8 +171,16 @@ export function failForwardStuckJobs() {
 
 export function startImportWorker() {
     failForwardStuckJobs();
+    // Serial invariant: yt-dlp/ffmpeg can each run for minutes, far longer than the 5s tick. Without this
+    // guard a new tick would SELECT the NEXT queued job (the running one is already 'processing') and run it
+    // concurrently — melting the weak box that already carries ~20 recording ffmpeg. Skip the tick while busy.
+    let busy = false;
     const t = setInterval(() => {
-        processNextJob().catch((e) => console.error('[AudioImport] Worker tick error:', e.message));
+        if (busy) return;
+        busy = true;
+        processNextJob()
+            .catch((e) => console.error('[AudioImport] Worker tick error:', e.message))
+            .finally(() => { busy = false; });
     }, 5000);
     if (t.unref) t.unref();
     console.log('[AudioImport] Import worker started (5s tick, serial, primary worker)');

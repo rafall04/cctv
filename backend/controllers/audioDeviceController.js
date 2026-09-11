@@ -13,7 +13,7 @@ import {
     listDevices as deviceList, createDevice as deviceCreate, updateDevice as deviceUpdate,
     deleteDevice as deviceDelete, regenToken as deviceRegen, authDevice as deviceAuth,
     enqueueCommand as deviceEnqueue, touchDevice as deviceTouch, claimNextCommand as deviceClaim,
-    castToDevices,
+    castToDevices, grantClip as deviceGrantClip, isClipGranted as deviceClipGranted,
 } from '../services/audioDeviceService.js';
 import { getClipWav } from '../services/audioClipService.js';
 import { addSink, removeSink } from '../services/audioDeviceTalk.js';
@@ -134,7 +134,12 @@ export async function nodePoll(request, reply) {
                     break;
                 }
                 const out = { command: cmd.command, loop: cmd.loop };
-                if (cmd.command === 'play' && cmd.clip_id) out.clip_url = `/api/admin/audio/node/clip/${cmd.clip_id}`;
+                if (cmd.command === 'play' && cmd.clip_id) {
+                    // Authorize THIS device to download exactly this clip; nodeClip refuses anything else so a
+                    // device token can't enumerate the whole clip library by id.
+                    deviceGrantClip(dev.id, cmd.clip_id);
+                    out.clip_url = `/api/admin/audio/node/clip/${cmd.clip_id}`;
+                }
                 if (cmd.command === 'talk_start') out.stream_url = '/api/admin/audio/node/stream';
                 return reply.send({ success: true, data: out });
             }
@@ -149,8 +154,13 @@ export async function nodePoll(request, reply) {
 // The agent downloads the clip to play (WAV, decoded from .ulaw). Token-gated like the poll.
 export async function nodeClip(request, reply) {
     try {
-        if (!deviceAuth(deviceTokenFrom(request))) return reply.code(401).send({ success: false, message: 'token tidak valid' });
+        const dev = deviceAuth(deviceTokenFrom(request));
+        if (!dev) return reply.code(401).send({ success: false, message: 'token tidak valid' });
         const id = parseId(request.params.id);
+        // Object-level authz: only serve a clip this device was actually told to fetch (via its poll). Without
+        // this, any valid device token could pull any clip by id and drain the whole library. 404 (not 403) so
+        // a probing node can't tell "exists but forbidden" from "absent".
+        if (!id || !deviceClipGranted(dev.id, id)) return reply.code(404).send({ success: false, message: 'Audio tidak ditemukan' });
         let wav = null;
         try { wav = getClipWav(id); } catch { wav = null; }
         if (!wav || !wav.buffer) return reply.code(404).send({ success: false, message: 'Audio tidak ditemukan' });
