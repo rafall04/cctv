@@ -933,10 +933,10 @@ class CameraService {
     invalidateCameraCache() {
         invalidateCache('/api/cameras');
         invalidateCache('/api/stream');
-        // Public growth lists + area counts (cached ~30s): a suspended/unpublished camera must drop off now.
+        // Public growth lists + area aggregates: a suspended/unpublished camera must drop off now — bust the HTTP layer AND the service-layer AREAS cache (count/presence up to 5m, filters up to 15m), else it lingers in area counts/filters.
         invalidateCache('/api/public');
         invalidateCache('/api/areas');
-        cacheInvalidate(`${CacheNamespace.CAMERAS}:`);
+        cacheInvalidate(`${CacheNamespace.CAMERAS}:`); cacheInvalidate(`${CacheNamespace.AREAS}:`);
         cacheInvalidate(`${CacheNamespace.STATS}:camera-`);
         // Tenancy gate cache: class/owner/billing changes must hit live streams fast.
         invalidateCameraAccessCache();

@@ -102,14 +102,14 @@ export function useLandingInteractions({
 
         const exists = multiCameras.some((item) => item.id === camera.id);
         if (exists) {
-            addToast(`"${camera.name}" removed from Multi-View`, 'info');
+            addToast(`"${camera.name}" dihapus dari Multi-View`, 'info');
             setMaxReached(false);
             setMultiCameras((previous) => previous.filter((item) => item.id !== camera.id));
             return;
         }
 
         if (multiCameras.length >= maxStreams) {
-            addToast(`Maximum ${maxStreams} cameras allowed in Multi-View mode (${deviceTier}-end device)`, 'warning');
+            addToast(`Maksimal ${maxStreams} kamera untuk Multi-View (perangkat ${deviceTier}-end)`, 'warning');
             setMaxReached(true);
             setTimeout(() => setMaxReached(false), 3000);
             return;
@@ -136,13 +136,13 @@ export function useLandingInteractions({
                 }
 
                 if (previous.length >= maxStreams) {
-                    addToast(`Maximum ${maxStreams} cameras allowed in Multi-View mode (${deviceTier}-end device)`, 'warning');
+                    addToast(`Maksimal ${maxStreams} kamera untuk Multi-View (perangkat ${deviceTier}-end)`, 'warning');
                     setMaxReached(true);
                     setTimeout(() => setMaxReached(false), 3000);
                     return previous;
                 }
 
-                addToast(`"${nextCamera.name}" added to Multi-View (${previous.length + 1}/${maxStreams})`, 'success');
+                addToast(`"${nextCamera.name}" ditambahkan ke Multi-View (${previous.length + 1}/${maxStreams})`, 'success');
                 return [...previous, nextCamera];
             });
         } catch {
@@ -156,7 +156,7 @@ export function useLandingInteractions({
         setMultiCameras((previous) => {
             const target = previous.find((camera) => camera.id === id);
             if (target) {
-                addToast(`"${target.name}" removed from Multi-View`, 'info');
+                addToast(`"${target.name}" dihapus dari Multi-View`, 'info');
             }
             const next = previous.filter((camera) => camera.id !== id);
             if (next.length === 0) {

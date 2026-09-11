@@ -41,6 +41,20 @@ function resolveHlsAccessInfo(cameraPath) {
     return legacyMatch ? getAccessInfo(Number(legacyMatch[1])) : null;
 }
 
+// Throttle the per-camera runtime signal. A live viewer refetches the playlist every ~3s and pulls segments
+// continuously, but recordRuntimeSignal upserts runtime state + triggers a recording-lifecycle reconcile on
+// EVERY call. One signal per window keeps the camera marked fresh (comfortably inside its runtime grace) while
+// sparing the weak box a DB write + reconcile per segment — mirrors the session-heartbeat throttle upstream.
+// Keyed by cameraId, so the map is bounded by the fleet size.
+const RUNTIME_SIGNAL_THROTTLE_MS = 10000;
+const lastRuntimeSignalAt = new Map(); // cameraId -> ms
+function shouldSignalRuntime(cameraId) {
+    const now = Date.now();
+    if (now - (lastRuntimeSignalAt.get(cameraId) || 0) < RUNTIME_SIGNAL_THROTTLE_MS) return false;
+    lastRuntimeSignalAt.set(cameraId, now);
+    return true;
+}
+
 export default async function hlsProxyRoutes(fastify, _options) {
     const mediamtxHlsUrl = config.mediamtx?.hlsUrlInternal || 'http://localhost:8888';
     // Hostnames allowed to hotlink community playlists when a browser omits
@@ -188,7 +202,7 @@ export default async function hlsProxyRoutes(fastify, _options) {
                 // segments is just a heartbeat optimisation, the
                 // playlist fetch is what creates/keeps the session).
                 applyLegacyCacheHeaders(reply, contentType);
-                if (cameraId) {
+                if (cameraId && shouldSignalRuntime(cameraId)) {
                     cameraHealthService.recordRuntimeSignal(cameraId, {
                         targetUrl,
                         signalType: 'internal_hls_playlist_proxy',
@@ -240,7 +254,7 @@ export default async function hlsProxyRoutes(fastify, _options) {
                 controller,
                 upstreamStream: response.data,
             }).attach();
-            if (cameraId) {
+            if (cameraId && shouldSignalRuntime(cameraId)) {
                 cameraHealthService.recordRuntimeSignal(cameraId, {
                     targetUrl,
                     signalType: 'internal_hls_segment_proxy',

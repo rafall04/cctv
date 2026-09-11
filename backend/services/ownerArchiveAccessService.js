@@ -81,7 +81,7 @@ export function resolveArchiveOwnerAccess(segmentId, request) {
             const recordedAtMs = parseTimestampMs(upload.recorded_at);
             if (recordedAtMs === null
                 || (fromIso && recordedAtMs < Date.parse(fromIso))
-                || (toIso && recordedAtMs > Date.parse(toIso))) {
+                || (toIso && recordedAtMs >= Date.parse(toIso))) { // half-open [from,to): EXCLUSIVE upper, paritas dgn publicArchiveAccessService
                 const err = new Error('Segmen di luar jangkauan token ini');
                 err.statusCode = 403;
                 throw err;

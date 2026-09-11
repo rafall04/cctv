@@ -13,11 +13,13 @@ yang menjual penempatan komersial.
 */
 
 import { getSupportReach } from '../controllers/supportReachController.js';
+import { cacheMiddleware } from '../middleware/cacheMiddleware.js';
 
 export default async function supportReachRoutes(fastify) {
     /*
-     * Boleh di-cache lama: tiga agregat 30-hari tidak berubah dari menit ke menit, dan tidak ada
-     * impresi yang dihitung di sini - berbeda dari rute slot, yang justru TIDAK boleh di-cache.
+     * Boleh di-cache lama: tiga agregat 30-hari (termasuk COUNT lintas 30 hari atas viewer_session_history)
+     * tidak berubah dari menit ke menit, dan tidak ada impresi yang dihitung di sini - berbeda dari rute slot,
+     * yang justru TIDAK boleh di-cache. Tanpa cache, tiap kunjungan /dukungan menghitung ulang ketiganya.
      */
-    fastify.get('/api/public/support-reach', getSupportReach);
+    fastify.get('/api/public/support-reach', { preHandler: cacheMiddleware(300000) }, getSupportReach);
 }
