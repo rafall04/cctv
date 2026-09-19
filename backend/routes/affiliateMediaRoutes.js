@@ -21,13 +21,13 @@ server.js is at 799 lines against a frozen 800-line ratchet — it cannot afford
 promoBannerRoutes already nests promoMediaRoutes for exactly this reason; this repeats the
 precedent rather than inventing a second convention.
 
-A NOTE ON API-KEY VALIDATION (a known, pre-existing gap — not introduced here)
+A NOTE ON API-KEY VALIDATION
 ------------------------------------------------------------------------------
-middleware/apiKeyValidator.js whitelists PREFIXES, and '/api/affiliate-media/' is not one of them —
-exactly like the existing '/api/promo-media/' and '/api/promo-banners/public'. It is invisible in
-practice only because API key validation passes through when no key row exists. If that knob is
-ever tightened (API_KEY_REQUIRE_KEYS=true), all three break together, and they should be fixed
-together in that middleware rather than by moving image files under /api/public/.
+middleware/apiKeyValidator.js whitelists '/api/affiliate-media/' in publicPrefixes — alongside
+'/api/promo-media/' and '/api/promo-banners/' — so these images keep loading when API key
+validation is enabled with requireKeys (API_KEY_REQUIRE_KEYS=true, shipped in the deployment
+templates). If a new anonymous media surface is ever added, whitelist it in that middleware
+rather than moving files under /api/public/.
 */
 
 import fastifyStatic from '@fastify/static';

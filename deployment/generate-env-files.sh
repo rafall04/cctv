@@ -197,6 +197,7 @@ ALLOWED_ORIGINS=
 # Security Configuration
 # ===================================
 API_KEY_VALIDATION_ENABLED=true
+API_KEY_REQUIRE_KEYS=true
 API_KEY_SECRET=$API_KEY_SECRET
 
 CSRF_ENABLED=true

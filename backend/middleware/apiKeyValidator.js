@@ -21,18 +21,51 @@ export const API_KEY_VALIDATOR_CONFIG = {
         '/api/auth/login',
         '/api/auth/register',
         '/api/auth/register-info',
+        '/api/auth/csrf',          // CSRF token must be fetchable before login
+        '/api/auth/refresh',       // refresh is anonymous by design (the access token expired)
         '/api/cameras/active',
         '/api/stream',
         '/api/areas/public',
+        '/api/areas/filters',
+        '/api/branding/public',
+        '/api/config/public',      // SPA bootstrap config
+        '/api/config/version',
+        '/api/config/manifest',
+        '/api/settings/map-center',
+        '/api/settings/landing-page',
+        '/api/settings/public-ads',
+        '/api/settings/timezone',
+        '/api/saweria/config',
+        '/api/sponsors/active',
+        '/api/sponsors/cameras',
+        '/api/promo-banners/public',
         '/api/viewer/start',
         '/api/viewer/heartbeat',
-        '/api/viewer/stop'
+        '/api/viewer/stop',
+        '/api/viewer/runtime-signal',
+        '/api/playback-viewer/start',
+        '/api/playback-viewer/heartbeat',
+        '/api/playback-viewer/stop',
+        '/api/feedback',           // anonymous feedback submission (GET / is authMiddleware-gated)
+        // NOT public — exempt only from the API-key layer. This is the bootstrap path:
+        // with requireKeys + an empty api_keys table it is the only way to mint the
+        // first key, and it stays behind authMiddleware + requireAdmin regardless.
+        '/api/admin/api-keys',
     ],
     // Endpoint prefixes that don't require API key validation
     publicPrefixes: [
         '/api/public/',
         '/api/stream/',
-        '/hls/',                 // HLS proxy - public streaming endpoint
+        '/hls/',                  // HLS proxy - public streaming endpoint
+        '/api/thumbnails/',       // static anonymous thumbnails (per-camera gate applied upstream)
+        '/api/playback-token/',   // activate/heartbeat/clear — all anonymous token operations
+        '/api/playback-archive/', // public archive stream — gated by playback token, not API key
+        '/api/voucher/',          // access/redeem/order/status — all anonymous
+        '/api/recordings/',       // anonymous community playback (segments/stream/playlist/archive);
+                                  // admin ops under the same prefix stay authMiddleware+requireAdmin gated
+        '/api/promo-media/',      // static promo poster images
+        '/api/affiliate-media/',  // static affiliate product photos
+        '/api/promo-banners/',    // public read + anonymous click tracking; admin CRUD stays JWT+requireAdmin
         '/api/billing/webhook',  // Payment gateway webhooks - authenticated by gateway signature
         '/api/voucher/webhook',  // Voucher payment webhook - server-to-server, re-verified via gateway API
         '/api/playback-access',  // Self-serve playback packages, orders, renewals, recovery + iPaymu notify (device-gated, not API-key)
@@ -94,7 +127,19 @@ async function apiKeyValidatorPlugin(fastify, options) {
         if (!API_KEY_VALIDATOR_CONFIG.enabled) {
             return;
         }
-        
+
+        // CORS preflights never carry credentials or API keys — rejecting them would
+        // break cross-origin consumers before the real request is even evaluated.
+        if (request.method === 'OPTIONS') {
+            return;
+        }
+
+        // Only /api/* routes are API-key consumers — anything else (hls paths,
+        // health, future ws/static routes, plain 404s) is out of scope.
+        if (!request.url.split('?')[0].startsWith('/api')) {
+            return;
+        }
+
         // Skip public endpoints
         if (isPublicEndpoint(request.url)) {
             return;

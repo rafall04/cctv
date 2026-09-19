@@ -171,6 +171,7 @@ env_ensure "$BACKEND_ENV" "TRUSTED_PROXY_CIDRS" "127.0.0.1/32,::1/128"
 env_ensure "$BACKEND_ENV" "RATE_LIMIT_ENABLED"          "true"
 env_ensure "$BACKEND_ENV" "CSRF_ENABLED"                "true"
 env_ensure "$BACKEND_ENV" "API_KEY_VALIDATION_ENABLED"  "true"
+env_ensure "$BACKEND_ENV" "API_KEY_REQUIRE_KEYS"        "true"
 # Proactive recording-health Telegram alerts (no-op unless Telegram is configured).
 env_ensure "$BACKEND_ENV" "RECORDING_HEALTH_ALERTS_ENABLED" "true"
 
