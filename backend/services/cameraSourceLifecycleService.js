@@ -80,11 +80,27 @@ export class CameraSourceLifecycleService {
             };
         }
 
-        return this.refreshCameraSource({
+        const result = await this.refreshCameraSource({
             camera: updatedCamera,
             reason,
             classification,
         });
+
+        if (!isEnabled(updatedCamera?.enabled)) {
+            // A disabled camera is never probed again (health checks select enabled=1), so a
+            // stale is_online=1 would persist forever and the camera would keep displaying
+            // "online" in admin lists. Clear both the flag column and the runtime-state mirror —
+            // readers COALESCE crs.is_online first, so clearing only one table leaves a stale
+            // flag in charge.
+            this.db.execute('UPDATE cameras SET is_online = 0 WHERE id = ?', [updatedCamera.id]);
+            this.cameraRuntimeStateService.upsertRuntimeState(updatedCamera.id, {
+                is_online: 0,
+                monitoring_state: 'disabled',
+                monitoring_reason: reason,
+            });
+        }
+
+        return result;
     }
 
     async refreshCameraSource({ camera, reason = 'manual_refresh', classification = null }) {

@@ -19,14 +19,11 @@ describe('cameraRuntimeStateService', () => {
         queryOneSpy
             .mockReturnValueOnce({ name: 'camera_runtime_state' })
             .mockReturnValueOnce(undefined)
-            .mockReturnValueOnce({
-                camera_id: 12,
-                is_online: 1,
-                monitoring_state: 'online',
-                monitoring_reason: 'seed_from_camera',
-            })
+            // ensureRuntimeState gates an is_online=1 seed on cameras.enabled — this Once is
+            // consumed by that SELECT, before the post-INSERT read-back.
+            .mockReturnValueOnce({ enabled: 1 })
             // TERMINAL DEFAULT, and it is load-bearing. `vi.spyOn` keeps calling THROUGH to the
-            // real function once the `Once` queue is exhausted — so a fourth queryOne here does
+            // real function once the `Once` queue is exhausted — so a further queryOne here does
             // not return undefined, it queries the developer's actual backend/data/cctv.db.
             // That is how this test failed intermittently: whether the queue ran dry depended on
             // test ordering under load, and what came back depended on whatever rows happened to
@@ -74,6 +71,7 @@ describe('cameraRuntimeStateService', () => {
         vi.spyOn(connectionPool, 'queryOne')
             .mockReturnValueOnce({ name: 'camera_runtime_state' }) // hasRuntimeTable
             .mockReturnValueOnce(undefined)                        // existing row: none
+            .mockReturnValueOnce({ enabled: 1 })                   // enabled-gate on the is_online=1 seed
             .mockReturnValueOnce(undefined)                        // read-back: invisible in-transaction
             .mockReturnValue(undefined);                           // never fall through to the real DB
 
@@ -117,9 +115,12 @@ describe('cameraRuntimeStateService', () => {
     });
 
     it('upserts runtime state with latest health metadata', () => {
-        vi.spyOn(connectionPool, 'queryOne')
-            .mockReturnValueOnce({ name: 'camera_runtime_state' })
-            .mockReturnValue({
+        vi.spyOn(connectionPool, 'queryOne').mockImplementation((sql) => {
+            if (sql.includes('sqlite_master')) return { name: 'camera_runtime_state' };
+            // upsertRuntimeState gates is_online=1 on cameras.enabled — without this the
+            // runtime row (which has no `enabled` column) silently fails the gate.
+            if (sql.includes('SELECT enabled')) return { enabled: 1 };
+            return {
                 camera_id: 8,
                 is_online: 0,
                 monitoring_state: 'offline',
@@ -127,7 +128,8 @@ describe('cameraRuntimeStateService', () => {
                 last_runtime_signal_at: null,
                 last_runtime_signal_type: null,
                 last_health_check_at: null,
-            });
+            };
+        });
         const executeSpy = vi.spyOn(connectionPool, 'execute').mockReturnValue({ changes: 1 });
 
         const result = cameraRuntimeStateService.upsertRuntimeState(8, {
@@ -157,5 +159,37 @@ describe('cameraRuntimeStateService', () => {
             monitoring_reason: 'health_check_online',
             last_runtime_signal_type: 'external_flv_runtime_playing',
         });
+    });
+
+    it('drops is_online=1 when the camera is disabled (stale-flag resurrection guard)', () => {
+        vi.spyOn(connectionPool, 'queryOne').mockImplementation((sql) => {
+            if (sql.includes('sqlite_master')) return { name: 'camera_runtime_state' };
+            if (sql.includes('SELECT enabled')) return { enabled: 0 };
+            return {
+                camera_id: 9,
+                is_online: 0,
+                monitoring_state: 'disabled',
+                monitoring_reason: 'camera_update',
+                last_runtime_signal_at: null,
+                last_runtime_signal_type: null,
+                last_health_check_at: null,
+            };
+        });
+        const executeSpy = vi.spyOn(connectionPool, 'execute').mockReturnValue({ changes: 1 });
+
+        const result = cameraRuntimeStateService.upsertRuntimeState(9, {
+            is_online: 1,
+            monitoring_state: 'online',
+            monitoring_reason: 'runtime_recent_success',
+            last_health_check_at: '2026-09-19 00:00:00',
+        });
+
+        // A runtime signal arriving after disable must not re-flag the camera online —
+        // probes never run on disabled cameras, so nothing would ever clear it again.
+        expect(result.is_online).toBe(0);
+        expect(executeSpy).toHaveBeenCalledWith(
+            expect.stringContaining('ON CONFLICT(camera_id) DO UPDATE'),
+            expect.arrayContaining([9, 0])
+        );
     });
 });

@@ -70,6 +70,7 @@ export default async function rondaAdminRoutes(fastify) {
                 type: 'object',
                 properties: {
                     enabled: { type: 'boolean' },
+                    stamp: { type: 'boolean' },
                     alert_hours: { type: 'string', maxLength: 11 },
                     tg_cooldown: { type: 'number' },
                     tg_cooldown_off: { type: 'number' },

@@ -184,8 +184,9 @@ await fastify.register(cors, {
                 origin,
                 allowedOrigins
             });
-            
-            callback(new Error('Not allowed by CORS'), false);
+
+            // Deny via no CORS headers — an Error here made preflights answer 500 (wrong semantics, noisy monitoring). Enforcement stays with originValidatorMiddleware + CSRF.
+            callback(null, false);
         }
     },
     credentials: true,
@@ -336,19 +337,17 @@ await fastify.register(jwt, {
 });
 
 // ============================================
-// HEALTH CHECK ENDPOINT
+// HEALTH CHECK — whitelisted from rate limiting + API key. /api/health exists because nginx only
+// proxies /api/* and useLandingReachability probes `${apiUrl}/health` (previously 404 on every load).
 // ============================================
-// Whitelisted from rate limiting and API key validation
-fastify.get('/health', async (request, reply) => {
+const healthHandler = async () => {
     const now = new Date();
     const timezone = getTimezone();
 
     // Offset label, short name, and local wall-clock derived from Intl off the ONE configured zone,
     // so any IANA zone the settings UI permits is reported right (the old 3-zone map mislabelled
     // every other zone as WIB/+7 and emitted a malformed "+010:00" for any offset >= 10).
-    let offsetLabel = 'GMT+0';
-    let timezoneName = timezone;
-    let timestampLocal = now.toISOString();
+    let offsetLabel = 'GMT+0', timezoneName = timezone, timestampLocal = now.toISOString();
     try {
         offsetLabel = new Intl.DateTimeFormat('en-US', { timeZone: timezone, timeZoneName: 'shortOffset' })
             .formatToParts(now).find((p) => p.type === 'timeZoneName')?.value || 'GMT+0';
@@ -360,7 +359,6 @@ fastify.get('/health', async (request, reply) => {
             hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
         }).format(now);
     } catch { /* keep the UTC fallbacks above for an unresolvable zone */ }
-
     return {
         status: 'ok',
         timestamp: now.toISOString(),
@@ -376,7 +374,8 @@ fastify.get('/health', async (request, reply) => {
             securityHeaders: true
         }
     };
-});
+};
+fastify.get('/health', healthHandler).get('/api/health', healthHandler);
 
 // ============================================
 // API ROUTES

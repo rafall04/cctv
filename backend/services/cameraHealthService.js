@@ -1012,7 +1012,7 @@ class CameraHealthService {
 
             const currentTimestamp = getTimestamp();
             execute(
-                'UPDATE cameras SET is_online = 1, last_online_check = ? WHERE id = ? AND (is_online IS NULL OR is_online = 0)',
+                'UPDATE cameras SET is_online = 1, last_online_check = ? WHERE id = ? AND (is_online IS NULL OR is_online = 0) AND enabled = 1',
                 [currentTimestamp, cameraId]
             );
             cameraRuntimeStateService.upsertRuntimeState(cameraId, {

@@ -40,6 +40,7 @@ export const RATE_LIMIT_CONFIG = {
     // Whitelisted endpoints (no rate limiting)
     whitelist: [
         '/health',
+        '/api/health',            // browser-side probe via nginx (only /api/* is proxied)
         '/api/stream',
         '/api/viewer/heartbeat',  // Viewer heartbeat needs frequent calls (every 10s)
         '/hls',                   // HLS proxy - high frequency segment requests

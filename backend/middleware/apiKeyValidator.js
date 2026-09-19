@@ -18,6 +18,7 @@ export const API_KEY_VALIDATOR_CONFIG = {
     // Endpoints that don't require API key validation
     publicEndpoints: [
         '/health',
+        '/api/health',           // same probe through the /api proxy path
         '/api/auth/login',
         '/api/auth/register',
         '/api/auth/register-info',

@@ -118,7 +118,9 @@ class CameraRuntimeStateService {
         }
 
         const timestamp = getTimestamp();
-        const isOnline = normalizeOnlineFlag(seed.is_online);
+        // Same enabled gate as upsertRuntimeState: a disabled camera must not be resurrected
+        // "online" when a stale signal creates its very first runtime row.
+        const isOnline = normalizeOnlineFlag(seed.is_online) ? this.resolveEnabledOnlineFlag(cameraId) : 0;
         const monitoringState = seed.monitoring_state || (isOnline ? 'online' : 'unknown');
         const monitoringReason = seed.monitoring_reason || (seed.is_online === undefined ? 'seed_unknown' : 'seed_from_camera');
 
@@ -180,6 +182,11 @@ class CameraRuntimeStateService {
         };
     }
 
+    resolveEnabledOnlineFlag(cameraId) {
+        const row = queryOne('SELECT enabled FROM cameras WHERE id = ?', [cameraId]);
+        return row && row.enabled === 1 ? 1 : 0;
+    }
+
     upsertRuntimeState(cameraId, fields = {}) {
         if (!this.hasRuntimeTable()) {
             return {
@@ -199,8 +206,16 @@ class CameraRuntimeStateService {
         const current = this.ensureRuntimeState(cameraId, fields);
         const timestamp = getTimestamp();
 
+        /*
+         * is_online=1 is only honored while the camera is enabled. recordRuntimeSignal can still
+         * fire on a viewer session that outlives a disable, and letting it re-flag the row would
+         * recreate the exact stale "online" state the disable transition just cleared — nothing
+         * downstream ever resets it because probes only run on enabled cameras.
+         */
         const nextState = {
-            is_online: fields.is_online !== undefined ? normalizeOnlineFlag(fields.is_online) : normalizeOnlineFlag(current.is_online),
+            is_online: fields.is_online !== undefined
+                ? (normalizeOnlineFlag(fields.is_online) ? this.resolveEnabledOnlineFlag(cameraId) : 0)
+                : normalizeOnlineFlag(current.is_online),
             monitoring_state: fields.monitoring_state ?? current.monitoring_state ?? 'unknown',
             monitoring_reason: fields.monitoring_reason ?? current.monitoring_reason ?? null,
             last_runtime_signal_at: fields.last_runtime_signal_at ?? current.last_runtime_signal_at ?? null,

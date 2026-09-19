@@ -60,9 +60,10 @@ export function cacheMiddleware(ttl = CacheTTL.SHORT, options = {}) {
         const cached = cache.get(cacheKey);
         
         if (cached !== null) {
-            // Cache hit
+            // Cache hit — X-Cache (HIT/MISS) is conventional and harmless; X-Cache-Key was
+            // dropped: it leaked the internal key format to every public client for zero
+            // legitimate use.
             reply.header('X-Cache', 'HIT');
-            reply.header('X-Cache-Key', cacheKey);
             reply.type(cached.contentType || 'application/json');
             /*
              * `return reply` — NOT a bare `return`. Resolving undefined does not stop Fastify's
@@ -82,7 +83,6 @@ export function cacheMiddleware(ttl = CacheTTL.SHORT, options = {}) {
         
         // Cache miss
         reply.header('X-Cache', 'MISS');
-        reply.header('X-Cache-Key', cacheKey);
         
         // Intercept reply.send to cache the response
         const originalSend = reply.send.bind(reply);
