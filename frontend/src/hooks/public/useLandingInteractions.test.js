@@ -77,7 +77,7 @@ describe('useLandingInteractions multi-view limits', () => {
         expect(result.current.maxStreams).toBe(3);
         expect(result.current.multiCameras.map((camera) => camera.id)).toEqual([1, 2, 3]);
         expect(addToast).toHaveBeenCalledWith(
-            'Maximum 3 cameras allowed in Multi-View mode (high-end device)',
+            'Maksimal 3 kamera untuk Multi-View (perangkat high-end)',
             'warning'
         );
     });
