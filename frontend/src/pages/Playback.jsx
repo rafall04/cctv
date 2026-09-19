@@ -495,14 +495,14 @@ function Playback({
 
         const fetchCameras = async () => {
             try {
-                const response = isAdminPlayback
-                    ? await cameraService.getAllCameras(REQUEST_POLICY.BLOCKING)
-                    : await cameraService.getActiveCameras(REQUEST_POLICY.BLOCKING);
+                const response = await cameraService.getPlaybackCameras(REQUEST_POLICY.BLOCKING);
                 if (response.success) {
                     // Public archive is community-ONLY (publicArchiveAccessService). A published rental
                     // (subscriber) camera passes the LIVE list but its archive always denies for an
                     // anonymous visitor, so it would sit in the picker as a dead "Belum ada rekaman".
-                    // Offer only what can actually play; admin playback keeps every camera.
+                    // Offer only what can actually play; admin playback keeps every camera. The
+                    // endpoint already filters server-side — this re-check keeps the propCameras
+                    // path (any caller-supplied list) under the same rule.
                     const recordingCameras = response.data.filter(cam =>
                         cam.enable_recording && (isAdminPlayback || cam.camera_class === 'community')
                     );

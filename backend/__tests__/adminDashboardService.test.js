@@ -303,3 +303,88 @@ describe('adminDashboardService dashboard stats', () => {
         expect(stats.recentLogs[1].id).toBe(9);
     });
 });
+
+describe('dashboard stream table split', () => {
+    /*
+     * The stream table is ~98% of the stats payload (~142KB of ~145KB) and the page only
+     * reads it for the "all streams" drawer, so /stats?streams=0 must return everything EXCEPT
+     * the table and /stats/streams must return exactly the table — built from the same inputs.
+     */
+    function stubSources({ cameras = [], paths = [], sessions = [], viewersByCamera = [] } = {}) {
+        vi.spyOn(timezoneService, 'getTimezone').mockReturnValue('Asia/Jakarta');
+        vi.spyOn(mediaMtxService, 'getStats').mockResolvedValue({ paths });
+        vi.spyOn(viewerSessionService, 'getViewerStats').mockReturnValue({
+            activeViewers: sessions.length,
+            viewersByCamera,
+            activeSessions: sessions,
+            allSessions: [],
+        });
+        vi.spyOn(database, 'query').mockImplementation((sql) => {
+            if (sql.includes('FROM cameras')) return cameras;
+            return []; // recentLogs
+        });
+        vi.spyOn(database, 'queryOne')
+            .mockReturnValueOnce({ total: cameras.length, active: cameras.length, disabled: 0 })
+            .mockReturnValueOnce({ count: 1 })
+            // Terminal default: without it vi.spyOn falls through to the REAL database.
+            .mockReturnValue(undefined);
+    }
+
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    it('omits the stream table when includeStreams is false but keeps everything else', async () => {
+        stubSources({
+            cameras: [{ id: 1, name: 'Cam', stream_key: 'cam', enabled: 1, status: 'active', is_online: 1 }],
+            paths: [{ name: 'cam', bytesSent: 100, bytesReceived: 50 }],
+        });
+
+        const stats = await adminDashboardService.getDashboardStats({ includeStreams: false });
+
+        expect(stats.streams).toEqual([]);
+        // Everything the summary cards/sidebar need still ships in the lite response.
+        expect(stats.summary).toMatchObject({ totalCameras: 1, activeCameras: 1 });
+        expect(stats.cameraStatusBreakdown).toMatchObject({ online: 1 });
+        expect(stats.topCameras).toEqual([{ id: 1, name: 'Cam', viewers: 0 }]);
+        expect(stats.mtxConnected).toBe(true);
+        expect(stats.system).toBeTruthy();
+        expect(Array.isArray(stats.recentLogs)).toBe(true);
+        expect(Array.isArray(stats.allSessions)).toBe(true);
+    });
+
+    it('includes the stream table by default (backward compatible)', async () => {
+        stubSources({
+            cameras: [{ id: 1, name: 'Cam', stream_key: 'cam', enabled: 1, status: 'active', is_online: 1 }],
+            paths: [{ name: 'cam', bytesSent: 100, bytesReceived: 50 }],
+            viewersByCamera: [{ camera_id: 1, viewer_count: 3 }],
+        });
+
+        const stats = await adminDashboardService.getDashboardStats();
+
+        expect(stats.streams).toHaveLength(1);
+        expect(stats.streams[0]).toMatchObject({ id: 1, name: 'Cam', viewers: 3 });
+    });
+
+    it('getDashboardStreams returns the full table from the same inputs', async () => {
+        stubSources({
+            cameras: [
+                { id: 1, name: 'Cam A', stream_key: 'cam-a', enabled: 1, status: 'active', is_online: 1 },
+                { id: 2, name: 'Cam B', stream_key: 'cam-b', enabled: 1, status: 'active', is_online: 0 },
+            ],
+            paths: [{ name: 'cam-a', bytesSent: 100, bytesReceived: 50 }],
+            viewersByCamera: [{ camera_id: 1, viewer_count: 2 }],
+            sessions: [{ session_id: 's1', camera_id: 1, ip_address: '10.0.0.1', device_type: 'desktop', started_at: 'x', duration_seconds: 5 }],
+        });
+
+        const { streams } = await adminDashboardService.getDashboardStreams();
+
+        expect(streams).toHaveLength(2);
+        const camA = streams.find((s) => s.id === 1);
+        const camB = streams.find((s) => s.id === 2);
+        expect(camA).toMatchObject({ name: 'Cam A', viewers: 2, bytesSent: 100 });
+        expect(camA.sessions).toHaveLength(1);
+        expect(camA.sessions[0]).toMatchObject({ sessionId: 's1', ipAddress: '10.0.0.1' });
+        expect(camB).toMatchObject({ name: 'Cam B', operationalState: 'offline' });
+    });
+});

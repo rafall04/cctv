@@ -2,7 +2,7 @@
  * Purpose: Shapes camera API responses for admin/public camera CRUD, source lifecycle, import, restore, and bulk flows.
  * Caller: backend/routes/cameraRoutes.js.
  * Deps: cameraService.
- * MainFuncs: getAllCameras, getActiveCameras, createCamera, updateCamera, refreshCameraStream, getCameraSourceLifecycleEvents.
+ * MainFuncs: getAllCameras, getActiveCameras, getPlaybackCameras, createCamera, updateCamera, refreshCameraStream, getCameraSourceLifecycleEvents.
  * SideEffects: Delegates camera mutations and lifecycle recovery to cameraService.
  */
 
@@ -59,6 +59,19 @@ export async function getActiveCameras(request, reply) {
         return reply.send({ success: true, data: cameras });
     } catch (error) {
         console.error('Get active cameras error:', error);
+        return reply.code(500).send({ success: false, message: 'Internal server error' });
+    }
+}
+
+// Slim camera list for the playback picker (optional auth). Admin gets every recording
+// camera; anonymous/token callers get the community archive only — the scoping itself
+// lives in cameraService.getPlaybackCameraList.
+export async function getPlaybackCameras(request, reply) {
+    try {
+        const cameras = cameraService.getPlaybackCameraList(request.user);
+        return reply.send({ success: true, data: cameras });
+    } catch (error) {
+        console.error('Get playback cameras error:', error);
         return reply.code(500).send({ success: false, message: 'Internal server error' });
     }
 }

@@ -33,6 +33,21 @@ export const cameraService = {
     },
 
     /*
+     * Slim camera list for the playback picker (optional auth): the backend returns only
+     * recording cameras in pickable scope and only the fields the picker reads — the fat
+     * admin/landing lists were ~100x the payload for the same rendered result.
+     */
+    async getPlaybackCameras(policy = REQUEST_POLICY.BLOCKING, config = {}) {
+        try {
+            const response = await apiClient.get('/api/cameras/playback', getRequestPolicyConfig(policy, config));
+            return response.data;
+        } catch (error) {
+            console.error('Get playback cameras error:', error);
+            throw error;
+        }
+    },
+
+    /*
      * Cameras whose upstream source is gone rather than merely offline (admin only). Its own
      * endpoint because the admin camera list shares its runtime projection with both PUBLIC read
      * models — this is staff-only detail about a third party's outage.

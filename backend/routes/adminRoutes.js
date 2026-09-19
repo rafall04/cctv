@@ -6,7 +6,7 @@
  * SideEffects: Adds authenticated admin routes to Fastify.
  */
 
-import { getDashboardStats, getTodayStats, testTelegramNotification, getTelegramConfig, updateTelegramConfig, previewNotificationDiagnostics, runNotificationDiagnosticsDrill, listNotificationDiagnosticsRuns, getViewerAnalytics, getViewerHistoryPage, getRealTimeViewers, getCameraHealthDebug, getRecordingHealth, getSecurityLogs, getSecurityStats, getCacheStats, clearCache, getTimezoneConfig, updateTimezoneConfig, exportDatabaseBackup, importDatabaseBackup, getBackupPreview } from '../controllers/adminController.js';
+import { getDashboardStats, getDashboardStreams, getTodayStats, testTelegramNotification, getTelegramConfig, updateTelegramConfig, previewNotificationDiagnostics, runNotificationDiagnosticsDrill, listNotificationDiagnosticsRuns, getViewerAnalytics, getViewerHistoryPage, getRealTimeViewers, getCameraHealthDebug, getRecordingHealth, getSecurityLogs, getSecurityStats, getCacheStats, clearCache, getTimezoneConfig, updateTimezoneConfig, exportDatabaseBackup, importDatabaseBackup, getBackupPreview } from '../controllers/adminController.js';
 import { generateApiKey, listApiKeys, deleteApiKey } from '../controllers/apiKeyController.js';
 import { clearPlaybackTokenSessions, createPlaybackToken, deletePlaybackTokenById, listPlaybackTokenAuditLogs, listPlaybackTokens, revokePlaybackToken, sharePlaybackToken, updatePlaybackToken } from '../controllers/playbackTokenController.js';
 import { createPlaybackProduct, listPlaybackProducts, updatePlaybackProduct } from '../controllers/playbackProductController.js';
@@ -35,6 +35,13 @@ export default async function adminRoutes(fastify, options) {
     fastify.get('/stats/today', {
         onRequest: [authMiddleware],
         handler: getTodayStats,
+    });
+
+    // Full stream table, on demand — /stats?streams=0 keeps it out of the 10s poll; the
+    // dashboard's "all streams" drawer calls this only when opened.
+    fastify.get('/stats/streams', {
+        onRequest: [authMiddleware],
+        handler: getDashboardStreams,
     });
 
     // Viewer Analytics endpoints

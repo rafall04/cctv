@@ -21,7 +21,7 @@ import { cacheGetOrSetSync, cacheInvalidate, cacheKey, CacheNamespace } from './
 import { invalidateCameraAccessCache } from './cameraAccessService.js';
 import { PUBLIC_LIVE_SQL } from '../utils/cameraVisibility.js';
 import { sanitizeCameraThumbnail, sanitizeCameraThumbnailList } from './thumbnailPathService.js';
-import { stripInternalLandingFields } from './publicLandingProjection.js';
+import { stripInternalLandingFields, stripProxiedOriginUrls } from './publicLandingProjection.js';
 import cameraHealthService from './cameraHealthService.js';
 import cameraRuntimeStateService from './cameraRuntimeStateService.js';
 import cameraSourceLifecycleService from './cameraSourceLifecycleService.js';
@@ -245,6 +245,24 @@ const ADMIN_CAMERA_LIST_PROJECTION = `
         ELSE 'default'
     END as area_internal_rtsp_transport_default,
     ${CAMERA_RUNTIME_STATE_PROJECTION}
+`;
+
+// Slim read-model for the playback camera picker only. Carries just what the picker rows,
+// grouping, and the token live button actually read — no monitoring/runtime/billing columns,
+// and no source URLs (never RTSP). Fetching the fat admin/landing lists (~60 columns/camera)
+// just to fill this picker cost the client a multi-MB JSON parse it then discarded.
+const PLAYBACK_CAMERA_PROJECTION = `
+    c.id,
+    c.name,
+    c.location,
+    c.area_id,
+    c.enable_recording,
+    c.camera_class,
+    c.video_codec,
+    c.thumbnail_path,
+    c.thumbnail_updated_at,
+    c.external_snapshot_url,
+    a.name as area_name
 `;
 
 function getAreaInternalPolicy(areaId) {
@@ -952,6 +970,22 @@ class CameraService {
 
     getActiveCameras() {
         return this.getPublicLandingCameraList();
+    }
+
+    // Playback picker read-model — role-aware, recording cameras only. Mirrors the filter the
+    // playback page used to apply client-side to the fat lists: admin sees every recording
+    // camera; everyone else gets community-only + enabled (the public ARCHIVE rule — a
+    // published subscriber camera is live-visible but its archive always denies anonymous).
+    getPlaybackCameraList(user) {
+        const isAdmin = user?.role === 'admin';
+        const key = cacheKey(CacheNamespace.CAMERAS, `playback-camera-list-${isAdmin ? 'admin' : 'public'}`);
+        return cacheGetOrSetSync(key, () => sanitizeCameraThumbnailList(query(`
+            SELECT ${PLAYBACK_CAMERA_PROJECTION}
+            FROM cameras c
+            LEFT JOIN areas a ON c.area_id = a.id
+            WHERE c.enable_recording = 1${isAdmin ? '' : ` AND c.enabled = 1 AND c.camera_class = 'community'`}
+            ORDER BY c.is_tunnel ASC, c.id ASC
+        `)).map((camera) => (isAdmin ? camera : stripProxiedOriginUrls(camera))), CAMERA_READ_MODEL_TTL_MS);
     }
 
     getCameraById(id) {

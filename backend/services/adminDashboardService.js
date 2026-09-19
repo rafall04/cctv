@@ -160,7 +160,57 @@ export function buildDashboardStreams({
 
 class AdminDashboardService {
 
-    async getDashboardStats() {
+    // Everything the stream table (and the stats fields derived from the same inputs) needs:
+    // MediaMTX paths, viewer/session maps, and the enabled-camera rows. Shared between
+    // getDashboardStats and getDashboardStreams so the two reads can't drift apart.
+    async loadStreamContext() {
+        const mtxStats = await mediaMtxService.getStats();
+        const viewerStats = viewerSessionService.getViewerStats();
+        const activeSessions = viewerStats.activeSessions || [];
+
+        const viewersByCamera = {};
+        const sessionsByCamera = {};
+        viewerStats.viewersByCamera.forEach(v => {
+            viewersByCamera[v.camera_id] = v.viewer_count;
+        });
+        activeSessions.forEach(session => {
+            if (!sessionsByCamera[session.camera_id]) {
+                sessionsByCamera[session.camera_id] = [];
+            }
+            sessionsByCamera[session.camera_id].push({
+                sessionId: session.session_id,
+                ipAddress: session.ip_address,
+                deviceType: session.device_type,
+                startedAt: session.started_at,
+                durationSeconds: session.duration_seconds
+            });
+        });
+
+        const allCameras = query(`
+            SELECT id, name, stream_key, enabled, status, is_online, stream_source, external_hls_url
+            FROM cameras
+            WHERE enabled = 1
+        `);
+
+        return { mtxStats, viewerStats, activeSessions, viewersByCamera, sessionsByCamera, allCameras };
+    }
+
+    // The full stream table is ~98% of the dashboard payload (~142KB of ~145KB) while the page
+    // only reads it when the "all streams" drawer opens, so it is served as its own on-demand
+    // read instead of riding the 10s stats poll.
+    async getDashboardStreams() {
+        const { mtxStats, viewersByCamera, sessionsByCamera, allCameras } = await this.loadStreamContext();
+        return {
+            streams: buildDashboardStreams({
+                cameras: allCameras,
+                paths: mtxStats.paths || [],
+                viewersByCamera,
+                sessionsByCamera,
+            }),
+        };
+    }
+
+    async getDashboardStats({ includeStreams = true } = {}) {
         const cameraStats = queryOne(`
             SELECT 
                 COUNT(*) as total,
@@ -170,8 +220,6 @@ class AdminDashboardService {
         `);
 
         const areaCount = queryOne('SELECT COUNT(*) as count FROM areas').count;
-
-        const mtxStats = await mediaMtxService.getStats();
 
         const cpusList = os.cpus();
 
@@ -215,40 +263,17 @@ class AdminDashboardService {
             loadAvg: os.loadavg(),
         };
 
-        const viewerStats = viewerSessionService.getViewerStats();
+        const {
+            mtxStats, viewerStats, activeSessions, viewersByCamera, sessionsByCamera, allCameras,
+        } = await this.loadStreamContext();
         const activeViewers = viewerStats.activeViewers;
-        const activeSessions = viewerStats.activeSessions || [];
 
-        const viewersByCamera = {};
-        const sessionsByCamera = {};
-        viewerStats.viewersByCamera.forEach(v => {
-            viewersByCamera[v.camera_id] = v.viewer_count;
-        });
-        activeSessions.forEach(session => {
-            if (!sessionsByCamera[session.camera_id]) {
-                sessionsByCamera[session.camera_id] = [];
-            }
-            sessionsByCamera[session.camera_id].push({
-                sessionId: session.session_id,
-                ipAddress: session.ip_address,
-                deviceType: session.device_type,
-                startedAt: session.started_at,
-                durationSeconds: session.duration_seconds
-            });
-        });
-
-        const allCameras = query(`
-            SELECT id, name, stream_key, enabled, status, is_online, stream_source, external_hls_url
-            FROM cameras
-            WHERE enabled = 1
-        `);
-
-        const activeStreams = buildDashboardStreams({
+        const activeStreams = includeStreams ? buildDashboardStreams({
             cameras: allCameras,
             paths: mtxStats.paths || [],
             viewersByCamera,
             sessionsByCamera,
-        });
+        }) : [];
 
         const cameraStatusBreakdown = getCameraStatusBreakdown(allCameras);
 

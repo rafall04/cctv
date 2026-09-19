@@ -5,13 +5,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithRouter } from '../test/renderWithRouter';
 import Dashboard from './Dashboard';
 
-const { getStats } = vi.hoisted(() => ({
+const { getStats, getDashboardStreams } = vi.hoisted(() => ({
     getStats: vi.fn(),
+    getDashboardStreams: vi.fn(),
 }));
 
 vi.mock('../services/adminService', () => ({
     adminService: {
         getStats,
+        getDashboardStreams,
     },
 }));
 
@@ -35,6 +37,8 @@ vi.mock('../components/TopCamerasWidget', () => ({
 describe('Dashboard', () => {
     beforeEach(() => {
         getStats.mockReset();
+        getDashboardStreams.mockReset();
+        getDashboardStreams.mockResolvedValue({ success: true, data: { streams: [] } });
         getStats.mockResolvedValue({
             success: true,
             data: {
@@ -189,6 +193,22 @@ describe('Dashboard', () => {
     });
 
     it('meringkas stream aktif menjadi top 8 dan membuka drawer untuk daftar penuh', async () => {
+        // Drawer open re-fetches the stream list — the same payload must come back both times.
+        getDashboardStreams.mockResolvedValue({
+            success: true,
+            data: {
+                streams: Array.from({ length: 10 }, (_, index) => ({
+                    id: index + 1,
+                    name: `Stream ${index + 1}`,
+                    viewers: 10 - index,
+                    sessions: [],
+                    bytesSent: 1024 * (index + 1),
+                    bytesReceived: 512 * (index + 1),
+                    operationalState: index === 8 ? 'offline' : 'online',
+                    state: index === 8 ? 'offline' : 'ready',
+                })),
+            },
+        });
         getStats.mockResolvedValueOnce({
             success: true,
             data: {
@@ -212,16 +232,7 @@ describe('Dashboard', () => {
                     uptime: 1000,
                     loadAvg: [0, 0, 0],
                 },
-                streams: Array.from({ length: 10 }, (_, index) => ({
-                    id: index + 1,
-                    name: `Stream ${index + 1}`,
-                    viewers: 10 - index,
-                    sessions: [],
-                    bytesSent: 1024 * (index + 1),
-                    bytesReceived: 512 * (index + 1),
-                    operationalState: index === 8 ? 'offline' : 'online',
-                    state: index === 8 ? 'offline' : 'ready',
-                })),
+                streams: [],
                 recentLogs: [],
                 mtxConnected: true,
                 cameraStatusBreakdown: { online: 10, offline: 2, maintenance: 0 },
@@ -247,6 +258,8 @@ describe('Dashboard', () => {
             expect(screen.getByText('Semua stream aktif')).toBeTruthy();
         });
 
+        // Mount + drawer open = two stream fetches; the 10s stats poll never carries them.
+        expect(getDashboardStreams).toHaveBeenCalledTimes(2);
         expect(screen.getByText('Stream 10')).toBeTruthy();
     });
 });

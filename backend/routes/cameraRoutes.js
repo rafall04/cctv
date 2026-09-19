@@ -9,6 +9,7 @@
 import {
     getAllCameras,
     getActiveCameras,
+    getPlaybackCameras,
     getCameraById,
     createCamera,
     updateCamera,
@@ -24,7 +25,7 @@ import {
     bulkDeleteByArea,
     bulkUpdateRecordingDuration,
 } from '../controllers/cameraController.js';
-import { authMiddleware, requireAdmin } from '../middleware/authMiddleware.js';
+import { authMiddleware, optionalAuthMiddleware, requireAdmin } from '../middleware/authMiddleware.js';
 import { 
     createCameraSchema, 
     updateCameraSchema, 
@@ -37,6 +38,14 @@ export default async function cameraRoutes(fastify, options) {
     fastify.get('/active', {
         preHandler: cacheMiddleware(30000),  // Cache for 30 seconds
         handler: getActiveCameras,
+    });
+
+    // Playback picker list (optional auth — admin sees every recording camera, the public
+    // archive is community-only; the service-level cache is keyed per scope, so no shared
+    // cacheMiddleware here or the admin list would leak into the public cache slot).
+    fastify.get('/playback', {
+        onRequest: [optionalAuthMiddleware],
+        handler: getPlaybackCameras,
     });
 
     // Admin endpoints (protected)

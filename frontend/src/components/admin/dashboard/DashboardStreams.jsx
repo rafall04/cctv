@@ -17,6 +17,7 @@ Chrome removed in the 2026-07 admin pass, and why:
 import { useRef } from 'react';
 import { TIMESTAMP_STORAGE, useTimezone } from '../../../contexts/TimezoneContext.jsx';
 import { NoStreamsEmptyState } from '../../ui/EmptyState';
+import { Skeleton } from '../../ui/Skeleton';
 import { useFocusTrap } from '../../../hooks/useFocusTrap';
 import { Modal } from '../../ui/Modal';
 import { Badge } from '../../ui/Badge';
@@ -200,7 +201,7 @@ const CloseIcon = () => (
     </svg>
 );
 
-export function StreamsDrawer({ open, streams, onClose, formatBytes, getOperationalTone, getStreamTransportTone, onOpenViewer }) {
+export function StreamsDrawer({ open, streams, streamsLoaded = true, streamsError = false, onRetry = null, onClose, formatBytes, getOperationalTone, getStreamTransportTone, onOpenViewer }) {
     const panelRef = useRef(null);
     useFocusTrap(panelRef, { active: open, onEscape: onClose });
 
@@ -222,7 +223,13 @@ export function StreamsDrawer({ open, streams, onClose, formatBytes, getOperatio
                     <div className="min-w-0">
                         <h2 className="text-sm font-semibold text-content">Semua stream aktif</h2>
                         <p className="mt-1 text-xs text-content-muted">
-                            {streams.length} stream diprioritaskan berdasarkan viewer dan kondisi operasional.
+                            {streams.length > 0
+                                ? `${streams.length} stream diprioritaskan berdasarkan viewer dan kondisi operasional.`
+                                : streamsError
+                                    ? 'Daftar stream gagal dimuat.'
+                                    : !streamsLoaded
+                                        ? 'Memuat daftar stream…'
+                                        : 'Tidak ada stream aktif.'}
                         </p>
                     </div>
                     <IconButton label="Tutup daftar stream" size="sm" onClick={onClose} className="-mr-2 -mt-1">
@@ -230,7 +237,19 @@ export function StreamsDrawer({ open, streams, onClose, formatBytes, getOperatio
                     </IconButton>
                 </div>
                 <div className="flex-1 space-y-2 overflow-y-auto p-4">
-                    {streams.map((stream) => (
+                    {streams.length === 0 ? (
+                        <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
+                            {streamsError && onRetry ? (
+                                <Button size="sm" onClick={onRetry}>Coba lagi</Button>
+                            ) : !streamsLoaded ? (
+                                <>
+                                    <Skeleton className="h-14 w-full" />
+                                    <Skeleton className="h-14 w-full" />
+                                    <Skeleton className="h-14 w-full" />
+                                </>
+                            ) : null}
+                        </div>
+                    ) : streams.map((stream) => (
                         <ActiveStreamRow
                             key={stream.id}
                             stream={stream}
@@ -321,6 +340,8 @@ export function DashboardStreamsPanel({
     rankedStreams,
     visibleStreams,
     overflowStreamCount,
+    streamsLoaded = true,
+    streamsError = false,
     formatBytes,
     getOperationalTone,
     getStreamTransportTone,
@@ -328,6 +349,7 @@ export function DashboardStreamsPanel({
     onOpenDrawer,
     onAddCamera,
     onRetry,
+    onRetryStreams = null,
 }) {
     return (
         <div className="space-y-3 xl:col-span-2">
@@ -361,10 +383,25 @@ export function DashboardStreamsPanel({
                     <TBody>
                         {!stats?.mtxConnected ? (
                             <StreamsUnavailable onRetry={onRetry} />
-                        ) : stats?.streams.length === 0 ? (
+                        ) : rankedStreams.length === 0 ? (
                             <TR>
                                 <TD colSpan="4" className="py-8">
-                                    <NoStreamsEmptyState onAddCamera={onAddCamera} />
+                                    {streamsError ? (
+                                        <div className="flex flex-col items-center gap-3 text-center">
+                                            <p className="text-sm text-content-muted">Daftar stream gagal dimuat.</p>
+                                            {onRetryStreams && (
+                                                <Button size="sm" onClick={onRetryStreams}>Coba lagi</Button>
+                                            )}
+                                        </div>
+                                    ) : !streamsLoaded ? (
+                                        <div className="space-y-3 px-2" aria-label="Memuat daftar stream">
+                                            <Skeleton className="h-8 w-full" />
+                                            <Skeleton className="h-8 w-full" />
+                                            <Skeleton className="h-8 w-full" />
+                                        </div>
+                                    ) : (
+                                        <NoStreamsEmptyState onAddCamera={onAddCamera} />
+                                    )}
                                 </TD>
                             </TR>
                         ) : (

@@ -93,6 +93,9 @@ export default function Dashboard() {
     const navigate = useNavigate();
     const {
         stats,
+        streams,
+        streamsLoaded,
+        streamsError,
         loading,
         error,
         lastSuccessfulUpdate,
@@ -102,10 +105,11 @@ export default function Dashboard() {
         setDateRange,
         setRefreshError,
         loadStats,
+        loadStreams,
         handleRetry,
     } = useDashboardData();
 
-    const rankedStreams = useMemo(() => rankDashboardStreams(stats?.streams || []), [stats?.streams]);
+    const rankedStreams = useMemo(() => rankDashboardStreams(streams), [streams]);
     const visibleStreams = useMemo(() => rankedStreams.slice(0, 8), [rankedStreams]);
     const overflowStreamCount = Math.max(rankedStreams.length - visibleStreams.length, 0);
 
@@ -210,13 +214,19 @@ export default function Dashboard() {
                         rankedStreams={rankedStreams}
                         visibleStreams={visibleStreams}
                         overflowStreamCount={overflowStreamCount}
+                        streamsLoaded={streamsLoaded}
+                        streamsError={streamsError}
                         formatBytes={formatBytes}
                         getOperationalTone={getOperationalTone}
                         getStreamTransportTone={getStreamTransportTone}
                         onOpenViewer={setViewerModal}
-                        onOpenDrawer={() => setIsStreamsDrawerOpen(true)}
+                        onOpenDrawer={() => {
+                            setIsStreamsDrawerOpen(true);
+                            loadStreams();
+                        }}
                         onAddCamera={() => navigate('/admin/cameras')}
                         onRetry={handleRetry}
+                        onRetryStreams={loadStreams}
                     />
                 </InlineErrorBoundary>
 
@@ -242,6 +252,9 @@ export default function Dashboard() {
             <StreamsDrawer
                 open={isStreamsDrawerOpen}
                 streams={rankedStreams}
+                streamsLoaded={streamsLoaded}
+                streamsError={streamsError}
+                onRetry={loadStreams}
                 onClose={() => setIsStreamsDrawerOpen(false)}
                 formatBytes={formatBytes}
                 getOperationalTone={getOperationalTone}

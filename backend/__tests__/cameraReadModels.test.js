@@ -162,4 +162,84 @@ describe('cameraService read models', () => {
             availability_state: 'offline',
         });
     });
+
+    describe('playback camera picker read model', () => {
+        it('scopes the public list to enabled community recording cameras only', async () => {
+            const querySpy = vi.spyOn(connectionPool, 'query').mockReturnValue([]);
+
+            const { default: cameraService } = await import('../services/cameraService.js');
+            cameraService.getPlaybackCameraList(null);
+
+            const sql = querySpy.mock.calls[0][0];
+            expect(sql).toContain('c.enable_recording = 1');
+            expect(sql).toContain('c.enabled = 1');
+            expect(sql).toContain("c.camera_class = 'community'");
+            // No subscriber escape hatch — the public ARCHIVE rule is stricter than the live list.
+            expect(sql).not.toContain('billing_status');
+        });
+
+        it('scopes the admin list to every recording camera', async () => {
+            const querySpy = vi.spyOn(connectionPool, 'query').mockReturnValue([
+                { id: 7, name: 'Owner Cam', camera_class: 'owner_private', enable_recording: 1 },
+            ]);
+
+            const { default: cameraService } = await import('../services/cameraService.js');
+            const rows = cameraService.getPlaybackCameraList({ role: 'admin' });
+
+            const sql = querySpy.mock.calls[0][0];
+            expect(sql).toContain('c.enable_recording = 1');
+            // Admin playback replays any recording camera — no community/enabled restriction.
+            // (c.camera_class IS still selected as a column; only the WHERE filter is absent.)
+            expect(sql).not.toContain("camera_class = 'community'");
+            expect(sql).not.toContain('c.enabled = 1');
+            expect(rows).toHaveLength(1);
+            expect(rows[0]).toMatchObject({ id: 7, camera_class: 'owner_private' });
+        });
+
+        it('selects only picker fields — no credentials, runtime state, or source URLs', async () => {
+            const querySpy = vi.spyOn(connectionPool, 'query').mockReturnValue([]);
+
+            const { default: cameraService } = await import('../services/cameraService.js');
+            cameraService.getPlaybackCameraList({ role: 'admin' });
+
+            const sql = querySpy.mock.calls[0][0];
+            for (const field of [
+                'private_rtsp_url',
+                'stream_key',
+                'external_hls_url',
+                'external_stream_url',
+                'external_embed_url',
+                'owner_user_id',
+                'billing_status',
+                'sponsor_id',
+            ]) {
+                expect(sql, field).not.toContain(field);
+            }
+            // Runtime/monitoring joins are what made the admin list fat — none here.
+            expect(sql).not.toContain('camera_runtime_state');
+            expect(sql).not.toContain('viewer_sessions');
+            // The fields the picker actually reads must be selected.
+            for (const field of ['c.id', 'c.name', 'c.location', 'c.area_id', 'c.enable_recording', 'c.camera_class', 'c.video_codec', 'c.thumbnail_path', 'c.thumbnail_updated_at', 'c.external_snapshot_url', 'area_name']) {
+                expect(sql, field).toContain(field);
+            }
+        });
+
+        it('strips userinfo credentials from external_snapshot_url for anonymous callers', async () => {
+            vi.spyOn(connectionPool, 'query').mockReturnValue([
+                {
+                    id: 5,
+                    name: 'Cam E',
+                    camera_class: 'community',
+                    enable_recording: 1,
+                    external_snapshot_url: 'https://user:secret@cam.example/snap.jpg',
+                },
+            ]);
+
+            const { default: cameraService } = await import('../services/cameraService.js');
+            const rows = cameraService.getPlaybackCameraList(null);
+
+            expect(rows[0].external_snapshot_url).not.toContain('user:secret');
+            expect(rows[0].external_snapshot_url).toContain('cam.example');
+        });
+    });
 });

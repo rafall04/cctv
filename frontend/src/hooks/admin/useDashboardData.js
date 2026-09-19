@@ -5,6 +5,9 @@ import { useAdminReconnectRefresh } from './useAdminReconnectRefresh';
 
 export function useDashboardData() {
     const [stats, setStats] = useState(null);
+    const [streams, setStreams] = useState([]);
+    const [streamsLoaded, setStreamsLoaded] = useState(false);
+    const [streamsError, setStreamsError] = useState(false);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [lastSuccessfulUpdate, setLastSuccessfulUpdate] = useState(null);
@@ -12,8 +15,10 @@ export function useDashboardData() {
     const [isRetrying, setIsRetrying] = useState(false);
     const [dateRange, setDateRange] = useState('today');
     const intervalRef = useRef(null);
+    const streamsIntervalRef = useRef(null);
     const statsRef = useRef(null);
     const requestIdRef = useRef(0);
+    const streamsRequestIdRef = useRef(0);
     const mountedRef = useRef(true);
 
     useEffect(() => {
@@ -65,20 +70,56 @@ export function useDashboardData() {
         }
     }, []);
 
+    // The stream table is too heavy for the 10s stats poll (~142KB of ~145KB), so it loads
+    // once, refreshes on a slower cadence for the top-8 panel, and is refetched fresh whenever
+    // the "all streams" drawer opens. Stats still poll at 10s for the summary cards.
+    const loadStreams = useCallback(async () => {
+        const requestId = ++streamsRequestIdRef.current;
+
+        try {
+            const response = await adminService.getDashboardStreams(REQUEST_POLICY.BACKGROUND);
+
+            if (!mountedRef.current || requestId !== streamsRequestIdRef.current) {
+                return;
+            }
+
+            if (response.success) {
+                setStreams(response.data?.streams || []);
+                setStreamsLoaded(true);
+                setStreamsError(false);
+            } else {
+                setStreamsError(true);
+            }
+        } catch (err) {
+            if (!mountedRef.current || requestId !== streamsRequestIdRef.current) {
+                return;
+            }
+            setStreamsError(true);
+        }
+    }, []);
+
     useEffect(() => {
         mountedRef.current = true;
         loadStats({ mode: 'initial' });
+        loadStreams();
         intervalRef.current = setInterval(() => loadStats({ mode: 'background' }), 10000);
+        streamsIntervalRef.current = setInterval(loadStreams, 30000);
 
         return () => {
             mountedRef.current = false;
             if (intervalRef.current) {
                 clearInterval(intervalRef.current);
             }
+            if (streamsIntervalRef.current) {
+                clearInterval(streamsIntervalRef.current);
+            }
         };
-    }, [loadStats]);
+    }, [loadStats, loadStreams]);
 
-    useAdminReconnectRefresh(() => loadStats({ mode: 'resume' }));
+    useAdminReconnectRefresh(() => {
+        loadStats({ mode: 'resume' });
+        loadStreams();
+    });
 
     const handleRetry = useCallback(() => {
         setError(null);
@@ -88,6 +129,9 @@ export function useDashboardData() {
 
     return {
         stats,
+        streams,
+        streamsLoaded,
+        streamsError,
         loading,
         error,
         lastSuccessfulUpdate,
@@ -97,6 +141,7 @@ export function useDashboardData() {
         setDateRange,
         setRefreshError,
         loadStats,
+        loadStreams,
         handleRetry,
     };
 }

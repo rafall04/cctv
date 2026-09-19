@@ -2,15 +2,36 @@ import apiClient from './apiClient';
 import { getRequestPolicyConfig, REQUEST_POLICY } from './requestPolicy';
 
 export const adminService = {
+    /*
+     * Dashboard poll payload WITHOUT the stream table — the table is ~98% of the response and
+     * the page only reads it via getDashboardStreams, so it stays out of the 10s poll.
+     */
     async getStats(policy = REQUEST_POLICY.BLOCKING, config = {}) {
         try {
-            const response = await apiClient.get('/api/admin/stats', getRequestPolicyConfig(policy, config));
+            const response = await apiClient.get('/api/admin/stats?streams=0', getRequestPolicyConfig(policy, config));
             return response.data;
         } catch (error) {
             console.error('Get stats error:', error);
             return {
                 success: false,
                 message: error.response?.data?.message || 'Failed to fetch statistics'
+            };
+        }
+    },
+
+    /*
+     * The full stream table, fetched on demand (drawer open) and on a slower cadence than the
+     * stats poll — it carries every enabled camera's stream state (~142KB at ~760 cameras).
+     */
+    async getDashboardStreams(policy = REQUEST_POLICY.BLOCKING, config = {}) {
+        try {
+            const response = await apiClient.get('/api/admin/stats/streams', getRequestPolicyConfig(policy, config));
+            return response.data;
+        } catch (error) {
+            console.error('Get dashboard streams error:', error);
+            return {
+                success: false,
+                message: error.response?.data?.message || 'Failed to fetch stream list'
             };
         }
     },

@@ -2,7 +2,7 @@
  * Purpose: Handle admin dashboard, Telegram, analytics, timezone, cache, and backup API responses.
  * Caller: backend/routes/adminRoutes.js.
  * Deps: admin services, Telegram service, cache, timezone, backup, camera health services.
- * MainFuncs: getDashboardStats, testTelegramNotification, getTelegramConfig, updateTelegramConfig.
+ * MainFuncs: getDashboardStats, getDashboardStreams, testTelegramNotification, getTelegramConfig, updateTelegramConfig.
  * SideEffects: Reads metrics/settings, writes Telegram/timezone config, sends Telegram test messages.
  */
 
@@ -30,7 +30,11 @@ import securityAuditLogger from '../services/securityAuditLogger.js';
 
 export async function getDashboardStats(request, reply) {
     try {
-        const data = await adminDashboardService.getDashboardStats();
+        // ?streams=0 keeps the heavy stream table out of the 10s poll; the dashboard's
+        // "all streams" drawer fetches it on demand from /stats/streams instead.
+        const data = await adminDashboardService.getDashboardStats({
+            includeStreams: request.query?.streams !== '0',
+        });
 
         return reply.send({
             success: true,
@@ -38,6 +42,24 @@ export async function getDashboardStats(request, reply) {
         });
     } catch (error) {
         console.error('Get dashboard stats error:', error);
+        return reply.code(500).send({
+            success: false,
+            message: 'Internal server error',
+        });
+    }
+}
+
+// The full stream table, on demand — the dashboard drawer calls this only when opened.
+export async function getDashboardStreams(request, reply) {
+    try {
+        const data = await adminDashboardService.getDashboardStreams();
+
+        return reply.send({
+            success: true,
+            data
+        });
+    } catch (error) {
+        console.error('Get dashboard streams error:', error);
         return reply.code(500).send({
             success: false,
             message: 'Internal server error',
