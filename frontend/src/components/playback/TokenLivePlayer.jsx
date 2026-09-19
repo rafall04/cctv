@@ -51,7 +51,7 @@ export default function TokenLivePlayer({ camera, onClose }) {
         [],
     );
 
-    const state = useHlsLivePlayer({ videoRef, resolveStream, resetKey: camera.id, messages, mapError });
+    const state = useHlsLivePlayer({ videoRef, resolveStream, resetKey: camera.id, videoCodec: camera.video_codec, messages, mapError });
     const aspectRatio = useVideoAspectRatio(videoRef, camera.id);
     // Constrain the video box by BOTH the modal width AND a viewport-height budget, preserving the
     // camera ratio — so a portrait/tall camera narrows (no pillarbox) instead of capping to landscape,

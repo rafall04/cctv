@@ -26,6 +26,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { isCodecFailure } from '../utils/publicPopupState.js';
+import { isGuaranteedUnplayableHevc } from '../utils/codecSupport.js';
 import { canPlayNativeHls, startNativeHlsPlayback } from '../utils/nativeHlsPlayback.js';
 import { getDeviceHLSConfig } from '../utils/hlsConfig.js';
 import { startLivePictureWatch } from '../utils/livePictureWatch.js';
@@ -90,12 +91,16 @@ const PLAYING_STATE = { status: 'playing', kind: null, httpCode: null, message: 
  * @param {boolean} [opts.respectUserPause=false] - set on a surface that renders a real pause control
  *        (native <video controls>). Stops the picture-watch from nudging play() / erroring a pause the
  *        VIEWER chose. Leave false for control-less surfaces (ZoomableVideo) where "paused" is never intended.
+ * @param {string} [opts.videoCodec] - the camera's video_codec; 'h265' lets the hook answer the
+ *        codec verdict BEFORE the grant fetch on devices that provably cannot decode HEVC,
+ *        instead of minting a grant, pulling the playlist, and arriving at the same 'codec'
+ *        verdict only after the watchdog timeout.
  * @param {Object<string,string>} [opts.messages] - per-kind copy overrides.
  * @param {({kind,httpCode}) => (string|undefined)} [opts.mapError] - dynamic copy; return undefined to fall through.
  * @param {({kind,httpCode}) => void} [opts.onError] - side effect on the final error (e.g. clearTokenCache).
  * @returns {{status:'loading'|'playing'|'error', kind:string|null, httpCode:number|null, message:string, needsGesture:boolean}}
  */
-export function useHlsLivePlayer({ videoRef, resolveStream, resetKey, active = true, respectUserPause = false, messages, mapError, onError }) {
+export function useHlsLivePlayer({ videoRef, resolveStream, resetKey, active = true, respectUserPause = false, videoCodec, messages, mapError, onError }) {
     const [state, setState] = useState(LOADING_STATE);
     // Bumped to re-run the effect for a warmup-404 retry (a fresh resolve + hls instance).
     const [retryTick, setRetryTick] = useState(0);
@@ -196,6 +201,10 @@ export function useHlsLivePlayer({ videoRef, resolveStream, resetKey, active = t
 
         async function run() {
             setState(LOADING_STATE);
+
+            // Pre-flight codec veto — definite "cannot decode" beats a grant fetch + playlist
+            // pull + watchdog wait that can only end at the identical 'codec' verdict.
+            if (isGuaranteedUnplayableHevc({ videoCodec })) { fail({ kind: 'codec' }); return; }
 
             let securedUrl;
             try {
@@ -332,7 +341,7 @@ export function useHlsLivePlayer({ videoRef, resolveStream, resetKey, active = t
                 hls = null;
             }
         };
-    }, [resetKey, active, retryTick, respectUserPause, messageFor, videoRef]);
+    }, [resetKey, active, retryTick, respectUserPause, videoCodec, messageFor, videoRef]);
 
     return state;
 }

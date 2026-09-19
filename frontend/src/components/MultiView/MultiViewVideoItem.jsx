@@ -18,6 +18,7 @@ import { LoadingStage, getStageMessage, createStreamError } from '../../utils/st
 import { createFallbackHandler } from '../../utils/fallbackHandler';
 import { getDeviceHLSConfig } from '../../utils/hlsConfig';
 import { isCodecFailure } from '../../utils/publicPopupState.js';
+import { isGuaranteedUnplayableHevc } from '../../utils/codecSupport.js';
 import { canPlayNativeHls, startNativeHlsPlayback } from '../../utils/nativeHlsPlayback.js';
 import { startLivePictureWatch } from '../../utils/livePictureWatch.js';
 import { PLAYHEAD_FROZEN, resumeAtLiveEdgeOrFail } from '../../utils/liveEdgeRecovery.js';
@@ -353,15 +354,11 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
 
     useEffect(() => {
         // Skip HLS loading if camera is in maintenance or offline
-        if (isMaintenance || isOffline) return;
-        if (renderMode !== 'hls') return;
+        if (isMaintenance || isOffline || renderMode !== 'hls') return;
 
-        if (!effectiveUrl || !videoRef.current) {
-            setStatus('error');
-            setLoadingStage(LoadingStage.ERROR);
-            onError?.(camera.id, new Error('Stream URL belum tersedia untuk Multi-View'));
-            return;
-        }
+        if (!effectiveUrl || !videoRef.current) { setStatus('error'); setLoadingStage(LoadingStage.ERROR); onError?.(camera.id, new Error('Stream URL belum tersedia untuk Multi-View')); return; }
+        // Pre-flight codec veto — the identical 'codec' verdict, instantly, without the fetch.
+        if (isGuaranteedUnplayableHevc({ videoCodec: camera.video_codec, isExternal: camera.stream_source === 'external' })) { setStatus('error'); setErrorType('codec'); setLoadingStage(LoadingStage.ERROR); onError?.(camera.id, new Error('Codec tidak didukung browser')); return; }
         const video = videoRef.current;
         let hls = null;
         let cancelled = false;
@@ -663,6 +660,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
         availabilityState,
         camera.id,
         camera.stream_source,
+        camera.video_codec,
         cleanupResources,
         clearInternalWarmupRetry,
         clearStreamTimeout,
@@ -1137,6 +1135,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                             </>
                         )}
                         <div className="flex items-center justify-center gap-2">
+                            {errorType !== 'codec' && (
                             <button
                                 onClick={handleRetry}
                                 aria-label="Coba sambungkan ulang stream"
@@ -1145,6 +1144,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                                 <Icons.Reset />
                                 Coba Lagi
                             </button>
+                            )}
                             <button
                                 onClick={handleClose}
                                 aria-label="Tutup tile kamera"

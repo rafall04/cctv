@@ -104,6 +104,35 @@ export const canPlayCodec = (codec) => {
     return false;
 };
 
+/*
+ * A veto asked BEFORE any bytes move: "is this camera provably unplayable on this device?"
+ *
+ * True only when EVERY layer agrees, because a wrong veto breaks a working stream:
+ *   - the camera encodes H.265 (callers pass video_codec verbatim)
+ *   - the stream is NOT external — the field describes the camera's own encoder, and an
+ *     external provider may transcode upstream, so external_* delivery can never be vetoed on it
+ *   - MSE answers "no" to hvc1 AND the native <video> element also shrugs — Safari plays HEVC
+ *     through its native path where MSE is silent, so a non-empty canPlayType is the escape hatch.
+ *     A null answer anywhere (no MSE to ask) means "cannot prove" — and an unproven veto is just
+ *     a new way to break playback, so it never fires.
+ *
+ * Effect: on a definite "no" the player skips the fetch/decode attempt entirely and shows the
+ * codec panel instantly — instead of pulling the playlist, waking an on-demand source on the
+ * server, and reaching the identical verdict only after the watchdog timeout.
+ */
+export const isGuaranteedUnplayableHevc = ({ videoCodec, isExternal = false } = {}) => {
+    if (isExternal || videoCodec !== 'h265') return false;
+    if (isHevcPlayable() !== false) return false;
+    if (typeof document === 'undefined') return false;
+    try {
+        const v = document.createElement('video');
+        if (v?.canPlayType?.('video/mp4;codecs="hvc1.1.6.L93.B0"')) return false;
+    } catch {
+        return false;
+    }
+    return true;
+};
+
 /**
  * Get user-friendly codec name
  * @param {string} codec - 'h264' or 'h265'

@@ -53,6 +53,7 @@ import {
     isPublicPopupPlaybackLocked,
     shouldShowPublicPopupRetry,
 } from '../../utils/publicPopupState.js';
+import { isGuaranteedUnplayableHevc } from '../../utils/codecSupport.js';
 import {
     getEffectiveDeliveryType,
     getPopupEmbedUrl,
@@ -526,12 +527,9 @@ function VideoPopup({
         if (isMaintenance || isOffline || isStreamResolving || !isHlsCamera) return;
         // No URL = nothing to load. Returning silently here left the spinner up forever with no
         // timeout armed and no retry, so say it out loud instead (mirrors MultiViewVideoItem).
-        if (!effectiveUrl || !videoRef.current) {
-            setStatus('error');
-            setErrorType('unknown');
-            setLoadingStage(LoadingStage.ERROR);
-            return;
-        }
+        if (!effectiveUrl || !videoRef.current) { setStatus('error'); setErrorType('unknown'); setLoadingStage(LoadingStage.ERROR); return; }
+        // Pre-flight codec veto — the identical 'codec' verdict, instantly, without the fetch.
+        if (isGuaranteedUnplayableHevc({ videoCodec: camera.video_codec, isExternal: isExternal || camera.stream_source === 'external' })) { setStatus('error'); setErrorType('codec'); setLoadingStage(LoadingStage.ERROR); return; }
         const video = videoRef.current;
         let hls = null;
         let HlsClass = null;
@@ -844,7 +842,7 @@ function VideoPopup({
             cleanupResources({ videoElement: video });
             if (hls) { hls.destroy(); hlsRef.current = null; }
         };
-    }, [camera.id, camera.stream_source, cleanupResources, clearInternalWarmupRetry, clearStreamTimeout, deviceTier, isExternal, isHlsCamera, isMaintenance, isOffline, isStreamResolving, requestVideoPlay, resetFailures, retryKey, startTimeout, syncVideoAspectRatio, updateStreamStage, effectiveUrl, forceProxyFallback, isDirectStream, proxyFallbackUrl, reportRuntimeFailure, reportRuntimeSuccess]);
+    }, [camera.id, camera.stream_source, camera.video_codec, cleanupResources, clearInternalWarmupRetry, clearStreamTimeout, deviceTier, isExternal, isHlsCamera, isMaintenance, isOffline, isStreamResolving, requestVideoPlay, resetFailures, retryKey, startTimeout, syncVideoAspectRatio, updateStreamStage, effectiveUrl, forceProxyFallback, isDirectStream, proxyFallbackUrl, reportRuntimeFailure, reportRuntimeSuccess]);
 
     useEffect(() => {
         if (isMaintenance || isOffline || isStreamResolving || deliveryType !== 'external_flv') return;

@@ -51,7 +51,7 @@ export default function CustomerLivePlayer({ camera, onClose }) {
     // respectUserPause: this player renders native <video controls>, so a viewer CAN pause — the
     // picture-watch must not nudge play() back or error a deliberate pause (its nudge is documented
     // safe only on control-less surfaces).
-    const state = useHlsLivePlayer({ videoRef, resolveStream, resetKey: camera.id, respectUserPause: true, messages, onError });
+    const state = useHlsLivePlayer({ videoRef, resolveStream, resetKey: camera.id, respectUserPause: true, videoCodec: camera.video_codec, messages, onError });
     const aspectRatio = useVideoAspectRatio(videoRef, camera.id);
     // Constrain the video box by BOTH modal width AND a viewport-height budget, preserving the camera
     // ratio, so a portrait/tall camera narrows (no pillarbox) instead of capping to landscape.

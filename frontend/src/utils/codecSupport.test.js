@@ -11,7 +11,7 @@
  * Refusing to play on a maybe would break devices that are perfectly capable.
  */
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { isCodecStringPlayable, isHevcPlayable, getCodecWarning } from './codecSupport';
+import { isCodecStringPlayable, isHevcPlayable, isGuaranteedUnplayableHevc, getCodecWarning } from './codecSupport';
 
 const H265 = 'hvc1.1.6.L150.0';
 const H264 = 'avc1.640028';
@@ -59,6 +59,44 @@ describe('isHevcPlayable', () => {
     it('false kalau keduanya ditolak', () => {
         noHevc();
         expect(isHevcPlayable()).toBe(false);
+    });
+});
+
+describe('isGuaranteedUnplayableHevc — veto pra-fetch', () => {
+    it('veto hanya saat h265 internal + MSE menolak + jalur native bungkam', () => {
+        // Bentuk Chrome/Android pada umumnya: MSE menjawab "tidak", canPlayType mengembalikan ''.
+        noHevc();
+        expect(isGuaranteedUnplayableHevc({ videoCodec: 'h265' })).toBe(true);
+    });
+
+    it('tidak pernah veto h264', () => {
+        noHevc();
+        expect(isGuaranteedUnplayableHevc({ videoCodec: 'h264' })).toBe(false);
+    });
+
+    it('tidak veto saat decoder memang mampu', () => {
+        allCodecs();
+        expect(isGuaranteedUnplayableHevc({ videoCodec: 'h265' })).toBe(false);
+    });
+
+    it('tidak veto saat dukungan tidak bisa dibuktikan (tanpa MSE)', () => {
+        // Asimetri yang sama dengan isHevcPlayable: "tidak tahu" bukan "tidak bisa".
+        vi.stubGlobal('MediaSource', undefined);
+        vi.stubGlobal('ManagedMediaSource', undefined);
+        expect(isGuaranteedUnplayableHevc({ videoCodec: 'h265' })).toBe(false);
+    });
+
+    it('jalur native yang menjawab ya adalah escape hatch (Safari)', () => {
+        // Safari membisukan MSE untuk hvc1 tetapi memutar HEVC lewat jalur native —
+        // jawaban canPlayType non-kosong berarti stream ini mungkin masih bisa jalan.
+        noHevc();
+        vi.spyOn(HTMLMediaElement.prototype, 'canPlayType').mockReturnValue('maybe');
+        expect(isGuaranteedUnplayableHevc({ videoCodec: 'h265' })).toBe(false);
+    });
+
+    it('stream eksternal tidak pernah diveto — provider bisa saja mentranskode', () => {
+        noHevc();
+        expect(isGuaranteedUnplayableHevc({ videoCodec: 'h265', isExternal: true })).toBe(false);
     });
 });
 
