@@ -148,17 +148,17 @@ export function CameraRouting({ cameras, routedCount, delivery }) {
                     placeholder="Cari kamera, area, grup…" aria-label="Cari kamera"
                     className={`${controlCls} min-w-0 flex-1 basis-40`}
                 />
-                <select value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Saring status arsip" className={controlCls}>
+                <select value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Saring status arsip" className={`${controlCls} min-w-0 max-w-full`}>
                     {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
                 {areaNames.length > 1 && (
-                    <select value={areaFilter} onChange={(e) => setAreaFilter(e.target.value)} aria-label="Saring per area" className={controlCls}>
+                    <select value={areaFilter} onChange={(e) => setAreaFilter(e.target.value)} aria-label="Saring per area" className={`${controlCls} min-w-0 max-w-full`}>
                         <option value="">Semua area</option>
                         {areaNames.map((name) => <option key={name} value={name}>{name}</option>)}
                     </select>
                 )}
                 {groupOptions.length > 1 && (
-                    <select value={groupFilter} onChange={(e) => setGroupFilter(e.target.value)} aria-label="Saring per grup tujuan" className={controlCls}>
+                    <select value={groupFilter} onChange={(e) => setGroupFilter(e.target.value)} aria-label="Saring per grup tujuan" className={`${controlCls} min-w-0 max-w-full`}>
                         <option value="">Semua grup</option>
                         {groupOptions.map((g) => <option key={g.chatId} value={g.chatId}>{g.label}</option>)}
                     </select>

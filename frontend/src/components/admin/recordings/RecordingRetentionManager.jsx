@@ -29,7 +29,7 @@ function DurationSelect({ id, value, onChange, disabled }) {
             value={value}
             onChange={(event) => onChange(Number(event.target.value))}
             disabled={disabled}
-            className="rounded-control border border-edge-strong bg-surface px-3 py-2 text-base sm:text-sm text-content focus:ring-2 focus:ring-primary-500 disabled:opacity-50"
+            className="w-full max-w-full rounded-control border border-edge-strong bg-surface px-3 py-2 text-base sm:text-sm text-content focus:ring-2 focus:ring-primary-500 disabled:opacity-50"
         >
             {recordingDurationOptions.map((group) => (
                 <optgroup key={group.label} label={group.label}>
@@ -169,7 +169,7 @@ export default function RecordingRetentionManager({
         ? `${visibleSelected.length} kamera terpilih`
         : `${filteredIds.length} kamera${filtersActive ? ' (hasil filter)' : ''}`;
 
-    const controlClass = 'rounded-control border border-edge-strong bg-surface px-3 py-2 text-base sm:text-sm text-content focus:ring-2 focus:ring-primary-500';
+    const controlClass = 'w-full max-w-full rounded-control border border-edge-strong bg-surface px-3 py-2 text-base sm:text-sm text-content focus:ring-2 focus:ring-primary-500';
 
     return (
         <div className="space-y-4">
@@ -187,7 +187,7 @@ export default function RecordingRetentionManager({
                             className={`w-full ${controlClass}`}
                         />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                         <label htmlFor="rec-area" className="mb-1 block text-xs font-medium text-content-muted">Area</label>
                         <select id="rec-area" value={areaFilter} onChange={(event) => setAreaFilter(event.target.value)} className={controlClass}>
                             <option value="all">Semua area</option>
@@ -197,7 +197,7 @@ export default function RecordingRetentionManager({
                             <option value={NO_AREA}>(Tanpa area)</option>
                         </select>
                     </div>
-                    <div>
+                    <div className="min-w-0">
                         <label htmlFor="rec-group" className="mb-1 block text-xs font-medium text-content-muted">Grup</label>
                         <select id="rec-group" value={groupFilter} onChange={(event) => setGroupFilter(event.target.value)} className={controlClass}>
                             <option value="all">Semua grup</option>
@@ -207,7 +207,7 @@ export default function RecordingRetentionManager({
                             <option value={UNGROUPED}>(Tanpa grup)</option>
                         </select>
                     </div>
-                    <div>
+                    <div className="min-w-0">
                         <label htmlFor="rec-status" className="mb-1 block text-xs font-medium text-content-muted">Status</label>
                         <select id="rec-status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className={controlClass}>
                             <option value="all">Semua status</option>
@@ -243,7 +243,7 @@ export default function RecordingRetentionManager({
             {/* ---- Bulk apply bar (filter / seleksi) ---- */}
             <div className="rounded-2xl border border-edge bg-surface-sunken p-4 shadow-sm md:p-5">
                 <div className="flex flex-wrap items-end gap-3">
-                    <div>
+                    <div className="min-w-0">
                         <label htmlFor="bulk-hours" className="mb-1 block text-xs font-medium text-content-muted">Set durasi retensi</label>
                         <DurationSelect id="bulk-hours" value={bulkHours} onChange={setBulkHours} disabled={bulkBusy} />
                     </div>
@@ -269,7 +269,7 @@ export default function RecordingRetentionManager({
             <details className="rounded-2xl border border-edge bg-surface p-4 shadow-sm md:p-5">
                 <summary className="cursor-pointer text-sm font-semibold text-content">Atur cepat per Area / Grup</summary>
                 <div className="mt-3 flex flex-wrap items-end gap-3">
-                    <div>
+                    <div className="min-w-0">
                         <label htmlFor="quick-scope" className="mb-1 block text-xs font-medium text-content-muted">Berdasarkan</label>
                         <select id="quick-scope" value={quickScope} onChange={(event) => setQuickScope(event.target.value)} className={controlClass}>
                             <option value="area">Area</option>
@@ -277,7 +277,7 @@ export default function RecordingRetentionManager({
                         </select>
                     </div>
                     {quickScope === 'area' ? (
-                        <div>
+                        <div className="min-w-0">
                             <label htmlFor="quick-area" className="mb-1 block text-xs font-medium text-content-muted">Pilih area</label>
                             <select id="quick-area" value={quickArea} onChange={(event) => setQuickArea(event.target.value)} className={controlClass}>
                                 <option value="">— pilih area —</option>
@@ -287,7 +287,7 @@ export default function RecordingRetentionManager({
                             </select>
                         </div>
                     ) : (
-                        <div>
+                        <div className="min-w-0">
                             <label htmlFor="quick-group" className="mb-1 block text-xs font-medium text-content-muted">Pilih grup</label>
                             <select id="quick-group" value={quickGroup} onChange={(event) => setQuickGroup(event.target.value)} className={controlClass}>
                                 <option value="">— pilih grup —</option>
@@ -297,7 +297,7 @@ export default function RecordingRetentionManager({
                             </select>
                         </div>
                     )}
-                    <div>
+                    <div className="min-w-0">
                         <label htmlFor="quick-hours" className="mb-1 block text-xs font-medium text-content-muted">Durasi retensi</label>
                         <DurationSelect id="quick-hours" value={quickHours} onChange={setQuickHours} disabled={bulkBusy} />
                     </div>

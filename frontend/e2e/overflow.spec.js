@@ -67,8 +67,12 @@ const CAMERAS = Array.from({ length: 8 }, (_, i) => ({
      * timeline, segment list, options, token access, usage guide, and now the affiliate slot — has
      * never once been on screen while this suite ran. The test passed for eight of them by never
      * rendering any of them.
+     *
+     * camera_class matters for the same reason: public archive is community-ONLY, so a camera
+     * without it is filtered out just as surely as one without enable_recording.
      */
     enable_recording: 1,
+    camera_class: 'community',
 }));
 
 /*

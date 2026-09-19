@@ -24,9 +24,11 @@ import { test, expect } from '@playwright/test';
 
 const CAMERAS = [
     { id: 1, name: 'SIMPANG 3 JAMBEAN', location: 'JL. BASUKI RAHMAT', area_id: 1, area_name: 'KEC BOJONEGORO',
-      status: 'active', enabled: 1, is_online: 1, enable_recording: 1, delivery_type: 'internal_hls' },
+      status: 'active', enabled: 1, is_online: 1, enable_recording: 1, delivery_type: 'internal_hls',
+      camera_class: 'community' },
     { id: 2, name: 'PEREMPATAN SOSRODILOGO', location: 'JL. DR SOETOMO', area_id: 1, area_name: 'KEC BOJONEGORO',
-      status: 'active', enabled: 1, is_online: 1, enable_recording: 1, delivery_type: 'internal_hls' },
+      status: 'active', enabled: 1, is_online: 1, enable_recording: 1, delivery_type: 'internal_hls',
+      camera_class: 'community' },
 ];
 
 /* delivery_type decides playback capability (getStreamCapabilities); without it the page correctly
