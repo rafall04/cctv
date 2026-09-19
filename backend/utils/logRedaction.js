@@ -1,9 +1,10 @@
 // Purpose: Strip embedded credentials out of free-text log lines before they are printed, and
 //          strip them out of URLs before they are handed to a client.
 // Caller: recordingService (FFmpeg output) + any log path that echoes third-party text
-//         (redactUrlCredentials); public camera projections (stripUrlCredentials).
+//         (redactUrlCredentials); public camera projections + camera-health debug payload
+//         (stripUrlCredentials, stripTargetCredentialsDeep).
 // Deps: None.
-// MainFuncs: redactUrlCredentials, stripUrlCredentials.
+// MainFuncs: redactUrlCredentials, stripUrlCredentials, stripTargetCredentialsDeep.
 // SideEffects: None; pure string transform.
 //
 // WHY THIS EXISTS SEPARATELY FROM maskRecordingSourceForLog
@@ -80,9 +81,10 @@ export function stripUrlCredentials(value) {
 }
 
 /**
- * Apply stripUrlCredentials to EVERY string in a nested value (objects, arrays, primitives), so a
- * client-facing payload whose detail object carries probe URLs cannot smuggle credentials through a
- * nested field. Non-strings are returned unchanged; safe to run over any structure.
+ * Recursively strip URL userinfo (`scheme://user:pass@host` → `scheme://host`) from every string
+ * in a details object before it is handed to a client. Used by the camera-health debug payload,
+ * whose `lastDetails`/`runtimeTarget`/`probeTarget` fields carry RTSP/HTTP probe targets that may
+ * embed camera credentials. Non-strings and plain values are returned unchanged.
  */
 export function stripTargetCredentialsDeep(value) {
     if (typeof value === 'string') {
