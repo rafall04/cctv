@@ -10,7 +10,6 @@ import { useCallback } from 'react';
 export function usePlaybackSelectionActions({
     sourceLoadTokenRef,
     playbackSourceRef,
-    lastSeekTimeRef,
     playbackSeekTargetRef,
     segmentsRef,
     queuedPlaybackPopunderRef,
@@ -23,7 +22,6 @@ export function usePlaybackSelectionActions({
     setDuration,
     setVideoError,
     setErrorType,
-    setSeekWarning,
     setAutoPlayNotification,
     setIsSeeking,
     setIsBuffering,
@@ -37,7 +35,6 @@ export function usePlaybackSelectionActions({
     } = {}) => {
         sourceLoadTokenRef.current += 1;
         playbackSourceRef.current = { segmentKey: null, streamUrl: null };
-        lastSeekTimeRef.current = 0;
         playbackSeekTargetRef.current = null;
         resetSourcePlaybackState();
 
@@ -45,7 +42,6 @@ export function usePlaybackSelectionActions({
         setDuration(0);
         setVideoError(null);
         setErrorType(null);
-        setSeekWarning(null);
 
         if (!preserveAutoPlayNotification) {
             setAutoPlayNotification(null);
@@ -61,7 +57,6 @@ export function usePlaybackSelectionActions({
 
         resetVideoElement();
     }, [
-        lastSeekTimeRef,
         playbackSeekTargetRef,
         playbackSourceRef,
         resetSourcePlaybackState,
@@ -71,7 +66,6 @@ export function usePlaybackSelectionActions({
         setCurrentTime,
         setDuration,
         setErrorType,
-        setSeekWarning,
         setSelectedSegment,
         setVideoError,
         sourceLoadTokenRef,
@@ -93,16 +87,13 @@ export function usePlaybackSelectionActions({
             replace: false,
         });
         setSelectedSegment(segment);
-        setSeekWarning(null);
         setAutoPlayNotification(null);
         setIsSeeking(false);
         setIsBuffering(false);
-        lastSeekTimeRef.current = 0;
         playbackSeekTargetRef.current = 0;
         resetSourcePlaybackState();
     }, [
         getSegmentKey,
-        lastSeekTimeRef,
         playbackSeekTargetRef,
         queuedPlaybackPopunderRef,
         resetSourcePlaybackState,
@@ -110,7 +101,6 @@ export function usePlaybackSelectionActions({
         setAutoPlayNotification,
         setIsBuffering,
         setIsSeeking,
-        setSeekWarning,
         setSelectedSegment,
         showPlaybackPopunder,
         updatePlaybackSearchParams,

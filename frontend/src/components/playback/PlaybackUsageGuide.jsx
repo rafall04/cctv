@@ -18,7 +18,7 @@ export default function PlaybackUsageGuide({ isAdminPlayback, playbackPolicy }) 
                 <div className="min-w-0 flex-1">
                     <h3 className="text-sm sm:text-base font-semibold text-content mb-2">Cara Menggunakan Playback</h3>
                     <ul className="space-y-1.5 break-words text-xs sm:text-sm text-content-muted">
-                        <li className="flex items-start gap-2"><span className="flex-shrink-0 mt-0.5">&bull;</span><span className="min-w-0"><strong>Skip Video:</strong> Maksimal lompat 3 menit per sekali skip</span></li>
+                        <li className="flex items-start gap-2"><span className="flex-shrink-0 mt-0.5">&bull;</span><span className="min-w-0"><strong>Skip Video:</strong> Geser atau klik batang video untuk lompat ke waktu mana pun</span></li>
                         <li className="flex items-start gap-2"><span className="flex-shrink-0 mt-0.5">&bull;</span><span className="min-w-0"><strong>Cari waktu:</strong> Klik pada batang waktu untuk melompat ke menit tertentu</span></li>
                         <li className="flex items-start gap-2"><span className="flex-shrink-0 mt-0.5">&bull;</span><span className="min-w-0"><strong>Kecepatan:</strong> Klik tombol di pojok kanan atas video (0.5x - 2x)</span></li>
                         {/* "di bawah" was true until the segment list moved above this guide. */}

@@ -33,8 +33,6 @@ const baseProps = {
     duration: 0,
     autoPlayNotification: null,
     onAutoPlayNotificationClose: vi.fn(),
-    seekWarning: null,
-    onSeekWarningClose: vi.fn(),
     snapshotNotification: null,
     formatTimestamp: (value) => value,
 };

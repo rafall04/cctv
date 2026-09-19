@@ -49,7 +49,6 @@ import { usePlaybackShareAndSnapshot } from '../hooks/playback/usePlaybackShareA
 import { usePlaybackTokenAccess } from '../hooks/playback/usePlaybackTokenAccess.js';
 import { usePlaybackViewerTracking } from '../hooks/playback/usePlaybackViewerTracking.js';
 
-const MAX_SEEK_DISTANCE = 180;
 const BUFFERING_STALL_THRESHOLD_MS = 350;
 function getSegmentKey(segment) {
     if (!segment) {
@@ -102,7 +101,6 @@ function Playback({
     const [isSeeking, setIsSeeking] = useState(false);
     const [isBuffering, setIsBuffering] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
-    const [seekWarning, setSeekWarning] = useState(null);
     const [autoPlayNotification, setAutoPlayNotification] = useState(null);
     const [autoPlayEnabled, setAutoPlayEnabled] = useState(() => {
         // Browsers that block site data (Chrome "block all", some in-app WebViews) THROW on any
@@ -231,7 +229,6 @@ function Playback({
         && (loading || !selectedCameraId || segmentsCameraId !== selectedCameraId);
     const videoRef = useRef(null);
     const containerRef = useRef(null);
-    const lastSeekTimeRef = useRef(0);
     const bufferingTimeoutRef = useRef(null);
     const playbackSourceRef = useRef({ segmentKey: null, streamUrl: null });
     const playbackSeekTargetRef = useRef(null);
@@ -419,7 +416,6 @@ function Playback({
     } = usePlaybackSelectionActions({
         sourceLoadTokenRef,
         playbackSourceRef,
-        lastSeekTimeRef,
         playbackSeekTargetRef,
         segmentsRef,
         queuedPlaybackPopunderRef,
@@ -432,7 +428,6 @@ function Playback({
         setDuration,
         setVideoError,
         setErrorType,
-        setSeekWarning,
         setAutoPlayNotification,
         setIsSeeking,
         setIsBuffering,
@@ -777,7 +772,6 @@ function Playback({
 
             if (playbackSeekTargetRef.current !== null) {
                 video.currentTime = playbackSeekTargetRef.current;
-                lastSeekTimeRef.current = playbackSeekTargetRef.current;
                 playbackSeekTargetRef.current = null;
             }
 
@@ -853,20 +847,9 @@ function Playback({
         };
 
         const handleSeeking = () => {
-            const targetTime = video.currentTime;
-            const previousTime = lastSeekTimeRef.current || 0;
-            const seekDistance = Math.abs(targetTime - previousTime);
-
-            if (seekDistance > MAX_SEEK_DISTANCE) {
-                const direction = targetTime > previousTime ? 1 : -1;
-                const limitedTarget = previousTime + (MAX_SEEK_DISTANCE * direction);
-                video.currentTime = limitedTarget;
-                lastSeekTimeRef.current = limitedTarget;
-                setSeekWarning({ type: 'limit' });
-            } else {
-                lastSeekTimeRef.current = targetTime;
-            }
-
+            // Segments are faststart MP4 (moov index first) over a range-capable endpoint, so a
+            // far seek is a direct byte-range jump to the target fragment — the old 3-minute
+            // clamp only guarded a cost that does not exist.
             setIsSeeking(true);
             setIsBuffering(true);
             setVideoError(null);
@@ -1104,7 +1087,6 @@ function Playback({
                     currentTime={currentTime} duration={duration}
                     autoPlayNotification={autoPlayNotification}
                     onAutoPlayNotificationClose={() => setAutoPlayNotification(null)}
-                    seekWarning={seekWarning} onSeekWarningClose={() => setSeekWarning(null)}
                     snapshotNotification={snapshotNotification}
                     onSnapshotNotificationClose={clearSnapshotNotification}
                     formatTimestamp={formatTimestamp}

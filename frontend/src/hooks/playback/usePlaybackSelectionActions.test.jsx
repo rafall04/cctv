@@ -13,7 +13,6 @@ function buildHookProps(overrides = {}) {
     return {
         sourceLoadTokenRef: { current: 4 },
         playbackSourceRef: { current: { segmentKey: 'id:7', streamUrl: '/stream/7' } },
-        lastSeekTimeRef: { current: 14 },
         playbackSeekTargetRef: { current: 28 },
         segmentsRef: { current: [{ id: 1 }] },
         queuedPlaybackPopunderRef: { current: null },
@@ -26,7 +25,6 @@ function buildHookProps(overrides = {}) {
         setDuration: vi.fn(),
         setVideoError: vi.fn(),
         setErrorType: vi.fn(),
-        setSeekWarning: vi.fn(),
         setAutoPlayNotification: vi.fn(),
         setIsSeeking: vi.fn(),
         setIsBuffering: vi.fn(),
@@ -50,14 +48,12 @@ describe('usePlaybackSelectionActions', () => {
 
         expect(props.sourceLoadTokenRef.current).toBe(5);
         expect(props.playbackSourceRef.current).toEqual({ segmentKey: null, streamUrl: null });
-        expect(props.lastSeekTimeRef.current).toBe(0);
         expect(props.playbackSeekTargetRef.current).toBe(null);
         expect(props.resetSourcePlaybackState).toHaveBeenCalledTimes(1);
         expect(props.setCurrentTime).toHaveBeenCalledWith(0);
         expect(props.setDuration).toHaveBeenCalledWith(0);
         expect(props.setVideoError).toHaveBeenCalledWith(null);
         expect(props.setErrorType).toHaveBeenCalledWith(null);
-        expect(props.setSeekWarning).toHaveBeenCalledWith(null);
         expect(props.setAutoPlayNotification).toHaveBeenCalledWith(null);
         expect(props.setSelectedSegment).toHaveBeenCalledWith(null);
         expect(props.segmentsRef.current).toEqual([]);
@@ -87,11 +83,9 @@ describe('usePlaybackSelectionActions', () => {
             replace: false,
         });
         expect(props.setSelectedSegment).toHaveBeenCalledWith(segment);
-        expect(props.setSeekWarning).toHaveBeenCalledWith(null);
         expect(props.setAutoPlayNotification).toHaveBeenCalledWith(null);
         expect(props.setIsSeeking).toHaveBeenCalledWith(false);
         expect(props.setIsBuffering).toHaveBeenCalledWith(false);
-        expect(props.lastSeekTimeRef.current).toBe(0);
         expect(props.playbackSeekTargetRef.current).toBe(0);
         expect(props.resetSourcePlaybackState).toHaveBeenCalledTimes(1);
     });
