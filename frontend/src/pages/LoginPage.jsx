@@ -324,7 +324,7 @@ export default function LoginPage() {
         const baseClass = "w-full pl-12 pr-4 py-3.5 bg-surface-sunken border rounded-xl text-content placeholder-content-subtle focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary transition-all disabled:opacity-50 disabled:cursor-not-allowed";
         
         if (fieldErrors[fieldName]) {
-            return `${baseClass} border-red-500 dark:border-red-500 focus:ring-red-500`;
+            return `${baseClass} border-status-fault focus:ring-status-fault`;
         }
         return `${baseClass} border-edge focus:ring-primary`;
     };
@@ -334,13 +334,13 @@ export default function LoginPage() {
         const baseClass = "w-full pl-12 pr-12 py-3.5 bg-surface-sunken border rounded-xl text-content placeholder-content-subtle focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary transition-all disabled:opacity-50 disabled:cursor-not-allowed";
         
         if (fieldErrors.password) {
-            return `${baseClass} border-red-500 dark:border-red-500 focus:ring-red-500`;
+            return `${baseClass} border-status-fault focus:ring-status-fault`;
         }
         return `${baseClass} border-edge focus:ring-primary`;
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-100 via-gray-50 to-gray-100 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 px-4 py-8 transition-colors">
+        <div className="min-h-screen flex items-center justify-center bg-surface-sunken px-4 py-8 transition-colors">
             {/* Background decoration */}
             <div className="fixed inset-0 overflow-hidden pointer-events-none">
                 <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl"></div>
@@ -375,25 +375,25 @@ export default function LoginPage() {
                 </div>
 
                 {/* Login Card */}
-                <div className="bg-white/80 dark:bg-gray-800/50 backdrop-blur-xl rounded-2xl shadow-2xl border border-gray-200/50 dark:border-gray-700/50 p-8">
+                <div className="bg-surface-raised/80 backdrop-blur-xl rounded-2xl shadow-2xl border border-edge p-8">
                     <form onSubmit={handleSubmit} className="space-y-6">
                         {/* Error Alert */}
                         {error && (
-                            <div role="alert" className="flex items-center gap-3 p-4 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded-xl">
-                                <div className="text-red-500 flex-shrink-0">
+                            <div role="alert" className="flex items-center gap-3 p-4 bg-status-fault/10 border border-status-fault/30 rounded-xl">
+                                <div className="text-status-fault flex-shrink-0">
                                     {(isRateLimited || isLocked) ? <Icons.Clock /> : <Icons.Alert />}
                                 </div>
                                 <div className="flex-1">
-                                    <p className="text-red-600 dark:text-red-400 text-sm font-medium">{error}</p>
+                                    <p className="text-status-fault text-sm font-medium">{error}</p>
                                     {/* Rate limit countdown (Requirements: 2.5) */}
                                     {isRateLimited && retryCountdown > 0 && (
-                                        <p className="text-red-500 dark:text-red-300 text-xs mt-1">
+                                        <p className="text-status-fault/80 text-xs mt-1">
                                             Retry in: <span className="font-mono font-semibold">{formatTime(retryCountdown)}</span>
                                         </p>
                                     )}
                                     {/* Lockout countdown (Requirements: 2.4) */}
                                     {isLocked && lockoutCountdown > 0 && (
-                                        <p className="text-red-500 dark:text-red-300 text-xs mt-1">
+                                        <p className="text-status-fault/80 text-xs mt-1">
                                             Try again in: <span className="font-mono font-semibold">{formatTime(lockoutCountdown)}</span>
                                         </p>
                                     )}
@@ -403,12 +403,12 @@ export default function LoginPage() {
 
                         {/* Warning Alert */}
                         {warning && (
-                            <div role="status" className="flex items-center gap-3 p-4 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-xl">
-                                <div className="text-amber-500 flex-shrink-0"><Icons.Warning /></div>
+                            <div role="status" className="flex items-center gap-3 p-4 bg-status-warn/10 border border-status-warn/30 rounded-xl">
+                                <div className="text-status-warn flex-shrink-0"><Icons.Warning /></div>
                                 <div className="flex-1">
-                                    <p className="text-amber-600 dark:text-amber-400 text-sm font-medium">{warning}</p>
+                                    <p className="text-status-warn text-sm font-medium">{warning}</p>
                                     {attemptsRemaining !== null && attemptsRemaining <= 2 && (
-                                        <p className="text-amber-500 dark:text-amber-300 text-xs mt-1">
+                                        <p className="text-status-warn/80 text-xs mt-1">
                                             Attempts remaining: <span className="font-semibold">{attemptsRemaining}</span>
                                         </p>
                                     )}
@@ -418,26 +418,26 @@ export default function LoginPage() {
 
                         {/* Account approval notice (pending / rejected) — calm info/warning, not an error */}
                         {accountNotice && (
-                            <div className={`flex items-start gap-3 p-4 rounded-xl border ${accountNotice.tone === 'info' ? 'bg-primary-100 dark:bg-primary/10 border-primary-300 border-primary-300' : 'bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/30'}`}>
-                                <div className={`flex-shrink-0 ${accountNotice.tone === 'info' ? 'text-primary' : 'text-amber-500'}`}>
+                            <div className={`flex items-start gap-3 p-4 rounded-xl border ${accountNotice.tone === 'info' ? 'bg-primary/10 border-primary/30' : 'bg-status-warn/10 border-status-warn/30'}`}>
+                                <div className={`flex-shrink-0 ${accountNotice.tone === 'info' ? 'text-primary' : 'text-status-warn'}`}>
                                     {accountNotice.tone === 'info' ? <Icons.Clock /> : <Icons.Warning />}
                                 </div>
                                 <div className="flex-1">
-                                    <p className={`text-sm font-semibold ${accountNotice.tone === 'info' ? 'text-primary text-primary' : 'text-amber-700 dark:text-amber-300'}`}>{accountNotice.title}</p>
-                                    <p className={`text-sm mt-0.5 ${accountNotice.tone === 'info' ? 'text-primary text-primary' : 'text-amber-600 dark:text-amber-400'}`}>{accountNotice.message}</p>
+                                    <p className={`text-sm font-semibold ${accountNotice.tone === 'info' ? 'text-primary' : 'text-status-warn'}`}>{accountNotice.title}</p>
+                                    <p className={`text-sm mt-0.5 ${accountNotice.tone === 'info' ? 'text-primary' : 'text-status-warn'}`}>{accountNotice.message}</p>
                                 </div>
                             </div>
                         )}
 
                         {/* Password Expiry Warning (Requirements: 2.8) */}
                         {passwordExpiryDays !== null && passwordExpiryDays <= 7 && (
-                            <div className="flex items-center gap-3 p-4 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-xl">
-                                <div className="text-amber-500 flex-shrink-0"><Icons.Warning /></div>
+                            <div className="flex items-center gap-3 p-4 bg-status-warn/10 border border-status-warn/30 rounded-xl">
+                                <div className="text-status-warn flex-shrink-0"><Icons.Warning /></div>
                                 <div className="flex-1">
-                                    <p className="text-amber-600 dark:text-amber-400 text-sm font-medium">
+                                    <p className="text-status-warn text-sm font-medium">
                                         Password Expiring Soon
                                     </p>
-                                    <p className="text-amber-500 dark:text-amber-300 text-xs mt-1">
+                                    <p className="text-status-warn/80 text-xs mt-1">
                                         Your password will expire in {passwordExpiryDays} day{passwordExpiryDays !== 1 ? 's' : ''}. 
                                         Please change it after logging in.
                                     </p>
@@ -471,7 +471,7 @@ export default function LoginPage() {
                             </div>
                             {/* Field-level error (Requirements: 2.1, 2.9) */}
                             {fieldErrors.username && (
-                                <p id="login-username-error" role="alert" className="mt-1.5 text-sm text-red-500 dark:text-red-400 flex items-center gap-1">
+                                <p id="login-username-error" role="alert" className="mt-1.5 text-sm text-status-fault flex items-center gap-1">
                                     <Icons.Alert />
                                     {fieldErrors.username}
                                 </p>
@@ -484,7 +484,7 @@ export default function LoginPage() {
                                 Password
                             </label>
                             <div className="relative">
-                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400">
+                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-content-subtle">
                                     <Icons.Key />
                                 </div>
                                 <input
@@ -514,7 +514,7 @@ export default function LoginPage() {
                             </div>
                             {/* Field-level error (Requirements: 2.2, 2.9) */}
                             {fieldErrors.password && (
-                                <p id="login-password-error" role="alert" className="mt-1.5 text-sm text-red-500 dark:text-red-400 flex items-center gap-1">
+                                <p id="login-password-error" role="alert" className="mt-1.5 text-sm text-status-fault flex items-center gap-1">
                                     <Icons.Alert />
                                     {fieldErrors.password}
                                 </p>
@@ -550,7 +550,7 @@ export default function LoginPage() {
 
                     {/* Register + Back Links */}
                     <div className="mt-6 pt-6 border-t border-edge space-y-3">
-                        <p className="text-center text-sm text-gray-500">
+                        <p className="text-center text-sm text-content-muted">
                             Mau sewa CCTV?{' '}
                             <a href="/daftar" className="font-semibold text-primary hover:underline">
                                 Daftar pelanggan baru

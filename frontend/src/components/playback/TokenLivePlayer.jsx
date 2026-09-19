@@ -188,7 +188,7 @@ export default function TokenLivePlayer({ camera, onClose }) {
                     {state.status === 'error' && (
                         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/80 p-6 text-center">
                             <span className="text-3xl">⚠️</span>
-                            <p className="text-sm text-red-300">{state.message}</p>
+                            <p className="text-sm text-status-fault">{state.message}</p>
                         </div>
                     )}
                 </div>

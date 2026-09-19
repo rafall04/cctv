@@ -151,7 +151,7 @@ function PlaybackDayCalendar({ value, days, onSelect, onClose }) {
                                 <span>{date.getDate()}</span>
                                 {/* Same green the coverage strip above uses for "Tersedia". */}
                                 <span
-                                    className={`mt-0.5 h-1.5 w-1.5 rounded-full ${recorded ? 'bg-emerald-500' : 'bg-transparent'}`}
+                                    className={`mt-0.5 h-1.5 w-1.5 rounded-full ${recorded ? 'bg-status-live' : 'bg-transparent'}`}
                                     aria-hidden="true"
                                 />
                             </button>
@@ -161,7 +161,7 @@ function PlaybackDayCalendar({ value, days, onSelect, onClose }) {
 
                 {/* items-start + mt: centred, the dot floats between the two wrapped lines. */}
                 <p className="mt-3 flex items-start gap-1.5 text-[11px] leading-relaxed text-content-muted">
-                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" aria-hidden="true" />
+                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-status-live" aria-hidden="true" />
                     Ada rekaman. Tanggal tanpa titik tidak bisa dipilih karena rekamannya sudah terhapus.
                 </p>
             </div>

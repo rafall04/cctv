@@ -45,7 +45,7 @@ const SaweriaSupport = lazyWithRetry(() => import('../components/SaweriaSupport'
 function DeferredSurfaceFallback({ className = '' }) {
     return (
         <div
-            className={`rounded-3xl border border-gray-200/70 bg-white/80 shadow-sm dark:border-gray-700/60 dark:bg-gray-900/70 ${className}`}
+            className={`rounded-3xl border border-edge bg-surface-raised/80 shadow-e1 ${className}`}
             aria-hidden="true"
         />
     );

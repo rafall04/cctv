@@ -1038,7 +1038,7 @@ function Playback({
         return (
             <div className="flex items-center justify-center min-h-screen bg-surface-sunken">
                 <div className="text-center max-w-xl mx-auto px-4">
-                    <svg className="w-20 h-20 mx-auto mb-6 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-20 h-20 mx-auto mb-6 text-status-warn" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01M5.071 19h13.858c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                     </svg>
                     <h3 className="text-xl font-semibold text-content mb-2">

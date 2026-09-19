@@ -120,8 +120,8 @@ const TimelineBands = memo(function TimelineBands({ bands, gaps, selectedSegment
                     onClick={(e) => { e.stopPropagation(); onSegmentClick(band.segment); }}
                     className={`absolute h-full cursor-pointer transition-colors ${
                         selectedSegmentId === band.segment.id
-                            ? 'bg-primary-500'
-                            : 'bg-emerald-500 hover:bg-emerald-600'
+                            ? 'bg-primary'
+                            : 'bg-status-live hover:opacity-80'
                     }`}
                     style={{ left: `${band.left}%`, width: `${band.width}%` }}
                     title={bandTitle(band.segment)}
@@ -131,7 +131,7 @@ const TimelineBands = memo(function TimelineBands({ bands, gaps, selectedSegment
             {gaps.map((gap) => (
                 <div
                     key={gap.key}
-                    className="absolute h-full bg-red-500/30"
+                    className="absolute h-full bg-status-fault/30"
                     style={{ left: `${gap.left}%`, width: `${gap.width}%` }}
                     title={`Hilang: ${gap.minutes} menit`}
                 />
@@ -226,7 +226,7 @@ function PlaybackTimeline({
     if (timelineData.start === null && !canBrowseDays) return null;
 
     return (
-        <div className="bg-white dark:bg-gray-900 rounded-lg sm:rounded-xl p-3 sm:p-4 md:p-6 shadow-lg">
+        <div className="bg-surface-raised rounded-card p-3 sm:p-4 md:p-6 shadow-e1">
             {/*
               * "Cari waktu", bukan "Timeline". Kartu ini memuat DUA pekerjaan: memilih hari dan
               * rentang (CoverageStrip + RangePicker tepat di bawah judul ini) serta menggeser
@@ -261,9 +261,9 @@ function PlaybackTimeline({
                 </p>
             ) : (
             <div className="mb-4 sm:mb-6">
-                <div className="flex justify-between text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2">
+                <div className="flex justify-between text-xs sm:text-sm text-content-muted mb-2">
                     <span>{formatBoundLabel(timelineData.start, spansDays, timezone)}</span>
-                    {hoverLabel && <span className="font-semibold text-gray-900 dark:text-white">{hoverLabel}</span>}
+                    {hoverLabel && <span className="font-semibold text-content">{hoverLabel}</span>}
                     <span>{formatBoundLabel(timelineData.end, spansDays, timezone)}</span>
                 </div>
 
@@ -272,7 +272,7 @@ function PlaybackTimeline({
                     onClick={handleTimelineClick}
                     onMouseMove={handleTimelineHover}
                     onMouseLeave={handleTimelineLeave}
-                    className="relative h-8 sm:h-10 md:h-12 bg-gray-200 dark:bg-gray-800 rounded-lg overflow-hidden cursor-pointer"
+                    className="relative h-8 sm:h-10 md:h-12 bg-surface-sunken rounded-lg overflow-hidden cursor-pointer"
                 >
                     <TimelineBands
                         bands={timelineData.bands}
@@ -286,14 +286,14 @@ function PlaybackTimeline({
 
                     {playheadOffset !== null && (
                         <div
-                            className="pointer-events-none absolute top-0 bottom-0 z-10 w-0.5 bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.45)]"
+                            className="pointer-events-none absolute top-0 bottom-0 z-raised w-0.5 bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.45)]"
                             style={{ left: `${playheadOffset}%` }}
                             aria-hidden="true"
                         />
                     )}
                     {hoverPercent !== null && (
                         <div
-                            className="pointer-events-none absolute top-0 bottom-0 z-[5] w-px bg-white/60"
+                            className="pointer-events-none absolute top-0 bottom-0 w-px bg-white/60"
                             style={{ left: `${hoverPercent}%` }}
                             aria-hidden="true"
                         />
@@ -304,15 +304,15 @@ function PlaybackTimeline({
                   * the Android 1.5x font scale, i.e. wider than a 320px phone. */}
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-3 text-xs text-content-muted">
                     <div className="flex items-center gap-2">
-                        <div className="w-4 h-4 shrink-0 bg-emerald-500 rounded"></div>
+                        <div className="w-4 h-4 shrink-0 bg-status-live rounded"></div>
                         <span>Tersedia</span>
                     </div>
                     <div className="flex items-center gap-2">
-                        <div className="w-4 h-4 shrink-0 bg-primary-500 rounded"></div>
+                        <div className="w-4 h-4 shrink-0 bg-primary rounded"></div>
                         <span>Diputar</span>
                     </div>
                     <div className="flex items-center gap-2">
-                        <div className="w-4 h-4 shrink-0 bg-red-500/30 rounded"></div>
+                        <div className="w-4 h-4 shrink-0 bg-status-fault/30 rounded"></div>
                         <span>Hilang</span>
                     </div>
                 </div>

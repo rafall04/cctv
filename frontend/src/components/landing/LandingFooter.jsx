@@ -111,7 +111,9 @@ export default function Footer({ saweriaEnabled, saweriaLink, branding }) {
                             href={saweriaLink}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-2 rounded-control bg-amber-500 px-6 py-3 font-semibold text-white transition-colors hover:bg-amber-600"
+                            /* amber-700 for the same reason as WhatsApp's green-700 above: white
+                               on amber-500 measures ~2.0 against the 4.5 WCAG AA floor. */
+                            className="inline-flex items-center gap-2 rounded-control bg-amber-700 px-6 py-3 font-semibold text-white transition-colors hover:bg-amber-800"
                         >
                             <Icons.Coffee />
                             <span>Traktir Kopi</span>

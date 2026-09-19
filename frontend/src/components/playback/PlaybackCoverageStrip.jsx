@@ -112,7 +112,7 @@ function PlaybackCoverageStrip({ coverage, range, onRangeChange }) {
                 {strip.bands.map((band) => (
                     <span
                         key={band.key}
-                        className="absolute top-0 h-full bg-emerald-500/70"
+                        className="absolute top-0 h-full bg-status-live/70"
                         style={{ left: `${band.left}%`, width: `${band.width}%` }}
                     />
                 ))}
@@ -120,7 +120,7 @@ function PlaybackCoverageStrip({ coverage, range, onRangeChange }) {
                 {strip.holes.map((hole) => (
                     <span
                         key={hole.key}
-                        className="absolute top-0 h-full bg-red-500/30"
+                        className="absolute top-0 h-full bg-status-fault/30"
                         style={{ left: `${hole.left}%`, width: `${hole.width}%` }}
                         title={`Tidak ada rekaman: ${hole.hours} jam`}
                     />

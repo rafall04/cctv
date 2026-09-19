@@ -60,7 +60,7 @@ function SimpleHeader({ branding, layoutMode, onLayoutToggle, disableHeavyEffect
     };
 
     return (
-        <header className={`sticky top-0 z-[1001] bg-surface ${disableAnimations ? '' : 'supports-[backdrop-filter]:bg-surface/85 supports-[backdrop-filter]:backdrop-blur-lg'} border-b border-edge`}>
+        <header className={`sticky top-0 z-map-chrome bg-surface ${disableAnimations ? '' : 'supports-[backdrop-filter]:bg-surface/85 supports-[backdrop-filter]:backdrop-blur-lg'} border-b border-edge`}>
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between h-14">
                     <div className="flex min-w-0 items-center gap-2.5">

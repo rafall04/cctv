@@ -138,13 +138,13 @@ export default function FeedbackWidget() {
                     <div className="p-4">
                         {isSuccess ? (
                             <div className="text-center py-8">
-                                <div className="text-emerald-500 flex justify-center mb-3">
+                                <div className="text-status-live flex justify-center mb-3">
                                     <Icons.Check />
                                 </div>
-                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
+                                <h3 className="text-lg font-semibold text-content mb-1">
                                     Terima Kasih!
                                 </h3>
-                                <p className="text-sm text-gray-500 dark:text-gray-400">
+                                <p className="text-sm text-content-muted">
                                     Kritik dan saran Anda telah kami terima
                                 </p>
                             </div>
@@ -180,13 +180,13 @@ export default function FeedbackWidget() {
                                         maxLength={1000}
                                         required
                                     />
-                                    <div className="text-xs text-gray-400 text-right mt-1">
+                                    <div className="text-xs text-content-subtle text-right mt-1">
                                         {form.message.length}/1000
                                     </div>
                                 </div>
 
                                 {error && (
-                                    <div className="text-sm text-red-500 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg">
+                                    <div className="text-sm text-status-fault bg-status-fault/10 px-3 py-2 rounded-lg">
                                         {error}
                                     </div>
                                 )}

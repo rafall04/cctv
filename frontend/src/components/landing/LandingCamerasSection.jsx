@@ -38,7 +38,7 @@ export function renderSearchDropdown({
 }) {
     if (searchQuery.trim() && cameras.length === 0) {
         return (
-            <div className="absolute left-0 right-0 top-full z-[1100] mt-2 rounded-card border border-edge bg-surface-overlay p-6 text-center shadow-e2">
+            <div className="absolute left-0 right-0 top-full z-map-chrome mt-2 rounded-card border border-edge bg-surface-overlay p-6 text-center shadow-e2">
                 <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-card bg-surface-sunken text-content-subtle">
                     <Icons.Search />
                 </div>
@@ -57,7 +57,7 @@ export function renderSearchDropdown({
     const hasHiddenResults = visibleCameras.length < cameras.length;
 
     return (
-        <div className="absolute left-0 right-0 top-full z-[1100] mt-2 max-h-[300px] overflow-y-auto rounded-card border border-edge bg-surface-overlay shadow-e2 sm:max-h-[400px]">
+        <div className="absolute left-0 right-0 top-full z-map-chrome mt-2 max-h-[300px] overflow-y-auto rounded-card border border-edge bg-surface-overlay shadow-e2 sm:max-h-[400px]">
             <div className="sticky top-0 border-b border-edge bg-surface-sunken px-3 py-2">
                 <span className="font-mono text-[11px] tabular-nums text-content-muted">
                     {hasHiddenResults ? `${visibleCameras.length} dari ${cameras.length}` : cameras.length} hasil pencarian

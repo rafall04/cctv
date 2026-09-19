@@ -140,7 +140,7 @@ export default function PlaybackVideo({
                 desc: 'Browser Anda tidak mendukung codec H.265/HEVC yang digunakan kamera ini. Coba gunakan browser lain seperti Safari.',
                 color: 'yellow',
                 icon: (
-                    <svg className="w-10 h-10 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="w-10 h-10 text-status-warn" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                     </svg>
                 )
@@ -152,7 +152,7 @@ export default function PlaybackVideo({
                 desc: 'Video sempat berjalan lalu berhenti. Biasanya sementara - coba putar ulang.',
                 color: 'yellow',
                 icon: (
-                    <svg className="w-10 h-10 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <svg className="w-10 h-10 text-status-warn" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                 ),
@@ -162,7 +162,7 @@ export default function PlaybackVideo({
                 desc: 'Tidak dapat terhubung ke server. Periksa koneksi internet Anda.',
                 color: 'orange',
                 icon: (
-                    <svg className="w-10 h-10 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <svg className="w-10 h-10 text-status-warn" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M15.536 8.464a5 5 0 010 7.072m0 0l-2.829-2.829m-4.243 2.829a4.978 4.978 0 01-1.414-2.83m-1.414 5.658a9 9 0 01-2.167-9.238m7.824 2.167a1 1 0 111.414 1.414m-1.414-1.414L3 3m8.293 8.293l1.414 1.414"/>
                     </svg>
                 )
@@ -172,7 +172,7 @@ export default function PlaybackVideo({
                 desc: 'Terjadi kesalahan saat memuat video. Silakan coba lagi.',
                 color: 'red',
                 icon: (
-                    <svg className="w-10 h-10 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <svg className="w-10 h-10 text-status-fault" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                     </svg>
                 )
@@ -182,9 +182,9 @@ export default function PlaybackVideo({
     };
 
     const errorColorClasses = {
-        yellow: 'bg-yellow-500/20',
-        orange: 'bg-orange-500/20',
-        red: 'bg-red-500/20'
+        yellow: 'bg-status-warn/20',
+        orange: 'bg-status-warn/20',
+        red: 'bg-status-fault/20'
     };
 
     const formatTime = (seconds) => {
@@ -195,21 +195,21 @@ export default function PlaybackVideo({
     };
 
     return (
-        <div className="bg-white dark:bg-gray-900 rounded-lg sm:rounded-xl overflow-hidden shadow-lg">
+        <div className="bg-surface-raised rounded-card overflow-hidden shadow-e1">
             {autoPlayNotification && (
                 <div className="relative z-50 p-3 sm:p-4">
                     <div className={`px-4 sm:px-5 py-3 rounded-xl shadow-2xl border-2 ${
-                        autoPlayNotification.type === 'complete' 
-                            ? 'bg-green-500 border-green-400'
+                        autoPlayNotification.type === 'complete'
+                            ? 'bg-status-live border-status-live'
                             : autoPlayNotification.type === 'gap'
-                            ? 'bg-yellow-500 border-yellow-400'
+                            ? 'bg-status-warn border-status-warn'
                             : autoPlayNotification.type === 'enabled'
-                            ? 'bg-green-500 border-green-400'
+                            ? 'bg-status-live border-status-live'
                             : autoPlayNotification.type === 'disabled'
-                            ? 'bg-gray-500 border-gray-400'
+                            ? 'bg-status-idle border-status-idle'
                             : autoPlayNotification.type === 'stopped'
-                            ? 'bg-gray-500 border-gray-400'
-                            : 'bg-blue-500 border-blue-400'
+                            ? 'bg-status-idle border-status-idle'
+                            : 'bg-primary border-primary'
                     } text-white`}>
                         <div className="flex items-start gap-3">
                             {autoPlayNotification.type === 'complete' || autoPlayNotification.type === 'enabled' ? (
@@ -234,7 +234,7 @@ export default function PlaybackVideo({
                             </div>
                             <button
                                 onClick={onAutoPlayNotificationClose}
-                                className="flex-shrink-0 text-white hover:text-gray-200 transition-colors"
+                                className="flex-shrink-0 text-white/80 hover:text-white transition-colors"
                                 aria-label="Tutup"
                             >
                                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
@@ -245,10 +245,10 @@ export default function PlaybackVideo({
                     </div>
                 </div>
             )}
-            
+
             {seekWarning && (
                 <div className="relative z-50 p-3 sm:p-4">
-                    <div className="bg-blue-500 text-white px-4 sm:px-5 py-3 rounded-xl shadow-2xl border-2 border-blue-400">
+                    <div className="bg-primary text-white px-4 sm:px-5 py-3 rounded-xl shadow-2xl border-2 border-primary">
                         <div className="flex items-start gap-3">
                             <svg className="w-6 h-6 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                                 <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
@@ -258,7 +258,7 @@ export default function PlaybackVideo({
                             </div>
                             <button
                                 onClick={onSeekWarningClose}
-                                className="flex-shrink-0 text-white hover:text-blue-200 transition-colors"
+                                className="flex-shrink-0 text-white/80 hover:text-white transition-colors"
                                 aria-label="Tutup"
                             >
                                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
@@ -293,9 +293,9 @@ export default function PlaybackVideo({
                     >
                         <div className="max-w-sm text-center">
                             {isLoadingSegments ? (
-                                <div className="mx-auto mb-4 h-14 w-14 animate-spin rounded-full border-4 border-white/15 border-t-sky-300" />
+                                <div className="mx-auto mb-4 h-14 w-14 animate-spin rounded-full border-4 border-white/15 border-t-primary" />
                             ) : (
-                                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10 text-sky-200 ring-1 ring-white/15">
+                                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10 text-primary ring-1 ring-white/15">
                                     <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
                                         <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                                     </svg>
@@ -355,7 +355,7 @@ export default function PlaybackVideo({
                                     // untuk video yang sudah jalan lagi.
                                     onRetry?.();
                                 }}
-                                className="inline-flex items-center gap-2 px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white rounded-lg font-medium transition-colors"
+                                className="inline-flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-600 text-white rounded-lg font-medium transition-colors"
                             >
                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -407,7 +407,7 @@ export default function PlaybackVideo({
                         className={`min-h-11 min-w-11 px-2 py-1 sm:min-h-0 sm:min-w-0 sm:px-3 sm:py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all shadow-lg ${
                             playbackSpeed === 1
                                 ? 'bg-black/70 text-white hover:bg-black/90'
-                                : 'bg-primary-500 text-white'
+                                : 'bg-primary text-white'
                         }`}
                         title={`Kecepatan ${playbackSpeed}x — ketuk untuk ganti`}
                         aria-label={`Kecepatan pemutaran ${playbackSpeed}x, ketuk untuk mengganti`}
@@ -480,8 +480,8 @@ export default function PlaybackVideo({
                     <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
                         <div className={`px-5 py-3 rounded-xl shadow-2xl border-2 ${
                             snapshotNotification.type === 'success'
-                                ? 'bg-green-500 border-green-400'
-                                : 'bg-red-500 border-red-400'
+                                ? 'bg-status-live border-status-live'
+                                : 'bg-status-fault border-status-fault'
                         } text-white animate-slide-down`}>
                             <div className="flex items-center gap-3">
                                 {snapshotNotification.type === 'success' ? (
@@ -510,12 +510,12 @@ export default function PlaybackVideo({
             </div>
             
             {selectedCamera?.video_codec && selectedCamera.video_codec === 'h265' && (
-                <div className="p-3 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-200 dark:border-gray-700">
-                    <div className="flex items-start gap-2 px-3 py-2 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
-                        <svg className="w-4 h-4 text-yellow-400 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                <div className="p-3 bg-surface-sunken border-t border-edge">
+                    <div className="flex items-start gap-2 px-3 py-2 bg-status-warn/10 border border-status-warn/20 rounded-lg">
+                        <svg className="w-4 h-4 text-status-warn shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                         </svg>
-                        <div className="flex-1 text-xs text-yellow-400 dark:text-yellow-400">
+                        <div className="flex-1 text-xs text-status-warn">
                             <strong>Codec H.265:</strong> Terbaik di Safari. Chrome/Edge tergantung hardware device.
                         </div>
                     </div>
