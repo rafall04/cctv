@@ -45,6 +45,7 @@ export default function PlaybackSettingsPanel() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+    const [whatsappNumber, setWhatsappNumber] = useState('');
 
     const loadSettings = useCallback(async () => {
         try {
@@ -65,6 +66,7 @@ export default function PlaybackSettingsPanel() {
                 public_playback_notice_text: data.public_playback_notice_text || DEFAULT_SETTINGS.public_playback_notice_text,
                 public_playback_contact_mode: data.public_playback_contact_mode || 'branding_whatsapp',
             });
+            setWhatsappNumber(String(data.whatsapp_number || '').trim());
         } catch (requestError) {
             console.error('Failed to load playback settings:', requestError);
             showError('Gagal Memuat', 'Gagal memuat pengaturan playback.');
@@ -217,6 +219,17 @@ export default function PlaybackSettingsPanel() {
                         <p className="mt-2 text-xs text-content-muted">
                             Kontak publik akan memakai `whatsapp_number` yang sudah ada di Branding Settings.
                         </p>
+                        {settings.public_playback_contact_mode === 'branding_whatsapp' && (
+                            whatsappNumber ? (
+                                <p className="mt-2 text-xs text-status-live">
+                                    Kontak aktif: {whatsappNumber} — tombol &quot;Hubungi Admin&quot; tampil di halaman publik.
+                                </p>
+                            ) : (
+                                <p className="mt-2 text-xs text-status-warn">
+                                    whatsapp_number masih kosong — tombol &quot;Hubungi Admin&quot; tidak tampil di halaman publik. Isi di tab Branding → Informasi Perusahaan.
+                                </p>
+                            )
+                        )}
                     </div>
                 </div>
 
