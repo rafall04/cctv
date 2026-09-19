@@ -11,23 +11,8 @@ import { getApiUrl } from '../../config/config.js';
 import { testBackendReachability } from '../../utils/connectionTester';
 
 function resolveHealthUrl() {
-    const hostname = window.location.hostname;
-    const protocol = window.location.protocol;
     const apiBaseUrl = getApiUrl().replace(/\/$/, '');
-
-    if (!apiBaseUrl) {
-        return '/health';
-    }
-
-    if (protocol === 'https:') {
-        const frontendDomain = import.meta.env.VITE_FRONTEND_DOMAIN || hostname;
-        if (hostname === frontendDomain) {
-            return `${apiBaseUrl}/health`;
-        }
-        return `${protocol}//${hostname.replace('cctv.', 'api-cctv.')}/health`;
-    }
-
-    return `${apiBaseUrl}/health`;
+    return apiBaseUrl ? `${apiBaseUrl}/health` : '/health';
 }
 
 export { resolveHealthUrl };

@@ -62,6 +62,20 @@ afterEach(() => {
         const { resolveHealthUrl } = await import('./useLandingReachability.js');
         expect(resolveHealthUrl()).toBe('https://api-cctv.raf.my.id/health');
     });
+
+    it('keeps a relative api base relative over https — never derives an api-* sibling host', async () => {
+        getApiUrlMock.mockReturnValue('/api');
+        Object.defineProperty(window, 'location', {
+            configurable: true,
+            value: {
+                hostname: 'cctv.raf.my.id',
+                protocol: 'https:',
+            },
+        });
+
+        const { resolveHealthUrl } = await import('./useLandingReachability.js');
+        expect(resolveHealthUrl()).toBe('/api/health');
+    });
 });
 
 describe('useLandingReachability', () => {
