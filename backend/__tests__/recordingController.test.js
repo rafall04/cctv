@@ -71,4 +71,18 @@ describe('recordingController', () => {
         });
         expect(createReadStreamMock).not.toHaveBeenCalled();
     });
+
+    it('marks segment streams non-cacheable so the CDN cannot collapse range requests', async () => {
+        const reply = createReply();
+
+        await streamSegment({
+            params: { cameraId: 7, filename: '20260517_010000.mp4' },
+            headers: { range: 'bytes=0-10' },
+        }, reply);
+
+        // `public` membiarkan Cloudflare menarik seluruh segmen untuk mengisi cache edge saat
+        // klien hanya meminta satu rentang byte - seek jauh lalu menunggu fill ratusan MB.
+        expect(reply.header).toHaveBeenCalledWith('Cache-Control', 'private, no-store');
+        expect(reply.code).toHaveBeenCalledWith(206);
+    });
 });

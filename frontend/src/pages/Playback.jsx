@@ -50,6 +50,9 @@ import { usePlaybackTokenAccess } from '../hooks/playback/usePlaybackTokenAccess
 import { usePlaybackViewerTracking } from '../hooks/playback/usePlaybackViewerTracking.js';
 
 const BUFFERING_STALL_THRESHOLD_MS = 350;
+// Seek yang byte-nya tak pernah datang membuat `seeked` tak pernah terbit dan overlay
+// "Memuat video" terkunci selamanya — batas ini mengubahnya jadi galat yang bisa di-retry.
+const SEEK_STALL_TIMEOUT_MS = 30000;
 function getSegmentKey(segment) {
     if (!segment) {
         return null;
@@ -230,6 +233,7 @@ function Playback({
     const videoRef = useRef(null);
     const containerRef = useRef(null);
     const bufferingTimeoutRef = useRef(null);
+    const seekTimeoutRef = useRef(null);
     const playbackSourceRef = useRef({ segmentKey: null, streamUrl: null });
     const playbackSeekTargetRef = useRef(null);
     const sourceLoadTokenRef = useRef(0);
@@ -371,6 +375,10 @@ function Playback({
         if (bufferingTimeoutRef.current) {
             clearTimeout(bufferingTimeoutRef.current);
             bufferingTimeoutRef.current = null;
+        }
+        if (seekTimeoutRef.current) {
+            clearTimeout(seekTimeoutRef.current);
+            seekTimeoutRef.current = null;
         }
     }, []);
 
@@ -854,6 +862,16 @@ function Playback({
             setIsBuffering(true);
             setVideoError(null);
             setErrorType(null);
+
+            resetBufferingTimeout();
+            seekTimeoutRef.current = setTimeout(() => {
+                seekTimeoutRef.current = null;
+                if (!hasActiveSource()) return;
+                setIsSeeking(false);
+                setIsBuffering(false);
+                setErrorType('stalled');
+                setVideoError('Lompatan video terlalu lama dimuat');
+            }, SEEK_STALL_TIMEOUT_MS);
         };
 
         const handleSeeked = () => {

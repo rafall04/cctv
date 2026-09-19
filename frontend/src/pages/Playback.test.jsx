@@ -95,11 +95,13 @@ vi.mock('../components/playback/PlaybackHeader', () => ({
 }));
 
 vi.mock('../components/playback/PlaybackVideo', () => ({
-    default: ({ selectedSegment, videoRef, isBuffering, isSeeking, autoPlayNotification }) => (
+    default: ({ selectedSegment, videoRef, isBuffering, isSeeking, autoPlayNotification, videoError, errorType }) => (
         <div>
             <div data-testid="video-segment">{selectedSegment?.id ?? 'none'}</div>
             <div data-testid="buffering-state">{String(isBuffering)}</div>
             <div data-testid="seeking-state">{String(isSeeking)}</div>
+            <div data-testid="error-type">{errorType ?? ''}</div>
+            <div data-testid="error-state">{String(Boolean(videoError))}</div>
             <div data-testid="autoplay-note">{autoPlayNotification?.message ?? ''}</div>
             <video data-testid="playback-video" ref={videoRef} />
         </div>
@@ -1254,6 +1256,88 @@ describe('Playback', () => {
         await waitFor(() => {
             expect(screen.getByTestId('buffering-state').textContent).toBe('false');
         });
+    });
+
+    it('seek yang byte-nya tidak pernah datang berubah menjadi galat stalled yang bisa di-retry', async () => {
+        render(
+            <TestRouter initialEntries={['/playback?mode=full&view=playback&cam=1']}>
+                <Playback
+                    cameras={[
+                        { id: 1, name: 'Lobby', enable_recording: 1 },
+                    ]}
+                />
+            </TestRouter>
+        );
+
+        await waitFor(() => {
+            expect(screen.getByTestId('video-segment').textContent).toBe('seg-2');
+        });
+
+        const video = screen.getByTestId('playback-video');
+        await waitFor(() => {
+            expect(video.getAttribute('src')).toBe('/stream/1/seg-2.mp4');
+        });
+        await act(async () => {
+            await Promise.resolve();
+        });
+
+        vi.useFakeTimers();
+        act(() => {
+            dispatchMediaEvent(video, 'seeking');
+        });
+        expect(screen.getByTestId('seeking-state').textContent).toBe('true');
+
+        // `seeked` tidak pernah terbit - byte target tidak kunjung tiba.
+        act(() => {
+            vi.advanceTimersByTime(30000);
+        });
+
+        expect(screen.getByTestId('seeking-state').textContent).toBe('false');
+        expect(screen.getByTestId('error-type').textContent).toBe('stalled');
+        expect(screen.getByTestId('error-state').textContent).toBe('true');
+    });
+
+    it('seek timeout tidak bocor ke sumber baru saat kamera diganti', async () => {
+        render(
+            <TestRouter initialEntries={['/playback?mode=full&view=playback&cam=1']}>
+                <Playback
+                    cameras={[
+                        { id: 1, name: 'Lobby', enable_recording: 1 },
+                        { id: 2, name: 'Gudang', enable_recording: 1 },
+                    ]}
+                />
+            </TestRouter>
+        );
+
+        await waitFor(() => {
+            expect(screen.getByTestId('video-segment').textContent).toBe('seg-2');
+        });
+
+        const video = screen.getByTestId('playback-video');
+        await waitFor(() => {
+            expect(video.getAttribute('src')).toBe('/stream/1/seg-2.mp4');
+        });
+        await act(async () => {
+            await Promise.resolve();
+        });
+
+        vi.useFakeTimers();
+        act(() => {
+            dispatchMediaEvent(video, 'seeking');
+        });
+        expect(screen.getByTestId('seeking-state').textContent).toBe('true');
+
+        // Ganti kamera di tengah seek yang menggantung - timer lama harus mati bersama
+        // reset sumber, bukan menembakkan galat stalled ke sumber yang baru.
+        act(() => {
+            fireEvent.click(screen.getByText('ganti-kamera'));
+        });
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(30000);
+        });
+
+        expect(screen.getByTestId('error-type').textContent).toBe('');
+        expect(screen.getByTestId('error-state').textContent).toBe('false');
     });
 
     it('waiting dan stalled saat manual pause tidak memunculkan buffering overlay', async () => {

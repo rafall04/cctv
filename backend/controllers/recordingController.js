@@ -128,7 +128,12 @@ export async function streamSegment(request, reply) {
         reply.header('Content-Type', 'video/mp4');
         reply.header('Content-Length', stats.size);
         reply.header('Accept-Ranges', 'bytes');
-        reply.header('Cache-Control', 'public, max-age=3600');
+        // `public` dulu membiarkan Cloudflare men-cache segmen MP4 di edge. Pada cache MISS,
+        // CF menarik SELURUH objek dari origin (header Range client ditelan) lalu melayani
+        // irisan byte dari proses fill itu — seek jauh ke segmen yang belum ter-cache menunggu
+        // fill ~136MB selesai, dan video "Memuat" selamanya. Kontennya juga gated per-kamera,
+        // jadi tidak ada alasan menyimpannya di cache bersama.
+        reply.header('Cache-Control', 'private, no-store');
 
         const range = normalizeRecordingRange({
             rangeHeader: request.headers?.range,
