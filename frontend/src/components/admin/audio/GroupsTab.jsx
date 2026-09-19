@@ -9,7 +9,8 @@
  */
 
 import { useState } from 'react';
-import { Button, EmptyState } from '../../ui';
+import { Button, EmptyState, Field } from '../../ui';
+import { useConfirm } from '../../../contexts/ConfirmContext';
 import CameraMultiSelect from './CameraMultiSelect';
 
 function GroupEditor({ initialName = '', initialIds = [], cameras, onCancel, onSave, saving }) {
@@ -17,14 +18,13 @@ function GroupEditor({ initialName = '', initialIds = [], cameras, onCancel, onS
     const [ids, setIds] = useState(initialIds);
     return (
         <div className="space-y-3 rounded-card border border-edge bg-surface-sunken p-3">
-            <input
-                type="text"
+            <Field
+                label="Nama grup"
                 autoFocus
                 value={name}
                 maxLength={80}
-                placeholder="Nama grup, mis. Musholla / Pasar / Sekolah"
+                placeholder="mis. Musholla / Pasar / Sekolah"
                 onChange={(e) => setName(e.target.value)}
-                className="w-full rounded-control border border-edge bg-surface px-3 py-2 text-sm text-content focus:border-primary focus:outline-none"
             />
             {/* Plain picker (no nested groups) to choose members across any area. */}
             <CameraMultiSelect cameras={cameras} value={ids} onChange={setIds} />
@@ -40,6 +40,7 @@ export default function GroupsTab({ groups = [], cameras = [], onSaveGroup, onUp
     const [creating, setCreating] = useState(false);
     const [editingId, setEditingId] = useState(null);
     const [saving, setSaving] = useState(false);
+    const confirm = useConfirm();
 
     const create = async (name, ids) => {
         setSaving(true);
@@ -54,7 +55,14 @@ export default function GroupsTab({ groups = [], cameras = [], onSaveGroup, onUp
         setEditingId(null);
     };
     const remove = async (g) => {
-        if (!window.confirm(`Hapus grup "${g.name}"?`)) return;
+        const ok = await confirm({
+            title: 'Hapus grup?',
+            message: `"${g.name}" akan dihapus.`,
+            confirmLabel: 'Hapus',
+            cancelLabel: 'Batal',
+            tone: 'danger',
+        });
+        if (!ok) return;
         await onDeleteGroup(g.id);
     };
 

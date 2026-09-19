@@ -36,14 +36,11 @@ import SpeakerNodesTab from '../components/admin/audio/SpeakerNodesTab';
 
 const TABS = [
     { id: 'play', label: 'Putar Sekarang' },
-    { id: 'panel', label: 'Panel' },
     { id: 'talk', label: 'Bicara' },
-    { id: 'library', label: 'Pustaka' },
-    { id: 'playlists', label: 'Playlist' },
-    { id: 'groups', label: 'Grup' },
+    { id: 'panel', label: 'Panel' },
+    { id: 'content', label: 'Konten' },
     { id: 'schedules', label: 'Jadwal' },
-    { id: 'targets', label: 'Kamera & Area' },
-    { id: 'devices', label: 'Titik Speaker' },
+    { id: 'targets', label: 'Target' },
     { id: 'history', label: 'Riwayat' },
 ];
 
@@ -177,25 +174,12 @@ export default function AudioBroadcast() {
                     <TalkTab cameras={cameras} />
                 </TabPanel>
             )}
-            {active === 'library' && (
-                <TabPanel id="library" idPrefix="audio">
-                    <LibraryTab clips={clips} loading={loading} reload={reloadClips} onPlayClip={playClipFromLibrary} />
-                </TabPanel>
-            )}
-            {active === 'playlists' && (
-                <TabPanel id="playlists" idPrefix="audio">
-                    <PlaylistTab playlists={playlists} clips={clips} loading={loading} reload={reloadPlaylists} />
-                </TabPanel>
-            )}
-            {active === 'groups' && (
-                <TabPanel id="groups" idPrefix="audio">
-                    <GroupsTab
-                        groups={groups}
-                        cameras={cameras}
-                        onSaveGroup={handleSaveGroup}
-                        onUpdateGroup={handleUpdateGroup}
-                        onDeleteGroup={handleDeleteGroup}
-                    />
+            {active === 'content' && (
+                <TabPanel id="content" idPrefix="audio">
+                    <div className="space-y-6">
+                        <LibraryTab clips={clips} loading={loading} reload={reloadClips} onPlayClip={playClipFromLibrary} />
+                        <PlaylistTab playlists={playlists} clips={clips} loading={loading} reload={reloadPlaylists} />
+                    </div>
                 </TabPanel>
             )}
             {active === 'schedules' && (
@@ -215,11 +199,6 @@ export default function AudioBroadcast() {
                   </div>
                 </TabPanel>
             )}
-            {active === 'devices' && (
-                <TabPanel id="devices" idPrefix="audio">
-                    <SpeakerNodesTab clips={clips} areas={areas} />
-                </TabPanel>
-            )}
             {active === 'history' && (
                 <TabPanel id="history" idPrefix="audio">
                     <HistoryTab />
@@ -235,6 +214,14 @@ export default function AudioBroadcast() {
                         loading={loading}
                         reloadAreas={reloadAreas}
                         reloadCapability={reloadCapability}
+                    />
+                    <SpeakerNodesTab clips={clips} areas={areas} />
+                    <GroupsTab
+                        groups={groups}
+                        cameras={cameras}
+                        onSaveGroup={handleSaveGroup}
+                        onUpdateGroup={handleUpdateGroup}
+                        onDeleteGroup={handleDeleteGroup}
                     />
                     <MotionArms capability={capability} clips={clips} />
                   </div>

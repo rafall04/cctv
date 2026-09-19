@@ -15,6 +15,7 @@ export { Tabs, TabPanel } from './Tabs';
 export { StatTile, MeterBar, SegmentedBar, loadTone } from './StatTile';
 export { Toolbar, SearchInput } from './Toolbar';
 export { Field, inputClasses } from './Field';
+export { SegmentedControl } from './SegmentedControl';
 
 export { Toast } from './Toast';
 export { ToastContainer } from './ToastContainer';

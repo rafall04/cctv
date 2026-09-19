@@ -13,7 +13,7 @@ import {
 } from '../../../services/audioService';
 import { useNotification } from '../../../contexts/NotificationContext';
 import { useConfirm } from '../../../contexts/ConfirmContext';
-import { Button, Modal, Field, EmptyState } from '../../ui';
+import { Button, Modal, Field, EmptyState, SegmentedControl } from '../../ui';
 import CameraMultiSelect from './CameraMultiSelect';
 import DeviceMultiSelect from './DeviceMultiSelect';
 import { DAYS, MASK_DAILY, MASK_WEEKDAYS, MASK_WEEKEND, describeDays } from './audioFormatting';
@@ -134,23 +134,12 @@ function ScheduleForm({ initial, clips, playlists, cameras, onSubmit, groups, on
             <Field label="Nama jadwal" value={name} onChange={(e) => setName(e.target.value)} required maxLength={120} placeholder="mis. Pengumuman Pagi" />
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                    <span className="text-xs font-semibold text-content-muted">Sumber</span>
-                    <div className="flex gap-2">
-                        {[['clip', 'Audio'], ['playlist', 'Playlist'], ['tts', 'Teks suara']].map(([val, label]) => (
-                            <button
-                                key={val}
-                                type="button"
-                                onClick={() => { setSourceType(val); setSourceId(''); }}
-                                className={`flex-1 rounded-control border px-3 py-2 text-sm font-medium transition-colors ${
-                                    sourceType === val ? 'border-primary bg-primary/10 text-primary' : 'border-edge text-content-muted hover:border-edge-strong'
-                                }`}
-                            >
-                                {label}
-                            </button>
-                        ))}
-                    </div>
-                </div>
+                <SegmentedControl
+                    label="Sumber"
+                    options={[{ value: 'clip', label: 'Audio' }, { value: 'playlist', label: 'Playlist' }, { value: 'tts', label: 'Teks suara' }]}
+                    value={sourceType}
+                    onChange={(v) => { setSourceType(v); setSourceId(''); }}
+                />
                 {sourceType !== 'tts' && (
                     <Field as="select" label={sourceType === 'clip' ? 'Pilih audio' : 'Pilih playlist'} value={sourceId} onChange={(e) => setSourceId(e.target.value)} required>
                         <option value="">— pilih —</option>
@@ -186,28 +175,15 @@ function ScheduleForm({ initial, clips, playlists, cameras, onSubmit, groups, on
                 <Field type="number" label="Ulang berapa kali" min={1} max={20} value={loopCount} onChange={(e) => setLoopCount(Math.min(20, Math.max(1, parseInt(e.target.value, 10) || 1)))} />
             </div>
 
-            <div className="space-y-2">
-                <span className="text-xs font-semibold text-content-muted">Jenis jadwal</span>
-                <div className="flex gap-2">
-                    {[['recurring', 'Berulang'], ['once', 'Sekali'], ['range', 'Rentang']].map(([val, label]) => (
-                        <button
-                            key={val}
-                            type="button"
-                            onClick={() => setScheduleKind(val)}
-                            className={`flex-1 rounded-control border px-3 py-2 text-sm font-medium transition-colors ${
-                                scheduleKind === val ? 'border-primary bg-primary/10 text-primary' : 'border-edge text-content-muted hover:border-edge-strong'
-                            }`}
-                        >
-                            {label}
-                        </button>
-                    ))}
-                </div>
-                <p className="text-xs text-content-subtle">
-                    {scheduleKind === 'once' ? 'Diputar sekali pada satu tanggal, lalu nonaktif otomatis.'
-                        : scheduleKind === 'range' ? 'Berulang mingguan, tapi hanya dalam rentang tanggal.'
-                            : 'Berulang mingguan sesuai hari yang dipilih, tanpa batas tanggal.'}
-                </p>
-            </div>
+            <SegmentedControl
+                label="Jenis jadwal"
+                options={[{ value: 'recurring', label: 'Berulang' }, { value: 'once', label: 'Sekali' }, { value: 'range', label: 'Rentang' }]}
+                value={scheduleKind}
+                onChange={setScheduleKind}
+                hint={scheduleKind === 'once' ? 'Diputar sekali pada satu tanggal, lalu nonaktif otomatis.'
+                    : scheduleKind === 'range' ? 'Berulang mingguan, tapi hanya dalam rentang tanggal.'
+                        : 'Berulang mingguan sesuai hari yang dipilih, tanpa batas tanggal.'}
+            />
 
             {scheduleKind === 'once' && (
                 <Field type="date" label="Tanggal (WIB)" value={runDate} onChange={(e) => setRunDate(e.target.value)} required />

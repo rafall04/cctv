@@ -11,7 +11,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { playNow, playDevices, getActivePlays, stopPlay, getPlayHistory } from '../../../services/audioService';
 import { useNotification } from '../../../contexts/NotificationContext';
 import { useConfirm } from '../../../contexts/ConfirmContext';
-import { Button, Field } from '../../ui';
+import { Button, Field, StatusDot, SegmentedControl } from '../../ui';
 import CameraMultiSelect from './CameraMultiSelect';
 import DeviceMultiSelect from './DeviceMultiSelect';
 import { formatDuration } from './audioFormatting';
@@ -130,25 +130,12 @@ export default function PlayNowTab({ clips, playlists, cameras, preselect, group
         <div className="space-y-6">
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <div className="space-y-4 rounded-card border border-edge bg-surface p-4 shadow-e1">
-                <div className="space-y-2">
-                    <span className="text-xs font-semibold text-content-muted">Sumber</span>
-                    <div className="flex gap-2">
-                        {[['clip', 'Audio tunggal'], ['playlist', 'Playlist']].map(([val, label]) => (
-                            <button
-                                key={val}
-                                type="button"
-                                onClick={() => { setSourceType(val); setSourceId(''); }}
-                                className={`flex-1 rounded-control border px-3 py-2 text-sm font-medium transition-colors ${
-                                    sourceType === val
-                                        ? 'border-primary bg-primary/10 text-primary'
-                                        : 'border-edge bg-surface text-content-muted hover:border-edge-strong'
-                                }`}
-                            >
-                                {label}
-                            </button>
-                        ))}
-                    </div>
-                </div>
+                <SegmentedControl
+                    label="Sumber"
+                    options={[{ value: 'clip', label: 'Audio tunggal' }, { value: 'playlist', label: 'Playlist' }]}
+                    value={sourceType}
+                    onChange={(v) => { setSourceType(v); setSourceId(''); }}
+                />
 
                 <Field
                     as="select"
@@ -206,7 +193,7 @@ export default function PlayNowTab({ clips, playlists, cameras, preselect, group
                         </div>
                         {active.map((a) => (
                             <div key={a.cameraId} className="flex items-center gap-2 rounded-control bg-surface px-3 py-2 text-sm">
-                                <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-status-live" aria-hidden="true" />
+                                <StatusDot tone="live" pulse label="sedang diputar" />
                                 <span className="min-w-0 flex-1 truncate text-content">{a.name}</span>
                                 <span className="shrink-0 font-mono text-xs tabular-nums text-content-subtle">{formatDuration(a.seconds)}</span>
                                 <button
@@ -228,10 +215,7 @@ export default function PlayNowTab({ clips, playlists, cameras, preselect, group
                                 key={r.cameraId}
                                 className="flex items-center gap-2 rounded-control border border-edge bg-surface-sunken px-3 py-2 text-sm"
                             >
-                                <span
-                                    className={`h-2 w-2 shrink-0 rounded-full ${r.ok ? 'bg-status-live' : 'bg-status-fault'}`}
-                                    aria-hidden="true"
-                                />
+                                <StatusDot tone={r.ok ? 'live' : 'fault'} label={r.ok ? 'berhasil' : 'gagal'} />
                                 <span className="min-w-0 flex-1 truncate text-content">{r.name}</span>
                                 <span className={`shrink-0 text-xs ${r.ok ? 'text-content-muted' : 'text-status-fault'}`}>
                                     {r.ok ? 'Terkirim' : r.message}
@@ -251,7 +235,10 @@ export default function PlayNowTab({ clips, playlists, cameras, preselect, group
                     {history.map((h) => (
                         <li key={h.id} className="rounded-control border border-edge bg-surface-sunken px-3 py-2 text-sm">
                             <div className="flex items-center gap-2">
-                                <span className={`h-2 w-2 shrink-0 rounded-full ${h.ok_count === h.total_count ? 'bg-status-live' : h.ok_count > 0 ? 'bg-status-warn' : 'bg-status-fault'}`} aria-hidden="true" />
+                                <StatusDot
+                                    tone={h.ok_count === h.total_count ? 'live' : h.ok_count > 0 ? 'warn' : 'fault'}
+                                    label={`${h.ok_count} dari ${h.total_count} berhasil`}
+                                />
                                 <span className="min-w-0 flex-1 truncate text-content">{h.source_name || `#${h.source_id}`}{h.source_type === 'playlist' ? ' (playlist)' : ''}</span>
                                 <span className="shrink-0 text-xs text-content-muted">{h.ok_count}/{h.total_count} berhasil</span>
                                 <button type="button" onClick={() => setExpanded(expanded === h.id ? null : h.id)} className="shrink-0 text-xs font-medium text-content-muted hover:underline">
@@ -265,7 +252,7 @@ export default function PlayNowTab({ clips, playlists, cameras, preselect, group
                                 <ul className="mt-1.5 space-y-1 border-t border-edge pt-1.5">
                                     {h.results.map((r) => (
                                         <li key={r.cameraId} className="flex items-center gap-2 text-xs">
-                                            <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${r.ok ? 'bg-status-live' : 'bg-status-fault'}`} aria-hidden="true" />
+                                            <StatusDot small tone={r.ok ? 'live' : 'fault'} label={r.ok ? 'berbunyi' : 'gagal'} />
                                             <span className="min-w-0 flex-1 truncate text-content-muted">{r.name}</span>
                                             <span className={`shrink-0 ${r.ok ? 'text-content-subtle' : 'text-status-fault'}`}>{r.ok ? 'berbunyi' : r.message}</span>
                                         </li>

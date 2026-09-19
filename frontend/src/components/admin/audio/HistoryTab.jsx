@@ -11,7 +11,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { getPlayHistory } from '../../../services/audioService';
-import { EmptyState } from '../../ui';
+import { EmptyState, StatusDot } from '../../ui';
 
 // created_at is a UTC "YYYY-MM-DD HH:MM:SS" string; show it in local (WIB) wall-clock.
 const fmtTime = (utc) => {
@@ -67,12 +67,14 @@ export default function HistoryTab() {
                 <ul className="space-y-2">
                     {history.map((h) => {
                         const k = kindOf(h);
-                        const dot = h.ok_count === 0 ? 'bg-status-fault' : h.ok_count < h.total_count ? 'bg-status-warn' : 'bg-status-live';
                         const open = openId === h.id;
                         return (
                             <li key={h.id} className="rounded-card border border-edge bg-surface p-3 shadow-e1">
                                 <button type="button" onClick={() => setOpenId(open ? null : h.id)} className="flex w-full items-center gap-3 text-left">
-                                    <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${dot}`} aria-hidden="true" />
+                                    <StatusDot
+                                        tone={h.ok_count === 0 ? 'fault' : h.ok_count < h.total_count ? 'warn' : 'live'}
+                                        label={`${h.ok_count} dari ${h.total_count} kamera berhasil`}
+                                    />
                                     <span className="min-w-0 flex-1">
                                         <span className="flex flex-wrap items-center gap-2">
                                             <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-xs font-medium ${k.cls}`}>{k.label}</span>
@@ -88,7 +90,7 @@ export default function HistoryTab() {
                                     <ul className="mt-2 space-y-1 border-t border-edge pt-2">
                                         {(h.results || []).map((r, i) => (
                                             <li key={r.cameraId ?? i} className="flex items-center gap-2 text-xs">
-                                                <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${r.ok ? 'bg-status-live' : 'bg-status-fault'}`} aria-hidden="true" />
+                                                <StatusDot small tone={r.ok ? 'live' : 'fault'} label={r.ok ? 'terkirim' : 'gagal'} />
                                                 <span className="min-w-0 flex-1 truncate text-content-muted">{r.name || `#${r.cameraId}`}</span>
                                                 <span className={`shrink-0 ${r.ok ? 'text-status-live' : 'text-status-fault'}`}>{r.ok ? 'terkirim' : (r.message || 'gagal')}</span>
                                             </li>

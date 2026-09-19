@@ -13,7 +13,7 @@
  * pre-fills unmapped cameras by name similarity for the operator to review + save — no typing.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getImouConfig, setImouConfig, testImou, getImouDevices, setCameraImouSn, cameraSiren, getActiveSirens, stopAllSirens } from '../../../services/audioService';
 import { useNotification } from '../../../contexts/NotificationContext';
 import { useConfirm } from '../../../contexts/ConfirmContext';
@@ -71,21 +71,27 @@ export default function SirenControl() {
         else showNotification({ type: 'error', title: 'Gagal', message: r.message });
     };
 
+    // Mirror of snEdits so the memoized loadDevices below (and any stale autoMatch closure it
+    // captured) still reads the CURRENT pending edits — otherwise a reload could auto-fill over
+    // an edit the operator just made.
+    const snEditsRef = useRef(snEdits);
+    snEditsRef.current = snEdits;
+
     // Auto-match unmapped cameras against the loaded device list (pending edits, not saved).
-    const autoMatch = useCallback((devs, cams) => {
+    // The additions are computed BEFORE setState — counting inside the updater was wrong:
+    // React may defer or double-invoke updaters, so the returned count raced the render.
+    const autoMatch = (devs, cams) => {
         if (!Array.isArray(devs) || !Array.isArray(cams)) return 0;
-        let n = 0;
-        setSnEdits((prev) => {
-            const next = { ...prev };
-            for (const cam of cams) {
-                if (cam.imou_sn || next[cam.id]) continue; // already mapped or already pending
-                const sn = matchDeviceSn(cam.name, devs);
-                if (sn) { next[cam.id] = sn; n += 1; }
-            }
-            return next;
-        });
+        const additions = {};
+        for (const cam of cams) {
+            if (cam.imou_sn || snEditsRef.current[cam.id]) continue; // already mapped or already pending
+            const sn = matchDeviceSn(cam.name, devs);
+            if (sn) additions[cam.id] = sn;
+        }
+        const n = Object.keys(additions).length;
+        if (n) setSnEdits((s) => ({ ...s, ...additions }));
         return n;
-    }, []);
+    };
 
     const loadDevices = useCallback(async (auto = false) => {
         setBusy('dev');
@@ -96,7 +102,7 @@ export default function SirenControl() {
         setDevices(list);
         const matched = autoMatch(list, cfg?.cameras || []);
         if (matched > 0) showNotification({ type: 'success', title: `${matched} kamera dicocokkan otomatis`, message: 'Periksa lalu simpan.' });
-    }, [autoMatch, cfg, showNotification]);
+    }, [cfg, showNotification]);
 
     // Pull the device list automatically once creds are configured — the operator shouldn't have to click.
     useEffect(() => { if (cfg?.configured && devices === null) loadDevices(true); }, [cfg, devices, loadDevices]);
@@ -163,7 +169,7 @@ export default function SirenControl() {
     return (
         <section className="space-y-3 rounded-card border border-edge bg-surface p-4 shadow-e1">
             <div>
-                <h3 className="text-sm font-semibold text-content">🔊 Sirene native (IMOU Cloud)</h3>
+                <h3 className="text-sm font-semibold text-content">Sirene native (IMOU Cloud)</h3>
                 <p className="mt-0.5 text-xs text-content-muted">Sirene bawaan kamera — jauh lebih keras dari jalur suara biasa. Lewat cloud IMOU (butuh internet + kamera ter-bind di IMOU Life). Kredensial juga bisa diatur di Pengaturan → Integrasi & Kunci API. Sirene mati otomatis setelah beberapa saat sebagai pengaman.</p>
             </div>
 
@@ -190,7 +196,7 @@ export default function SirenControl() {
                     <button type="button" onClick={test} disabled={busy === 'test'} className="rounded-control border border-edge bg-surface px-2.5 py-1 font-medium text-content-muted hover:border-edge-strong">{busy === 'test' ? '…' : 'Tes koneksi'}</button>
                     <button type="button" onClick={() => loadDevices(false)} disabled={busy === 'dev'} className="rounded-control border border-edge bg-surface px-2.5 py-1 font-medium text-content-muted hover:border-edge-strong">{busy === 'dev' ? '…' : 'Muat ulang perangkat'}</button>
                     {devices && devices.length > 0 && (
-                        <button type="button" onClick={() => { const n = autoMatch(devices, cfg.cameras || []); showNotification({ type: n ? 'success' : 'info', title: n ? `${n} kamera dicocokkan` : 'Tak ada kecocokan baru' }); }} className="rounded-control border border-edge bg-surface px-2.5 py-1 font-medium text-content-muted hover:border-edge-strong">🔎 Cocokkan otomatis</button>
+                        <button type="button" onClick={() => { const n = autoMatch(devices, cfg.cameras || []); showNotification({ type: n ? 'success' : 'info', title: n ? `${n} kamera dicocokkan` : 'Tak ada kecocokan baru' }); }} className="rounded-control border border-edge bg-surface px-2.5 py-1 font-medium text-content-muted hover:border-edge-strong">Cocokkan otomatis</button>
                     )}
                     <button type="button" onClick={() => { setCfg({ ...cfg, configured: false }); setAppId(''); }} className="text-content-subtle hover:underline">ubah kredensial</button>
                 </div>
@@ -226,6 +232,7 @@ export default function SirenControl() {
                                     <span className="min-w-0 flex-1 truncate text-sm text-content">{cam.name}</span>
                                     {Array.isArray(devices) && devices.length > 0 ? (
                                         <select
+                                            aria-label={`SN IMOU untuk ${cam.name}`}
                                             value={value}
                                             onChange={(e) => setSnEdits((s) => ({ ...s, [cam.id]: e.target.value }))}
                                             className="w-56 max-w-full rounded-control border border-edge bg-surface px-2 py-1 text-xs text-content focus:border-primary focus:outline-none"
@@ -239,14 +246,14 @@ export default function SirenControl() {
                                     ) : (
                                         <input
                                             type="text"
-                                            defaultValue={cam.imou_sn || ''}
+                                            value={value}
                                             onChange={(e) => setSnEdits((s) => ({ ...s, [cam.id]: e.target.value }))}
                                             placeholder="SN IMOU"
                                             className="w-40 rounded-control border border-edge bg-surface px-2 py-1 font-mono text-xs text-content"
                                         />
                                     )}
                                     <button type="button" onClick={() => saveSn(cam)} disabled={busy === `sn-${cam.id}` || !dirty} title={dirty ? '' : 'Tak ada perubahan'} className="rounded-control border border-edge px-2.5 py-1 text-xs font-medium text-content-muted hover:border-edge-strong disabled:opacity-40">Simpan SN</button>
-                                    <button type="button" onClick={() => siren(cam, true)} disabled={!mapped || dirty || busy === `siren-${cam.id}`} title={dirty ? 'Simpan SN dulu' : (mapped ? '' : 'Petakan SN dulu')} className="rounded-control border-2 border-status-fault bg-status-fault/10 px-3 py-1 text-xs font-bold text-status-fault hover:bg-status-fault/20 disabled:opacity-40">🔊 ON</button>
+                                    <button type="button" onClick={() => siren(cam, true)} disabled={!mapped || dirty || busy === `siren-${cam.id}`} title={dirty ? 'Simpan SN dulu' : (mapped ? '' : 'Petakan SN dulu')} className="rounded-control border-2 border-status-fault bg-status-fault/10 px-3 py-1 text-xs font-bold text-status-fault hover:bg-status-fault/20 disabled:opacity-40">NYALA</button>
                                     <button type="button" onClick={() => siren(cam, false)} disabled={!mapped || dirty || busy === `siren-${cam.id}`} className="rounded-control border border-edge px-2.5 py-1 text-xs font-medium text-content-muted hover:border-edge-strong disabled:opacity-40">OFF</button>
                                 </li>
                             );

@@ -14,6 +14,7 @@
 import { useEffect, useState } from 'react';
 import { toggleArea, recheckCameraCapability, recheckCapability, setCameraBlocked, setAreaPolicy, testSpeaker } from '../../../services/audioService';
 import { useNotification } from '../../../contexts/NotificationContext';
+import { useConfirm } from '../../../contexts/ConfirmContext';
 import { Button, EmptyState } from '../../ui';
 import { capabilityInfo } from './audioFormatting';
 
@@ -71,7 +72,7 @@ function agoLabel(iso) {
 
 function Badge({ supports, blocked }) {
     if (blocked) {
-        return <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-status-fault/30 bg-status-fault/10 px-2 py-0.5 text-xs font-medium text-status-fault">⛔ Diblokir</span>;
+        return <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-status-fault/30 bg-status-fault/10 px-2 py-0.5 text-xs font-medium text-status-fault">Diblokir</span>;
     }
     const info = capabilityInfo(supports);
     const cls = info.tone === 'live'
@@ -88,6 +89,7 @@ export default function TargetsTab({ areas, capability, clips = [], loading, rel
     const [testClipId, setTestClipId] = useState('');
     const [testing, setTesting] = useState(null); // cameraId | 'all-test'
     const { showNotification } = useNotification();
+    const confirm = useConfirm();
 
     // AUDIBLE test (vs the silent "Cek" probe): actually play a short clip to the speaker so the operator
     // hears it works in the field. Bypasses the area allowlist server-side, so testing before enabling works.
@@ -142,7 +144,16 @@ export default function TargetsTab({ areas, capability, clips = [], loading, rel
     const onToggleBlock = async (cam) => {
         const nextBlocked = !cam.audio_out_blocked;
         // Unblocking a hang-prone device is the risky direction — confirm it.
-        if (!nextBlocked && !window.confirm(`"${cam.name}" ditandai rawan hang (mis. V380). Lepas blokir & izinkan audio lagi?`)) return;
+        if (!nextBlocked) {
+            const ok = await confirm({
+                title: 'Lepas blokir audio?',
+                message: `"${cam.name}" ditandai rawan hang (mis. V380). Lepas blokir & izinkan audio lagi?`,
+                confirmLabel: 'Lepas blokir',
+                cancelLabel: 'Batal',
+                tone: 'danger',
+            });
+            if (!ok) return;
+        }
         setRechecking(`block-${cam.id}`);
         const result = await setCameraBlocked(cam.id, nextBlocked);
         setRechecking(null);
@@ -251,8 +262,8 @@ export default function TargetsTab({ areas, capability, clips = [], loading, rel
                 {/* Uji suara NYATA (bukan probe senyap): putar klip pendek ke speaker agar terdengar di lapangan. */}
                 {clips.length > 0 && capability.length > 0 && (
                     <div className="flex flex-wrap items-center gap-2 rounded-control border border-edge bg-surface-sunken p-2">
-                        <span className="text-xs font-medium text-content-muted">🔊 Uji suara:</span>
-                        <select value={testClipId} onChange={(e) => setTestClipId(e.target.value)} className="min-w-0 flex-1 rounded-control border border-edge bg-surface px-2 py-1 text-sm text-content sm:w-52 sm:flex-none">
+                        <span className="text-xs font-medium text-content-muted">Uji suara:</span>
+                        <select aria-label="Audio uji suara" value={testClipId} onChange={(e) => setTestClipId(e.target.value)} className="min-w-0 flex-1 rounded-control border border-edge bg-surface px-2 py-1 text-sm text-content sm:w-52 sm:flex-none">
                             <option value="">— pilih audio uji —</option>
                             {clips.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                         </select>
@@ -311,7 +322,7 @@ export default function TargetsTab({ areas, capability, clips = [], loading, rel
                                                     title={testClipId ? 'Putar audio uji ke speaker ini' : 'Pilih audio uji di atas dulu'}
                                                     className="rounded-control border border-edge bg-surface px-2.5 py-1.5 text-sm font-medium text-content-muted transition-colors hover:border-primary hover:text-primary disabled:opacity-40"
                                                 >
-                                                    {testing === cam.id ? '…' : '🔊 Uji'}
+                                                    {testing === cam.id ? '…' : 'Uji'}
                                                 </button>
                                                 <button
                                                     type="button"

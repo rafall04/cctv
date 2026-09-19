@@ -14,7 +14,7 @@ import {
 } from '../../../services/audioService';
 import { useNotification } from '../../../contexts/NotificationContext';
 import { useConfirm } from '../../../contexts/ConfirmContext';
-import { Button, Field } from '../../ui';
+import { Button, Field, SegmentedControl } from '../../ui';
 import CameraMultiSelect from './CameraMultiSelect';
 import DeviceMultiSelect from './DeviceMultiSelect';
 
@@ -119,34 +119,24 @@ export default function EmergencyPanel({ clips, playlists, cameras, areas }) {
                 <div className="space-y-3 rounded-card border border-edge bg-surface p-3">
                     <Field label="Label" value={form.label} maxLength={40} onChange={(e) => setForm({ ...form, label: e.target.value })} placeholder="mis. Banjir / Kebakaran" />
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <div>
-                            <span className="mb-1.5 block text-xs font-semibold text-content-muted">Sumber</span>
-                            <div className="flex gap-2">
-                                {[['clip', 'Audio'], ['playlist', 'Playlist']].map(([val, lbl]) => (
-                                    <button key={val} type="button" onClick={() => setForm({ ...form, sourceType: val, sourceId: '' })}
-                                        className={`flex-1 rounded-control border px-3 py-2 text-sm font-medium transition-colors ${form.sourceType === val ? 'border-primary bg-primary/10 text-primary' : 'border-edge bg-surface text-content-muted hover:border-edge-strong'}`}>
-                                        {lbl}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
+                        <SegmentedControl
+                            label="Sumber"
+                            options={[{ value: 'clip', label: 'Audio' }, { value: 'playlist', label: 'Playlist' }]}
+                            value={form.sourceType}
+                            onChange={(v) => setForm({ ...form, sourceType: v, sourceId: '' })}
+                        />
                         <Field as="select" label="Pilih audio" value={form.sourceId} onChange={(e) => setForm({ ...form, sourceId: e.target.value })}>
                             <option value="">— pilih —</option>
                             {options(form.sourceType).map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
                         </Field>
                     </div>
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <div>
-                            <span className="mb-1.5 block text-xs font-semibold text-content-muted">Target</span>
-                            <div className="flex gap-2">
-                                {[['area', 'Seluruh area'], ['cameras', 'Kamera pilihan']].map(([val, lbl]) => (
-                                    <button key={val} type="button" onClick={() => setForm({ ...form, targetKind: val })}
-                                        className={`flex-1 rounded-control border px-3 py-2 text-sm font-medium transition-colors ${form.targetKind === val ? 'border-primary bg-primary/10 text-primary' : 'border-edge bg-surface text-content-muted hover:border-edge-strong'}`}>
-                                        {lbl}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
+                        <SegmentedControl
+                            label="Target"
+                            options={[{ value: 'area', label: 'Seluruh area' }, { value: 'cameras', label: 'Kamera pilihan' }]}
+                            value={form.targetKind}
+                            onChange={(v) => setForm({ ...form, targetKind: v })}
+                        />
                         <Field type="number" label="Ulang" min={1} max={20} value={form.loop} onChange={(e) => setForm({ ...form, loop: Math.min(20, Math.max(1, parseInt(e.target.value, 10) || 1)) })} />
                     </div>
                     {form.targetKind === 'area' ? (

@@ -55,12 +55,16 @@ export function Badge({ tone = 'neutral', dot = false, mono = false, className =
 
 /**
  * Bare state dot for dense rows. A dot must never be the sole carrier of meaning, so `label` is
- * required and ships as sr-only text next to it.
+ * required and ships as sr-only text next to it. `small` drops to the 6px chip-dot size.
+ * `pulse` animates for an actively-changing state (e.g. currently broadcasting).
  */
-export function StatusDot({ tone = 'idle', label, className = '' }) {
+export function StatusDot({ tone = 'idle', label, small = false, pulse = false, className = '' }) {
     return (
         <span className={`inline-flex items-center ${className}`}>
-            <span className={`h-2 w-2 shrink-0 rounded-full ${DOT_CLASSES[tone] ?? DOT_CLASSES.idle}`} aria-hidden="true" />
+            <span
+                className={`${small ? 'h-1.5 w-1.5' : 'h-2 w-2'} shrink-0 rounded-full ${pulse ? 'animate-pulse' : ''} ${DOT_CLASSES[tone] ?? DOT_CLASSES.idle}`}
+                aria-hidden="true"
+            />
             <span className="sr-only">{label}</span>
         </span>
     );

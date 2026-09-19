@@ -15,7 +15,7 @@ import {
 } from '../../../services/audioService';
 import { useNotification } from '../../../contexts/NotificationContext';
 import { useConfirm } from '../../../contexts/ConfirmContext';
-import { Button, Field, EmptyState } from '../../ui';
+import { Button, Field, EmptyState, SegmentedControl } from '../../ui';
 import CameraMultiSelect from './CameraMultiSelect';
 import DeviceMultiSelect from './DeviceMultiSelect';
 
@@ -116,17 +116,12 @@ export default function SoundboardTab({ clips, playlists, cameras }) {
                 <div className="space-y-3 rounded-card border border-edge bg-surface-sunken p-3">
                     <Field label="Label tombol" value={form.label} maxLength={40} onChange={(e) => setForm({ ...form, label: e.target.value })} placeholder="mis. Sirene / Adzan / Panggilan" />
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <div>
-                            <span className="mb-1.5 block text-xs font-semibold text-content-muted">Sumber</span>
-                            <div className="flex gap-2">
-                                {[['clip', 'Audio'], ['playlist', 'Playlist']].map(([val, lbl]) => (
-                                    <button key={val} type="button" onClick={() => setForm({ ...form, sourceType: val, sourceId: '' })}
-                                        className={`flex-1 rounded-control border px-3 py-2 text-sm font-medium transition-colors ${form.sourceType === val ? 'border-primary bg-primary/10 text-primary' : 'border-edge bg-surface text-content-muted hover:border-edge-strong'}`}>
-                                        {lbl}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
+                        <SegmentedControl
+                            label="Sumber"
+                            options={[{ value: 'clip', label: 'Audio' }, { value: 'playlist', label: 'Playlist' }]}
+                            value={form.sourceType}
+                            onChange={(v) => setForm({ ...form, sourceType: v, sourceId: '' })}
+                        />
                         <Field as="select" label={form.sourceType === 'clip' ? 'Pilih audio' : 'Pilih playlist'} value={form.sourceId} onChange={(e) => setForm({ ...form, sourceId: e.target.value })}>
                             <option value="">— pilih —</option>
                             {options(form.sourceType).map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}

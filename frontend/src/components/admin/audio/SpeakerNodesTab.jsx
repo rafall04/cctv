@@ -13,7 +13,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { getDevices, createDevice, updateDevice, deleteDevice, regenDeviceToken, testDevice, playDevices } from '../../../services/audioService';
 import { useNotification } from '../../../contexts/NotificationContext';
 import { useConfirm } from '../../../contexts/ConfirmContext';
-import { Button, Field, EmptyState } from '../../ui';
+import { Button, Field, EmptyState, StatusDot } from '../../ui';
 
 export default function SpeakerNodesTab({ clips = [], areas = [] }) {
     const [devices, setDevices] = useState([]);
@@ -106,7 +106,7 @@ export default function SpeakerNodesTab({ clips = [], areas = [] }) {
     return (
         <div className="space-y-5">
             <div>
-                <h3 className="text-sm font-semibold text-content">📻 Titik Speaker (STB + amp + TOA)</h3>
+                <h3 className="text-sm font-semibold text-content">Titik Speaker (STB + amp + TOA)</h3>
                 <p className="mt-0.5 text-xs text-content-muted">Speaker jaringan untuk tempat yang kameranya belum punya speaker. STB menjalankan agen <span className="font-mono">audio_node.py</span> dan menarik siaran dengan token-nya.</p>
                 <p className="mt-1 text-xs text-primary">ℹ️ Titik speaker <span className="font-semibold">otomatis ikut</span> siaran yang menyasar <span className="font-semibold">area</span>-nya: adzan/qori, jadwal, &amp; darurat. Pasang area di bawah agar ikut — kosongkan area bila hanya mau disiarkan manual dari tab ini.</p>
             </div>
@@ -147,7 +147,7 @@ export default function SpeakerNodesTab({ clips = [], areas = [] }) {
                 <ul className="space-y-2">
                     {devices.map((d) => (
                         <li key={d.id} className={`flex flex-wrap items-center gap-2 rounded-card border p-3 shadow-e1 ${d.enabled ? 'border-edge bg-surface' : 'border-dashed border-edge bg-surface-sunken opacity-70'}`}>
-                            <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${d.online ? 'bg-status-live' : 'bg-edge-strong'}`} title={d.online ? 'online' : 'offline'} aria-hidden="true" />
+                            <StatusDot tone={d.online ? 'live' : 'neutral'} label={d.online ? 'online' : 'offline'} />
                             <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2">
                                 <input type="checkbox" checked={selected.includes(d.id)} onChange={() => toggleSel(d.id)} className="h-4 w-4 accent-primary" />
                                 <span className="min-w-0">
@@ -155,7 +155,7 @@ export default function SpeakerNodesTab({ clips = [], areas = [] }) {
                                     <span className="block text-xs text-content-subtle">{d.online ? 'online' : 'offline'}{d.area_name ? ` · ${d.area_name}` : ''}{d.enabled ? '' : ' · nonaktif'}</span>
                                 </span>
                             </label>
-                            <button type="button" onClick={() => test(d)} disabled={busy === `test-${d.id}` || !testClip} title={testClip ? 'Putar audio uji ke titik ini' : 'Pilih audio uji dulu'} className="shrink-0 rounded-control border border-edge bg-surface px-2.5 py-1.5 text-sm font-medium text-content-muted hover:border-primary hover:text-primary disabled:opacity-40">{busy === `test-${d.id}` ? '…' : '🔊 Uji'}</button>
+                            <button type="button" onClick={() => test(d)} disabled={busy === `test-${d.id}` || !testClip} title={testClip ? 'Putar audio uji ke titik ini' : 'Pilih audio uji dulu'} className="shrink-0 rounded-control border border-edge bg-surface px-2.5 py-1.5 text-sm font-medium text-content-muted hover:border-primary hover:text-primary disabled:opacity-40">{busy === `test-${d.id}` ? '…' : 'Uji'}</button>
                             <button type="button" onClick={() => toggleEnabled(d)} className="shrink-0 rounded-control border border-edge bg-surface px-2.5 py-1.5 text-xs font-medium text-content-muted hover:border-edge-strong">{d.enabled ? 'Nonaktifkan' : 'Aktifkan'}</button>
                             <button type="button" onClick={() => regen(d)} className="shrink-0 rounded-control border border-edge bg-surface px-2.5 py-1.5 text-xs font-medium text-content-muted hover:border-edge-strong">Token baru</button>
                             <button type="button" onClick={() => remove(d)} className="shrink-0 rounded-control border border-edge bg-surface px-2.5 py-1.5 text-xs font-medium text-status-fault hover:border-status-fault/40">Hapus</button>
@@ -166,13 +166,10 @@ export default function SpeakerNodesTab({ clips = [], areas = [] }) {
 
             {/* Broadcast / test source */}
             <div className="flex flex-wrap items-end gap-2 rounded-card border border-edge bg-surface-sunken p-3">
-                <div className="min-w-0 flex-1">
-                    <span className="mb-1 block text-xs font-semibold text-content-muted">Audio (untuk Uji &amp; Siaran)</span>
-                    <select value={testClip} onChange={(e) => setTestClip(e.target.value)} className="w-full rounded-control border border-edge bg-surface px-2 py-1.5 text-sm text-content">
-                        <option value="">— pilih audio —</option>
-                        {clips.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                    </select>
-                </div>
+                <Field as="select" label="Audio (untuk Uji & Siaran)" value={testClip} onChange={(e) => setTestClip(e.target.value)} className="min-w-0 flex-1">
+                    <option value="">— pilih audio —</option>
+                    {clips.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </Field>
                 <Field type="number" label="Ulang" min={1} max={20} value={loop} onChange={(e) => setLoop(Math.min(20, Math.max(1, parseInt(e.target.value, 10) || 1)))} />
                 <Button variant="primary" loading={busy === 'broadcast'} onClick={broadcast} disabled={!testClip || selected.length === 0}>Siarkan ke terpilih ({selected.length})</Button>
             </div>

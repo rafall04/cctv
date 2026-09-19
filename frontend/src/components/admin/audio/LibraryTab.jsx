@@ -11,8 +11,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { uploadClip, deleteClip, updateClipMeta, importClip, getImportJobs, getTtsEngines, createTts, getTemplates, createTemplate, deleteTemplate, fetchClipPreview, getTtsConfig, setTtsConfig, previewTtsVoice } from '../../../services/audioService';
 import { useNotification } from '../../../contexts/NotificationContext';
 import { useConfirm } from '../../../contexts/ConfirmContext';
-import { Button, Field, EmptyState } from '../../ui';
+import { Button, Field, EmptyState, StatusDot } from '../../ui';
 import { formatDuration, formatBytes, fileToBase64 } from './audioFormatting';
+import TextPrompt from './TextPrompt';
 
 const MAX_MB = 12;
 const MAX_TTS = 1500;
@@ -43,6 +44,8 @@ export default function LibraryTab({ clips, loading, reload, onPlayClip }) {
     const [tplFills, setTplFills] = useState({});
     const [favOnly, setFavOnly] = useState(false);
     const [catFilter, setCatFilter] = useState('');
+    // One prompt dialog serves both "save as template" and "edit category" — {kind, clip?}.
+    const [prompt, setPrompt] = useState(null);
     // In-page preview: which clip is loaded in the hidden <audio>, and whether it's playing.
     const [previewId, setPreviewId] = useState(null);
     const [previewPlaying, setPreviewPlaying] = useState(false);
@@ -159,10 +162,8 @@ export default function LibraryTab({ clips, loading, reload, onPlayClip }) {
         setTplFills(next);
         setTtsText(substitute(tplBody, next));
     };
-    const saveAsTemplate = async () => {
-        const name = window.prompt('Nama template:');
-        if (!name || !name.trim()) return;
-        const r = await createTemplate({ name: name.trim(), body: ttsText.trim() });
+    const saveAsTemplate = async (name) => {
+        const r = await createTemplate({ name, body: ttsText.trim() });
         if (r.success) { showNotification({ type: 'success', title: 'Template disimpan' }); loadTemplates(); }
         else showNotification({ type: 'error', title: 'Gagal', message: r.message });
     };
@@ -298,9 +299,7 @@ export default function LibraryTab({ clips, loading, reload, onPlayClip }) {
         const r = await updateClipMeta(clip.id, { isFavorite: !clip.is_favorite });
         if (r.success) reload(); else showNotification({ type: 'error', title: 'Gagal', message: r.message });
     };
-    const editCategory = async (clip) => {
-        const cat = window.prompt('Kategori audio (kosongkan untuk hapus):', clip.category || '');
-        if (cat === null) return;
+    const editCategory = async (clip, cat) => {
         const r = await updateClipMeta(clip.id, { category: cat });
         if (r.success) reload(); else showNotification({ type: 'error', title: 'Gagal', message: r.message });
     };
@@ -398,21 +397,23 @@ export default function LibraryTab({ clips, loading, reload, onPlayClip }) {
                 </div>
 
                 {/* Template pengumuman: pilih -> isi otomatis, ganti bagian {…}. */}
-                <div className="flex flex-wrap items-center gap-2">
-                    <select
+                <div className="flex flex-wrap items-end gap-2">
+                    <Field
+                        as="select"
+                        label="Template pengumuman"
                         value={templateId}
                         onChange={(e) => applyTemplate(e.target.value)}
-                        className="min-w-0 flex-1 rounded-control border border-edge bg-surface px-2 py-1.5 text-sm text-content focus:border-primary focus:outline-none"
+                        className="min-w-0 flex-1"
                     >
                         <option value="">— pakai template —</option>
                         {templates.map((t) => (
                             <option key={t.id} value={t.id}>{t.category ? `${t.category} · ` : ''}{t.name}</option>
                         ))}
-                    </select>
+                    </Field>
                     {templateId && (
                         <button type="button" onClick={removeTemplate} className="shrink-0 rounded-control border border-edge px-2.5 py-1.5 text-xs font-medium text-status-fault hover:border-status-fault/40">Hapus template</button>
                     )}
-                    <button type="button" onClick={saveAsTemplate} disabled={!ttsText.trim()} className="shrink-0 rounded-control border border-edge px-2.5 py-1.5 text-xs font-medium text-content-muted hover:border-edge-strong disabled:opacity-40">Simpan teks jadi template</button>
+                    <button type="button" onClick={() => setPrompt({ kind: 'template' })} disabled={!ttsText.trim()} className="shrink-0 rounded-control border border-edge px-2.5 py-1.5 text-xs font-medium text-content-muted hover:border-edge-strong disabled:opacity-40">Simpan teks jadi template</button>
                 </div>
 
                 {/* Isian per-placeholder: isi sekali -> ganti SEMUA kemunculan {ini} di teks. */}
@@ -444,36 +445,32 @@ export default function LibraryTab({ clips, loading, reload, onPlayClip }) {
                     Variabel otomatis: <span className="font-mono text-content-muted">{'{jam}'}</span> <span className="font-mono text-content-muted">{'{hari}'}</span> <span className="font-mono text-content-muted">{'{tanggal}'}</span> — terisi sendiri dengan tanggal/jam saat suara dibuat.
                 </p>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                    <div className="min-w-0">
-                        <span className="mb-1.5 block text-xs font-semibold text-content-muted">Mesin suara</span>
-                        <select
-                            value={ttsEngine}
-                            onChange={(e) => onEngineChange(e.target.value)}
-                            className="w-full min-h-11 rounded-control border border-edge bg-surface px-3 py-2 text-sm text-content focus:border-primary focus:outline-none"
-                        >
-                            {engines.map((e) => (
-                                // NOT disabled even when unavailable: Gemini becomes available only AFTER a key
-                                // is pasted, and the key box below only shows when Gemini is selected — disabling
-                                // the option made entering the key impossible. Selecting an unavailable engine
-                                // just reveals its activation hint; the synth buttons stay disabled until ready.
-                                <option key={e.id} value={e.id}>
-                                    {e.label}{e.available ? '' : (e.id === 'gemini' ? ' — belum aktif (butuh kunci)' : ' — belum terpasang')}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-                    <div className="min-w-0">
-                        <span className="mb-1.5 block text-xs font-semibold text-content-muted">Suara</span>
-                        <select
-                            value={ttsVoice}
-                            onChange={(e) => setTtsVoice(e.target.value)}
-                            className="w-full min-h-11 rounded-control border border-edge bg-surface px-3 py-2 text-sm text-content focus:border-primary focus:outline-none"
-                        >
-                            {(currentEngine?.voices || []).map((v) => (
-                                <option key={v.id} value={v.id}>{v.label}</option>
-                            ))}
-                        </select>
-                    </div>
+                    <Field
+                        as="select"
+                        label="Mesin suara"
+                        value={ttsEngine}
+                        onChange={(e) => onEngineChange(e.target.value)}
+                    >
+                        {engines.map((e) => (
+                            // NOT disabled even when unavailable: Gemini becomes available only AFTER a key
+                            // is pasted, and the key box below only shows when Gemini is selected — disabling
+                            // the option made entering the key impossible. Selecting an unavailable engine
+                            // just reveals its activation hint; the synth buttons stay disabled until ready.
+                            <option key={e.id} value={e.id}>
+                                {e.label}{e.available ? '' : (e.id === 'gemini' ? ' — belum aktif (butuh kunci)' : ' — belum terpasang')}
+                            </option>
+                        ))}
+                    </Field>
+                    <Field
+                        as="select"
+                        label="Suara"
+                        value={ttsVoice}
+                        onChange={(e) => setTtsVoice(e.target.value)}
+                    >
+                        {(currentEngine?.voices || []).map((v) => (
+                            <option key={v.id} value={v.id}>{v.label}</option>
+                        ))}
+                    </Field>
                     <Field label="Nama (opsional)" value={ttsName} onChange={(e) => setTtsName(e.target.value)} placeholder="mis. Kerja Bakti" maxLength={120} />
                 </div>
 
@@ -515,7 +512,7 @@ export default function LibraryTab({ clips, loading, reload, onPlayClip }) {
                     </p>
                     <div className="flex shrink-0 items-center gap-2">
                         <Button type="button" variant="ghost" loading={voicePreviewBusy} disabled={!currentEngine?.available} onClick={previewVoice} title="Dengar contoh suara sebelum dibuat/disiarkan">
-                            {voicePreviewBusy ? 'Menyiapkan…' : '🔊 Coba suara'}
+                            {voicePreviewBusy ? 'Menyiapkan…' : 'Coba suara'}
                         </Button>
                         <Button type="submit" variant="secondary" loading={ttsBusy} disabled={!ttsText.trim() || !currentEngine?.available}>
                             {ttsBusy ? 'Membuat…' : 'Buat suara'}
@@ -531,9 +528,10 @@ export default function LibraryTab({ clips, loading, reload, onPlayClip }) {
                 <ul className="space-y-1.5">
                     {jobs.slice(0, 6).map((j) => (
                         <li key={j.id} className="flex items-center gap-2 rounded-control border border-edge bg-surface-sunken px-3 py-2 text-sm">
-                            <span className={`h-2 w-2 shrink-0 rounded-full ${
-                                j.status === 'ready' ? 'bg-status-live' : j.status === 'failed' ? 'bg-status-fault' : 'bg-status-warn'
-                            }`} />
+                            <StatusDot
+                                tone={j.status === 'ready' ? 'live' : j.status === 'failed' ? 'fault' : 'warn'}
+                                label={JOB_LABEL[j.status] || j.status}
+                            />
                             <span className="min-w-0 flex-1 truncate text-content-muted">{j.title || j.requested_name || (j.source_kind === 'tts' ? j.tts_text : j.source_url)}</span>
                             <span className={`shrink-0 text-xs ${j.status === 'failed' ? 'text-status-fault' : 'text-content-subtle'}`}>
                                 {j.status === 'failed' && j.error ? j.error : (JOB_LABEL[j.status] || j.status)}
@@ -611,7 +609,7 @@ export default function LibraryTab({ clips, loading, reload, onPlayClip }) {
                                 </div>
                                 <button
                                     type="button"
-                                    onClick={() => editCategory(clip)}
+                                    onClick={() => setPrompt({ kind: 'category', clip })}
                                     className="shrink-0 rounded-control border border-edge bg-surface px-2.5 py-1.5 text-xs font-medium text-content-subtle transition-colors hover:border-edge-strong hover:text-content"
                                     title="Beri/ubah kategori"
                                 >
@@ -654,6 +652,23 @@ export default function LibraryTab({ clips, loading, reload, onPlayClip }) {
                     </ul>
                 </div>
             )}
+
+            <TextPrompt
+                open={Boolean(prompt)}
+                title={prompt?.kind === 'category' ? 'Kategori audio' : 'Nama template'}
+                label={prompt?.kind === 'category' ? 'Kategori (kosongkan untuk hapus)' : 'Nama template'}
+                initial={prompt?.kind === 'category' ? (prompt.clip?.category || '') : ''}
+                placeholder={prompt?.kind === 'category' ? 'mis. Pengumuman' : 'mis. Jadwal Kegiatan'}
+                maxLength={prompt?.kind === 'category' ? 60 : 80}
+                onSubmit={async (v) => {
+                    const p = prompt;
+                    setPrompt(null);
+                    if (!p) return;
+                    if (p.kind === 'template') { if (v) await saveAsTemplate(v); }
+                    else await editCategory(p.clip, v);
+                }}
+                onClose={() => setPrompt(null)}
+            />
         </div>
     );
 }

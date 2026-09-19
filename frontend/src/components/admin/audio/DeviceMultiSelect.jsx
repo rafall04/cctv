@@ -9,21 +9,26 @@
 
 import { useEffect, useState } from 'react';
 import { getDevices } from '../../../services/audioService';
+import { StatusDot } from '../../ui';
 
-export default function DeviceMultiSelect({ value = [], onChange, disabled = false, label = 'Titik Speaker (STB)', hint }) {
+export default function DeviceMultiSelect({ value = [], onChange, disabled = false, label = 'Titik Speaker (STB)', hint, pollInterval = 0, className = '' }) {
     const [devices, setDevices] = useState([]);
     useEffect(() => {
         let cancelled = false;
-        getDevices().then((r) => { if (!cancelled && r.success) setDevices((r.data || []).filter((d) => d.enabled)); });
-        return () => { cancelled = true; };
-    }, []);
+        const load = () => getDevices().then((r) => { if (!cancelled && r.success) setDevices((r.data || []).filter((d) => d.enabled)); });
+        load();
+        // Live target pickers (e.g. TalkTab paging) need fresh online state — the chips
+        // badge it, and only online nodes actually sound.
+        const t = pollInterval > 0 ? setInterval(load, pollInterval) : null;
+        return () => { cancelled = true; if (t) clearInterval(t); };
+    }, [pollInterval]);
     if (devices.length === 0) return null; // no nodes configured -> nothing to show
 
     const toggle = (id) => onChange(value.includes(id) ? value.filter((x) => x !== id) : [...value, id]);
     return (
-        <div>
+        <div className={className || undefined}>
             <span className="mb-1.5 block text-xs font-semibold text-content-muted">
-                📻 {label}{value.length ? ` — ${value.length} dipilih` : ''}
+                {label}{value.length ? ` — ${value.length} dipilih` : ''}
             </span>
             <div className="flex flex-wrap gap-1.5">
                 {devices.map((d) => {
@@ -31,10 +36,11 @@ export default function DeviceMultiSelect({ value = [], onChange, disabled = fal
                     return (
                         <button
                             key={d.id} type="button" disabled={disabled}
+                            aria-pressed={on}
                             onClick={() => toggle(d.id)}
                             className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-50 ${on ? 'border-primary bg-primary/10 text-primary' : 'border-edge bg-surface text-content-muted hover:border-edge-strong'}`}
                         >
-                            <span className={`h-1.5 w-1.5 rounded-full ${d.online ? 'bg-status-live' : 'bg-edge-strong'}`} aria-hidden="true" />
+                            <StatusDot small tone={d.online ? 'live' : 'neutral'} label={d.online ? 'online' : 'offline'} />
                             {d.name}
                         </button>
                     );
