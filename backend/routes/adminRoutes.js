@@ -22,6 +22,7 @@ import vehicleCountAdminRoutes from './vehicleCountAdminRoutes.js';
 import cameraTimeRoutes from './cameraTimeRoutes.js';
 import { createApiKeySchema, apiKeyIdParamSchema } from '../middleware/schemaValidators.js';
 import mediaMtxService from '../services/mediaMtxService.js';
+import { stripUrlCredentials } from '../utils/logRedaction.js';
 
 export default async function adminRoutes(fastify, options) {
     // Dashboard stats
@@ -293,11 +294,14 @@ export default async function adminRoutes(fastify, options) {
                         cameraId: cam.id,
                         cameraName: cam.name,
                         pathName: cam.path_name,
-                        dbRtspUrl: cam.rtsp_url,
+                        // RTSP URLs embed camera credentials. This is an admin page, but the
+                        // platform invariant is that RTSP URLs never reach a browser at all —
+                        // host/port/path stay diagnosable, userinfo is stripped (logRedaction).
+                        dbRtspUrl: stripUrlCredentials(cam.rtsp_url),
                         sourceProfile: cam.source_profile || null,
                         policyMode: cam.internal_ingest_policy_override || 'default',
                         closeAfterSeconds: cam.internal_on_demand_close_after_seconds_override || cam.area_internal_on_demand_close_after_seconds || null,
-                        mtxSource: mtxPath?.source || null,
+                        mtxSource: stripUrlCredentials(mtxPath?.source || null),
                         inMediaMTX: !!mtxPath,
                         sourceMatch: mtxPath?.source === cam.rtsp_url,
                         sourceOnDemand: mtxPath?.sourceOnDemand ?? null,
@@ -313,7 +317,7 @@ export default async function adminRoutes(fastify, options) {
                         comparison,
                         orphanedPaths: configuredPaths
                             .filter(p => p.name.startsWith('camera') && !dbCameras.some(c => c.path_name === p.name))
-                            .map(p => ({ name: p.name, source: p.source }))
+                            .map(p => ({ name: p.name, source: stripUrlCredentials(p.source) }))
                     }
                 });
             } catch (error) {

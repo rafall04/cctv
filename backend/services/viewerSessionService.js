@@ -397,6 +397,35 @@ class ViewerSessionService {
         }
     }
 
+    /**
+     * Does this camera have a LIVE viewer right now? A session counts only when its last heartbeat
+     * is fresh (default 30s — real viewers heartbeat every 5s, SESSION_TIMEOUT is 15s).
+     *
+     * Callers use this as a server-side presence gate for client-supplied runtime signals: those
+     * signals mutate camera health state and can trigger recording reconcile, so they must only be
+     * applied while somebody is actually watching. The window is slightly wider than SESSION_TIMEOUT
+     * so a signal racing a heartbeat is not dropped.
+     */
+    hasActiveSessionForCamera(cameraId, windowSeconds = 30) {
+        try {
+            const id = Number.parseInt(cameraId, 10);
+            if (!Number.isInteger(id) || id <= 0) return false;
+            // Integer-only interpolation after validation: never a caller string in SQL.
+            const window = Number.isInteger(windowSeconds) && windowSeconds > 0 ? windowSeconds : 30;
+            const row = queryOne(`
+                SELECT COUNT(*) AS n
+                FROM viewer_sessions
+                WHERE is_active = 1
+                  AND camera_id = ?
+                  AND datetime(last_heartbeat) >= datetime('now', '-${window} seconds')
+            `, [id]);
+            return (row?.n || 0) > 0;
+        } catch (error) {
+            console.error('[ViewerSession] Error checking active session for camera:', error);
+            return false;
+        }
+    }
+
     getViewerCountByCamera() {
         try {
             return query(`

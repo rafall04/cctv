@@ -7,6 +7,11 @@ import viewerSessionService from '../services/viewerSessionService.js';
 import cameraService from '../services/cameraService.js';
 import cameraHealthService from '../services/cameraHealthService.js';
 import { getStreamCapabilities } from '../utils/cameraDelivery.js';
+import { checkRateLimit } from '../middleware/rateLimiter.js';
+
+// Per-camera ceiling for client runtime signals (see reportViewerRuntimeSignal). Deliberately well
+// above the real cadence (a viewer emits a handful per minute) so only floods are cut.
+const RUNTIME_SIGNAL_MAX_PER_MIN = 240;
 
 /**
  * Start a new viewer session
@@ -143,6 +148,50 @@ export async function reportViewerRuntimeSignal(request, reply) {
             });
         }
 
+        // Camera must exist — recordRuntimeSignal() would otherwise create in-memory state for an
+        // arbitrary id, letting a script pollute health state with non-cameras.
+        const camera = cameraService.getCameraById(cameraId);
+        if (!camera) {
+            return reply.code(404).send({
+                success: false,
+                message: 'Camera not found'
+            });
+        }
+
+        // Per-camera flood bound. The generic limiter caps 100/min per client IP, but one camera can
+        // be targeted from many IPs; the real cadence is a few signals per viewer per minute.
+        const gate = checkRateLimit(`runtime-signal:${cameraId}`, RUNTIME_SIGNAL_MAX_PER_MIN, 60000);
+        if (!gate.allowed) {
+            reply.header('Retry-After', gate.retryAfter);
+            return reply.code(429).send({
+                success: false,
+                message: 'Terlalu banyak sinyal untuk kamera ini. Coba lagi sebentar lagi.',
+                retryAfter: gate.retryAfter
+            });
+        }
+
+        /*
+         * SECURITY — presence gate.
+         *
+         * A runtime signal is an unauthenticated CLIENT CLAIM (this endpoint is public so anonymous
+         * viewers can report playback health). Applying it mutates camera state: it can mark a camera
+         * online (`is_online=1` + effectiveOnline), set providerDomain/lastRuntimeTarget from the
+         * caller's targetUrl, force tier 'hot', and trigger recordingControl.reconcile() — i.e. an
+         * anonymous script could falsify health and start on-demand recordings for every camera.
+         *
+         * So the claim is only honoured while the camera actually has a live viewer session (created
+         * by POST /api/viewer/start, kept fresh by 5s heartbeats). A real viewer always has one; a
+         * bare forge does not. Requests without presence are acknowledged (200) but ignored so the
+         * player never sees an error, and nothing downstream is touched.
+         */
+        if (!viewerSessionService.hasActiveSessionForCamera(cameraId)) {
+            return reply.send({
+                success: true,
+                ignored: true,
+                message: 'Runtime signal ignored - no active viewer session'
+            });
+        }
+
         const success = request.body?.success !== false;
         const signalType = typeof request.body?.signalType === 'string' && request.body.signalType.trim()
             ? request.body.signalType.trim()
@@ -163,10 +212,17 @@ export async function reportViewerRuntimeSignal(request, reply) {
             message: 'Runtime signal recorded'
         });
     } catch (error) {
-        console.error('Report viewer runtime signal error:', error);
-        return reply.code(500).send({
+        // cameraService.getCameraById throws a 404-carrying error for unknown ids; surface 4xx as-is
+        // instead of masking every failure as a 500.
+        const code = Number.isInteger(error?.statusCode) && error.statusCode >= 400 && error.statusCode < 500
+            ? error.statusCode
+            : 500;
+        if (code === 500) {
+            console.error('Report viewer runtime signal error:', error);
+        }
+        return reply.code(code).send({
             success: false,
-            message: 'Failed to record runtime signal'
+            message: code === 500 ? 'Failed to record runtime signal' : (error.message || 'Failed to record runtime signal')
         });
     }
 }
