@@ -677,18 +677,17 @@ export const areaIdParamSchema = {
 export const createApiKeySchema = {
     body: {
         type: 'object',
-        required: ['name'],
+        required: ['clientName'],
         properties: {
-            name: {
+            clientName: {
                 type: 'string',
                 minLength: 1,
                 maxLength: 100
             },
-            description: {
-                anyOf: [{ type: 'string', maxLength: 500 }, { type: 'null' }]
-            },
-            expires_at: {
-                anyOf: [{ type: 'string', format: 'date-time' }, { type: 'null' }]
+            expiresInDays: {
+                type: 'integer',
+                minimum: 1,
+                maximum: 365
             }
         },
         additionalProperties: false
