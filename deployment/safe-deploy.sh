@@ -587,13 +587,23 @@ if [ -n "$BACKEND_OUT_LOG" ] && [ -f "$BACKEND_OUT_LOG" ]; then
     # PHASE 7 — so no amount of thumbnail spam following the marker can bury it (a line-count tail
     # could not win that race and cried "SUSPECT" + exit 1 on every healthy deploy). Fall back to a
     # wide tail only if the offset is unusable (never captured, or the log rotated/shrank since).
-    CUR_SIZE="$(wc -c < "$BACKEND_OUT_LOG" 2>/dev/null || echo 0)"
-    if [ "${OUT_LOG_OFFSET:-0}" -gt 0 ] && [ "$CUR_SIZE" -ge "${OUT_LOG_OFFSET:-0}" ]; then
-        BOOT_SLICE="$(tail -c +"$((OUT_LOG_OFFSET + 1))" "$BACKEND_OUT_LOG" 2>/dev/null || true)"
-    else
-        BOOT_SLICE="$(tail -n 4000 "$BACKEND_OUT_LOG" 2>/dev/null || true)"
-    fi
-    if printf '%s' "$BOOT_SLICE" | grep -qF "$BOOT_MARKER"; then
+    #
+    # And POLL, don't peek: the crash-watch above is a fixed 90s, but the boot tail itself can run
+    # past that on a loaded box (StreamWarmer pre-warm + the health/audio sweeps here take ~100s),
+    # so a one-shot grep cried SUSPECT on every healthy deploy — the marker simply had not been
+    # written yet. Give the marker up to ~120s beyond the crash-watch, checking every 5s.
+    BOOT_FOUND=""
+    for _try in $(seq 1 24); do
+        CUR_SIZE="$(wc -c < "$BACKEND_OUT_LOG" 2>/dev/null || echo 0)"
+        if [ "${OUT_LOG_OFFSET:-0}" -gt 0 ] && [ "$CUR_SIZE" -ge "${OUT_LOG_OFFSET:-0}" ]; then
+            BOOT_SLICE="$(tail -c +"$((OUT_LOG_OFFSET + 1))" "$BACKEND_OUT_LOG" 2>/dev/null || true)"
+        else
+            BOOT_SLICE="$(tail -n 4000 "$BACKEND_OUT_LOG" 2>/dev/null || true)"
+        fi
+        if printf '%s' "$BOOT_SLICE" | grep -qF "$BOOT_MARKER"; then BOOT_FOUND=1; break; fi
+        sleep 5
+    done
+    if [ -n "$BOOT_FOUND" ]; then
         ok "Boot completed fully — '${BOOT_MARKER}' present."
     else
         hr
