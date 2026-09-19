@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
 import { useNotification } from '../../../contexts/NotificationContext';
 import { adminAPI } from '../../../services/api';
 
@@ -58,10 +57,6 @@ const SETTING_DESCRIPTIONS = {
     announcement_end_at: 'End datetime for announcement visibility',
     announcement_show_in_full: 'Whether announcement appears in full mode',
     announcement_show_in_simple: 'Whether announcement appears in simple mode',
-};
-
-const getApiUrl = () => {
-    return import.meta.env.VITE_API_URL || 'http://localhost:3000';
 };
 
 function toLocalDateTimeValue(value) {
@@ -145,7 +140,7 @@ export default function GeneralSettingsPanel() {
     const fetchSettings = useCallback(async () => {
         try {
             setLoading(true);
-            const response = await axios.get(`${getApiUrl()}/api/settings/landing-page`);
+            const response = await adminAPI.get('/api/settings/landing-page');
             setSettings(mapResponseToSettings(response.data.data));
         } catch (requestError) {
             console.error('Error fetching settings:', requestError);

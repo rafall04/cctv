@@ -11,14 +11,9 @@ const { getMock, putMock, successMock, errorMock } = vi.hoisted(() => ({
     errorMock: vi.fn(),
 }));
 
-vi.mock('axios', () => ({
-    default: {
-        get: getMock,
-    },
-}));
-
 vi.mock('../../../services/api', () => ({
     adminAPI: {
+        get: getMock,
         put: putMock,
     },
 }));
