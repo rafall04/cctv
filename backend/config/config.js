@@ -100,7 +100,12 @@ export const config = {
     hlsUrlInternal: process.env.MEDIAMTX_HLS_URL_INTERNAL || 'http://localhost:8888',
     webrtcUrlInternal: process.env.MEDIAMTX_WEBRTC_URL_INTERNAL || 'http://localhost:8889',
     hlsUrl: buildPublicUrl(process.env.PUBLIC_HLS_PATH, '/hls'),
-    webrtcUrl: buildPublicUrl(process.env.PUBLIC_WEBRTC_PATH, '/webrtc'),
+    // null unless PUBLIC_WEBRTC_PATH is set: MediaMTX's WebRTC port binds loopback and
+    // /webrtc has no backend canViewLive gate, so there is no public path to advertise
+    // unless the operator deliberately publishes one (see streamService.buildStreamUrls).
+    webrtcUrl: process.env.PUBLIC_WEBRTC_PATH
+      ? buildPublicUrl(process.env.PUBLIC_WEBRTC_PATH, '/webrtc')
+      : null,
     publicBaseUrl: process.env.PUBLIC_STREAM_BASE_URL || '',
   },
 

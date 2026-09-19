@@ -158,7 +158,11 @@ class StreamService {
 
     buildStreamUrls(streamKey, requestHost) {
         let hlsBase = (config.mediamtx.hlsUrl || '/hls').replace(/\/$/, '');
-        let webrtcBase = (config.mediamtx.webrtcUrl || '/webrtc').replace(/\/$/, '');
+        // webrtcUrl is null unless PUBLIC_WEBRTC_PATH is set — there is no public path
+        // to WebRTC otherwise, so advertising one would publish a dead endpoint.
+        let webrtcBase = config.mediamtx.webrtcUrl
+            ? config.mediamtx.webrtcUrl.replace(/\/$/, '')
+            : null;
 
         const isIpAccess = requestHost && (
             /^(\d{1,3}\.){3}\d{1,3}$/.test(requestHost) ||
@@ -171,7 +175,7 @@ class StreamService {
                     const url = new URL(hlsBase);
                     hlsBase = url.pathname;
                 }
-                if (webrtcBase.startsWith('http')) {
+                if (webrtcBase && webrtcBase.startsWith('http')) {
                     const url = new URL(webrtcBase);
                     webrtcBase = url.pathname;
                 }
@@ -182,7 +186,7 @@ class StreamService {
 
         return {
             hls: `${hlsBase}/${streamKey}/index.m3u8`,
-            webrtc: `${webrtcBase}/${streamKey}`,
+            webrtc: webrtcBase ? `${webrtcBase}/${streamKey}` : null,
         };
     }
 

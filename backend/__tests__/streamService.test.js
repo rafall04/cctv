@@ -373,6 +373,15 @@ describe('streamService camera response routing', () => {
             });
         });
 
+        it('advertises no webrtc URL when webrtcUrl is not configured (no public path)', () => {
+            mockConfig.mediamtx.webrtcUrl = null;
+
+            expect(streamService.buildStreamUrls('camera31')).toEqual({
+                hls: '/hls/camera31/index.m3u8',
+                webrtc: null,
+            });
+        });
+
         it('falls back to relative paths when reached by raw IP, even with an absolute base', () => {
             mockConfig.mediamtx.hlsUrl = 'https://api-cctv.raf.my.id/hls';
             mockConfig.mediamtx.webrtcUrl = 'https://api-cctv.raf.my.id/webrtc';
