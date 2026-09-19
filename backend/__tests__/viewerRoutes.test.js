@@ -14,6 +14,9 @@ vi.mock('../services/viewerSessionService.js', () => ({
         getActiveSessions: vi.fn(() => []),
         getViewerStats: vi.fn(() => ({})),
         getSessionHistory: vi.fn(() => []),
+        // Runtime signals are gated on live viewer presence; these route tests represent a
+        // real viewer flow, so presence is true by default.
+        hasActiveSessionForCamera: vi.fn(() => true),
     },
 }));
 
@@ -162,6 +165,8 @@ describe('viewerRoutes', () => {
     });
 
     it('records runtime success signals for passive health evidence', async () => {
+        // The handler validates the camera exists before applying a signal.
+        getCameraByIdMock.mockReturnValue({ id: 393, enabled: 1 });
         const { default: viewerRoutes } = await import('../routes/viewerRoutes.js');
         const fastify = Fastify();
         await fastify.register(viewerRoutes, { prefix: '/api/viewer' });

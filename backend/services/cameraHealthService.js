@@ -9,7 +9,7 @@ SideEffects: Updates camera online state/runtime state, repairs MediaMTX paths, 
 import axios from 'axios';
 import https from 'https';
 import { probeRtspSource } from './rtspProbe.js';
-import { redactUrlCredentials, stripUrlCredentials } from '../utils/logRedaction.js';
+import { redactUrlCredentials, stripUrlCredentials, stripTargetCredentialsDeep } from '../utils/logRedaction.js';
 import {
     SCORE_DECAY_ON_SUCCESS,
     OFFLINE_SCORE_THRESHOLD,
@@ -57,29 +57,6 @@ import {
 } from './telegramAlertConfirmationPolicy.js';
 
 const mediaMtxApiBaseUrl = `${(config.mediamtx?.apiUrl || 'http://localhost:9997').replace(/\/$/, '')}/v3`;
-
-/**
- * Recursively strip URL userinfo (`scheme://user:pass@host` → `scheme://host`) from every string
- * in a details object before it is handed to a client. Used by the camera-health debug payload,
- * whose `lastDetails`/`runtimeTarget`/`probeTarget` fields carry RTSP/HTTP probe targets that may
- * embed camera credentials. Non-strings and plain values are returned unchanged.
- */
-function stripTargetCredentialsDeep(value) {
-    if (typeof value === 'string') {
-        return stripUrlCredentials(value);
-    }
-    if (Array.isArray(value)) {
-        return value.map(stripTargetCredentialsDeep);
-    }
-    if (value && typeof value === 'object') {
-        const out = {};
-        for (const [key, entry] of Object.entries(value)) {
-            out[key] = stripTargetCredentialsDeep(entry);
-        }
-        return out;
-    }
-    return value;
-}
 
 const EXTERNAL_REQUEST_TIMEOUT_MS = 10000;
 const EXTERNAL_MAX_PDT_AGE_SEC = 120;
@@ -2832,11 +2809,7 @@ class CameraHealthService {
                 confidence: state.confidence,
                 errorClass: state.errorClass,
                 lastReason: state.lastReason,
-                // Client-facing: never hand RTSP/HTTP targets with embedded userinfo to the
-                // frontend. This debug page is reachable by every staff role, and the raw
-                // targets are what leaked `rtsp://user:pass@host/...` for 57 cameras when the
-                // auth bypass let anonymous stream tokens in. stripUrlCredentials removes the
-                // userinfo while keeping host/port/path diagnosable (logRedaction.js).
+                // Client-facing: strip URL userinfo (credentials); host/port/path stay diagnosable.
                 lastDetails: stripTargetCredentialsDeep(state.lastDetails),
                 runtimeTarget: stripUrlCredentials(state.lastDetails?.runtimeTarget || null),
                 probeTarget: stripUrlCredentials(state.lastDetails?.probeTarget || null),

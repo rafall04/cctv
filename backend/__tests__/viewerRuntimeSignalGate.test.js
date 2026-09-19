@@ -22,6 +22,14 @@ vi.mock('../services/cameraHealthService.js', () => ({
 vi.mock('../middleware/rateLimiter.js', () => ({
     checkRateLimit: vi.fn(),
 }));
+// rateLimiter reads the runtime `settings` table; the guardrail requires such tests to isolate the
+// database (see guardrails.test.js: "any test importing a settings consumer mocks the database").
+vi.mock('../database/connectionPool.js', () => ({
+    query: vi.fn(() => []),
+    queryOne: vi.fn(() => null),
+    execute: vi.fn(() => ({ changes: 0 })),
+    transaction: vi.fn((fn) => fn()),
+}));
 
 import viewerSessionService from '../services/viewerSessionService.js';
 import cameraService from '../services/cameraService.js';
