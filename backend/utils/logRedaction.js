@@ -79,4 +79,26 @@ export function stripUrlCredentials(value) {
     return value.replace(URL_USERINFO_RE, '$1');
 }
 
-export default { redactUrlCredentials, stripUrlCredentials };
+/**
+ * Apply stripUrlCredentials to EVERY string in a nested value (objects, arrays, primitives), so a
+ * client-facing payload whose detail object carries probe URLs cannot smuggle credentials through a
+ * nested field. Non-strings are returned unchanged; safe to run over any structure.
+ */
+export function stripTargetCredentialsDeep(value) {
+    if (typeof value === 'string') {
+        return stripUrlCredentials(value);
+    }
+    if (Array.isArray(value)) {
+        return value.map(stripTargetCredentialsDeep);
+    }
+    if (value && typeof value === 'object') {
+        const out = {};
+        for (const [key, entry] of Object.entries(value)) {
+            out[key] = stripTargetCredentialsDeep(entry);
+        }
+        return out;
+    }
+    return value;
+}
+
+export default { redactUrlCredentials, stripUrlCredentials, stripTargetCredentialsDeep };

@@ -1,5 +1,29 @@
 import { logAuthorizationFailure } from '../services/securityAuditLogger.js';
 
+/*
+ * Session identity is a JWT whose `type` is exactly `access` — the only type
+ * `sessionManager.createAccessToken` mints for a logged-in user.
+ *
+ * Signature validity alone is NOT identity. `GET /api/stream/:id/token` mints a
+ * public `stream_access` JWT signed with the SAME secret (and `refresh` tokens
+ * are signed the same way too). Before this check, any visitor could take that
+ * public stream token and send it as `Authorization: Bearer` / `Cookie: token=`
+ * to every authenticate-only route: the signature verified, so the request was
+ * treated as a logged-in session. That turned the whole auth-required surface
+ * into a public one (RTSP credentials via /api/admin/debug/camera-health,
+ * viewer IP history, feedback PII, ...).
+ *
+ * Stream tokens are therefore only valid where they are explicitly consumed
+ * (the HLS proxy reads `request.streamToken` / `?token=`, and
+ * hlsProxyService.resolveHlsViewerUser already refuses to treat them as a
+ * user). Everywhere else they are not a session and must be rejected.
+ */
+const SESSION_TOKEN_TYPE = 'access';
+
+function isSessionToken(decoded) {
+    return decoded?.type === SESSION_TOKEN_TYPE;
+}
+
 export async function authMiddleware(request, reply) {
     // Mark that this route REQUIRES auth — customerAccessPolicy uses this flag to
     // deny-by-default the `customer` role on staff endpoints (public and
@@ -28,6 +52,14 @@ export async function authMiddleware(request, reply) {
                 message: 'Unauthorized - Invalid or expired token',
             });
         }
+    }
+
+    if (!isSessionToken(request.user)) {
+        request.user = null;
+        return reply.code(401).send({
+            success: false,
+            message: 'Unauthorized - Invalid or expired token',
+        });
     }
 }
 
@@ -80,6 +112,11 @@ export async function requireCustomerOrAdmin(request, reply) {
 export async function optionalAuthMiddleware(request, reply) {
     try {
         await request.jwtVerify();
+        // A public stream_access / refresh token is not a user session: treat it
+        // as anonymous here exactly as hlsProxyService.resolveHlsViewerUser does.
+        if (!isSessionToken(request.user)) {
+            request.user = null;
+        }
         return;
     } catch {
         // Fall back to cookie-based auth if available
@@ -92,7 +129,9 @@ export async function optionalAuthMiddleware(request, reply) {
 
     try {
         const decoded = request.server.jwt.verify(token);
-        request.user = decoded;
+        if (isSessionToken(decoded)) {
+            request.user = decoded;
+        }
     } catch {
         // Treat invalid public playback auth as anonymous instead of failing request
     }

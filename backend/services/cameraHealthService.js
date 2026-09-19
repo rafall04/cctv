@@ -9,7 +9,7 @@ SideEffects: Updates camera online state/runtime state, repairs MediaMTX paths, 
 import axios from 'axios';
 import https from 'https';
 import { probeRtspSource } from './rtspProbe.js';
-import { redactUrlCredentials } from '../utils/logRedaction.js';
+import { redactUrlCredentials, stripUrlCredentials, stripTargetCredentialsDeep } from '../utils/logRedaction.js';
 import {
     SCORE_DECAY_ON_SUCCESS,
     OFFLINE_SCORE_THRESHOLD,
@@ -2809,11 +2809,12 @@ class CameraHealthService {
                 confidence: state.confidence,
                 errorClass: state.errorClass,
                 lastReason: state.lastReason,
-                lastDetails: state.lastDetails,
-                runtimeTarget: state.lastDetails?.runtimeTarget || null,
-                probeTarget: state.lastDetails?.probeTarget || null,
+                // Client-facing: strip URL userinfo (credentials); host/port/path stay diagnosable.
+                lastDetails: stripTargetCredentialsDeep(state.lastDetails),
+                runtimeTarget: stripUrlCredentials(state.lastDetails?.runtimeTarget || null),
+                probeTarget: stripUrlCredentials(state.lastDetails?.probeTarget || null),
                 probeMethod: state.lastDetails?.probe_method || null,
-                fallbackTarget: state.lastDetails?.fallbackTarget || null,
+                fallbackTarget: stripUrlCredentials(state.lastDetails?.fallbackTarget || null),
                 usedFallback: state.lastDetails?.usedFallback || false,
                 httpStatus: state.lastDetails?.http_status ?? null,
                 contentType: state.lastDetails?.content_type || null,

@@ -9,12 +9,40 @@
 import cameraService from '../services/cameraService.js';
 import billingService from '../services/billingService.js';
 import bulkRecordingDurationUpdater from '../services/recordingRetentionBulkService.js';
+import { stripUrlCredentials } from '../utils/logRedaction.js';
 
-// Get all cameras (admin only - includes disabled cameras)
+// URL-valued columns in the admin camera list that may embed third-party credentials
+// (`https://user:pass@host/...`). Same rule as getCameraById: only admins ever need them.
+const CREDENTIAL_BEARING_URL_FIELDS = [
+    'external_hls_url',
+    'external_stream_url',
+    'external_embed_url',
+    'external_snapshot_url',
+];
+
+// Get all cameras (any authenticated staff role - includes disabled cameras).
+// The list is viewer-accessible (Camera Management page), so non-admins get the same
+// record minus the secrets: `stream_key` (the HLS path for private cameras) and any
+// embedded userinfo in external URLs. Admin keeps the full record for the edit form.
 export async function getAllCameras(request, reply) {
     try {
         const cameras = cameraService.getAdminCameraList();
-        return reply.send({ success: true, data: cameras });
+        if (request.user?.role === 'admin') {
+            return reply.send({ success: true, data: cameras });
+        }
+        // Copy before stripping: getAdminCameraList() is served from a shared cache, so
+        // mutating the returned objects would poison it for admins too.
+        const sanitized = cameras.map((camera) => {
+            const copy = { ...camera };
+            delete copy.stream_key;
+            for (const field of CREDENTIAL_BEARING_URL_FIELDS) {
+                if (copy[field]) {
+                    copy[field] = stripUrlCredentials(copy[field]);
+                }
+            }
+            return copy;
+        });
+        return reply.send({ success: true, data: sanitized });
     } catch (error) {
         console.error('Get all cameras error:', error);
         return reply.code(500).send({ success: false, message: 'Internal server error' });
