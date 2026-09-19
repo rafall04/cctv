@@ -49,7 +49,7 @@ export function Tabs({ tabs, activeId, onChange, idPrefix = 'tab', className = '
                 ref={listRef}
                 role="tablist"
                 onKeyDown={handleKeyDown}
-                className="-mb-px flex gap-1 overflow-x-auto no-scrollbar"
+                className="-mb-px flex gap-1 overflow-x-auto no-scrollbar lg:flex-wrap lg:overflow-x-visible"
             >
                 {tabs.map((tab) => {
                     const selected = tab.id === activeId;
