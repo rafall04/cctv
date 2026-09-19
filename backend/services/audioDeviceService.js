@@ -116,13 +116,18 @@ export function authDevice(token) {
  * Enqueue a command to one or more ENABLED devices. 'play' needs clip_id; 'stop' clears the device's queue.
  * @returns {number} how many devices the command was enqueued to.
  */
-const ALLOWED_COMMANDS = ['play', 'stop', 'talk_start', 'talk_end'];
-export function enqueueCommand(deviceIds, command, clipId = null, loop = 1) {
+const ALLOWED_COMMANDS = ['play', 'stop', 'talk_start', 'talk_end', 'volume'];
+export function enqueueCommand(deviceIds, command, clipId = null, loop = 1, level = null) {
     const ids = [...new Set((deviceIds || []).map((x) => parseInt(x, 10)).filter(Number.isInteger))];
     if (ids.length === 0) return 0;
     const cmd = ALLOWED_COMMANDS.includes(command) ? command : 'play';
     const cid = cmd === 'play' ? (parseInt(clipId, 10) || null) : null;
     if (cmd === 'play' && !cid) { const e = new Error('clip_id wajib untuk play'); e.statusCode = 400; throw e; }
+    // 'volume' carries a 0-100 level (applied via amixer on the node); other commands leave it NULL.
+    const lvl = cmd === 'volume' ? Math.min(Math.max(parseInt(level, 10) || 0, 0), 100) : null;
+    if (cmd === 'volume' && (level === null || level === undefined || Number.isNaN(parseInt(level, 10)))) {
+        const e = new Error('level 0-100 wajib untuk volume'); e.statusCode = 400; throw e;
+    }
     const n = Math.min(Math.max(parseInt(loop, 10) || 1, 1), 20);
     let count = 0;
     for (const id of ids) {
@@ -130,16 +135,16 @@ export function enqueueCommand(deviceIds, command, clipId = null, loop = 1) {
         if (!dev) continue;
         // 'stop'/'talk_start' supersede anything pending (drop stale queue first) so a live action is immediate.
         if (cmd === 'stop' || cmd === 'talk_start') execute('DELETE FROM audio_device_commands WHERE device_id = ?', [id]);
-        execute('INSERT INTO audio_device_commands (device_id, command, clip_id, loop) VALUES (?, ?, ?, ?)', [id, cmd, cid, n]);
+        execute('INSERT INTO audio_device_commands (device_id, command, clip_id, loop, level) VALUES (?, ?, ?, ?, ?)', [id, cmd, cid, n, lvl]);
         count += 1;
     }
     return count;
 }
 
-/** Mark a device as seen now (+ its source IP). Cheap; called every poll so liveness stays fresh. */
-export function touchDevice(deviceId, ip = null) {
-    execute("UPDATE audio_devices SET last_seen = datetime('now'), last_ip = COALESCE(?, last_ip) WHERE id = ?",
-        [ip ? String(ip).slice(0, 64) : null, parseInt(deviceId, 10)]);
+/** Mark a device as seen now (+ its source IP + agent version). Cheap; called every poll. */
+export function touchDevice(deviceId, ip = null, agentVersion = null) {
+    execute("UPDATE audio_devices SET last_seen = datetime('now'), last_ip = COALESCE(?, last_ip), agent_version = COALESCE(?, agent_version) WHERE id = ?",
+        [ip ? String(ip).slice(0, 64) : null, agentVersion ? String(agentVersion).slice(0, 24) : null, parseInt(deviceId, 10)]);
 }
 
 /** Claim (delete + return) the oldest queued command for a device, or null. Used by the long-poll loop. */
@@ -204,6 +209,11 @@ export function castToDevices(deviceIds, sourceType, sourceId, loop = 1, { preem
     return count; // enabled devices that received the (first) clip
 }
 
+/** Remote volume (0-100) to ENABLED devices — the node's agent applies it via amixer. */
+export function setDeviceVolume(deviceIds, level) {
+    return enqueueCommand(deviceIds, 'volume', null, 1, level);
+}
+
 /** Stop clip playback on every enabled device (kill-switch companion to stopAllPlaying). */
 export function stopAllDevices() {
     const ids = query('SELECT id FROM audio_devices WHERE enabled = 1').map((r) => r.id);
@@ -222,5 +232,5 @@ export default {
     listDevices, createDevice, updateDevice, deleteDevice, regenToken,
     authDevice, enqueueCommand, touchDevice, claimNextCommand, pollDevice,
     enabledDeviceIdsInAreas, enabledDeviceIdsForCameras, castToDevices, stopAllDevices,
-    grantClip, isClipGranted,
+    grantClip, isClipGranted, setDeviceVolume,
 };

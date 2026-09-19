@@ -366,6 +366,11 @@ export const playDevices = async ({ deviceIds, sourceId, loop = 1, sourceType = 
     try { return (await apiClient.post(`${BASE}/devices/play`, { deviceIds, sourceId, loop, sourceType })).data; }
     catch (error) { return failure(error, 'Gagal menyiarkan ke titik speaker'); }
 };
+/** Remote volume 0-100 on one or more nodes (amixer on the STB). */
+export const setDevicesVolume = async ({ deviceIds, level }) => {
+    try { return (await apiClient.post(`${BASE}/devices/volume`, { deviceIds, level })).data; }
+    catch (error) { return failure(error, 'Gagal mengatur volume titik speaker'); }
+};
 
 /* ----------------------------------------------------- motion -> deter audio */
 

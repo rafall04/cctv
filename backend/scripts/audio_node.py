@@ -13,6 +13,7 @@ CONFIG — env vars, or /etc/rafnet-speaker.conf with KEY=VALUE lines:
   HUB_URL   e.g. https://cctv.contoh.desa      (tanpa garis miring akhir)
   TOKEN     token titik speaker dari halaman admin
   PLAYER    opsional: aplay (default) | mpv | ffplay
+  CACHE_DIR opsional: direktori cache clip (default /var/cache/rafnet-speaker)
 
 RUN:  HUB_URL=... TOKEN=... python3 audio_node.py
 Atau pasang sebagai service systemd (contoh unit di bawah, di komentar).
@@ -57,17 +58,89 @@ def load_conf():
     return hub, token, player
 
 
+AGENT_VERSION = '1.1.0'
+
 HUB, TOKEN, PLAYER = load_conf()
 if not HUB or not TOKEN:
     print('HUB_URL dan TOKEN wajib (env atau /etc/rafnet-speaker.conf)', file=sys.stderr)
     sys.exit(1)
 
+CACHE_DIR = os.environ.get('CACHE_DIR') or '/var/cache/rafnet-speaker'
+CACHE_MAX_BYTES = 200 * 1024 * 1024  # keep the newest clips; prune LRU beyond this
+
 _current = None  # current playback process
 
 
 def http_get(path, timeout=30):
-    req = urllib.request.Request(HUB + path, headers={'x-device-token': TOKEN})
+    # x-agent-version lets the admin list show which nodes run an old agent (field ops hygiene).
+    req = urllib.request.Request(HUB + path, headers={'x-device-token': TOKEN, 'x-agent-version': AGENT_VERSION})
     return urllib.request.urlopen(req, timeout=timeout)  # noqa: S310 (fixed HUB base)
+
+
+def clip_cache_path(clip_id):
+    return os.path.join(CACHE_DIR, 'clip_%s.wav' % clip_id)
+
+
+def prune_cache():
+    """LRU-prune the clip cache: a node that loops the same adzan daily must not grow forever."""
+    try:
+        entries = []
+        total = 0
+        for name in os.listdir(CACHE_DIR):
+            p = os.path.join(CACHE_DIR, name)
+            if not (name.startswith('clip_') and name.endswith('.wav') and os.path.isfile(p)):
+                continue
+            st = os.stat(p)
+            entries.append((st.st_mtime, st.st_size, p))
+            total += st.st_size
+        for _, size, p in sorted(entries):  # oldest mtime first
+            if total <= CACHE_MAX_BYTES:
+                break
+            try:
+                os.remove(p)
+                total -= size
+            except OSError:
+                pass
+    except OSError:
+        pass  # cache dir missing/unreadable — non-fatal, playback still works uncached
+
+
+def fetch_clip(clip_url):
+    """Return WAV bytes — from the local cache when this clip was already downloaded (daily adzan
+    doesn't re-download every time), else fetch and cache it. Cache key = clip_id from the URL tail."""
+    clip_id = clip_url.rstrip('/').rsplit('/', 1)[-1]
+    cached = clip_cache_path(clip_id)
+    try:
+        if os.path.getsize(cached) > 0:
+            os.utime(cached)  # touch: most-recently-played survives LRU pruning
+            with open(cached, 'rb') as f:
+                return f.read()
+    except OSError:
+        pass
+    data = http_get(clip_url, timeout=30).read()
+    try:
+        os.makedirs(CACHE_DIR, exist_ok=True)
+        tmp = cached + '.tmp'
+        with open(tmp, 'wb') as f:
+            f.write(data)
+        os.replace(tmp, cached)
+        prune_cache()
+    except OSError:
+        pass  # read-only fs / no space — play uncached
+    return data
+
+
+def set_volume(level):
+    """amixer volume 0-100. HG680P/Armbian exposes the line-out under different control names
+    depending on the DTB, so try the common ones and stop at the first that answers."""
+    level = max(0, min(int(level), 100))
+    for ctl in ('Master', 'PCM', 'Lineout', 'HDMI', 'DAC'):
+        r = subprocess.call(['amixer', '-q', 'sset', ctl, '%d%%' % level],
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)  # noqa: S603,S607
+        if r == 0:
+            print('volume %d%% -> %s' % (level, ctl))
+            return
+    print('volume: tak ada kontrol amixer yang cocok', file=sys.stderr)
 
 
 def stop_playback():
@@ -151,11 +224,13 @@ def main():
             data = body.get('data') or {}
             cmd = data.get('command')
             if cmd == 'play' and data.get('clip_url'):
-                audio = http_get(data['clip_url'], timeout=30).read()
+                audio = fetch_clip(data['clip_url'])
                 play_wav(audio, data.get('loop') or 1)
             elif cmd == 'talk_start' and data.get('stream_url'):
                 play_stream(data['stream_url'])  # blocks (plays live) until talk ends, then resume polling
-            elif cmd == 'stop':
+            elif cmd == 'volume' and data.get('level') is not None:
+                set_volume(data['level'])
+            elif cmd in ('stop', 'talk_end'):
                 stop_playback()
             time.sleep(0.3)  # small floor; the server long-poll provides the real pacing
         except urllib.error.HTTPError as e:

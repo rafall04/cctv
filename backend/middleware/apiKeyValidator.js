@@ -70,6 +70,7 @@ export const API_KEY_VALIDATOR_CONFIG = {
         '/api/billing/webhook',  // Payment gateway webhooks - authenticated by gateway signature
         '/api/voucher/webhook',  // Voucher payment webhook - server-to-server, re-verified via gateway API
         '/api/playback-access',  // Self-serve playback packages, orders, renewals, recovery + iPaymu notify (device-gated, not API-key)
+        '/api/admin/audio/node', // Titik Speaker STB agents — device-token auth inside the handlers (x-device-token); an STB can't hold an API key
         '/api/internal/'         // MediaMTX push hooks - loopback + shared-secret gated in the controller
     ],
     // Whether to enforce API key validation (can be disabled for development)

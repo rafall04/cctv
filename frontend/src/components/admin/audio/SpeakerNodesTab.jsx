@@ -10,7 +10,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { getDevices, createDevice, updateDevice, deleteDevice, regenDeviceToken, testDevice, playDevices } from '../../../services/audioService';
+import { getDevices, createDevice, updateDevice, deleteDevice, regenDeviceToken, testDevice, playDevices, setDevicesVolume } from '../../../services/audioService';
 import { useNotification } from '../../../contexts/NotificationContext';
 import { useConfirm } from '../../../contexts/ConfirmContext';
 import { Button, Field, EmptyState, StatusDot } from '../../ui';
@@ -25,6 +25,7 @@ export default function SpeakerNodesTab({ clips = [], areas = [] }) {
     const [testClip, setTestClip] = useState('');
     const [selected, setSelected] = useState([]);
     const [loop, setLoop] = useState(1);
+    const [volume, setVolume] = useState(80);
     const [busy, setBusy] = useState('');
     const { showNotification } = useNotification();
     const confirm = useConfirm();
@@ -90,6 +91,14 @@ export default function SpeakerNodesTab({ clips = [], areas = [] }) {
         showNotification({ type: r.success ? 'success' : 'error', title: 'Siaran', message: r.message });
     };
 
+    const applyVolume = async () => {
+        if (selected.length === 0) { showNotification({ type: 'error', title: 'Pilih titik speaker' }); return; }
+        setBusy('volume');
+        const r = await setDevicesVolume({ deviceIds: selected, level: volume });
+        setBusy('');
+        showNotification({ type: r.success ? 'success' : 'error', title: 'Volume', message: r.message });
+    };
+
     const copy = (text) => {
         // writeText returns a Promise — a sync try/catch misses its rejection (blocked/insecure context) and
         // would show a false "Disalin". Confirm only on resolve; tell the operator to copy manually on failure.
@@ -102,6 +111,9 @@ export default function SpeakerNodesTab({ clips = [], areas = [] }) {
     const toggleSel = (id) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
 
     const confSnippet = (token) => `HUB_URL=${hubOrigin}\nTOKEN=${token}\nPLAYER=aplay`;
+    // One-command install: the hub itself serves the bash installer + the agent (public, no auth —
+    // they're just client code). The token arrives as $1, never in the URL (access-log safe).
+    const installCmd = (token) => `curl -sL ${hubOrigin}/api/admin/audio/node/install | bash -s -- ${token}`;
 
     return (
         <div className="space-y-5">
@@ -119,10 +131,11 @@ export default function SpeakerNodesTab({ clips = [], areas = [] }) {
                         <code className="min-w-0 flex-1 truncate rounded-control border border-edge bg-surface px-2 py-1 font-mono text-xs text-content">{reveal.token}</code>
                         <button type="button" onClick={() => copy(reveal.token)} className="shrink-0 rounded-control border border-edge bg-surface px-2.5 py-1 text-xs font-medium text-content-muted hover:border-edge-strong">Salin token</button>
                     </div>
-                    <p className="text-xs text-content-muted">Isi <span className="font-mono">/etc/rafnet-speaker.conf</span> di STB:</p>
-                    <pre className="overflow-x-auto rounded-control border border-edge bg-surface p-2 font-mono text-xs text-content-muted">{confSnippet(reveal.token)}</pre>
-                    <div className="flex gap-2">
-                        <button type="button" onClick={() => copy(confSnippet(reveal.token))} className="rounded-control border border-edge bg-surface px-2.5 py-1 text-xs font-medium text-content-muted hover:border-edge-strong">Salin konfigurasi</button>
+                    <p className="text-xs text-content-muted">Di STB (Armbian, sebagai root), jalankan satu perintah ini — memasang agen + service systemd sekaligus:</p>
+                    <pre className="overflow-x-auto rounded-control border border-edge bg-surface p-2 font-mono text-xs text-content-muted">{installCmd(reveal.token)}</pre>
+                    <div className="flex flex-wrap gap-2">
+                        <button type="button" onClick={() => copy(installCmd(reveal.token))} className="rounded-control border border-primary/40 bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary hover:border-primary">Salin perintah instal</button>
+                        <button type="button" onClick={() => copy(confSnippet(reveal.token))} className="rounded-control border border-edge bg-surface px-2.5 py-1 text-xs font-medium text-content-muted hover:border-edge-strong">Salin konfigurasi manual</button>
                         <button type="button" onClick={() => setReveal(null)} className="rounded-control border border-edge bg-surface px-2.5 py-1 text-xs font-medium text-content-subtle hover:border-edge-strong">Sudah disalin</button>
                     </div>
                 </div>
@@ -152,7 +165,7 @@ export default function SpeakerNodesTab({ clips = [], areas = [] }) {
                                 <input type="checkbox" checked={selected.includes(d.id)} onChange={() => toggleSel(d.id)} className="h-4 w-4 accent-primary" />
                                 <span className="min-w-0">
                                     <span className="block truncate text-sm font-semibold text-content">{d.name}</span>
-                                    <span className="block text-xs text-content-subtle">{d.online ? 'online' : 'offline'}{d.area_name ? ` · ${d.area_name}` : ''}{d.enabled ? '' : ' · nonaktif'}</span>
+                                    <span className="block text-xs text-content-subtle">{d.online ? 'online' : 'offline'}{d.area_name ? ` · ${d.area_name}` : ''}{d.enabled ? '' : ' · nonaktif'}{d.agent_version ? ` · v${d.agent_version}` : (d.last_seen ? ' · agen lama' : '')}</span>
                                 </span>
                             </label>
                             <button type="button" onClick={() => test(d)} disabled={busy === `test-${d.id}` || !testClip} title={testClip ? 'Putar audio uji ke titik ini' : 'Pilih audio uji dulu'} className="shrink-0 rounded-control border border-edge bg-surface px-2.5 py-1.5 text-sm font-medium text-content-muted hover:border-primary hover:text-primary disabled:opacity-40">{busy === `test-${d.id}` ? '…' : 'Uji'}</button>
@@ -171,17 +184,18 @@ export default function SpeakerNodesTab({ clips = [], areas = [] }) {
                     {clips.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </Field>
                 <Field type="number" label="Ulang" min={1} max={20} value={loop} onChange={(e) => setLoop(Math.min(20, Math.max(1, parseInt(e.target.value, 10) || 1)))} />
+                <Field type="number" label="Volume %" min={0} max={100} value={volume} onChange={(e) => setVolume(Math.min(100, Math.max(0, parseInt(e.target.value, 10) || 0)))} />
                 <Button variant="primary" loading={busy === 'broadcast'} onClick={broadcast} disabled={!testClip || selected.length === 0}>Siarkan ke terpilih ({selected.length})</Button>
+                <Button variant="secondary" loading={busy === 'volume'} onClick={applyVolume} disabled={selected.length === 0}>Atur volume terpilih</Button>
             </div>
 
             <details className="rounded-card border border-edge bg-surface p-3 text-xs text-content-muted">
-                <summary className="cursor-pointer font-medium text-content">Cara pasang di STB (Armbian)</summary>
+                <summary className="cursor-pointer font-medium text-content">Cara pasang di STB (Armbian — HG680P/B860H)</summary>
                 <ol className="mt-2 list-decimal space-y-1 pl-4">
-                    <li>Salin <span className="font-mono">backend/scripts/audio_node.py</span> ke STB (mis. <span className="font-mono">/opt/rafnet/</span>).</li>
-                    <li>Pasang pemutar: <span className="font-mono">apt install alsa-utils</span> (untuk <span className="font-mono">aplay</span>).</li>
-                    <li>Buat <span className="font-mono">/etc/rafnet-speaker.conf</span> berisi HUB_URL + TOKEN (dari token di atas).</li>
-                    <li>Colok line-out 3.5mm STB → input TPA3116D2 → TOA (8Ω). Tes: <span className="font-mono">HUB_URL=… TOKEN=… python3 audio_node.py</span>.</li>
-                    <li>Jadikan service systemd (contoh unit ada di header <span className="font-mono">audio_node.py</span>) agar jalan otomatis.</li>
+                    <li>Buat titik speaker di atas → salin <span className="font-semibold">perintah instal</span> yang muncul (token sudah tertanam di dalamnya).</li>
+                    <li>Di STB sebagai root, tempel perintah itu. Installer memasang <span className="font-mono">alsa-utils</span> + agen + service systemd sekaligus, lalu memverifikasi token.</li>
+                    <li>Colok line-out 3.5mm STB → input TPA3116D2 → TOA (8Ω). Tes lewat tombol <span className="font-semibold">Uji</span>.</li>
+                    <li>Manual/alternatif: unduh agen dari <span className="font-mono">/api/admin/audio/node/agent</span>, isi <span className="font-mono">/etc/rafnet-speaker.conf</span> (HUB_URL + TOKEN), contoh unit systemd ada di header <span className="font-mono">audio_node.py</span>.</li>
                 </ol>
             </details>
         </div>

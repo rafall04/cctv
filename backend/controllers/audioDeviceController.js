@@ -14,7 +14,11 @@ import {
     deleteDevice as deviceDelete, regenToken as deviceRegen, authDevice as deviceAuth,
     enqueueCommand as deviceEnqueue, touchDevice as deviceTouch, claimNextCommand as deviceClaim,
     castToDevices, grantClip as deviceGrantClip, isClipGranted as deviceClipGranted,
+    setDeviceVolume,
 } from '../services/audioDeviceService.js';
+import { readFileSync } from 'fs';
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
 import { getClipWav } from '../services/audioClipService.js';
 import { addSink, removeSink } from '../services/audioDeviceTalk.js';
 import { logAdminAction } from '../services/securityAuditLogger.js';
@@ -108,6 +112,18 @@ export async function playDevices(request, reply) {
     } catch (error) { return fail(reply, error, 'Gagal menyiarkan ke titik speaker'); }
 }
 
+// Remote volume: enqueue a 'volume' command to the chosen Titik Speaker nodes (applied via amixer).
+export async function setDevicesVolume(request, reply) {
+    try {
+        const { deviceIds, level } = request.body || {};
+        const ids = Array.isArray(deviceIds) ? deviceIds : [];
+        if (ids.length === 0) return reply.code(400).send({ success: false, message: 'Pilih titik speaker' });
+        const n = setDeviceVolume(ids, level);
+        logAdminAction({ action: 'audio_device_volume', targetType: 'audio_device', devices: n, level, ...adminContext(request) }, request);
+        return reply.send({ success: true, message: n ? `Volume ${level}% dikirim ke ${n} titik speaker` : 'Tak ada titik speaker aktif terpilih', data: { queued: n } });
+    } catch (error) { return fail(reply, error, 'Gagal mengatur volume titik speaker'); }
+}
+
 /* ---- NODE endpoints: the STB agent (device TOKEN auth, NOT an admin JWT) ---- */
 function deviceTokenFrom(request) {
     // Header-only: a token in the query string (?token=) lands in Cloudflare/nginx access logs,
@@ -124,7 +140,7 @@ export async function nodePoll(request, reply) {
         const ip = resolveClientIp(request);
         const dev = deviceAuth(deviceTokenFrom(request));
         if (!dev) return reply.code(401).send({ success: false, message: 'token tidak valid' });
-        deviceTouch(dev.id, ip);
+        deviceTouch(dev.id, ip, request.headers['x-agent-version']);
         const deadline = Date.now() + POLL_HOLD_MS;
         for (;;) {
             // Check the socket BEFORE claiming: claimNextCommand DELETES the command, so claiming onto a dead
@@ -133,10 +149,11 @@ export async function nodePoll(request, reply) {
             const cmd = deviceClaim(dev.id);
             if (cmd) {
                 if (request.raw.destroyed) { // raced: socket died between the check and the claim -> put it back
-                    try { deviceEnqueue([dev.id], cmd.command, cmd.clip_id, cmd.loop); } catch { /* device gone */ }
+                    try { deviceEnqueue([dev.id], cmd.command, cmd.clip_id, cmd.loop, cmd.level); } catch { /* device gone */ }
                     break;
                 }
                 const out = { command: cmd.command, loop: cmd.loop };
+                if (cmd.command === 'volume') out.level = cmd.level;
                 if (cmd.command === 'play' && cmd.clip_id) {
                     // Authorize THIS device to download exactly this clip; nodeClip refuses anything else so a
                     // device token can't enumerate the whole clip library by id.
@@ -196,4 +213,38 @@ export async function nodeStream(request, reply) {
     res.on('close', cleanup);
     res.on('error', cleanup);
     return undefined;
+}
+
+/* ---- Node provisioning (PUBLIC, no token needed): the installer + agent scripts are just client
+   code — no secrets in them. Serving them from the hub means one URL is all an STB needs:
+   `curl -sL <hub>/api/admin/audio/node/install | bash -s -- <TOKEN>` ---------------------------- */
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const SCRIPTS_DIR = join(__dirname, '..', 'scripts');
+
+function serveScript(request, reply, filename, contentType) {
+    const path = join(SCRIPTS_DIR, filename);
+    try {
+        let body = readFileSync(path); // tiny file, read per request keeps the deployed copy fresh
+        if (filename === 'install-speaker.sh') {
+            // Bake the hub's own address into the script so `curl … | bash -s -- TOKEN` just works —
+            // the STB calls back to exactly the origin the operator used to fetch the installer.
+            const proto = String(request.headers['x-forwarded-proto'] || request.protocol || 'https').split(',')[0].trim();
+            const host = String(request.headers['x-forwarded-host'] || request.headers.host || '').split(',')[0].trim();
+            if (host) body = body.toString('utf8').replaceAll('__HUB_URL__', `${proto}://${host}`);
+        }
+        reply.header('Content-Type', contentType);
+        reply.header('Cache-Control', 'no-store');
+        return reply.send(body);
+    } catch {
+        return reply.code(404).send({ success: false, message: 'Script tidak ditemukan' });
+    }
+}
+
+export async function nodeInstallScript(request, reply) {
+    return serveScript(request, reply, 'install-speaker.sh', 'text/x-shellscript; charset=utf-8');
+}
+
+export async function nodeAgentScript(request, reply) {
+    return serveScript(request, reply, 'audio_node.py', 'text/x-python; charset=utf-8');
 }
