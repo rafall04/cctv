@@ -61,6 +61,23 @@ export default function PlaybackOptions({
     const { timezone } = useTimezone();
     const unreachableMoment = useUnreachableSharedMoment(playbackPolicy);
 
+    /*
+     * Server-resolved contact path (playback_policy.contact) — present only when the operator set
+     * contactMode=branding_whatsapp AND filled the branding WhatsApp number. Rendered as a quiet
+     * secondary link beside the self-serve button, and still rendered when nothing is on sale:
+     * for that visitor it is the only way forward at all.
+     */
+    const contactLink = playbackPolicy?.contact?.href ? (
+        <a
+            href={playbackPolicy.contact.href}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-2 rounded-control border border-edge px-3 py-1.5 text-xs font-medium text-content-muted transition-colors hover:border-edge-strong hover:text-content focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary"
+        >
+            {playbackPolicy.contact.label || 'Hubungi Admin'}
+        </a>
+    ) : null;
+
     return (
         <div className="space-y-3 rounded-card border border-edge bg-surface p-3 sm:p-4">
             {/*
@@ -76,14 +93,19 @@ export default function PlaybackOptions({
                         {unreachableMoment.previewMinutes} menit yang terbuka untuk umum. Yang tampil
                         sekarang rekaman terbaru, bukan momen tersebut.
                     </p>
-                    {accessOffered && (
-                        <button
-                            type="button"
-                            onClick={() => window.dispatchEvent(new CustomEvent('playback:open-access'))}
-                            className="mt-2 inline-flex items-center gap-2 rounded-control bg-primary px-3 py-1.5 text-xs font-medium text-white"
-                        >
-                            Buka akses ke momen ini
-                        </button>
+                    {(accessOffered || contactLink) && (
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                            {accessOffered && (
+                                <button
+                                    type="button"
+                                    onClick={() => window.dispatchEvent(new CustomEvent('playback:open-access'))}
+                                    className="inline-flex items-center gap-2 rounded-control bg-primary px-3 py-1.5 text-xs font-medium text-white"
+                                >
+                                    Buka akses ke momen ini
+                                </button>
+                            )}
+                            {contactLink}
+                        </div>
                     )}
                 </div>
             )}
@@ -112,26 +134,32 @@ export default function PlaybackOptions({
                         {playbackPolicy.notice.text}
                     </p>
                     {/*
-                     * The only next step offered. The admin-contact button was removed deliberately:
-                     * self-serve exists, so sending people to chat an operator adds a manual step
-                     * that scales badly and leaves the visitor waiting.
+                     * Self-serve stays the primary next step — the earlier admin-contact button was
+                     * removed because pushing every visitor to chat an operator scales badly. The
+                     * contact link that returns here is different: it exists only when the operator
+                     * configured one (policy.contact), so it is their choice, not a default funnel.
                      *
                      * An event, not an <a href="#...">. The anchor only scrolled to the access box
                      * while it was still COLLAPSED, so the visitor landed in the right place and saw
                      * nothing happen. The intent here is "open the access panel", and a hash cannot
                      * express that — nor re-fire when the hash is already set.
                      *
-                     * Hidden entirely when no package is enabled: the panel it opens would be empty,
-                     * and the button names a free trial that the server would refuse.
+                     * The offer button hides when no package is enabled: the panel it opens would be
+                     * empty, and the button names a free trial that the server would refuse.
                      */}
-                    {accessOffered && (
-                        <button
-                            type="button"
-                            onClick={() => window.dispatchEvent(new CustomEvent('playback:open-access'))}
-                            className="mt-2 inline-flex items-center gap-2 rounded-control bg-primary px-3 py-1.5 text-xs font-medium text-white"
-                        >
-                            {hasPaid ? 'Coba gratis 3 hari atau beli akses' : 'Coba gratis 3 hari'}
-                        </button>
+                    {(accessOffered || contactLink) && (
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                            {accessOffered && (
+                                <button
+                                    type="button"
+                                    onClick={() => window.dispatchEvent(new CustomEvent('playback:open-access'))}
+                                    className="inline-flex items-center gap-2 rounded-control bg-primary px-3 py-1.5 text-xs font-medium text-white"
+                                >
+                                    {hasPaid ? 'Coba gratis 3 hari atau beli akses' : 'Coba gratis 3 hari'}
+                                </button>
+                            )}
+                            {contactLink}
+                        </div>
                     )}
                 </div>
             )}

@@ -33,6 +33,13 @@ const PREVIEW_POLICY = {
     notice: { enabled: true, title: 'Akses Playback Publik Terbatas', text: 'Hanya 10 menit terakhir.' },
 };
 
+const CONTACT = {
+    mode: 'branding_whatsapp',
+    value: '6289685645956',
+    label: 'Hubungi Admin',
+    href: 'https://wa.me/6289685645956?text=Halo%20Admin',
+};
+
 /** The component reads `?t=` off the address bar; jsdom lets us put one there. */
 const visitWithMoment = (ms) => window.history.replaceState({}, '', ms === null ? '/playback' : `/playback?t=${ms}`);
 
@@ -199,5 +206,59 @@ describe('PlaybackOptions notice honesty', () => {
         expect(screen.getByText('Akses Playback Publik Terbatas')).toBeTruthy();
         expect(screen.getByText('Hanya 10 menit terakhir.')).toBeTruthy();
         expect(screen.queryByRole('button', { name: /Coba gratis 3 hari/ })).toBeNull();
+    });
+});
+
+describe('PlaybackOptions — policy.contact link', () => {
+    it('renders the operator-configured contact inside the notice', () => {
+        render(
+            <PlaybackOptions
+                {...base}
+                showPublicNotice
+                playbackPolicy={{ ...PREVIEW_POLICY, contact: CONTACT }}
+            />,
+        );
+
+        const link = screen.getByRole('link', { name: 'Hubungi Admin' });
+        expect(link).toBeTruthy();
+        expect(link.getAttribute('href')).toBe(CONTACT.href);
+        expect(link.getAttribute('target')).toBe('_blank');
+    });
+
+    /*
+     * No package on sale means the self-serve button hides — the contact link is then the ONLY
+     * path forward, so it must not hide with it.
+     */
+    it('keeps the contact link when nothing is on sale', () => {
+        offerState = { ready: true, offered: false };
+        render(
+            <PlaybackOptions
+                {...base}
+                showPublicNotice
+                playbackPolicy={{ ...PREVIEW_POLICY, contact: CONTACT }}
+            />,
+        );
+
+        expect(screen.queryByRole('button', { name: /Coba gratis 3 hari/ })).toBeNull();
+        expect(screen.getByRole('link', { name: 'Hubungi Admin' })).toBeTruthy();
+    });
+
+    it('shows the contact beside the out-of-reach moment too', () => {
+        visitWithMoment(Date.now() - 60 * 60 * 1000);
+        render(
+            <PlaybackOptions
+                {...base}
+                showPublicNotice
+                playbackPolicy={{ ...PREVIEW_POLICY, contact: CONTACT }}
+            />,
+        );
+
+        expect(screen.getByRole('link', { name: 'Hubungi Admin' })).toBeTruthy();
+    });
+
+    it('renders no contact link when the server sent none', () => {
+        render(<PlaybackOptions {...base} showPublicNotice playbackPolicy={PREVIEW_POLICY} />);
+
+        expect(screen.queryByRole('link', { name: 'Hubungi Admin' })).toBeNull();
     });
 });
