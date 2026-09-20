@@ -5,7 +5,8 @@
  * Deps: database/connectionPool (telegram_archive_uploads + cameras), node:fs, global fetch.
  * MainFuncs: listUploads, getUpload, openSegmentStream.
  * SideEffects: Calls the LOCAL Bot API server's getFile and the MTProto sidecar's /segment;
- *          reads the resulting file from disk; prefetches a whole-segment copy into the managed
+ *          reads the resulting file from disk; prefetches a whole-segment copy VIA BOT API
+ *          (never the sidecar — a full download there starves live slices) into the managed
  *          transit dir (archiveCacheService) after the first MTProto slice is served.
  *
  * Why the stream is proxied rather than linked: a Telegram file URL contains the bot token and is
@@ -352,9 +353,15 @@ export function localSegmentFile(segmentId) {
  * archiveCacheService (pin saat dibaca, write-grace saat ditulis, TTL/kapasitas untuk evict) —
  * request berikutnya untuk segmen yang sama dilayani disk lokal, byte-exact dan instan.
  *
+ * Salinan itu ditarik LEWAT BOT API, bukan sidecar: sidecar hanya punya satu client Pyrogram, jadi
+ * unduhan penuh di sana mengantrekan semua irisan live (seek -> 504, terukur). getFile Bot API
+ * berjalan di daemon C++ terpisah dan hasilnya di-hardlink — konkurensi native, nol byte disalin.
+ *
  * Nama file deterministik supaya proses restart tetap menemukan hasil prefetch tanpa state apa pun.
  */
-const PREFETCH_FILE_PREFIX = 'rafnet-mtproto-seg-';
+// Nama sengaja NETRAL transportasi: prefetch lewat Bot API, bukan MTProto — prefix lama yang
+// menyebut sidecar adalah jebakan dokumentasi (prefetch via sidecar mengantrekan irisan live).
+const PREFETCH_FILE_PREFIX = 'rafnet-arch-seg-';
 const prefetchInFlight = new Set();
 
 function prefetchedPathFor(segmentId) {
@@ -394,36 +401,81 @@ function streamSliceFromDisk(absPath, filename, totalSize, range) {
 }
 
 /**
- * Tarik SELURUH segmen lewat MTProto di latar, lalu atomically rename ke nama finalnya. Yang
- * memanggil tidak menunggu — request yang sedang berjalan sudah dilayani irisan live-nya. Gagal
- * di mana pun hanya berarti cache tidak terisi: permintaan berikutnya tetap lewat jalur biasa.
- * `.part` melindungi pembaca dari file setengah jadi, dan kalau ditinggal mati pun disapu sweep
- * lewat write-grace — tidak ada state yang perlu dibersihkan tangan.
+ * Tarik SELURUH segmen di latar lewat Bot API (bukan MTProto), lalu atomically rename ke nama
+ * finalnya. Yang memanggil tidak menunggu — request yang sedang berjalan sudah dilayani irisan
+ * live-nya. Gagal di mana pun hanya berarti cache tidak terisi: permintaan berikutnya tetap
+ * lewat jalur biasa. `.part` melindungi pembaca dari file setengah jadi, dan kalau ditinggal
+ * mati pun disapu sweep lewat write-grace — tidak ada state yang perlu dibersihkan tangan.
+ *
+ * KENAPA BOT API, BUKAN SIDECAR MTPROTO
+ * Prefetch adalah unduhan penuh ~150 MB. Kalau ia lewat sidecar yang sama dengan irisan live,
+ * seluruh unduhan itu berbagi SATU client Pyrogram — seek yang datang selama prefetch berjalan
+ * antre di belakangnya sampai 60+ detik (terukur di prod: 504 saat seek menit 5). Daemon Bot API
+ * (telegram-bot-api, proses C++ terpisah) punya konkurensi native, dan getFile-nya malah
+ * me-materialisasi berkas ke storage bersama — cukup di-hardlink (nol byte disalin) ke nama
+ * cache kita. Sidecar tetap menganggur untuk irisan live: itulah pembagian kerja yang benar,
+ * MTProto untuk range parsial, Bot API untuk salinan utuh.
  */
 const PREFETCH_MAX_CONCURRENT = 2;
 
-function prefetchWholeSegment(segmentId, fileSize, mtprotoUrl) {
-    // Tanpa file_size kita tidak bisa menghitung kebutuhan disk — transit dir ini berbagi box
-    // yang sudah 82% penuh, jadi prefetch hanya untuk baris yang ukurannya tercatat. Konkurensi
-    // dibatasi: setiap prefetch adalah unduhan penuh, dan box ini sudah jenuh — yang terlewat
-    // akan dicoba lagi oleh request berikutnya.
-    if (!fileSize || prefetchInFlight.size >= PREFETCH_MAX_CONCURRENT || prefetchInFlight.has(segmentId)) {
+function prefetchWholeSegment(segmentId, fileId, fileSize) {
+    // Tanpa file_id tidak ada yang bisa ditarik; tanpa file_size kita tidak bisa menghitung
+    // kebutuhan disk — transit dir ini berbagi box yang sudah 82% penuh. Konkurensi dibatasi:
+    // setiap prefetch adalah unduhan penuh, dan yang terlewat dicoba lagi oleh request berikutnya.
+    if (!fileId || !fileSize || prefetchInFlight.size >= PREFETCH_MAX_CONCURRENT || prefetchInFlight.has(segmentId)) {
         return;
     }
     prefetchInFlight.add(segmentId);
     const tmpPath = path.join(archiveCache.CACHE_DIR, `${PREFETCH_FILE_PREFIX}${segmentId}.part`);
     (async () => {
         try {
-            // makeRoom SEBELUM menarik — aturan transit dir yang sama seperti jalur Bot API: sebuah
-            // fetch tidak boleh jadi penyebab evict, dan tidak boleh menjatuhkan disk di bawah floor.
+            // makeRoom SEBELUM menarik — aturan transit dir yang sama seperti jalur live Bot API:
+            // sebuah fetch tidak boleh jadi penyebab evict, dan tidak boleh menjatuhkan disk di
+            // bawah floor.
             if (fileSize) archiveCache.makeRoom(fileSize);
-            // Batasi umur unduhan: fetch yang menggantung akan mengunci slot in-flight selamanya
-            // dan segmen itu tidak akan pernah di-prefetch ulang sampai restart.
-            const resp = await fetch(`${mtprotoUrl.replace(/\/+$/, '')}/segment/${segmentId}`, {
+            const { apiBase, token } = telegramConfig();
+            if (!token) return;
+            // getFile di server --local MEMBLOKIR sampai berkas utuh mendarat di storage-nya —
+            // persis alasan ia terlarang di jalur live, dan persis yang dibutuhkan di latar.
+            // Batasi umurnya: fetch yang menggantung akan mengunci slot in-flight selamanya.
+            const gf = await fetch(`${apiBase}/bot${token}/getFile?file_id=${encodeURIComponent(fileId)}`, {
                 signal: AbortSignal.timeout(10 * 60 * 1000),
             });
-            if (!resp.ok || !resp.body) return;
-            await pipeline(Readable.fromWeb(resp.body), fs.createWriteStream(tmpPath));
+            const body = await gf.json().catch(() => ({}));
+            const filePath = body?.result?.file_path;
+            if (!filePath) return;
+
+            const expected = Number(body?.result?.file_size) || fileSize;
+            const isLocal = filePath.startsWith('/') || /^[A-Za-z]:[\/]/.test(filePath);
+            let linked = false;
+            if (isLocal && fs.existsSync(filePath)) {
+                try {
+                    // Hardlink: satu inode dua nama — nol byte disalin. Nama milik bot-api tetap
+                    // punya dia; kalau GC-nya menghapus nama itu, data bertahan lewat nama kita.
+                    fs.linkSync(filePath, tmpPath);
+                    linked = true;
+                } catch {
+                    // Beda filesystem (EXDEV), izin, atau berkas lenyap berpacu dengan GC —
+                    // lanjut ke unduhan biasa di bawah.
+                }
+            }
+            if (!linked) {
+                const relative = isLocal
+                    ? filePath.replace(/^.*\/var\/lib\/telegram-bot-api\//, '')
+                    : filePath;
+                const dl = await fetch(`${apiBase}/file/bot${token}/${relative}`, {
+                    signal: AbortSignal.timeout(10 * 60 * 1000),
+                });
+                if (!dl.ok || !dl.body) return;
+                await pipeline(Readable.fromWeb(dl.body), fs.createWriteStream(tmpPath));
+            }
+            // Verifikasi byte-exact SEBELUM rename: berkas setengah jadi atau objek salah yang
+            // masuk cache akan membohongi Content-Length semua pemutaran berikutnya. Mismatch =
+            // batalkan; jalur live tidak terpengaruh.
+            if (!expected || fs.statSync(tmpPath).size !== expected) {
+                fs.unlinkSync(tmpPath);
+                return;
+            }
             fs.renameSync(tmpPath, prefetchedPathFor(segmentId));
         } catch (err) {
             console.warn(`[arsip] prefetch segmen ${segmentId} gagal: ${err.message}`);
@@ -500,8 +552,10 @@ export async function openSegmentStream(segmentId, range = null) {
             });
             if (resp.ok && resp.body) {
                 // Irisan ini dilayani live; di latar kita tarik salinan utuhnya supaya seek dan
-                // pemutaran berikutnya tidak membayar perjalanan Telegram lagi. Fire-and-forget.
-                prefetchWholeSegment(segmentId, row.file_size, mtprotoUrl);
+                // pemutaran berikutnya tidak membayar perjalanan Telegram lagi. Fire-and-forget —
+                // dan sengaja LEWAT Bot API, bukan sidecar ini, supaya unduhan penuh tidak pernah
+                // mengantrekan irisan live berikutnya (terukur: seek menit 5 -> 504).
+                prefetchWholeSegment(segmentId, row.file_id, row.file_size);
                 // Percayai Content-Range service sebagai kebenaran: ia yang benar-benar memotong.
                 const cr = resp.headers.get('content-range');
                 const m = cr && /bytes (\d+)-(\d+)\/(\d+)/.exec(cr);

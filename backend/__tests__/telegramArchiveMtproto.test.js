@@ -58,6 +58,8 @@ beforeEach(() => {
 });
 afterEach(() => {
     delete process.env.TG_ARCHIVE_MTPROTO_URL;
+    delete process.env.TG_BOT_TOKEN;
+    delete process.env.TG_API_BASE;
     vi.restoreAllMocks();
 });
 
@@ -151,6 +153,10 @@ describe('prefetch ke transit dir', () => {
      * Janji fitur: irisan pertama dilayani live dari MTProto, lalu salinan utuh mendarat di
      * CACHE_DIR di latar — request BERIKUTNYA untuk segmen yang sama dibaca dari disk tanpa
      * menyentuh Telegram sama sekali.
+     *
+     * Salinan itu ditarik lewat BOT API (getFile -> hardlink /file/bot), BUKAN sidecar: unduhan
+     * penuh di sidecar Pyrogram mengantrekan irisan live — seek ke menit 5 selama prefetch
+     * terukur 60s+ -> 504 di prod. Daemon Bot API konkuren secara native.
      */
     const ISI_PENUH = Buffer.from('0123456789abcdefghijABCDEFGHIJ'); // 30 byte
 
@@ -163,24 +169,66 @@ describe('prefetch ke transit dir', () => {
         });
     }
 
-    it('menarik berkas utuh di latar setelah irisan live tersaji', async () => {
+    // fetch tiruan: /segment/* = irisan live MTProto; /getFile = JSON Bot API; /file/bot = unduhan.
+    function pasangFetch(filePathResult) {
+        globalThis.fetch = vi.fn(async (url) => {
+            const u = String(url);
+            if (u.includes('/getFile')) {
+                return { ok: true, json: async () => ({ ok: true, result: { file_path: filePathResult, file_size: ISI_PENUH.length } }) };
+            }
+            return respons({ body: streamWeb(ISI_PENUH) });
+        });
+    }
+
+    // Prefetch menulis lewat pipeline stream nyata — di bawah beban suite paralel 50 tick
+    // setImmediate bisa habis sebelum flush. Batasi dengan waktu, bukan jumlah giliran.
+    async function tungguFile(file) {
+        const deadline = Date.now() + 3000;
+        while (!fs.existsSync(file) && Date.now() < deadline) {
+            await new Promise((resolve) => setTimeout(resolve, 10));
+        }
+    }
+
+    it('menarik berkas utuh di latar: getFile -> hardlink, tanpa menyentuh sidecar lagi', async () => {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mt-cache-'));
         cacheDirValue = dir;
+        process.env.TG_BOT_TOKEN = 'TESTTOKEN';
+        // Berkas "dimaterialisasi" daemon Bot API di storage bersama — persis bentuk --local.
+        const materialized = path.join(dir, 'botapi-src-7.mp4');
+        fs.writeFileSync(materialized, ISI_PENUH);
         rows.upload = { ...rows.upload, segment_id: 7, file_size: ISI_PENUH.length, file_id: 'FID7', local_path: null };
-        globalThis.fetch = vi.fn(async () => respons({ body: streamWeb(ISI_PENUH) }));
+        pasangFetch(materialized);
 
         await openSegmentStream(7, { start: 5, end: 9 });
-        // Prefetch adalah fire-and-forget — beri event loop satu giliran untuk menyelesaikannya.
-        for (let i = 0; i < 20 && !fs.existsSync(path.join(dir, 'rafnet-mtproto-seg-7.mp4')); i += 1) {
-            await new Promise((resolve) => setImmediate(resolve));
-        }
+        const file = path.join(dir, 'rafnet-arch-seg-7.mp4');
+        await tungguFile(file);
 
-        const file = path.join(dir, 'rafnet-mtproto-seg-7.mp4');
         expect(fs.existsSync(file)).toBe(true);
         expect(fs.readFileSync(file).equals(ISI_PENUH)).toBe(true);
-        // Prefetch meminta TANPA Range — seluruh berkas, bukan irisan.
-        const prefetchCall = globalThis.fetch.mock.calls.find(([, opt]) => opt === undefined || !opt.headers?.Range);
-        expect(prefetchCall).toBeTruthy();
+        // Prefetch = getFile berisi file_id segmen, dan TIDAK ADA panggilan kedua ke sidecar.
+        const urls = globalThis.fetch.mock.calls.map(([u]) => String(u));
+        expect(urls.some((u) => u.includes('getFile') && u.includes('FID7'))).toBe(true);
+        expect(urls.filter((u) => u.startsWith(URL_MT)).length).toBe(1);
+
+        fs.rmSync(dir, { recursive: true, force: true });
+        cacheDirValue = '/var/lib/telegram-bot-api';
+    });
+
+    it('file_path relatif (mode cloud): prefetch mengunduh lewat /file/bot', async () => {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mt-cache-'));
+        cacheDirValue = dir;
+        process.env.TG_BOT_TOKEN = 'TESTTOKEN';
+        rows.upload = { ...rows.upload, segment_id: 9, file_size: ISI_PENUH.length, file_id: 'FID9', local_path: null };
+        pasangFetch('videos/file_9.mp4');
+
+        await openSegmentStream(9, { start: 5, end: 9 });
+        const file = path.join(dir, 'rafnet-arch-seg-9.mp4');
+        await tungguFile(file);
+
+        expect(fs.existsSync(file)).toBe(true);
+        expect(fs.readFileSync(file).equals(ISI_PENUH)).toBe(true);
+        const urls = globalThis.fetch.mock.calls.map(([u]) => String(u));
+        expect(urls.some((u) => u.includes('/file/botTESTTOKEN/videos/file_9.mp4'))).toBe(true);
 
         fs.rmSync(dir, { recursive: true, force: true });
         cacheDirValue = '/var/lib/telegram-bot-api';
@@ -189,7 +237,7 @@ describe('prefetch ke transit dir', () => {
     it('request berikutnya membaca dari disk — Telegram tidak disentuh lagi', async () => {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mt-cache-'));
         cacheDirValue = dir;
-        fs.writeFileSync(path.join(dir, 'rafnet-mtproto-seg-8.mp4'), ISI_PENUH);
+        fs.writeFileSync(path.join(dir, 'rafnet-arch-seg-8.mp4'), ISI_PENUH);
         rows.upload = { ...rows.upload, segment_id: 8, file_size: ISI_PENUH.length, file_id: 'FID8', local_path: null };
         globalThis.fetch = vi.fn(async () => { throw new Error('Telegram disentuh padahal prefetch sudah mendarat'); });
 
