@@ -28,16 +28,21 @@ describe('surabayaSitsExtractor', () => {
         vi.restoreAllMocks();
     });
 
-    it('decrypts a sample rtsp payload from the Surabaya feed', () => {
-        const plain = decryptSurabayaSitsHex('f09ac26facf91bcd66c22ed76568432be4bcdd4f2435b204d576cc759a0626f71126f43036c0c4e72be3e5b4e9faf8a44b66e7f03d374ac31a616eefe8827921b22aa524246b90f891a4f1a9c66d7b9b');
+    // Fixture ciphertexts are aes-128-cbc over FAKE urls (TEST-NET-3 host, placeholder creds) —
+    // a real feed credential was committed here once; the secret-hygiene guardrail now fails on it.
+    const FAKE_RTSP_HEX = '8ade0e5f9fe33b4c2b7d74dd0a910699ee45ec470bac65ad32eb90154f014a007b52665d92115edf3c4f238d3292064336a34ce35103acb43425fd2fce05b9d4';
+    const FAKE_HTTP_HEX = 'd8eafeadd2d775ea3c7790d504a09f6584d49287eeef4f3cc9418c0e009255d8f3f801b3035f8352f23584fd50cd9fa5';
 
-        expect(plain).toBe('rtsp://edishub:g412uda5u12y426@36.66.208.98:554/mpeg4/ch19/sub/av_stream');
+    it('decrypts a sample rtsp payload from the Surabaya feed', () => {
+        const plain = decryptSurabayaSitsHex(FAKE_RTSP_HEX);
+
+        expect(plain).toBe('rtsp://user:pass@203.0.113.10:554/mpeg4/ch99/sub/av_stream');
     });
 
     it('decrypts a sample http fallback payload from the Surabaya feed', () => {
-        const plain = decryptSurabayaSitsHex('dd858626d3d9b1f9a9f4f96a193276c3d25423e999863534eaaf2b4670aaa4473cb6d94be5c61a32d036a0eb213174d49e8d28e32b98280f8226c75204e21b9d');
+        const plain = decryptSurabayaSitsHex(FAKE_HTTP_HEX);
 
-        expect(plain).toBe('http://sits.dishub.surabaya.go.id/ver2/vms/atcs_24.mp4');
+        expect(plain).toBe('http://vms.example.test/ver2/vms/atcs_99.mp4');
     });
 
     it('normalizes raw records into private import shape', () => {
@@ -45,7 +50,7 @@ describe('surabayaSitsExtractor', () => {
             nama_cctv: 'Adityawarman Indragiri Utara',
             status: 'on',
             url_cctv: '',
-            rtsp: 'f09ac26facf91bcd66c22ed76568432be4bcdd4f2435b204d576cc759a0626f71126f43036c0c4e72be3e5b4e9faf8a44b66e7f03d374ac31a616eefe8827921b22aa524246b90f891a4f1a9c66d7b9b',
+            rtsp: FAKE_RTSP_HEX,
         });
 
         expect(normalized).toMatchObject({
@@ -55,10 +60,10 @@ describe('surabayaSitsExtractor', () => {
             coordinates: null,
             areaHint: 'SURABAYA',
             sourceMeta: {
-                rtspHost: '36.66.208.98',
+                rtspHost: '203.0.113.10',
                 rtspPort: 554,
-                rtspUsername: 'edishub',
-                rtspPassword: 'g412uda5u12y426',
+                rtspUsername: 'user',
+                rtspPassword: 'pass',
             },
         });
     });
@@ -69,25 +74,25 @@ describe('surabayaSitsExtractor', () => {
                 nama_cctv: 'Camera 1',
                 status: 'on',
                 url_cctv: '',
-                rtsp: 'f09ac26facf91bcd66c22ed76568432be4bcdd4f2435b204d576cc759a0626f71126f43036c0c4e72be3e5b4e9faf8a44b66e7f03d374ac31a616eefe8827921b22aa524246b90f891a4f1a9c66d7b9b',
+                rtsp: FAKE_RTSP_HEX,
             }),
         ];
 
         const report = buildSanitizedReportPayload(records, '2026-03-30T00:00:00.000Z');
 
-        expect(JSON.stringify(report)).not.toContain('g412uda5u12y426');
+        expect(JSON.stringify(report)).not.toContain('pass@');
         expect(report.records[0]).toEqual({
             name: 'Camera 1',
             status: 'on',
-            rtspHost: '36.66.208.98',
+            rtspHost: '203.0.113.10',
             hasHttpFallback: false,
             coordinates: null,
         });
     });
 
     it('masks rtsp urls deterministically for logs', () => {
-        expect(maskRtspUrl('rtsp://edishub:g412uda5u12y426@36.66.208.112:554/Streaming/Channels/102')).toBe(
-            'rtsp://edishub:***@36.66.208.112:554/Streaming/Channels/102'
+        expect(maskRtspUrl('rtsp://user:pass@203.0.113.10:554/Streaming/Channels/102')).toBe(
+            'rtsp://user:***@203.0.113.10:554/Streaming/Channels/102'
         );
     });
 

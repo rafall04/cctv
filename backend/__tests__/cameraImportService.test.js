@@ -155,7 +155,7 @@ describe('cameraService import preview', () => {
             cameras: [
                 {
                     name: 'A. YANI - JEMURSARI',
-                    private_rtsp_url: 'rtsp://edishub:g412uda5u12y426@36.66.208.98:554/mpeg4/ch39/sub/av_stream',
+                    private_rtsp_url: 'rtsp://user:pass@203.0.113.10:554/mpeg4/ch39/sub/av_stream',
                     delivery_type: 'external_hls',
                     stream_source: 'external',
                     enable_recording: 1,
@@ -187,15 +187,15 @@ describe('cameraService import preview', () => {
             resolvedDeliveryType: 'internal_hls',
             resolvedStreamSource: 'internal',
             resolvedRecordingEnabled: 0,
-            resolvedUrl: 'rtsp://edishub:***@36.66.208.98:554/mpeg4/ch39/sub/av_stream',
+            resolvedUrl: 'rtsp://user:***@203.0.113.10:554/mpeg4/ch39/sub/av_stream',
         }));
         expect(result.rows[1].status).toBe('duplicate_url');
-        expect(result.rows[0].resolvedUrl).not.toContain('g412uda5u12y426');
+        expect(result.rows[0].resolvedUrl).not.toContain(':pass@');
         expect(result.warnings.some((warning) => warning.code === 'private_rtsp_live_only')).toBe(true);
         expect(result.importableRows[0].importData).toEqual(expect.objectContaining({
             delivery_type: 'internal_hls',
             stream_source: 'internal',
-            private_rtsp_url: 'rtsp://edishub:g412uda5u12y426@36.66.208.98:554/mpeg4/ch39/sub/av_stream',
+            private_rtsp_url: 'rtsp://user:pass@203.0.113.10:554/mpeg4/ch39/sub/av_stream',
             enable_recording: 0,
             external_stream_url: null,
             external_embed_url: null,

@@ -10,10 +10,10 @@ import { redactUrlCredentials, stripUrlCredentials } from '../utils/logRedaction
 
 describe('redactUrlCredentials', () => {
     it('masks user and password inside an FFmpeg error line', () => {
-        const line = 'rtsp://admin:Aldivarama9@192.168.1.50:554/stream1: Connection timed out';
+        const line = 'rtsp://admin:FixturePass9@192.168.1.50:554/stream1: Connection timed out';
         const out = redactUrlCredentials(line);
 
-        expect(out).not.toContain('Aldivarama9');
+        expect(out).not.toContain('FixturePass9');
         expect(out).not.toContain('admin');
         expect(out).toBe('rtsp://****:****@192.168.1.50:554/stream1: Connection timed out');
     });
