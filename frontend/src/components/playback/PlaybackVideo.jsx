@@ -5,7 +5,7 @@
  * MainFuncs: PlaybackVideo component.
  * SideEffects: Invokes handler props for speed, snapshot, fullscreen, retry, and notification close.
  */
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import CodecBadge from '../CodecBadge';
 import usePlaybackZoom from '../../hooks/playback/usePlaybackZoom';
 import {
@@ -67,11 +67,14 @@ export default function PlaybackVideo({
      */
     const videoElRef = useRef(null);
     const stageRef = useRef(null);
-    const setVideoNode = (node) => {
+    // Memoized: an inline ref callback detaches/reattaches the element on EVERY render —
+    // during pinch-zoom that is once per frame, and each detach briefly nulls the parent's
+    // videoRef (the ref this component exists to feed).
+    const setVideoNode = useCallback((node) => {
         videoElRef.current = node;
         if (typeof videoRef === 'function') videoRef(node);
         else if (videoRef && typeof videoRef === 'object') videoRef.current = node;
-    };
+    }, [videoRef]);
 
     const { zoom, isZoomed, zoomIn, zoomOut, resetZoom, touchAction } = usePlaybackZoom({
         stageRef,
@@ -102,9 +105,13 @@ export default function PlaybackVideo({
         return () => video.removeEventListener('volumechange', syncFromElement);
     }, [isMuted]);
 
-    // Keyed on the filename, not the segment object: a new object identity on every parent
-    // render would tear these listeners down and rebuild them four times a second.
-    const segmentKey = selectedSegment?.filename ?? null;
+    // Keyed on camera+filename, not the segment object: a new object identity on every parent
+    // render would tear these listeners down and rebuild them four times a second. The camera
+    // prefix matters — two cameras can own segments with the same timestamped filename, and
+    // without it switching camera could keep the old zoom pinned to a different picture.
+    const segmentKey = selectedSegment
+        ? `${selectedSegment.camera_id ?? ''}:${selectedSegment.filename}`
+        : null;
 
     // Zoom tidak dibawa antar segmen — inspeksi satu momen tidak boleh menyembunyikan frame
     // rekaman berikutnya di balik pan/zoom yang tertinggal.
@@ -414,20 +421,24 @@ export default function PlaybackVideo({
                   * "UI looks off" this fixes. Cycling one button keeps every speed reachable, keeps
                   * the 44px touch target, and gives the picture its corner back.
                   */}
-                <div className="absolute top-2 sm:top-4 right-2 sm:right-4 z-30">
-                    <button
-                        onClick={() => onSpeedChange(SPEED_STEPS[(SPEED_STEPS.indexOf(playbackSpeed) + 1) % SPEED_STEPS.length] ?? 1)}
-                        className={`min-h-11 min-w-11 px-2 py-1 sm:min-h-0 sm:min-w-0 sm:px-3 sm:py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all shadow-lg ${
-                            playbackSpeed === 1
-                                ? 'bg-black/70 text-white hover:bg-black/90'
-                                : 'bg-primary text-white'
-                        }`}
-                        title={`Kecepatan ${playbackSpeed}x — ketuk untuk ganti`}
-                        aria-label={`Kecepatan pemutaran ${playbackSpeed}x, ketuk untuk mengganti`}
-                    >
-                        {playbackSpeed}x
-                    </button>
-                </div>
+                {/* Windowed only: in fullscreen this corner belongs to the z-50 header bar
+                    (which also swallows the clicks) — the speed pill lives inside that bar. */}
+                {!isFullscreen && (
+                    <div className="absolute top-2 sm:top-4 right-2 sm:right-4 z-30">
+                        <button
+                            onClick={() => onSpeedChange(SPEED_STEPS[(SPEED_STEPS.indexOf(playbackSpeed) + 1) % SPEED_STEPS.length] ?? 1)}
+                            className={`min-h-11 min-w-11 px-2 py-1 sm:min-h-0 sm:min-w-0 sm:px-3 sm:py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all shadow-lg ${
+                                playbackSpeed === 1
+                                    ? 'bg-black/70 text-white hover:bg-black/90'
+                                    : 'bg-primary text-white'
+                            }`}
+                            title={`Kecepatan ${playbackSpeed}x — ketuk untuk ganti`}
+                            aria-label={`Kecepatan pemutaran ${playbackSpeed}x, ketuk untuk mengganti`}
+                        >
+                            {playbackSpeed}x
+                        </button>
+                    </div>
+                )}
 
                 {!isFullscreen && selectedSegment && !videoError && (
                     <>
@@ -502,11 +513,25 @@ export default function PlaybackVideo({
                     <div className="absolute inset-0 z-50 pointer-events-none">
                         <div className="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/80 to-transparent pointer-events-auto">
                             <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                    <h2 className="text-white font-bold text-lg">{selectedCamera?.name}</h2>
+                                <div className="flex items-center gap-3 min-w-0">
+                                    <h2 className="text-white font-bold text-lg truncate">{selectedCamera?.name}</h2>
                                     {selectedCamera?.video_codec && (
                                         <CodecBadge codec={selectedCamera.video_codec} size="sm" />
                                     )}
+                                    {/* Speed control must live INSIDE this bar in fullscreen —
+                                        a floating copy sits under it and can never be clicked. */}
+                                    <button
+                                        onClick={() => onSpeedChange(SPEED_STEPS[(SPEED_STEPS.indexOf(playbackSpeed) + 1) % SPEED_STEPS.length] ?? 1)}
+                                        className={`shrink-0 min-h-[40px] px-3 py-1.5 rounded-lg text-sm font-medium tabular-nums transition-colors ${
+                                            playbackSpeed === 1
+                                                ? 'bg-white/10 text-white hover:bg-white/20'
+                                                : 'bg-primary text-white'
+                                        }`}
+                                        title={`Kecepatan ${playbackSpeed}x — ketuk untuk ganti`}
+                                        aria-label={`Kecepatan pemutaran ${playbackSpeed}x, ketuk untuk mengganti`}
+                                    >
+                                        {playbackSpeed}x
+                                    </button>
                                 </div>
                                 <button onClick={onToggleFullscreen} className="p-2 hover:bg-white/20 rounded-xl text-white bg-white/10">
                                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

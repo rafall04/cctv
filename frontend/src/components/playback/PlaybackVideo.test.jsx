@@ -259,6 +259,26 @@ describe('PlaybackVideo speed control on a phone', () => {
         fireEvent.click(screen.getByTitle(/^Kecepatan /));
         expect(onSpeedChange).toHaveBeenLastCalledWith(1);
     });
+
+    /*
+     * Fullscreen regression: the floating speed button rendered UNDER the z-50 header bar —
+     * same corner as the close button, and the bar's pointer-events-auto swallowed every
+     * click. In fullscreen the control must live INSIDE the header, next to the camera name.
+     */
+    it('moves into the fullscreen header bar instead of floating under it', () => {
+        render(
+            <PlaybackVideo
+                {...baseProps}
+                isFullscreen
+                selectedSegment={{ id: 1, filename: 'a.mp4' }}
+            />
+        );
+
+        const speedButtons = screen.getAllByTitle(/^Kecepatan /);
+        expect(speedButtons).toHaveLength(1);
+        // Header membership: its flex group is the one carrying the camera name.
+        expect(speedButtons[0].parentElement.textContent).toContain('Lobby');
+    });
 });
 
 /*

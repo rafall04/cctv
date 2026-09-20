@@ -135,8 +135,16 @@ export default function usePlaybackZoom({ stageRef, videoElRef, isFullscreen = f
         const pointers = pointersRef.current;
 
         const onWheel = (e) => {
+            // Hanya telan wheel yang benar-benar mengubah zoom. Pada 1x scroll ke bawah tidak
+            // ada yang bisa di-zoom-out — tanpa guard ini halaman tidak bisa di-scroll saat
+            // kursor berada di atas video (scroll-jacking).
+            const zoomingIn = e.deltaY < 0;
+            const canChange = zoomingIn
+                ? stateRef.current.zoom < maxZoom
+                : stateRef.current.zoom > 1;
+            if (!canChange) return;
             e.preventDefault();
-            handleZoom(e.deltaY > 0 ? -0.5 : 0.5, false);
+            handleZoom(zoomingIn ? 0.5 : -0.5, false);
         };
 
         const onPointerDown = (e) => {

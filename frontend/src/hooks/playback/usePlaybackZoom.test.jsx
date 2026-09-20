@@ -91,6 +91,25 @@ describe('usePlaybackZoom', () => {
         expect(zoomOf()).toBe(1);
     });
 
+    /*
+     * Scroll-jacking regression: the wheel listener used to preventDefault unconditionally,
+     * so a desktop visitor could never scroll the page while the cursor sat over the video.
+     * Wheel may only be captured when it would actually change the zoom.
+     */
+    it('lets wheel-down fall through to page scroll at 1x, captures it only when zoomed', () => {
+        render(<Harness />);
+
+        // 1x + scroll ke bawah: tidak ada yang bisa di-zoom-out → halaman boleh scroll.
+        expect(fireEvent.wheel(stage(), { deltaY: 120 })).toBe(true);
+        expect(zoomOf()).toBe(1);
+
+        // Zoom masuk tetap dicegat, dan begitu aktif zoom-out juga milik kita.
+        expect(fireEvent.wheel(stage(), { deltaY: -120 })).toBe(false);
+        expect(zoomOf()).toBe(1.5);
+        expect(fireEvent.wheel(stage(), { deltaY: 120 })).toBe(false);
+        expect(zoomOf()).toBe(1);
+    });
+
     it('pinch gesture on two pointers scales the zoom', () => {
         render(<Harness />);
 
