@@ -5,8 +5,9 @@
  * MainFuncs: PlaybackVideo component.
  * SideEffects: Invokes handler props for speed, snapshot, fullscreen, retry, and notification close.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import CodecBadge from '../CodecBadge';
+import usePlaybackZoom from '../../hooks/playback/usePlaybackZoom';
 import {
     detectHasAudioTrack,
     readRecordingMutePreference,
@@ -58,8 +59,28 @@ export default function PlaybackVideo({
     // null = we could not tell. Never rendered as "no audio": see detectHasAudioTrack.
     const [hasAudioTrack, setHasAudioTrack] = useState(null);
 
+    /*
+     * videoRef dari parent adalah CALLBACK ref (attachVideo) — `videoRef.current` di sini
+     * tidak pernah terisi, jadi semua pembacaan element di komponen ini dulu mati sunyi di
+     * produksi (preferensi mute, probe audio, disabled snapshot). Ref internal ini menampung
+     * node lalu meneruskannya ke parent dalam bentuk apa pun yang ia kirim.
+     */
+    const videoElRef = useRef(null);
+    const stageRef = useRef(null);
+    const setVideoNode = (node) => {
+        videoElRef.current = node;
+        if (typeof videoRef === 'function') videoRef(node);
+        else if (videoRef && typeof videoRef === 'object') videoRef.current = node;
+    };
+
+    const { zoom, isZoomed, zoomIn, zoomOut, resetZoom, touchAction } = usePlaybackZoom({
+        stageRef,
+        videoElRef,
+        isFullscreen,
+    });
+
     useEffect(() => {
-        const video = videoRef?.current;
+        const video = videoElRef.current;
         if (!video) return undefined;
 
         video.muted = isMuted;
@@ -79,14 +100,20 @@ export default function PlaybackVideo({
 
         video.addEventListener('volumechange', syncFromElement);
         return () => video.removeEventListener('volumechange', syncFromElement);
-    }, [isMuted, videoRef]);
+    }, [isMuted]);
 
     // Keyed on the filename, not the segment object: a new object identity on every parent
     // render would tear these listeners down and rebuild them four times a second.
     const segmentKey = selectedSegment?.filename ?? null;
 
+    // Zoom tidak dibawa antar segmen — inspeksi satu momen tidak boleh menyembunyikan frame
+    // rekaman berikutnya di balik pan/zoom yang tertinggal.
     useEffect(() => {
-        const video = videoRef?.current;
+        resetZoom();
+    }, [segmentKey, resetZoom]);
+
+    useEffect(() => {
+        const video = videoElRef.current;
         if (!video) return undefined;
 
         setHasAudioTrack(null);
@@ -115,10 +142,10 @@ export default function PlaybackVideo({
             video.removeEventListener('loadedmetadata', probe);
             video.removeEventListener('timeupdate', probe);
         };
-    }, [videoRef, segmentKey]);
+    }, [segmentKey]);
 
     const unmute = () => {
-        const video = videoRef?.current;
+        const video = videoElRef.current;
         if (video) {
             video.muted = false;
         }
@@ -244,15 +271,27 @@ export default function PlaybackVideo({
                 </div>
             )}
 
-            <div className="aspect-video bg-black relative" ref={containerRef}>
-                <video
-                    ref={videoRef}
-                    className="w-full h-full object-contain"
-                    controls
-                    playsInline
-                    preload="auto"
-                    crossOrigin={crossOriginMode}
-                />
+            <div className="aspect-video bg-black relative overflow-hidden" ref={containerRef}>
+                {/*
+                  * Stage = satu-satunya elemen yang di-transform oleh zoom. Overlay adalah
+                  * SIBLING (bukan anak) supaya kontrol tetap di tempatnya saat frame di-zoom.
+                  * Kontrol native disembunyikan begitu zoom > 1 — saat itu gesture pan/pinch
+                  * sepenuhnya milik stage, dan bar yang ikut membesar hanya mengganggu.
+                  */}
+                <div
+                    ref={stageRef}
+                    className="absolute inset-0"
+                    style={{ transformOrigin: 'center center', touchAction, willChange: isZoomed ? 'transform' : 'auto' }}
+                >
+                    <video
+                        ref={setVideoNode}
+                        className="w-full h-full object-contain"
+                        controls={!isZoomed}
+                        playsInline
+                        preload="auto"
+                        crossOrigin={crossOriginMode}
+                    />
+                </div>
                 
                 {/*
                   * "Belum ada rekaman" is a VERDICT, and it must not be announced before the answer
@@ -321,8 +360,8 @@ export default function PlaybackVideo({
                             })()}
                             <button
                                 onClick={() => {
-                                    if (videoRef.current) {
-                                        videoRef.current.load();
+                                    if (videoElRef.current) {
+                                        videoElRef.current.load();
                                     }
                                     // Tanpa ini panelnya TIDAK PERNAH tertutup: videonya dimuat
                                     // ulang di belakang layar hitam, dan pengunjung menatap galat
@@ -390,30 +429,73 @@ export default function PlaybackVideo({
                     </button>
                 </div>
 
-                {!isFullscreen && (
-                    <div className="absolute bottom-16 sm:bottom-20 right-2 sm:right-4 flex flex-col gap-2 z-30">
-                        <button
-                            onClick={onSnapshot}
-                            disabled={!videoRef.current || videoRef.current.paused || videoRef.current.readyState < 2}
-                            className="p-2 sm:p-2.5 bg-black/70 hover:bg-black/90 disabled:bg-black/40 disabled:cursor-not-allowed text-white rounded-lg transition-all shadow-lg hover:scale-110 disabled:scale-100"
-                            title="Ambil Snapshot & Share"
-                        >
-                            <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                            </svg>
-                        </button>
-                        
-                        <button
-                            onClick={onToggleFullscreen}
-                            className="p-2 sm:p-2.5 bg-black/70 hover:bg-black/90 text-white rounded-lg transition-all shadow-lg hover:scale-110"
-                            title="Fullscreen"
-                        >
-                            <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-                            </svg>
-                        </button>
-                    </div>
+                {!isFullscreen && selectedSegment && !videoError && (
+                    <>
+                        {/*
+                          * Dua cluster, bukan tombol-tombol terpisah: satu rail kanan
+                          * (snapshot + fullscreen) dan satu pill kiri (zoom). Setiap sudut
+                          * kini memegang SATU objek — sebelumnya dua tombol mengambang
+                          * terpisah dengan bayangan masing-masing terlihat berantakan di
+                          * atas frame kecil ponsel.
+                          */}
+                        <div className="absolute bottom-16 sm:bottom-20 right-2 sm:right-4 z-30 flex flex-col overflow-hidden rounded-lg bg-black/70 shadow-lg divide-y divide-white/15">
+                            <button
+                                onClick={onSnapshot}
+                                disabled={!videoElRef.current || videoElRef.current.paused || videoElRef.current.readyState < 2}
+                                className="min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 p-2.5 sm:p-3 text-white transition-colors hover:bg-white/15 disabled:opacity-40 disabled:cursor-not-allowed"
+                                title="Ambil Snapshot & Share"
+                                aria-label="Ambil Snapshot & Share"
+                            >
+                                <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                            </button>
+                            <button
+                                onClick={onToggleFullscreen}
+                                className="min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 p-2.5 sm:p-3 text-white transition-colors hover:bg-white/15"
+                                title="Fullscreen"
+                                aria-label="Fullscreen"
+                            >
+                                <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div className="absolute bottom-16 sm:bottom-20 left-2 sm:left-4 z-30 flex overflow-hidden rounded-lg bg-black/70 shadow-lg" data-testid="playback-zoom">
+                            <button
+                                onClick={zoomOut}
+                                disabled={!isZoomed}
+                                className="min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 p-2.5 sm:p-3 text-white transition-colors hover:bg-white/15 disabled:opacity-40 disabled:cursor-not-allowed"
+                                title="Perkecil"
+                                aria-label="Perkecil"
+                            >
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607zM13.5 10.5h-6" />
+                                </svg>
+                            </button>
+                            <button
+                                onClick={resetZoom}
+                                className="min-h-11 sm:min-h-0 px-2 sm:px-2.5 text-white text-xs sm:text-sm font-medium tabular-nums transition-colors hover:bg-white/15 border-x border-white/15"
+                                title={isZoomed ? `Zoom ${zoom.toFixed(1)}x — ketuk untuk reset` : 'Zoom 1.0x'}
+                                aria-label={isZoomed ? `Zoom ${zoom.toFixed(1)}x, ketuk untuk reset` : 'Zoom 1.0x'}
+                            >
+                                {zoom.toFixed(1)}x
+                            </button>
+                            <button
+                                onClick={zoomIn}
+                                disabled={zoom >= 4}
+                                className="min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 p-2.5 sm:p-3 text-white transition-colors hover:bg-white/15 disabled:opacity-40 disabled:cursor-not-allowed"
+                                title="Perbesar"
+                                aria-label="Perbesar"
+                            >
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607zM10.5 7.5v6m3-3h-6" />
+                                </svg>
+                            </button>
+                        </div>
+                    </>
                 )}
 
                 {isFullscreen && (
@@ -434,16 +516,50 @@ export default function PlaybackVideo({
                             </div>
                         </div>
 
-                        <div className="absolute bottom-20 right-4 flex flex-col gap-2 pointer-events-auto">
+                        <div className="absolute bottom-20 right-4 flex flex-col overflow-hidden rounded-xl bg-white/10 shadow-lg divide-y divide-white/15 pointer-events-auto">
                             <button
                                 onClick={onSnapshot}
-                                disabled={!videoRef.current || videoRef.current.paused || videoRef.current.readyState < 2}
-                                className="p-3 bg-white/10 hover:bg-white/20 disabled:bg-white/5 disabled:cursor-not-allowed text-white rounded-xl transition-all shadow-lg"
+                                disabled={!videoElRef.current || videoElRef.current.paused || videoElRef.current.readyState < 2}
+                                className="p-3 text-white transition-colors hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed"
                                 title="Ambil Snapshot & Share"
+                                aria-label="Ambil Snapshot & Share"
                             >
                                 <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div className="absolute bottom-20 left-4 flex overflow-hidden rounded-xl bg-white/10 shadow-lg pointer-events-auto" data-testid="playback-zoom-fullscreen">
+                            <button
+                                onClick={zoomOut}
+                                disabled={!isZoomed}
+                                className="p-3 text-white transition-colors hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed"
+                                title="Perkecil"
+                                aria-label="Perkecil"
+                            >
+                                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607zM13.5 10.5h-6" />
+                                </svg>
+                            </button>
+                            <button
+                                onClick={resetZoom}
+                                className="px-3 text-white text-sm font-medium tabular-nums transition-colors hover:bg-white/20 border-x border-white/15"
+                                title={isZoomed ? `Zoom ${zoom.toFixed(1)}x — ketuk untuk reset` : 'Zoom 1.0x'}
+                                aria-label={isZoomed ? `Zoom ${zoom.toFixed(1)}x, ketuk untuk reset` : 'Zoom 1.0x'}
+                            >
+                                {zoom.toFixed(1)}x
+                            </button>
+                            <button
+                                onClick={zoomIn}
+                                disabled={zoom >= 4}
+                                className="p-3 text-white transition-colors hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed"
+                                title="Perbesar"
+                                aria-label="Perbesar"
+                            >
+                                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607zM10.5 7.5v6m3-3h-6" />
                                 </svg>
                             </button>
                         </div>

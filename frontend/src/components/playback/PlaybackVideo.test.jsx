@@ -260,3 +260,93 @@ describe('PlaybackVideo speed control on a phone', () => {
         expect(onSpeedChange).toHaveBeenLastCalledWith(1);
     });
 });
+
+/*
+ * Production bug, caught live: the page passes `videoRef={attachVideo}` — a FUNCTION ref —
+ * and every internal read of `videoRef.current` (mute preference, audio probing, snapshot
+ * disabled-state) silently saw undefined. The component now holds its own element ref and
+ * forwards the node to whatever shape the parent sent. This test is the regression guard:
+ * if someone reverts to reading videoRef.current, it fails immediately.
+ */
+describe('PlaybackVideo ref forwarding', () => {
+    const playingSegment = { id: 1, filename: 'a.mp4' };
+
+    it('accepts a CALLBACK ref (the shape the page actually sends) and still wires the element', () => {
+        let received = null;
+        render(
+            <PlaybackVideo
+                {...baseProps}
+                videoRef={(node) => { received = node; }}
+                selectedSegment={playingSegment}
+            />
+        );
+
+        expect(received).not.toBeNull();
+        expect(received.tagName).toBe('VIDEO');
+        // The mute default must land on the element — before the fix this read
+        // videoRef.current (undefined for a function ref) and silently did nothing.
+        expect(received.muted).toBe(true);
+    });
+
+    it('still accepts an object ref for callers that use one', () => {
+        const videoRef = { current: null };
+        render(<PlaybackVideo {...baseProps} videoRef={videoRef} selectedSegment={playingSegment} />);
+        expect(videoRef.current?.tagName).toBe('VIDEO');
+    });
+});
+
+/*
+ * The playback page had NO zoom at all, while MultiView already shipped pinch/pan. The zoom
+ * pill must exist wherever a segment plays — and must NOT appear over the empty state, where
+ * zooming a "no recording" message is meaningless.
+ */
+describe('PlaybackVideo zoom pill', () => {
+    const playingSegment = { id: 1, filename: 'a.mp4' };
+
+    it('renders the zoom control once a segment is playing', () => {
+        render(<PlaybackVideo {...baseProps} selectedSegment={playingSegment} />);
+
+        const pill = screen.getByTestId('playback-zoom');
+        expect(pill).toBeTruthy();
+        expect(screen.getByTitle('Perbesar')).toBeTruthy();
+        expect(screen.getByTitle('Perkecil')).toBeTruthy();
+    });
+
+    it('stays hidden over the empty state — nothing to zoom', () => {
+        render(<PlaybackVideo {...baseProps} />);
+
+        expect(screen.queryByTestId('playback-zoom')).toBeNull();
+    });
+
+    it('zooming in updates the readout and hides native controls for gesture ownership', () => {
+        const { container } = render(
+            <PlaybackVideo {...baseProps} selectedSegment={playingSegment} />
+        );
+
+        fireEvent.click(screen.getByTitle('Perbesar'));
+
+        expect(screen.getByTestId('playback-zoom').textContent).toContain('1.5x');
+        // controls={!isZoomed} — once zoomed the stage owns every gesture, and a native
+        // bar that scales with the frame is worse than none.
+        expect(container.querySelector('video').hasAttribute('controls')).toBe(false);
+    });
+});
+
+/*
+ * On a phone the old right side was three floating buttons (fullscreen, snapshot, speed)
+ * each casting its own shadow — the "berantakan" look. They now live in ONE rounded rail
+ * per corner: every corner holds a single visual object.
+ */
+describe('PlaybackVideo control rails on mobile', () => {
+    it('groups snapshot + fullscreen into a single rail, not two floating buttons', () => {
+        render(
+            <PlaybackVideo {...baseProps} selectedSegment={{ id: 1, filename: 'a.mp4' }} />
+        );
+
+        const snapshot = screen.getByTitle('Ambil Snapshot & Share');
+        const fullscreen = screen.getByTitle('Fullscreen');
+        expect(snapshot.parentElement).toBe(fullscreen.parentElement);
+        expect(snapshot.parentElement.className).toContain('rounded-lg');
+        expect(snapshot.parentElement.className).toContain('divide-y');
+    });
+});
