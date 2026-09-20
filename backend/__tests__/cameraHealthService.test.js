@@ -18,6 +18,8 @@ const {
     handleCameraBecameOfflineMock,
     reconcileCameraLifecycleMock,
     refreshCameraThumbnailMock,
+    registerThumbnailFailureMock,
+    shouldReportThumbnailFailureLoudlyMock,
     updateCameraPathMock,
     queryMock,
     executeMock,
@@ -30,6 +32,8 @@ const {
     handleCameraBecameOfflineMock: vi.fn(),
     reconcileCameraLifecycleMock: vi.fn(),
     refreshCameraThumbnailMock: vi.fn(),
+    registerThumbnailFailureMock: vi.fn(() => 1),
+    shouldReportThumbnailFailureLoudlyMock: vi.fn(() => true),
     updateCameraPathMock: vi.fn(),
     queryMock: vi.fn(),
     executeMock: vi.fn(),
@@ -58,6 +62,8 @@ vi.mock('../services/recordingControlService.js', () => ({
 vi.mock('../services/thumbnailService.js', () => ({
     default: {
         refreshCameraThumbnail: refreshCameraThumbnailMock,
+        registerThumbnailFailure: registerThumbnailFailureMock,
+        shouldReportThumbnailFailureLoudly: shouldReportThumbnailFailureLoudlyMock,
     },
 }));
 
@@ -1824,6 +1830,59 @@ describe('cameraHealthService status transitions', () => {
         expect(handleCameraBecameOnlineMock).not.toHaveBeenCalled();
         expect(refreshCameraThumbnailMock).toHaveBeenCalledWith(43);
     });
+
+    it('routes a transition-path thumbnail failure through the shared loud/quiet policy', async () => {
+        const service = new CameraHealthService();
+        refreshCameraThumbnailMock.mockRejectedValueOnce(new Error('ffmpeg died: rtsp://admin:secret@10.0.0.9/x'));
+        const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+        try {
+            await service.handleCameraStatusTransition(
+                { id: 44, enabled: 1, enable_recording: 1, delivery_type: 'internal_hls' },
+                0,
+                1,
+                'stream_recovered'
+            );
+
+            expect(registerThumbnailFailureMock).toHaveBeenCalledWith(44);
+            expect(shouldReportThumbnailFailureLoudlyMock).toHaveBeenCalledWith(
+                expect.objectContaining({ id: 44 }),
+                expect.objectContaining({ failures: 1 })
+            );
+            expect(errorSpy).toHaveBeenCalledTimes(1);
+            // The ffmpeg error embeds the camera's RTSP URL — credentials must never reach the log line.
+            expect(errorSpy.mock.calls[0].join(' ')).not.toContain('secret');
+            expect(logSpy).not.toHaveBeenCalled();
+        } finally {
+            errorSpy.mockRestore();
+            logSpy.mockRestore();
+        }
+    });
+
+    it('keeps repeat/external thumbnail failures off stderr when the loud policy says quiet', async () => {
+        const service = new CameraHealthService();
+        refreshCameraThumbnailMock.mockRejectedValueOnce(new Error('timeout'));
+        registerThumbnailFailureMock.mockReturnValueOnce(3);
+        shouldReportThumbnailFailureLoudlyMock.mockReturnValueOnce(false);
+        const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+        try {
+            await service.handleCameraStatusTransition(
+                { id: 45, enabled: 1, enable_recording: 0, delivery_type: 'external_hls' },
+                0,
+                1,
+                'stream_recovered'
+            );
+
+            expect(errorSpy).not.toHaveBeenCalled();
+            expect(logSpy).toHaveBeenCalledTimes(1);
+        } finally {
+            errorSpy.mockRestore();
+            logSpy.mockRestore();
+        }
+    });
 });
 
 describe('cameraHealthService check loop', () => {
@@ -1863,6 +1922,38 @@ describe('cameraHealthService check loop', () => {
             expect.stringContaining('UPDATE cameras SET is_online'),
             expect.arrayContaining([1, expect.any(String), 51])
         );
+    });
+
+    it('summarizes probe rejections into one stderr line per sweep, not one per camera', async () => {
+        const service = new CameraHealthService();
+        const camA = {
+            id: 71, name: 'Cam A', enabled: 1, is_online: 1,
+            stream_source: 'internal', delivery_type: 'internal_hls', stream_key: 'cam-71',
+        };
+        const camB = {
+            id: 72, name: 'Cam B', enabled: 1, is_online: 1,
+            stream_source: 'internal', delivery_type: 'internal_hls', stream_key: 'cam-72',
+        };
+
+        vi.spyOn(service, 'getActivePaths').mockResolvedValue(new Map());
+        vi.spyOn(service, 'evaluateCameraStatus').mockRejectedValue(new Error('probe boom'));
+        queryMock.mockReturnValue([camA, camB]);
+        executeMock.mockReturnValue({ changes: 1 });
+        upsertRuntimeStateMock.mockImplementation(() => {});
+        const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        try {
+            await expect(service.checkAllCameras()).resolves.toBeUndefined();
+
+            const sweepErrors = errorSpy.mock.calls.filter(
+                ([msg]) => typeof msg === 'string' && msg.includes('eval/probe threw')
+            );
+            expect(sweepErrors).toHaveLength(1);
+            expect(sweepErrors[0][0]).toContain('2 eval/probe threw');
+            expect(sweepErrors[0][0]).toContain('camera 71');
+        } finally {
+            errorSpy.mockRestore();
+        }
     });
 
     it('hydrates detailed camera rows only for due cameras in the health loop', async () => {
@@ -2455,16 +2546,21 @@ describe('cameraHealthService check loop', () => {
             rtsp_url: 'rtsp://example/recovery-confirmed',
         };
 
-        queryMock.mockReturnValueOnce([camera]);
+        queryMock
+            .mockReturnValueOnce([camera])   // getEnabledCameraCandidates
+            .mockReturnValueOnce([camera]);  // getDetailedEnabledCamerasByIds
         service.evaluateCameraStatus = vi.fn(async () => ({
             camera,
             isOnline: true,
             rawReason: 'online',
         }));
-        service.evaluateCameraMonitoringResult = vi.fn(async () => ({
-            monitoringState: 'online',
-            monitoringReason: 'rtsp_probe_ok',
-        }));
+        vi.spyOn(service, 'evaluateCameraMonitoringStatus').mockResolvedValue({
+            camera,
+            isOnline: 1,
+            monitoring_state: 'online',
+            monitoring_reason: 'rtsp_probe_ok',
+        });
+        vi.spyOn(service, 'getActivePaths').mockResolvedValue(new Map());
         vi.spyOn(Date, 'now').mockReturnValue(62_000);
 
         await service.checkAllCameras();

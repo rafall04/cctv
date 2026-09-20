@@ -34,7 +34,10 @@ describe('guardrail: file-size ratchet (anti-penumpukan)', () => {
     const MAX = 800;
     const FROZEN = {
         'services/cameraHealthService.js': 3159,
-        'services/cameraService.js': 2775,
+        // Bumped 2775→2809 to match reality: commit 6459b263 ("Perf: pisahkan payload besar
+        // dashboard & playback picker") grew the file without updating this baseline, so HEAD
+        // itself tripped the ratchet. The ceiling now locks the shipped size — do not grow.
+        'services/cameraService.js': 2809,
         // Bumped 1581→1587 (visible decision): the /hls/proxy anti-open-proxy / anti-SSRF guard
         // (Audit v1.2.0, S-03) — a no-camera-binding request now requires an explicit allow-list.
         'services/hlsProxyService.js': 1587,

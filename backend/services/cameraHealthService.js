@@ -1337,10 +1337,13 @@ class CameraHealthService {
             try {
                 await thumbnailService.refreshCameraThumbnail(camera.id);
             } catch (error) {
-                // FFmpeg echoes its whole command line on failure, so error.message here carries the
-                // camera's RTSP URL — credentials and all. Redact before it reaches the pm2 error log
-                // (world-readable, archived). redactUrlCredentials is a no-op on credential-free text.
-                console.error(`[CameraHealth] Failed to refresh thumbnail for camera ${camera.id}:`, redactUrlCredentials(error.message));
+                // FFmpeg echoes its command line on failure — error.message carries the camera's RTSP
+                // URL, credentials included; redact before it reaches the (world-readable) error log.
+                // Reuse the sweep's dedup policy so a flapping camera doesn't re-log every edge.
+                const message = redactUrlCredentials(error.message);
+                const isConfigFact = /unsupported_delivery_type|missing_external_snapshot_source|missing_mjpeg_thumbnail_source/i.test(message || '');
+                const emit = thumbnailService.shouldReportThumbnailFailureLoudly(camera, { isConfigFact, failures: thumbnailService.registerThumbnailFailure(camera.id) }) ? console.error : console.log;
+                emit(`[CameraHealth] Failed to refresh thumbnail for camera ${camera.id}:`, message);
             }
 
             return;
@@ -2499,11 +2502,12 @@ class CameraHealthService {
 
             const finalResults = [];
             const finalResultsById = new Map();
+            const sweepThrowers = []; // app-side throws collected for ONE summary line at sweep end — never stderr per item
             for (const probe of probeResults.filter(p => p.result.status === 'fulfilled')) {
                 const streamResult = probe.result.value;
                 // One camera must never cost the sweep: a throw here used to leave every other camera unchecked this tick.
                 const monitoring = await guardProbeSettlement(this.evaluateCameraMonitoringStatus(streamResult.camera, activePaths, streamResult))
-                    .catch((error) => { console.error(`[CameraHealth] Camera ${streamResult.camera.id} monitoring failed:`, redactUrlCredentials(error.message)); return null; });
+                    .catch((error) => { sweepThrowers.push({ kind: 'monitoring eval', camera: streamResult.camera, error }); return null; });
                 if (!monitoring) continue;
                 const finalResult = {
                     cameraId: streamResult.camera.id,
@@ -2567,10 +2571,7 @@ class CameraHealthService {
             const pendingAlertCommits = new Map();
 
             for (const { result, camera: probedCamera } of probeResults) {
-                if (result.status !== 'fulfilled') {
-                    console.error(`[CameraHealth] Camera ${probedCamera.id} (${probedCamera.name}) probe failed:`, result.reason?.message || result.reason);
-                    continue;
-                }
+                if (result.status !== 'fulfilled') { sweepThrowers.push({ kind: 'probe', camera: probedCamera, error: result.reason }); continue; }
 
                 const { camera, isOnline, rawReason } = result.value;
                 processedIds.add(camera.id);
@@ -2720,6 +2721,9 @@ class CameraHealthService {
                 }
             }
 
+            if (sweepThrowers.length > 0) { // ONE stderr line per sweep — a systemic bug must not flood the error log per camera per tick
+                const f = sweepThrowers[0]; console.error(`[CameraHealth] Sweep [${scope}]: ${sweepThrowers.length} eval/probe threw (first: ${f.kind} on camera ${f.camera.id} (${f.camera.name}): ${redactUrlCredentials(f.error?.message || String(f.error))})`);
+            }
             this.lastCheck = new Date();
             console.log(`[CameraHealth] Check complete [${scope}]: ${onlineCount} online, ${offlineCount} offline (${changedCount} changed, ${dueCameras.length} probed)`);
         } catch (error) {
