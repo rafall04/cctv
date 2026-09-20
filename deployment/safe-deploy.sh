@@ -262,6 +262,10 @@ if [ -f "$DB_PATH" ]; then
         { [ -f "${DB_PATH}-shm" ] && cp "${DB_PATH}-shm" "${DB_BAK}-shm"; } || true
         warn "sqlite3 not found — copied .db + -wal + -shm (restore needs all three files)."
     fi
+    # Keep the 10 most recent timestamped backups; named milestones (backup-pre*) are never
+    # touched. Without this every deploy leaves ~110 MB behind — on prod it reached 304
+    # files / 28 GB in four months and pushed the root disk to 84%.
+    ls -1t "$BACKEND_DIR"/data/cctv.db.backup-2* 2>/dev/null | tail -n +11 | xargs -r rm -f
 else
     warn "Database not found at ${DB_PATH} (first run?) — skipping DB backup."
 fi
