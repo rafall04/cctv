@@ -24,6 +24,7 @@ import cameraHealthService from '../services/cameraHealthService.js';
 import notificationDiagnosticsService from '../services/notificationDiagnosticsService.js';
 import recordingHealthDashboardService from '../services/recordingHealthDashboardService.js';
 import recordingControlService from '../services/recordingControlService.js';
+import systemHealthService from '../services/systemHealthService.js';
 import workerState from '../services/recordingWorkerStateRepository.js';
 import { config } from '../config/config.js';
 import securityAuditLogger from '../services/securityAuditLogger.js';
@@ -393,6 +394,21 @@ export async function getRecordingHealth(request, reply) {
             success: false,
             message: 'Internal server error',
         });
+    }
+}
+
+/**
+ * Whole-box health snapshot (admin only): host load/memory, recordings disk, SQLite WAL state,
+ * pm2 restart counts, recorder-worker heartbeat + reconcile queue, Telegram archive backlog, and
+ * camera-health sweep liveness. Distinct from /recording-health (pipeline detail) and
+ * /debug/camera-health (per-camera detail) — this is the "is the SERVER okay" answer.
+ */
+export async function getSystemHealth(request, reply) {
+    try {
+        return reply.send({ success: true, data: await systemHealthService.getSnapshot() });
+    } catch (error) {
+        console.error('Get system health error:', error);
+        return reply.code(500).send({ success: false, message: 'Internal server error' });
     }
 }
 

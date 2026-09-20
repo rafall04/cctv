@@ -6,7 +6,7 @@
  * SideEffects: Adds authenticated admin routes to Fastify.
  */
 
-import { getDashboardStats, getDashboardStreams, getTodayStats, testTelegramNotification, getTelegramConfig, updateTelegramConfig, previewNotificationDiagnostics, runNotificationDiagnosticsDrill, listNotificationDiagnosticsRuns, getViewerAnalytics, getViewerHistoryPage, getRealTimeViewers, getCameraHealthDebug, getRecordingHealth, getSecurityLogs, getSecurityStats, getCacheStats, clearCache, getTimezoneConfig, updateTimezoneConfig, exportDatabaseBackup, importDatabaseBackup, getBackupPreview } from '../controllers/adminController.js';
+import { getDashboardStats, getDashboardStreams, getTodayStats, testTelegramNotification, getTelegramConfig, updateTelegramConfig, previewNotificationDiagnostics, runNotificationDiagnosticsDrill, listNotificationDiagnosticsRuns, getViewerAnalytics, getViewerHistoryPage, getRealTimeViewers, getCameraHealthDebug, getRecordingHealth, getSystemHealth, getSecurityLogs, getSecurityStats, getCacheStats, clearCache, getTimezoneConfig, updateTimezoneConfig, exportDatabaseBackup, importDatabaseBackup, getBackupPreview } from '../controllers/adminController.js';
 import { generateApiKey, listApiKeys, deleteApiKey } from '../controllers/apiKeyController.js';
 import { clearPlaybackTokenSessions, createPlaybackToken, deletePlaybackTokenById, listPlaybackTokenAuditLogs, listPlaybackTokens, revokePlaybackToken, sharePlaybackToken, updatePlaybackToken } from '../controllers/playbackTokenController.js';
 import { createPlaybackProduct, listPlaybackProducts, updatePlaybackProduct } from '../controllers/playbackProductController.js';
@@ -69,6 +69,13 @@ export default async function adminRoutes(fastify, options) {
     fastify.get('/recording-health', {
         onRequest: [authMiddleware],
         handler: getRecordingHealth,
+    });
+
+    // Whole-box health: host load/mem, recordings disk, WAL, pm2 restarts, worker + archive backlog.
+    // requireAdmin — it publishes host internals (paths, memory, process table) staff don't need.
+    fastify.get('/system-health', {
+        onRequest: [authMiddleware, requireAdmin],
+        handler: getSystemHealth,
     });
 
     // Security activity — audit log viewer (admin only)
