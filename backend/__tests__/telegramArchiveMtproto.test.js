@@ -19,11 +19,17 @@ import os from 'os';
 import path from 'path';
 
 const rows = { upload: null };
+// CACHE_DIR digerakkan lewat getter supaya tes prefetch bisa mengarahkannya ke tmpdir nyata —
+// jalur hit-disk di openSegmentStream memakai existsSync, bukan mock.
+let cacheDirValue = '/var/lib/telegram-bot-api';
 vi.mock('../database/connectionPool.js', () => ({
     query: () => [], queryOne: () => rows.upload, execute: () => ({ changes: 0 }), transaction: (f) => f(),
 }));
 vi.mock('../services/archiveCacheService.js', () => ({
-    default: { makeRoom: vi.fn(), pin: vi.fn(), release: vi.fn(), CACHE_DIR: '/var/lib/telegram-bot-api' },
+    default: {
+        makeRoom: vi.fn(), pin: vi.fn(), release: vi.fn(),
+        get CACHE_DIR() { return cacheDirValue; },
+    },
 }));
 vi.mock('../services/thumbnailPathService.js', () => ({ sanitizeCameraThumbnailList: (x) => x }));
 
@@ -61,8 +67,10 @@ describe('MTProto dipakai lebih dulu', () => {
 
         const hasil = await openSegmentStream(1, { start: 5, end: 9 });
 
-        expect(globalThis.fetch).toHaveBeenCalledOnce();
+        // Panggilan pertama = irisan live; panggilan berikutnya (kalau ada) adalah prefetch latar
+        // ke service yang sama — yang tidak boleh terjadi hanya satu: menyentuh Bot API.
         const [url, opt] = globalThis.fetch.mock.calls[0];
+        expect(globalThis.fetch.mock.calls.every(([u]) => String(u).startsWith(URL_MT))).toBe(true);
         expect(url).toBe(`${URL_MT}/segment/1`);
         expect(opt.headers.Range).toBe('bytes=5-9');
         expect(hasil.range).toEqual({ start: 5, end: 9 });
@@ -135,5 +143,65 @@ describe('gerbang tetap dihormati', () => {
         hasil.stream.on('error', () => {});
         hasil.stream.destroy();
         fs.rmSync(dir, { recursive: true, force: true });
+    });
+});
+
+describe('prefetch ke transit dir', () => {
+    /*
+     * Janji fitur: irisan pertama dilayani live dari MTProto, lalu salinan utuh mendarat di
+     * CACHE_DIR di latar — request BERIKUTNYA untuk segmen yang sama dibaca dari disk tanpa
+     * menyentuh Telegram sama sekali.
+     */
+    const ISI_PENUH = Buffer.from('0123456789abcdefghijABCDEFGHIJ'); // 30 byte
+
+    function streamWeb(buf) {
+        return new ReadableStream({
+            start(controller) {
+                controller.enqueue(new Uint8Array(buf));
+                controller.close();
+            },
+        });
+    }
+
+    it('menarik berkas utuh di latar setelah irisan live tersaji', async () => {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mt-cache-'));
+        cacheDirValue = dir;
+        rows.upload = { ...rows.upload, segment_id: 7, file_size: ISI_PENUH.length, file_id: 'FID7', local_path: null };
+        globalThis.fetch = vi.fn(async () => respons({ body: streamWeb(ISI_PENUH) }));
+
+        await openSegmentStream(7, { start: 5, end: 9 });
+        // Prefetch adalah fire-and-forget — beri event loop satu giliran untuk menyelesaikannya.
+        for (let i = 0; i < 20 && !fs.existsSync(path.join(dir, 'rafnet-mtproto-seg-7.mp4')); i += 1) {
+            await new Promise((resolve) => setImmediate(resolve));
+        }
+
+        const file = path.join(dir, 'rafnet-mtproto-seg-7.mp4');
+        expect(fs.existsSync(file)).toBe(true);
+        expect(fs.readFileSync(file).equals(ISI_PENUH)).toBe(true);
+        // Prefetch meminta TANPA Range — seluruh berkas, bukan irisan.
+        const prefetchCall = globalThis.fetch.mock.calls.find(([, opt]) => opt === undefined || !opt.headers?.Range);
+        expect(prefetchCall).toBeTruthy();
+
+        fs.rmSync(dir, { recursive: true, force: true });
+        cacheDirValue = '/var/lib/telegram-bot-api';
+    });
+
+    it('request berikutnya membaca dari disk — Telegram tidak disentuh lagi', async () => {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mt-cache-'));
+        cacheDirValue = dir;
+        fs.writeFileSync(path.join(dir, 'rafnet-mtproto-seg-8.mp4'), ISI_PENUH);
+        rows.upload = { ...rows.upload, segment_id: 8, file_size: ISI_PENUH.length, file_id: 'FID8', local_path: null };
+        globalThis.fetch = vi.fn(async () => { throw new Error('Telegram disentuh padahal prefetch sudah mendarat'); });
+
+        const hasil = await openSegmentStream(8, { start: 2, end: 5 });
+
+        expect(globalThis.fetch).not.toHaveBeenCalled();
+        expect(hasil.totalSize).toBe(ISI_PENUH.length);
+        expect(hasil.range).toEqual({ start: 2, end: 5 });
+        hasil.stream.on('error', () => {});
+        hasil.stream.destroy();
+
+        fs.rmSync(dir, { recursive: true, force: true });
+        cacheDirValue = '/var/lib/telegram-bot-api';
     });
 });

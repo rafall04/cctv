@@ -135,11 +135,12 @@ function clampIntervalsToRange(intervals, range) {
  * thick-archive camera slows every other request (live, health, billing), not just their own page.
  *
  * The answer — "which stretches of time have footage" — is quasi-static: new segments land every ten
- * minutes, archive uploads lag further. A short TTL cache turns the 6×/min recompute into ~0 ms
- * cache hits with at most a few tens of seconds of staleness, which the timeline can absolutely wear.
+ * minutes, archive uploads lag further. A TTL cache turns the recompute into ~0 ms cache hits; the
+ * bar can wear minutes of staleness, and on the saturated prod box each cold run is a synchronous
+ * scan of ~7.6k archive rows that stalls the whole event loop — so TTL is 3 min, not 45 s.
  * Same shape as cameraAccessService's 30 s access cache.
  */
-const COVERAGE_TTL_MS = 45_000;
+const COVERAGE_TTL_MS = 180_000;
 // A safety ceiling on distinct (camera, range) keys so a burst of token users with varied windows
 // cannot grow this without bound; expired entries are pruned lazily on hit, this catches the rest.
 const COVERAGE_CACHE_MAX = 500;

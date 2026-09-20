@@ -4,7 +4,9 @@
  * Caller: routes/telegramArchiveRoutes.js (admin-only).
  * Deps: database/connectionPool (telegram_archive_uploads + cameras), node:fs, global fetch.
  * MainFuncs: listUploads, getUpload, openSegmentStream.
- * SideEffects: Calls the LOCAL Bot API server's getFile; reads the resulting file from disk.
+ * SideEffects: Calls the LOCAL Bot API server's getFile and the MTProto sidecar's /segment;
+ *          reads the resulting file from disk; prefetches a whole-segment copy into the managed
+ *          transit dir (archiveCacheService) after the first MTProto slice is served.
  *
  * Why the stream is proxied rather than linked: a Telegram file URL contains the bot token and is
  * fetchable by anyone who has the string. Handing one to a browser would leak both the token and
@@ -18,6 +20,8 @@
 
 import fs from 'fs';
 import path from 'path';
+import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 import { query, queryOne } from '../database/connectionPool.js';
 import archiveCache from './archiveCacheService.js';
 import { sanitizeCameraThumbnailList } from './thumbnailPathService.js';
@@ -339,6 +343,97 @@ export function localSegmentFile(segmentId) {
     }
 }
 
+/*
+ * PREFETCH CACHE — pemutaran kedua dan seterusnya dibaca dari disk.
+ *
+ * MTProto memotong irisan byte per request: tiap <video> open dan tiap seek adalah perjalanan baru
+ * ke DC Telegram (terukur di prod: TTFB ~28s, seek ~9s pada box yang jenuh). Begitu sebuah segmen
+ * dimainkan sekali, salinan utuhnya ditarik di latar ke dir transit yang sudah di-manage
+ * archiveCacheService (pin saat dibaca, write-grace saat ditulis, TTL/kapasitas untuk evict) —
+ * request berikutnya untuk segmen yang sama dilayani disk lokal, byte-exact dan instan.
+ *
+ * Nama file deterministik supaya proses restart tetap menemukan hasil prefetch tanpa state apa pun.
+ */
+const PREFETCH_FILE_PREFIX = 'rafnet-mtproto-seg-';
+const prefetchInFlight = new Set();
+
+function prefetchedPathFor(segmentId) {
+    return path.join(archiveCache.CACHE_DIR, `${PREFETCH_FILE_PREFIX}${segmentId}.mp4`);
+}
+
+/**
+ * Sajikan irisan byte dari berkas utuh di disk lokal. Dipakai oleh tiga jalur: rekaman asli yang
+ * masih ada, hasil prefetch MTProto, dan berkas yang dimaterialisasi Bot API — ketiganya identik.
+ * Berkas di dalam CACHE_DIR di-pin selama stream hidup supaya sweep tidak menariknya dari bawah
+ * penonton; di luar dir itu pin tidak diperlukan (rekaman asli tidak di-manage archiveCache).
+ */
+function streamSliceFromDisk(absPath, filename, totalSize, range) {
+    const wanted = range && range.end < totalSize ? range : (range ? { start: range.start, end: totalSize - 1 } : null);
+    const stream = wanted
+        ? fs.createReadStream(absPath, { start: wanted.start, end: wanted.end })
+        : fs.createReadStream(absPath);
+    if (absPath.startsWith(archiveCache.CACHE_DIR)) {
+        archiveCache.pin(absPath);
+        let done = false;
+        const unpin = () => {
+            if (done) return;
+            done = true;
+            archiveCache.release(absPath);
+        };
+        stream.once('close', unpin);
+        stream.once('end', unpin);
+        stream.once('error', unpin);
+    }
+    return {
+        stream,
+        size: wanted ? wanted.end - wanted.start + 1 : totalSize,
+        filename,
+        range: wanted,
+        totalSize,
+    };
+}
+
+/**
+ * Tarik SELURUH segmen lewat MTProto di latar, lalu atomically rename ke nama finalnya. Yang
+ * memanggil tidak menunggu — request yang sedang berjalan sudah dilayani irisan live-nya. Gagal
+ * di mana pun hanya berarti cache tidak terisi: permintaan berikutnya tetap lewat jalur biasa.
+ * `.part` melindungi pembaca dari file setengah jadi, dan kalau ditinggal mati pun disapu sweep
+ * lewat write-grace — tidak ada state yang perlu dibersihkan tangan.
+ */
+const PREFETCH_MAX_CONCURRENT = 2;
+
+function prefetchWholeSegment(segmentId, fileSize, mtprotoUrl) {
+    // Tanpa file_size kita tidak bisa menghitung kebutuhan disk — transit dir ini berbagi box
+    // yang sudah 82% penuh, jadi prefetch hanya untuk baris yang ukurannya tercatat. Konkurensi
+    // dibatasi: setiap prefetch adalah unduhan penuh, dan box ini sudah jenuh — yang terlewat
+    // akan dicoba lagi oleh request berikutnya.
+    if (!fileSize || prefetchInFlight.size >= PREFETCH_MAX_CONCURRENT || prefetchInFlight.has(segmentId)) {
+        return;
+    }
+    prefetchInFlight.add(segmentId);
+    const tmpPath = path.join(archiveCache.CACHE_DIR, `${PREFETCH_FILE_PREFIX}${segmentId}.part`);
+    (async () => {
+        try {
+            // makeRoom SEBELUM menarik — aturan transit dir yang sama seperti jalur Bot API: sebuah
+            // fetch tidak boleh jadi penyebab evict, dan tidak boleh menjatuhkan disk di bawah floor.
+            if (fileSize) archiveCache.makeRoom(fileSize);
+            // Batasi umur unduhan: fetch yang menggantung akan mengunci slot in-flight selamanya
+            // dan segmen itu tidak akan pernah di-prefetch ulang sampai restart.
+            const resp = await fetch(`${mtprotoUrl.replace(/\/+$/, '')}/segment/${segmentId}`, {
+                signal: AbortSignal.timeout(10 * 60 * 1000),
+            });
+            if (!resp.ok || !resp.body) return;
+            await pipeline(Readable.fromWeb(resp.body), fs.createWriteStream(tmpPath));
+            fs.renameSync(tmpPath, prefetchedPathFor(segmentId));
+        } catch (err) {
+            console.warn(`[arsip] prefetch segmen ${segmentId} gagal: ${err.message}`);
+            try { if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath); } catch { /* sweep membersihkan */ }
+        } finally {
+            prefetchInFlight.delete(segmentId);
+        }
+    })();
+}
+
 export async function openSegmentStream(segmentId, range = null) {
     const row = getUpload(segmentId);
 
@@ -353,19 +448,7 @@ export async function openSegmentStream(segmentId, range = null) {
      */
     const lokal = row.local_path ? localSegmentFile(segmentId) : null;
     if (lokal) {
-        const wantedLokal = range && range.end < lokal.size
-            ? range
-            : (range ? { start: range.start, end: lokal.size - 1 } : null);
-        const stream = wantedLokal
-            ? fs.createReadStream(lokal.path, { start: wantedLokal.start, end: wantedLokal.end })
-            : fs.createReadStream(lokal.path);
-        return {
-            stream,
-            size: wantedLokal ? wantedLokal.end - wantedLokal.start + 1 : lokal.size,
-            filename: lokal.filename,
-            range: wantedLokal,
-            totalSize: lokal.size,
-        };
+        return streamSliceFromDisk(lokal.path, lokal.filename, lokal.size, range);
     }
 
     if (!row.file_id) {
@@ -374,6 +457,23 @@ export async function openSegmentStream(segmentId, range = null) {
         const err = new Error('Segmen ini terarsip sebelum file_id dicatat, jadi tidak bisa diputar dari web');
         err.statusCode = 409;
         throw err;
+    }
+
+    // Segmen ini pernah dimainkan dan salinannya sudah mendarat utuh di transit dir — irisan
+    // dibaca dari disk, tanpa perjalanan ke Telegram sama sekali. Nama deterministik, jadi state
+    // ini juga selamat dari restart proses.
+    const prefetched = prefetchedPathFor(segmentId);
+    try {
+        if (fs.existsSync(prefetched)) {
+            const size = row.file_size || fs.statSync(prefetched).size;
+            // Berkas aneh (0 byte, ukuran tak tercatat) lebih baik jatuh ke jalur hidup daripada
+            // menyajikan Content-Length yang mustahil — sweep akan membersihkannya nanti.
+            if (size > 0) {
+                return streamSliceFromDisk(prefetched, row.filename, size, range);
+            }
+        }
+    } catch {
+        // Hilang di antara existsSync dan statSync (sweep berpacu) — lanjut ke jalur hidup.
     }
 
     /*
@@ -399,6 +499,9 @@ export async function openSegmentStream(segmentId, range = null) {
                 headers: wanted ? { Range: `bytes=${wanted.start}-${wanted.end}` } : {},
             });
             if (resp.ok && resp.body) {
+                // Irisan ini dilayani live; di latar kita tarik salinan utuhnya supaya seek dan
+                // pemutaran berikutnya tidak membayar perjalanan Telegram lagi. Fire-and-forget.
+                prefetchWholeSegment(segmentId, row.file_size, mtprotoUrl);
                 // Percayai Content-Range service sebagai kebenaran: ia yang benar-benar memotong.
                 const cr = resp.headers.get('content-range');
                 const m = cr && /bytes (\d+)-(\d+)\/(\d+)/.exec(cr);
@@ -462,26 +565,7 @@ export async function openSegmentStream(segmentId, range = null) {
         if (fs.existsSync(filePath)) {
             // Slice on disk: the player gets exactly the bytes it asked for, and a seek costs one
             // short read instead of re-sending the whole segment.
-            const stream = wanted
-                ? fs.createReadStream(filePath, { start: wanted.start, end: wanted.end })
-                : fs.createReadStream(filePath);
-
-            // Pin for the life of the stream so eviction can never pull the file out from under a
-            // viewer. Released on every terminal event — a missed release would pin it forever.
-            if (filePath.startsWith(archiveCache.CACHE_DIR)) {
-                archiveCache.pin(filePath);
-                let done = false;
-                const unpin = () => {
-                    if (done) return;
-                    done = true;
-                    archiveCache.release(filePath);
-                };
-                stream.once('close', unpin);
-                stream.once('end', unpin);
-                stream.once('error', unpin);
-            }
-
-            return { stream, size: wanted ? wanted.end - wanted.start + 1 : size, filename: row.filename, range: wanted, totalSize: size };
+            return streamSliceFromDisk(filePath, row.filename, size, range);
         }
         // Path is real but not visible from this process — ask the local server to serve it, and
         // pass the range along so seeking keeps working on that path too.

@@ -322,9 +322,15 @@ export function usePlaybackSegments({
             return undefined;
         }
 
+        /*
+         * 30s, not 10s: the list only gains a row when a ~10-minute segment finishes recording or an
+         * archive upload lands, so the old cadence re-ran the merge+coverage path ~60x per landed
+         * row. On the saturated prod box each poll is also a stall victim — fewer polls, fewer
+         * frozen "Memuat" overlays, same freshness that matters.
+         */
         const interval = setInterval(() => {
             loadSegments(cameraId, { mode: 'background' });
-        }, 10000);
+        }, 30000);
 
         return () => {
             clearInterval(interval);
