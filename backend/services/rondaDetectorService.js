@@ -225,6 +225,9 @@ class RondaDetectorService {
         return [
             'run', '-d', '--name', name, '--restart', 'unless-stopped', '--network', 'host',
             '--cpus', String(cfg.cpus || 2), '--memory', `${cfg.memory_mb || 2048}m`,
+            // Bobot CPU opsional (512 = separuh prioritas saat box jenuh) — hanya dikirim kalau
+            // config menetapkannya; tanpa flag docker memakai default 1024.
+            ...(cfg.cpu_shares ? ['--cpu-shares', String(cfg.cpu_shares)] : []),
             ...env('TZ', getTimezone()),
             // `source_url` diisi saat kamera dibuat; cadangan lama dipertahankan supaya config
             // yang ditulis sebelum resolusi sumber ada tetap bisa dinyalakan ulang.

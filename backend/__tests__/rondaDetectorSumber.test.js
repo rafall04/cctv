@@ -44,6 +44,7 @@ vi.mock('../services/rondaConfigService.js', () => ({
         listNames: vi.fn(() => []),
         writeRaw: vi.fn((nama, cfg) => { ditulis.push({ nama, cfg }); return cfg; }),
         deleteRaw: vi.fn(),
+        getRaw: vi.fn(() => null),
         getCamera: vi.fn((nama) => ({ name: nama })),
     },
 }));
@@ -128,5 +129,27 @@ describe('rondaDetectorService — sumber kamera', () => {
         const tersedia = svc.listAvailableCameras();
 
         expect(tersedia.map((c) => c.id).sort((a, b) => a - b)).toEqual([7, 15]);
+    });
+
+    /*
+     * Bobot CPU menjaga cap yang dipasang operator tetap hidup setelah restart kanonik —
+     * tanpa flag ini recreate lewat panel akan diam-diam mengembalikan docker default 1024.
+     */
+    it('restartDetector mengirim --cpu-shares hanya bila config menetapkannya', async () => {
+        const dasar = {
+            stream_key: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+            bot_token: 't', source_url: 'rtsp://192.168.1.9:554/stream2',
+            out_dir: '/work/live/motion-x',
+        };
+        const { default: cfgMock } = await import('../services/rondaConfigService.js');
+        const svc = await muat();
+
+        cfgMock.getRaw.mockReturnValue({ ...dasar, cpu_shares: 512 });
+        await svc.restartDetector('motion-x');
+        expect(execFileMock.mock.calls.at(-1)[1].join(' ')).toContain('--cpu-shares 512');
+
+        cfgMock.getRaw.mockReturnValue({ ...dasar });
+        await svc.restartDetector('motion-x');
+        expect(execFileMock.mock.calls.at(-1)[1].join(' ')).not.toContain('--cpu-shares');
     });
 });
