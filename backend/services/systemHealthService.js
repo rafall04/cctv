@@ -21,6 +21,7 @@ import { queryOne } from '../database/connectionPool.js';
 import { RECORDINGS_BASE_PATH } from './recordingPaths.js';
 import workerState from './recordingWorkerStateRepository.js';
 import telegramArchiveService from './telegramArchiveService.js';
+import playbackTelemetryService from './playbackTelemetryService.js';
 import cameraHealthService from './cameraHealthService.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -57,6 +58,7 @@ export function createSystemHealthService({
     queryOneFn = queryOne,
     workerStateApi = workerState,
     telegramArchiveApi = telegramArchiveService,
+    playbackTelemetryApi = playbackTelemetryService,
     cameraHealthApi = cameraHealthService,
     recordingsPath = RECORDINGS_BASE_PATH,
     workerEnabled = config.recording.workerEnabled,
@@ -120,7 +122,7 @@ export function createSystemHealthService({
 
     return {
         async getSnapshot() {
-            const [pm2, recordingWorker, telegramArchive, cameraHealth, disk, database] = await Promise.all([
+            const [pm2, recordingWorker, telegramArchive, playbackTelemetry, cameraHealth, disk, database] = await Promise.all([
                 probe(pm2Processes),
                 probe(async () => {
                     const published = workerStateApi.readHealthSnapshot();
@@ -145,6 +147,7 @@ export function createSystemHealthService({
                         failingCameras: delivery.failing?.length ?? 0,
                     };
                 }),
+                probe(async () => playbackTelemetryApi.getSummary()),
                 probe(() => cameraHealthApi.getStatus()),
                 probe(async () => diskStats()),
                 probe(async () => databaseStats()),
@@ -200,6 +203,7 @@ export function createSystemHealthService({
                 pm2: pm2.ok ? pm2.data : { available: false, error: pm2.error },
                 recordingWorker: rw || { error: recordingWorker.error },
                 telegramArchive: tg || { error: telegramArchive.error },
+                playbackTelemetry: playbackTelemetry.ok ? playbackTelemetry.data : { error: playbackTelemetry.error },
                 cameraHealth: ch || { error: cameraHealth.error },
             };
         },

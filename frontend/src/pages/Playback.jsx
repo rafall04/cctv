@@ -24,6 +24,7 @@ import { isAdsMobileViewport, shouldRenderAdSlot } from '../components/ads/adsCo
 import { getStreamCapabilities } from '../utils/cameraDelivery.js';
 import { toggleElementFullscreen } from '../utils/fullscreen.js';
 import { classifyPlaybackMediaError } from '../utils/playbackMediaError.js';
+import { reportPlaybackFailure } from '../services/playbackTelemetryService.js';
 import { isAdminPlaybackScope, PLAYBACK_ACCESS_SCOPES, resolveViewerTrackingScope } from '../utils/playbackAccessPolicy.js';
 import { resolveTokenScopedCameras } from '../utils/playbackTokenCameras.js';
 
@@ -799,10 +800,18 @@ function Playback({
             if (isStale()) return;
 
             const mediaError = video.error;
+            const classified = classifyPlaybackMediaError(mediaError, video);
 
             clearBufferingState();
-            setErrorType(classifyPlaybackMediaError(mediaError, video));
+            setErrorType(classified);
             setVideoError(mediaError?.message || 'Gagal memuat video playback');
+            reportPlaybackFailure({
+                stage: 'source_load',
+                errorCode: classified || `media_err_${mediaError?.code ?? 'unknown'}`,
+                cameraId: selectedCameraId,
+                scope: accessScope,
+                segment: selectedSegment?.filename,
+            });
         };
 
         resetSourcePlaybackState({
@@ -832,7 +841,7 @@ function Playback({
                 resetVideoElement();
             }
         };
-    }, [clearBufferingState, loading, resetSourcePlaybackState, resetVideoElement, selectedCameraId, selectedPlaybackStreamUrl, selectedSegment, selectedSegmentKey, videoNode]);
+    }, [accessScope, clearBufferingState, loading, resetSourcePlaybackState, resetVideoElement, selectedCameraId, selectedPlaybackStreamUrl, selectedSegment, selectedSegmentKey, videoNode]);
 
     useEffect(() => {
         const video = videoRef.current;
@@ -871,6 +880,13 @@ function Playback({
                 setIsBuffering(false);
                 setErrorType('stalled');
                 setVideoError('Lompatan video terlalu lama dimuat');
+                reportPlaybackFailure({
+                    stage: 'seek_stall',
+                    errorCode: 'stalled',
+                    cameraId: selectedCameraId,
+                    scope: accessScope,
+                    segment: selectedSegment?.filename,
+                });
             }, SEEK_STALL_TIMEOUT_MS);
         };
 
@@ -949,7 +965,7 @@ function Playback({
 
             resetBufferingTimeout();
         };
-    }, [clearBufferingState, hasActiveSource, loading, resetBufferingTimeout]);
+    }, [accessScope, clearBufferingState, hasActiveSource, loading, resetBufferingTimeout, selectedCameraId, selectedSegment?.filename]);
 
     const handleSpeedChange = (speed) => {
         setPlaybackSpeed(speed);
