@@ -151,6 +151,9 @@ if [ ! -f "$BACKEND_ENV" ]; then
     warn "backend/.env did not exist — created a fresh one."
 fi
 cp "$BACKEND_ENV" "${BACKEND_ENV}.bak.$(date +%Y%m%d-%H%M%S)"
+# .env.bak.* contain live secrets in plaintext — cap at the newest 20, never let them
+# accumulate (prod carried ~140 world-readable copies of every past JWT secret).
+ls -1t "${BACKEND_ENV}".bak.* 2>/dev/null | tail -n +21 | xargs -r rm -f
 
 # Core runtime
 env_ensure "$BACKEND_ENV" "NODE_ENV" "production"
@@ -193,6 +196,7 @@ if [ -d "$FRONTEND_DIR" ]; then
         warn "frontend/.env did not exist — created a fresh one."
     fi
     cp "$FRONTEND_ENV" "${FRONTEND_ENV}.bak.$(date +%Y%m%d-%H%M%S)"
+    ls -1t "${FRONTEND_ENV}".bak.* 2>/dev/null | tail -n +21 | xargs -r rm -f
 
     env_ensure "$FRONTEND_ENV" "VITE_API_URL"        "https://api-cctv.your-domain.com"
     env_ensure "$FRONTEND_ENV" "VITE_FRONTEND_DOMAIN" "cctv.your-domain.com"

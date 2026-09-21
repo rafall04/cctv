@@ -48,6 +48,7 @@ import { startDailyCleanup, stopDailyCleanup, logSecurityEvent, SECURITY_EVENTS 
 import playbackOrderService from './services/playbackOrderService.js';
 import { startOperationalRetention, stopOperationalRetention } from './services/operationalRetentionService.js';
 import backupTelegramService from './services/backupTelegramService.js';
+import localBackupService from './services/localBackupService.js';
 import { getSecuritySettings } from './services/securitySettingsService.js';
 import workerWatchdogService from './services/workerWatchdogService.js';
 import { getTimezone } from './services/timezoneService.js';
@@ -576,6 +577,8 @@ const start = async () => {
         // Off-box database backup. Scheduling lives in the service (it owns the "is one due?"
         // decision), and it reports its real state rather than claiming to be scheduled.
         backupTelegramService.startScheduledBackups();
+        // Local daily snapshot with retention — owed unconditionally (Telegram may be off).
+        localBackupService.startLocalBackups();
 
         // Worker watchdog. Restart policies bring a dead worker back but tell nobody it keeps
         // dying, and the workers live under three different supervisors (pm2/systemd/docker), so

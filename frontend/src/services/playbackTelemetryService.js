@@ -67,3 +67,8 @@ export function resetPlaybackTelemetryForTests() {
     sentSignatures.clear();
     sentCount = 0;
 }
+
+// Positional convenience wrapper — keeps call sites in Playback.jsx to one line.
+export function reportSegmentFailure(stage, errorCode, cameraId, scope, segment) {
+    reportPlaybackFailure({ stage, errorCode, cameraId, scope, segment });
+}

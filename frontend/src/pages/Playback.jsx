@@ -24,7 +24,7 @@ import { isAdsMobileViewport, shouldRenderAdSlot } from '../components/ads/adsCo
 import { getStreamCapabilities } from '../utils/cameraDelivery.js';
 import { toggleElementFullscreen } from '../utils/fullscreen.js';
 import { classifyPlaybackMediaError } from '../utils/playbackMediaError.js';
-import { reportPlaybackFailure } from '../services/playbackTelemetryService.js';
+import { reportSegmentFailure } from '../services/playbackTelemetryService.js';
 import { isAdminPlaybackScope, PLAYBACK_ACCESS_SCOPES, resolveViewerTrackingScope } from '../utils/playbackAccessPolicy.js';
 import { resolveTokenScopedCameras } from '../utils/playbackTokenCameras.js';
 
@@ -805,13 +805,10 @@ function Playback({
             clearBufferingState();
             setErrorType(classified);
             setVideoError(mediaError?.message || 'Gagal memuat video playback');
-            reportPlaybackFailure({
-                stage: 'source_load',
-                errorCode: classified || `media_err_${mediaError?.code ?? 'unknown'}`,
-                cameraId: selectedCameraId,
-                scope: accessScope,
-                segment: selectedSegment?.filename,
-            });
+            reportSegmentFailure(
+                'source_load', classified || `media_err_${mediaError?.code ?? 'unknown'}`,
+                selectedCameraId, accessScope, selectedSegment?.filename
+            );
         };
 
         resetSourcePlaybackState({
@@ -880,13 +877,7 @@ function Playback({
                 setIsBuffering(false);
                 setErrorType('stalled');
                 setVideoError('Lompatan video terlalu lama dimuat');
-                reportPlaybackFailure({
-                    stage: 'seek_stall',
-                    errorCode: 'stalled',
-                    cameraId: selectedCameraId,
-                    scope: accessScope,
-                    segment: selectedSegment?.filename,
-                });
+                reportSegmentFailure('seek_stall', 'stalled', selectedCameraId, accessScope, selectedSegment?.filename);
             }, SEEK_STALL_TIMEOUT_MS);
         };
 
@@ -907,16 +898,7 @@ function Playback({
             setIsBuffering(true);
         };
 
-        const handleCanPlay = () => {
-            if (!hasActiveSource()) {
-                return;
-            }
-
-            hasLoadedDataForSourceRef.current = true;
-            clearBufferingState();
-        };
-
-        const handleCanPlayThrough = () => {
+        const handlePlayable = () => {
             if (!hasActiveSource()) {
                 return;
             }
@@ -949,8 +931,8 @@ function Playback({
         video.addEventListener('seeking', handleSeeking);
         video.addEventListener('seeked', handleSeeked);
         video.addEventListener('waiting', handleWaiting);
-        video.addEventListener('canplay', handleCanPlay);
-        video.addEventListener('canplaythrough', handleCanPlayThrough);
+        video.addEventListener('canplay', handlePlayable);
+        video.addEventListener('canplaythrough', handlePlayable);
         video.addEventListener('stalled', handleStalled);
 
         return () => {
@@ -959,8 +941,8 @@ function Playback({
             video.removeEventListener('seeking', handleSeeking);
             video.removeEventListener('seeked', handleSeeked);
             video.removeEventListener('waiting', handleWaiting);
-            video.removeEventListener('canplay', handleCanPlay);
-            video.removeEventListener('canplaythrough', handleCanPlayThrough);
+            video.removeEventListener('canplay', handlePlayable);
+            video.removeEventListener('canplaythrough', handlePlayable);
             video.removeEventListener('stalled', handleStalled);
 
             resetBufferingTimeout();
