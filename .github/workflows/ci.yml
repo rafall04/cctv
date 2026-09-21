@@ -114,6 +114,8 @@ jobs:
         run: |
           set -o pipefail
           npm run build 2>&1 | tee /tmp/e2e-build.log
+      - name: Bundle budget
+        run: node scripts/check-bundle-budget.mjs
       - run: npx playwright install --with-deps chromium
       - name: Overflow smoke
         run: |
