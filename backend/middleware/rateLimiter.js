@@ -48,6 +48,21 @@ export const RATE_LIMIT_CONFIG = {
         '/api/admin/audio/node'   // Titik Speaker agents: device-token long-poll (held ~25s) — NOT an admin JWT.
                                   // Would otherwise fall under adminPrefixes (60/min per CF-IP) and 429 adzan/emergency.
     ],
+    /*
+     * GET/HEAD-only media prefixes. A camera grid fires dozens of thumbnail fetches per
+     * page and a playback session streams a segment every few seconds — all under the
+     * SAME shared 'public' bucket as JSON API calls. Measured in prod (Jul 2026): one
+     * visitor on /area/kab-surabaya exhausted 100/min on thumbnails alone and every
+     * subsequent /api/* call — including the playback endpoints — returned 429 until
+     * the window rolled. These are cheap static/media reads with their own access
+     * gates (thumbnail tenancy hook, recordings scope check); rate-limiting them buys
+     * nothing and breaks real pages. JSON/control endpoints under /api/recordings
+     * (start/stop/settings/segments) stay limited — only the stream/playlist paths
+     * below are media.
+     */
+    mediaGetWhitelist: [
+        '/api/thumbnails',
+    ],
     // Auth endpoint prefixes
     authPrefixes: [
         '/api/auth'
@@ -79,10 +94,27 @@ let cleanupIntervalId = null;
  * @param {string} url - Request URL
  * @returns {boolean} True if whitelisted
  */
-export function isWhitelisted(url) {
-    return RATE_LIMIT_CONFIG.whitelist.some(pattern => 
-        url === pattern || url.startsWith(pattern + '/')
-    );
+export function isWhitelisted(url, method = 'GET') {
+    const path = (url || '').split('?')[0];
+    if (RATE_LIMIT_CONFIG.whitelist.some(pattern =>
+        path === pattern || path.startsWith(pattern + '/')
+    )) {
+        return true;
+    }
+    if (method === 'GET' || method === 'HEAD') {
+        if (RATE_LIMIT_CONFIG.mediaGetWhitelist.some(pattern =>
+            path === pattern || path.startsWith(pattern + '/')
+        )) {
+            return true;
+        }
+        // Recording media GETs: /api/recordings/<id>/stream/<file>,
+        // /api/recordings/archive/<id>/stream, /api/recordings/<id>/playlist.m3u8
+        if (path.startsWith('/api/recordings/')
+            && (path.includes('/stream') || path.endsWith('/playlist.m3u8'))) {
+            return true;
+        }
+    }
+    return false;
 }
 
 /**
@@ -90,8 +122,8 @@ export function isWhitelisted(url) {
  * @param {string} url - Request URL
  * @returns {'public' | 'auth' | 'admin' | 'whitelist'} Endpoint type
  */
-export function getEndpointType(url) {
-    if (isWhitelisted(url)) {
+export function getEndpointType(url, method = 'GET') {
+    if (isWhitelisted(url, method)) {
         return 'whitelist';
     }
     
@@ -369,7 +401,7 @@ async function rateLimiterPlugin(fastify, options = {}) {
         const ip = resolveClientIp(request);
 
         // Get endpoint type
-        const endpointType = getEndpointType(url);
+        const endpointType = getEndpointType(url, request.method);
         
         // Skip rate limiting for whitelisted endpoints
         if (endpointType === 'whitelist') {

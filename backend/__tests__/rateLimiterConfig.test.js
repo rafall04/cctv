@@ -87,6 +87,57 @@ describe('rateLimiter — config wiring', () => {
     });
 });
 
+describe('media GET whitelist — thumbnails & recording streams', () => {
+    /*
+     * Regression for the July-2026 incident: a visitor on an area page fired dozens of
+     * /api/thumbnails/*.jpg fetches, exhausted the shared 100/min 'public' bucket, and
+     * every subsequent /api/* call — including the playback page's endpoints — 429'd
+     * until the 60s window rolled. Media GETs must not share the JSON bucket.
+     */
+    it('thumbnail GETs are whitelisted; POSTs to the same path are not', async () => {
+        const { isWhitelisted, getEndpointType } = await loadRateLimiter({});
+        expect(isWhitelisted('/api/thumbnails/1377.jpg', 'GET')).toBe(true);
+        expect(isWhitelisted('/api/thumbnails/1377.jpg?v=2', 'GET')).toBe(true);
+        expect(isWhitelisted('/api/thumbnails/1377.jpg', 'POST')).toBe(false);
+        expect(getEndpointType('/api/thumbnails/1377.jpg', 'GET')).toBe('whitelist');
+        expect(getEndpointType('/api/thumbnails/1377.jpg', 'POST')).toBe('public');
+    });
+
+    it('recording stream + playlist GETs are whitelisted; JSON endpoints stay limited', async () => {
+        const { isWhitelisted, getEndpointType } = await loadRateLimiter({});
+        expect(isWhitelisted('/api/recordings/15/stream/20260808_120000.mp4', 'GET')).toBe(true);
+        expect(isWhitelisted('/api/recordings/15/stream/20260808_120000.mp4?scope=admin', 'GET')).toBe(true);
+        expect(isWhitelisted('/api/recordings/archive/987/stream?scope=owner', 'GET')).toBe(true);
+        expect(isWhitelisted('/api/recordings/15/playlist.m3u8', 'GET')).toBe(true);
+        // The segment list and admin controls are JSON API calls, not media — still limited.
+        expect(isWhitelisted('/api/recordings/15/segments', 'GET')).toBe(false);
+        expect(isWhitelisted('/api/recordings/15/start', 'POST')).toBe(false);
+        expect(getEndpointType('/api/recordings/15/segments', 'GET')).toBe('public');
+    });
+
+    it('thumbnail fetches no longer consume the shared public bucket', async () => {
+        const { rateLimiterMiddleware } = await loadRateLimiter({
+            RATE_LIMIT_ENABLED: 'true',
+            RATE_LIMIT_PUBLIC: '5',
+        });
+        const app = Fastify();
+        await app.register(rateLimiterMiddleware);
+        app.get('/api/thumbnails/:file', async () => ({ ok: true }));
+        app.get('/api/x', async () => ({ ok: true }));
+        // 20 thumbnail GETs would have burned a 5/min bucket 4x over — all pass.
+        for (let i = 0; i < 20; i += 1) {
+            const res = await app.inject({ method: 'GET', url: `/api/thumbnails/${i}.jpg` });
+            expect(res.statusCode).toBe(200);
+        }
+        // The JSON bucket itself is untouched: still 5, then 429.
+        for (let i = 0; i < 5; i += 1) {
+            await app.inject({ method: 'GET', url: '/api/x' });
+        }
+        expect((await app.inject({ method: 'GET', url: '/api/x' })).statusCode).toBe(429);
+        await app.close();
+    });
+});
+
 describe('resolveClientIp — per-user bucketing behind proxies', () => {
     it('prefers CF-Connecting-IP (the real visitor) over the proxy socket ip', async () => {
         const { resolveClientIp } = await loadRateLimiter({});

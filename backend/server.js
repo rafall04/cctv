@@ -279,7 +279,7 @@ await fastify.register(securityHeadersMiddleware);
 // Implements sliding window rate limiting:
 // - 100 req/min for public endpoints
 // - 30 req/min for auth endpoints
-// - Whitelist for /health and /api/stream/*
+// - Whitelist: /health, /api/stream/*, /hls, heartbeat + GET media (thumbnails, recording streams)
 // - Returns 429 with Retry-After header when exceeded
 // Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8
 await fastify.register(rateLimiterMiddleware);
