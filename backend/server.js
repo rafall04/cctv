@@ -574,15 +574,12 @@ const start = async () => {
         startOperationalRetention();
         console.log('[Retention] Operational table retention scheduled (audit_logs, restart_logs)');
 
-        // Off-box database backup. Scheduling lives in the service (it owns the "is one due?"
-        // decision), and it reports its real state rather than claiming to be scheduled.
+        // DB backups — the services own their "is one due?" decision and report real state.
         backupTelegramService.startScheduledBackups();
-        // Local daily snapshot with retention — owed unconditionally (Telegram may be off).
         localBackupService.startLocalBackups();
 
-        // Worker watchdog. Restart policies bring a dead worker back but tell nobody it keeps
-        // dying, and the workers live under three different supervisors (pm2/systemd/docker), so
-        // "pm2 list looks fine" was never proof. Alerts fire on transition only.
+        // Worker watchdog — supervisors (pm2/systemd/docker) revive a dead worker but tell
+        // nobody it keeps dying; "pm2 list looks fine" was never proof. Alerts on transition only.
         setInterval(() => {
             workerWatchdogService.runWatchdogCycle().catch((error) => {
                 console.error('[Watchdog] cycle failed:', error.message);

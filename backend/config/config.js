@@ -336,6 +336,37 @@ export function assertSecureConfig() {
     warnings.push('INTERNAL_HOOK_SECRET contains characters outside [A-Za-z0-9_-]; MediaMTX push hooks will stay DISABLED. Use a hex/base64url secret.');
   }
 
+  // A numeric var that is SET but unparsable lands as NaN and fails much later with a cryptic
+  // error (port bind, limiter math that never compares true). Catch it at boot instead.
+  const numericEnvVars = [
+    ['PORT', process.env.PORT],
+    ['RATE_LIMIT_PUBLIC', process.env.RATE_LIMIT_PUBLIC],
+    ['RATE_LIMIT_AUTH', process.env.RATE_LIMIT_AUTH],
+    ['RATE_LIMIT_ADMIN', process.env.RATE_LIMIT_ADMIN],
+    ['SESSION_ABSOLUTE_TIMEOUT_HOURS', process.env.SESSION_ABSOLUTE_TIMEOUT_HOURS],
+  ];
+  for (const [name, raw] of numericEnvVars) {
+    if (raw !== undefined && raw !== '' && Number.isNaN(parseInt(raw, 10))) {
+      errors.push(`${name} is set to "${raw}" which is not a number; fix or remove it.`);
+    }
+  }
+
+  // An empty origin list makes every cross-origin call fail at the CORS preflight — the public
+  // site looks up but every API call dies. That is an operator error, not a dev convenience.
+  if (config.security.allowedOrigins.length === 0) {
+    (isProduction ? errors : warnings).push(
+      'No CORS origins resolved (ALLOWED_ORIGINS/FRONTEND_DOMAIN/SERVER_IP all empty); every cross-origin request will be rejected.'
+    );
+  }
+
+  // A base URL without a scheme produces relative-looking stream URLs that 404 in the player.
+  const publicBase = config.mediamtx.publicBaseUrl;
+  if (publicBase && !/^https?:\/\//.test(publicBase)) {
+    (isProduction ? errors : warnings).push(
+      `PUBLIC_STREAM_BASE_URL "${publicBase}" must start with http:// or https:// — generated HLS URLs are broken otherwise.`
+    );
+  }
+
   for (const warning of warnings) {
     console.warn(`[Config] WARNING: ${warning}`);
   }

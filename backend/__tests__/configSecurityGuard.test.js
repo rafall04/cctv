@@ -97,6 +97,45 @@ describe('assertSecureConfig', () => {
         expect(() => assertSecureConfig()).toThrow(/placeholder/);
     });
 
+    it('throws in production when a numeric env var is set but unparsable', async () => {
+        const assertSecureConfig = await loadGuard({
+            NODE_ENV: 'production',
+            JWT_SECRET: 'a'.repeat(48),
+            PORT: 'tiga-ribu',
+        });
+        expect(() => assertSecureConfig()).toThrow(/PORT.*not a number/);
+    });
+
+    it('throws in production when no CORS origin can be resolved', async () => {
+        const assertSecureConfig = await loadGuard({
+            NODE_ENV: 'production',
+            JWT_SECRET: 'a'.repeat(48),
+            ALLOWED_ORIGINS: '',
+            FRONTEND_DOMAIN: '',
+            SERVER_IP: '',
+        });
+        expect(() => assertSecureConfig()).toThrow(/No CORS origins/);
+    });
+
+    it('throws in production when PUBLIC_STREAM_BASE_URL has no scheme', async () => {
+        const assertSecureConfig = await loadGuard({
+            NODE_ENV: 'production',
+            JWT_SECRET: 'a'.repeat(48),
+            PUBLIC_STREAM_BASE_URL: 'cctv.raf.my.id',
+        });
+        expect(() => assertSecureConfig()).toThrow(/PUBLIC_STREAM_BASE_URL/);
+    });
+
+    it('warns instead of throwing for malformed PUBLIC_STREAM_BASE_URL outside production', async () => {
+        const assertSecureConfig = await loadGuard({
+            NODE_ENV: 'development',
+            JWT_SECRET: 'a'.repeat(48),
+            PUBLIC_STREAM_BASE_URL: 'cctv.raf.my.id',
+        });
+        const result = assertSecureConfig();
+        expect(result.warnings.some((w) => w.includes('PUBLIC_STREAM_BASE_URL'))).toBe(true);
+    });
+
     it('throws in production when CSRF_SECRET / API_KEY_SECRET are placeholders', async () => {
         const assertSecureConfig = await loadGuard({
             NODE_ENV: 'production',
