@@ -67,9 +67,17 @@ const LOCAL_SQL = `
       FROM recording_segments
      WHERE camera_id = ?`;
 
+/*
+ * INDEXED BY is deliberate: the planner prefers idx_tg_archive_status_cam_time (status-first), which
+ * cannot prove file_id IS NOT NULL without a main-table lookup per row — measured 828ms warm vs 9ms
+ * on the partial index, and ~72s cold on prod (the /api/recordings/:id/segments?scope=admin stall).
+ * The partial index's own predicate guarantees status/file_id, and it carries recorded_until +
+ * duration_seconds, so this scan never leaves the index. If the index is missing (unmigrated DB),
+ * read() catches the error and coverage degrades to local-only — fail-soft, same as a missing table.
+ */
 const ARCHIVE_SQL = `
     SELECT recorded_at AS from_at, recorded_until AS to_at, duration_seconds AS duration
-      FROM telegram_archive_uploads
+      FROM telegram_archive_uploads INDEXED BY idx_tg_archive_ok_camera_time
      WHERE camera_id = ?
        AND status = 'ok'
        AND file_id IS NOT NULL`;

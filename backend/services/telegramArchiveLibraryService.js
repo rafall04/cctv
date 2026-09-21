@@ -211,13 +211,33 @@ export function locateUpload({ at = null, ...filters } = {}) {
  */
 export function getSummary(filters = {}) {
     const { clause, params } = buildUploadFilter(filters);
+    /*
+     * Split deliberately: `file_id IS NOT NULL` inside a CASE forces a main-table lookup on EVERY
+     * matched row (~120k on prod — a 47.8s synchronous stall measured 2026-09-21). As its own
+     * query the count rides idx_tg_archive_ok_camera_time (partial: status='ok' AND file_id IS NOT
+     * NULL) or the status prefix index — both index-only. The totals query needs status/camera_id/
+     * recorded_at/file_size only, all inside idx_tg_archive_status_cam_time.
+     */
     const totals = queryOne(
         `SELECT COUNT(*) AS total,
-                SUM(CASE WHEN u.file_id IS NOT NULL THEN 1 ELSE 0 END) AS playable,
                 COALESCE(SUM(u.file_size), 0) AS bytes
          FROM telegram_archive_uploads u WHERE ${clause}`,
         params,
     ) || {};
+    /*
+     * With a camera filter the planner picks idx_tg_archive_status_cam_time, which cannot prove
+     * file_id IS NOT NULL without a per-row lookup — 4.2s measured on prod for one camera. The
+     * partial index carries that predicate in its WHERE, so the count never leaves the index
+     * (13ms). Only valid when the effective status IS 'ok' — other statuses have no rows in it.
+     */
+    const okPartial = (filters.status || 'ok') === 'ok'
+        ? ' INDEXED BY idx_tg_archive_ok_camera_time'
+        : '';
+    const playable = queryOne(
+        `SELECT COUNT(*) AS c
+         FROM telegram_archive_uploads u${okPartial} WHERE ${clause} AND u.file_id IS NOT NULL`,
+        params,
+    )?.c || 0;
 
     // The camera list drives the PICKER, so every camera stays in it regardless of the current
     // camera filter — narrowing by cameraId would strand the operator on one camera with no way
@@ -241,7 +261,7 @@ export function getSummary(filters = {}) {
     );
     return {
         total: totals.total || 0,
-        playable: totals.playable || 0,
+        playable,
         bytes: totals.bytes || 0,
         // snake_case for the camera's own fields on purpose: these ARE camera rows, and the shared
         // picker + its matching helpers read `area_name` / `thumbnail_path` like everywhere else.

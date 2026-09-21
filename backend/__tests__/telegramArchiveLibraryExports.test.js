@@ -64,10 +64,15 @@ describe('telegramArchiveLibraryService default export covers what the routes ca
         query.mockClear();
         archiveLibrary.getSummary({ cameraId: 16, from: '2026-07-31T00:00:00.000Z' });
 
-        const [totalsSql, totalsParams] = queryOne.mock.calls.at(-1);
-        expect(totalsSql).toContain('u.camera_id = ?');
-        expect(totalsSql).toContain('u.recorded_at >= ?');
-        expect(totalsParams).toContain(16);
+        // getSummary issues two scalar reads — totals, then the playable count — and BOTH must
+        // carry the caller's filters, or the header would describe a different set than the list.
+        const scalarCalls = queryOne.mock.calls;
+        expect(scalarCalls.length).toBe(2);
+        for (const [scalarSql, scalarParams] of scalarCalls) {
+            expect(scalarSql).toContain('u.camera_id = ?');
+            expect(scalarSql).toContain('u.recorded_at >= ?');
+            expect(scalarParams).toContain(16);
+        }
 
         // The picker must keep every camera, or filtering to one strands the operator there with
         // no way back. Dates still apply, so the counts match the list.
@@ -141,9 +146,11 @@ describe('telegramArchiveLibraryService default export covers what the routes ca
         queryOne.mockClear();
         archiveLibrary.getSummary();
 
-        const [sql, params] = queryOne.mock.calls.at(-1);
-        expect(sql).not.toContain('recorded_at');
-        expect(sql).not.toContain('camera_id = ?');
-        expect(params).toEqual(['ok']);
+        // Both scalar reads (totals + playable) must stay unrestricted.
+        for (const [sql, params] of queryOne.mock.calls) {
+            expect(sql).not.toContain('recorded_at');
+            expect(sql).not.toContain('camera_id = ?');
+            expect(params).toEqual(['ok']);
+        }
     });
 });
