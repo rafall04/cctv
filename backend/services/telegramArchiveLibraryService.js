@@ -85,8 +85,14 @@ function buildDateClause({ from = null, to = null } = {}) {
 }
 
 function buildUploadFilter({ cameraId = null, status = 'ok', from = null, to = null } = {}) {
-    const where = ['u.status = ?'];
-    const params = [status];
+    const where = [];
+    const params = [];
+    // status === null skips the term entirely — used by the playable count, which must present
+    // 'ok' as a literal for the partial index (a bound ? cannot prove a partial WHERE clause).
+    if (status != null) {
+        where.push('u.status = ?');
+        params.push(status);
+    }
     if (cameraId) {
         where.push('u.camera_id = ?');
         params.push(cameraId);
@@ -96,7 +102,7 @@ function buildUploadFilter({ cameraId = null, status = 'ok', from = null, to = n
         where.push(dates.clause);
         params.push(...dates.params);
     }
-    return { clause: where.join(' AND '), params };
+    return { clause: where.join(' AND ') || '1', params };
 }
 
 /**
@@ -225,19 +231,31 @@ export function getSummary(filters = {}) {
         params,
     ) || {};
     /*
-     * With a camera filter the planner picks idx_tg_archive_status_cam_time, which cannot prove
-     * file_id IS NOT NULL without a per-row lookup — 4.2s measured on prod for one camera. The
-     * partial index carries that predicate in its WHERE, so the count never leaves the index
-     * (13ms). Only valid when the effective status IS 'ok' — other statuses have no rows in it.
+     * The planner otherwise picks idx_tg_archive_status_cam_time, which cannot prove
+     * file_id IS NOT NULL without a per-row lookup — 4.2s measured on prod for one camera.
+     * idx_tg_archive_fileid_status is a narrow partial index on exactly (status) WHERE
+     * file_id IS NOT NULL: ~34ms for any filter shape, index-only. But SQLite only consults a
+     * partial index when the query implies its predicate LITERALLY — a bound `u.status = ?`
+     * cannot, and INDEXED BY then throws "no query solution" (prod incident 2026-09-21). So the
+     * 'ok' here is our literal constant and the remaining filters are rebuilt without their
+     * status term. Only valid when status IS 'ok' — a filtered 'failed' count takes the plain
+     * plan instead (its file_id rows are few).
      */
-    const okPartial = (filters.status || 'ok') === 'ok'
-        ? ' INDEXED BY idx_tg_archive_ok_camera_time'
-        : '';
-    const playable = queryOne(
-        `SELECT COUNT(*) AS c
-         FROM telegram_archive_uploads u${okPartial} WHERE ${clause} AND u.file_id IS NOT NULL`,
-        params,
-    )?.c || 0;
+    const playable = (filters.status || 'ok') === 'ok'
+        ? (() => {
+            const { clause: rest, params: restParams } = buildUploadFilter({ ...filters, status: null });
+            const tail = rest === '1' ? '' : ` AND ${rest}`;
+            return queryOne(
+                `SELECT COUNT(*) AS c FROM telegram_archive_uploads u INDEXED BY idx_tg_archive_fileid_status
+                 WHERE u.status = 'ok' AND u.file_id IS NOT NULL${tail}`,
+                restParams,
+            )?.c || 0;
+        })()
+        : queryOne(
+            `SELECT COUNT(*) AS c
+             FROM telegram_archive_uploads u WHERE ${clause} AND u.file_id IS NOT NULL`,
+            params,
+        )?.c || 0;
 
     // The camera list drives the PICKER, so every camera stays in it regardless of the current
     // camera filter — narrowing by cameraId would strand the operator on one camera with no way

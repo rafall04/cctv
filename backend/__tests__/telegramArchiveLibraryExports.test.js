@@ -147,10 +147,14 @@ describe('telegramArchiveLibraryService default export covers what the routes ca
         archiveLibrary.getSummary();
 
         // Both scalar reads (totals + playable) must stay unrestricted.
-        for (const [sql, params] of queryOne.mock.calls) {
-            expect(sql).not.toContain('recorded_at');
-            expect(sql).not.toContain('camera_id = ?');
-            expect(params).toEqual(['ok']);
-        }
+        const [totalsCall, playableCall] = queryOne.mock.calls;
+        expect(totalsCall[0]).not.toContain('recorded_at');
+        expect(totalsCall[0]).not.toContain('camera_id = ?');
+        expect(totalsCall[1]).toEqual(['ok']);
+        // The playable count carries 'ok' as a literal (partial indexes require provable
+        // predicates), so its params hold only the caller's filters — none here.
+        expect(playableCall[0]).not.toContain('recorded_at');
+        expect(playableCall[0]).not.toContain('camera_id = ?');
+        expect(playableCall[1]).toEqual([]);
     });
 });
