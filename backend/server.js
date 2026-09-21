@@ -51,6 +51,7 @@ import backupTelegramService from './services/backupTelegramService.js';
 import localBackupService from './services/localBackupService.js';
 import { getSecuritySettings } from './services/securitySettingsService.js';
 import workerWatchdogService from './services/workerWatchdogService.js';
+import restartWatchdogService from './services/restartWatchdogService.js';
 import { getTimezone } from './services/timezoneService.js';
 import { closeAll as closeDbConnections, getStats as getDbStats } from './database/connectionPool.js';
 import { cachePlugin, getCacheStats } from './middleware/cacheMiddleware.js';
@@ -464,6 +465,7 @@ const start = async () => {
     try {
         // Fail-fast: refuse to boot production with insecure secrets (default JWT secret, etc.)
         assertSecureConfig();
+        restartWatchdogService.recordBoot();
 
         await fastify.listen({
             port: config.server.port,
@@ -568,9 +570,7 @@ const start = async () => {
         startDailyCleanup();
         console.log('[Security] Daily audit log cleanup scheduled (90-day retention)');
 
-        // audit_logs and restart_logs had no owner at all: AUDIT_LOG_RETENTION_DAYS
-        // was parsed into config and then read by nothing, and recorder restart
-        // diagnostics accumulated at ~140 rows/day forever.
+        // audit_logs and restart_logs had no owner: diagnostics piled up ~140 rows/day.
         startOperationalRetention();
         console.log('[Retention] Operational table retention scheduled (audit_logs, restart_logs)');
 
@@ -578,13 +578,13 @@ const start = async () => {
         backupTelegramService.startScheduledBackups();
         localBackupService.startLocalBackups();
 
-        // Worker watchdog — supervisors (pm2/systemd/docker) revive a dead worker but tell
-        // nobody it keeps dying; "pm2 list looks fine" was never proof. Alerts on transition only.
+        // Watchdogs — supervisors revive a dead worker but tell nobody; alerts on transitions.
         setInterval(() => {
             workerWatchdogService.runWatchdogCycle().catch((error) => {
                 console.error('[Watchdog] cycle failed:', error.message);
             });
         }, 5 * 60 * 1000).unref();
+        restartWatchdogService.start();
         console.log('[Watchdog] Worker liveness watchdog started (5m interval)');
 
         playbackOrderService.startReconciler();
