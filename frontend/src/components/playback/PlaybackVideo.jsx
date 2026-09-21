@@ -83,6 +83,31 @@ export default function PlaybackVideo({
         videoElRef,
         isFullscreen,
     });
+
+    /*
+     * Native <video controls> ships its own fullscreen button — a SECOND entry path our
+     * chrome cannot survive: when the <video> element itself is the fullscreen element,
+     * only ITS subtree paints on the fullscreen layer, and every overlay we own (zoom
+     * pill, snapshot, header) is a sibling, not a descendant — invisible, and zoom is
+     * gone with them. controlsList="nofullscreen" removes the button where honoured;
+     * this effect covers the rest (Firefox ignores controlsList): steal the fullscreen
+     * element back to the CONTAINER. requestFullscreen on another element while already
+     * fullscreen swaps the target in place — no exit, no flicker — and where a container
+     * cannot go fullscreen (iOS native player) the request just rejects and the user
+     * keeps the fullscreen they picked, matching the popup's iOS behaviour.
+     */
+    useEffect(() => {
+        const stealToContainer = () => {
+            if (document.fullscreenElement !== videoElRef.current) return;
+            containerRef?.current?.requestFullscreen?.().catch(() => {});
+        };
+        document.addEventListener('fullscreenchange', stealToContainer);
+        document.addEventListener('webkitfullscreenchange', stealToContainer);
+        return () => {
+            document.removeEventListener('fullscreenchange', stealToContainer);
+            document.removeEventListener('webkitfullscreenchange', stealToContainer);
+        };
+    }, [containerRef]);
     // Reactive gate: low-end device OR prefers-reduced-motion flips this live,
     // so a user toggling the OS setting mid-playback drops the spinners without reload.
     const noAnim = useAnimationGate();
@@ -299,6 +324,7 @@ export default function PlaybackVideo({
                         ref={setVideoNode}
                         className="w-full h-full object-contain"
                         controls={!isZoomed}
+                        controlsList="nofullscreen"
                         playsInline
                         preload="auto"
                         crossOrigin={crossOriginMode}

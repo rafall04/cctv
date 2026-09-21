@@ -422,4 +422,40 @@ describe('PlaybackVideo external control bar', () => {
             expect(pill.contains(screen.getByTitle(title))).toBe(true);
         }
     });
+
+    /*
+     * The native <video controls> fullscreen button sends the VIDEO element to fullscreen —
+     * our chrome is a sibling, never a descendant, so the whole fullscreen UI vanished
+     * (operator report: no zoom in fullscreen). The component steals the fullscreen element
+     * back to the container, where the chrome lives; the request rejects harmlessly on
+     * platforms that can only fullscreen video (iOS native player).
+     */
+    it('steals fullscreen back to the container when the VIDEO element itself went fullscreen', () => {
+        const containerRef = { current: null };
+        const videoRef = { current: null };
+        render(
+            <PlaybackVideo {...baseProps} videoRef={videoRef} containerRef={containerRef} selectedSegment={playingSegment} />
+        );
+
+        const request = vi.fn().mockResolvedValue(undefined);
+        containerRef.current.requestFullscreen = request;
+
+        // Browser draws it: fullscreen element = the <video>, not our container.
+        Object.defineProperty(document, 'fullscreenElement', {
+            configurable: true,
+            get: () => videoRef.current,
+        });
+        act(() => { document.dispatchEvent(new Event('fullscreenchange')); });
+        expect(request).toHaveBeenCalledTimes(1);
+
+        // Once the container holds fullscreen, the steal must NOT fire again (no loop).
+        Object.defineProperty(document, 'fullscreenElement', {
+            configurable: true,
+            get: () => containerRef.current,
+        });
+        act(() => { document.dispatchEvent(new Event('fullscreenchange')); });
+        expect(request).toHaveBeenCalledTimes(1);
+
+        delete document.fullscreenElement;
+    });
 });
