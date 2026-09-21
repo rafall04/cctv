@@ -27,7 +27,7 @@
  * still shorter than local retention, local disk is covering it and there is no hole yet.
  */
 
-import { queryOne } from '../database/connectionPool.js';
+import { query, queryOne } from '../database/connectionPool.js';
 import { RECORDING_DEFAULT_RETENTION_HOURS } from './recordingIntervalsPolicy.js';
 
 const CACHE_MS = 60 * 1000;
@@ -80,33 +80,40 @@ function readLocal() {
 function readArchive(nowMs) {
     const absent = { hours: 0, cameras: 0, start: null, continuous: false, staleHours: null, present: false };
 
-    let row;
+    /*
+     * Per-camera MIN/MAX instead of a table-wide GROUP BY: each subquery is a boundary probe on
+     * idx_tg_archive_ok_camera_time, so the whole read costs ~2 index seeks per camera regardless
+     * of archive size. The old GROUP BY scanned every 'ok' row through a temp b-tree — 8–42s on
+     * production, a synchronous stall of the entire event loop on a public endpoint.
+     * Deleted cameras are excluded by the join — their footage is unreachable anyway.
+     */
+    let rows;
     try {
-        row = queryOne(
-            `SELECT MAX(oldest) AS guaranteed_start,
-                    MAX(newest) AS last_upload,
-                    COUNT(*)    AS cameras
-               FROM (SELECT camera_id,
-                            MIN(recorded_at) AS oldest,
-                            MAX(recorded_at) AS newest
-                       FROM telegram_archive_uploads
-                      WHERE status = 'ok'
-                        AND file_id IS NOT NULL
-                      GROUP BY camera_id)`
+        rows = query(
+            `SELECT cam.id AS camera_id,
+                    (SELECT MIN(t.recorded_at) FROM telegram_archive_uploads t
+                      WHERE t.camera_id = cam.id AND t.status = 'ok' AND t.file_id IS NOT NULL) AS oldest,
+                    (SELECT MAX(t.recorded_at) FROM telegram_archive_uploads t
+                      WHERE t.camera_id = cam.id AND t.status = 'ok' AND t.file_id IS NOT NULL) AS newest
+               FROM cameras cam`
         );
     } catch {
         // No archive table yet (fresh install, or a test DB that does not need one). Not an error.
         return absent;
     }
 
-    if (!row?.guaranteed_start || !row?.cameras) return absent;
+    const withArchive = (rows || []).filter((r) => r.oldest != null);
+    if (!withArchive.length) return absent;
+
+    const guaranteedStart = withArchive.reduce((max, r) => (r.oldest > max ? r.oldest : max), withArchive[0].oldest);
+    const lastUpload = withArchive.reduce((max, r) => (r.newest > max ? r.newest : max), withArchive[0].newest);
 
     return {
-        hours: hoursSince(row.guaranteed_start, nowMs),
-        cameras: Number(row.cameras) || 0,
-        start: row.guaranteed_start,
-        lastUpload: row.last_upload,
-        staleHours: hoursSince(row.last_upload, nowMs),
+        hours: hoursSince(guaranteedStart, nowMs),
+        cameras: withArchive.length,
+        start: guaranteedStart,
+        lastUpload,
+        staleHours: hoursSince(lastUpload, nowMs),
         continuous: true,
         present: true,
     };

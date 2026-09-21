@@ -147,6 +147,20 @@ describe('coverage — the Telegram archive', () => {
         expect(coverage.archiveContinuous).toBe(true);
     });
 
+    it('ignores archive rows whose camera no longer exists — deleted footage is unreachable', () => {
+        // Camera 99 has a shallow archive but is gone from the fleet; it must not drag coverage down.
+        addUpload({ id: 1, cameraId: 99, recordedAt: at('2026-08-01T00:00:00') });
+        addUpload({ id: 2, cameraId: 1, recordedAt: at('2026-07-20T00:00:00') });
+        addUpload({ id: 3, cameraId: 1, recordedAt: at('2026-08-02T11:00:00') });
+        addUpload({ id: 4, cameraId: 2, recordedAt: at('2026-07-20T00:00:00') });
+        addUpload({ id: 5, cameraId: 2, recordedAt: at('2026-08-02T11:00:00') });
+
+        const coverage = coverageService.getCoverage({ now: NOW });
+
+        expect(coverage.camerasArchived).toBe(2);
+        expect(coverage.archiveHours).toBe(324);
+    });
+
     it('ignores cameras with no archive at all instead of scoring them zero', () => {
         addCamera({ id: 3, hours: 4 });
         addUpload({ id: 1, cameraId: 1, recordedAt: at('2026-08-01T00:00:00') });
