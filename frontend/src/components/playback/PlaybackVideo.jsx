@@ -406,111 +406,11 @@ export default function PlaybackVideo({
                         <svg className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM12.293 7.293a1 1 0 011.414 0L15 8.586l1.293-1.293a1 1 0 111.414 1.414L16.414 10l1.293 1.293a1 1 0 01-1.414 1.414L15 11.414l-1.293 1.293a1 1 0 01-1.414-1.414L13.586 10l-1.293-1.293a1 1 0 010-1.414z" clipRule="evenodd" />
                         </svg>
-                        {/* Speed buttons own the opposite corner; the long label would collide
-                            with them on a phone, so it only unfolds where there is room. */}
+                        {/* The long label only unfolds where there is room — on a phone it
+                            would crowd the frame corner, so it collapses to "Suara". */}
                         <span className="truncate sm:hidden">Suara</span>
                         <span className="hidden truncate sm:inline">Suara mati — ketuk untuk menyalakan</span>
                     </button>
-                )}
-
-                {/*
-                  * ONE control, not a row of four.
-                  *
-                  * Four always-on buttons spanned the whole top-right of the picture — measured on a
-                  * 393px phone the player is only 345x194, and the speed row alone covered ~9% of it,
-                  * landing exactly where cameras burn in their date/time stamp (the operator's
-                  * screenshot shows "26-08-25 23:50:16" sitting behind these buttons). The <video>
-                  * also carries `controls`, so the browser draws its own bar in the same box: seven
-                  * product-drawn buttons plus a native control surface over one small picture is the
-                  * "UI looks off" this fixes. Cycling one button keeps every speed reachable, keeps
-                  * the 44px touch target, and gives the picture its corner back.
-                  */}
-                {/* Windowed only: in fullscreen this corner belongs to the z-50 header bar
-                    (which also swallows the clicks) — the speed pill lives inside that bar. */}
-                {!isFullscreen && (
-                    <div className="absolute top-2 sm:top-4 right-2 sm:right-4 z-30">
-                        <button
-                            onClick={() => onSpeedChange(SPEED_STEPS[(SPEED_STEPS.indexOf(playbackSpeed) + 1) % SPEED_STEPS.length] ?? 1)}
-                            className={`min-h-11 min-w-11 px-2 py-1 sm:min-h-0 sm:min-w-0 sm:px-3 sm:py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all shadow-lg ${
-                                playbackSpeed === 1
-                                    ? 'bg-black/70 text-white hover:bg-black/90'
-                                    : 'bg-primary text-white'
-                            }`}
-                            title={`Kecepatan ${playbackSpeed}x — ketuk untuk ganti`}
-                            aria-label={`Kecepatan pemutaran ${playbackSpeed}x, ketuk untuk mengganti`}
-                        >
-                            {playbackSpeed}x
-                        </button>
-                    </div>
-                )}
-
-                {!isFullscreen && selectedSegment && !videoError && (
-                    <>
-                        {/*
-                          * Dua cluster, bukan tombol-tombol terpisah: satu rail kanan
-                          * (snapshot + fullscreen) dan satu pill kiri (zoom). Setiap sudut
-                          * kini memegang SATU objek — sebelumnya dua tombol mengambang
-                          * terpisah dengan bayangan masing-masing terlihat berantakan di
-                          * atas frame kecil ponsel.
-                          */}
-                        <div className="absolute bottom-16 sm:bottom-20 right-2 sm:right-4 z-30 flex flex-col overflow-hidden rounded-lg bg-black/70 shadow-lg divide-y divide-white/15">
-                            <button
-                                onClick={onSnapshot}
-                                disabled={!videoElRef.current || videoElRef.current.paused || videoElRef.current.readyState < 2}
-                                className="min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 p-2.5 sm:p-3 text-white transition-colors hover:bg-white/15 disabled:opacity-40 disabled:cursor-not-allowed"
-                                title="Ambil Snapshot & Share"
-                                aria-label="Ambil Snapshot & Share"
-                            >
-                                <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                                </svg>
-                            </button>
-                            <button
-                                onClick={onToggleFullscreen}
-                                className="min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 p-2.5 sm:p-3 text-white transition-colors hover:bg-white/15"
-                                title="Fullscreen"
-                                aria-label="Fullscreen"
-                            >
-                                <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-                                </svg>
-                            </button>
-                        </div>
-
-                        <div className="absolute bottom-16 sm:bottom-20 left-2 sm:left-4 z-30 flex overflow-hidden rounded-lg bg-black/70 shadow-lg" data-testid="playback-zoom">
-                            <button
-                                onClick={zoomOut}
-                                disabled={!isZoomed}
-                                className="min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 p-2.5 sm:p-3 text-white transition-colors hover:bg-white/15 disabled:opacity-40 disabled:cursor-not-allowed"
-                                title="Perkecil"
-                                aria-label="Perkecil"
-                            >
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607zM13.5 10.5h-6" />
-                                </svg>
-                            </button>
-                            <button
-                                onClick={resetZoom}
-                                className="min-h-11 sm:min-h-0 px-2 sm:px-2.5 text-white text-xs sm:text-sm font-medium tabular-nums transition-colors hover:bg-white/15 border-x border-white/15"
-                                title={isZoomed ? `Zoom ${zoom.toFixed(1)}x — ketuk untuk reset` : 'Zoom 1.0x'}
-                                aria-label={isZoomed ? `Zoom ${zoom.toFixed(1)}x, ketuk untuk reset` : 'Zoom 1.0x'}
-                            >
-                                {zoom.toFixed(1)}x
-                            </button>
-                            <button
-                                onClick={zoomIn}
-                                disabled={zoom >= 4}
-                                className="min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 p-2.5 sm:p-3 text-white transition-colors hover:bg-white/15 disabled:opacity-40 disabled:cursor-not-allowed"
-                                title="Perbesar"
-                                aria-label="Perbesar"
-                            >
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607zM10.5 7.5v6m3-3h-6" />
-                                </svg>
-                            </button>
-                        </div>
-                    </>
                 )}
 
                 {isFullscreen && (
@@ -618,16 +518,99 @@ export default function PlaybackVideo({
                     </div>
                 )}
 
-                {selectedSegment && (
-                    <div className="hidden sm:block absolute bottom-16 sm:bottom-4 right-2 sm:right-4 bg-black/70 text-white px-2 sm:px-4 py-1 sm:py-2 rounded text-xs sm:text-sm pointer-events-none">
-                        <div className="font-medium">{formatTimestamp(selectedSegment.start_time)}</div>
-                        <div className="text-xs text-gray-300">
+            </div>
+
+            {/*
+              * Control bar OUTSIDE the picture — the live popup's pattern. Speed, snapshot,
+              * fullscreen, and the zoom pill used to float over the frame's corners (measured
+              * on a 393px phone they covered ~15% of a 345px player, right where cameras burn
+              * in their timestamp). One honest bar below the video gives every control back.
+              * Fullscreen keeps its own overlay chrome — this bar is not inside the
+              * fullscreen element, so it would be unreachable there.
+              */}
+            {!isFullscreen && selectedSegment && !videoError && (
+                <div className="flex items-center justify-end gap-2 border-t border-edge bg-surface px-2 py-1.5 sm:justify-between sm:px-3 sm:py-2" data-testid="playback-controls">
+                    <div className="hidden min-w-0 text-xs sm:block">
+                        <div className="truncate font-medium text-content">{formatTimestamp(selectedSegment.start_time)}</div>
+                        <div className="tabular-nums text-content-muted">
                             {formatTime(currentTime)} / {formatTime(duration)}
                         </div>
                     </div>
-                )}
-            </div>
-            
+
+                    <div className="flex shrink-0 items-center gap-1">
+                        <div className="flex items-center gap-0.5 rounded-lg bg-surface-raised p-0.5" data-testid="playback-zoom">
+                            <button
+                                onClick={zoomOut}
+                                disabled={!isZoomed}
+                                className="min-h-[40px] min-w-[40px] rounded text-content transition-colors hover:bg-surface-overlay disabled:opacity-30 disabled:cursor-not-allowed sm:min-h-0 sm:min-w-0 sm:p-1.5"
+                                title="Perkecil"
+                                aria-label="Perkecil"
+                            >
+                                <svg className="mx-auto h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607zM13.5 10.5h-6" />
+                                </svg>
+                            </button>
+                            <button
+                                onClick={resetZoom}
+                                className="min-h-[40px] rounded px-1.5 text-xs font-medium tabular-nums text-content transition-colors hover:bg-surface-overlay sm:min-h-0 sm:px-2"
+                                title={isZoomed ? `Zoom ${zoom.toFixed(1)}x — ketuk untuk reset` : 'Zoom 1.0x'}
+                                aria-label={isZoomed ? `Zoom ${zoom.toFixed(1)}x, ketuk untuk reset` : 'Zoom 1.0x'}
+                            >
+                                {zoom.toFixed(1)}x
+                            </button>
+                            <button
+                                onClick={zoomIn}
+                                disabled={zoom >= 4}
+                                className="min-h-[40px] min-w-[40px] rounded text-content transition-colors hover:bg-surface-overlay disabled:opacity-30 disabled:cursor-not-allowed sm:min-h-0 sm:min-w-0 sm:p-1.5"
+                                title="Perbesar"
+                                aria-label="Perbesar"
+                            >
+                                <svg className="mx-auto h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607zM10.5 7.5v6m3-3h-6" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <button
+                            onClick={() => onSpeedChange(SPEED_STEPS[(SPEED_STEPS.indexOf(playbackSpeed) + 1) % SPEED_STEPS.length] ?? 1)}
+                            className={`min-h-[40px] min-w-[40px] rounded-lg px-2 text-xs font-medium tabular-nums transition-colors sm:min-h-0 sm:min-w-0 sm:px-2.5 sm:py-1.5 ${
+                                playbackSpeed === 1
+                                    ? 'bg-surface-raised text-content hover:bg-surface-overlay'
+                                    : 'bg-primary text-white'
+                            }`}
+                            title={`Kecepatan ${playbackSpeed}x — ketuk untuk ganti`}
+                            aria-label={`Kecepatan pemutaran ${playbackSpeed}x, ketuk untuk mengganti`}
+                        >
+                            {playbackSpeed}x
+                        </button>
+
+                        <button
+                            onClick={onSnapshot}
+                            disabled={!videoElRef.current || videoElRef.current.paused || videoElRef.current.readyState < 2}
+                            className="min-h-[40px] min-w-[40px] rounded-lg bg-surface-raised text-content transition-colors hover:bg-surface-overlay disabled:opacity-30 disabled:cursor-not-allowed sm:min-h-0 sm:min-w-0 sm:p-1.5"
+                            title="Ambil Snapshot & Share"
+                            aria-label="Ambil Snapshot & Share"
+                        >
+                            <svg className="mx-auto h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                        </button>
+
+                        <button
+                            onClick={onToggleFullscreen}
+                            className="min-h-[40px] min-w-[40px] rounded-lg bg-surface-raised text-content transition-colors hover:bg-surface-overlay sm:min-h-0 sm:min-w-0 sm:p-1.5"
+                            title="Fullscreen"
+                            aria-label="Fullscreen"
+                        >
+                            <svg className="mx-auto h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {selectedCamera?.video_codec && selectedCamera.video_codec === 'h265' && (
                 <div className="p-3 bg-surface-sunken border-t border-edge">
                     <div className="flex items-start gap-2 px-3 py-2 bg-status-warn/10 border border-status-warn/20 rounded-lg">

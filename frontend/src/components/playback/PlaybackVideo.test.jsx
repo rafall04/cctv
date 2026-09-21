@@ -227,19 +227,21 @@ describe('PlaybackVideo audio honesty', () => {
 });
 
 /*
- * The speed control floats over the video, so it is both a thumb target and something covering the
- * picture. It ran at 24px high — well under the 40px touch floor in docs/frontend-guide.md — and as
- * a row of FOUR buttons it covered ~9% of a 345x194 player on a 393px phone, right where cameras
- * burn in their timestamp. It is now ONE cycling button: same reach, a quarter of the footprint.
+ * The speed control once floated over the video, both a thumb target and something covering the
+ * picture — it ran at 24px high, well under the 40px touch floor in docs/frontend-guide.md. It
+ * now sits in the external bar below the frame: ONE cycling button, same reach, and the picture
+ * keeps its corners.
  */
 describe('PlaybackVideo speed control on a phone', () => {
+    const playingSegment = { id: 1, filename: 'a.mp4' };
+
     it('is a single control that meets the touch-target floor', () => {
-        render(<PlaybackVideo {...baseProps} />);
+        render(<PlaybackVideo {...baseProps} selectedSegment={playingSegment} />);
 
         const speedButtons = screen.getAllByTitle(/^Kecepatan /);
         expect(speedButtons).toHaveLength(1);
         const cls = speedButtons[0].getAttribute('class');
-        expect(cls).toContain('min-h-11');
+        expect(cls).toContain('min-h-[40px]');
         expect(cls).toContain('sm:min-h-0');
         expect(cls).toContain('px-2');
     });
@@ -247,7 +249,7 @@ describe('PlaybackVideo speed control on a phone', () => {
     it('shows the current speed and cycles to the next one when tapped', () => {
         const onSpeedChange = vi.fn();
         const { rerender } = render(
-            <PlaybackVideo {...baseProps} playbackSpeed={1} onSpeedChange={onSpeedChange} />,
+            <PlaybackVideo {...baseProps} selectedSegment={playingSegment} playbackSpeed={1} onSpeedChange={onSpeedChange} />,
         );
 
         expect(screen.getByTitle(/^Kecepatan /).textContent).toBe('1x');
@@ -255,7 +257,7 @@ describe('PlaybackVideo speed control on a phone', () => {
         expect(onSpeedChange).toHaveBeenLastCalledWith(1.5);
 
         // …and wraps around from the last step back to normal speed, so every value stays reachable.
-        rerender(<PlaybackVideo {...baseProps} playbackSpeed={0.5} onSpeedChange={onSpeedChange} />);
+        rerender(<PlaybackVideo {...baseProps} selectedSegment={playingSegment} playbackSpeed={0.5} onSpeedChange={onSpeedChange} />);
         fireEvent.click(screen.getByTitle(/^Kecepatan /));
         expect(onSpeedChange).toHaveBeenLastCalledWith(1);
     });
@@ -353,20 +355,39 @@ describe('PlaybackVideo zoom pill', () => {
 });
 
 /*
- * On a phone the old right side was three floating buttons (fullscreen, snapshot, speed)
- * each casting its own shadow — the "berantakan" look. They now live in ONE rounded rail
- * per corner: every corner holds a single visual object.
+ * Operator feedback: controls floating over the picture looked cluttered — zoom pill bottom-left,
+ * snapshot/fullscreen rail bottom-right, speed pill top-right, all fighting the camera's own
+ * burned-in timestamp. They now live in ONE bar BELOW the video frame (the live popup's pattern);
+ * only fullscreen keeps overlay chrome, because an outside bar can't reach inside the
+ * fullscreen element. This test guards the boundary: every control stays OFF the picture.
  */
-describe('PlaybackVideo control rails on mobile', () => {
-    it('groups snapshot + fullscreen into a single rail, not two floating buttons', () => {
-        render(
-            <PlaybackVideo {...baseProps} selectedSegment={{ id: 1, filename: 'a.mp4' }} />
+describe('PlaybackVideo external control bar', () => {
+    const playingSegment = { id: 1, filename: 'a.mp4' };
+
+    it('keeps zoom, speed, snapshot, and fullscreen OFF the picture', () => {
+        const { container } = render(
+            <PlaybackVideo {...baseProps} selectedSegment={playingSegment} />
         );
 
-        const snapshot = screen.getByTitle('Ambil Snapshot & Share');
-        const fullscreen = screen.getByTitle('Fullscreen');
-        expect(snapshot.parentElement).toBe(fullscreen.parentElement);
-        expect(snapshot.parentElement.className).toContain('rounded-lg');
-        expect(snapshot.parentElement.className).toContain('divide-y');
+        const bar = screen.getByTestId('playback-controls');
+        const frame = container.querySelector('.aspect-video');
+        expect(frame.contains(bar)).toBe(false);
+        for (const title of ['Perbesar', 'Perkecil', /^Kecepatan /, 'Ambil Snapshot & Share', 'Fullscreen']) {
+            const control = screen.getByTitle(title);
+            expect(bar.contains(control)).toBe(true);
+            expect(frame.contains(control)).toBe(false);
+        }
+    });
+
+    it('does not render the bar over the empty state — nothing to control', () => {
+        render(<PlaybackVideo {...baseProps} />);
+        expect(screen.queryByTestId('playback-controls')).toBeNull();
+    });
+
+    it('keeps overlay chrome in fullscreen, where an outside bar cannot reach', () => {
+        render(<PlaybackVideo {...baseProps} isFullscreen selectedSegment={playingSegment} />);
+
+        expect(screen.queryByTestId('playback-controls')).toBeNull();
+        expect(screen.getByTestId('playback-zoom-fullscreen')).toBeTruthy();
     });
 });
