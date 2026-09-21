@@ -458,4 +458,54 @@ describe('PlaybackVideo external control bar', () => {
 
         delete document.fullscreenElement;
     });
+
+    /*
+     * Operator report: fullscreen entered from the toggle left a portrait-LOCKED phone
+     * vertical — the 16:9 frame letterboxed tiny. Entering fullscreen (any path) must
+     * lock landscape; leaving must hand the orientation back to the system setting.
+     */
+    it('locks landscape while fullscreen is held and unlocks on exit', () => {
+        const lock = vi.fn().mockResolvedValue(undefined);
+        const unlock = vi.fn();
+        const containerRef = { current: null };
+        render(
+            <PlaybackVideo {...baseProps} containerRef={containerRef} selectedSegment={playingSegment} />
+        );
+        Object.defineProperty(window.screen, 'orientation', {
+            configurable: true,
+            value: { lock, unlock },
+        });
+
+        Object.defineProperty(document, 'fullscreenElement', {
+            configurable: true,
+            get: () => containerRef.current,
+        });
+        act(() => { document.dispatchEvent(new Event('fullscreenchange')); });
+        expect(lock).toHaveBeenCalledWith('landscape');
+        expect(unlock).not.toHaveBeenCalled();
+
+        Object.defineProperty(document, 'fullscreenElement', {
+            configurable: true,
+            get: () => null,
+        });
+        act(() => { document.dispatchEvent(new Event('fullscreenchange')); });
+        expect(unlock).toHaveBeenCalledTimes(1);
+
+        delete document.fullscreenElement;
+        delete window.screen.orientation;
+    });
+
+    /*
+     * The unmute prompt sat at top-2 — in fullscreen that is INSIDE the z-50 header
+     * bar, whose pointer-events-auto swallows every tap. Same class of bug that
+     * trapped the old floating speed button. In FS it must drop below the header.
+     */
+    it('drops the unmute prompt below the fullscreen header instead of under it', () => {
+        // Prompt renders only while muted — earlier describes may leave a remembered
+        // unmuted choice in localStorage, which would hide it before we can check.
+        localStorage.setItem('recording-audio-muted', '1');
+        render(<PlaybackVideo {...baseProps} isFullscreen selectedSegment={playingSegment} />);
+        expect(screen.getByTestId('playback-unmute').className).toContain('top-16');
+        localStorage.clear();
+    });
 });

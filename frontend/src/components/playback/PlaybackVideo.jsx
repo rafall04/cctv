@@ -97,15 +97,29 @@ export default function PlaybackVideo({
      * keeps the fullscreen they picked, matching the popup's iOS behaviour.
      */
     useEffect(() => {
-        const stealToContainer = () => {
-            if (document.fullscreenElement !== videoElRef.current) return;
-            containerRef?.current?.requestFullscreen?.().catch(() => {});
+        const syncFullscreenSideEffects = () => {
+            if (document.fullscreenElement === videoElRef.current) {
+                containerRef?.current?.requestFullscreen?.().catch(() => {});
+            }
+            // Rekaman 16:9 — ponsel yang orientasinya dikunci portrait harus tetap dibelokkan
+            // ke landscape di fullscreen (pola MultiViewVideoItem). Dipasang di handler —
+            // bukan di tombol — supaya jalan native/steal ikut terkunci juga.
+            try {
+                if (document.fullscreenElement) {
+                    screen.orientation?.lock?.('landscape').catch(() => {
+                        screen.orientation.lock?.('landscape-primary').catch(() => {});
+                    });
+                } else {
+                    screen.orientation?.unlock?.();
+                }
+            } catch { /* browser tanpa Screen Orientation API */ }
         };
-        document.addEventListener('fullscreenchange', stealToContainer);
-        document.addEventListener('webkitfullscreenchange', stealToContainer);
+        document.addEventListener('fullscreenchange', syncFullscreenSideEffects);
+        document.addEventListener('webkitfullscreenchange', syncFullscreenSideEffects);
         return () => {
-            document.removeEventListener('fullscreenchange', stealToContainer);
-            document.removeEventListener('webkitfullscreenchange', stealToContainer);
+            document.removeEventListener('fullscreenchange', syncFullscreenSideEffects);
+            document.removeEventListener('webkitfullscreenchange', syncFullscreenSideEffects);
+            try { screen.orientation?.unlock?.(); } catch { /* unmount saat FS */ }
         };
     }, [containerRef]);
     // Reactive gate: low-end device OR prefers-reduced-motion flips this live,
@@ -428,7 +442,11 @@ export default function PlaybackVideo({
                         data-testid="playback-unmute"
                         aria-label="Nyalakan suara rekaman"
                         title="Nyalakan suara rekaman"
-                        className="absolute top-2 left-2 sm:top-4 sm:left-4 z-30 inline-flex min-h-11 max-w-[55%] items-center gap-2 rounded-lg bg-black/70 px-3 py-2 text-xs font-medium text-white shadow-lg transition-all hover:bg-black/90 hover:scale-105 sm:text-sm"
+                        className={`absolute left-2 sm:left-4 z-30 inline-flex min-h-11 max-w-[55%] items-center gap-2 rounded-lg bg-black/70 px-3 py-2 text-xs font-medium text-white shadow-lg transition-all hover:bg-black/90 hover:scale-105 sm:text-sm ${
+                            // Di fullscreen, top-2 jatuh DI BAWAH header z-50 yang menelan
+                            // pointer — prompt tak pernah bisa diklik. Turunkan di bawahnya.
+                            isFullscreen ? 'top-16' : 'top-2 sm:top-4'
+                        }`}
                     >
                         <svg className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM12.293 7.293a1 1 0 011.414 0L15 8.586l1.293-1.293a1 1 0 111.414 1.414L16.414 10l1.293 1.293a1 1 0 01-1.414 1.414L15 11.414l-1.293 1.293a1 1 0 01-1.414-1.414L13.586 10l-1.293-1.293a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -525,7 +543,8 @@ export default function PlaybackVideo({
                 )}
 
                 {snapshotNotification && (
-                    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
+                    // Di fullscreen top-4 menumpuk teks header — turunkan di bawahnya.
+                    <div className={`absolute left-1/2 -translate-x-1/2 z-50 pointer-events-none ${isFullscreen ? 'top-20' : 'top-4'}`}>
                         <div className={`px-5 py-3 rounded-xl shadow-2xl border-2 ${
                             snapshotNotification.type === 'success'
                                 ? 'bg-status-live border-status-live'
