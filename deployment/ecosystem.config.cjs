@@ -28,6 +28,7 @@ module.exports = {
             cwd: path.join(ROOT_DIR, 'mediamtx'),
             interpreter: 'none',
             instances: 1,
+            exec_mode: 'fork',
             autorestart: true,
             watch: false,
             max_restarts: 10,
@@ -37,7 +38,15 @@ module.exports = {
             name: `${CLIENT_CODE}-cctv-backend`,
             script: 'server.js',
             cwd: path.join(ROOT_DIR, 'backend'),
+            // fork, never cluster — pin BOTH sides. `instances:1` alone still lands in
+            // cluster mode (pm2 switches on the presence of `instances`), and prod ran
+            // like that for months. The backend is single-process by design: rate-limit
+            // buckets, camera audio locks, runtime-signal sessions, playback telemetry,
+            // thumbnail dedupe and camera-health alert state all live in per-process
+            // Maps — a second instance silently halves rate limits and forks state.
+            // Full inventory: backend/__tests__/pm2SingleInstance.test.js
             instances: 1,
+            exec_mode: 'fork',
             autorestart: true,
             watch: false,
             max_memory_restart: '1G',
