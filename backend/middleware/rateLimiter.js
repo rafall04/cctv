@@ -43,6 +43,17 @@ export const RATE_LIMIT_CONFIG = {
         '/api/health',            // browser-side probe via nginx (only /api/* is proxied)
         '/api/stream',
         '/api/viewer/heartbeat',  // Viewer heartbeat needs frequent calls (every 10s)
+        // Playback session lifecycle — heartbeat fires every 5s per viewer (12/min), so
+        // an open playback tab alone would eat ~12% of the shared 100/min public bucket
+        // forever; during a spike the 429'd heartbeat ALSO let playback-token sessions
+        // expire (dead video until reload). Same class as /api/viewer/heartbeat above.
+        // Listed one by one: the /api/playback-viewer/* GET routes (active/stats/
+        // history/analytics) are admin-only reads — keep them rate-limited (public
+        // bucket; their auth gate is requireAdmin on the route, not this limiter).
+        '/api/playback-viewer/start',
+        '/api/playback-viewer/heartbeat',
+        '/api/playback-viewer/stop',
+        '/api/playback-token/heartbeat',
         '/hls',                   // HLS proxy - high frequency segment requests
         '/api/internal',          // MediaMTX push hooks - bursty on restart; self-bounded (debounce + in-flight cap)
         '/api/admin/audio/node'   // Titik Speaker agents: device-token long-poll (held ~25s) — NOT an admin JWT.

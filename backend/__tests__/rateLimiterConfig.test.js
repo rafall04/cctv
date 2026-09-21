@@ -115,6 +115,26 @@ describe('media GET whitelist — thumbnails & recording streams', () => {
         expect(getEndpointType('/api/recordings/15/segments', 'GET')).toBe('public');
     });
 
+    it('playback session lifecycle (start/heartbeat/stop, any method) is whitelisted — heartbeats fire every 5s', async () => {
+        const { isWhitelisted, getEndpointType } = await loadRateLimiter({});
+        for (const p of ['/api/playback-viewer/start', '/api/playback-viewer/heartbeat', '/api/playback-viewer/stop']) {
+            expect(isWhitelisted(p, 'POST')).toBe(true);
+            expect(getEndpointType(p, 'POST')).toBe('whitelist');
+        }
+        expect(isWhitelisted('/api/playback-token/heartbeat', 'POST')).toBe(true);
+        // Token activation/clear stay limited — they throttle token-guessing, not playback.
+        expect(isWhitelisted('/api/playback-token/activate', 'POST')).toBe(false);
+    });
+
+    it('playback-viewer admin GETs stay in the PUBLIC bucket — whitelist must not leak sideways', async () => {
+        const { isWhitelisted, getEndpointType } = await loadRateLimiter({});
+        for (const p of ['/api/playback-viewer/active', '/api/playback-viewer/stats',
+            '/api/playback-viewer/history', '/api/playback-viewer/analytics']) {
+            expect(isWhitelisted(p, 'GET')).toBe(false);
+            expect(getEndpointType(p, 'GET')).toBe('public');
+        }
+    });
+
     it('thumbnail fetches no longer consume the shared public bucket', async () => {
         const { rateLimiterMiddleware } = await loadRateLimiter({
             RATE_LIMIT_ENABLED: 'true',
