@@ -120,11 +120,19 @@ export const authService = {
      */
     async verifyTotp(pendingToken, code) {
         try {
-            const response = await apiClient.post('/api/auth/totp/verify', { pendingToken, code });
+            // skipAuthRefresh: a wrong code returns 401, and without this flag the
+            // response interceptor would try a session refresh, retry once, then
+            // reject with the REFRESH error — hiding "Kode verifikasi salah" and
+            // breaking the expired-challenge detection that drops back to step 1.
+            const response = await apiClient.post('/api/auth/totp/verify', { pendingToken, code }, { skipAuthRefresh: true });
             if (response.data.success) {
                 const { user } = response.data.data;
                 localStorage.setItem('user', JSON.stringify(user));
-                return { success: true, user };
+                return {
+                    success: true,
+                    user,
+                    passwordExpiryWarning: response.data.data.passwordExpiryWarning || null
+                };
             }
             return { success: false, message: response.data.message || 'Verifikasi gagal' };
         } catch (error) {

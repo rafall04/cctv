@@ -27,7 +27,7 @@ const ADMIN_EVENTS = [
 ];
 const AUTH_EVENTS = [
     'AUTH_SUCCESS', 'SESSION_CREATED', 'SESSION_REFRESHED', 'SESSION_INVALIDATED',
-    'TOKEN_BLACKLISTED', 'PASSWORD_CHANGED',
+    'TOKEN_BLACKLISTED', 'PASSWORD_CHANGED', 'TOTP_CHALLENGE_ISSUED',
 ];
 const ALL_EVENT_TYPES = [...THREAT_EVENTS, ...ADMIN_EVENTS, ...AUTH_EVENTS];
 
@@ -175,8 +175,6 @@ function TotpSecurityCard() {
     };
 
     const inputClass = 'w-full rounded-xl border border-edge-strong bg-surface px-3 py-2 text-center font-mono text-lg tracking-[0.3em] text-content';
-    const primaryBtn = 'rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-600 disabled:opacity-50';
-    const ghostBtn = 'rounded-xl border border-edge px-4 py-2 text-sm font-medium text-content transition-colors hover:border-primary disabled:opacity-50';
 
     return (
         <section className="rounded-2xl border border-edge bg-surface p-4 shadow-sm sm:p-5" aria-label="Verifikasi dua langkah">
@@ -199,7 +197,7 @@ function TotpSecurityCard() {
                 )}
             </div>
 
-            {error && <p role="alert" className="mt-3 rounded-xl bg-red-100 px-3 py-2 text-sm text-red-700 dark:bg-red-500/15 dark:text-red-300">{error}</p>}
+            {error && <p role="alert" className="mt-3 rounded-xl border border-status-fault/30 bg-status-fault/10 px-3 py-2 text-sm text-status-fault">{error}</p>}
 
             {phase === 'setup' && setup && (
                 <div className="mt-4 grid gap-4 sm:grid-cols-[auto_1fr] sm:items-start">
@@ -223,10 +221,10 @@ function TotpSecurityCard() {
                             className={`mt-1.5 ${inputClass}`}
                         />
                         <div className="mt-3 flex flex-wrap gap-2">
-                            <button type="button" onClick={confirmSetup} disabled={busy || code.trim().length !== 6} className={primaryBtn}>
-                                {busy ? 'Memverifikasi...' : 'Verifikasi & Aktifkan'}
-                            </button>
-                            <button type="button" onClick={cancel} disabled={busy} className={ghostBtn}>Batal</button>
+                            <Button variant="primary" onClick={confirmSetup} loading={busy} disabled={code.trim().length !== 6}>
+                                Verifikasi &amp; Aktifkan
+                            </Button>
+                            <Button variant="secondary" onClick={cancel} disabled={busy}>Batal</Button>
                         </div>
                     </div>
                 </div>
@@ -234,7 +232,7 @@ function TotpSecurityCard() {
 
             {phase === 'recovery' && recoveryCodes && (
                 <div className="mt-4">
-                    <p className="rounded-xl bg-amber-100 px-3 py-2 text-sm font-semibold text-amber-800 dark:bg-amber-500/15 dark:text-amber-300">
+                    <p className="rounded-xl border border-status-warn/30 bg-status-warn/10 px-3 py-2 text-sm font-semibold text-status-warn">
                         Simpan kode-kode ini SEKARANG — tidak akan ditampilkan lagi. Satu kode = satu login darurat bila authenticator hilang.
                     </p>
                     <ul className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -243,33 +241,32 @@ function TotpSecurityCard() {
                         ))}
                     </ul>
                     <div className="mt-3 flex flex-wrap gap-2">
-                        <button type="button" onClick={copyRecovery} className={ghostBtn}>Salin semua</button>
-                        <button
-                            type="button"
+                        <Button variant="secondary" onClick={copyRecovery}>Salin semua</Button>
+                        <Button
+                            variant="primary"
                             onClick={() => { setRecoveryCodes(null); setPhase('idle'); notifySuccess('2FA Aktif', 'Verifikasi dua langkah sekarang melindungi akun Anda.'); }}
-                            className={primaryBtn}
                         >
                             Sudah saya simpan
-                        </button>
+                        </Button>
                     </div>
                 </div>
             )}
 
             {phase === 'disable' && (
                 <div className="mt-4">
-                    <label htmlFor="totp-disable-code" className="block text-sm font-semibold text-content-muted">Konfirmasi: masukkan kode authenticator saat ini</label>
+                    <label htmlFor="totp-disable-code" className="block text-sm font-semibold text-content-muted">Konfirmasi: kode authenticator saat ini, atau kode pemulihan</label>
                     <input
                         id="totp-disable-code"
-                        type="text" inputMode="numeric" autoComplete="one-time-code"
+                        type="text" autoComplete="one-time-code"
                         value={code} onChange={(e) => setCode(e.target.value)}
-                        maxLength={6} placeholder="••••••"
+                        maxLength={9} placeholder="••••••"
                         className={`mt-1.5 ${inputClass} max-w-xs`}
                     />
                     <div className="mt-3 flex flex-wrap gap-2">
-                        <button type="button" onClick={disableTotp} disabled={busy || code.trim().length !== 6} className="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-50">
-                            {busy ? 'Memproses...' : 'Nonaktifkan 2FA'}
-                        </button>
-                        <button type="button" onClick={cancel} disabled={busy} className={ghostBtn}>Batal</button>
+                        <Button variant="danger" onClick={disableTotp} loading={busy} disabled={code.trim().length < 6}>
+                            Nonaktifkan 2FA
+                        </Button>
+                        <Button variant="secondary" onClick={cancel} disabled={busy}>Batal</Button>
                     </div>
                 </div>
             )}
@@ -277,13 +274,13 @@ function TotpSecurityCard() {
             {phase === 'idle' && status && (
                 <div className="mt-4">
                     {status.enabled ? (
-                        <button type="button" onClick={() => { setCode(''); setPhase('disable'); }} className={ghostBtn}>
+                        <Button variant="dangerGhost" onClick={() => { setCode(''); setPhase('disable'); }}>
                             Nonaktifkan 2FA
-                        </button>
+                        </Button>
                     ) : (
-                        <button type="button" onClick={startSetup} disabled={busy} className={primaryBtn}>
-                            {busy ? 'Menyiapkan...' : 'Aktifkan 2FA'}
-                        </button>
+                        <Button variant="primary" onClick={startSetup} loading={busy}>
+                            Aktifkan 2FA
+                        </Button>
                     )}
                 </div>
             )}

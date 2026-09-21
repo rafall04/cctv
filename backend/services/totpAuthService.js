@@ -67,9 +67,14 @@ class TotpAuthService {
     /**
      * Stage a new seed. The secret is stored encrypted immediately (pending state —
      * totp_enabled stays 0 until confirmSetup verifies a live code), so a half-finished
-     * enrollment cannot lock anyone out.
+     * enrollment cannot lock anyone out. Refuses to run while 2FA is already enabled —
+     * overwriting the live seed would silently kill the current authenticator.
      */
     async startSetup(userId, username, request) {
+        const existing = queryOne('SELECT totp_enabled FROM users WHERE id = ?', [userId]);
+        if (existing?.totp_enabled === 1) {
+            throw fail(400, '2FA sudah aktif — nonaktifkan dulu untuk ganti perangkat');
+        }
         const secret = totpService.generateSecret();
         execute('UPDATE users SET totp_secret = ? WHERE id = ?', [totpService.encryptSecret(secret), userId]);
         audit(userId, 'TOTP_SETUP_STARTED', `username=${username}`, request);
@@ -106,7 +111,10 @@ class TotpAuthService {
         const { ok, usedRecoveryIndex } = this.#verifyAny(row, code);
         if (!ok) {
             audit(userId, 'TOTP_VERIFY_FAILED', `username=${row.username} context=disable`, request);
-            throw fail(401, 'Kode salah');
+            // 400, not 401: the SESSION is valid — only the code payload is wrong. A 401
+            // would trigger the frontend refresh→retry→session-expired path and kick a
+            // healthy admin to the login page for a typo.
+            throw fail(400, 'Kode salah');
         }
         execute(
             `UPDATE users SET totp_enabled = 0, totp_secret = NULL, totp_confirmed_at = NULL,
@@ -173,13 +181,10 @@ class TotpAuthService {
             'UPDATE users SET totp_failed_attempts = 0, totp_locked_until = NULL WHERE id = ?',
             [row.id]
         );
-        logAuthAttempt(true, {
-            username: row.username, ip_address: request?.ip,
-            user_id: row.id, reason: usedRecoveryIndex >= 0 ? 'totp_recovery' : 'totp_ok',
-        }, request);
-        // Only the recovery path earns its own security_logs row — burning a one-time
-        // code is the event an operator wants to see. A normal TOTP success is already
-        // covered by the AUTH_SUCCESS row logAuthAttempt just wrote.
+        // One event, one line: the AUTH_SUCCESS row is written by #issueSession once the
+        // session actually exists — logging it here too would double every 2FA login.
+        // Only the recovery path earns its own row — burning a one-time code is the
+        // event an operator wants to see.
         if (usedRecoveryIndex >= 0) {
             audit(row.id, 'TOTP_RECOVERY_USED', `username=${row.username}`, request);
         }

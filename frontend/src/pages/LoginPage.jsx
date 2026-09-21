@@ -192,10 +192,15 @@ export default function LoginPage() {
 
     /** Shared success tail for both factors: expiry warning → toast → navigate. */
     const finishLogin = (user, passwordExpiryWarning) => {
+        // The API sends { shouldWarn, daysRemaining, message } — the banner needs the
+        // message TEXT; calling .match on the object itself throws TypeError.
+        const warningText = typeof passwordExpiryWarning === 'string'
+            ? passwordExpiryWarning
+            : passwordExpiryWarning?.message;
         // Check for password expiry warning (Requirements: 2.8)
-        if (passwordExpiryWarning) {
-            sessionStorage.setItem('passwordExpiryWarning', passwordExpiryWarning);
-            const daysMatch = passwordExpiryWarning.match(/(\d+)\s*day/i);
+        if (warningText) {
+            sessionStorage.setItem('passwordExpiryWarning', warningText);
+            const daysMatch = warningText.match(/(\d+)\s*day/i);
             if (daysMatch) {
                 setPasswordExpiryDays(parseInt(daysMatch[1], 10));
             }
@@ -225,7 +230,7 @@ export default function LoginPage() {
         setError('');
         const result = await authService.verifyTotp(totpChallenge.pendingToken, code);
         if (result.success) {
-            finishLogin(result.user, null);
+            finishLogin(result.user, result.passwordExpiryWarning);
             return;
         }
         // An expired/invalid pending token means the 5-minute window closed — drop

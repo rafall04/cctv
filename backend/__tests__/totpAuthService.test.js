@@ -88,6 +88,16 @@ describe('enrollment: start → confirm → enabled', () => {
         expect(hashes).toContain(totpService.hashRecoveryCode(recoveryCodes[0]));
     });
 
+    it('startSetup refuses to overwrite an ACTIVE enrollment — disable first', async () => {
+        seedUser();
+        const { secret } = await totpAuthService.startSetup(1, 'alice', REQUEST);
+        totpAuthService.confirmSetup(1, totpService.totp(secret), REQUEST);
+        await expect(totpAuthService.startSetup(1, 'alice', REQUEST))
+            .rejects.toThrowError(expect.objectContaining({ statusCode: 400 }));
+        // The live seed is untouched — the existing authenticator still works.
+        expect(totpService.decryptSecret(row().totp_secret)).toBe(secret);
+    });
+
     it('confirmSetup with a wrong code stays disabled and audits the failure', async () => {
         seedUser();
         await totpAuthService.startSetup(1, 'alice', REQUEST);
@@ -200,8 +210,11 @@ describe('disable + status', () => {
         expect(on).toMatchObject({ enabled: true, recoveryRemaining: 8 });
         expect(JSON.stringify(on)).not.toContain(secret);     // status never leaks the seed
 
+        // Wrong code on an AUTHENTICATED request is a validation failure (400), not
+        // a 401 — the session is valid; a 401 would trigger the frontend's
+        // refresh→retry→session-expired path and kick a healthy admin out for a typo.
         expect(() => totpAuthService.disable(1, '000000', REQUEST))
-            .toThrowError(expect.objectContaining({ statusCode: 401 }));
+            .toThrowError(expect.objectContaining({ statusCode: 400 }));
         totpAuthService.disable(1, totpService.totp(secret), REQUEST);
         const u = row();
         expect(u.totp_enabled).toBe(0);

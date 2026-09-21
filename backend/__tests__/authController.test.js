@@ -191,6 +191,17 @@ describe('verifyTotp handler', () => {
         expect(reply.body.data.user.username).toBe('admin');
     });
 
+    it('mirrors the password-only login: passwordExpiryWarning reaches the client', async () => {
+        authService.completeTwoFactorLogin.mockResolvedValue({
+            accessToken: 'a2', refreshToken: 'r2', user: { id: 3, username: 'admin', role: 'admin' },
+            passwordExpiryWarning: { shouldWarn: true, daysRemaining: 3, message: 'Password expires in 3 days.' },
+        });
+        const reply = makeReply();
+        await verifyTotp(makeRequest({ body: { pendingToken: 'p', code: '123456' } }), reply);
+
+        expect(reply.body.data.passwordExpiryWarning?.message).toContain('3 days');
+    });
+
     it('passes a bad-code/lockout 401 through and sets no cookies', async () => {
         const err = new Error('Kode verifikasi salah');
         err.statusCode = 401;

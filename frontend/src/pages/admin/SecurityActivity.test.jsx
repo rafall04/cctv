@@ -145,7 +145,7 @@ describe('SecurityActivity — 2FA card', () => {
 
         await waitFor(() => expect(screen.getByText(/kode pemulihan tersisa 6/i)).toBeTruthy());
         fireEvent.click(screen.getByRole('button', { name: 'Nonaktifkan 2FA' }));
-        fireEvent.change(screen.getByLabelText(/masukkan kode authenticator saat ini/i), { target: { value: '654321' } });
+        fireEvent.change(screen.getByLabelText(/kode authenticator saat ini/i), { target: { value: '654321' } });
         fireEvent.click(screen.getByRole('button', { name: 'Nonaktifkan 2FA' }));
 
         await waitFor(() => expect(disableTotpMock).toHaveBeenCalledWith('654321'));

@@ -8,7 +8,7 @@ import {
     getCurrentAttemptCount,
     applyProgressiveDelay
 } from './bruteForceProtection.js';
-import { logAuthAttempt, logSessionCreated, logSessionRefreshed, logFingerprintMismatch } from './securityAuditLogger.js';
+import { logAuthAttempt, logSessionCreated, logSessionRefreshed, logFingerprintMismatch, logSecurityEvent } from './securityAuditLogger.js';
 import {
     generateFingerprint,
     createTokenPair,
@@ -110,14 +110,15 @@ class AuthService {
         const fingerprint = generateFingerprint(request);
 
         // Second factor: password verified but no session exists yet — hand back a
-        // 5-minute pending token that only /api/auth/totp/verify can exchange.
+        // 5-minute pending token that only /api/auth/totp/verify can exchange. Logged
+        // as its own event, NOT AUTH_FAILURE — a successful password factor must not
+        // pollute the failed-login stats and brute-force views.
         if (user.totp_enabled === 1) {
             const pendingToken = totpAuthService.createPendingToken(server, user, fingerprint);
-            logAuthAttempt(false, {
+            logSecurityEvent('TOTP_CHALLENGE_ISSUED', {
                 username,
                 ip_address: clientIp,
                 user_id: user.id,
-                reason: 'totp_challenge_issued'
             }, request);
             return { requiresTwoFactor: true, pendingToken };
         }
@@ -131,14 +132,15 @@ class AuthService {
      * partial session.
      */
     async completeTwoFactorLogin(server, pendingToken, code, request) {
+        const fingerprint = generateFingerprint(request);
         const { user } = totpAuthService.verifyChallenge(server, {
             pendingToken,
             code,
-            fingerprint: generateFingerprint(request),
+            fingerprint,
             request
         });
         const ip = request?.ip || request?.headers?.['x-forwarded-for'] || 'unknown';
-        return this.#issueSession(user, generateFingerprint(request), request, server, ip);
+        return this.#issueSession(user, fingerprint, request, server, ip);
     }
 
     #issueSession(user, fingerprint, request, server, clientIp) {

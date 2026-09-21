@@ -87,10 +87,19 @@ export async function verifyTotp(request, reply) {
         const cookieOptions = getAuthCookieOptions(request);
         reply.setCookie('token', data.accessToken, cookieOptions.access);
         reply.setCookie('refreshToken', data.refreshToken, cookieOptions.refresh);
+        // Mirror the password-only login tail — the 2FA path must surface the same
+        // password-expiry signals or 2FA users would never see the warning.
+        const responseData = { token: data.accessToken, refreshToken: data.refreshToken, user: data.user };
+        if (data.passwordExpiryStatus?.expired) {
+            responseData.passwordExpired = true;
+            responseData.passwordExpiryMessage = 'Your password has expired. Please change it immediately.';
+        } else if (data.passwordExpiryWarning?.shouldWarn) {
+            responseData.passwordExpiryWarning = data.passwordExpiryWarning;
+        }
         return reply.send({
             success: true,
             message: 'Login successful',
-            data: { token: data.accessToken, refreshToken: data.refreshToken, user: data.user },
+            data: responseData,
         });
     } catch (error) {
         const status = error.statusCode || 500;

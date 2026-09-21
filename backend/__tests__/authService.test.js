@@ -42,6 +42,7 @@ vi.mock('../services/bruteForceProtection.js', async (importActual) => {
     return { ...actual, applyProgressiveDelay: () => Promise.resolve() };
 });
 
+import { logAuthAttempt, logSecurityEvent } from '../services/securityAuditLogger.js';
 import authService from '../services/authService.js';
 
 const PASSWORD = 'correct-horse-battery';
@@ -143,15 +144,23 @@ describe('authService two-factor login', () => {
     };
 
     it('a totp_enabled account gets a pendingToken and NO session tokens', async () => {
+        // The logger mocks accumulate across tests (no per-test clear) — reset so the
+        // "not a failure" assertion below only measures THIS login call.
+        vi.clearAllMocks();
         seedUser();
         await enrollTotp();
-        const res = await authService.login('alice', PASSWORD, '1.2.3.4', makeRequest(), jsonServer());
+        const req = makeRequest();
+        const res = await authService.login('alice', PASSWORD, '1.2.3.4', req, jsonServer());
         expect(res.requiresTwoFactor).toBe(true);
         expect(res.pendingToken).toBeTruthy();
         expect(res.accessToken).toBeUndefined();
         expect(res.refreshToken).toBeUndefined();
         // No LOGIN audit row yet — the session does not exist until factor 2 passes.
         expect(db.prepare("SELECT COUNT(*) c FROM audit_logs WHERE action = 'LOGIN'").get().c).toBe(0);
+        // The challenge is its OWN event — a successful password factor must not
+        // pollute AUTH_FAILURE (failed-login stats / brute-force views).
+        expect(logSecurityEvent).toHaveBeenCalledWith('TOTP_CHALLENGE_ISSUED', expect.objectContaining({ username: 'alice' }), req);
+        expect(logAuthAttempt).not.toHaveBeenCalled();
     });
 
     it('completeTwoFactorLogin mints the normal session tail after a valid code', async () => {
