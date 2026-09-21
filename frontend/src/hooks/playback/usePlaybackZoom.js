@@ -13,6 +13,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { detectDeviceTier } from '../../utils/deviceDetector.js';
+import { prefersReducedMotion } from '../../utils/animationControl.js';
 import { createTransformThrottle } from '../../utils/rafThrottle.js';
 import { computeFitFractions, fillScaleFrom, appliedScale, maxPanPercent } from '../../utils/zoomFit.js';
 
@@ -75,7 +76,12 @@ export default function usePlaybackZoom({ stageRef, videoElRef, isFullscreen = f
         if (!stage) return;
         const { zoom: z, panX, panY } = stateRef.current;
         const s = scaleFor(z);
-        stage.style.transition = animate && !isLowEnd ? 'transform 0.2s ease-out' : 'none';
+        // The 0.2s ease-out is decoration on a functional jump — low-end AND
+        // prefers-reduced-motion users get the instant version. (CSS clamps it to
+        // 0.01ms anyway; gating here keeps "no animation" literally true.)
+        stage.style.transition = animate && !isLowEnd && !prefersReducedMotion()
+            ? 'transform 0.2s ease-out'
+            : 'none';
         const paint = `scale(${s}) translate(${panX}%, ${panY}%)`;
         if (throttleRef.current && !isLowEnd && !animate) {
             throttleRef.current.update(s, panX, panY);

@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import CodecBadge from '../CodecBadge';
 import usePlaybackZoom from '../../hooks/playback/usePlaybackZoom';
+import { useAnimationGate } from '../../utils/animationControl';
 import {
     detectHasAudioTrack,
     readRecordingMutePreference,
@@ -81,6 +82,9 @@ export default function PlaybackVideo({
         videoElRef,
         isFullscreen,
     });
+    // Reactive gate: low-end device OR prefers-reduced-motion flips this live,
+    // so a user toggling the OS setting mid-playback drops the spinners without reload.
+    const noAnim = useAnimationGate();
 
     useEffect(() => {
         const video = videoElRef.current;
@@ -313,7 +317,7 @@ export default function PlaybackVideo({
                     >
                         <div className="max-w-sm text-center">
                             {isLoadingSegments ? (
-                                <div className="mx-auto mb-4 h-14 w-14 animate-spin rounded-full border-4 border-white/15 border-t-primary" />
+                                <div className={`mx-auto mb-4 h-14 w-14 rounded-full border-4 border-white/15 border-t-primary ${noAnim ? 'opacity-75' : 'animate-spin'}`} />
                             ) : (
                                 <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10 text-primary ring-1 ring-white/15">
                                     <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
@@ -336,7 +340,7 @@ export default function PlaybackVideo({
                 {(isBuffering || isSeeking) && !videoError && selectedSegment && (
                     <div className="absolute inset-0 flex items-center justify-center bg-black/60 pointer-events-none z-40">
                         <div className="text-center bg-black/80 px-8 py-6 rounded-xl">
-                            <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-white mb-4 mx-auto"></div>
+                            <div className={`rounded-full h-16 w-16 border-b-4 border-white mb-4 mx-auto ${noAnim ? 'opacity-75' : 'animate-spin'}`}></div>
                             <p className="text-white text-lg font-medium mb-2">
                                 {isSeeking ? 'Memuat video...' : 'Buffering...'}
                             </p>
@@ -597,7 +601,7 @@ export default function PlaybackVideo({
                             snapshotNotification.type === 'success'
                                 ? 'bg-status-live border-status-live'
                                 : 'bg-status-fault border-status-fault'
-                        } text-white animate-slide-down`}>
+                        } text-white ${noAnim ? '' : 'animate-slide-down'}`}>
                             <div className="flex items-center gap-3">
                                 {snapshotNotification.type === 'success' ? (
                                     <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">

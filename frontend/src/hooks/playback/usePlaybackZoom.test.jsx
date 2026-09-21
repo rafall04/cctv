@@ -16,6 +16,13 @@ import usePlaybackZoom from './usePlaybackZoom';
 vi.mock('../../utils/deviceDetector.js', () => ({
     detectDeviceTier: () => 'high',
 }));
+// Flag mutable supaya satu file test bisa menyalakan/mematikan preferensi OS
+// tanpa menyentuh matchMedia (jsdom tidak mengimplementasikannya).
+const reducedMotion = vi.hoisted(() => ({ value: false }));
+vi.mock('../../utils/animationControl.js', async (importOriginal) => ({
+    ...(await importOriginal()),
+    prefersReducedMotion: () => reducedMotion.value,
+}));
 // Mock tetap menulis transform sungguhan supaya assertion membaca hasil akhir yang sama
 // seperti di browser (RAF hanya menjadwalkan, bukan mengubah apa yang ditulis).
 vi.mock('../../utils/rafThrottle.js', () => ({
@@ -172,6 +179,25 @@ describe('usePlaybackZoom', () => {
 
         expect(zoomOf()).toBe(1);
         expect(transformOf()).toContain('scale(1) translate(0%, 0%)');
+    });
+
+    it('drops the ease-out transition entirely when the user prefers reduced motion', () => {
+        reducedMotion.value = false;
+        render(<Harness />);
+        fireEvent.click(screen.getByTestId('in'));
+        expect(stage().style.transition).toContain('transform 0.2s');
+    });
+
+    it('keeps reduced-motion users on the instant path — no transition is written', () => {
+        reducedMotion.value = true;
+        try {
+            render(<Harness />);
+            fireEvent.click(screen.getByTestId('in'));
+            expect(zoomOf()).toBe(1.5);
+            expect(stage().style.transition).toBe('none');
+        } finally {
+            reducedMotion.value = false;
+        }
     });
 
     it('reports touch-action that keeps page scroll at 1x and owns gestures when zoomed', () => {
