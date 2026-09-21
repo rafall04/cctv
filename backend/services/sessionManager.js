@@ -225,6 +225,38 @@ export function isTokenBlacklisted(token) {
     }
 }
 
+/*
+ * Reuse-detection grace window: a refresh token blacklisted by rotation and replayed
+ * WITHIN this window is almost always a concurrent browser refresh racing itself (two
+ * in-flight calls sharing the pre-rotation cookie), not token theft — revoking the
+ * session family there would kick the legitimate user out for nothing. Replays OLDER
+ * than this mean a second party holds the rotated-out credential. (Audit F2.2)
+ */
+export const REFRESH_REUSE_GRACE_SECONDS = 30;
+
+/**
+ * Fetch the live blacklist entry for a token (null when not blacklisted / expired).
+ * Unlike isTokenBlacklisted this also returns WHY/WHEN it was blacklisted, which the
+ * refresh endpoint needs to distinguish a benign rotation race from token replay.
+ * @param {string} token - Token to look up
+ * @returns {{user_id: number|null, reason: string, within_grace: number}|null}
+ */
+export function getTokenBlacklistEntry(token) {
+    const tokenHash = hashToken(token);
+    try {
+        return queryOne(
+            `SELECT user_id, reason,
+                    (blacklisted_at > datetime('now', ?)) AS within_grace
+             FROM token_blacklist
+             WHERE token_hash = ? AND expires_at > datetime('now')`,
+            [`-${REFRESH_REUSE_GRACE_SECONDS} seconds`, tokenHash]
+        ) || null;
+    } catch (error) {
+        console.error('Error checking token blacklist entry:', error);
+        return null;
+    }
+}
+
 /**
  * Blacklist all tokens for a user (used on password change)
  * @param {number} userId - User ID
@@ -374,6 +406,8 @@ export default {
     hashToken,
     blacklistToken,
     isTokenBlacklisted,
+    getTokenBlacklistEntry,
+    REFRESH_REUSE_GRACE_SECONDS,
     blacklistAllUserTokens,
     isTokenInvalidatedByUser,
     invalidateUserSessionsOnPasswordChange,

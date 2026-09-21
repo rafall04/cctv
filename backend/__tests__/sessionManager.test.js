@@ -30,6 +30,7 @@ import {
     createTokenPair,
     blacklistToken,
     isTokenBlacklisted,
+    getTokenBlacklistEntry,
     blacklistAllUserTokens,
     isTokenInvalidatedByUser,
     cleanupExpiredBlacklistEntries,
@@ -54,7 +55,8 @@ beforeEach(() => {
         token_hash TEXT NOT NULL UNIQUE,
         user_id INTEGER,
         reason TEXT,
-        expires_at TEXT NOT NULL
+        expires_at TEXT NOT NULL,
+        blacklisted_at TEXT DEFAULT CURRENT_TIMESTAMP
     )`);
     db.exec('CREATE TABLE users (id INTEGER PRIMARY KEY, username TEXT, tokens_invalidated_at TEXT)');
     db.prepare('INSERT INTO users (id, username) VALUES (?, ?)').run(USER.id, USER.username);
@@ -125,6 +127,18 @@ describe('sessionManager — blacklist & invalidation', () => {
         expect(isTokenBlacklisted('still-valid')).toBe(false);
         expect(blacklistToken('bad-token', USER.id, 'logout')).toBe(true);
         expect(isTokenBlacklisted('bad-token')).toBe(true);
+    });
+
+    it('getTokenBlacklistEntry returns reason + grace flag; fresh entries are within grace', () => {
+        expect(getTokenBlacklistEntry('never-seen')).toBeNull();
+        blacklistToken('rotated', USER.id, 'token_rotation');
+        const fresh = getTokenBlacklistEntry('rotated');
+        expect(fresh).toMatchObject({ user_id: USER.id, reason: 'token_rotation', within_grace: 1 });
+        // An entry blacklisted 60s ago sits outside the 30s reuse-grace window.
+        db.prepare(`INSERT INTO token_blacklist (token_hash, user_id, reason, expires_at, blacklisted_at)
+                    VALUES (?, ?, 'token_rotation', ?, datetime('now', '-60 seconds'))`)
+            .run(hashToken('old-rotated'), USER.id, new Date(Date.now() + 86400000).toISOString());
+        expect(getTokenBlacklistEntry('old-rotated').within_grace).toBe(0);
     });
 
     it('an expired blacklist entry no longer blocks the token', () => {

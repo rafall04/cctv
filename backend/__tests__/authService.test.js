@@ -74,7 +74,7 @@ beforeEach(() => {
     )`);
     db.exec(`CREATE TABLE audit_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, action TEXT, details TEXT, ip_address TEXT)`);
     db.exec(`CREATE TABLE login_attempts (id INTEGER PRIMARY KEY AUTOINCREMENT, identifier TEXT, identifier_type TEXT, attempt_time TEXT, success INTEGER DEFAULT 0)`);
-    db.exec(`CREATE TABLE token_blacklist (id INTEGER PRIMARY KEY AUTOINCREMENT, token_hash TEXT UNIQUE, user_id INTEGER, reason TEXT, expires_at TEXT)`);
+    db.exec(`CREATE TABLE token_blacklist (id INTEGER PRIMARY KEY AUTOINCREMENT, token_hash TEXT UNIQUE, user_id INTEGER, reason TEXT, expires_at TEXT, blacklisted_at TEXT DEFAULT CURRENT_TIMESTAMP)`);
 });
 
 describe('authService.login', () => {
@@ -144,6 +144,45 @@ describe('authService.refreshTokens', () => {
         blacklistToken('revoked-refresh', 1, 'logout');
         await expect(authService.refreshTokens('revoked-refresh', makeServer(), makeRequest()))
             .rejects.toMatchObject({ statusCode: 401 });
+    });
+
+    it('revokes the whole session family when a rotated token is replayed AFTER the grace window', async () => {
+        seedUser();
+        const { hashToken } = await import('../services/sessionManager.js');
+        // Token rotated >30s ago (theft window): manual insert with a past blacklisted_at.
+        db.prepare(
+            `INSERT INTO token_blacklist (token_hash, user_id, reason, expires_at, blacklisted_at)
+             VALUES (?, ?, 'token_rotation', ?, datetime('now', '-60 seconds'))`
+        ).run(hashToken('stolen-refresh'), 1, new Date(Date.now() + 86400000).toISOString());
+
+        await expect(authService.refreshTokens('stolen-refresh', makeServer(), makeRequest()))
+            .rejects.toMatchObject({ statusCode: 401 });
+        // Family revocation = tokens_invalidated_at stamped → every session of the user dies.
+        const row = db.prepare('SELECT tokens_invalidated_at FROM users WHERE id = 1').get();
+        expect(row.tokens_invalidated_at).toBeTruthy();
+    });
+
+    it('does NOT revoke the family for a rotation replay INSIDE the grace window (browser race)', async () => {
+        seedUser();
+        const { blacklistToken } = await import('../services/sessionManager.js');
+        blacklistToken('raced-refresh', 1, 'token_rotation'); // blacklisted_at = now
+        await expect(authService.refreshTokens('raced-refresh', makeServer(), makeRequest()))
+            .rejects.toMatchObject({ statusCode: 401 });
+        const row = db.prepare('SELECT tokens_invalidated_at FROM users WHERE id = 1').get();
+        expect(row.tokens_invalidated_at).toBeNull();
+    });
+
+    it('does NOT revoke the family for a logout-blacklisted token replay (no live session to protect)', async () => {
+        seedUser();
+        const { hashToken } = await import('../services/sessionManager.js');
+        db.prepare(
+            `INSERT INTO token_blacklist (token_hash, user_id, reason, expires_at, blacklisted_at)
+             VALUES (?, ?, 'logout', ?, datetime('now', '-60 seconds'))`
+        ).run(hashToken('logged-out-refresh'), 1, new Date(Date.now() + 86400000).toISOString());
+        await expect(authService.refreshTokens('logged-out-refresh', makeServer(), makeRequest()))
+            .rejects.toMatchObject({ statusCode: 401 });
+        const row = db.prepare('SELECT tokens_invalidated_at FROM users WHERE id = 1').get();
+        expect(row.tokens_invalidated_at).toBeNull();
     });
 
     it('rejects an unverifiable token with 401', async () => {

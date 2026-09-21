@@ -13,7 +13,8 @@ import {
     generateFingerprint,
     createTokenPair,
     blacklistToken,
-    isTokenBlacklisted,
+    getTokenBlacklistEntry,
+    blacklistAllUserTokens,
     rotateTokens,
     validateFingerprint,
     isSessionExpired,
@@ -167,7 +168,19 @@ class AuthService {
     }
 
     async refreshTokens(refreshToken, server, request) {
-        if (isTokenBlacklisted(refreshToken)) {
+        const blacklistEntry = getTokenBlacklistEntry(refreshToken);
+        if (blacklistEntry) {
+            // Reuse detection: a token blacklisted by rotation and replayed AFTER the grace
+            // window means a second party holds the rotated-out credential — revoke the whole
+            // session family (every session shares sessionCreatedAt < invalidated_at), not
+            // just this token. Within the window it is a concurrent browser refresh racing
+            // itself; rejecting quietly is enough. (Audit F2.2)
+            if (blacklistEntry.reason === 'token_rotation' && !blacklistEntry.within_grace) {
+                const victimId = blacklistEntry.user_id ?? this.#decodeUserId(server, refreshToken);
+                if (victimId != null) {
+                    blacklistAllUserTokens(victimId, 'refresh_token_reuse', request);
+                }
+            }
             const err = new Error('Refresh token has been invalidated');
             err.statusCode = 401;
             throw err;
@@ -245,6 +258,16 @@ class AuthService {
         }, request);
 
         return { newAccessToken, newRefreshToken };
+    }
+
+    // Last-resort user lookup for reuse detection when the blacklist row lost its user_id
+    // (FOREIGN KEY ... ON DELETE SET NULL) — a still-verifiable token still names its owner.
+    #decodeUserId(server, token) {
+        try {
+            return server.jwt.verify(token)?.id ?? null;
+        } catch {
+            return null;
+        }
     }
 }
 
