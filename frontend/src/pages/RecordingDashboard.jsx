@@ -9,6 +9,7 @@ SideEffects: Calls recording APIs, refreshes dashboard data, displays operator n
 import { useState } from 'react';
 import recordingService from '../services/recordingService';
 import { useNotification } from '../contexts/NotificationContext';
+import { useTimezone } from '../contexts/TimezoneContext.jsx';
 import { Button, PageHeader } from '../components/ui';
 import { InlineErrorBoundary } from '../components/ui/ErrorBoundary';
 import { TableSkeleton, StatCardSkeleton } from '../components/ui/Skeleton';
@@ -40,6 +41,7 @@ function RecordingLoadingState() {
 
 export default function RecordingDashboard() {
     const { success, error: notifyError } = useNotification();
+    const { timezone } = useTimezone();
     const [updatingCameraId, setUpdatingCameraId] = useState(null);
     const [bulkBusy, setBulkBusy] = useState(false);
     const {
@@ -59,7 +61,7 @@ export default function RecordingDashboard() {
         const diff = Math.floor((Date.now() - date.getTime()) / 1000);
         if (diff < 60) return 'Baru saja';
         if (diff < 3600) return `${Math.floor(diff / 60)} menit lalu`;
-        return date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+        return date.toLocaleTimeString('id-ID', { timeZone: timezone, hour: '2-digit', minute: '2-digit' });
     };
 
     const handleStartRecording = async (cameraId) => {

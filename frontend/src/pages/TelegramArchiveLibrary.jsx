@@ -27,7 +27,8 @@ import { Badge, Button, Field, IconButton, Modal, PageHeader } from '../componen
 import ArchiveVideo from '../components/admin/archive/ArchiveVideo';
 import PlaybackCameraPicker from '../components/playback/PlaybackCameraPicker';
 import { TableSkeleton } from '../components/ui/Skeleton';
-import { buildTimeline, findSegmentAt, formatDuration, segmentWindow } from '../utils/admin/archiveTimeline';
+import { buildTimeline, findSegmentAt, formatDuration, segmentWindow, tzParts, wallClockToInstant } from '../utils/admin/archiveTimeline';
+import { useTimezone } from '../contexts/TimezoneContext.jsx';
 
 const DownloadIcon = () => (
     <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden="true">
@@ -136,25 +137,34 @@ const RANGE_PRESETS = [
  * already said which day; without one, the most recent occurrence is meant — which is yesterday if
  * that time has not come round yet today.
  */
-function instantFromTime(hhmm, { from, to }) {
+// "19:36" means 19:36 in the CONFIGURED timezone, not the browser's — an admin abroad jumping to
+// a wall-clock moment must land on the same instant the archive grid shows.
+function instantFromTime(hhmm, { from, to }, timeZone) {
     const match = /^(\d{1,2})[.:](\d{2})$/.exec(String(hhmm).trim());
     if (!match) return null;
     const hours = Number(match[1]);
     const minutes = Number(match[2]);
     if (hours > 23 || minutes > 59) return null;
 
-    const anchor = to || from;
-    const target = anchor ? new Date(`${anchor}T00:00:00`) : new Date();
-    if (Number.isNaN(target.getTime())) return null;
-    target.setHours(hours, minutes, 0, 0);
+    const anchor = to || from; // 'YYYY-MM-DD' — already a configured-tz calendar day
+    let y, mo, d;
+    if (anchor) {
+        [y, mo, d] = anchor.split('-').map(Number);
+        if (!y || !mo || !d) return null;
+    } else {
+        const p = tzParts(new Date(), timeZone);
+        y = +p.year; mo = +p.month; d = +p.day;
+    }
+    let target = wallClockToInstant(y, mo, d, hours, minutes, timeZone);
     if (!anchor && target.getTime() > Date.now()) {
-        target.setDate(target.getDate() - 1);
+        target = wallClockToInstant(y, mo, d - 1, hours, minutes, timeZone);
     }
     return target.toISOString();
 }
 
 export default function TelegramArchiveLibrary() {
     const { error: notifyError, warning: notifyWarning } = useNotification();
+    const { timezone } = useTimezone();
     const [summary, setSummary] = useState(null);
     const [rows, setRows] = useState([]);
     const [total, setTotal] = useState(0);
@@ -261,11 +271,11 @@ export default function TelegramArchiveLibrary() {
     // Gaps are only meaningful along ONE camera's timeline. Across a mixed feed, a "hole" between
     // two different cameras means nothing — drawing one would be a false alarm, so we don't.
     const singleCamera = Boolean(cameraId);
-    const days = useMemo(() => buildTimeline(rows, { detectGaps: singleCamera }), [rows, singleCamera]);
+    const days = useMemo(() => buildTimeline(rows, { detectGaps: singleCamera, timeZone: timezone }), [rows, singleCamera, timezone]);
 
     const handleJump = async (event) => {
         event.preventDefault();
-        const at = instantFromTime(jumpTo, { from, to });
+        const at = instantFromTime(jumpTo, { from, to }, timezone);
         if (!at) {
             notifyWarning('Format jam salah', 'Tulis seperti 19:36.');
             return;
@@ -273,7 +283,7 @@ export default function TelegramArchiveLibrary() {
 
         // Try the rows already on screen first: no round trip, and it keeps the common case
         // (scanning the page you are looking at) instant.
-        const onThisPage = findSegmentAt(rows, jumpTo);
+        const onThisPage = findSegmentAt(rows, jumpTo, null, timezone);
         if (onThisPage && !onThisPage._approximate) {
             setHighlighted(onThisPage.segmentId);
             setPendingScroll(onThisPage.segmentId);
@@ -556,7 +566,7 @@ export default function TelegramArchiveLibrary() {
                 <Modal
                     title={playing.cameraName}
                     description={(() => {
-                        const w = segmentWindow(playing);
+                        const w = segmentWindow(playing, timezone);
                         return [w.range, w.duration, formatSize(playing.fileSize)].filter(Boolean).join(' · ');
                     })()}
                     size="xl"

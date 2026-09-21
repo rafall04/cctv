@@ -25,8 +25,10 @@
  */
 
 import { PageHeader } from '../../ui/PageHeader';
+import { useTimezone } from '../../../contexts/TimezoneContext.jsx';
 
 export function AnalyticsWorkspaceHeader({ title, description, lastUpdate, filters }) {
+    const { timezone } = useTimezone();
     return (
         <div className="space-y-4">
             <PageHeader
@@ -37,7 +39,7 @@ export function AnalyticsWorkspaceHeader({ title, description, lastUpdate, filte
                 // competed with a title it is subordinate to.
                 meta={(
                     <span className="text-xs text-content-muted">
-                        Update terakhir: {lastUpdate ? lastUpdate.toLocaleTimeString('id-ID') : '-'}
+                        Update terakhir: {lastUpdate ? lastUpdate.toLocaleTimeString('id-ID', { timeZone: timezone }) : '-'}
                     </span>
                 )}
             />

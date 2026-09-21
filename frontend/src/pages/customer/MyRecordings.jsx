@@ -25,14 +25,15 @@ import PlaybackCoverageStrip from '../../components/playback/PlaybackCoverageStr
 import PlaybackRangePicker from '../../components/playback/PlaybackRangePicker';
 import { rollingRange } from '../../utils/playbackDayRange';
 import { readRecordingMutePreference, writeRecordingMutePreference } from '../../utils/recordingAudio';
-import { useTimezone } from '../../contexts/TimezoneContext.jsx';
+import { useTimezone, parseBackendDateInput, TIMESTAMP_STORAGE } from '../../contexts/TimezoneContext.jsx';
 
 const SCOPE = 'owner_full';
 
 function formatWaktu(iso, timeZone) {
     if (!iso) return '—';
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return '—';
+    // start_time is ISO-Z; the created_at fallback is a bare SQLite CURRENT_TIMESTAMP (UTC).
+    const d = parseBackendDateInput(String(iso), { storage: TIMESTAMP_STORAGE.UTC_SQL });
+    if (!d || Number.isNaN(d.getTime())) return '—';
     return d.toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short', timeZone });
 }
 

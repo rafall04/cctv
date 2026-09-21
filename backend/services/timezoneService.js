@@ -89,6 +89,17 @@ function zoneOffsetMinutes(timeZone, now) {
     return Math.round((asUTC - d.getTime()) / 60000);
 }
 
+// 'YYYY-MM-DD HH:MM:SS' is SQLite CURRENT_TIMESTAMP output — UTC, not server-local. new Date()
+// reads it in the OS zone, shifting the instant by the server offset (WIB server = 7h early).
+const BARE_SQL_DATETIME = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d+)?$/;
+
+export function parseStoredTimestamp(value) {
+    if (typeof value === 'string' && BARE_SQL_DATETIME.test(value.trim())) {
+        return new Date(`${value.trim().replace(' ', 'T')}Z`);
+    }
+    return new Date(value);
+}
+
 export function formatDateTime(date, timezone = null) {
     const tz = timezone || getTimezone();
     return new Intl.DateTimeFormat('id-ID', {
@@ -100,7 +111,7 @@ export function formatDateTime(date, timezone = null) {
         minute: '2-digit',
         second: '2-digit',
         hour12: false
-    }).format(new Date(date));
+    }).format(parseStoredTimestamp(date));
 }
 
 export { TIMEZONE_MAP };

@@ -8,6 +8,7 @@ SideEffects: Fetches dashboard stats through useDashboardData.
 
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTimezone } from '../contexts/TimezoneContext.jsx';
 import { Alert } from '../components/ui/Alert';
 import { Button, PageHeader } from '../components/ui';
 import { InlineErrorBoundary } from '../components/ui/ErrorBoundary';
@@ -32,13 +33,13 @@ function formatBytes(bytes) {
     return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
 }
 
-function formatLastUpdate(date) {
+function formatLastUpdate(date, timeZone) {
     if (!date) return 'Belum pernah';
     const now = new Date();
     const diff = Math.floor((now - date) / 1000);
     if (diff < 60) return 'Baru saja';
     if (diff < 3600) return `${Math.floor(diff / 60)} menit lalu`;
-    return date.toLocaleTimeString('id-ID');
+    return date.toLocaleTimeString('id-ID', { timeZone });
 }
 
 /*
@@ -88,6 +89,7 @@ const RefreshIcon = ({ spinning }) => (
 );
 
 export default function Dashboard() {
+    const { timezone } = useTimezone();
     const [viewerModal, setViewerModal] = useState(null);
     const [isStreamsDrawerOpen, setIsStreamsDrawerOpen] = useState(false);
     const navigate = useNavigate();
@@ -135,7 +137,7 @@ export default function Dashboard() {
         },
         refreshError && {
             title: 'Refresh background gagal',
-            description: `Data terakhir yang valid: ${formatLastUpdate(lastSuccessfulUpdate)}.`,
+            description: `Data terakhir yang valid: ${formatLastUpdate(lastSuccessfulUpdate, timezone)}.`,
             tone: 'data',
         },
     ].filter(Boolean);
@@ -154,7 +156,7 @@ export default function Dashboard() {
                 <Alert
                     type="warning"
                     title="Refresh background gagal"
-                    message={`Data terbaru belum bisa diambil. Update valid terakhir: ${formatLastUpdate(lastSuccessfulUpdate)}`}
+                    message={`Data terbaru belum bisa diambil. Update valid terakhir: ${formatLastUpdate(lastSuccessfulUpdate, timezone)}`}
                     dismissible
                     onDismiss={() => setRefreshError(false)}
                 />
@@ -235,7 +237,7 @@ export default function Dashboard() {
                         topCameras={stats?.topCameras || []}
                         recentLogs={stats?.recentLogs || []}
                         mtxConnected={stats?.mtxConnected}
-                        lastUpdateLabel={formatLastUpdate(lastSuccessfulUpdate)}
+                        lastUpdateLabel={formatLastUpdate(lastSuccessfulUpdate, timezone)}
                         refreshFailed={Boolean(refreshError)}
                     />
                 </InlineErrorBoundary>

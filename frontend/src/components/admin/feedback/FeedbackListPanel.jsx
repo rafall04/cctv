@@ -1,3 +1,4 @@
+import { TIMESTAMP_STORAGE } from '../../../contexts/TimezoneContext.jsx';
 import { TableSkeleton } from '../../ui/Skeleton';
 import { NoFeedbackEmptyState } from '../../ui/EmptyState';
 import { FeedbackIcons, feedbackStatusConfig } from './feedbackConstants.jsx';
@@ -47,7 +48,7 @@ export default function FeedbackListPanel({
                                     <div className="flex items-center gap-3 mt-2 text-xs text-content-subtle">
                                         <span className="flex items-center gap-1">
                                             <FeedbackIcons.Clock />
-                                            {formatDate(feedback.created_at)}
+                                            {formatDate(feedback.created_at, { storage: TIMESTAMP_STORAGE.UTC_SQL })}
                                         </span>
                                     </div>
                                 </div>

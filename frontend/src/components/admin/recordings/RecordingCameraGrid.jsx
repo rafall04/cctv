@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { recordingDurationOptions } from '../../../utils/admin/cameraFormAdapter';
-import { useTimezone } from '../../../contexts/TimezoneContext.jsx';
+import { useTimezone, parseBackendDateInput, TIMESTAMP_STORAGE } from '../../../contexts/TimezoneContext.jsx';
 
 function formatFileSize(bytes) {
     if (bytes === 0) {
@@ -13,7 +13,8 @@ function formatFileSize(bytes) {
 }
 
 function formatTimestamp(timestamp, timeZone) {
-    return new Date(timestamp).toLocaleString('id-ID', {
+    return parseBackendDateInput(String(timestamp), { storage: TIMESTAMP_STORAGE.UTC_SQL })
+        .toLocaleString('id-ID', {
         year: 'numeric',
         month: 'short',
         day: 'numeric',

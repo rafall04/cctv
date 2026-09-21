@@ -13,15 +13,16 @@
 import { useCallback, useEffect, useState } from 'react';
 import { listTokens, removeToken, saveToken, isExpired } from '../../utils/savedPlaybackTokens';
 import playbackAccessService from '../../services/playbackAccessService';
+import { useTimezone } from '../../contexts/TimezoneContext.jsx';
 
 /** Show a stored UTC-SQL / ISO timestamp in the reader's locale; '-' when absent/unparseable. */
-function fmtDate(value) {
+function fmtDate(value, timeZone) {
     if (!value) return 'tanpa batas';
     const iso = String(value).includes('T') ? String(value) : `${String(value).replace(' ', 'T')}Z`;
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return String(value);
     try {
-        return d.toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
+        return d.toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short', timeZone });
     } catch {
         return d.toISOString().slice(0, 16).replace('T', ' ');
     }
@@ -50,6 +51,7 @@ async function copyText(value) {
 }
 
 export default function MyPlaybackTokens({ onActivate = null, onRenew = null, version = 0 }) {
+    const { timezone } = useTimezone();
     const [tokens, setTokens] = useState([]);
     const [copiedKey, setCopiedKey] = useState(null);
 
@@ -133,7 +135,7 @@ export default function MyPlaybackTokens({ onActivate = null, onRenew = null, ve
                                     <div className="min-w-0">
                                         <p className="truncate text-xs font-semibold text-content">{t.label || 'Paket Playback'}</p>
                                         <p className={`mt-0.5 text-[11px] ${expired ? 'text-status-warn' : 'text-content-muted'}`}>
-                                            {expired ? 'Kadaluarsa' : `Aktif sampai ${fmtDate(t.expiresAt)}`}
+                                            {expired ? 'Kadaluarsa' : `Aktif sampai ${fmtDate(t.expiresAt, timezone)}`}
                                         </p>
                                     </div>
                                     <code className="shrink-0 select-all rounded bg-surface-sunken px-1.5 py-0.5 font-mono text-[11px] tracking-wide text-content">

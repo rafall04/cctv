@@ -6,8 +6,9 @@ MainFuncs: RealtimeChart, RealtimeActivityChart.
 SideEffects: Polls realtime viewer API and schedules intervals/animation cleanup.
 */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { adminService } from '../services/adminService';
+import { useTimezone } from '../contexts/TimezoneContext.jsx';
 
 /**
  * Lightweight Real-time Chart Component
@@ -209,13 +210,14 @@ export function RealtimeChart({
  * Wrapper dengan live indicator dan auto-refresh
  */
 export function RealtimeActivityChart() {
+    const { timezone } = useTimezone();
     const [data, setData] = useState([]);
     const [isLive, setIsLive] = useState(true);
     const [lastUpdate, setLastUpdate] = useState(null);
     const intervalRef = useRef(null);
 
     // Fetch real-time data dari API
-    const fetchRealtimeData = async () => {
+    const fetchRealtimeData = useCallback(async () => {
         try {
             // Gunakan adminService yang sudah handle authentication
             const result = await adminService.getRealTimeViewers();
@@ -225,7 +227,7 @@ export function RealtimeActivityChart() {
                 const activeViewers = result.data.activeViewers || 0;
                 
                 const newPoint = {
-                    label: now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+                    label: now.toLocaleTimeString('id-ID', { timeZone: timezone, hour: '2-digit', minute: '2-digit' }),
                     value: activeViewers,
                     timestamp: now.getTime()
                 };
@@ -240,7 +242,7 @@ export function RealtimeActivityChart() {
         } catch (error) {
             console.error('Failed to fetch real-time data:', error);
         }
-    };
+    }, [timezone]);
 
     // Auto-refresh setiap 5 detik
     useEffect(() => {
@@ -257,7 +259,7 @@ export function RealtimeActivityChart() {
                 clearInterval(intervalRef.current);
             }
         };
-    }, [isLive]);
+    }, [isLive, fetchRealtimeData]);
 
     return (
         <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl p-6">
@@ -278,7 +280,7 @@ export function RealtimeActivityChart() {
                 <div className="flex items-center gap-3">
                     {lastUpdate && (
                         <span className="text-xs text-gray-400 dark:text-gray-500">
-                            {lastUpdate.toLocaleTimeString('id-ID')}
+                            {lastUpdate.toLocaleTimeString('id-ID', { timeZone: timezone })}
                         </span>
                     )}
                     

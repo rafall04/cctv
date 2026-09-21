@@ -11,6 +11,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { QRCodeCanvas } from 'qrcode.react';
 import customerService from '../../services/customerService';
 import { formatRupiah } from '../../layouts/CustomerLayout';
+import { useTimezone, TIMESTAMP_STORAGE } from '../../contexts/TimezoneContext.jsx';
 
 const PRESET_AMOUNTS = [25000, 50000, 100000];
 const POLL_INTERVAL_MS = 5000;
@@ -458,6 +459,7 @@ function TopupPanel({ onCompleted, resumable = [] }) {
 }
 
 export default function MyWallet() {
+    const { formatDateTime } = useTimezone();
     const [summary, setSummary] = useState(null);
     const [wallet, setWallet] = useState(null);
     const [payments, setPayments] = useState([]);
@@ -603,7 +605,7 @@ export default function MyWallet() {
                                             {TYPE_LABELS[trx.type] || trx.type}
                                         </p>
                                         <p className="truncate text-xs text-content-muted">
-                                            {trx.note || trx.reference || ''} · {trx.created_at}
+                                            {trx.note || trx.reference || ''} · {formatDateTime(trx.created_at, { storage: TIMESTAMP_STORAGE.UTC_SQL })}
                                         </p>
                                     </div>
                                     <p className={`font-semibold ${trx.amount >= 0
@@ -635,7 +637,7 @@ export default function MyWallet() {
                                     <div key={p.id} className="flex items-center justify-between py-2 text-sm">
                                         <div className="min-w-0">
                                             <p className="font-medium text-content">{formatRupiah(p.amount)}</p>
-                                            <p className="truncate text-xs text-content-muted">{p.gateway} · {p.created_at}</p>
+                                            <p className="truncate text-xs text-content-muted">{p.gateway} · {formatDateTime(p.created_at, { storage: TIMESTAMP_STORAGE.UTC_SQL })}</p>
                                         </div>
                                         <span className={`shrink-0 text-xs font-semibold ${st.className}`}>{st.text}</span>
                                     </div>

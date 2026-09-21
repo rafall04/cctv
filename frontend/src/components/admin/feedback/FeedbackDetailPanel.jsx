@@ -1,3 +1,4 @@
+import { TIMESTAMP_STORAGE } from '../../../contexts/TimezoneContext.jsx';
 import { FeedbackIcons, feedbackStatusConfig } from './feedbackConstants.jsx';
 
 export default function FeedbackDetailPanel({
@@ -28,7 +29,7 @@ export default function FeedbackDetailPanel({
                     <div className="text-sm text-content-subtle flex items-center gap-4">
                         <span className="flex items-center gap-1">
                             <FeedbackIcons.Clock />
-                            {formatDate(selectedFeedback.created_at)}
+                            {formatDate(selectedFeedback.created_at, { storage: TIMESTAMP_STORAGE.UTC_SQL })}
                         </span>
                         <span>ID: #{selectedFeedback.id}</span>
                     </div>

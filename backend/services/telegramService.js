@@ -832,7 +832,7 @@ export async function sendFeedbackNotification(feedback) {
 ━━━━━━━━━━━━━━━━━━━━
 👤 <b>Nama:</b> ${feedback.name || 'Anonim'}
 📧 <b>Email:</b> ${feedback.email || '-'}
-⏰ <b>Waktu:</b> ${formatDateTime(new Date(feedback.created_at))}
+⏰ <b>Waktu:</b> ${formatDateTime(feedback.created_at)}
 ━━━━━━━━━━━━━━━━━━━━
 💬 <b>Pesan:</b>
 ${feedback.message}

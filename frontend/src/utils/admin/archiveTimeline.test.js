@@ -40,6 +40,15 @@ describe('segmentWindow', () => {
         expect(win.range).toMatch(/–/);
         expect(win.duration).toBe('10 mnt');
     });
+
+    it('renders the range in the CONFIGURED timezone, not the browser\'s', () => {
+        const win = segmentWindow(seg(1, '2026-07-27 12:32:00', '2026-07-27 12:42:00'), 'Asia/Jakarta');
+        // 12:32–12:42 UTC == 19:32–19:42 WIB — machine tz must not matter.
+        expect(win.range).toContain('19.32');
+        expect(win.range).toContain('19.42');
+        const utc = segmentWindow(seg(1, '2026-07-27 12:32:00', '2026-07-27 12:42:00'), 'UTC');
+        expect(utc.range).toContain('12.32');
+    });
 });
 
 describe('buildTimeline gaps', () => {
@@ -78,6 +87,18 @@ describe('buildTimeline gaps', () => {
         expect(days).toHaveLength(2);
         expect(days[0].items[0].row.segmentId).toBe(2);
     });
+
+    it('splits days on the configured timezone boundary — a 17:30 UTC clip is the next day in WIB', () => {
+        const rows = [
+            seg(1, '2026-07-27 16:30:00', '2026-07-27 16:40:00'), // 23:30 WIB Jul 27
+            seg(2, '2026-07-27 17:30:00', '2026-07-27 17:40:00'), // 00:30 WIB Jul 28
+        ];
+        const wib = buildTimeline(rows, { timeZone: 'Asia/Jakarta', now: new Date('2026-07-28T05:00:00Z') });
+        expect(wib).toHaveLength(2);
+        expect(wib[0].items[0].row.segmentId).toBe(2); // newer WIB day first
+        const utc = buildTimeline(rows, { timeZone: 'UTC' });
+        expect(utc).toHaveLength(1);
+    });
 });
 
 describe('findSegmentAt', () => {
@@ -96,5 +117,13 @@ describe('findSegmentAt', () => {
     it('rejects nonsense rather than guessing', () => {
         expect(findSegmentAt(rows, '99:99')).toBeNull();
         expect(findSegmentAt(rows, 'pagi')).toBeNull();
+    });
+
+    it('resolves the requested wall-clock in the configured timezone, not the browser\'s', () => {
+        // 19:36 WIB == 12:36 UTC — lands inside segment 2. Must hold on ANY machine zone.
+        expect(findSegmentAt(rows, '19:36', null, 'Asia/Jakarta')?.segmentId).toBe(2);
+        // Same wall-clock in UTC falls in the hole between the clips -> approximate, not a hit.
+        const utc = findSegmentAt(rows, '19:36', null, 'UTC');
+        expect(utc?._approximate).toBe(true);
     });
 });

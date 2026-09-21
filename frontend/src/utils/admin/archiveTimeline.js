@@ -27,7 +27,22 @@ export function parseWhen(value) {
     return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
-const clock = (d) => d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+// All wall-clock work runs in the CONFIGURED timezone (Settings → timezone), not the browser's —
+// an admin viewing from another zone must still see the same day boundaries and labels.
+export const tzParts = (d, tz) => Object.fromEntries(new Intl.DateTimeFormat('en-US', {
+    timeZone: tz, hour12: false,
+    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
+}).formatToParts(d).filter((p) => p.type !== 'literal').map((p) => [p.type, p.value]));
+
+const clock = (d, tz) => d.toLocaleTimeString('id-ID', { timeZone: tz, hour: '2-digit', minute: '2-digit' });
+
+/** Instant whose wall-clock in `tz` reads y-m-d hh:mm. One-shot offset solve — fine for ID zones (no DST). */
+export function wallClockToInstant(y, mo, d, h, mi, tz) {
+    const guess = Date.UTC(y, mo - 1, d, h, mi);
+    const p = tzParts(new Date(guess), tz);
+    const offset = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour % 24, +p.minute) - guess;
+    return new Date(guess - offset);
+}
 
 export function formatDuration(seconds) {
     const total = Math.round(Number(seconds) || 0);
@@ -41,28 +56,31 @@ export function formatDuration(seconds) {
 }
 
 /** A segment is a RANGE; one start time cannot answer "which clip contains 19.36?". */
-export function segmentWindow(row) {
+export function segmentWindow(row, timeZone) {
     const start = parseWhen(row.recordedAt);
     const end = parseWhen(row.recordedUntil);
     if (!start) return { start: null, end: null, range: '—', duration: null };
     return {
         start,
         end,
-        range: end ? `${clock(start)} – ${clock(end)}` : clock(start),
+        range: end ? `${clock(start, timeZone)} – ${clock(end, timeZone)}` : clock(start, timeZone),
         duration: formatDuration(row.durationSeconds),
     };
 }
 
-function dayKey(date) {
-    return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+function dayKey(date, tz) {
+    const p = tzParts(date, tz);
+    return `${p.year}-${p.month}-${p.day}`;
 }
 
-export function dayLabel(date, now = new Date()) {
-    const diff = Math.round((new Date(now.getFullYear(), now.getMonth(), now.getDate())
-        - new Date(date.getFullYear(), date.getMonth(), date.getDate())) / 86400000);
+export function dayLabel(date, now = new Date(), tz) {
+    const a = tzParts(now, tz);
+    const b = tzParts(date, tz);
+    const diff = Math.round((Date.UTC(+a.year, +a.month - 1, +a.day)
+        - Date.UTC(+b.year, +b.month - 1, +b.day)) / 86400000);
     if (diff === 0) return 'Hari ini';
     if (diff === 1) return 'Kemarin';
-    return date.toLocaleDateString('id-ID', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+    return date.toLocaleDateString('id-ID', { timeZone: tz, weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
 }
 
 /**
@@ -73,9 +91,9 @@ export function dayLabel(date, now = new Date()) {
  * @param {boolean} detectGaps only true for a SINGLE camera — across a mixed feed a "gap" between
  *   two different cameras is meaningless, and drawing one would be a false alarm.
  */
-export function buildTimeline(rows, { detectGaps = false, now = new Date() } = {}) {
+export function buildTimeline(rows, { detectGaps = false, now = new Date(), timeZone } = {}) {
     const withTime = rows
-        .map((row) => ({ row, win: segmentWindow(row) }))
+        .map((row) => ({ row, win: segmentWindow(row, timeZone) }))
         .filter((entry) => entry.win.start)
         .sort((a, b) => b.win.start - a.win.start);
 
@@ -83,9 +101,9 @@ export function buildTimeline(rows, { detectGaps = false, now = new Date() } = {
     let current = null;
 
     withTime.forEach((entry, index) => {
-        const key = dayKey(entry.win.start);
+        const key = dayKey(entry.win.start, timeZone);
         if (!current || current.key !== key) {
-            current = { key, label: dayLabel(entry.win.start, now), items: [] };
+            current = { key, label: dayLabel(entry.win.start, now, timeZone), items: [] };
             days.push(current);
         }
 
@@ -98,13 +116,13 @@ export function buildTimeline(rows, { detectGaps = false, now = new Date() } = {
         const seconds = Math.round((entry.win.start - next.win.end) / 1000);
         if (seconds <= GAP_TOLERANCE_SECONDS) return;
 
-        const sameDay = dayKey(next.win.end) === key;
+        const sameDay = dayKey(next.win.end, timeZone) === key;
         (sameDay ? current : (current = { key, label: current.label, items: current.items })).items.push({
             kind: 'gap',
             seconds,
             from: next.win.end,
             to: entry.win.start,
-            label: `${clock(next.win.end)} – ${clock(entry.win.start)}`,
+            label: `${clock(next.win.end, timeZone)} – ${clock(entry.win.start, timeZone)}`,
         });
     });
 
@@ -115,7 +133,7 @@ export function buildTimeline(rows, { detectGaps = false, now = new Date() } = {
  * The clip covering a wall-clock time, or the nearest one before it.
  * @param {string} hhmm e.g. "19:36"
  */
-export function findSegmentAt(rows, hhmm, dayHint = null) {
+export function findSegmentAt(rows, hhmm, dayHint = null, timeZone) {
     const match = /^(\d{1,2})[.:](\d{2})$/.exec(String(hhmm).trim());
     if (!match) return null;
     const hours = Number(match[1]);
@@ -123,22 +141,24 @@ export function findSegmentAt(rows, hhmm, dayHint = null) {
     if (hours > 23 || minutes > 59) return null;
 
     const candidates = rows
-        .map((row) => ({ row, win: segmentWindow(row) }))
+        .map((row) => ({ row, win: segmentWindow(row, timeZone) }))
         .filter((entry) => entry.win.start)
-        .filter((entry) => !dayHint || dayKey(entry.win.start) === dayHint)
+        .filter((entry) => !dayHint || dayKey(entry.win.start, timeZone) === dayHint)
         .sort((a, b) => b.win.start - a.win.start);
+
+    const targetOn = (s) => {
+        const p = tzParts(s, timeZone);
+        return wallClockToInstant(+p.year, +p.month, +p.day, hours, minutes, timeZone);
+    };
 
     for (const entry of candidates) {
         const s = entry.win.start;
-        const target = new Date(s.getFullYear(), s.getMonth(), s.getDate(), hours, minutes, 0);
+        const target = targetOn(s);
         const end = entry.win.end || new Date(s.getTime() + (Number(entry.row.durationSeconds) || 600) * 1000);
         if (target >= s && target <= end) return entry.row;
     }
     // Nothing covers it: return the closest clip that STARTED before, so the operator lands next to
     // the moment rather than being told "not found" with no bearing.
-    const before = candidates.find((entry) => {
-        const s = entry.win.start;
-        return new Date(s.getFullYear(), s.getMonth(), s.getDate(), hours, minutes, 0) >= s;
-    });
+    const before = candidates.find((entry) => targetOn(entry.win.start) >= entry.win.start);
     return before ? { ...before.row, _approximate: true } : null;
 }

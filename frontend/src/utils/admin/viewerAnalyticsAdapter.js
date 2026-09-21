@@ -35,6 +35,9 @@ export function formatDate(dateStr, options = {}) {
     const date = new Date(dateStr);
     const { year, ...restOptions } = options;
     return date.toLocaleDateString('id-ID', {
+        // 'YYYY-MM-DD' groups already live in the configured tz — render the literal calendar day,
+        // not the instant (a browser-tz render shifts the label a day in negative offsets).
+        timeZone: 'UTC',
         day: '2-digit',
         month: 'short',
         year: year ? 'numeric' : undefined,
