@@ -36,7 +36,7 @@ describe('viewerService.stopSession', () => {
         expect(postMock).toHaveBeenLastCalledWith('/api/viewer/stop', {
             sessionId: 'abc',
             cancelled: true,
-        });
+        }, { skipCsrf: true, skipAuthRefresh: true });
     });
 
     it('sends a plain stop unchanged, so a real 2-second bounce still reaches history', async () => {
@@ -44,6 +44,7 @@ describe('viewerService.stopSession', () => {
 
         await service.stopSession('abc');
 
-        expect(postMock).toHaveBeenLastCalledWith('/api/viewer/stop', { sessionId: 'abc' });
+        expect(postMock).toHaveBeenLastCalledWith('/api/viewer/stop', { sessionId: 'abc' },
+            { skipCsrf: true, skipAuthRefresh: true });
     });
 });

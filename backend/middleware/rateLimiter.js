@@ -73,6 +73,11 @@ export const RATE_LIMIT_CONFIG = {
      */
     mediaGetWhitelist: [
         '/api/thumbnails',
+        // Static public image handlers behind filename allowlists — same class as
+        // thumbnails: a landing load fires a burst of promo/affiliate renditions, and a
+        // visitor reloading on a flapping connection must not burn the JSON bucket on them.
+        '/api/promo-media',
+        '/api/affiliate-media',
     ],
     // Auth endpoint prefixes
     authPrefixes: [
@@ -122,6 +127,23 @@ export function isWhitelisted(url, method = 'GET') {
         // /api/recordings/archive/<id>/stream, /api/recordings/<id>/playlist.m3u8
         if (path.startsWith('/api/recordings/')
             && (path.includes('/stream') || path.endsWith('/playlist.m3u8'))) {
+            return true;
+        }
+        /*
+         * Archive media GETs — the same media class as the recordings stream above:
+         *  - /api/playback-archive/<id>/stream proxies Telegram-archive MP4 bytes to a
+         *    public playback-token holder. A <video> element fetches it with many Range
+         *    requests per segment, and local retention is only ~4h so almost every
+         *    past-date replay lands here — billing them against the shared public JSON
+         *    bucket (100/min) made archive playback trip 429 for the whole page.
+         *    The route carries its own gates: token-cookie auth + a per-token ceiling.
+         *  - /api/admin/telegram-archive/<...>/stream is the staff-side equivalent —
+         *    same Range-request flood against the admin bucket (60/min).
+         * Matched by `/stream` suffix (not bare prefix) so JSON routes under these
+         * prefixes stay limited.
+         */
+        if ((path.startsWith('/api/playback-archive/') || path.startsWith('/api/admin/telegram-archive/'))
+            && path.endsWith('/stream')) {
             return true;
         }
     }

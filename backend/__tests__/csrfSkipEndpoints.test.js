@@ -24,6 +24,12 @@ describe('shouldSkipCsrf', () => {
         expect(shouldSkipCsrf('/api/playback-viewer/stop')).toBe(true);
     });
 
+    it('exempts anonymous playback telemetry — the beacon cannot carry a CSRF cookie', () => {
+        expect(shouldSkipCsrf('/api/public/playback-telemetry')).toBe(true);
+        // But the skip must not bleed into other /api/public/* POSTs.
+        expect(shouldSkipCsrf('/api/public/cameras/5/reaction')).toBe(false);
+    });
+
     it('exempts token refresh', () => {
         expect(shouldSkipCsrf('/api/auth/refresh')).toBe(true);
     });

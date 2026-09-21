@@ -8,7 +8,7 @@
  * SideEffects: Uses jsdom localStorage only.
  */
 
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { usePlaybackTokenAccess } from './usePlaybackTokenAccess.js';
 import playbackTokenService from '../../services/playbackTokenService.js';
@@ -211,5 +211,51 @@ describe('usePlaybackTokenAccess cookie hydration', () => {
 
         resolveHeartbeat({ success: true, data: { id: 9, label: 'DARI HEARTBEAT' } });
         await waitFor(() => expect(result.current.tokenStatus?.label).toBe('DARI AKTIVASI'));
+    });
+
+    /*
+     * The periodic heartbeat used to clear the session on ANY failure — one dropped packet on a
+     * wobbly link and the paid viewer's video died with "session berakhir". Only a definitive
+     * end-of-session signal (401, or a 200 carrying data:null) may tear it down.
+     */
+    it('survives a transient heartbeat error; only a definitive 401 ends the session', async () => {
+        const onCleared = vi.fn();
+        playbackTokenService.heartbeatToken.mockResolvedValue({
+            success: true, data: { id: 9, label: 'BJN', allowed_camera_ids: [3] },
+        });
+
+        // Fake timers BEFORE the mount: the 30s interval is armed the moment hydration fills
+        // tokenStatus — installing them later would leave the interval on the real clock.
+        vi.useFakeTimers();
+        try {
+            const { result } = renderHook(() => usePlaybackTokenAccess({
+                enabled: true,
+                searchParams: new URLSearchParams(''),
+                setSearchParams: vi.fn(),
+                cameraId: 3,
+                onActivated: vi.fn(),
+                onCleared,
+            }));
+
+            // Hydration resolves on a microtask — flush it, then tokenStatus arms the interval.
+            await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+            expect(result.current.tokenStatus?.label).toBe('BJN');
+
+            // A dropped connection mid-heartbeat must NOT tear the session down.
+            playbackTokenService.heartbeatToken.mockRejectedValueOnce(new Error('socket hangup'));
+            await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+            expect(result.current.tokenStatus?.label).toBe('BJN');
+            expect(onCleared).not.toHaveBeenCalled();
+
+            // A definitive 401 — cookie present but no longer valid — still clears.
+            const denied = new Error('Token playback tidak aktif');
+            denied.response = { status: 401, data: { message: 'Token playback tidak aktif' } };
+            playbackTokenService.heartbeatToken.mockRejectedValueOnce(denied);
+            await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+            expect(result.current.tokenStatus).toBeNull();
+            expect(onCleared).toHaveBeenCalledTimes(1);
+        } finally {
+            vi.useRealTimers();
+        }
     });
 });

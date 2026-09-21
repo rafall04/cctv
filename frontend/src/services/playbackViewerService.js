@@ -2,6 +2,12 @@ import apiClient from './apiClient';
 
 const HEARTBEAT_INTERVAL = 5000;
 
+// The /api/playback-viewer/* tracking routes are CSRF-exempt server-side and
+// optional-auth — anonymous viewers have no CSRF token and a 401 there can never
+// mean "your admin session expired". Skipping both avoids a pointless
+// /api/auth/csrf prefetch on every heartbeat and any refresh attempt.
+const TRACKING_REQUEST = { skipCsrf: true, skipAuthRefresh: true };
+
 class PlaybackViewerService {
     constructor() {
         this.sessions = new Map();
@@ -15,7 +21,7 @@ class PlaybackViewerService {
                 segmentFilename,
                 segmentStartedAt,
                 accessMode,
-            });
+            }, TRACKING_REQUEST);
 
             if (!response.data?.success) {
                 throw new Error(response.data?.message || 'Failed to start playback viewer session');
@@ -52,7 +58,7 @@ class PlaybackViewerService {
         const promises = [];
         for (const [sessionId] of this.sessions) {
             promises.push(
-                apiClient.post('/api/playback-viewer/heartbeat', { sessionId }).catch((error) => {
+                apiClient.post('/api/playback-viewer/heartbeat', { sessionId }, TRACKING_REQUEST).catch((error) => {
                     console.error(`[PlaybackViewerService] Heartbeat failed for ${sessionId}:`, error.message);
                 })
             );
@@ -84,7 +90,7 @@ class PlaybackViewerService {
         }
 
         try {
-            await apiClient.post('/api/playback-viewer/stop', { sessionId });
+            await apiClient.post('/api/playback-viewer/stop', { sessionId }, TRACKING_REQUEST);
         } catch (error) {
             console.error('[PlaybackViewerService] Error stopping session:', error);
         } finally {
@@ -101,7 +107,7 @@ class PlaybackViewerService {
         const stopPromises = [];
         for (const [sessionId] of this.sessions) {
             stopPromises.push(
-                apiClient.post('/api/playback-viewer/stop', { sessionId }).catch((error) => {
+                apiClient.post('/api/playback-viewer/stop', { sessionId }, TRACKING_REQUEST).catch((error) => {
                     console.error(`[PlaybackViewerService] Error stopping session ${sessionId}:`, error);
                 })
             );

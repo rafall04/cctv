@@ -22,6 +22,11 @@ import apiClient from './apiClient';
 // Reduced from 10s to 5s for more reliable session tracking
 const HEARTBEAT_INTERVAL = 5000; // 5 seconds
 
+// The /api/viewer/* tracking routes are CSRF-exempt server-side and optional-auth —
+// skipping the CSRF prefetch keeps the 5s heartbeat from depending on a
+// /api/auth/csrf fetch it never needed.
+const TRACKING_REQUEST = { skipCsrf: true, skipAuthRefresh: true };
+
 class ViewerService {
     constructor() {
         // Map of sessionId -> session data
@@ -40,7 +45,7 @@ class ViewerService {
             const normalizedCameraId = Number.parseInt(cameraId, 10);
             const response = await apiClient.post('/api/viewer/start', {
                 cameraId: Number.isInteger(normalizedCameraId) ? normalizedCameraId : cameraId
-            });
+            }, TRACKING_REQUEST);
             
             if (response.data.success) {
                 const sessionId = response.data.data.sessionId;
@@ -82,7 +87,7 @@ class ViewerService {
         
         for (const [sessionId] of this.sessions) {
             promises.push(
-                apiClient.post('/api/viewer/heartbeat', { sessionId })
+                apiClient.post('/api/viewer/heartbeat', { sessionId }, TRACKING_REQUEST)
                     .catch(error => {
                         console.error(`[ViewerService] Heartbeat failed for ${sessionId}:`, error.message);
                         // Don't remove session here, let server handle cleanup
@@ -125,7 +130,7 @@ class ViewerService {
         if (!sessionId || !this.sessions.has(sessionId)) return;
 
         try {
-            await apiClient.post('/api/viewer/stop', cancelled ? { sessionId, cancelled: true } : { sessionId });
+            await apiClient.post('/api/viewer/stop', cancelled ? { sessionId, cancelled: true } : { sessionId }, TRACKING_REQUEST);
             console.log(`[ViewerService] Session stopped: ${sessionId}`);
         } catch (error) {
             console.error('[ViewerService] Error stopping session:', error);
@@ -145,7 +150,7 @@ class ViewerService {
         
         for (const [sessionId] of this.sessions) {
             promises.push(
-                apiClient.post('/api/viewer/stop', { sessionId })
+                apiClient.post('/api/viewer/stop', { sessionId }, TRACKING_REQUEST)
                     .catch(error => {
                         console.error(`[ViewerService] Error stopping session ${sessionId}:`, error);
                     })
@@ -213,7 +218,7 @@ class ViewerService {
                 targetUrl,
                 signalType,
                 success,
-            });
+            }, TRACKING_REQUEST);
         } catch (error) {
             console.warn('[ViewerService] Runtime signal failed:', signalType, normalizedCameraId, error?.message || error);
         }

@@ -221,7 +221,19 @@ export function usePlaybackTokenAccess({
                     return;
                 }
 
-                clear(error?.response?.data?.message);
+                /*
+                 * Only a definitive "session is over" clears the UI. 401 means the cookie
+                 * exists but no longer validates (revoked/expired) — the same signal as
+                 * `data: null` above. Anything else — a dropped connection, a tunnel blip,
+                 * a 5xx, a CSRF retry that failed — is transient: the next beat retries,
+                 * and killing playback on one failed heartbeat turned a 30s network hiccup
+                 * into a dead video for no reason.
+                 */
+                if (error?.response?.status === 401) {
+                    clear(error?.response?.data?.message);
+                    return;
+                }
+                console.warn('[usePlaybackTokenAccess] heartbeat failed, will retry:', error?.message || error);
             }
         };
 

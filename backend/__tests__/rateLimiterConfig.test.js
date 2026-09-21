@@ -103,6 +103,18 @@ describe('media GET whitelist — thumbnails & recording streams', () => {
         expect(getEndpointType('/api/thumbnails/1377.jpg', 'POST')).toBe('public');
     });
 
+    it('static promo/affiliate image GETs are whitelisted; their JSON endpoints stay limited', async () => {
+        const { isWhitelisted, getEndpointType } = await loadRateLimiter({});
+        expect(isWhitelisted('/api/promo-media/abc-160.webp', 'GET')).toBe(true);
+        expect(isWhitelisted('/api/affiliate-media/offer-9-320.webp', 'GET')).toBe(true);
+        expect(getEndpointType('/api/promo-media/abc-160.webp', 'GET')).toBe('whitelist');
+        // Non-media routes that merely share the /api/promo* or /api/affiliate* family
+        // must not ride the exemption — clicks and offer JSON stay counted.
+        expect(isWhitelisted('/api/promo-banners/public', 'GET')).toBe(false);
+        expect(isWhitelisted('/api/public/affiliate/offers', 'GET')).toBe(false);
+        expect(isWhitelisted('/api/promo-media/abc-160.webp', 'POST')).toBe(false);
+    });
+
     it('recording stream + playlist GETs are whitelisted; JSON endpoints stay limited', async () => {
         const { isWhitelisted, getEndpointType } = await loadRateLimiter({});
         expect(isWhitelisted('/api/recordings/15/stream/20260808_120000.mp4', 'GET')).toBe(true);
@@ -113,6 +125,23 @@ describe('media GET whitelist — thumbnails & recording streams', () => {
         expect(isWhitelisted('/api/recordings/15/segments', 'GET')).toBe(false);
         expect(isWhitelisted('/api/recordings/15/start', 'POST')).toBe(false);
         expect(getEndpointType('/api/recordings/15/segments', 'GET')).toBe('public');
+    });
+
+    it('archive stream GETs are whitelisted; non-stream paths under the same prefixes stay limited', async () => {
+        const { isWhitelisted, getEndpointType } = await loadRateLimiter({});
+        // Public token holder replaying a Telegram-archive segment (the common case for
+        // past-date footage — local retention is ~4h). A <video> element fires many Range
+        // GETs per segment; counting them against the public JSON bucket starves the page.
+        expect(isWhitelisted('/api/playback-archive/42/stream', 'GET')).toBe(true);
+        expect(getEndpointType('/api/playback-archive/42/stream', 'GET')).toBe('whitelist');
+        // Staff replaying the same archive through the admin library route — same Range
+        // flood, previously billed against the 60/min admin bucket.
+        expect(isWhitelisted('/api/admin/telegram-archive/library/42/stream', 'GET')).toBe(true);
+        // JSON routes under these prefixes must NOT ride the media exemption.
+        expect(isWhitelisted('/api/admin/telegram-archive/library', 'GET')).toBe(false);
+        expect(getEndpointType('/api/admin/telegram-archive/library', 'GET')).toBe('admin');
+        // POSTs to a stream path stay limited — the exemption is media GETs only.
+        expect(isWhitelisted('/api/playback-archive/42/stream', 'POST')).toBe(false);
     });
 
     it('playback session lifecycle (start/heartbeat/stop, any method) is whitelisted — heartbeats fire every 5s', async () => {

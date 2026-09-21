@@ -301,3 +301,44 @@ describe('apiClient session refresh under concurrency', () => {
         expect(notify.mock.calls.filter(([, t]) => t === 'Session Expired')).toHaveLength(2);
     });
 });
+
+/*
+ * Viewer-tracking POSTs (/api/viewer/*, /api/playback-viewer/*) are CSRF-exempt server-side, yet
+ * the request interceptor still awaited a /api/auth/csrf fetch before each one — a wasted
+ * auth-bucket hit plus a round-trip of stall on every 5s heartbeat. `skipCsrf` opts a request out.
+ */
+describe('apiClient skipCsrf opt-out', () => {
+    beforeEach(() => {
+        vi.resetModules();
+        vi.restoreAllMocks();
+    });
+
+    it('makes no /api/auth/csrf fetch when the request marks skipCsrf', async () => {
+        const axios = (await import('axios')).default;
+        const getSpy = vi.spyOn(axios, 'get').mockRejectedValue(new Error('must not be called'));
+        const { default: apiClient } = await import('./apiClient.js');
+
+        const result = await runRequestInterceptors(apiClient, {
+            method: 'post', url: '/api/viewer/heartbeat', headers: {}, skipCsrf: true,
+        });
+
+        expect(getSpy).not.toHaveBeenCalled();
+        expect(result.headers['X-CSRF-Token']).toBeUndefined();
+    });
+
+    it('still fetches and attaches the CSRF token for an ordinary POST', async () => {
+        const axios = (await import('axios')).default;
+        const token = 'a'.repeat(64);
+        const getSpy = vi.spyOn(axios, 'get').mockResolvedValue({
+            data: { success: true, data: { token, expiresIn: 3600 } },
+        });
+        const { default: apiClient } = await import('./apiClient.js');
+
+        const result = await runRequestInterceptors(apiClient, {
+            method: 'post', url: '/api/x', headers: {},
+        });
+
+        expect(getSpy).toHaveBeenCalledTimes(1);
+        expect(result.headers['X-CSRF-Token']).toBe(token);
+    });
+});

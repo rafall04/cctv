@@ -238,8 +238,12 @@ apiClient.interceptors.request.use(
         // JWT tokens are in HttpOnly cookies - automatically sent by browser
         // No need to manually attach Authorization header
 
-        // Add CSRF token for state-changing requests
-        if (isStateChangingMethod(config.method)) {
+        // Add CSRF token for state-changing requests. `skipCsrf` marks endpoints the
+        // server already exempts (CSRF_SKIP_ENDPOINTS) — the anonymous viewer-tracking
+        // POSTs. Without it each one would first await a /api/auth/csrf fetch that the
+        // endpoint never needed: a wasted auth-bucket hit, a round-trip of latency on
+        // every 5s heartbeat, and a stall point when the csrf endpoint is struggling.
+        if (isStateChangingMethod(config.method) && !config.skipCsrf) {
             const csrf = await getCsrfToken();
             if (csrf) {
                 config.headers['X-CSRF-Token'] = csrf;

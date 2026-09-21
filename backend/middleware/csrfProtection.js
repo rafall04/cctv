@@ -45,6 +45,10 @@ export const CSRF_SKIP_ENDPOINTS = [
     // so a newly added tracking endpoint cannot be missed.
     '/api/viewer/',                     // Live viewer tracking
     '/api/playback-viewer/',            // Playback viewer tracking
+    // Anonymous failure telemetry — sent via fetch(keepalive)/sendBeacon with
+    // credentials:'omit', so no CSRF cookie can ever accompany it. Worst a forged
+    // POST achieves is noise in an in-memory ring buffer.
+    '/api/public/playback-telemetry',
     '/api/auth/refresh',                // Token rotation via httpOnly cookie; CSRF cookie can expire first
     '/health',                          // Health check endpoint
     '/hls',                             // HLS proxy - public streaming endpoint
