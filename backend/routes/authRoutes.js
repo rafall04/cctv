@@ -1,4 +1,4 @@
-import { login, logout, verifyToken, refreshTokens, register, registerInfo } from '../controllers/authController.js';
+import { login, logout, verifyToken, refreshTokens, register, registerInfo, verifyTotp } from '../controllers/authController.js';
 import { getCsrfToken } from '../controllers/csrfController.js';
 import { fingerprintAuthMiddleware } from '../middleware/fingerprintValidator.js';
 import { loginSchema, refreshTokenSchema, registerSchema } from '../middleware/schemaValidators.js';
@@ -11,6 +11,12 @@ export default async function authRoutes(fastify, options) {
     fastify.post('/login', {
         schema: loginSchema,
         handler: login,
+    });
+
+    // Second-factor exchange (public — the pending JWT is the credential; the code
+    // check + per-user lockout live in totpAuthService).
+    fastify.post('/totp/verify', {
+        handler: verifyTotp,
     });
 
     // Customer self-registration (public; can be disabled from the admin billing page)

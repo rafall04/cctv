@@ -18,6 +18,7 @@ import {
     updateCameraReport,
 } from '../controllers/adminCameraFeedbackController.js';
 import { authMiddleware, requireAdmin } from '../middleware/authMiddleware.js';
+import { getTotpStatus, startTotpSetup, confirmTotpSetup, disableTotp } from '../controllers/totpController.js';
 import vehicleCountAdminRoutes from './vehicleCountAdminRoutes.js';
 import cameraTimeRoutes from './cameraTimeRoutes.js';
 import { createApiKeySchema, apiKeyIdParamSchema } from '../middleware/schemaValidators.js';
@@ -87,6 +88,25 @@ export default async function adminRoutes(fastify, options) {
     fastify.get('/security/stats', {
         onRequest: [authMiddleware, requireAdmin],
         handler: getSecurityStats,
+    });
+
+    // TOTP self-service — an admin manages their OWN second factor. Each request still
+    // carries the session JWT; the enrollment secret/code never travels for anyone else.
+    fastify.get('/totp/status', {
+        onRequest: [authMiddleware, requireAdmin],
+        handler: getTotpStatus,
+    });
+    fastify.post('/totp/setup', {
+        onRequest: [authMiddleware, requireAdmin],
+        handler: startTotpSetup,
+    });
+    fastify.post('/totp/confirm', {
+        onRequest: [authMiddleware, requireAdmin],
+        handler: confirmTotpSetup,
+    });
+    fastify.post('/totp/disable', {
+        onRequest: [authMiddleware, requireAdmin],
+        handler: disableTotp,
     });
 
     // Telegram notification endpoints

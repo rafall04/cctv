@@ -7,25 +7,37 @@ MainFuncs: SecurityActivity rendering assertions.
 SideEffects: Mocks the security log/stat API calls.
 */
 
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import SecurityActivity from './SecurityActivity.jsx';
 
-const { getSecurityLogsMock, getSecurityStatsMock, notifyErrorMock } = vi.hoisted(() => ({
+const {
+    getSecurityLogsMock, getSecurityStatsMock, notifyErrorMock, notifySuccessMock,
+    getTotpStatusMock, startTotpSetupMock, confirmTotpSetupMock, disableTotpMock,
+} = vi.hoisted(() => ({
     getSecurityLogsMock: vi.fn(),
     getSecurityStatsMock: vi.fn(),
     notifyErrorMock: vi.fn(),
+    notifySuccessMock: vi.fn(),
+    getTotpStatusMock: vi.fn(),
+    startTotpSetupMock: vi.fn(),
+    confirmTotpSetupMock: vi.fn(),
+    disableTotpMock: vi.fn(),
 }));
 
 vi.mock('../../services/adminService', () => ({
     adminService: {
         getSecurityLogs: getSecurityLogsMock,
         getSecurityStats: getSecurityStatsMock,
+        getTotpStatus: getTotpStatusMock,
+        startTotpSetup: startTotpSetupMock,
+        confirmTotpSetup: confirmTotpSetupMock,
+        disableTotp: disableTotpMock,
     },
 }));
 
 vi.mock('../../contexts/NotificationContext', () => ({
-    useNotification: () => ({ error: notifyErrorMock, success: vi.fn() }),
+    useNotification: () => ({ error: notifyErrorMock, success: notifySuccessMock }),
 }));
 
 /*
@@ -48,6 +60,11 @@ describe('SecurityActivity', () => {
             success: true,
             data: { period_days: 7, total_events: 12, events_by_type: { AUTH_FAILURE: 3, AUTHZ_FAILURE: 2 } },
         });
+        // Default: 2FA off — the card offers "Aktifkan 2FA".
+        getTotpStatusMock.mockResolvedValue({ success: true, data: { enabled: false, recoveryRemaining: 0 } });
+        startTotpSetupMock.mockReset();
+        confirmTotpSetupMock.mockReset();
+        disableTotpMock.mockReset();
     });
 
     it('renders security events and the 7-day stat summary', async () => {
@@ -86,5 +103,52 @@ describe('SecurityActivity', () => {
         await waitFor(() => {
             expect(notifyErrorMock).toHaveBeenCalledWith('Gagal Memuat Log', 'Boom');
         });
+    });
+});
+
+describe('SecurityActivity — 2FA card', () => {
+    it('offers setup when disabled, shows QR + secret, then recovery codes once', async () => {
+        getSecurityLogsMock.mockResolvedValue({ success: true, data: [], pagination: { page: 1, limit: 50, total: 0, totalPages: 0 } });
+        startTotpSetupMock.mockResolvedValue({
+            success: true,
+            data: { secret: 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ', otpauthUrl: 'otpauth://x', qrDataUrl: 'data:image/png;base64,AAAA' },
+        });
+        confirmTotpSetupMock.mockResolvedValue({ success: true, data: { recoveryCodes: ['aaaa-bbbb', 'cccc-dddd'] } });
+
+        render(<SecurityActivity />);
+
+        // Enabled? No — the setup button must be offered.
+        const enableBtn = await screen.findByRole('button', { name: 'Aktifkan 2FA' });
+        fireEvent.click(enableBtn);
+
+        await waitFor(() => expect(startTotpSetupMock).toHaveBeenCalled());
+        expect(screen.getByAltText('QR code untuk aplikasi authenticator')).toBeTruthy();
+        expect(screen.getByText('GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ')).toBeTruthy();
+
+        // Confirm requires a 6-digit code.
+        fireEvent.change(screen.getByLabelText(/kode 6 digit/i), { target: { value: '123456' } });
+        fireEvent.click(screen.getByRole('button', { name: /verifikasi & aktifkan/i }));
+
+        await waitFor(() => expect(confirmTotpSetupMock).toHaveBeenCalledWith('123456'));
+        // Recovery codes appear exactly once — dismissal clears them.
+        await waitFor(() => expect(screen.getByText('aaaa-bbbb')).toBeTruthy());
+        fireEvent.click(screen.getByRole('button', { name: /sudah saya simpan/i }));
+        await waitFor(() => expect(screen.queryByText('aaaa-bbbb')).toBeNull());
+    });
+
+    it('shows enabled status and gates disable behind a code input', async () => {
+        getSecurityLogsMock.mockResolvedValue({ success: true, data: [], pagination: { page: 1, limit: 50, total: 0, totalPages: 0 } });
+        getTotpStatusMock.mockResolvedValue({ success: true, data: { enabled: true, recoveryRemaining: 6 } });
+        disableTotpMock.mockResolvedValue({ success: true });
+
+        render(<SecurityActivity />);
+
+        await waitFor(() => expect(screen.getByText(/kode pemulihan tersisa 6/i)).toBeTruthy());
+        fireEvent.click(screen.getByRole('button', { name: 'Nonaktifkan 2FA' }));
+        fireEvent.change(screen.getByLabelText(/masukkan kode authenticator saat ini/i), { target: { value: '654321' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Nonaktifkan 2FA' }));
+
+        await waitFor(() => expect(disableTotpMock).toHaveBeenCalledWith('654321'));
+        await waitFor(() => expect(notifySuccessMock).toHaveBeenCalledWith('2FA Dinonaktifkan', expect.any(String)));
     });
 });

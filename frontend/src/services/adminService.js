@@ -336,6 +336,43 @@ export const adminService = {
         }
     },
 
+    // ---- Admin TOTP self-service (own account only) ----
+    async getTotpStatus() {
+        try {
+            const response = await apiClient.get('/api/admin/totp/status');
+            return response.data;
+        } catch (error) {
+            return { success: false, message: error.response?.data?.message || 'Gagal membaca status 2FA' };
+        }
+    },
+
+    async startTotpSetup() {
+        try {
+            const response = await apiClient.post('/api/admin/totp/setup');
+            return response.data;
+        } catch (error) {
+            return { success: false, message: error.response?.data?.message || 'Gagal memulai setup 2FA' };
+        }
+    },
+
+    async confirmTotpSetup(code) {
+        try {
+            const response = await apiClient.post('/api/admin/totp/confirm', { code });
+            return response.data;
+        } catch (error) {
+            return { success: false, message: error.response?.data?.message || 'Kode verifikasi salah' };
+        }
+    },
+
+    async disableTotp(code) {
+        try {
+            const response = await apiClient.post('/api/admin/totp/disable', { code });
+            return response.data;
+        } catch (error) {
+            return { success: false, message: error.response?.data?.message || 'Kode salah' };
+        }
+    },
+
     async getTelegramStatus() {
         try {
             const response = await apiClient.get('/api/admin/telegram/status');

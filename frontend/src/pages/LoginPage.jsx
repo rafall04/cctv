@@ -126,6 +126,11 @@ export default function LoginPage() {
     const [isLocked, setIsLocked] = useState(false);
     const [lockoutCountdown, setLockoutCountdown] = useState(0);
 
+    // Second-factor step: pendingToken bridges the password factor and the code
+    // factor — it is NOT a session and expires in 5 minutes server-side.
+    const [totpChallenge, setTotpChallenge] = useState(null);
+    const [totpCode, setTotpCode] = useState('');
+
     // Countdown timer for rate limiting
     useEffect(() => {
         if (retryCountdown > 0) {
@@ -185,6 +190,54 @@ export default function LoginPage() {
         setFieldErrors(prev => ({ ...prev, [name]: error }));
     };
 
+    /** Shared success tail for both factors: expiry warning → toast → navigate. */
+    const finishLogin = (user, passwordExpiryWarning) => {
+        // Check for password expiry warning (Requirements: 2.8)
+        if (passwordExpiryWarning) {
+            sessionStorage.setItem('passwordExpiryWarning', passwordExpiryWarning);
+            const daysMatch = passwordExpiryWarning.match(/(\d+)\s*day/i);
+            if (daysMatch) {
+                setPasswordExpiryDays(parseInt(daysMatch[1], 10));
+            }
+        }
+
+        // Customers land on their portal; staff (admin/viewer) on the dashboard.
+        const destination = user?.role === 'customer' ? '/my' : '/admin/dashboard';
+
+        // Show success toast (Requirements: 2.10)
+        showSuccess('Berhasil Masuk', 'Selamat datang kembali! Mengalihkan...');
+
+        // Small delay to show the toast before redirect
+        setTimeout(() => {
+            navigate(destination);
+        }, 500);
+    };
+
+    /** Second-factor step — pendingToken + 6-digit TOTP or an "xxxx-xxxx" recovery code. */
+    const handleTotpSubmit = async (e) => {
+        e.preventDefault();
+        const code = totpCode.trim();
+        if (!code) {
+            setError('Masukkan kode verifikasi dari aplikasi authenticator');
+            return;
+        }
+        setLoading(true);
+        setError('');
+        const result = await authService.verifyTotp(totpChallenge.pendingToken, code);
+        if (result.success) {
+            finishLogin(result.user, null);
+            return;
+        }
+        // An expired/invalid pending token means the 5-minute window closed — drop
+        // back to the password step so the next attempt mints a fresh challenge.
+        if (/kedaluwarsa|expired/i.test(result.message || '')) {
+            setTotpChallenge(null);
+            setTotpCode('');
+        }
+        setError(result.message || 'Kode verifikasi salah');
+        setLoading(false);
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         
@@ -213,28 +266,17 @@ export default function LoginPage() {
         
         try {
             const result = await authService.login(formData.username, formData.password);
-            
+
+            if (result.requiresTwoFactor) {
+                // Password OK — swap to the code step. No session exists yet.
+                setTotpChallenge({ pendingToken: result.pendingToken });
+                setTotpCode('');
+                setLoading(false);
+                return;
+            }
+
             if (result.success) {
-                // Check for password expiry warning (Requirements: 2.8)
-                if (result.passwordExpiryWarning) {
-                    sessionStorage.setItem('passwordExpiryWarning', result.passwordExpiryWarning);
-                    // Extract days from warning message if available
-                    const daysMatch = result.passwordExpiryWarning.match(/(\d+)\s*day/i);
-                    if (daysMatch) {
-                        setPasswordExpiryDays(parseInt(daysMatch[1], 10));
-                    }
-                }
-                
-                // Customers land on their portal; staff (admin/viewer) on the dashboard.
-                const destination = result.user?.role === 'customer' ? '/my' : '/admin/dashboard';
-
-                // Show success toast (Requirements: 2.10)
-                showSuccess('Berhasil Masuk', 'Selamat datang kembali! Mengalihkan...');
-
-                // Small delay to show the toast before redirect
-                setTimeout(() => {
-                    navigate(destination);
-                }, 500);
+                finishLogin(result.user, result.passwordExpiryWarning);
             } else {
                 handleLoginError(result);
                 setLoading(false);
@@ -376,7 +418,7 @@ export default function LoginPage() {
 
                 {/* Login Card */}
                 <div className="bg-surface-raised/80 backdrop-blur-xl rounded-2xl shadow-2xl border border-edge p-8">
-                    <form onSubmit={handleSubmit} className="space-y-6">
+                    <form onSubmit={totpChallenge ? handleTotpSubmit : handleSubmit} className="space-y-6">
                         {/* Error Alert */}
                         {error && (
                             <div role="alert" className="flex items-center gap-3 p-4 bg-status-fault/10 border border-status-fault/30 rounded-xl">
@@ -445,6 +487,11 @@ export default function LoginPage() {
                             </div>
                         )}
 
+                        {/* Username + password hidden once the 2FA challenge is pending —
+                            the password factor already succeeded; showing it again would
+                            imply it needs re-checking. */}
+                        {!totpChallenge && (
+                        <>
                         {/* Username Field */}
                         <div>
                             <label htmlFor="login-username" className="block text-sm font-semibold text-content-muted mb-2">
@@ -520,6 +567,44 @@ export default function LoginPage() {
                                 </p>
                             )}
                         </div>
+                        </>
+                        )}
+
+                        {/* Second-factor step — accepts the 6-digit authenticator code
+                            or an "xxxx-xxxx" recovery code (same input, server decides). */}
+                        {totpChallenge && (
+                            <div>
+                                <div className="mb-4 flex items-center gap-3 p-4 bg-primary/10 border border-primary/30 rounded-xl">
+                                    <div className="text-primary flex-shrink-0"><Icons.Lock /></div>
+                                    <p className="text-sm text-content">
+                                        Password benar. Masukkan <span className="font-semibold">kode verifikasi 6 digit</span> dari aplikasi authenticator, atau kode pemulihan.
+                                    </p>
+                                </div>
+                                <label htmlFor="login-totp" className="block text-sm font-semibold text-content-muted mb-2">
+                                    Kode Verifikasi
+                                </label>
+                                <input
+                                    id="login-totp"
+                                    type="text"
+                                    inputMode="numeric"
+                                    autoComplete="one-time-code"
+                                    value={totpCode}
+                                    onChange={(e) => { setTotpCode(e.target.value); setError(''); }}
+                                    className="w-full px-4 py-3.5 bg-surface-sunken border border-edge rounded-xl text-content text-center text-2xl font-mono tracking-[0.4em] placeholder-content-subtle focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary transition-all disabled:opacity-50"
+                                    placeholder="••••••"
+                                    disabled={loading}
+                                    autoFocus
+                                    maxLength={9}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => { setTotpChallenge(null); setTotpCode(''); setError(''); }}
+                                    className="mt-3 text-sm text-content-muted hover:text-primary transition-colors"
+                                >
+                                    ← Kembali ke username &amp; password
+                                </button>
+                            </div>
+                        )}
 
                         {/* Submit Button */}
                         <button
@@ -543,7 +628,7 @@ export default function LoginPage() {
                                     <span>Wait {formatTime(retryCountdown)}</span>
                                 </>
                             ) : (
-                                <span>Masuk</span>
+                                <span>{totpChallenge ? 'Verifikasi' : 'Masuk'}</span>
                             )}
                         </button>
                     </form>

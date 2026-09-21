@@ -32,6 +32,7 @@ describe('apiKeyValidator public endpoint classification', () => {
             '/api/auth/register',
             '/api/auth/register-info',
             '/api/auth/refresh',
+            '/api/auth/totp/verify',
             '/api/cameras/active',
             '/api/areas/public',
             '/api/areas/filters',

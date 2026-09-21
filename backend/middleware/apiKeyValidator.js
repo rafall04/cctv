@@ -24,6 +24,7 @@ export const API_KEY_VALIDATOR_CONFIG = {
         '/api/auth/register-info',
         '/api/auth/csrf',          // CSRF token must be fetchable before login
         '/api/auth/refresh',       // refresh is anonymous by design (the access token expired)
+        '/api/auth/totp/verify',   // 2FA exchange — the pending token IS the credential; no session/API key exists yet
         '/api/cameras/active',
         '/api/stream',
         '/api/areas/public',

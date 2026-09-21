@@ -30,7 +30,7 @@ vi.mock('../database/connectionPool.js', () => ({
 vi.mock('../services/securityAuditLogger.js', () => ({
     logAuthAttempt: vi.fn(), logSessionCreated: vi.fn(), logSessionRefreshed: vi.fn(),
     logFingerprintMismatch: vi.fn(), logAccountLockout: vi.fn(), logTokenBlacklisted: vi.fn(),
-    logSessionInvalidated: vi.fn(),
+    logSessionInvalidated: vi.fn(), logSecurityEvent: vi.fn(),
 }));
 vi.mock('../services/passwordExpiry.js', () => ({
     checkPasswordExpiry: () => ({ expired: false }),
@@ -70,7 +70,9 @@ beforeEach(() => {
     for (const t of ['users', 'audit_logs', 'login_attempts', 'token_blacklist']) db.exec(`DROP TABLE IF EXISTS ${t}`);
     db.exec(`CREATE TABLE users (
         id INTEGER PRIMARY KEY, username TEXT, password_hash TEXT, role TEXT,
-        account_status TEXT DEFAULT 'approved', last_login_at TEXT, last_login_ip TEXT, tokens_invalidated_at TEXT
+        account_status TEXT DEFAULT 'approved', last_login_at TEXT, last_login_ip TEXT, tokens_invalidated_at TEXT,
+        totp_secret TEXT, totp_enabled INTEGER NOT NULL DEFAULT 0, totp_confirmed_at TEXT,
+        totp_recovery_hashes TEXT, totp_failed_attempts INTEGER NOT NULL DEFAULT 0, totp_locked_until TEXT
     )`);
     db.exec(`CREATE TABLE audit_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, action TEXT, details TEXT, ip_address TEXT)`);
     db.exec(`CREATE TABLE login_attempts (id INTEGER PRIMARY KEY AUTOINCREMENT, identifier TEXT, identifier_type TEXT, attempt_time TEXT, success INTEGER DEFAULT 0)`);
@@ -120,6 +122,51 @@ describe('authService.login', () => {
         seedUser({ account_status: 'rejected' });
         await expect(authService.login('alice', PASSWORD, '1.2.3.4', makeRequest(), makeServer()))
             .rejects.toMatchObject({ statusCode: 403, reason: 'registration_rejected' });
+    });
+});
+
+describe('authService two-factor login', () => {
+    // An honest jwt double: verifyChallenge checks the pending token's type/fp/sub
+    // claims, so the fake must round-trip real JSON rather than a static string.
+    const jsonServer = () => ({
+        jwt: {
+            sign: (payload) => Buffer.from(JSON.stringify(payload)).toString('base64url'),
+            verify: (token) => JSON.parse(Buffer.from(token, 'base64url').toString()),
+        },
+    });
+    const enrollTotp = async () => {
+        const { default: totpAuthService } = await import('../services/totpAuthService.js');
+        const { default: totpService } = await import('../services/totpService.js');
+        const { secret } = await totpAuthService.startSetup(1, 'alice', makeRequest());
+        totpAuthService.confirmSetup(1, totpService.totp(secret), makeRequest());
+        return totpService;
+    };
+
+    it('a totp_enabled account gets a pendingToken and NO session tokens', async () => {
+        seedUser();
+        await enrollTotp();
+        const res = await authService.login('alice', PASSWORD, '1.2.3.4', makeRequest(), jsonServer());
+        expect(res.requiresTwoFactor).toBe(true);
+        expect(res.pendingToken).toBeTruthy();
+        expect(res.accessToken).toBeUndefined();
+        expect(res.refreshToken).toBeUndefined();
+        // No LOGIN audit row yet — the session does not exist until factor 2 passes.
+        expect(db.prepare("SELECT COUNT(*) c FROM audit_logs WHERE action = 'LOGIN'").get().c).toBe(0);
+    });
+
+    it('completeTwoFactorLogin mints the normal session tail after a valid code', async () => {
+        seedUser();
+        const totpService = await enrollTotp();
+        const req = makeRequest();
+        const server = jsonServer();
+        const { pendingToken } = await authService.login('alice', PASSWORD, '1.2.3.4', req, server);
+        const stored = db.prepare('SELECT totp_secret FROM users WHERE id = 1').get();
+        const res = await authService.completeTwoFactorLogin(
+            server, pendingToken, totpService.totp(totpService.decryptSecret(stored.totp_secret)), req
+        );
+        expect(res.accessToken).toBeTruthy();
+        expect(res.refreshToken).toBeTruthy();
+        expect(res.user.username).toBe('alice');
     });
 });
 

@@ -17,7 +17,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../services/authService.js', () => ({
-    default: { login: vi.fn(), logout: vi.fn(), refreshTokens: vi.fn() },
+    default: { login: vi.fn(), logout: vi.fn(), refreshTokens: vi.fn(), completeTwoFactorLogin: vi.fn() },
 }));
 vi.mock('../services/billingPlanService.js', () => ({
     default: { registerCustomer: vi.fn(), getRegistrationSettings: vi.fn() },
@@ -27,7 +27,7 @@ vi.mock('../services/telegramBotService.js', () => ({
 }));
 
 const authService = (await import('../services/authService.js')).default;
-const { login, logout, refreshTokens, verifyToken } = await import('../controllers/authController.js');
+const { login, logout, refreshTokens, verifyToken, verifyTotp } = await import('../controllers/authController.js');
 
 function makeReply() {
     const reply = {
@@ -152,6 +152,66 @@ describe('login handler', () => {
         await login(makeRequest({ body: { username: 'admin', password: 'pw' } }), reply);
 
         expect(reply.body.data.passwordExpired).toBe(true);
+    });
+
+    it('2FA challenge: returns pendingToken and sets NO cookies (the session does not exist yet)', async () => {
+        authService.login.mockResolvedValue({ requiresTwoFactor: true, pendingToken: 'pend.tok' });
+        const reply = makeReply();
+        await login(makeRequest({ body: { username: 'admin', password: 'pw' } }), reply);
+
+        expect(reply.statusCode).toBe(200);
+        expect(reply.body.data).toEqual({ requiresTwoFactor: true, pendingToken: 'pend.tok' });
+        // The critical invariant: zero auth cookies on a challenge response.
+        expect(reply.cookies).toHaveLength(0);
+        expect(reply.body.data.accessToken).toBeUndefined();
+    });
+});
+
+describe('verifyTotp handler', () => {
+    it('rejects a missing pendingToken/code with 400 without reaching the service', async () => {
+        const reply = makeReply();
+        await verifyTotp(makeRequest({ body: { pendingToken: 'x' } }), reply);
+
+        expect(reply.statusCode).toBe(400);
+        expect(authService.completeTwoFactorLogin).not.toHaveBeenCalled();
+    });
+
+    it('mints the same cookie pair as a password-only login on success', async () => {
+        authService.completeTwoFactorLogin.mockResolvedValue({
+            accessToken: 'a2', refreshToken: 'r2', user: { id: 3, username: 'admin', role: 'admin' },
+        });
+        const reply = makeReply();
+        await verifyTotp(
+            makeRequest({ body: { pendingToken: 'pend.tok', code: '123456' } }), reply
+        );
+
+        expect(authService.completeTwoFactorLogin).toHaveBeenCalledWith(expect.anything(), 'pend.tok', '123456', expect.anything());
+        expect(cookie(reply, 'token').value).toBe('a2');
+        expect(cookie(reply, 'refreshToken').value).toBe('r2');
+        expect(reply.body.data.user.username).toBe('admin');
+    });
+
+    it('passes a bad-code/lockout 401 through and sets no cookies', async () => {
+        const err = new Error('Kode verifikasi salah');
+        err.statusCode = 401;
+        authService.completeTwoFactorLogin.mockRejectedValue(err);
+
+        const reply = makeReply();
+        await verifyTotp(makeRequest({ body: { pendingToken: 'p', code: '000000' } }), reply);
+
+        expect(reply.statusCode).toBe(401);
+        expect(reply.cookies).toHaveLength(0);
+    });
+
+    it('answers a GENERIC 500 on an unexpected failure', async () => {
+        authService.completeTwoFactorLogin.mockRejectedValue(new Error('SQLITE_ERROR in totp_secret'));
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        const reply = makeReply();
+        await verifyTotp(makeRequest({ body: { pendingToken: 'p', code: '1' } }), reply);
+
+        expect(reply.statusCode).toBe(500);
+        expect(JSON.stringify(reply.body)).not.toMatch(/SQLITE|totp_secret/);
     });
 });
 

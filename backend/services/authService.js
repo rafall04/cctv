@@ -21,6 +21,7 @@ import {
     isTokenInvalidatedByUser
 } from './sessionManager.js';
 import { checkPasswordExpiry, checkPasswordExpiryWarning } from './passwordExpiry.js';
+import totpAuthService from './totpAuthService.js';
 
 class AuthService {
     async login(username, password, clientIp, request, server) {
@@ -41,7 +42,7 @@ class AuthService {
         const attemptCount = getCurrentAttemptCount(username, clientIp);
 
         const user = queryOne(
-            'SELECT id, username, password_hash, role, account_status FROM users WHERE username = ?',
+            'SELECT id, username, password_hash, role, account_status, totp_enabled FROM users WHERE username = ?',
             [username]
         );
 
@@ -108,6 +109,39 @@ class AuthService {
 
         const fingerprint = generateFingerprint(request);
 
+        // Second factor: password verified but no session exists yet — hand back a
+        // 5-minute pending token that only /api/auth/totp/verify can exchange.
+        if (user.totp_enabled === 1) {
+            const pendingToken = totpAuthService.createPendingToken(server, user, fingerprint);
+            logAuthAttempt(false, {
+                username,
+                ip_address: clientIp,
+                user_id: user.id,
+                reason: 'totp_challenge_issued'
+            }, request);
+            return { requiresTwoFactor: true, pendingToken };
+        }
+
+        return this.#issueSession(user, fingerprint, request, server, clientIp);
+    }
+
+    /**
+     * Second-factor exchange: pending token + TOTP/recovery code → the same session
+     * tail as password-only login. Anything wrong throws 401 — callers never get a
+     * partial session.
+     */
+    async completeTwoFactorLogin(server, pendingToken, code, request) {
+        const { user } = totpAuthService.verifyChallenge(server, {
+            pendingToken,
+            code,
+            fingerprint: generateFingerprint(request),
+            request
+        });
+        const ip = request?.ip || request?.headers?.['x-forwarded-for'] || 'unknown';
+        return this.#issueSession(user, generateFingerprint(request), request, server, ip);
+    }
+
+    #issueSession(user, fingerprint, request, server, clientIp) {
         const { accessToken, refreshToken, sessionCreatedAt } = createTokenPair(
             server,
             user,
@@ -120,15 +154,15 @@ class AuthService {
         );
 
         logAuthAttempt(true, {
-            username,
-            ip_address: clientIp,
+            username: user.username,
+            ip_address: request.ip,
             user_id: user.id,
             fingerprint: fingerprint.substring(0, 16) + '...'
         }, request);
 
         logSessionCreated({
             userId: user.id,
-            username: username,
+            username: user.username,
             fingerprint: fingerprint
         }, request);
 

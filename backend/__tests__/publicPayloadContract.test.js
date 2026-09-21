@@ -200,7 +200,7 @@ beforeAll(() => {
             last_online_check, owner_user_id, leak_canary)
         VALUES (@id, @name, 'desc', 'loc', 'grp', 10, 0, -7.8, 112.0, 'active', 1, 1,
             @camera_class, 0, 'active', 'h264', '/api/thumbnails/cam1.jpg', '2026-09-21',
-            'internal', 'internal_hls', 'rtsp://admin:canary@10.0.0.9:554/stream1',
+            'internal', 'internal_hls', 'rtsp://admin:secret@10.0.0.9:554/stream1',
             'sekrit_stream_key_9', NULL, NULL, NULL, NULL, 'direct', 1, 'strict', 'default',
             'inherit', NULL, 'default', NULL, 'default', 1, '2026-09-21', 42, '${CANARY_VALUE}')`);
 

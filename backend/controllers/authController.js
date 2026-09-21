@@ -25,6 +25,15 @@ export async function login(request, reply) {
 
         const data = await authService.login(username, password, clientIp, request, request.server);
 
+        // 2FA challenge — NO cookies/tokens are issued here; the client must exchange
+        // pendingToken + code at /api/auth/totp/verify to get a real session.
+        if (data.requiresTwoFactor) {
+            return reply.send({
+                success: true,
+                data: { requiresTwoFactor: true, pendingToken: data.pendingToken },
+            });
+        }
+
         const cookieOptions = getAuthCookieOptions(request);
         reply.setCookie('token', data.accessToken, cookieOptions.access);
         reply.setCookie('refreshToken', data.refreshToken, cookieOptions.refresh);
@@ -61,6 +70,35 @@ export async function login(request, reply) {
             success: false,
             message: 'Internal server error',
         });
+    }
+}
+
+/**
+ * Second-factor exchange: { pendingToken, code } → session cookies + user, identical
+ * shape to a successful password-only login so the frontend shares one code path.
+ */
+export async function verifyTotp(request, reply) {
+    try {
+        const { pendingToken, code } = request.body || {};
+        if (!pendingToken || !code) {
+            return reply.code(400).send({ success: false, message: 'pendingToken dan code wajib diisi' });
+        }
+        const data = await authService.completeTwoFactorLogin(request.server, pendingToken, code, request);
+        const cookieOptions = getAuthCookieOptions(request);
+        reply.setCookie('token', data.accessToken, cookieOptions.access);
+        reply.setCookie('refreshToken', data.refreshToken, cookieOptions.refresh);
+        return reply.send({
+            success: true,
+            message: 'Login successful',
+            data: { token: data.accessToken, refreshToken: data.refreshToken, user: data.user },
+        });
+    } catch (error) {
+        const status = error.statusCode || 500;
+        if (status < 500) {
+            return reply.code(status).send({ success: false, message: error.message });
+        }
+        console.error('TOTP verify error:', error);
+        return reply.code(500).send({ success: false, message: 'Internal server error' });
     }
 }
 

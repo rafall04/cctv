@@ -29,13 +29,22 @@ export const authService = {
             });
 
             if (response.data.success) {
+                // 2FA branch: password verified server-side but no session exists —
+                // the caller must exchange pendingToken + code via verifyTotp.
+                if (response.data.data?.requiresTwoFactor) {
+                    return {
+                        success: true,
+                        requiresTwoFactor: true,
+                        pendingToken: response.data.data.pendingToken,
+                    };
+                }
                 const { user } = response.data.data;
-                
+
                 // Store only user info (tokens are in HttpOnly cookies)
                 localStorage.setItem('user', JSON.stringify(user));
-                
-                return { 
-                    success: true, 
+
+                return {
+                    success: true,
                     user,
                     // Include password expiry warning if present
                     passwordExpiryWarning: response.data.data.passwordExpiryWarning || null
@@ -99,6 +108,30 @@ export const authService = {
             return {
                 success: false,
                 message: response?.data?.message || 'Login failed. Please try again.',
+            };
+        }
+    },
+
+    /**
+     * Second-factor exchange after a login that returned requiresTwoFactor.
+     * Accepts a 6-digit TOTP or a one-time recovery code; on success the backend
+     * has already set the session cookies and returns the user.
+     * @returns {Promise<Object>} { success, user } | { success:false, message }
+     */
+    async verifyTotp(pendingToken, code) {
+        try {
+            const response = await apiClient.post('/api/auth/totp/verify', { pendingToken, code });
+            if (response.data.success) {
+                const { user } = response.data.data;
+                localStorage.setItem('user', JSON.stringify(user));
+                return { success: true, user };
+            }
+            return { success: false, message: response.data.message || 'Verifikasi gagal' };
+        } catch (error) {
+            return {
+                success: false,
+                message: error.response?.data?.message || 'Verifikasi gagal. Coba lagi.',
+                isRateLimited: error.response?.status === 429,
             };
         }
     },
