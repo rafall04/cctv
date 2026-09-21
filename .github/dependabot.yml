@@ -1,0 +1,41 @@
+# Dependabot — weekly dependency updates + security advisories.
+# Security updates for prod deps are what keep the deps-audit CI job green without
+# manual firefighting; dev deps ride along so vite/vitest majors arrive as reviewable PRs
+# instead of surprise breakage.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /backend
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    versioning-strategy: increase
+    groups:
+      # Land related majors together (vitest + @vitest/* must move as one unit).
+      vitest:
+        patterns: ["vitest", "@vitest/*"]
+      fastify:
+        patterns: ["fastify", "@fastify/*"]
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    versioning-strategy: increase
+    groups:
+      vitest:
+        patterns: ["vitest", "@vitest/*"]
+      vite:
+        patterns: ["vite", "@vitejs/*", "esbuild"]
+      react-router:
+        patterns: ["react-router", "react-router-dom"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
