@@ -241,8 +241,8 @@ describe('PlaybackVideo speed control on a phone', () => {
         const speedButtons = screen.getAllByTitle(/^Kecepatan /);
         expect(speedButtons).toHaveLength(1);
         const cls = speedButtons[0].getAttribute('class');
-        expect(cls).toContain('min-h-[40px]');
-        expect(cls).toContain('sm:min-h-0');
+        expect(cls).toContain('h-10');
+        expect(cls).toContain('sm:h-8');
         expect(cls).toContain('px-2');
     });
 
@@ -352,6 +352,24 @@ describe('PlaybackVideo zoom pill', () => {
         // bar that scales with the frame is worse than none.
         expect(container.querySelector('video').hasAttribute('controls')).toBe(false);
     });
+
+    /*
+     * The live popup offers an explicit ⟲ reset once zoomed; playback originally hid reset
+     * INSIDE the % label — invisible until you already knew it. The dedicated button must
+     * appear exactly while zoomed and return the picture to 1x, matching the popup.
+     */
+    it('offers an explicit reset only while zoomed, and reset returns to 1x', () => {
+        render(<PlaybackVideo {...baseProps} selectedSegment={playingSegment} />);
+
+        expect(screen.queryByTitle('Reset Zoom')).toBeNull();
+
+        fireEvent.click(screen.getByTitle('Perbesar'));
+        expect(screen.getByTestId('playback-zoom').textContent).toContain('1.5x');
+
+        fireEvent.click(screen.getByTitle('Reset Zoom'));
+        expect(screen.getByTestId('playback-zoom').textContent).toContain('1.0x');
+        expect(screen.queryByTitle('Reset Zoom')).toBeNull();
+    });
 });
 
 /*
@@ -389,5 +407,19 @@ describe('PlaybackVideo external control bar', () => {
 
         expect(screen.queryByTestId('playback-controls')).toBeNull();
         expect(screen.getByTestId('playback-zoom-fullscreen')).toBeTruthy();
+    });
+
+    /*
+     * Fullscreen mirrors the live popup: ONE minimal pill at the bottom-right corner holds
+     * zoom AND snapshot together — not two separate floating rails on opposite corners.
+     */
+    it('groups zoom and snapshot into one bottom-right pill in fullscreen', () => {
+        render(<PlaybackVideo {...baseProps} isFullscreen selectedSegment={playingSegment} />);
+
+        const pill = screen.getByTestId('playback-zoom-fullscreen');
+        expect(pill.className).toContain('right-4');
+        for (const title of ['Perkecil', 'Perbesar', 'Ambil Snapshot & Share']) {
+            expect(pill.contains(screen.getByTitle(title))).toBe(true);
+        }
     });
 });

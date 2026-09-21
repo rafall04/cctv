@@ -7,6 +7,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import CodecBadge from '../CodecBadge';
+import { Icons } from '../ui/Icons.jsx';
 import usePlaybackZoom from '../../hooks/playback/usePlaybackZoom';
 import { useAnimationGate } from '../../utils/animationControl';
 import {
@@ -445,51 +446,53 @@ export default function PlaybackVideo({
                             </div>
                         </div>
 
-                        <div className="absolute bottom-20 right-4 flex flex-col overflow-hidden rounded-xl bg-white/10 shadow-lg divide-y divide-white/15 pointer-events-auto">
-                            <button
-                                onClick={onSnapshot}
-                                disabled={!videoElRef.current || videoElRef.current.paused || videoElRef.current.readyState < 2}
-                                className="p-3 text-white transition-colors hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed"
-                                title="Ambil Snapshot & Share"
-                                aria-label="Ambil Snapshot & Share"
-                            >
-                                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                                </svg>
-                            </button>
-                        </div>
-
-                        <div className="absolute bottom-20 left-4 flex overflow-hidden rounded-xl bg-white/10 shadow-lg pointer-events-auto" data-testid="playback-zoom-fullscreen">
+                        {/*
+                          * ONE minimal pill bottom-right — the live popup's fullscreen pattern
+                          * (bg-black/60 rounded-xl p-1). Zoom + snapshot share the pill so the
+                          * corner holds a single visual object; bottom-20 clears the native
+                          * <video controls> bar that browsers draw at 1x.
+                          */}
+                        <div className="absolute bottom-20 right-4 flex items-center gap-1 rounded-xl bg-black/60 p-1 pointer-events-auto" data-testid="playback-zoom-fullscreen">
                             <button
                                 onClick={zoomOut}
                                 disabled={!isZoomed}
-                                className="p-3 text-white transition-colors hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed"
+                                className="p-2 rounded-lg text-white transition-colors hover:bg-white/20 active:bg-white/30 disabled:opacity-30 disabled:cursor-not-allowed"
                                 title="Perkecil"
                                 aria-label="Perkecil"
                             >
-                                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607zM13.5 10.5h-6" />
-                                </svg>
+                                <Icons.ZoomOut />
                             </button>
-                            <button
-                                onClick={resetZoom}
-                                className="px-3 text-white text-sm font-medium tabular-nums transition-colors hover:bg-white/20 border-x border-white/15"
-                                title={isZoomed ? `Zoom ${zoom.toFixed(1)}x — ketuk untuk reset` : 'Zoom 1.0x'}
-                                aria-label={isZoomed ? `Zoom ${zoom.toFixed(1)}x, ketuk untuk reset` : 'Zoom 1.0x'}
-                            >
+                            <span className="w-9 text-center text-xs font-medium tabular-nums text-white">
                                 {zoom.toFixed(1)}x
-                            </button>
+                            </span>
                             <button
                                 onClick={zoomIn}
                                 disabled={zoom >= 4}
-                                className="p-3 text-white transition-colors hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed"
+                                className="p-2 rounded-lg text-white transition-colors hover:bg-white/20 active:bg-white/30 disabled:opacity-30 disabled:cursor-not-allowed"
                                 title="Perbesar"
                                 aria-label="Perbesar"
                             >
-                                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607zM10.5 7.5v6m3-3h-6" />
-                                </svg>
+                                <Icons.ZoomIn />
+                            </button>
+                            {isZoomed && (
+                                <button
+                                    onClick={resetZoom}
+                                    className="p-2 rounded-lg text-white transition-colors hover:bg-white/20 active:bg-white/30"
+                                    title="Reset Zoom"
+                                    aria-label="Reset Zoom"
+                                >
+                                    <Icons.Reset />
+                                </button>
+                            )}
+                            <span className="mx-0.5 h-5 w-px bg-white/20" aria-hidden="true" />
+                            <button
+                                onClick={onSnapshot}
+                                disabled={!videoElRef.current || videoElRef.current.paused || videoElRef.current.readyState < 2}
+                                className="p-2 rounded-lg text-white transition-colors hover:bg-white/20 active:bg-white/30 disabled:opacity-30 disabled:cursor-not-allowed"
+                                title="Ambil Snapshot & Share"
+                                aria-label="Ambil Snapshot & Share"
+                            >
+                                <Icons.Image />
                             </button>
                         </div>
                     </div>
@@ -538,42 +541,46 @@ export default function PlaybackVideo({
                     </div>
 
                     <div className="flex shrink-0 items-center gap-1">
+                        {/* Zoom pill — identical anatomy to the live popup: − | x.x | + | ⟲(saat zoom).
+                            Semua tombol satu tinggi (h-10 sentuh / h-8 desktop) supaya bar terbaca
+                            sebagai satu deret rapi, bukan kumpulan ukuran acak. */}
                         <div className="flex items-center gap-0.5 rounded-lg bg-surface-raised p-0.5" data-testid="playback-zoom">
                             <button
                                 onClick={zoomOut}
                                 disabled={!isZoomed}
-                                className="min-h-[40px] min-w-[40px] rounded text-content transition-colors hover:bg-surface-overlay disabled:opacity-30 disabled:cursor-not-allowed sm:min-h-0 sm:min-w-0 sm:p-1.5"
+                                className="flex h-10 w-10 items-center justify-center rounded text-content transition-colors hover:bg-surface-overlay disabled:opacity-30 disabled:cursor-not-allowed sm:h-8 sm:w-8"
                                 title="Perkecil"
                                 aria-label="Perkecil"
                             >
-                                <svg className="mx-auto h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607zM13.5 10.5h-6" />
-                                </svg>
+                                <Icons.ZoomOut />
                             </button>
-                            <button
-                                onClick={resetZoom}
-                                className="min-h-[40px] rounded px-1.5 text-xs font-medium tabular-nums text-content transition-colors hover:bg-surface-overlay sm:min-h-0 sm:px-2"
-                                title={isZoomed ? `Zoom ${zoom.toFixed(1)}x — ketuk untuk reset` : 'Zoom 1.0x'}
-                                aria-label={isZoomed ? `Zoom ${zoom.toFixed(1)}x, ketuk untuk reset` : 'Zoom 1.0x'}
-                            >
+                            <span className="w-10 text-center text-xs font-medium tabular-nums text-content sm:w-9">
                                 {zoom.toFixed(1)}x
-                            </button>
+                            </span>
                             <button
                                 onClick={zoomIn}
                                 disabled={zoom >= 4}
-                                className="min-h-[40px] min-w-[40px] rounded text-content transition-colors hover:bg-surface-overlay disabled:opacity-30 disabled:cursor-not-allowed sm:min-h-0 sm:min-w-0 sm:p-1.5"
+                                className="flex h-10 w-10 items-center justify-center rounded text-content transition-colors hover:bg-surface-overlay disabled:opacity-30 disabled:cursor-not-allowed sm:h-8 sm:w-8"
                                 title="Perbesar"
                                 aria-label="Perbesar"
                             >
-                                <svg className="mx-auto h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607zM10.5 7.5v6m3-3h-6" />
-                                </svg>
+                                <Icons.ZoomIn />
                             </button>
+                            {isZoomed && (
+                                <button
+                                    onClick={resetZoom}
+                                    className="flex h-10 w-10 items-center justify-center rounded text-content transition-colors hover:bg-surface-overlay sm:h-8 sm:w-8"
+                                    title="Reset Zoom"
+                                    aria-label="Reset Zoom"
+                                >
+                                    <Icons.Reset />
+                                </button>
+                            )}
                         </div>
 
                         <button
                             onClick={() => onSpeedChange(SPEED_STEPS[(SPEED_STEPS.indexOf(playbackSpeed) + 1) % SPEED_STEPS.length] ?? 1)}
-                            className={`min-h-[40px] min-w-[40px] rounded-lg px-2 text-xs font-medium tabular-nums transition-colors sm:min-h-0 sm:min-w-0 sm:px-2.5 sm:py-1.5 ${
+                            className={`flex h-10 min-w-10 items-center justify-center rounded-lg px-2 text-xs font-medium tabular-nums transition-colors sm:h-8 sm:min-w-0 sm:px-2.5 ${
                                 playbackSpeed === 1
                                     ? 'bg-surface-raised text-content hover:bg-surface-overlay'
                                     : 'bg-primary text-white'
@@ -587,25 +594,20 @@ export default function PlaybackVideo({
                         <button
                             onClick={onSnapshot}
                             disabled={!videoElRef.current || videoElRef.current.paused || videoElRef.current.readyState < 2}
-                            className="min-h-[40px] min-w-[40px] rounded-lg bg-surface-raised text-content transition-colors hover:bg-surface-overlay disabled:opacity-30 disabled:cursor-not-allowed sm:min-h-0 sm:min-w-0 sm:p-1.5"
+                            className="flex h-10 w-10 items-center justify-center rounded-lg bg-surface-raised text-content transition-colors hover:bg-surface-overlay disabled:opacity-30 disabled:cursor-not-allowed sm:h-8 sm:w-8"
                             title="Ambil Snapshot & Share"
                             aria-label="Ambil Snapshot & Share"
                         >
-                            <svg className="mx-auto h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                            </svg>
+                            <Icons.Image />
                         </button>
 
                         <button
                             onClick={onToggleFullscreen}
-                            className="min-h-[40px] min-w-[40px] rounded-lg bg-surface-raised text-content transition-colors hover:bg-surface-overlay sm:min-h-0 sm:min-w-0 sm:p-1.5"
+                            className="flex h-10 w-10 items-center justify-center rounded-lg bg-surface-raised text-content transition-colors hover:bg-surface-overlay sm:h-8 sm:w-8"
                             title="Fullscreen"
                             aria-label="Fullscreen"
                         >
-                            <svg className="mx-auto h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-                            </svg>
+                            <Icons.Fullscreen />
                         </button>
                     </div>
                 </div>
