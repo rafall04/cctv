@@ -21,6 +21,7 @@ SSH_TARGET=""            # user@host:port — enables auto-discovery + infra che
 PRIVATE_SET=""           # "id:stream_key,id:stream_key,..."
 COMMUNITY=""             # "id:stream_key" positive control
 DB_PATH="/root/cctv/backend/data/cctv.db"  # prod default; override with --db
+APP_DIR="${APP_DIR:-/var/www/rafnet-cctv}"   # deploy root for the .env perms check
 
 RED=$'\033[0;31m'; GREEN=$'\033[0;32m'; YELLOW=$'\033[1;33m'; BLUE=$'\033[0;36m'; NC=$'\033[0m'
 info() { echo -e "${BLUE}i${NC} $1"; }
@@ -80,6 +81,7 @@ if [ -n "$SSH_TARGET" ]; then
     SSH_HOST="${SSH_TARGET%%:*}"; SSH_PORT="${SSH_TARGET##*:}"
     [ "$SSH_PORT" = "$SSH_TARGET" ] && SSH_PORT=22
     SSH_CMD=(ssh -p "$SSH_PORT" -o BatchMode=yes -o StrictHostKeyChecking=accept-new)
+    [ -n "${SSH_KEY:-}" ] && SSH_CMD+=(-i "$SSH_KEY")
     if [ -n "${SSH_PASS:-}" ]; then
         command -v sshpass >/dev/null || { echo "sshpass needed for SSH_PASS auth" >&2; exit 2; }
         SSH_CMD=(sshpass -e ssh -p "$SSH_PORT" -o StrictHostKeyChecking=accept-new)
@@ -179,7 +181,38 @@ grep -o '"[^"]*"[[:space:]]*:[[:space:]]*"[^"]*token=' "$BODY_ACTIVE" | grep -v 
     || report PASS "/api/cameras/active" "token= only in external_*_url"
 
 # ---------------------------------------------------------------------------
-# Step 4 (optional, --ssh only): infra exposure — bind addresses + env perms.
+# Step 4: security headers — CSP on the document, hardened set, no duplicates.
+# A proxied response used to emit each header twice (nginx add_header inherits
+# into proxy locations AND Fastify set its own) — count occurrences, not just
+# presence.
+# ---------------------------------------------------------------------------
+echo; hr; echo "Security headers"; hr
+HDR_HTML="$TMPDIR_PROBE/headers-html.txt"; HDR_API="$TMPDIR_PROBE/headers-api.txt"
+curl -sI --max-time 15 "$BASE_URL/" -o "$HDR_HTML" || true
+curl -sI --max-time 15 "$BASE_URL/api/cameras/active" -o "$HDR_API" || true
+
+header_count() { grep -ciE "^$2:" "$1" || true; }
+
+grep -qi '^content-security-policy:.*default-src' "$HDR_HTML" \
+    && report PASS "/ CSP" "present" \
+    || report FAIL "/ CSP" "present" "absent"
+grep -qi 'frame-ancestors' "$HDR_HTML" \
+    && report PASS "/ CSP frame-ancestors" "present" \
+    || report FAIL "/ CSP frame-ancestors" "present" "absent"
+grep -qi '^strict-transport-security:' "$HDR_HTML" \
+    && report PASS "/ HSTS" "present" \
+    || report WARN "/ HSTS" "present" "absent"
+grep -qi '^x-xss-protection: 0' "$HDR_HTML" \
+    && report PASS "/ X-XSS-Protection" "0 (auditor off)" \
+    || report FAIL "/ X-XSS-Protection" "0" "$(grep -i '^x-xss-protection' "$HDR_HTML" | tr -d '\r')"
+for h in x-frame-options x-content-type-options x-xss-protection content-security-policy; do
+    n=$(header_count "$HDR_API" "$h")
+    [ "$n" -le 1 ] && report PASS "/api/ $h count" "<=1" || report FAIL "/api/ $h count" "<=1" "$n (duplicate headers)"
+done
+grep -qi '^server: cloudflare' "$HDR_HTML" || true  # informational only
+
+# ---------------------------------------------------------------------------
+# Step 5 (optional, --ssh only): infra exposure — bind addresses + env perms.
 # ---------------------------------------------------------------------------
 if [ -n "$SSH_TARGET" ]; then
     echo; hr; echo "Infra exposure (SSH, read-only)"; hr

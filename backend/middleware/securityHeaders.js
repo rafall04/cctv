@@ -1,57 +1,19 @@
 /**
- * Security Headers Middleware
- * 
- * Implements security headers to protect against common web vulnerabilities:
- * - X-Content-Type-Options: nosniff (prevents MIME type sniffing)
- * - X-Frame-Options: DENY (prevents clickjacking)
- * - X-XSS-Protection: 1; mode=block (enables XSS filter)
- * - Content-Security-Policy (restricts resource origins)
- * - Removes X-Powered-By and Server headers
- * - Cache-Control: no-store for auth endpoints
- * 
+ * Security Headers Middleware — API/backend layer.
+ *
+ * The Fastify process serves JSON + media bytes only (no HTML — the SPA is
+ * served by nginx, which owns the DOCUMENT Content-Security-Policy). Two facts
+ * follow:
+ *   - This layer IS the only header authority for clients hitting the backend
+ *     directly (api-cctv.raf.my.id reaches :3000 through cloudflared, not nginx).
+ *   - The CSP here is deliberately strict-none: a CSP on a JSON or playlist
+ *     response is inert anyway, and `default-src 'none'` is the honest statement
+ *     that nothing this process emits is a document.
+ *
  * Requirements: 8.1, 8.2, 8.3, 8.5, 8.6, 8.7
  */
 
 import fp from 'fastify-plugin';
-import { config } from '../config/config.js';
-
-const DEFAULT_AD_SCRIPT_SOURCES = [
-    'http://www.topcreativeformat.com',
-    'https://www.topcreativeformat.com',
-    'https://inklinkor.com',
-    'https://*.effectivegatecpm.com',
-    'https://*.topcreativeformat.com',
-];
-
-const DEFAULT_AD_FRAME_SOURCES = [
-    'http://www.topcreativeformat.com',
-    'https://www.topcreativeformat.com',
-    'https://*.effectivegatecpm.com',
-    'https://*.topcreativeformat.com',
-];
-
-const DEFAULT_AD_CONNECT_SOURCES = [
-    'https://*.effectivegatecpm.com',
-    'https://*.topcreativeformat.com',
-    'https://inklinkor.com',
-];
-
-function uniqueSources(...sourceGroups) {
-    return [...new Set(sourceGroups.flat().filter(Boolean))];
-}
-
-const adScriptSources = uniqueSources(
-    DEFAULT_AD_SCRIPT_SOURCES,
-    config.security?.ads?.scriptAllowedHosts || []
-);
-const adFrameSources = uniqueSources(
-    DEFAULT_AD_FRAME_SOURCES,
-    config.security?.ads?.frameAllowedHosts || []
-);
-const adConnectSources = uniqueSources(
-    DEFAULT_AD_CONNECT_SOURCES,
-    config.security?.ads?.connectAllowedHosts || []
-);
 
 /**
  * Security headers configuration
@@ -59,29 +21,32 @@ const adConnectSources = uniqueSources(
 export const SECURITY_HEADERS_CONFIG = {
     // X-Content-Type-Options prevents MIME type sniffing
     contentTypeOptions: 'nosniff',
-    
+
     // X-Frame-Options prevents clickjacking
     frameOptions: 'DENY',
-    
-    // X-XSS-Protection enables browser XSS filter
-    xssProtection: '1; mode=block',
-    
-    // Content-Security-Policy restricts resource origins
-    contentSecurityPolicy: [
-        "default-src 'self'",
-        `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${adScriptSources.join(' ')}`,
-        "style-src 'self' 'unsafe-inline'",
-        "img-src 'self' data: blob: https: http:",
-        "font-src 'self' data:",
-        `connect-src 'self' ws: wss: http: https: ${adConnectSources.join(' ')}`,
-        "media-src 'self' blob: http: https:",
-        `frame-src ${adFrameSources.join(' ')}`,
-        "frame-ancestors 'none'"
-    ].join('; '),
-    
+
+    // X-XSS-Protection '0' — the browser XSS auditor is deprecated and was itself
+    // an XSS vector (attackers could force-block legitimate scripts). Modern
+    // guidance is to disable it explicitly; CSP is the real control.
+    xssProtection: '0',
+
+    // API/media responses are never documents — strict-none is the correct shape.
+    contentSecurityPolicy: "default-src 'none'; frame-ancestors 'none'; base-uri 'none'",
+
+    // API responses must not leak the request URL as Referer to subresources.
+    referrerPolicy: 'no-referrer',
+
+    // The API never needs device features; deny all so a compromised page context
+    // cannot piggyback on api-origin responses for permissions.
+    permissionsPolicy: 'camera=(), microphone=(), geolocation=()',
+
+    // 6 months + subdomains. Emitted over HTTPS only has effect; on HTTP it is
+    // ignored per spec — harmless either way.
+    strictTransportSecurity: 'max-age=15552000; includeSubDomains',
+
     // Headers to remove for security
     headersToRemove: ['X-Powered-By', 'Server'],
-    
+
     // Auth endpoints that need Cache-Control: no-store
     authEndpoints: ['/api/auth', '/api/admin']
 };
@@ -92,7 +57,7 @@ export const SECURITY_HEADERS_CONFIG = {
  * @returns {boolean} True if auth endpoint
  */
 export function isAuthEndpoint(url) {
-    return SECURITY_HEADERS_CONFIG.authEndpoints.some(endpoint => 
+    return SECURITY_HEADERS_CONFIG.authEndpoints.some(endpoint =>
         url.startsWith(endpoint)
     );
 }
@@ -107,14 +72,17 @@ export function getSecurityHeaders(url = '') {
         'X-Content-Type-Options': SECURITY_HEADERS_CONFIG.contentTypeOptions,
         'X-Frame-Options': SECURITY_HEADERS_CONFIG.frameOptions,
         'X-XSS-Protection': SECURITY_HEADERS_CONFIG.xssProtection,
-        'Content-Security-Policy': SECURITY_HEADERS_CONFIG.contentSecurityPolicy
+        'Content-Security-Policy': SECURITY_HEADERS_CONFIG.contentSecurityPolicy,
+        'Referrer-Policy': SECURITY_HEADERS_CONFIG.referrerPolicy,
+        'Permissions-Policy': SECURITY_HEADERS_CONFIG.permissionsPolicy,
+        'Strict-Transport-Security': SECURITY_HEADERS_CONFIG.strictTransportSecurity
     };
-    
+
     // Add Cache-Control: no-store for auth endpoints
     if (isAuthEndpoint(url)) {
         headers['Cache-Control'] = 'no-store';
     }
-    
+
     return headers;
 }
 
@@ -161,25 +129,28 @@ export function validateSecurityHeaders(headers) {
         'X-Content-Type-Options',
         'X-Frame-Options',
         'X-XSS-Protection',
-        'Content-Security-Policy'
+        'Content-Security-Policy',
+        'Referrer-Policy',
+        'Permissions-Policy',
+        'Strict-Transport-Security'
     ];
-    
+
     const forbiddenHeaders = ['X-Powered-By', 'Server'];
-    
+
     // Normalize header names to lowercase for comparison
     const normalizedHeaders = {};
     Object.keys(headers).forEach(key => {
         normalizedHeaders[key.toLowerCase()] = headers[key];
     });
-    
-    const missing = requiredHeaders.filter(h => 
+
+    const missing = requiredHeaders.filter(h =>
         !normalizedHeaders[h.toLowerCase()]
     );
-    
-    const extra = forbiddenHeaders.filter(h => 
+
+    const extra = forbiddenHeaders.filter(h =>
         normalizedHeaders[h.toLowerCase()]
     );
-    
+
     return {
         valid: missing.length === 0 && extra.length === 0,
         missing,
@@ -194,37 +165,37 @@ export function validateSecurityHeaders(headers) {
  */
 export function validateSecurityHeaderValues(headers) {
     const errors = [];
-    
+
     // Normalize header names to lowercase for comparison
     const normalizedHeaders = {};
     Object.keys(headers).forEach(key => {
         normalizedHeaders[key.toLowerCase()] = headers[key];
     });
-    
+
     // Validate X-Content-Type-Options
     const contentTypeOptions = normalizedHeaders['x-content-type-options'];
     if (contentTypeOptions && contentTypeOptions !== 'nosniff') {
         errors.push(`X-Content-Type-Options should be 'nosniff', got '${contentTypeOptions}'`);
     }
-    
+
     // Validate X-Frame-Options
     const frameOptions = normalizedHeaders['x-frame-options'];
     if (frameOptions && frameOptions !== 'DENY') {
         errors.push(`X-Frame-Options should be 'DENY', got '${frameOptions}'`);
     }
-    
-    // Validate X-XSS-Protection
+
+    // Validate X-XSS-Protection — must be disabled, never the legacy mode=block
     const xssProtection = normalizedHeaders['x-xss-protection'];
-    if (xssProtection && xssProtection !== '1; mode=block') {
-        errors.push(`X-XSS-Protection should be '1; mode=block', got '${xssProtection}'`);
+    if (xssProtection && xssProtection !== '0') {
+        errors.push(`X-XSS-Protection should be '0' (deprecated auditor disabled), got '${xssProtection}'`);
     }
-    
+
     // Validate Content-Security-Policy contains frame-ancestors 'none'
     const csp = normalizedHeaders['content-security-policy'];
     if (csp && !csp.includes("frame-ancestors 'none'")) {
         errors.push("Content-Security-Policy should include frame-ancestors 'none'");
     }
-    
+
     return {
         valid: errors.length === 0,
         errors
