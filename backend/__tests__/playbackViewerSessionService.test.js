@@ -22,6 +22,7 @@ vi.mock('../database/connectionPool.js', () => ({
     query: queryMock,
     queryOne: queryOneMock,
     execute: executeMock,
+    transaction: (fn) => () => fn(),
 }));
 
 vi.mock('../services/timezoneService.js', () => ({
@@ -67,11 +68,18 @@ describe('playbackViewerSessionService', () => {
         });
 
         expect(ended).toBe(true);
-        expect(executeMock).toHaveBeenCalledWith(expect.stringContaining('UPDATE playback_viewer_sessions'), [
-            '2026-05-05 14:00:30',
-            30,
-            'playback-session-1',
-        ]);
+        // History INSERT carries the computed duration; the live row is then DELETEd
+        // (every reader filters is_active=1, so ended rows were insert-only bloat).
+        expect(executeMock).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO playback_viewer_session_history'),
+            expect.arrayContaining([
+                7,
+                'Playback Camera',
+                'seg-1.mp4',
+                '2026-05-05 14:00:00',
+                '2026-05-05 14:00:30',
+                30,
+            ]));
+        expect(executeMock).toHaveBeenCalledWith(expect.stringContaining('DELETE FROM playback_viewer_sessions'), ['playback-session-1']);
     });
 
     it('archives playback history against a UTC cutoff (90 days before now, UTC)', () => {

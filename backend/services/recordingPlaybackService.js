@@ -672,8 +672,7 @@ class RecordingPlaybackService {
     generatePlaylist(cameraId, request) {
         const { access, segmentsAscending } = this.getAccessibleSegments(cameraId, request);
 
-        // Unlike the JSON segment list, an HLS playlist cannot express "nothing here" —
-        // a player handed an empty manifest stalls rather than reporting the condition.
+        // An HLS playlist cannot express "nothing here" — an empty manifest stalls the player.
         if (segmentsAscending.length === 0) {
             const err = new Error('No segments found');
             err.statusCode = 404;
@@ -685,7 +684,8 @@ class RecordingPlaybackService {
         playlist += '#EXT-X-TARGETDURATION:600\n';
         playlist += '#EXT-X-MEDIA-SEQUENCE:0\n';
 
-        const querySuffix = access.accessMode === 'admin_full' ? '?scope=admin' : '';
+        // Propagate the non-public scope — each emitted segment URL re-resolves access from scratch.
+        const querySuffix = { admin_full: '?scope=admin', owner_full: '?scope=owner' }[access.accessMode] || '';
 
         segmentsAscending.forEach((segment) => {
             playlist += `#EXTINF:${segment.duration}.0,\n`;

@@ -287,7 +287,7 @@ function App() {
                 <Route
                     path="/admin/feedback"
                     element={
-                        <AdminPageRoute>
+                        <AdminPageRoute adminOnly>
                             <FeedbackManagement />
                         </AdminPageRoute>
                     }

@@ -99,6 +99,15 @@ export async function getCameraById(request, reply) {
         if (camera && request.user?.role !== 'admin') {
             delete camera.private_rtsp_url;
             delete camera.stream_key;
+            // ONVIF creds are plaintext by design (time-sync feature needs them) and were
+            // never meant to leave this route — same rule as private_rtsp_url above.
+            delete camera.onvif_username;
+            delete camera.onvif_password;
+            for (const field of CREDENTIAL_BEARING_URL_FIELDS) {
+                if (camera[field]) {
+                    camera[field] = stripUrlCredentials(camera[field]);
+                }
+            }
         }
 
         return reply.send({ success: true, data: camera });

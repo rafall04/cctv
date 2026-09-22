@@ -225,6 +225,18 @@ describe('createOrder — refuses before it ever charges', () => {
         expect(Number.isInteger(row.amount)).toBe(true);
     });
 
+    it('stores iPaymu Expired as UTC — zoneless WIB wall-clock, not server-local', async () => {
+        h.chargeResponse = {
+            httpOk: true,
+            body: { Data: { TransactionId: 'TRX-TZ', QrString: '00020101', Expired: '2026-09-22 20:30:00' } },
+        };
+        await service.createOrder(PRODUCT.key, { deviceHash: 'dev-tz' });
+        // 20:30 WIB == 13:30Z. new Date() on a UTC host would store 20:30Z — the order would
+        // look alive ~7h too long and, worse, expire a paid-in-flight order early.
+        const row = db.prepare('SELECT expires_at FROM playback_orders WHERE gateway_ref = ?').get('TRX-TZ');
+        expect(row.expires_at).toBe('2026-09-22T13:30:00.000Z');
+    });
+
     it('surfaces a gateway refusal instead of writing a phantom order', async () => {
         h.chargeResponse = { httpOk: false, body: { Message: 'insufficient' } };
         vi.spyOn(console, 'error').mockImplementation(() => {});

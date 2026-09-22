@@ -726,8 +726,8 @@ function VideoPopup({
                     if (!hls._networkErrorRecoveryCount) hls._networkErrorRecoveryCount = 0;
                     hls._networkErrorRecoveryCount++;
 
-                    if (hls._networkErrorRecoveryCount <= 5) {
-                        console.log(`[VideoPopup] Recovering external stream network error (${hls._networkErrorRecoveryCount}/5)`);
+                    if (hls._networkErrorRecoveryCount <= 2) {
+                        console.log(`[VideoPopup] Recovering external stream network error (${hls._networkErrorRecoveryCount}/2)`);
                         hls.startLoad();
 
                         // Jump to live sync directly on network error recovery to avoid 404s
@@ -739,7 +739,7 @@ function VideoPopup({
                         return;
                     }
 
-                    // CORS Fallback: if direct stream failed after 5 retries, switch to proxy
+                    // CORS Fallback: if direct stream failed after 2 retries, switch to proxy
                     if (isDirectStream && proxyFallbackUrl) {
                         console.log('[VideoPopup] Direct stream failed, falling back to proxy');
                         setForceProxyFallback(true);

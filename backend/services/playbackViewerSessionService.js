@@ -6,7 +6,7 @@
  * SideEffects: Writes playback viewer session/history rows and runs cleanup/retention timers.
  */
 
-import { query, queryOne, execute } from '../database/connectionPool.js';
+import { query, queryOne, execute, transaction } from '../database/connectionPool.js';
 import { v4 as uuidv4 } from 'uuid';
 import { cacheGetOrSetSync, cacheKey, CacheNamespace, CacheTTL } from './cacheService.js';
 import { diffLocalSqlSeconds, getLocalDate, getLocalDateWithOffset, getSqliteTzOffsetModifier, resolveUtcSqlTimestamp, toUtcSql } from './timeService.js';
@@ -257,65 +257,68 @@ class PlaybackViewerSessionService {
         const timestamp = resolveUtcSqlTimestamp(rawEndTimestamp);
         const durationSeconds = diffLocalSqlSeconds(session.started_at, timestamp);
 
-        execute(`
-            UPDATE playback_viewer_sessions
-            SET is_active = 0, ended_at = ?, duration_seconds = ?
-            WHERE session_id = ?
-        `, [timestamp, durationSeconds, sessionId]);
-
-        execute(`
-            INSERT INTO playback_viewer_session_history (
-                camera_id,
-                camera_name,
-                segment_filename,
-                segment_started_at,
-                playback_access_mode,
-                ip_address,
-                user_agent,
-                device_type,
-                admin_user_id,
-                admin_username,
-                token_id,
-                token_label,
-                started_at,
-                ended_at,
-                duration_seconds
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `, [
-            session.camera_id,
-            session.camera_name,
-            session.segment_filename,
-            session.segment_started_at,
-            session.playback_access_mode,
-            session.ip_address,
-            session.user_agent,
-            session.device_type,
-            session.admin_user_id,
-            session.admin_username,
-            session.token_id,
-            session.token_label,
-            session.started_at,
-            timestamp,
-            durationSeconds,
-        ]);
+        // Record to history, then DELETE the row — mirrors viewerSessionService: every reader
+        // filters is_active=1, so ended rows were pure insert-only bloat on a hot path.
+        transaction(() => {
+            execute(`
+                INSERT INTO playback_viewer_session_history (
+                    camera_id,
+                    camera_name,
+                    segment_filename,
+                    segment_started_at,
+                    playback_access_mode,
+                    ip_address,
+                    user_agent,
+                    device_type,
+                    admin_user_id,
+                    admin_username,
+                    token_id,
+                    token_label,
+                    started_at,
+                    ended_at,
+                    duration_seconds
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `, [
+                session.camera_id,
+                session.camera_name,
+                session.segment_filename,
+                session.segment_started_at,
+                session.playback_access_mode,
+                session.ip_address,
+                session.user_agent,
+                session.device_type,
+                session.admin_user_id,
+                session.admin_username,
+                session.token_id,
+                session.token_label,
+                session.started_at,
+                timestamp,
+                durationSeconds,
+            ]);
+            execute('DELETE FROM playback_viewer_sessions WHERE session_id = ?', [sessionId]);
+        })();
 
         return true;
     }
 
     cleanupStaleSessions() {
-        const timestamp = toUtcSql(new Date());
-        const staleSessions = query(`
-            SELECT session_id, last_heartbeat
-            FROM playback_viewer_sessions
-            WHERE is_active = 1
-            AND datetime(last_heartbeat) < datetime(?, '-${SESSION_TIMEOUT} seconds')
-        `, [timestamp]);
+        try {
+            const timestamp = toUtcSql(new Date());
+            const staleSessions = query(`
+                SELECT session_id, last_heartbeat
+                FROM playback_viewer_sessions
+                WHERE is_active = 1
+                AND datetime(last_heartbeat) < datetime(?, '-${SESSION_TIMEOUT} seconds')
+            `, [timestamp]);
 
-        for (const session of staleSessions) {
-            this.endSession(session.session_id, { endedAt: session.last_heartbeat });
+            for (const session of staleSessions) {
+                this.endSession(session.session_id, { endedAt: session.last_heartbeat });
+            }
+
+            this.runRetentionIfDue();
+        } catch (error) {
+            console.error('[PlaybackViewerSession] Error cleaning up sessions:', error);
         }
-
-        this.runRetentionIfDue();
     }
 
     runRetentionIfDue() {

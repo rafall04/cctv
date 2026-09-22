@@ -8,6 +8,9 @@ import cameraService from '../services/cameraService.js';
 import cameraHealthService from '../services/cameraHealthService.js';
 import { getStreamCapabilities } from '../utils/cameraDelivery.js';
 import { checkRateLimit } from '../middleware/rateLimiter.js';
+import { getAccessInfo as getCameraAccessInfo, canViewLive } from '../services/cameraAccessService.js';
+import { resolveHlsViewerUser } from '../services/hlsProxyService.js';
+import { readVoucherDeviceHash } from '../services/voucherPass.js';
 
 // Per-camera ceiling for client runtime signals (see reportViewerRuntimeSignal). Deliberately well
 // above the real cadence (a viewer emits a handful per minute) so only floods are cut.
@@ -44,6 +47,20 @@ export async function startViewerSession(request, reply) {
             return reply.code(400).send({
                 success: false,
                 message: 'Camera does not support popup viewing'
+            });
+        }
+
+        // SAME gate live HLS uses. Without it an anonymous caller could open "sessions" on
+        // private/suspended cameras and inflate the view counters feeding /api/public/trending.
+        const decision = canViewLive({
+            info: getCameraAccessInfo(cameraId),
+            user: resolveHlsViewerUser(request),
+            voucherDeviceHash: readVoucherDeviceHash(request),
+        });
+        if (!decision.allowed) {
+            return reply.code(decision.statusCode).send({
+                success: false,
+                message: 'Camera is not available for viewing'
             });
         }
 

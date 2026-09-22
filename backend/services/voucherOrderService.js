@@ -21,6 +21,7 @@ import { queryOne, execute } from '../database/connectionPool.js';
 import paymentSettingsService from './paymentSettingsService.js';
 import voucherService from './voucherService.js';
 import { ipaymuRequest, interpretIpaymuTransaction } from '../utils/ipaymuClient.js';
+import { parseIpaymuExpiryIso } from './paymentService.js';
 
 const ORDER_EXPIRY_MINUTES = 30;
 const RECHECK_THROTTLE_MS = 15000;
@@ -138,9 +139,10 @@ class VoucherOrderService {
             throw err;
         }
 
-        const expiresAt = data.Expired
-            ? new Date(data.Expired).toISOString()
-            : new Date(Date.now() + ORDER_EXPIRY_MINUTES * 60 * 1000).toISOString();
+        // iPaymu's Expired is a zoneless WIB wall-clock — parseIpaymuExpiryIso applies UTC+7.
+        // new Date() would read it as server-local (UTC in prod) and expire the order ~7h early.
+        const expiresAt = parseIpaymuExpiryIso(data.Expired)
+            || new Date(Date.now() + ORDER_EXPIRY_MINUTES * 60 * 1000).toISOString();
         const result = execute(
             `INSERT INTO voucher_orders
                (profile_id, buyer_name, buyer_phone, device_hash, request_ip, gateway, gateway_ref, reference, amount, status, qris_payload, expires_at)

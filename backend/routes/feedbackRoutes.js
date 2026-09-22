@@ -23,9 +23,10 @@ export default async function feedbackRoutes(fastify) {
         },
     }, createFeedback);
 
-    // Admin endpoints
-    fastify.get('/', { onRequest: [authMiddleware] }, getAllFeedbacks);
-    fastify.get('/stats', { onRequest: [authMiddleware] }, getFeedbackStats);
+    // Admin endpoints — reads carry submitter name/email (PII) + revenue-adjacent stats,
+    // so they need requireAdmin like PATCH/DELETE, not bare authMiddleware (viewer is staff).
+    fastify.get('/', { onRequest: [authMiddleware, requireAdmin] }, getAllFeedbacks);
+    fastify.get('/stats', { onRequest: [authMiddleware, requireAdmin] }, getFeedbackStats);
     fastify.patch('/:id/status', { preHandler: [authMiddleware, requireAdmin] }, updateFeedbackStatus);
     fastify.delete('/:id', { preHandler: [authMiddleware, requireAdmin] }, deleteFeedback);
 }

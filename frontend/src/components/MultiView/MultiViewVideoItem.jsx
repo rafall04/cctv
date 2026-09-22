@@ -544,14 +544,14 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                         if (!hls._networkErrorRecoveryCount) hls._networkErrorRecoveryCount = 0;
                         hls._networkErrorRecoveryCount++;
 
-                        if (hls._networkErrorRecoveryCount <= 5) {
-                            console.log(`[MultiViewVideoItem] Recovering external stream network error (${hls._networkErrorRecoveryCount}/5)`);
+                        if (hls._networkErrorRecoveryCount <= 2) {
+                            console.log(`[MultiViewVideoItem] Recovering external stream network error (${hls._networkErrorRecoveryCount}/2)`);
                             hls.startLoad();
                             if (video.paused) video.play().catch(() => { });
                             return;
                         }
 
-                        // CORS Fallback: if direct stream failed after 5 retries, switch to proxy
+                        // CORS Fallback: if direct stream failed after 2 retries, switch to proxy
                         if (isDirectStream && proxyFallbackUrl) {
                             console.log('[MultiViewVideoItem] Direct stream failed, falling back to proxy');
                             setForceProxyFallback(true);

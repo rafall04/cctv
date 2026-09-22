@@ -346,7 +346,9 @@ export function cleanupExpiredBlacklistEntries() {
         const result = execute(
             `DELETE FROM token_blacklist WHERE expires_at < datetime('now')`
         );
-        console.log(`Cleaned up ${result.changes} expired blacklist entries`);
+        if (result.changes > 0) {
+            console.log(`Cleaned up ${result.changes} expired blacklist entries`);
+        }
         return result.changes;
     } catch (error) {
         console.error('Error cleaning up blacklist:', error);

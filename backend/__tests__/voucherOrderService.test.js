@@ -134,6 +134,21 @@ describe('voucherOrderService', () => {
             expect(raw.device_hash).toBe('dev-A');
         });
 
+        it('stores iPaymu Expired as UTC — the gateway sends a zoneless WIB wall-clock', async () => {
+            const p = makePaidProfile();
+            ipaymuRequestMock.mockResolvedValue({
+                httpOk: true,
+                body: { Data: { TransactionId: 'TRX-TZ', QrString: 'qr', Expired: '2026-09-22 20:30:00' } },
+            });
+
+            const order = await voucherOrderService.createOrder(p.id, { name: 'Budi', phone: '0812', deviceHash: 'dev-tz' });
+
+            // new Date() would read it as server-local (UTC in prod) and expire the order ~7h
+            // early — paid-but-expired orders never fulfil. 20:30 WIB == 13:30Z.
+            const raw = db.prepare('SELECT expires_at FROM voucher_orders WHERE id = ?').get(order.id);
+            expect(raw.expires_at).toBe('2026-09-22T13:30:00.000Z');
+        });
+
         it('reuses a still-valid pending order for the same device/profile/amount', async () => {
             const p = makePaidProfile();
             ipaymuRequestMock.mockResolvedValue(CHARGE_OK);

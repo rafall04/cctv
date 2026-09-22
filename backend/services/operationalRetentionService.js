@@ -6,8 +6,10 @@
 //
 // WHAT IS AND IS NOT PRUNED
 // -------------------------
-// `security_logs`, `login_attempts` and `playback_token_audit_logs` already have
-// owners that prune them. These two did not:
+// `security_logs` already has an owner (securityAuditLogger.cleanupOldLogs).
+// `login_attempts`, `playback_token_sessions`/`playback_token_audit_logs`/`token_blacklist`
+// and `api_keys` do NOT — their cleanup functions existed but nothing scheduled them,
+// so this service calls them below alongside the table DELETEs. These two did not:
 //
 //   audit_logs    AUDIT_LOG_RETENTION_DAYS (default 90). Now settable from the admin panel
 //                 (Keamanan tab) via securitySettingsService — DB over env over default — so an
@@ -28,6 +30,10 @@
 
 import { execute } from '../database/connectionPool.js';
 import { getSecuritySettings } from './securitySettingsService.js';
+import { cleanupOldAttempts } from './bruteForceProtection.js';
+import { cleanupExpiredBlacklistEntries } from './sessionManager.js';
+import playbackTokenService from './playbackTokenService.js';
+import { cleanupExpiredKeys } from './apiKeyService.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -86,6 +92,23 @@ export function pruneOperationalTables() {
         } catch (error) {
             // An older DB may not have the table yet; that is not an incident.
             console.log(`[Retention] Skipped ${target.table}: ${error.message}`);
+        }
+    }
+
+    // Orphaned cleanups: the functions existed and are test-covered, but no scheduler
+    // ever called them — the tables grew without bound (login_attempts at brute-force
+    // attack rate, token_blacklist at 2 rows per refresh rotation).
+    const orphanTasks = [
+        ['login_attempts', () => cleanupOldAttempts()],
+        ['token_blacklist', () => cleanupExpiredBlacklistEntries()],
+        ['playback_token_maintenance', () => playbackTokenService.cleanupExpiredMaintenanceRows()],
+        ['api_keys', () => cleanupExpiredKeys()],
+    ];
+    for (const [name, task] of orphanTasks) {
+        try {
+            task();
+        } catch (error) {
+            console.log(`[Retention] Skipped ${name}: ${error.message}`);
         }
     }
 

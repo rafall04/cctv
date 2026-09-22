@@ -32,6 +32,21 @@ vi.mock('../services/cameraHealthService.js', () => ({
     },
 }));
 
+// The live-view gate itself is covered by cameraAccessService/viewerControllerGate tests;
+// here it only needs to let an enabled camera through (these fixtures have no camera_class).
+vi.mock('../services/cameraAccessService.js', () => ({
+    getAccessInfo: (id) => ({ id, enabled: 1, camera_class: 'community' }),
+    canViewLive: () => ({ allowed: true }),
+}));
+
+vi.mock('../services/hlsProxyService.js', () => ({
+    resolveHlsViewerUser: () => null,
+}));
+
+vi.mock('../services/voucherPass.js', () => ({
+    readVoucherDeviceHash: () => null,
+}));
+
 describe('viewerRoutes', () => {
     beforeEach(() => {
         startSessionMock.mockReset();

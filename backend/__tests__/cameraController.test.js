@@ -11,12 +11,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const updateCameraMock = vi.fn();
 const refreshCameraStreamMock = vi.fn();
 const getCameraSourceLifecycleEventsMock = vi.fn();
+const getCameraDetailByIdMock = vi.fn();
 
 vi.mock('../services/cameraService.js', () => ({
     default: {
         updateCamera: updateCameraMock,
         refreshCameraStream: refreshCameraStreamMock,
         getCameraSourceLifecycleEvents: getCameraSourceLifecycleEventsMock,
+        getCameraDetailById: getCameraDetailByIdMock,
     },
 }));
 
@@ -96,5 +98,46 @@ describe('cameraController source lifecycle responses', () => {
             success: true,
             data: [{ id: 1, camera_id: 7, status: 'refreshed' }],
         });
+    });
+});
+
+describe('getCameraById credential stripping', () => {
+    it('strips rtsp/stream_key/onvif + external URL userinfo for non-admin staff', async () => {
+        getCameraDetailByIdMock.mockReturnValue({
+            id: 7,
+            name: 'cam',
+            private_rtsp_url: 'rtsp://u:p@cam',
+            stream_key: 'sk',
+            onvif_username: 'admin',
+            onvif_password: 'cam-secret',
+            external_stream_url: 'https://user:pass@ext.example/stream?token=abc',
+        });
+        const { getCameraById } = await import('../controllers/cameraController.js');
+        const reply = createReply();
+
+        await getCameraById({ params: { id: 7 }, user: { id: 2, role: 'viewer' } }, reply);
+
+        const cam = reply.payload.data;
+        expect(cam).not.toHaveProperty('private_rtsp_url');
+        expect(cam).not.toHaveProperty('stream_key');
+        expect(cam).not.toHaveProperty('onvif_username');
+        expect(cam).not.toHaveProperty('onvif_password');
+        expect(cam.external_stream_url).toBe('https://ext.example/stream?token=abc');
+    });
+
+    it('keeps the full record for admin', async () => {
+        getCameraDetailByIdMock.mockReturnValue({
+            id: 7,
+            private_rtsp_url: 'rtsp://u:p@cam',
+            onvif_username: 'admin',
+            onvif_password: 'cam-secret',
+        });
+        const { getCameraById } = await import('../controllers/cameraController.js');
+        const reply = createReply();
+
+        await getCameraById({ params: { id: 7 }, user: { id: 1, role: 'admin' } }, reply);
+
+        expect(reply.payload.data.onvif_password).toBe('cam-secret');
+        expect(reply.payload.data.private_rtsp_url).toBe('rtsp://u:p@cam');
     });
 });

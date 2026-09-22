@@ -395,6 +395,30 @@ describe('recordingPlaybackService', () => {
         expect(result.segments).toHaveLength(2);
     });
 
+    it('propagates ?scope=owner into playlist segment URLs so each request re-resolves as owner', () => {
+        queryOneMock.mockReturnValueOnce({
+            id: 11,
+            name: 'CCTV SEWA',
+            camera_class: 'subscriber',
+            owner_user_id: 77,
+            billing_status: 'active',
+            public_playback_mode: 'admin_only',
+            public_playback_preview_minutes: null,
+        });
+        queryMock
+            .mockReturnValueOnce([
+                { id: 1, filename: 'seg1.mp4', start_time: '2026-03-20T10:00:00.000Z', end_time: '2026-03-20T10:10:00.000Z', duration: 600, file_path: 'a', file_size: 100, created_at: '2026-03-20T10:00:00.000Z' },
+            ])
+            .mockReturnValueOnce([]); // archived merge
+
+        const playlist = recordingPlaybackService.generatePlaylist(11, {
+            query: { scope: 'owner' },
+            user: { id: 77, role: 'customer' },
+        });
+
+        expect(playlist).toContain('/api/recordings/11/stream/seg1.mp4?scope=owner');
+    });
+
     /*
      * The list is what the page ships and re-ships every ten seconds; the coverage bar is what
      * keeps it honest about everything outside the day on screen. Narrowing the first must never

@@ -155,7 +155,7 @@ export const NAV_GROUPS = [
             { label: 'Diagnostik Notifikasi', path: '/admin/notification-diagnostics', icon: AdminIcons.Bell, adminOnly: true },
             { label: 'Impor/Ekspor', path: '/admin/import-export', icon: AdminIcons.Transfer, adminOnly: true },
             { label: 'Cadangan & Pulihkan', path: '/admin/backup-restore', icon: AdminIcons.Backup, adminOnly: true },
-            { label: 'Masukan', path: '/admin/feedback', icon: AdminIcons.Feedback },
+            { label: 'Masukan', path: '/admin/feedback', icon: AdminIcons.Feedback, adminOnly: true },
             { label: 'Pengaturan', path: '/admin/settings', icon: AdminIcons.Settings, adminOnly: true },
         ],
     },
