@@ -2,7 +2,7 @@
 # RAF NET Titik Speaker — installer satu-perintah untuk STB Armbian (HG680P/B860H, dst).
 #
 # Pemakaian (di STB, sebagai root):
-#   curl -sL https://<HUB>/api/admin/audio/node/install | bash -s -- <TOKEN>
+#   curl -sL -H "x-device-token: <TOKEN>" https://<HUB>/api/admin/audio/node/install | bash -s -- <TOKEN>
 # atau non-interaktif penuh:
 #   HUB_URL=https://cctv.contoh.desa TOKEN=xxx bash install-speaker.sh
 #
@@ -26,7 +26,7 @@ fi
 HUB_URL="${HUB_URL%/}"
 if [ -z "$HUB_URL" ] || [ "$HUB_URL" = "__HUB_URL__" ] || [ -z "$TOKEN" ]; then
     echo "HUB_URL dan TOKEN wajib. Contoh:" >&2
-    echo "  curl -sL https://cctv.contoh.desa/api/admin/audio/node/install | bash -s -- <TOKEN>" >&2
+    echo "  curl -sL -H \"x-device-token: <TOKEN>\" https://cctv.contoh.desa/api/admin/audio/node/install | bash -s -- <TOKEN>" >&2
     exit 1
 fi
 
@@ -37,7 +37,7 @@ apt-get install -y -qq python3 alsa-utils curl >/dev/null
 
 echo "==> Mengunduh agen ke /opt/rafnet/audio_node.py"
 install -d -m 0755 /opt/rafnet
-curl -fsSL "$HUB_URL/api/admin/audio/node/agent" -o /opt/rafnet/audio_node.py
+curl -fsSL -H "x-device-token: $TOKEN" "$HUB_URL/api/admin/audio/node/agent" -o /opt/rafnet/audio_node.py
 chmod 0644 /opt/rafnet/audio_node.py
 # Sanity: file yang diunduh harus python, bukan halaman error HTML.
 head -1 /opt/rafnet/audio_node.py | grep -q "python3" || {

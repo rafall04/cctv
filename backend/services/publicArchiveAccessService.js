@@ -62,7 +62,7 @@ class PublicArchiveAccessService {
         // Gate 1 + 2 in one read: the join makes a segment whose camera was deleted unreachable too.
         const row = queryOne(
             `SELECT u.segment_id, u.camera_id, u.filename, u.file_size, u.file_id, u.recorded_at,
-                    c.id AS camera_id_ref, c.area_id, c.camera_class, c.public_playback_mode
+                    c.id AS camera_id_ref, c.area_id, c.camera_class, c.public_playback_mode, c.enabled
                FROM telegram_archive_uploads u
                JOIN cameras c ON c.id = u.camera_id
               WHERE u.segment_id = ? AND u.status = 'ok'`,
@@ -74,7 +74,10 @@ class PublicArchiveAccessService {
         }
 
         // Gate 2. 404 rather than 403 on purpose — a 403 would confirm the segment exists.
-        if (row.camera_class !== 'community') {
+        // Same for a switched-off community camera: the off-switch must retire the archive
+        // too, not just the live feed (audit 2026-09-22, F2 — disabled cams leaked snapshots
+        // and segment lists on the sibling endpoints; don't leave the same hole here).
+        if (row.camera_class !== 'community' || Number(row.enabled) !== 1) {
             throw httpError('Segment tidak ditemukan', 404);
         }
 

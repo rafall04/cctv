@@ -139,8 +139,8 @@ export default async function audioRoutes(fastify) {
     fastify.get('/node/poll', nodePoll);       // STB agent long-poll (x-device-token header) — NOT admin
     fastify.get('/node/clip/:id', nodeClip);   // STB agent downloads the clip (WAV) — token-gated in-handler
     fastify.get('/node/stream', nodeStream);   // STB agent live-talk audio stream (raw u-law) — token-gated
-    fastify.get('/node/install', nodeInstallScript); // installer bash satu-perintah untuk STB Armbian (publik — isinya cuma kode klien)
-    fastify.get('/node/agent', nodeAgentScript);     // audio_node.py terbaru (publik — dipakai installer & update manual)
+    fastify.get('/node/install', nodeInstallScript); // installer bash — x-device-token (no admin JWT; STB bootstrap)
+    fastify.get('/node/agent', nodeAgentScript);     // audio_node.py — x-device-token (dipakai installer & update manual)
 
     // Motion -> deterrent audio (armed per camera; heavily guarded)
     fastify.get('/motion/arms', admin, listMotionArms);

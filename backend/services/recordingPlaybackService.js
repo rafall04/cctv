@@ -311,6 +311,12 @@ class RecordingPlaybackService {
             };
         }
 
+        // Disabled community cameras are off the public surface (picker/live gate already exclude
+        // them) — this path skipped the check (audit 2026-09-22, F2). Deny before token work.
+        if (Number(camera.enabled) === 0) {
+            return { accessMode: 'public_denied', isPublicPreview: false, previewMinutes: 0, notice: null, contact: null, deniedReason: 'camera_disabled' };
+        }
+
         // Cookie-based validation: a stale/revoked/out-of-scope playback
         // cookie must NOT lock the visitor out of public preview. The
         // explicit /activate path already returns the 401/403 properly; here

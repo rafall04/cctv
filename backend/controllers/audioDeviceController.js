@@ -215,9 +215,10 @@ export async function nodeStream(request, reply) {
     return undefined;
 }
 
-/* ---- Node provisioning (PUBLIC, no token needed): the installer + agent scripts are just client
-   code — no secrets in them. Serving them from the hub means one URL is all an STB needs:
-   `curl -sL <hub>/api/admin/audio/node/install | bash -s -- <TOKEN>` ---------------------------- */
+/* ---- Node provisioning: reachable without an admin session (fetched by curl inside the Pi
+   bootstrap) but still gated by x-device-token. The token exists BEFORE install — the operator
+   creates the node in the admin UI first, then runs the printed command. Serving agent source +
+   device protocol anonymously under /api/admin/* was audit finding F1 (2026-09-22). -------- */
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SCRIPTS_DIR = join(__dirname, '..', 'scripts');
@@ -242,9 +243,13 @@ function serveScript(request, reply, filename, contentType) {
 }
 
 export async function nodeInstallScript(request, reply) {
+    const dev = deviceAuth(deviceTokenFrom(request));
+    if (!dev) return reply.code(401).send({ success: false, message: 'token tidak valid' });
     return serveScript(request, reply, 'install-speaker.sh', 'text/x-shellscript; charset=utf-8');
 }
 
 export async function nodeAgentScript(request, reply) {
+    const dev = deviceAuth(deviceTokenFrom(request));
+    if (!dev) return reply.code(401).send({ success: false, message: 'token tidak valid' });
     return serveScript(request, reply, 'audio_node.py', 'text/x-python; charset=utf-8');
 }

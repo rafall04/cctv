@@ -1,8 +1,8 @@
 // Purpose: Decide which /api/thumbnails/* request paths may reach the static file handler.
 // Caller: server.js thumbnail tenancy hook (runs in onRequest, before @fastify/static).
 // Deps: None.
-// MainFuncs: parseThumbnailRequestPath.
-// SideEffects: None; pure parsing.
+// MainFuncs: parseThumbnailRequestPath, decideThumbnailResponse.
+// SideEffects: None; pure parsing/decision.
 //
 // WHY THIS IS DENY-BY-DEFAULT
 // ---------------------------
@@ -61,4 +61,24 @@ export function parseThumbnailRequestPath(url) {
     return { kind: 'thumbnail', cameraId: Number(match[1]) };
 }
 
-export default { parseThumbnailRequestPath };
+/**
+ * Turn a canViewLive verdict into the thumbnail response decision.
+ *
+ * The hook runs the SAME gate live HLS uses — for every camera, community included. The old
+ * short-circuit (`!info || community → allow`) kept serving snapshots for disabled community
+ * cameras and leftover files for deleted ids, and skipped the voucher area-gate entirely
+ * (audit 2026-09-22, F2). canViewLive already answers 404 for missing/disabled, 402 for
+ * voucher-gated, 403 for non-community unauthorized — those codes are intended semantics.
+ *
+ * Returns { status, body } when the request must be refused, or { allow: true,
+ * gated } when it may proceed — `gated` marks private responses that must not populate
+ * shared caches (community-public thumbnails stay edge-cacheable).
+ */
+export function decideThumbnailResponse(access, info) {
+    if (!access?.allowed) {
+        return { status: access?.statusCode || 403, body: { success: false, message: 'Forbidden' } };
+    }
+    return { allow: true, gated: info?.camera_class !== 'community' || !!access.voucherGated };
+}
+
+export default { parseThumbnailRequestPath, decideThumbnailResponse };

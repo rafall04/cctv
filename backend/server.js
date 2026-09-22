@@ -41,7 +41,8 @@ import { schemaErrorHandler } from './middleware/schemaValidators.js';
 import { customerAccessPolicyHook } from './middleware/customerAccessPolicy.js';
 import { getAccessInfo as getCameraAccessInfo, canViewLive as canViewCameraLive } from './services/cameraAccessService.js';
 import { resolveHlsViewerUser } from './services/hlsProxyService.js';
-import { parseThumbnailRequestPath } from './utils/thumbnailRequestPolicy.js';
+import { readVoucherDeviceHash } from './services/voucherPass.js';
+import { parseThumbnailRequestPath, decideThumbnailResponse } from './utils/thumbnailRequestPolicy.js';
 
 // Import services
 import { startDailyCleanup, stopDailyCleanup, logSecurityEvent, SECURITY_EVENTS } from './services/securityAuditLogger.js';
@@ -211,41 +212,39 @@ fastify.addHook('onSend', async (request, reply, payload) => {
     return payload;
 });
 
-// Tenancy gate for thumbnails: files are named {cameraId}.jpg, so rented/private
-// camera snapshots must not be fetchable by guessing ids. Community thumbnails
-// stay public. Runs in onRequest, before the static handler below.
+// Tenancy gate for thumbnails: files are named {cameraId}.jpg, so private camera snapshots
+// must not be fetchable by guessing ids. Runs in onRequest, before the static handler below.
 fastify.addHook('onRequest', async (request, reply) => {
     const parsed = parseThumbnailRequestPath(request.url);
-    if (parsed.kind === 'not_thumbnail') {
-        return;
-    }
+    if (parsed.kind === 'not_thumbnail') return;
 
-    /*
-     * DENY BY DEFAULT. This hook used to `return` on any filename it did not
-     * recognise, handing the request straight to @fastify/static ungated — the
-     * precise shape of the two advisories open against the pinned version
-     * (GHSA-83w8-p2f5-377r, GHSA-8pvw-jcv7-9cmj). What it guards is the project's
-     * first invariant: a non-community camera must never surface publicly.
-     *
-     * 404, not 403: a missing thumbnail already 404s, so refusing this way tells a
-     * prober nothing about which camera ids exist.
-     */
+    // DENY BY DEFAULT — unrecognised filenames 404 before @fastify/static can see them
+    // (GHSA-83w8-p2f5-377r route-guard bypass, GHSA-8pvw-jcv7-9cmj non-canonical paths).
+    // 404 not 403: a missing thumbnail already 404s, so a prober learns nothing about ids.
     if (parsed.kind === 'reject') {
         reply.header('Cache-Control', 'no-store');
         return reply.code(404).send({ success: false, message: 'Not found' });
     }
 
     const info = getCameraAccessInfo(parsed.cameraId);
-    if (!info || info.camera_class === 'community') {
-        return;
-    }
-    const access = canViewCameraLive({ info, user: resolveHlsViewerUser(request) });
-    if (!access.allowed) {
+    // SAME gate live HLS uses — every camera, community included. The old `!info ||
+    // community → allow` let disabled cams serve snapshots and stale files outlive deleted
+    // rows, and skipped the voucher gate (audit 2026-09-22, F2).
+    const decision = decideThumbnailResponse(
+        canViewCameraLive({
+            info,
+            user: resolveHlsViewerUser(request),
+            voucherDeviceHash: readVoucherDeviceHash(request),
+        }),
+        info,
+    );
+    if (!decision.allow) {
         reply.header('Cache-Control', 'no-store');
-        return reply.code(403).send({ success: false, message: 'Forbidden' });
+        return reply.code(decision.status).send(decision.body);
     }
-    // Authorized viewers of gated thumbnails must not populate shared caches.
-    reply.header('Cache-Control', 'private, no-store');
+    if (decision.gated) {
+        reply.header('Cache-Control', 'private, no-store');
+    }
 });
 
 // Register Static File Serving for thumbnails

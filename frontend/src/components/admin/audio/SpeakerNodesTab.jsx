@@ -113,7 +113,7 @@ export default function SpeakerNodesTab({ clips = [], areas = [] }) {
     const confSnippet = (token) => `HUB_URL=${hubOrigin}\nTOKEN=${token}\nPLAYER=aplay`;
     // One-command install: the hub itself serves the bash installer + the agent (public, no auth —
     // they're just client code). The token arrives as $1, never in the URL (access-log safe).
-    const installCmd = (token) => `curl -sL ${hubOrigin}/api/admin/audio/node/install | bash -s -- ${token}`;
+    const installCmd = (token) => `curl -sL -H "x-device-token: ${token}" ${hubOrigin}/api/admin/audio/node/install | bash -s -- ${token}`;
 
     return (
         <div className="space-y-5">
@@ -195,7 +195,7 @@ export default function SpeakerNodesTab({ clips = [], areas = [] }) {
                     <li>Buat titik speaker di atas → salin <span className="font-semibold">perintah instal</span> yang muncul (token sudah tertanam di dalamnya).</li>
                     <li>Di STB sebagai root, tempel perintah itu. Installer memasang <span className="font-mono">alsa-utils</span> + agen + service systemd sekaligus, lalu memverifikasi token.</li>
                     <li>Colok line-out 3.5mm STB → input TPA3116D2 → TOA (8Ω). Tes lewat tombol <span className="font-semibold">Uji</span>.</li>
-                    <li>Manual/alternatif: unduh agen dari <span className="font-mono">/api/admin/audio/node/agent</span>, isi <span className="font-mono">/etc/rafnet-speaker.conf</span> (HUB_URL + TOKEN), contoh unit systemd ada di header <span className="font-mono">audio_node.py</span>.</li>
+                    <li>Manual/alternatif: unduh agen dari <span className="font-mono">/api/admin/audio/node/agent</span> dengan header <span className="font-mono">x-device-token</span>, isi <span className="font-mono">/etc/rafnet-speaker.conf</span> (HUB_URL + TOKEN), contoh unit systemd ada di header <span className="font-mono">audio_node.py</span>.</li>
                 </ol>
             </details>
         </div>

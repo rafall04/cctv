@@ -742,6 +742,7 @@ describe('resolvePlaybackAccess leaves a trace when a token is refused', () => {
     const refusedCamera = (id) => ({
         id,
         camera_class: 'community',
+        enabled: 1,
         public_playback_mode: 'inherit',
         public_playback_preview_minutes: 10,
     });
@@ -816,5 +817,38 @@ describe('resolvePlaybackAccess leaves a trace when a token is refused', () => {
 
         expect(() => recordingPlaybackService.resolvePlaybackAccess(refusedCamera(706), segmentRequest(706)))
             .toThrow('database is locked');
+    });
+});
+
+describe('disabled community camera is off the public playback surface', () => {
+    const disabledCommunity = { id: 59, camera_class: 'community', enabled: 0, public_playback_mode: 'inherit', public_playback_preview_minutes: 30 };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getPublicPlaybackSettingsMock.mockReturnValue({ publicPlaybackEnabled: true, publicPlaybackMinutes: 30 });
+    });
+
+    it('denies segments anonymously (audit F2: /recordings/:id/segments used to leak name+archive)', () => {
+        const access = recordingPlaybackService.resolvePlaybackAccess(disabledCommunity, { query: {}, url: '/api/recordings/59/segments' });
+        expect(access.accessMode).toBe('public_denied');
+        expect(access.deniedReason).toBe('camera_disabled');
+    });
+
+    it('denies even when a live playback cookie is presented — token cannot outlive the off-switch', () => {
+        validateRequestForCameraMock.mockReturnValue({ id: 20, scope_type: 'all', effective_playback_window_hours: 12 });
+        const access = recordingPlaybackService.resolvePlaybackAccess(disabledCommunity, {
+            query: {}, url: '/api/recordings/59/segments', cookies: { raf_playback_token: 'valid' },
+        });
+        expect(access.accessMode).toBe('public_denied');
+        // Cheapest proof the denial fired before any token work happened.
+        expect(validateRequestForCameraMock).not.toHaveBeenCalled();
+    });
+
+    it('still reaches the token/preview path for an ENABLED community camera', () => {
+        validateRequestForCameraMock.mockReturnValue({ id: 20, scope_type: 'all', effective_playback_window_hours: 12 });
+        const access = recordingPlaybackService.resolvePlaybackAccess({ ...disabledCommunity, enabled: 1 }, {
+            query: {}, url: '/api/recordings/59/segments', cookies: { raf_playback_token: 'valid' },
+        });
+        expect(access.accessMode).toBe('token_full');
     });
 });
