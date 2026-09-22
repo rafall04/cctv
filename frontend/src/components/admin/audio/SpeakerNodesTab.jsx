@@ -15,7 +15,7 @@ import { useNotification } from '../../../contexts/NotificationContext';
 import { useConfirm } from '../../../contexts/ConfirmContext';
 import { Button, Field, EmptyState, StatusDot } from '../../ui';
 
-export default function SpeakerNodesTab({ clips = [], areas = [] }) {
+export default function SpeakerNodesTab({ clips = [], areas = [], clipsLoading }) {
     const [devices, setDevices] = useState([]);
     const [loading, setLoading] = useState(true);
     const [newName, setNewName] = useState('');
@@ -111,8 +111,9 @@ export default function SpeakerNodesTab({ clips = [], areas = [] }) {
     const toggleSel = (id) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
 
     const confSnippet = (token) => `HUB_URL=${hubOrigin}\nTOKEN=${token}\nPLAYER=aplay`;
-    // One-command install: the hub itself serves the bash installer + the agent (public, no auth —
-    // they're just client code). The token arrives as $1, never in the URL (access-log safe).
+    // One-command install: the hub serves the bash installer + the agent gated by x-device-token —
+    // they're client code, but the token proves the node was registered. Token rides as a header/$1,
+    // never in the URL (access-log safe).
     const installCmd = (token) => `curl -sL -H "x-device-token: ${token}" ${hubOrigin}/api/admin/audio/node/install | bash -s -- ${token}`;
 
     return (
@@ -180,7 +181,7 @@ export default function SpeakerNodesTab({ clips = [], areas = [] }) {
             {/* Broadcast / test source */}
             <div className="flex flex-wrap items-end gap-2 rounded-card border border-edge bg-surface-sunken p-3">
                 <Field as="select" label="Audio (untuk Uji & Siaran)" value={testClip} onChange={(e) => setTestClip(e.target.value)} className="min-w-0 flex-1">
-                    <option value="">— pilih audio —</option>
+                    <option value="">{clipsLoading ? 'Memuat…' : '— pilih audio —'}</option>
                     {clips.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </Field>
                 <Field type="number" label="Ulang" min={1} max={20} value={loop} onChange={(e) => setLoop(Math.min(20, Math.max(1, parseInt(e.target.value, 10) || 1)))} />

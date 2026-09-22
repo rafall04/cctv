@@ -16,7 +16,7 @@ import { useConfirm } from '../../../contexts/ConfirmContext';
 import { Button, Modal, Field, EmptyState } from '../../ui';
 import { formatDuration } from './audioFormatting';
 
-function PlaylistForm({ clips, initial, onSubmit }) {
+function PlaylistForm({ clips, initial, onSubmit, loading }) {
     const [name, setName] = useState(initial?.name || '');
     // Ordered list of clip ids; duplicates are allowed (a clip may repeat in a playlist).
     const [items, setItems] = useState((initial?.items || []).map((i) => i.clip_id));
@@ -50,7 +50,7 @@ function PlaylistForm({ clips, initial, onSubmit }) {
 
             <div className="flex items-end gap-2">
                 <Field as="select" label="Tambah audio" value={toAdd} onChange={(e) => setToAdd(e.target.value)} className="flex-1">
-                    <option value="">— pilih audio —</option>
+                    <option value="">{loading ? 'Memuat…' : '— pilih audio —'}</option>
                     {clips.map((c) => (
                         <option key={c.id} value={c.id}>{c.name} ({formatDuration(c.duration_sec)})</option>
                     ))}
@@ -146,7 +146,7 @@ export default function PlaylistTab({ playlists, clips, loading, reload }) {
     return (
         <div className="space-y-4">
             <div className="flex justify-end">
-                <Button variant="primary" onClick={openNew} disabled={clips.length === 0}>Playlist baru</Button>
+                <Button variant="primary" onClick={openNew} disabled={!loading && clips.length === 0}>Playlist baru</Button>
             </div>
 
             {loading ? (
@@ -187,7 +187,7 @@ export default function PlaylistTab({ playlists, clips, loading, reload }) {
                         </>
                     )}
                 >
-                    <PlaylistForm clips={clips} initial={editing} onSubmit={handleSubmit} />
+                    <PlaylistForm clips={clips} initial={editing} onSubmit={handleSubmit} loading={loading} />
                 </Modal>
             )}
         </div>

@@ -20,7 +20,7 @@ import DeviceMultiSelect from './DeviceMultiSelect';
 
 const BLANK = { id: null, label: '', sourceType: 'clip', sourceId: '', targetKind: 'area', areaId: '', cameraIds: [], deviceIds: [], loop: 3, gain_db: 0, siren: false };
 
-export default function EmergencyPanel({ clips, playlists, cameras, areas }) {
+export default function EmergencyPanel({ clips, playlists, cameras, areas, loading }) {
     const [presets, setPresets] = useState([]);
     const [manage, setManage] = useState(false);
     const [form, setForm] = useState(null);
@@ -126,7 +126,7 @@ export default function EmergencyPanel({ clips, playlists, cameras, areas }) {
                             onChange={(v) => setForm({ ...form, sourceType: v, sourceId: '' })}
                         />
                         <Field as="select" label="Pilih audio" value={form.sourceId} onChange={(e) => setForm({ ...form, sourceId: e.target.value })}>
-                            <option value="">— pilih —</option>
+                            <option value="">{loading ? 'Memuat…' : '— pilih —'}</option>
                             {options(form.sourceType).map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
                         </Field>
                     </div>
@@ -146,7 +146,7 @@ export default function EmergencyPanel({ clips, playlists, cameras, areas }) {
                         </Field>
                     ) : (
                         <div className="space-y-1.5">
-                            <CameraMultiSelect cameras={cameras} value={form.cameraIds} onChange={(ids) => setForm({ ...form, cameraIds: ids })} />
+                            <CameraMultiSelect cameras={cameras} value={form.cameraIds} onChange={(ids) => setForm({ ...form, cameraIds: ids })} loading={loading} />
                             {form.cameraIds.length > 0 && selectedSupported === 0 && (
                                 <p className="text-xs text-status-warn">⚠ Tak ada kamera yang terbukti bersuara di pilihan ini — darurat akan gagal. Pilih kamera berstatus “didukung”, atau uji dulu di tab Kamera &amp; Area.</p>
                             )}

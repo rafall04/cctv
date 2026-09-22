@@ -40,6 +40,7 @@ function CapabilityTag({ supports }) {
 export default function CameraMultiSelect({
     cameras = [], value = [], onChange, disabled = false,
     groups = null, onSaveGroup = null, onDeleteGroup = null,
+    loading = false,
 }) {
     const selected = new Set(value);
     const [supportedOnly, setSupportedOnly] = useState(false);
@@ -198,7 +199,8 @@ export default function CameraMultiSelect({
 
             {shown.length === 0 ? (
                 <p className="rounded-control border border-dashed border-edge bg-surface-sunken p-3 text-xs text-content-subtle">
-                    {supportedOnly ? 'Belum ada kamera "Didukung". Jalankan "Cek ulang" di tab Kamera & Area.'
+                    {loading ? 'Memuat daftar kamera…'
+                        : supportedOnly ? 'Belum ada kamera "Didukung". Jalankan "Cek ulang" di tab Kamera & Area.'
                         : 'Tidak ada kamera. Aktifkan area lokal Anda di tab "Kamera & Area" dulu.'}
                 </p>
             ) : (

@@ -16,7 +16,7 @@ import { Field } from '../../ui';
 
 const DEFAULT_FORM = { clip_id: '', arm_minutes: 120, cooldown_sec: 60, max_per_hour: 6, gain_db: 0 };
 
-export default function MotionArms({ capability, clips }) {
+export default function MotionArms({ capability, clips, loading }) {
     const [arms, setArms] = useState([]);
     const [editing, setEditing] = useState(null); // cameraId being configured
     const [form, setForm] = useState(DEFAULT_FORM);
@@ -106,7 +106,7 @@ export default function MotionArms({ capability, clips }) {
                                 {isEditing && (
                                     <div className="mt-2 space-y-2 border-t border-edge pt-2">
                                         <Field as="select" label="Audio pengusir" value={form.clip_id} onChange={(e) => setForm({ ...form, clip_id: e.target.value })}>
-                                            <option value="">— pilih audio —</option>
+                                            <option value="">{loading ? 'Memuat…' : '— pilih audio —'}</option>
                                             {clips.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                                         </Field>
                                         <div className="grid grid-cols-3 gap-2">

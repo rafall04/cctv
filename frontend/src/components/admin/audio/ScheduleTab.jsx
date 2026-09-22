@@ -70,7 +70,7 @@ function describeSchedule(s) {
     return describeDays(s.days_mask);
 }
 
-function ScheduleForm({ initial, clips, playlists, cameras, onSubmit, groups, onSaveGroup, onDeleteGroup }) {
+function ScheduleForm({ initial, clips, playlists, cameras, onSubmit, groups, onSaveGroup, onDeleteGroup, loading }) {
     const [name, setName] = useState(initial?.name || '');
     const [sourceType, setSourceType] = useState(initial?.source_type || 'clip');
     const [sourceId, setSourceId] = useState(initial?.source_id ? String(initial.source_id) : '');
@@ -142,7 +142,7 @@ function ScheduleForm({ initial, clips, playlists, cameras, onSubmit, groups, on
                 />
                 {sourceType !== 'tts' && (
                     <Field as="select" label={sourceType === 'clip' ? 'Pilih audio' : 'Pilih playlist'} value={sourceId} onChange={(e) => setSourceId(e.target.value)} required>
-                        <option value="">— pilih —</option>
+                        <option value="">{loading ? 'Memuat…' : '— pilih —'}</option>
                         {options.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
                     </Field>
                 )}
@@ -204,6 +204,7 @@ function ScheduleForm({ initial, clips, playlists, cameras, onSubmit, groups, on
                 groups={groups}
                 onSaveGroup={onSaveGroup}
                 onDeleteGroup={onDeleteGroup}
+                loading={loading}
             />
 
             <DeviceMultiSelect value={deviceIds} onChange={setDeviceIds} hint="Titik speaker di area kamera terpilih sudah ikut otomatis; ini menambah/menargetkan titik spesifik (boleh tanpa kamera)." />
@@ -322,7 +323,7 @@ export default function ScheduleTab({ schedules, clips, playlists, cameras, load
                         </>
                     )}
                 >
-                    <ScheduleForm initial={editing.id ? editing : null} clips={clips} playlists={playlists} cameras={cameras} onSubmit={handleSubmit} groups={groups} onSaveGroup={onSaveGroup} onDeleteGroup={onDeleteGroup} />
+                    <ScheduleForm initial={editing.id ? editing : null} clips={clips} playlists={playlists} cameras={cameras} onSubmit={handleSubmit} groups={groups} onSaveGroup={onSaveGroup} onDeleteGroup={onDeleteGroup} loading={loading} />
                 </Modal>
             )}
         </div>

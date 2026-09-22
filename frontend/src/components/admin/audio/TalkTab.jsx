@@ -41,7 +41,7 @@ class PTT extends AudioWorkletProcessor {
 registerProcessor('ptt', PTT);
 `;
 
-export default function TalkTab({ cameras }) {
+export default function TalkTab({ cameras, loading }) {
     const [cameraIds, setCameraIds] = useState([]);
     const [deviceIds, setDeviceIds] = useState([]);
     const [state, setState] = useState('idle'); // idle | connecting | onair
@@ -168,7 +168,7 @@ export default function TalkTab({ cameras }) {
     return (
         <div className="space-y-5">
             <div className="rounded-card border border-edge bg-surface p-4 shadow-e1">
-                <CameraMultiSelect cameras={cameras} value={cameraIds} onChange={setCameraIds} disabled={held} />
+                <CameraMultiSelect cameras={cameras} value={cameraIds} onChange={setCameraIds} disabled={held} loading={loading} />
                 <p className="mt-2 text-xs text-content-subtle">
                     Bisa banyak kamera sekaligus (paging zona) — maksimum beberapa kamera per sesi; hanya yang
                     &quot;Didukung&quot; yang berbunyi, yang sibuk dilewati. Endurance kamera murah belum teruji: uji dulu.

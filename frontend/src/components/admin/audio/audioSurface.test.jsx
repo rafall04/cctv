@@ -20,6 +20,20 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { SegmentedControl } from '../../ui/SegmentedControl';
 import { StatusDot } from '../../ui/Badge';
+import CameraMultiSelect from './CameraMultiSelect';
+
+vi.mock('../../../services/audioService', () => ({
+    playNow: vi.fn(), playDevices: vi.fn(), stopPlay: vi.fn(),
+    getActivePlays: vi.fn().mockResolvedValue({ success: true, data: [] }),
+    getPlayHistory: vi.fn().mockResolvedValue({ success: true, data: [] }),
+    getDevices: vi.fn().mockResolvedValue({ success: true, data: [] }),
+}));
+vi.mock('../../../contexts/NotificationContext', () => ({
+    useNotification: () => ({ showNotification: vi.fn() }),
+}));
+vi.mock('../../../contexts/ConfirmContext', () => ({
+    useConfirm: () => vi.fn().mockResolvedValue(true),
+}));
 
 const AUDIO_DIR = path.dirname(fileURLToPath(import.meta.url));
 const AUDIO_FILES = fs.readdirSync(AUDIO_DIR)
@@ -98,6 +112,42 @@ describe('StatusDot (audio audit extensions)', () => {
         const dot = container.querySelector('[aria-hidden="true"]');
         expect(dot.className).toContain('h-1.5');
         expect(dot.className).toContain('animate-pulse');
+    });
+});
+
+describe('loading-state contract (initial Promise.all paint bug)', () => {
+    // Regression: the default "Putar Sekarang" tab rendered empty pickers while the parent's
+    // Promise.all was still in flight — "— pilih —" / "Tidak ada kamera" showed, then options
+    // popped in later with no "memuat" cue. loading=true must say so instead of faking empty.
+    it('CameraMultiSelect shows a loading note, not the empty-state text, while loading', () => {
+        render(<CameraMultiSelect cameras={[]} value={[]} onChange={() => {}} loading />);
+        expect(screen.getByText(/Memuat daftar kamera/)).toBeTruthy();
+        expect(screen.queryByText(/Tidak ada kamera/)).toBeNull();
+    });
+
+    it('CameraMultiSelect falls back to the real empty state once loading is done', () => {
+        render(<CameraMultiSelect cameras={[]} value={[]} onChange={() => {}} loading={false} />);
+        expect(screen.getByText(/Tidak ada kamera/)).toBeTruthy();
+    });
+
+    it('PlayNowTab says "Memuat…" in the source picker instead of a bare "— pilih —"', async () => {
+        const { default: PlayNowTab } = await import('./PlayNowTab');
+        render(<PlayNowTab clips={[]} playlists={[]} cameras={[]} groups={[]} loading />);
+        const select = screen.getByRole('combobox', { name: /Pilih audio/ });
+        expect(select.disabled).toBe(true);
+        expect(select.querySelector('option').textContent).toBe('Memuat…');
+        expect(screen.getByText(/Memuat daftar kamera/)).toBeTruthy();
+    });
+
+    it('PlayNowTab shows real options after loading resolves', async () => {
+        const { default: PlayNowTab } = await import('./PlayNowTab');
+        render(<PlayNowTab
+            clips={[{ id: 7, name: 'Azan', duration_sec: 120 }]}
+            playlists={[]} cameras={[]} groups={[]} loading={false}
+        />);
+        const select = screen.getByRole('combobox', { name: /Pilih audio/ });
+        expect(select.disabled).toBe(false);
+        expect(screen.getByRole('option', { name: /Azan/ })).toBeTruthy();
     });
 });
 

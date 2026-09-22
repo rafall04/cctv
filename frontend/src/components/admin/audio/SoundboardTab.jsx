@@ -21,7 +21,7 @@ import DeviceMultiSelect from './DeviceMultiSelect';
 
 const BLANK = { id: null, label: '', sourceType: 'clip', sourceId: '', cameraIds: [], deviceIds: [], loop: 1, gain_db: 0 };
 
-export default function SoundboardTab({ clips, playlists, cameras }) {
+export default function SoundboardTab({ clips, playlists, cameras, loading }) {
     const [buttons, setButtons] = useState([]);
     const [manage, setManage] = useState(false);
     const [form, setForm] = useState(null); // null = closed; BLANK/existing = editing
@@ -123,12 +123,12 @@ export default function SoundboardTab({ clips, playlists, cameras }) {
                             onChange={(v) => setForm({ ...form, sourceType: v, sourceId: '' })}
                         />
                         <Field as="select" label={form.sourceType === 'clip' ? 'Pilih audio' : 'Pilih playlist'} value={form.sourceId} onChange={(e) => setForm({ ...form, sourceId: e.target.value })}>
-                            <option value="">— pilih —</option>
+                            <option value="">{loading ? 'Memuat…' : '— pilih —'}</option>
                             {options(form.sourceType).map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
                         </Field>
                     </div>
                     <Field type="number" label="Ulang berapa kali" min={1} max={20} value={form.loop} onChange={(e) => setForm({ ...form, loop: Math.min(20, Math.max(1, parseInt(e.target.value, 10) || 1)) })} />
-                    <CameraMultiSelect cameras={cameras} value={form.cameraIds} onChange={(ids) => setForm({ ...form, cameraIds: ids })} />
+                    <CameraMultiSelect cameras={cameras} value={form.cameraIds} onChange={(ids) => setForm({ ...form, cameraIds: ids })} loading={loading} />
                     <DeviceMultiSelect value={form.deviceIds} onChange={(ids) => setForm({ ...form, deviceIds: ids })} hint="Titik speaker yang dibunyikan tombol ini (boleh tanpa kamera)." />
                     <div className="flex justify-end gap-2">
                         <button type="button" onClick={() => setForm(null)} className="rounded-control border border-edge px-3 py-1.5 text-sm font-medium text-content-muted">Batal</button>

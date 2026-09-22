@@ -13,7 +13,7 @@ import { Button, EmptyState, Field } from '../../ui';
 import { useConfirm } from '../../../contexts/ConfirmContext';
 import CameraMultiSelect from './CameraMultiSelect';
 
-function GroupEditor({ initialName = '', initialIds = [], cameras, onCancel, onSave, saving }) {
+function GroupEditor({ initialName = '', initialIds = [], cameras, loading, onCancel, onSave, saving }) {
     const [name, setName] = useState(initialName);
     const [ids, setIds] = useState(initialIds);
     return (
@@ -27,7 +27,7 @@ function GroupEditor({ initialName = '', initialIds = [], cameras, onCancel, onS
                 onChange={(e) => setName(e.target.value)}
             />
             {/* Plain picker (no nested groups) to choose members across any area. */}
-            <CameraMultiSelect cameras={cameras} value={ids} onChange={setIds} />
+            <CameraMultiSelect cameras={cameras} value={ids} onChange={setIds} loading={loading} />
             <div className="flex justify-end gap-2">
                 <button type="button" onClick={onCancel} className="rounded-control border border-edge px-3 py-1.5 text-sm font-medium text-content-muted">Batal</button>
                 <Button variant="primary" disabled={!name.trim() || ids.length === 0 || saving} loading={saving} onClick={() => onSave(name.trim(), ids)}>Simpan</Button>
@@ -36,7 +36,7 @@ function GroupEditor({ initialName = '', initialIds = [], cameras, onCancel, onS
     );
 }
 
-export default function GroupsTab({ groups = [], cameras = [], onSaveGroup, onUpdateGroup, onDeleteGroup }) {
+export default function GroupsTab({ groups = [], cameras = [], loading, onSaveGroup, onUpdateGroup, onDeleteGroup }) {
     const [creating, setCreating] = useState(false);
     const [editingId, setEditingId] = useState(null);
     const [saving, setSaving] = useState(false);
@@ -81,7 +81,7 @@ export default function GroupsTab({ groups = [], cameras = [], onSaveGroup, onUp
                 </div>
 
                 {creating && (
-                    <GroupEditor cameras={cameras} saving={saving} onCancel={() => setCreating(false)} onSave={create} />
+                    <GroupEditor cameras={cameras} loading={loading} saving={saving} onCancel={() => setCreating(false)} onSave={create} />
                 )}
             </section>
 
@@ -96,6 +96,7 @@ export default function GroupsTab({ groups = [], cameras = [], onSaveGroup, onUp
                                     initialName={g.name}
                                     initialIds={g.camera_ids || []}
                                     cameras={cameras}
+                                    loading={loading}
                                     saving={saving}
                                     onCancel={() => setEditingId(null)}
                                     onSave={(name, ids) => save(g.id, name, ids)}

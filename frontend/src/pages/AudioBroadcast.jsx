@@ -118,21 +118,27 @@ export default function AudioBroadcast() {
         let cancelled = false;
         (async () => {
             setLoading(true);
-            const [c, p, s, cam, ar, cap, gr] = await Promise.all([
-                getClips(), getPlaylists(), getSchedules(), getCameras(), getAreas(), getCapability(), getGroups(),
-            ]);
-            if (cancelled) return;
-            if (c.success) setClips(c.data || []); else warn(c, 'Gagal memuat audio');
-            if (p.success) setPlaylists(p.data || []); else warn(p, 'Gagal memuat playlist');
-            if (s.success) setSchedules(s.data || []); else warn(s, 'Gagal memuat jadwal');
-            if (cam.success) setCameras(cam.data || []); else warn(cam, 'Gagal memuat kamera');
-            if (ar.success) setAreas(ar.data || []);
-            if (cap.success) setCapability(cap.data || []);
-            if (gr.success) setGroups(gr.data || []);
-            setLoading(false);
+            try {
+                const [c, p, s, cam, ar, cap, gr] = await Promise.all([
+                    getClips(), getPlaylists(), getSchedules(), getCameras(), getAreas(), getCapability(), getGroups(),
+                ]);
+                if (cancelled) return;
+                if (c.success) setClips(c.data || []); else warn(c, 'Gagal memuat audio');
+                if (p.success) setPlaylists(p.data || []); else warn(p, 'Gagal memuat playlist');
+                if (s.success) setSchedules(s.data || []); else warn(s, 'Gagal memuat jadwal');
+                if (cam.success) setCameras(cam.data || []); else warn(cam, 'Gagal memuat kamera');
+                if (ar.success) setAreas(ar.data || []);
+                if (cap.success) setCapability(cap.data || []);
+                if (gr.success) setGroups(gr.data || []);
+            } catch {
+                // A thrown (not {success:false}) failure would otherwise leave the whole page stuck on "Memuat…".
+                if (!cancelled) showNotification({ type: 'error', title: 'Gagal memuat data siaran', message: 'Muat ulang halaman untuk mencoba lagi.' });
+            } finally {
+                if (!cancelled) setLoading(false);
+            }
         })();
         return () => { cancelled = true; };
-    }, [warn]);
+    }, [warn, showNotification]);
 
     const playClipFromLibrary = (clip) => {
         setPreselectClip(clip);
@@ -157,21 +163,22 @@ export default function AudioBroadcast() {
                         preselect={preselectClip}
                         groups={groups}
                         onSaveGroup={handleSaveGroup}
+                        loading={loading}
                     />
                 </TabPanel>
             )}
             {active === 'panel' && (
                 <TabPanel id="panel" idPrefix="audio">
                     <div className="space-y-6">
-                        <EmergencyPanel clips={clips} playlists={playlists} cameras={cameras} areas={areas} />
+                        <EmergencyPanel clips={clips} playlists={playlists} cameras={cameras} areas={areas} loading={loading} />
                         <SirenControl />
-                        <SoundboardTab clips={clips} playlists={playlists} cameras={cameras} />
+                        <SoundboardTab clips={clips} playlists={playlists} cameras={cameras} loading={loading} />
                     </div>
                 </TabPanel>
             )}
             {active === 'talk' && (
                 <TabPanel id="talk" idPrefix="audio">
-                    <TalkTab cameras={cameras} />
+                    <TalkTab cameras={cameras} loading={loading} />
                 </TabPanel>
             )}
             {active === 'content' && (
@@ -215,15 +222,16 @@ export default function AudioBroadcast() {
                         reloadAreas={reloadAreas}
                         reloadCapability={reloadCapability}
                     />
-                    <SpeakerNodesTab clips={clips} areas={areas} />
+                    <SpeakerNodesTab clips={clips} areas={areas} clipsLoading={loading} />
                     <GroupsTab
                         groups={groups}
                         cameras={cameras}
+                        loading={loading}
                         onSaveGroup={handleSaveGroup}
                         onUpdateGroup={handleUpdateGroup}
                         onDeleteGroup={handleDeleteGroup}
                     />
-                    <MotionArms capability={capability} clips={clips} />
+                    <MotionArms capability={capability} clips={clips} loading={loading} />
                   </div>
                 </TabPanel>
             )}

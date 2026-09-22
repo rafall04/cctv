@@ -16,7 +16,7 @@ import CameraMultiSelect from './CameraMultiSelect';
 import DeviceMultiSelect from './DeviceMultiSelect';
 import { formatDuration } from './audioFormatting';
 
-export default function PlayNowTab({ clips, playlists, cameras, preselect, groups, onSaveGroup, onDeleteGroup }) {
+export default function PlayNowTab({ clips, playlists, cameras, preselect, groups, onSaveGroup, onDeleteGroup, loading }) {
     const [sourceType, setSourceType] = useState('clip');
     const [sourceId, setSourceId] = useState('');
     const [cameraIds, setCameraIds] = useState([]);
@@ -142,8 +142,9 @@ export default function PlayNowTab({ clips, playlists, cameras, preselect, group
                     label={sourceType === 'clip' ? 'Pilih audio' : 'Pilih playlist'}
                     value={sourceId}
                     onChange={(e) => setSourceId(e.target.value)}
+                    disabled={loading}
                 >
-                    <option value="">— pilih —</option>
+                    <option value="">{loading ? 'Memuat…' : '— pilih —'}</option>
                     {options.map((o) => (
                         <option key={o.id} value={o.id}>
                             {o.name}
@@ -174,6 +175,7 @@ export default function PlayNowTab({ clips, playlists, cameras, preselect, group
                     groups={groups}
                     onSaveGroup={onSaveGroup}
                     onDeleteGroup={onDeleteGroup}
+                    loading={loading}
                 />
 
                 <DeviceMultiSelect value={deviceIds} onChange={setDeviceIds} disabled={playing} hint="Titik Speaker (STB) tujuan siaran ini (boleh tanpa kamera)." />
