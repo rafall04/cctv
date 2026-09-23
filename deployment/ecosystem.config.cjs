@@ -71,7 +71,11 @@ module.exports = {
             treekill: false,
             env_production: {
                 NODE_ENV: 'production',
-                PORT: 3000
+                PORT: 3000,
+                // NODE_OPTIONS is the deterministic path — PM2 registers node_args as
+                // "interpreter args" but 6.0.14 does not pass them to the spawn cmdline
+                // (verified on prod: /proc/<pid>/cmdline shows plain `node server.js`).
+                NODE_OPTIONS: '--max-old-space-size=768'
             }
         },
         {
@@ -112,7 +116,8 @@ module.exports = {
             // alive across its own restarts.
             treekill: false,
             env_production: {
-                NODE_ENV: 'production'
+                NODE_ENV: 'production',
+                NODE_OPTIONS: '--max-old-space-size=768'
             }
         }
     ]
