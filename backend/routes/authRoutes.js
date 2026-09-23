@@ -1,4 +1,4 @@
-import { login, logout, verifyToken, refreshTokens, register, registerInfo, verifyTotp } from '../controllers/authController.js';
+import { login, logout, verifyToken, refreshTokens, register, registerInfo, verifyTotp, enrollTotpSetup, enrollTotpConfirm } from '../controllers/authController.js';
 import { getCsrfToken } from '../controllers/csrfController.js';
 import { fingerprintAuthMiddleware } from '../middleware/fingerprintValidator.js';
 import { loginSchema, refreshTokenSchema, registerSchema } from '../middleware/schemaValidators.js';
@@ -17,6 +17,15 @@ export default async function authRoutes(fastify, options) {
     // check + per-user lockout live in totpAuthService).
     fastify.post('/totp/verify', {
         handler: verifyTotp,
+    });
+
+    // Mandatory-admin enrollment (public — the enroll-only JWT is the credential;
+    // confirm enables 2FA and issues the session atomically).
+    fastify.post('/totp/enroll-setup', {
+        handler: enrollTotpSetup,
+    });
+    fastify.post('/totp/enroll-confirm', {
+        handler: enrollTotpConfirm,
     });
 
     // Customer self-registration (public; can be disabled from the admin billing page)

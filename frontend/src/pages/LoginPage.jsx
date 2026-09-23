@@ -130,6 +130,10 @@ export default function LoginPage() {
     // factor — it is NOT a session and expires in 5 minutes server-side.
     const [totpChallenge, setTotpChallenge] = useState(null);
     const [totpCode, setTotpCode] = useState('');
+    // Mandatory-admin enrollment: enrollToken only buys setup+confirm — never a
+    // session. Recovery codes surface ONCE after confirm, before the app opens.
+    const [totpEnroll, setTotpEnroll] = useState(null);
+    const [enrollRecoveryCodes, setEnrollRecoveryCodes] = useState(null);
 
     // Countdown timer for rate limiting
     useEffect(() => {
@@ -228,6 +232,22 @@ export default function LoginPage() {
         }
         setLoading(true);
         setError('');
+        if (totpEnroll) {
+            const enrollResult = await authService.enrollTotpConfirm(totpEnroll.enrollToken, code);
+            if (enrollResult.success) {
+                // Hold the codes on screen — this is the only time they are shown.
+                setEnrollRecoveryCodes({ codes: enrollResult.recoveryCodes, user: enrollResult.user });
+                setLoading(false);
+                return;
+            }
+            if (/kedaluwarsa|expired/i.test(enrollResult.message || '')) {
+                setTotpEnroll(null);
+                setTotpCode('');
+            }
+            setError(enrollResult.message || 'Kode verifikasi salah');
+            setLoading(false);
+            return;
+        }
         const result = await authService.verifyTotp(totpChallenge.pendingToken, code);
         if (result.success) {
             finishLogin(result.user, result.passwordExpiryWarning);
@@ -276,6 +296,20 @@ export default function LoginPage() {
                 // Password OK — swap to the code step. No session exists yet.
                 setTotpChallenge({ pendingToken: result.pendingToken });
                 setTotpCode('');
+                setLoading(false);
+                return;
+            }
+
+            if (result.requiresTotpEnrollment) {
+                // Admin without 2FA: fetch the staged seed (QR) — the enroll token is
+                // the only credential the setup endpoint accepts.
+                setTotpCode('');
+                const setup = await authService.enrollTotpSetup(result.enrollToken);
+                if (setup.success) {
+                    setTotpEnroll({ enrollToken: result.enrollToken, qrDataUrl: setup.qrDataUrl, secret: setup.secret });
+                } else {
+                    setError(setup.message || 'Gagal menyiapkan 2FA');
+                }
                 setLoading(false);
                 return;
             }
@@ -423,7 +457,7 @@ export default function LoginPage() {
 
                 {/* Login Card */}
                 <div className="bg-surface-raised/80 backdrop-blur-xl rounded-2xl shadow-2xl border border-edge p-8">
-                    <form onSubmit={totpChallenge ? handleTotpSubmit : handleSubmit} className="space-y-6">
+                    <form onSubmit={(totpChallenge || totpEnroll) ? handleTotpSubmit : handleSubmit} className="space-y-6">
                         {/* Error Alert */}
                         {error && (
                             <div role="alert" className="flex items-center gap-3 p-4 bg-status-fault/10 border border-status-fault/30 rounded-xl">
@@ -492,10 +526,10 @@ export default function LoginPage() {
                             </div>
                         )}
 
-                        {/* Username + password hidden once the 2FA challenge is pending —
-                            the password factor already succeeded; showing it again would
-                            imply it needs re-checking. */}
-                        {!totpChallenge && (
+                        {/* Username + password hidden once the 2FA challenge/enrollment is
+                            pending — the password factor already succeeded; showing it again
+                            would imply it needs re-checking. */}
+                        {!totpChallenge && !totpEnroll && !enrollRecoveryCodes && (
                         <>
                         {/* Username Field */}
                         <div>
@@ -611,7 +645,75 @@ export default function LoginPage() {
                             </div>
                         )}
 
-                        {/* Submit Button */}
+                        {/* Mandatory enrollment step (admin without 2FA): scan the QR into
+                            an authenticator, then type the first 6-digit code to activate. */}
+                        {totpEnroll && !enrollRecoveryCodes && (
+                            <div>
+                                <div className="mb-4 flex items-center gap-3 p-4 bg-status-warn/10 border border-status-warn/30 rounded-xl">
+                                    <div className="text-status-warn flex-shrink-0"><Icons.Warning /></div>
+                                    <p className="text-sm text-content">
+                                        <span className="font-semibold">2FA wajib untuk admin.</span> Scan QR ini di aplikasi authenticator (Google Authenticator, Aegis, dsb), lalu masukkan kode 6 digit untuk mengaktifkan.
+                                    </p>
+                                </div>
+                                {totpEnroll.qrDataUrl && (
+                                    <div className="flex justify-center py-3">
+                                        <img src={totpEnroll.qrDataUrl} alt="QR setup 2FA" className="w-44 h-44 rounded-xl border border-edge bg-white p-2" />
+                                    </div>
+                                )}
+                                <p className="text-xs text-content-subtle text-center break-all font-mono select-all mb-3">{totpEnroll.secret}</p>
+                                <label htmlFor="login-totp-enroll" className="block text-sm font-semibold text-content-muted mb-2">
+                                    Kode dari Authenticator
+                                </label>
+                                <input
+                                    id="login-totp-enroll"
+                                    type="text"
+                                    inputMode="numeric"
+                                    autoComplete="one-time-code"
+                                    value={totpCode}
+                                    onChange={(e) => { setTotpCode(e.target.value); setError(''); }}
+                                    className="w-full px-4 py-3.5 bg-surface-sunken border border-edge rounded-xl text-content text-center text-2xl font-mono tracking-[0.4em] placeholder-content-subtle focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary transition-all disabled:opacity-50"
+                                    placeholder="••••••"
+                                    disabled={loading}
+                                    autoFocus
+                                    maxLength={6}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => { setTotpEnroll(null); setTotpCode(''); setError(''); }}
+                                    className="mt-3 text-sm text-content-muted hover:text-primary transition-colors"
+                                >
+                                    ← Kembali ke username &amp; password
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Recovery codes — shown exactly once, right after enrollment. */}
+                        {enrollRecoveryCodes && (
+                            <div>
+                                <div className="mb-4 flex items-center gap-3 p-4 bg-status-ok/10 border border-status-ok/30 rounded-xl">
+                                    <div className="text-status-ok flex-shrink-0"><Icons.Lock /></div>
+                                    <p className="text-sm text-content">
+                                        <span className="font-semibold">2FA aktif.</span> Simpan kode pemulihan ini — dipakai bila HP/authenticator hilang. Tidak ditampilkan lagi.
+                                    </p>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2 p-4 bg-surface-sunken border border-edge rounded-xl font-mono text-sm text-content text-center">
+                                    {enrollRecoveryCodes.codes.map((code) => (
+                                        <span key={code} className="select-all">{code}</span>
+                                    ))}
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => { const u = enrollRecoveryCodes.user; setEnrollRecoveryCodes(null); finishLogin(u, null); }}
+                                    className="mt-4 w-full py-3.5 px-4 bg-primary hover:bg-primary-600 text-white font-semibold rounded-xl transition-all"
+                                >
+                                    Sudah saya simpan — Lanjut masuk
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Submit Button — hidden while recovery codes are on screen
+                            (they carry their own continue button). */}
+                        {!enrollRecoveryCodes && (
                         <button
                             type="submit"
                             disabled={isSubmitDisabled}
@@ -633,9 +735,10 @@ export default function LoginPage() {
                                     <span>Wait {formatTime(retryCountdown)}</span>
                                 </>
                             ) : (
-                                <span>{totpChallenge ? 'Verifikasi' : 'Masuk'}</span>
+                                <span>{totpEnroll ? 'Aktifkan 2FA' : totpChallenge ? 'Verifikasi' : 'Masuk'}</span>
                             )}
                         </button>
+                        )}
                     </form>
 
                     {/* Register + Back Links */}

@@ -23,9 +23,13 @@
 
 import { queryOne, execute } from '../database/connectionPool.js';
 import totpService from './totpService.js';
+import { config } from '../config/config.js';
 import { logAuthAttempt, logSecurityEvent } from './securityAuditLogger.js';
 
 export const PENDING_TOKEN_TTL = '5m';
+// Enrollment needs more room than the challenge: scan QR, add to authenticator, type a
+// code, and copy 8 recovery codes — 5 minutes was too tight for that whole flow.
+export const ENROLL_TOKEN_TTL = '15m';
 export const MAX_TOTP_FAILURES = 5;
 export const TOTP_LOCK_MINUTES = 15;
 
@@ -104,10 +108,16 @@ class TotpAuthService {
     /** Disable requires a live TOTP or a recovery code — never the password alone. */
     disable(userId, code, request) {
         const row = queryOne(
-            'SELECT username, totp_enabled, totp_secret, totp_recovery_hashes FROM users WHERE id = ?',
+            'SELECT username, role, totp_enabled, totp_secret, totp_recovery_hashes FROM users WHERE id = ?',
             [userId]
         );
         if (!row || row.totp_enabled !== 1) throw fail(400, '2FA tidak aktif');
+        // While admin enrollment is mandatory, an admin disabling their own factor would
+        // quietly re-open the gate the policy exists to close.
+        if (config.security.adminTotpRequired && row.role === 'admin') {
+            audit(userId, 'TOTP_DISABLE_BLOCKED', `username=${row.username} reason=admin_required`, request);
+            throw fail(400, '2FA wajib untuk role admin — tidak dapat dinonaktifkan');
+        }
         const { ok, usedRecoveryIndex } = this.#verifyAny(row, code);
         if (!ok) {
             audit(userId, 'TOTP_VERIFY_FAILED', `username=${row.username} context=disable`, request);
@@ -131,6 +141,45 @@ class TotpAuthService {
             { sub: user.id, username: user.username, fp: fingerprint, type: 'totp_pending' },
             { expiresIn: PENDING_TOKEN_TTL }
         );
+    }
+
+    /**
+     * Bridge for admins REQUIRED to enroll (ADMIN_TOTP_REQUIRED): the login password
+     * factor succeeded but no session may exist until 2FA is on. This token only buys
+     * /api/auth/totp/enroll-setup + enroll-confirm — never a session on its own.
+     */
+    createEnrollToken(server, user, fingerprint) {
+        return server.jwt.sign(
+            { sub: user.id, username: user.username, fp: fingerprint, type: 'totp_enroll' },
+            { expiresIn: ENROLL_TOKEN_TTL }
+        );
+    }
+
+    /**
+     * Consume an enroll token → the user row allowed to run setup/confirm. Same binding
+     * rules as the pending token: right type, right fingerprint, account still usable —
+     * and the user must STILL lack 2FA (a second session that finished enrollment first
+     * makes this token's job done; it becomes a normal login instead).
+     */
+    verifyEnrollToken(server, { enrollToken, fingerprint }) {
+        let claims;
+        try {
+            claims = server.jwt.verify(enrollToken);
+        } catch {
+            throw fail(401, 'Sesi pendaftaran 2FA kedaluwarsa — ulangi login');
+        }
+        if (claims.type !== 'totp_enroll' || !claims.sub || claims.fp !== fingerprint) {
+            throw fail(401, 'Token pendaftaran 2FA tidak valid');
+        }
+        const row = queryOne(
+            'SELECT id, username, role, account_status, totp_enabled FROM users WHERE id = ?',
+            [claims.sub]
+        );
+        if (!row) throw fail(401, 'Akun tidak ditemukan');
+        if (row.account_status === 'pending' || row.account_status === 'rejected') {
+            throw fail(401, 'Akun tidak aktif — hubungi admin');
+        }
+        return { user: row };
     }
 
     /**

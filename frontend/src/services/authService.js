@@ -38,6 +38,15 @@ export const authService = {
                         pendingToken: response.data.data.pendingToken,
                     };
                 }
+                // Admin WITHOUT 2FA while enrollment is mandatory — the enroll token is
+                // the only credential; setup+confirm must run before any session exists.
+                if (response.data.data?.requiresTotpEnrollment) {
+                    return {
+                        success: true,
+                        requiresTotpEnrollment: true,
+                        enrollToken: response.data.data.enrollToken,
+                    };
+                }
                 const { user } = response.data.data;
 
                 // Store only user info (tokens are in HttpOnly cookies)
@@ -140,6 +149,49 @@ export const authService = {
                 success: false,
                 message: error.response?.data?.message || 'Verifikasi gagal. Coba lagi.',
                 isRateLimited: error.response?.status === 429,
+            };
+        }
+    },
+
+    /**
+     * Mandatory-admin enrollment step 1: trade the enroll-only token for a staged TOTP
+     * seed (secret + otpauth URL + QR data URL). No session exists yet.
+     * @returns {Promise<Object>} { success, secret, otpauthUrl, qrDataUrl } | { success:false, message }
+     */
+    async enrollTotpSetup(enrollToken) {
+        try {
+            const response = await apiClient.post('/api/auth/totp/enroll-setup', { enrollToken }, { skipAuthRefresh: true });
+            if (response.data.success) {
+                return { success: true, ...response.data.data };
+            }
+            return { success: false, message: response.data.message || 'Gagal menyiapkan 2FA' };
+        } catch (error) {
+            return {
+                success: false,
+                message: error.response?.data?.message || 'Gagal menyiapkan 2FA. Coba lagi.',
+            };
+        }
+    },
+
+    /**
+     * Mandatory-admin enrollment step 2: confirm a live code → 2FA enabled AND the
+     * session is issued in the same response. Recovery codes come back once — the
+     * caller must show them before navigating away.
+     * @returns {Promise<Object>} { success, user, recoveryCodes } | { success:false, message }
+     */
+    async enrollTotpConfirm(enrollToken, code) {
+        try {
+            const response = await apiClient.post('/api/auth/totp/enroll-confirm', { enrollToken, code }, { skipAuthRefresh: true });
+            if (response.data.success) {
+                const { user, recoveryCodes } = response.data.data;
+                localStorage.setItem('user', JSON.stringify(user));
+                return { success: true, user, recoveryCodes };
+            }
+            return { success: false, message: response.data.message || 'Kode verifikasi salah' };
+        } catch (error) {
+            return {
+                success: false,
+                message: error.response?.data?.message || 'Verifikasi gagal. Coba lagi.',
             };
         }
     },

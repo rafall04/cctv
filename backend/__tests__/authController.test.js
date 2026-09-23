@@ -17,7 +17,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../services/authService.js', () => ({
-    default: { login: vi.fn(), logout: vi.fn(), refreshTokens: vi.fn(), completeTwoFactorLogin: vi.fn() },
+    default: { login: vi.fn(), logout: vi.fn(), refreshTokens: vi.fn(), completeTwoFactorLogin: vi.fn(), completeTotpEnrollment: vi.fn() },
+}));
+vi.mock('../services/totpAuthService.js', () => ({
+    default: { verifyEnrollToken: vi.fn(), startSetup: vi.fn() },
 }));
 vi.mock('../services/billingPlanService.js', () => ({
     default: { registerCustomer: vi.fn(), getRegistrationSettings: vi.fn() },
@@ -27,7 +30,8 @@ vi.mock('../services/telegramBotService.js', () => ({
 }));
 
 const authService = (await import('../services/authService.js')).default;
-const { login, logout, refreshTokens, verifyToken, verifyTotp } = await import('../controllers/authController.js');
+const totpAuthService = (await import('../services/totpAuthService.js')).default;
+const { login, logout, refreshTokens, verifyToken, verifyTotp, enrollTotpSetup, enrollTotpConfirm } = await import('../controllers/authController.js');
 
 function makeReply() {
     const reply = {
@@ -164,6 +168,87 @@ describe('login handler', () => {
         // The critical invariant: zero auth cookies on a challenge response.
         expect(reply.cookies).toHaveLength(0);
         expect(reply.body.data.accessToken).toBeUndefined();
+    });
+
+    it('admin enrollment gate: returns enrollToken and sets NO cookies (no session yet)', async () => {
+        authService.login.mockResolvedValue({ requiresTotpEnrollment: true, enrollToken: 'enr.tok' });
+        const reply = makeReply();
+        await login(makeRequest({ body: { username: 'admin', password: 'pw' } }), reply);
+
+        expect(reply.statusCode).toBe(200);
+        expect(reply.body.data).toEqual({ requiresTotpEnrollment: true, enrollToken: 'enr.tok' });
+        expect(reply.cookies).toHaveLength(0);
+        expect(reply.body.data.accessToken).toBeUndefined();
+    });
+});
+
+describe('enrollTotpSetup handler', () => {
+    it('rejects a missing enrollToken with 400 without reaching the service', async () => {
+        const reply = makeReply();
+        await enrollTotpSetup(makeRequest({ body: {} }), reply);
+
+        expect(reply.statusCode).toBe(400);
+        expect(totpAuthService.verifyEnrollToken).not.toHaveBeenCalled();
+    });
+
+    it('stages a seed for a verified enroll token — QR payload only, never a session', async () => {
+        totpAuthService.verifyEnrollToken.mockReturnValue({ user: { id: 7, username: 'admin' } });
+        totpAuthService.startSetup.mockResolvedValue({
+            secret: 'ABC123', otpauthUrl: 'otpauth://x', qrDataUrl: 'data:image/png;base64,q',
+        });
+        const reply = makeReply();
+        await enrollTotpSetup(makeRequest({ body: { enrollToken: 'enr.tok' } }), reply);
+
+        expect(totpAuthService.startSetup).toHaveBeenCalledWith(7, 'admin', expect.anything());
+        expect(reply.statusCode).toBe(200);
+        expect(reply.body.data.qrDataUrl).toContain('data:image/png');
+        expect(reply.cookies).toHaveLength(0);
+    });
+
+    it('passes a bad/expired enroll-token 401 through unchanged', async () => {
+        const err = new Error('Token enrollment tidak valid atau kedaluwarsa');
+        err.statusCode = 401;
+        totpAuthService.verifyEnrollToken.mockImplementation(() => { throw err; });
+        const reply = makeReply();
+        await enrollTotpSetup(makeRequest({ body: { enrollToken: 'junk' } }), reply);
+
+        expect(reply.statusCode).toBe(401);
+        expect(totpAuthService.startSetup).not.toHaveBeenCalled();
+    });
+});
+
+describe('enrollTotpConfirm handler', () => {
+    it('rejects missing fields with 400 without reaching the service', async () => {
+        const reply = makeReply();
+        await enrollTotpConfirm(makeRequest({ body: { enrollToken: 'x' } }), reply);
+
+        expect(reply.statusCode).toBe(400);
+        expect(authService.completeTotpEnrollment).not.toHaveBeenCalled();
+    });
+
+    it('mints the session cookie pair + returns recovery codes on success', async () => {
+        authService.completeTotpEnrollment.mockResolvedValue({
+            accessToken: 'a3', refreshToken: 'r3', user: { id: 7, username: 'admin', role: 'admin' },
+            recoveryCodes: ['RC1', 'RC2'],
+        });
+        const reply = makeReply();
+        await enrollTotpConfirm(makeRequest({ body: { enrollToken: 'enr.tok', code: '123456' } }), reply);
+
+        expect(authService.completeTotpEnrollment).toHaveBeenCalledWith(expect.anything(), 'enr.tok', '123456', expect.anything());
+        expect(cookie(reply, 'token').value).toBe('a3');
+        expect(cookie(reply, 'refreshToken').value).toBe('r3');
+        expect(reply.body.data.recoveryCodes).toEqual(['RC1', 'RC2']);
+    });
+
+    it('a bad code passes the 400 through and sets no cookies', async () => {
+        const err = new Error('Kode verifikasi salah');
+        err.statusCode = 400;
+        authService.completeTotpEnrollment.mockRejectedValue(err);
+        const reply = makeReply();
+        await enrollTotpConfirm(makeRequest({ body: { enrollToken: 'enr.tok', code: '000000' } }), reply);
+
+        expect(reply.statusCode).toBe(400);
+        expect(reply.cookies).toHaveLength(0);
     });
 });
 

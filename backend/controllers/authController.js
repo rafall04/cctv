@@ -7,8 +7,10 @@
  */
 
 import authService from '../services/authService.js';
+import totpAuthService from '../services/totpAuthService.js';
 import billingPlanService from '../services/billingPlanService.js';
 import telegramBotService from '../services/telegramBotService.js';
+import { generateFingerprint } from '../services/sessionManager.js';
 import { getAuthCookieOptions } from '../utils/authCookieOptions.js';
 
 export async function login(request, reply) {
@@ -31,6 +33,15 @@ export async function login(request, reply) {
             return reply.send({
                 success: true,
                 data: { requiresTwoFactor: true, pendingToken: data.pendingToken },
+            });
+        }
+
+        // Mandatory admin enrollment: no session, no cookies — the enroll token is the
+        // only credential the setup/confirm endpoints accept.
+        if (data.requiresTotpEnrollment) {
+            return reply.send({
+                success: true,
+                data: { requiresTotpEnrollment: true, enrollToken: data.enrollToken },
             });
         }
 
@@ -107,6 +118,67 @@ export async function verifyTotp(request, reply) {
             return reply.code(status).send({ success: false, message: error.message });
         }
         console.error('TOTP verify error:', error);
+        return reply.code(500).send({ success: false, message: 'Internal server error' });
+    }
+}
+
+/**
+ * Required-admin enrollment: stage a TOTP seed behind the enroll-only token minted by
+ * login. The token carries sub+fp — no session exists yet and none may exist until
+ * enrollment completes.
+ */
+export async function enrollTotpSetup(request, reply) {
+    try {
+        const { enrollToken } = request.body || {};
+        if (!enrollToken) {
+            return reply.code(400).send({ success: false, message: 'enrollToken wajib diisi' });
+        }
+        const { user } = totpAuthService.verifyEnrollToken(request.server, {
+            enrollToken,
+            fingerprint: generateFingerprint(request),
+        });
+        const setup = await totpAuthService.startSetup(user.id, user.username, request);
+        return reply.send({ success: true, data: setup });
+    } catch (error) {
+        const status = error.statusCode || 500;
+        if (status < 500) {
+            return reply.code(status).send({ success: false, message: error.message });
+        }
+        console.error('TOTP enroll setup error:', error);
+        return reply.code(500).send({ success: false, message: 'Internal server error' });
+    }
+}
+
+/**
+ * Confirm the staged seed → enable 2FA → issue the real session in the same response.
+ * Recovery codes ride along — this is the ONLY response that ever shows them.
+ */
+export async function enrollTotpConfirm(request, reply) {
+    try {
+        const { enrollToken, code } = request.body || {};
+        if (!enrollToken || !code) {
+            return reply.code(400).send({ success: false, message: 'enrollToken dan code wajib diisi' });
+        }
+        const data = await authService.completeTotpEnrollment(request.server, enrollToken, code, request);
+        const cookieOptions = getAuthCookieOptions(request);
+        reply.setCookie('token', data.accessToken, cookieOptions.access);
+        reply.setCookie('refreshToken', data.refreshToken, cookieOptions.refresh);
+        return reply.send({
+            success: true,
+            message: '2FA aktif — login berhasil',
+            data: {
+                token: data.accessToken,
+                refreshToken: data.refreshToken,
+                user: data.user,
+                recoveryCodes: data.recoveryCodes,
+            },
+        });
+    } catch (error) {
+        const status = error.statusCode || 500;
+        if (status < 500) {
+            return reply.code(status).send({ success: false, message: error.message });
+        }
+        console.error('TOTP enroll confirm error:', error);
         return reply.code(500).send({ success: false, message: 'Internal server error' });
     }
 }

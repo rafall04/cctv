@@ -14,15 +14,22 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import LoginPage from './LoginPage.jsx';
 
-const { loginMock, verifyTotpMock, navigateMock, notifySuccessMock } = vi.hoisted(() => ({
+const { loginMock, verifyTotpMock, enrollSetupMock, enrollConfirmMock, navigateMock, notifySuccessMock } = vi.hoisted(() => ({
     loginMock: vi.fn(),
     verifyTotpMock: vi.fn(),
+    enrollSetupMock: vi.fn(),
+    enrollConfirmMock: vi.fn(),
     navigateMock: vi.fn(),
     notifySuccessMock: vi.fn(),
 }));
 
 vi.mock('../services/authService', () => ({
-    authService: { login: loginMock, verifyTotp: verifyTotpMock },
+    authService: {
+        login: loginMock,
+        verifyTotp: verifyTotpMock,
+        enrollTotpSetup: enrollSetupMock,
+        enrollTotpConfirm: enrollConfirmMock,
+    },
 }));
 vi.mock('react-router-dom', async (importActual) => ({
     ...(await importActual()),
@@ -114,5 +121,60 @@ describe('LoginPage — TOTP second factor', () => {
 
         // Challenge cleared → username field returns so a fresh password login mints a new token.
         await waitFor(() => expect(screen.getByLabelText(/username/i)).toBeTruthy());
+    });
+});
+
+describe('LoginPage — mandatory admin 2FA enrollment', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        localStorage.clear();
+        sessionStorage.clear();
+        vi.useRealTimers();
+    });
+
+    it('swaps to the QR enrollment step when login returns requiresTotpEnrollment', async () => {
+        loginMock.mockResolvedValue({ success: true, requiresTotpEnrollment: true, enrollToken: 'enr.tok' });
+        enrollSetupMock.mockResolvedValue({
+            success: true, secret: 'ABC123', qrDataUrl: 'data:image/png;base64,q', otpauthUrl: 'otpauth://x',
+        });
+        render(<MemoryRouter><LoginPage /></MemoryRouter>);
+
+        fillLogin();
+        fireEvent.click(screen.getByRole('button', { name: 'Masuk' }));
+
+        await waitFor(() => expect(enrollSetupMock).toHaveBeenCalledWith('enr.tok'));
+        expect(screen.getByText(/2FA wajib untuk admin/i)).toBeTruthy();
+        expect(screen.getByAltText('QR setup 2FA')).toBeTruthy();
+        expect(screen.getByLabelText(/kode dari authenticator/i)).toBeTruthy();
+        // No session, no navigation — the enroll token is the only credential held.
+        expect(screen.queryByLabelText(/username/i)).toBeNull();
+        expect(navigateMock).not.toHaveBeenCalled();
+    });
+
+    it('confirm success shows the recovery codes once — continue then finishes the login', async () => {
+        loginMock.mockResolvedValue({ success: true, requiresTotpEnrollment: true, enrollToken: 'enr.tok' });
+        enrollSetupMock.mockResolvedValue({ success: true, secret: 'ABC123', qrDataUrl: 'data:image/png;base64,q' });
+        enrollConfirmMock.mockResolvedValue({
+            success: true,
+            user: { id: 1, username: 'admin', role: 'admin' },
+            recoveryCodes: ['AAAA-1111', 'BBBB-2222'],
+        });
+        render(<MemoryRouter><LoginPage /></MemoryRouter>);
+
+        fillLogin();
+        fireEvent.click(screen.getByRole('button', { name: 'Masuk' }));
+        await waitFor(() => screen.getByLabelText(/kode dari authenticator/i));
+
+        fireEvent.change(screen.getByLabelText(/kode dari authenticator/i), { target: { value: '123456' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Aktifkan 2FA' }));
+
+        await waitFor(() => expect(screen.getByText('AAAA-1111')).toBeTruthy());
+        expect(screen.getByText('BBBB-2222')).toBeTruthy();
+        expect(navigateMock).not.toHaveBeenCalled();    // codes must be acknowledged first
+
+        vi.useFakeTimers();
+        fireEvent.click(screen.getByRole('button', { name: /lanjut masuk/i }));
+        await vi.advanceTimersByTimeAsync(600);
+        expect(navigateMock).toHaveBeenCalledWith('/admin/dashboard');
     });
 });

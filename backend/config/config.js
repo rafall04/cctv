@@ -154,6 +154,11 @@ export const config = {
 
     sessionAbsoluteTimeoutHours: parseInt(process.env.SESSION_ABSOLUTE_TIMEOUT_HOURS || '24', 10),
 
+    // Mandatory 2FA for role=admin: login returns an enroll-only token instead of a
+    // session until /api/auth/totp/enroll-confirm completes. ADMIN_TOTP_REQUIRED=false
+    // is the documented escape hatch (ops emergency) — never default-off in code.
+    adminTotpRequired: process.env.ADMIN_TOTP_REQUIRED !== 'false',
+
     passwordMinLength: parseInt(process.env.PASSWORD_MIN_LENGTH || '12', 10),
     passwordMaxAgeDays: parseInt(process.env.PASSWORD_MAX_AGE_DAYS || '90', 10),
     passwordHistoryCount: parseInt(process.env.PASSWORD_HISTORY_COUNT || '5', 10),

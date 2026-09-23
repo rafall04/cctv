@@ -59,3 +59,51 @@ describe('authService.verifyTotp', () => {
         expect(JSON.parse(localStorage.getItem('user')).username).toBe('admin');
     });
 });
+
+describe('authService mandatory-admin enrollment', () => {
+    beforeEach(() => {
+        postMock.mockReset();
+        localStorage.clear();
+    });
+
+    it('enrollTotpSetup trades ONLY the enroll token — skipAuthRefresh so a dead token stays a 401', async () => {
+        postMock.mockResolvedValue({
+            data: { success: true, data: { secret: 'ABC', otpauthUrl: 'otpauth://x', qrDataUrl: 'data:image/png;base64,q' } },
+        });
+
+        const res = await authService.enrollTotpSetup('enr.tok');
+
+        expect(postMock).toHaveBeenCalledWith('/api/auth/totp/enroll-setup',
+            { enrollToken: 'enr.tok' },
+            expect.objectContaining({ skipAuthRefresh: true }));
+        expect(res).toEqual({ success: true, secret: 'ABC', otpauthUrl: 'otpauth://x', qrDataUrl: 'data:image/png;base64,q' });
+    });
+
+    it('enrollTotpConfirm stores the session user and returns recoveryCodes once', async () => {
+        postMock.mockResolvedValue({
+            data: {
+                success: true,
+                data: {
+                    user: { id: 1, username: 'admin', role: 'admin' },
+                    recoveryCodes: ['AAAA-1111', 'BBBB-2222'],
+                },
+            },
+        });
+
+        const res = await authService.enrollTotpConfirm('enr.tok', '123456');
+
+        expect(postMock).toHaveBeenCalledWith('/api/auth/totp/enroll-confirm',
+            { enrollToken: 'enr.tok', code: '123456' },
+            expect.objectContaining({ skipAuthRefresh: true }));
+        expect(res.recoveryCodes).toEqual(['AAAA-1111', 'BBBB-2222']);
+        expect(JSON.parse(localStorage.getItem('user')).username).toBe('admin');
+    });
+
+    it('a wrong code surfaces the server message, not a refresh-loop error', async () => {
+        postMock.mockRejectedValue({ response: { status: 400, data: { message: 'Kode verifikasi salah — pastikan jam HP akurat' } } });
+
+        const res = await authService.enrollTotpConfirm('enr.tok', '000000');
+
+        expect(res).toEqual({ success: false, message: 'Kode verifikasi salah — pastikan jam HP akurat' });
+    });
+});

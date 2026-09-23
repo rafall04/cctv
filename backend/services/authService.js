@@ -22,6 +22,7 @@ import {
 } from './sessionManager.js';
 import { checkPasswordExpiry, checkPasswordExpiryWarning } from './passwordExpiry.js';
 import totpAuthService from './totpAuthService.js';
+import { config } from '../config/config.js';
 
 class AuthService {
     async login(username, password, clientIp, request, server) {
@@ -123,7 +124,39 @@ class AuthService {
             return { requiresTwoFactor: true, pendingToken };
         }
 
+        // Mandatory enrollment: an admin WITHOUT 2FA never gets a session — only a
+        // 15-minute enroll token that can run setup+confirm and nothing else.
+        if (config.security.adminTotpRequired && user.role === 'admin') {
+            const enrollToken = totpAuthService.createEnrollToken(server, user, fingerprint);
+            logSecurityEvent('TOTP_ENROLL_REQUIRED', {
+                username,
+                ip_address: clientIp,
+                user_id: user.id,
+            }, request);
+            return { requiresTotpEnrollment: true, enrollToken };
+        }
+
         return this.#issueSession(user, fingerprint, request, server, clientIp);
+    }
+
+    /**
+     * Enrollment exchange for required-admin flow: enroll token + first valid code →
+     * enables 2FA (confirmSetup) AND issues the session tail — one atomic step, so the
+     * admin lands logged-in the moment enrollment completes.
+     */
+    async completeTotpEnrollment(server, enrollToken, code, request) {
+        const fingerprint = generateFingerprint(request);
+        const { user } = totpAuthService.verifyEnrollToken(server, { enrollToken, fingerprint });
+        if (user.totp_enabled === 1) {
+            // Another session already finished enrollment — this token has nothing left
+            // to do; a normal login (with the 2FA challenge) is the way in now.
+            const err = new Error('2FA sudah aktif — silakan login ulang');
+            err.statusCode = 400;
+            throw err;
+        }
+        const { recoveryCodes } = totpAuthService.confirmSetup(user.id, code, request);
+        const session = this.#issueSession(user, fingerprint, request, server, request?.ip || 'unknown');
+        return { ...session, recoveryCodes };
     }
 
     /**

@@ -41,8 +41,23 @@ vi.mock('../services/bruteForceProtection.js', async (importActual) => {
     const actual = await importActual();
     return { ...actual, applyProgressiveDelay: () => Promise.resolve() };
 });
+// Mandatory-admin-2FA flag must be toggleable per test — a getter reads the CURRENT
+// value at call time, so tests flip it without re-importing config.
+const { totpFlags } = await vi.hoisted(() => ({ totpFlags: { adminTotpRequired: false } }));
+vi.mock('../config/config.js', async (importActual) => {
+    const actual = await importActual();
+    const config = {
+        ...actual.config,
+        security: {
+            ...actual.config.security,
+            get adminTotpRequired() { return totpFlags.adminTotpRequired; },
+        },
+    };
+    return { ...actual, config, default: config };
+});
 
 import { logAuthAttempt, logSecurityEvent } from '../services/securityAuditLogger.js';
+import { generateFingerprint } from '../services/sessionManager.js';
 import authService from '../services/authService.js';
 
 const PASSWORD = 'correct-horse-battery';
@@ -68,6 +83,7 @@ const seedUser = (over = {}) => {
 };
 
 beforeEach(() => {
+    totpFlags.adminTotpRequired = false;
     for (const t of ['users', 'audit_logs', 'login_attempts', 'token_blacklist']) db.exec(`DROP TABLE IF EXISTS ${t}`);
     db.exec(`CREATE TABLE users (
         id INTEGER PRIMARY KEY, username TEXT, password_hash TEXT, role TEXT,
@@ -176,6 +192,89 @@ describe('authService two-factor login', () => {
         expect(res.accessToken).toBeTruthy();
         expect(res.refreshToken).toBeTruthy();
         expect(res.user.username).toBe('alice');
+    });
+});
+
+describe('mandatory admin 2FA enrollment (ADMIN_TOTP_REQUIRED)', () => {
+    const jsonServer = () => ({
+        jwt: {
+            sign: (payload) => Buffer.from(JSON.stringify(payload)).toString('base64url'),
+            verify: (token) => JSON.parse(Buffer.from(token, 'base64url').toString()),
+        },
+    });
+    // The REAL fingerprint recipe — the enroll token binds to it exactly like the
+    // challenge token does, so the test must compute it the same way.
+    const fingerprint = (req) => generateFingerprint(req);
+
+    it('an admin WITHOUT 2FA gets an enrollToken and NO session tokens', async () => {
+        totpFlags.adminTotpRequired = true;
+        seedUser();
+        const req = makeRequest();
+        const res = await authService.login('alice', PASSWORD, '1.2.3.4', req, jsonServer());
+        expect(res.requiresTotpEnrollment).toBe(true);
+        expect(res.enrollToken).toBeTruthy();
+        expect(res.accessToken).toBeUndefined();
+        expect(res.refreshToken).toBeUndefined();
+        // No LOGIN audit row — the session does not exist until enrollment completes.
+        expect(db.prepare("SELECT COUNT(*) c FROM audit_logs WHERE action = 'LOGIN'").get().c).toBe(0);
+        expect(logSecurityEvent).toHaveBeenCalledWith('TOTP_ENROLL_REQUIRED', expect.objectContaining({ username: 'alice' }), req);
+    });
+
+    it('a non-admin role still gets a normal session even when enrollment is required', async () => {
+        totpFlags.adminTotpRequired = true;
+        seedUser({ role: 'viewer' });
+        const res = await authService.login('alice', PASSWORD, '1.2.3.4', makeRequest(), jsonServer());
+        expect(res.accessToken).toBeTruthy();
+        expect(res.requiresTotpEnrollment).toBeUndefined();
+    });
+
+    it('the flag being OFF keeps the classic password-only admin login', async () => {
+        totpFlags.adminTotpRequired = false;
+        seedUser();
+        const res = await authService.login('alice', PASSWORD, '1.2.3.4', makeRequest(), jsonServer());
+        expect(res.accessToken).toBeTruthy();
+        expect(res.requiresTotpEnrollment).toBeUndefined();
+    });
+
+    it('full enroll flow: enrollToken → setup → confirm → session + recovery codes', async () => {
+        totpFlags.adminTotpRequired = true;
+        seedUser();
+        const req = makeRequest();
+        const server = jsonServer();
+        const { enrollToken } = await authService.login('alice', PASSWORD, '1.2.3.4', req, server);
+
+        const { default: totpAuthService } = await import('../services/totpAuthService.js');
+        const { default: totpService } = await import('../services/totpService.js');
+        // enroll-setup: the token buys a staged seed, nothing else.
+        const { user } = totpAuthService.verifyEnrollToken(server, { enrollToken, fingerprint: fingerprint(req) });
+        const { secret } = await totpAuthService.startSetup(user.id, user.username, req);
+        // enroll-confirm: wrong code stays locked out.
+        await expect(authService.completeTotpEnrollment(server, enrollToken, '000000', req))
+            .rejects.toMatchObject({ statusCode: 400 });
+        // Correct first code → 2FA on + session minted + recovery codes returned once.
+        const res = await authService.completeTotpEnrollment(server, enrollToken, totpService.totp(secret), req);
+        expect(res.accessToken).toBeTruthy();
+        expect(res.refreshToken).toBeTruthy();
+        expect(res.recoveryCodes).toHaveLength(8);
+        expect(db.prepare('SELECT totp_enabled e FROM users WHERE id = 1').get().e).toBe(1);
+        expect(db.prepare("SELECT COUNT(*) c FROM audit_logs WHERE action = 'LOGIN'").get().c).toBe(1);
+    });
+
+    it('the enroll token cannot masquerade as a challenge token (and vice versa)', async () => {
+        totpFlags.adminTotpRequired = true;
+        seedUser();
+        const req = makeRequest();
+        const server = jsonServer();
+        const { enrollToken } = await authService.login('alice', PASSWORD, '1.2.3.4', req, server);
+        const { default: totpAuthService } = await import('../services/totpAuthService.js');
+        // Wrong token type for the challenge path.
+        expect(() => totpAuthService.verifyChallenge(server, {
+            pendingToken: enrollToken, code: '123456', fingerprint: fingerprint(req), request: req,
+        })).toThrowError(expect.objectContaining({ statusCode: 401 }));
+        // Wrong fingerprint for the enroll path.
+        expect(() => totpAuthService.verifyEnrollToken(server, {
+            enrollToken, fingerprint: 'fp-OTHER-device',
+        })).toThrowError(expect.objectContaining({ statusCode: 401 }));
     });
 });
 
