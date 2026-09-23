@@ -40,16 +40,18 @@ try {
     const normalizeAll = db.transaction(() => {
         for (const [table, column] of PHONE_COLUMNS) {
             if (!hasColumn(table, column)) continue;
+            // `rowid AS __mig_rowid` — plain `SELECT rowid` reports the INTEGER PRIMARY KEY
+            // alias column name ('id'), so row.rowid is undefined and the UPDATE silently
+            // no-ops on `WHERE rowid = NULL`. The explicit alias keeps the key stable.
             const rows = db.prepare(
-                `SELECT rowid, ${column} AS phone FROM ${table} WHERE ${column} IS NOT NULL AND ${column} != ''`
+                `SELECT rowid AS __mig_rowid, ${column} AS phone FROM ${table} WHERE ${column} IS NOT NULL AND ${column} != ''`
             ).all();
             const update = db.prepare(`UPDATE ${table} SET ${column} = ? WHERE rowid = ?`);
             let changed = 0;
             for (const row of rows) {
                 const canonical = normalizePhone(row.phone);
                 if (canonical && canonical !== row.phone) {
-                    update.run(canonical, row.rowid);
-                    changed += 1;
+                    changed += update.run(canonical, row.__mig_rowid).changes;
                 }
             }
             if (changed > 0) console.log(`   ${table}.${column}: ${changed} row(s) canonicalized`);
