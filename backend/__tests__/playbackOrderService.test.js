@@ -80,6 +80,7 @@ vi.mock('../services/playbackProductService.js', () => ({
 
 vi.mock('../services/playbackTokenService.js', () => ({
     default: { revokeToken: (id) => { h.revoked.push(id); } },
+    revealShareKey: (stored) => stored,
 }));
 
 vi.mock('../services/playbackTokenRenewalService.js', () => ({

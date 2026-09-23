@@ -97,10 +97,11 @@ describe('PlaybackTokenAuditLog detail', () => {
         expect(screen.getByText('something_new')).toBeTruthy();
     });
 
-    it('summarises the share detail rather than dumping raw JSON', () => {
+    it('summarises the share detail masked — the raw key is never republished', () => {
         setup([log({ event_type: 'shared', detail_json: '{"share_key_prefix":"CCTVKU","reused":true}' })]);
 
-        expect(screen.getByText('kunci CCTVKU (dipakai ulang)')).toBeTruthy();
+        expect(screen.getByText('kunci CCTV… (dipakai ulang)')).toBeTruthy();
+        expect(screen.queryByText('CCTVKU')).toBeNull();
         expect(screen.queryByText(/share_key_prefix/)).toBeNull();
     });
 

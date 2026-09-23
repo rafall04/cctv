@@ -227,7 +227,7 @@ describe('playbackTokenService', () => {
             })
                 // Terminal default: without it vi.spyOn falls through to the REAL database.
                 .mockReturnValue(undefined);
-        const { default: playbackTokenService } = await import('../services/playbackTokenService.js');
+        const { default: playbackTokenService, revealShareKey } = await import('../services/playbackTokenService.js');
 
         const result = playbackTokenService.createToken(
             {
@@ -244,7 +244,9 @@ describe('playbackTokenService', () => {
         expect(result.share_text).toContain('Kode: RAFNET88');
         expect(result.share_text).toContain('/playback?share=RAFNET88');
         expect(connectionPool.queryOne.mock.calls[0][0]).toContain('share_key_hash = ?');
-        expect(connectionPool.execute.mock.calls[0][1][4]).toBe('RAFNET88');
+        const sealedShareKey = connectionPool.execute.mock.calls[0][1][4];
+        expect(sealedShareKey).not.toBe('RAFNET88');
+        expect(revealShareKey(sealedShareKey)).toBe('RAFNET88');
     });
 
     it('creates an automatic short access code using requested length', async () => {
@@ -292,6 +294,10 @@ describe('playbackTokenService', () => {
     it('creates selected token camera rules from payload', async () => {
         vi.spyOn(connectionPool, 'transaction').mockImplementation((callback) => callback);
         vi.spyOn(connectionPool, 'execute').mockReturnValue({ lastInsertRowid: 52, changes: 1 });
+        vi.spyOn(connectionPool, 'query').mockReturnValue([
+            { camera_id: 3, enabled: 1, playback_window_hours: 24, expires_at: null, note: '', allow_live: null },
+            { camera_id: 4, enabled: 1, playback_window_hours: null, expires_at: null, note: '', allow_live: null },
+        ]);
         vi.spyOn(connectionPool, 'queryOne')
             .mockReturnValueOnce(null)
             .mockReturnValueOnce({
@@ -399,6 +405,7 @@ describe('playbackTokenService', () => {
 
     it('allows only cameras included in selected scope', async () => {
         vi.spyOn(connectionPool, 'execute').mockReturnValue({ changes: 1 });
+        vi.spyOn(connectionPool, 'query').mockReturnValue([]);
         vi.spyOn(connectionPool, 'queryOne').mockReturnValue({
             id: 9,
             label: 'Area Timur',
@@ -574,6 +581,7 @@ describe('playbackTokenService', () => {
 
     it('records camera access audit when token validation is touched', async () => {
         vi.spyOn(connectionPool, 'execute').mockReturnValue({ changes: 1 });
+        vi.spyOn(connectionPool, 'query').mockReturnValue([]);
         vi.spyOn(connectionPool, 'queryOne').mockReturnValue({
             id: 21,
             label: 'Audit Client',

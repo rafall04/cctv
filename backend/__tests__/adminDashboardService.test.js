@@ -3,6 +3,7 @@ import * as database from '../database/connectionPool.js';
 import mediaMtxService from '../services/mediaMtxService.js';
 import viewerSessionService from '../services/viewerSessionService.js';
 import * as timezoneService from '../services/timezoneService.js';
+import { localDayUtcRange } from '../services/timeService.js';
 import {
     default as adminDashboardService,
     buildDashboardStreams,
@@ -42,12 +43,26 @@ describe('adminDashboardService period filters are bound, not interpolated', () 
         vi.restoreAllMocks();
     });
 
+    const dayRange = (days) => localDayUtcRange(dayOffset(days), 'Asia/Jakarta');
+
     it.each([
-        ['today', () => [[dayOffset(0)], [dayOffset(-1)]]],
-        ['yesterday', () => [[dayOffset(-1)], [dayOffset(-2)]]],
-        ['7days', () => [[dayOffset(-7)], [dayOffset(-14), dayOffset(-7)]]],
-        ['30days', () => [[dayOffset(-30)], [dayOffset(-60), dayOffset(-30)]]],
-    ])('period %s binds the right dates', async (period, expected) => {
+        ['today', () => [
+            [dayRange(0).startUtcSql, dayRange(0).endUtcSql],
+            [dayRange(-1).startUtcSql, dayRange(-1).endUtcSql],
+        ]],
+        ['yesterday', () => [
+            [dayRange(-1).startUtcSql, dayRange(-1).endUtcSql],
+            [dayRange(-2).startUtcSql, dayRange(-2).endUtcSql],
+        ]],
+        ['7days', () => [
+            [dayRange(-7).startUtcSql],
+            [dayRange(-14).startUtcSql, dayRange(-7).startUtcSql],
+        ]],
+        ['30days', () => [
+            [dayRange(-30).startUtcSql],
+            [dayRange(-60).startUtcSql, dayRange(-30).startUtcSql],
+        ]],
+    ])('period %s binds the right UTC bounds', async (period, expected) => {
         const [currentQuery, previousQuery] = await captureSessionQueries(period);
         const [currentParams, previousParams] = expected();
 
@@ -65,7 +80,7 @@ describe('adminDashboardService period filters are bound, not interpolated', () 
 
     it('an unknown period falls back to today rather than dropping the filter', async () => {
         const [currentQuery] = await captureSessionQueries('nonsense');
-        expect(currentQuery.params).toEqual([dayOffset(0)]);
+        expect(currentQuery.params).toEqual([dayRange(0).startUtcSql, dayRange(0).endUtcSql]);
     });
 });
 

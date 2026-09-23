@@ -40,6 +40,10 @@ vi.mock('../services/playbackSessionReuseService.js', () => ({
     findLiveSession: findLiveSessionMock,
 }));
 
+vi.mock('../services/playbackTokenCameraCatalog.js', () => ({
+    listTokenPlayableCameras: () => [],
+}));
+
 vi.mock('../utils/authCookieOptions.js', () => ({
     isHttpsRequest: () => false,
 }));
