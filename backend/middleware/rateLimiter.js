@@ -91,9 +91,21 @@ export const RATE_LIMIT_CONFIG = {
 
 /**
  * In-memory store for rate limiting
- * Structure: Map<key, { timestamps: number[], windowStart: number }>
+ * Structure: Map<key, { count: number, windowStart: number }>
+ *
+ * Bounded: an attacker spraying unique IPs (or forging CF-Connecting-IP on a direct
+ * origin hit) would otherwise grow one Map entry per key forever. 20k entries ≈ ~2MB;
+ * on overflow the expired-window entries go first, then oldest-seen (insertion order).
  */
 const rateLimitStore = new Map();
+const MAX_STORE_ENTRIES = 20000;
+
+// Per-key throttle for the 429 violation log+audit — without it, a rejected flood writes
+// a console line AND an audit row per request, which is the amplification the limiter
+// exists to prevent. One log line per key per minute keeps the signal.
+const violationLogStore = new Map();
+const VIOLATION_LOG_INTERVAL_MS = 60 * 1000;
+const MAX_VIOLATION_KEYS = 20000;
 
 /**
  * Cleanup interval for expired entries (5 minutes)
@@ -258,6 +270,9 @@ export function checkRateLimit(key, limit, windowMs) {
     // Get or create entry
     let entry = rateLimitStore.get(key);
     if (!entry) {
+        if (rateLimitStore.size >= MAX_STORE_ENTRIES) {
+            evictStorePressure(rateLimitStore, now);
+        }
         entry = { count: 0, windowStart: now };
         rateLimitStore.set(key, entry);
     }
@@ -340,6 +355,24 @@ export function getRateLimitStatus(key, limit, windowMs) {
 }
 
 /**
+ * Shed load when the store hits MAX_STORE_ENTRIES: drop expired-window entries first,
+ * then oldest-seen if still over. Returns nothing; caller proceeds to set the new key.
+ */
+function evictStorePressure(store, now) {
+    for (const [key, entry] of store.entries()) {
+        if (now - entry.windowStart > 60000 && store.size > MAX_STORE_ENTRIES * 0.9) {
+            store.delete(key);
+        }
+    }
+    // Still over → evict oldest-seen ~10% (Map iterates in insertion order).
+    const target = Math.floor(MAX_STORE_ENTRIES * 0.9);
+    for (const key of store.keys()) {
+        if (store.size <= target) break;
+        store.delete(key);
+    }
+}
+
+/**
  * Cleanup expired entries from the store
  */
 export function cleanupExpiredEntries() {
@@ -355,6 +388,14 @@ export function cleanupExpiredEntries() {
         if (now - entry.windowStart > maxWindow) {
             rateLimitStore.delete(key);
         }
+    }
+    for (const [key, at] of violationLogStore.entries()) {
+        if (now - at > VIOLATION_LOG_INTERVAL_MS * 2) {
+            violationLogStore.delete(key);
+        }
+    }
+    if (violationLogStore.size > MAX_VIOLATION_KEYS) {
+        violationLogStore.clear();
     }
 }
 
@@ -383,6 +424,14 @@ export function stopCleanupInterval() {
  * @param {Object} request - Fastify request object (optional)
  */
 export function logRateLimitViolation(details, request = null) {
+    // Throttle per ip+endpoint — a sustained flood is ONE signal, not N log+audit writes.
+    const throttleKey = `${details.ip}:${details.url}`;
+    const lastLogged = violationLogStore.get(throttleKey) || 0;
+    if (Date.now() - lastLogged < VIOLATION_LOG_INTERVAL_MS) {
+        return null;
+    }
+    violationLogStore.set(throttleKey, Date.now());
+
     const logEntry = {
         event_type: 'RATE_LIMIT_EXCEEDED',
         timestamp: new Date().toISOString(),

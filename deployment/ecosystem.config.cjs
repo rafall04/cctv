@@ -49,6 +49,9 @@ module.exports = {
             exec_mode: 'fork',
             autorestart: true,
             watch: false,
+            // V8 heap cap — GC pressure rises near the ceiling instead of RSS drifting up to
+            // the 1G pm2 kill line. Measured idle ~140-290MB; 768M leaves ~3x headroom.
+            node_args: '--max-old-space-size=768',
             max_memory_restart: '1G',
             wait_ready: true,
             listen_timeout: 10000,
@@ -98,6 +101,9 @@ module.exports = {
             // but memory thrash is not something to leave running. If this app ever
             // genuinely approaches 1G at idle, that is a leak worth chasing, not a limit
             // worth raising again.
+            // Same V8 heap cap as the backend — peaks ~570MB during recovery backlogs, so
+            // 768M keeps the ceiling below the 1G RSS restart without throttling normal load.
+            node_args: '--max-old-space-size=768',
             max_memory_restart: '1G',
             wait_ready: true,
             listen_timeout: 30000,

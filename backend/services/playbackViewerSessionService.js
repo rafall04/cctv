@@ -9,7 +9,7 @@
 import { query, queryOne, execute, transaction } from '../database/connectionPool.js';
 import { v4 as uuidv4 } from 'uuid';
 import { cacheGetOrSetSync, cacheKey, CacheNamespace, CacheTTL } from './cacheService.js';
-import { diffLocalSqlSeconds, getLocalDate, getLocalDateWithOffset, getSqliteTzOffsetModifier, resolveUtcSqlTimestamp, toUtcSql } from './timeService.js';
+import { diffLocalSqlSeconds, getLocalDate, getLocalDateWithOffset, localDayUtcRange, resolveUtcSqlTimestamp, toUtcSql } from './timeService.js';
 
 const SESSION_TIMEOUT = 15;
 const CLEANUP_INTERVAL = 60000;
@@ -32,31 +32,37 @@ function normalizeAccessMode(value) {
     return PLAYBACK_ACCESS_MODES.has(value) ? value : 'public_preview';
 }
 
+// Day windows are configured-tz dates but started_at is stored UTC — express the window as a
+// half-open UTC range so idx_playback_viewer_sessions_started_at applies (date(started_at, tz)
+// forced a full scan). See localDayUtcRange.
+const dayClause = (localDate) => {
+    const range = localDayUtcRange(localDate);
+    if (!range) return null;
+    return { clause: 'AND started_at >= ? AND started_at < ?', params: [range.startUtcSql, range.endUtcSql] };
+};
+const sinceDayClause = (localDate) => {
+    const range = localDayUtcRange(localDate);
+    if (!range) return null;
+    return { clause: 'AND started_at >= ?', params: [range.startUtcSql] };
+};
+
 function buildHistoryDateFilter(period) {
     const todayDate = getDate();
-    // started_at is stored in UTC; shift it into the configured tz before date() so these day
-    // windows (whose bounds are configured-tz dates) line up. See getSqliteTzOffsetModifier.
-    const tz = getSqliteTzOffsetModifier();
 
     if (period?.startsWith('date:')) {
-        const customDate = period.substring(5);
-        if (/^\d{4}-\d{2}-\d{2}$/.test(customDate)) {
-            return {
-                clause: 'AND date(started_at, ?) = ?',
-                params: [tz, customDate],
-            };
-        }
+        const clause = dayClause(period.substring(5));
+        if (clause) return clause;
     }
 
     switch (period) {
         case 'today':
-            return { clause: 'AND date(started_at, ?) = ?', params: [tz, todayDate] };
+            return dayClause(todayDate) || { clause: '', params: [] };
         case 'yesterday':
-            return { clause: 'AND date(started_at, ?) = ?', params: [tz, getDateWithOffset(-1)] };
+            return dayClause(getDateWithOffset(-1)) || { clause: '', params: [] };
         case '7days':
-            return { clause: 'AND date(started_at, ?) >= ?', params: [tz, getDateWithOffset(-7)] };
+            return sinceDayClause(getDateWithOffset(-7)) || { clause: '', params: [] };
         case '30days':
-            return { clause: 'AND date(started_at, ?) >= ?', params: [tz, getDateWithOffset(-30)] };
+            return sinceDayClause(getDateWithOffset(-30)) || { clause: '', params: [] };
         default:
             return { clause: '', params: [] };
     }
@@ -374,7 +380,7 @@ class PlaybackViewerSessionService {
                     created_at,
                     CURRENT_TIMESTAMP
                 FROM playback_viewer_session_history
-                WHERE datetime(started_at) < datetime(?)
+                WHERE started_at < ?
                 AND NOT EXISTS (
                     SELECT 1
                     FROM playback_viewer_session_history_archive archive
@@ -384,7 +390,7 @@ class PlaybackViewerSessionService {
 
             execute(`
                 DELETE FROM playback_viewer_session_history
-                WHERE datetime(started_at) < datetime(?)
+                WHERE started_at < ?
             `, [cutoff]);
         } catch (error) {
             if (!String(error?.message || '').includes('no such table')) {

@@ -27,7 +27,7 @@ import crypto from 'crypto';
 import { query, queryOne, execute } from '../database/connectionPool.js';
 import paymentSettingsService from './paymentSettingsService.js';
 import playbackProductService from './playbackProductService.js';
-import playbackTokenService from './playbackTokenService.js';
+import playbackTokenService, { revealShareKey } from './playbackTokenService.js';
 import playbackTokenRenewalService from './playbackTokenRenewalService.js';
 import { ipaymuRequest, interpretIpaymuTransaction } from '../utils/ipaymuClient.js';
 import { parseIpaymuExpiryIso } from './paymentService.js';
@@ -410,7 +410,7 @@ class PlaybackOrderService {
             );
             if (token) {
                 access = {
-                    shareKey: token.share_key_prefix,
+                    shareKey: revealShareKey(token.share_key_prefix),
                     expiresAt: token.expires_at,
                     windowHours: token.playback_window_hours,
                 };
@@ -512,7 +512,7 @@ class PlaybackOrderService {
             out.push({
                 orderId: o.id,
                 orderKind: o.order_kind || 'purchase',
-                shareKey: token.share_key_prefix,
+                shareKey: revealShareKey(token.share_key_prefix),
                 expiresAt: token.expires_at,
                 windowHours: token.playback_window_hours,
                 product: product ? { key: product.key, label: product.label } : null,

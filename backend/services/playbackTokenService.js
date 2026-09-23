@@ -9,6 +9,8 @@
 import crypto from 'crypto';
 import { execute, query, queryOne, transaction } from '../database/connectionPool.js';
 import { parseUtcSql, toUtcSql } from './timeService.js';
+import { resolveClientIp } from '../middleware/rateLimiter.js';
+import { encryptSecret, decryptSecret } from './totpService.js';
 import playbackTokenRuleService from './playbackTokenRuleService.js';
 import { normalizeCameraIds, parseCameraIdsJson, parseAreaIdsJson, resolveAreaIdsForWrite } from './playbackTokenScopeIds.js';
 import { formatLocalDateTime, formatShareDepth } from './playbackShareFormat.js';
@@ -320,8 +322,35 @@ function resolveDefaultCameraId(row = {}, requestedCameraId = null) {
     return allowedCameraIds[0] || null;
 }
 
+// share_key_prefix historically held the FULL share key in plaintext — anyone reading a DB
+// dump could mint share links for every token. New rows store an AES-256-GCM blob (same
+// envelope as TOTP secrets, keyed off JWT_SECRET); legacy plaintext still resolves until the
+// zz_*_encrypt_share_key_prefix migration seals it. Blob shape: <b64>.<b64>.<b64>.
+const SECRET_BLOB_RE = /^[A-Za-z0-9+/]{8,}={0,2}\.[A-Za-z0-9+/]{8,}={0,2}\.[A-Za-z0-9+/]+=*$/;
+
+export function isSealedShareKey(value) {
+    return SECRET_BLOB_RE.test(String(value || '').trim());
+}
+
+/** Full share key for display/use, or null when a sealed blob can't be opened (wrong key). */
+export function revealShareKey(stored) {
+    const raw = String(stored || '').trim();
+    if (!raw) return null;
+    return isSealedShareKey(raw) ? decryptSecret(raw) : raw;
+}
+
+function sealShareKey(shareKey) {
+    try {
+        return encryptSecret(shareKey);
+    } catch (error) {
+        // No JWT secret → encryption unavailable; store plaintext rather than lose the key.
+        console.warn('[PlaybackToken] share-key seal unavailable:', error.message);
+        return shareKey;
+    }
+}
+
 function resolveReusableShareKey(row = {}) {
-    const shareKey = String(row.share_key_prefix || '').trim();
+    const shareKey = revealShareKey(row.share_key_prefix);
     if (!shareKey || !row.share_key_hash) {
         return null;
     }
@@ -395,12 +424,10 @@ class PlaybackTokenService {
     }
 
     getClientIp(request = {}) {
-        const forwardedFor = request.headers?.['x-forwarded-for'];
-        if (typeof forwardedFor === 'string' && forwardedFor.trim()) {
-            return forwardedFor.split(',')[0].trim();
-        }
-
-        return request.ip || request.socket?.remoteAddress || null;
+        // XFF leftmost is client-spoofable through the proxy chain; CF-Connecting-IP is
+        // stamped by Cloudflare and can't be forged on proxied traffic. Same resolution
+        // order as the rate limiter.
+        return resolveClientIp(request) || request.socket?.remoteAddress || null;
     }
 
     recordAudit({
@@ -631,7 +658,7 @@ class PlaybackTokenService {
                 tokenHash,
                 token.slice(0, 12),
                 shareKeyHash,
-                shareKey,
+                sealShareKey(shareKey),
                 presetKey,
                 scopeType,
                 JSON.stringify(cameraIds),
@@ -1221,7 +1248,9 @@ class PlaybackTokenService {
             tokenId,
             eventType: 'shared',
             request,
-            detail: { share_key_prefix: shareKey, reused: true },
+            // Full key never lands in the audit trail — a masked hint is enough to tell
+            // which share link was re-sent.
+            detail: { share_key_hint: shareKey ? `${String(shareKey).slice(0, 4)}…` : null, reused: true },
         });
 
         return {

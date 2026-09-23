@@ -1,6 +1,6 @@
 import { query, queryOne } from '../database/connectionPool.js';
 import { getTimezone } from './timezoneService.js';
-import { getSqliteTzOffsetModifier } from './timeService.js';
+import { getSqliteTzOffsetModifier, localDayUtcRange } from './timeService.js';
 // Removed circular dependency import
 
 /**
@@ -38,12 +38,27 @@ function sqlDate(value) {
 
 // A period resolves to a SQL fragment plus the values its placeholders consume. Callers
 // must splice the params in the same order the fragments appear in their statement.
+// Day windows are configured-tz dates but started_at is stored UTC — express them as a
+// half-open UTC range so idx_viewer_history_started_at applies (date(started_at, tz)
+// forced a full scan of the table). See timeService.localDayUtcRange.
 const NO_FILTER = { sql: '', params: [] };
-const onDate = (date) => ({ sql: `AND date(started_at, '${tzOffset()}') = ?`, params: [sqlDate(date)] });
-const sinceDate = (date) => ({ sql: `AND date(started_at, '${tzOffset()}') >= ?`, params: [sqlDate(date)] });
+const onDate = (date) => {
+    const range = localDayUtcRange(sqlDate(date));
+    return {
+        sql: 'AND started_at >= ? AND started_at < ?',
+        params: [range.startUtcSql, range.endUtcSql],
+    };
+};
+const sinceDate = (date) => ({
+    sql: 'AND started_at >= ?',
+    params: [localDayUtcRange(sqlDate(date)).startUtcSql],
+});
 const betweenDates = (from, to) => ({
-    sql: `AND date(started_at, '${tzOffset()}') >= ? AND date(started_at, '${tzOffset()}') < ?`,
-    params: [sqlDate(from), sqlDate(to)],
+    sql: 'AND started_at >= ? AND started_at < ?',
+    params: [
+        localDayUtcRange(sqlDate(from)).startUtcSql,
+        localDayUtcRange(sqlDate(to)).startUtcSql,
+    ],
 });
 
 function getDate() {
@@ -183,11 +198,11 @@ class ViewerAnalyticsService {
             LEFT JOIN (
                 SELECT ip_address, COUNT(*) as visit_count
                 FROM viewer_session_history
-                WHERE date(started_at, '${tzOffset()}') <= date(?)
+                WHERE started_at < ?
                 GROUP BY ip_address
             ) h2 ON h1.ip_address = h2.ip_address
             WHERE 1=1 ${dateFilter}
-        `, [sqlDate(todayDate), ...dateParams]) || {};
+        `, [localDayUtcRange(sqlDate(todayDate)).endUtcSql, ...dateParams]) || {};
     }
 
     #calculateTrend(current, previous) {

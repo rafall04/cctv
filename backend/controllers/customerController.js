@@ -16,7 +16,7 @@ import paymentService from '../services/paymentService.js';
 import promoService from '../services/promoService.js';
 import paymentSettingsService from '../services/paymentSettingsService.js';
 import cameraHealthService from '../services/cameraHealthService.js';
-import playbackTokenService from '../services/playbackTokenService.js';
+import playbackTokenService, { revealShareKey } from '../services/playbackTokenService.js';
 import { sanitizeCameraThumbnailList } from '../services/thumbnailPathService.js';
 
 function handleError(reply, error, fallback) {
@@ -286,6 +286,8 @@ function tokenMilikPelanggan(userId) {
         [userId]
     ).map((row) => ({
         ...row,
+        // share_key_prefix stores a sealed blob on new rows — reveal it for the owner's own view.
+        share_key_prefix: revealShareKey(row.share_key_prefix),
         camera_ids: JSON.parse(row.camera_ids_json || '[]'),
         is_active: !row.revoked_at && (!row.expires_at || new Date(row.expires_at).getTime() > Date.now()),
     }));

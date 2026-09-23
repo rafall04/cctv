@@ -223,10 +223,12 @@ class TelegramArchiveService {
             upload: db.prepare(
                 'SELECT MAX(uploaded_at) AS lastAt, julianday(MAX(uploaded_at)) AS lastJul FROM uploaded',
             ).get() || {},
+            // uploaded_at is stored UTC SQL text — a bare compare is the same filter
+            // julianday() computed, minus the per-row call that defeats indexing.
             failed: db.prepare(
                 `SELECT camera_id AS cameraId, detail, uploaded_at AS uploadedAt
                  FROM uploaded
-                 WHERE status = 'failed' AND julianday(uploaded_at) > julianday('now', ?)
+                 WHERE status = 'failed' AND uploaded_at > datetime('now', ?)
                  ORDER BY uploaded_at DESC`,
             ).all(`-${Number(failWindowMinutes)} minutes`),
         }), null);

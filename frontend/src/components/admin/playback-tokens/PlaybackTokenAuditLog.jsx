@@ -72,7 +72,11 @@ function describeDetail(log) {
     const bits = [];
     if (detail.preset) bits.push(`preset ${detail.preset}`);
     if (Number.isFinite(detail.camera_count) && detail.camera_count > 0) bits.push(`${detail.camera_count} kamera`);
-    if (detail.share_key_prefix) bits.push(`kunci ${detail.share_key_prefix}${detail.reused ? ' (dipakai ulang)' : ' (baru)'}`);
+    // share_key_hint is the masked write; legacy rows logged the raw key — mask those too
+    // rather than re-publishing it into the admin UI.
+    const keyHint = detail.share_key_hint
+        || (detail.share_key_prefix ? `${String(detail.share_key_prefix).slice(0, 4)}…` : null);
+    if (keyHint) bits.push(`kunci ${keyHint}${detail.reused ? ' (dipakai ulang)' : ' (baru)'}`);
     if (Number.isFinite(detail.cleared)) bits.push(`${detail.cleared} sesi dihentikan`);
     if (detail.timeout_seconds) {
         const limit = detail.max_active_sessions ? `maks ${detail.max_active_sessions} sesi` : 'tanpa batas sesi';

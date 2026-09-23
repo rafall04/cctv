@@ -233,3 +233,23 @@ export function getSqliteTzOffsetModifier(timezone = getTimezone()) {
     const minutes = getTimezoneOffsetMinutes(timezone);
     return `${minutes >= 0 ? '+' : '-'}${Math.abs(minutes)} minutes`;
 }
+
+/**
+ * A configured-tz calendar day ('YYYY-MM-DD') expressed as a half-open UTC SQL range:
+ * [start inclusive, end exclusive). Lets WHERE filters compare the raw UTC timestamp
+ * column directly — `started_at >= ? AND started_at < ?` — so an index on started_at
+ * still applies, where `date(started_at, <tz>) = ?` forced a full scan.
+ * Returns null on malformed input. Exact for fixed-offset zones (all shipped ones).
+ */
+export function localDayUtcRange(localDate, timezone = getTimezone()) {
+    const match = typeof localDate === 'string' ? localDate.match(/^(\d{4})-(\d{2})-(\d{2})$/) : null;
+    if (!match) {
+        return null;
+    }
+    const tzMinutes = getTimezoneOffsetMinutes(timezone);
+    const startMs = Date.UTC(+match[1], +match[2] - 1, +match[3]) - tzMinutes * 60000;
+    return {
+        startUtcSql: toUtcSql(new Date(startMs)),
+        endUtcSql: toUtcSql(new Date(startMs + 86400000)),
+    };
+}
