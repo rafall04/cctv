@@ -9,7 +9,7 @@
  * SideEffects: polls the broadcast history while mounted.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { getPlayHistory } from '../../../services/audioService';
 import { EmptyState, StatusDot } from '../../ui';
 
@@ -36,12 +36,28 @@ const kindOf = (h) => {
 export default function HistoryTab() {
     const [history, setHistory] = useState([]);
     const [loading, setLoading] = useState(true);
+    // Throw di request pertama dulu membiarkan "Memuat riwayat…" tampil selamanya — bedakan
+    // dari list yang memang kosong. Setelah pernah sukses, gagal poll cukup diam (data stale
+    // tetap tampil, retry otomatis tiap 8s).
+    const [loadError, setLoadError] = useState(null);
+    const pernahMuat = useRef(false);
     const [openId, setOpenId] = useState(null);
 
     const load = useCallback(async () => {
-        const r = await getPlayHistory();
-        if (r.success) setHistory(r.data || []);
-        setLoading(false);
+        try {
+            const r = await getPlayHistory();
+            if (r.success) {
+                setHistory(r.data || []);
+                pernahMuat.current = true;
+                setLoadError(null);
+            } else if (!pernahMuat.current) {
+                setLoadError('Riwayat siaran tidak dapat dimuat.');
+            }
+        } catch {
+            if (!pernahMuat.current) setLoadError('Riwayat siaran tidak dapat dimuat.');
+        } finally {
+            setLoading(false);
+        }
     }, []);
     useEffect(() => {
         load();
@@ -50,6 +66,17 @@ export default function HistoryTab() {
     }, [load]);
 
     if (loading) return <p className="text-sm text-content-muted">Memuat riwayat…</p>;
+
+    if (loadError) {
+        return (
+            <div className="py-8 text-center">
+                <p className="text-sm text-status-fault">{loadError}</p>
+                <button type="button" onClick={load} className="mt-2 rounded-lg border border-edge-strong px-3 py-1.5 text-xs text-content-muted hover:bg-surface-sunken">
+                    Coba lagi
+                </button>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-3">

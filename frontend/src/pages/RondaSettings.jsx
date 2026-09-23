@@ -11,7 +11,7 @@
  * "perlu nyalakan ulang" only apply when the container is recreated, and the save response says so.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNotification } from '../contexts/NotificationContext';
 import { useConfirm } from '../contexts/ConfirmContext';
 import rondaAdminService from '../services/rondaAdminService';
@@ -83,6 +83,11 @@ export function RondaSettings() {
     const [available, setAvailable] = useState(true);
     const [kesiapan, setKesiapan] = useState(null);
     const [loading, setLoading] = useState(true);
+    // Initial-load failure must not render "Belum ada kamera yang dipantau" — that claims the
+    // fleet is empty when the fetch simply failed. Poll failures after a successful load keep
+    // the stale list visible (toast only).
+    const [loadError, setLoadError] = useState(null);
+    const pernahMuat = useRef(false);
     const [drafts, setDrafts] = useState({});
     const [busy, setBusy] = useState(null);
     const [previewKey, setPreviewKey] = useState(0);
@@ -101,8 +106,9 @@ export function RondaSettings() {
                 rondaAdminService.getAvailableCameras().catch(() => ({ data: [] })),
             ]);
             const cams = list?.data?.cameras ?? [];
-            setAvailable(list?.data?.available !== false);
-            setKesiapan(list?.data?.kesiapan ?? null);
+            if (!list?.data) throw new Error('empty response');
+            setAvailable(list.data.available !== false);
+            setKesiapan(list.data.kesiapan ?? null);
             setCameras(cams);
             setAvailableCams(avail?.data ?? []);
             setDrafts((prev) => {
@@ -110,7 +116,10 @@ export function RondaSettings() {
                 cams.forEach((cam) => { if (!next[cam.name]) next[cam.name] = draftFrom(cam.config); });
                 return next;
             });
+            pernahMuat.current = true;
+            setLoadError(null);
         } catch (error) {
+            if (!pernahMuat.current) setLoadError('Gagal memuat pengaturan ronda.');
             showNotification(error.response?.data?.message || 'Gagal memuat pengaturan ronda', 'error');
         } finally {
             setLoading(false);
@@ -291,6 +300,17 @@ export function RondaSettings() {
     };
 
     if (loading) return <TableSkeleton rows={4} />;
+
+    if (loadError && !pernahMuat.current) {
+        return (
+            <div className="py-12 text-center">
+                <p className="text-sm text-status-fault">{loadError}</p>
+                <button type="button" onClick={load} className="mt-3 rounded-xl border border-edge-strong px-4 py-2 text-sm text-content-muted hover:bg-surface-sunken">
+                    Coba lagi
+                </button>
+            </div>
+        );
+    }
 
     const pendingNames = cameras.map((c) => c.name).filter((n) => pendingRestart[n]);
 

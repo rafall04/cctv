@@ -31,6 +31,7 @@ import playbackTokenService from './playbackTokenService.js';
 import playbackTokenRenewalService from './playbackTokenRenewalService.js';
 import { ipaymuRequest, interpretIpaymuTransaction } from '../utils/ipaymuClient.js';
 import { parseIpaymuExpiryIso } from './paymentService.js';
+import { normalizePhone, phoneLookupVariants } from '../utils/phoneNumber.js';
 
 const ORDER_EXPIRY_MINUTES = 30;
 const RECHECK_THROTTLE_MS = 15000;
@@ -159,7 +160,7 @@ class PlaybackOrderService {
 
         const { httpOk, body } = await ipaymuRequest('/api/v2/payment/direct', {
             name: (name && String(name).trim()) || 'Pembeli',
-            phone: (phone && String(phone).trim()) || '081234567890',
+            phone: normalizePhone(phone) || (phone && String(phone).trim()) || '081234567890',
             email: fallbackEmail(publicBaseUrl),
             amount,
             notifyUrl: publicBaseUrl ? `${publicBaseUrl}/api/playback-access/webhook/ipaymu` : undefined,
@@ -188,7 +189,8 @@ class PlaybackOrderService {
             [
                 product.id,
                 name ? String(name).trim() : null,
-                phone ? String(phone).trim() : null,
+                // Canonical '0xxx' — recovery matches by phone, so it must be one string per human.
+                normalizePhone(phone) || (phone ? String(phone).trim() : null),
                 deviceHash,
                 ip || null,
                 String(data.TransactionId),
@@ -488,12 +490,16 @@ class PlaybackOrderService {
         const code = (recoveryCode || '').toString().trim().toUpperCase();
         if (!ph || !code) throw badRequest('Nomor HP dan kode pemulihan wajib diisi');
 
+        // Match every stored spelling of the same number ('0xxx' canonical + legacy '62xxx'/'+62xxx'
+        // rows written before canonicalization). Unparseable input falls back to its raw form.
+        const variants = phoneLookupVariants(ph);
+        const candidates = variants.length ? variants : [ph];
         const orders = query(
             `SELECT id, token_id, product_id, order_kind, created_at, paid_at
              FROM playback_orders
-             WHERE buyer_phone = ? AND recovery_code = ? AND status = 'paid' AND token_id IS NOT NULL
+             WHERE buyer_phone IN (${candidates.map(() => '?').join(',')}) AND recovery_code = ? AND status = 'paid' AND token_id IS NOT NULL
              ORDER BY id DESC`,
-            [ph, code]
+            [...candidates, code]
         );
         const out = [];
         for (const o of orders) {

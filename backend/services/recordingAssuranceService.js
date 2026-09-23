@@ -91,33 +91,29 @@ class RecordingAssuranceService {
 
         const cameraIds = cameras.map((camera) => camera.id);
         const placeholders = buildPlaceholders(cameraIds.length);
+        // Latest segment per camera via a correlated LIMIT 1 — idx_recording_segments_
+        // camera_start_time serves each probe, so this stays cheap no matter how deep a
+        // camera's history runs. The old ROW_NUMBER() ranked EVERY segment row first.
+        // start_time is stored ISO-8601 UTC, so bare-column order == chronological order
+        // (datetime() normalization added nothing and blocked the index ordering).
         const latestSegments = query(`
-            WITH ranked_segments AS (
-                SELECT
-                    rs.camera_id,
-                    rs.filename,
-                    rs.start_time,
-                    rs.end_time,
-                    rs.file_size,
-                    rs.duration,
-                    rs.file_path,
-                    ROW_NUMBER() OVER (
-                        PARTITION BY rs.camera_id
-                        ORDER BY datetime(rs.start_time) DESC, rs.id DESC
-                    ) as rank
-                FROM recording_segments rs
-                WHERE rs.camera_id IN (${placeholders})
-            )
             SELECT
-                camera_id,
-                filename,
-                start_time,
-                end_time,
-                file_size,
-                duration,
-                file_path
-            FROM ranked_segments
-            WHERE rank = 1
+                rs.camera_id,
+                rs.filename,
+                rs.start_time,
+                rs.end_time,
+                rs.file_size,
+                rs.duration,
+                rs.file_path
+            FROM recording_segments rs
+            WHERE rs.camera_id IN (${placeholders})
+              AND rs.id = (
+                  SELECT rs2.id
+                  FROM recording_segments rs2
+                  WHERE rs2.camera_id = rs.camera_id
+                  ORDER BY rs2.start_time DESC, rs2.id DESC
+                  LIMIT 1
+              )
         `, cameraIds);
 
         const recentWindowStart = new Date(now.getTime() - recentWindowHours * 60 * 60 * 1000).toISOString();
@@ -129,7 +125,7 @@ class RecordingAssuranceService {
                     rs.end_time,
                     LAG(rs.end_time) OVER (
                         PARTITION BY rs.camera_id
-                        ORDER BY datetime(rs.start_time) ASC, rs.id ASC
+                        ORDER BY rs.start_time ASC, rs.id ASC
                     ) as previous_end_time
                 FROM recording_segments rs
                 WHERE rs.camera_id IN (${placeholders})
@@ -157,13 +153,11 @@ class RecordingAssuranceService {
         // In worker mode the recorders run in ANOTHER process, so the in-process recording map is
         // empty here — the old recordingService.getRecordingStatus reported EVERY camera as
         // not-recording => 'recording_process_down' => the whole fleet 'critical' (a false alarm that
-        // buries real ones). getRuntimeStatus is worker-aware (reads what the recorder published).
-        // Collected FIRST in a sequential await loop (no shared state), so the summary counters below
-        // are only ever mutated inside the synchronous map() — never across an await, so no race.
-        const runtimeByCamera = new Map();
-        for (const camera of cameras) {
-            runtimeByCamera.set(camera.id, await recordingControlService.getRuntimeStatus(camera.id));
-        }
+        // buries real ones). getRuntimeStatusMap is the worker-aware bulk variant: one heartbeat read
+        // + one process-state table scan instead of two queries PER camera in a sequential await loop.
+        const runtimeByCamera = await recordingControlService.getRuntimeStatusMap(cameraIds);
+        // Same N+1 for recovery diagnostics: one active-rows read, grouped + capped per camera here.
+        const diagnosticsByCamera = recordingRecoveryDiagnosticsRepository.listActiveForCameras(cameraIds, 10);
 
         const snapshot = makeEmptySnapshot(now);
         snapshot.summary.total_monitored = cameras.length;
@@ -173,7 +167,7 @@ class RecordingAssuranceService {
             const latestSegment = latestByCamera.get(camera.id) || null;
             const recentGap = gapByCamera.get(camera.id) || null;
             const reasons = [];
-            const recoveryDiagnostics = recordingRecoveryDiagnosticsRepository.listActiveByCamera(camera.id, 10);
+            const recoveryDiagnostics = diagnosticsByCamera.get(camera.id) || [];
             if (recoveryDiagnostics.some((diagnostic) => diagnostic.state === 'retryable_failed' || diagnostic.state === 'pending')) {
                 reasons.push('recording_recovery_attention');
             }

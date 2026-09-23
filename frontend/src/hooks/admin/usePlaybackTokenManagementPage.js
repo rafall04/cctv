@@ -256,6 +256,7 @@ export function usePlaybackTokenManagementPage() {
     const [cameraSearch, setCameraSearch] = useState('');
     const [editCameraSearch, setEditCameraSearch] = useState('');
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState(null);
     const [saving, setSaving] = useState(false);
     const [sharingTokenId, setSharingTokenId] = useState(null);
     const [editingTokenId, setEditingTokenId] = useState(null);
@@ -332,6 +333,7 @@ export function usePlaybackTokenManagementPage() {
 
     const loadData = useCallback(async () => {
         setLoading(true);
+        setLoadError(null);
         try {
             const [tokenResponse, auditResponse, cameraResponse] = await Promise.all([
                 playbackTokenService.listTokens(),
@@ -342,9 +344,12 @@ export function usePlaybackTokenManagementPage() {
             setAuditLogs(Array.isArray(auditResponse?.data) ? auditResponse.data : []);
             setCameras(normalizeCameraRows(cameraResponse));
             if (!tokenResponse?.success) {
+                setLoadError(tokenResponse?.message || 'Daftar token tidak bisa dimuat.');
                 showError('Gagal memuat token playback', tokenResponse?.message || 'Daftar token tidak bisa dimuat.');
             }
         } catch (error) {
+            // Tanpa ini, request yang gagal tampil sebagai daftar token kosong — palsu.
+            setLoadError('Daftar token tidak bisa dimuat.');
             showError('Gagal memuat token playback', error?.response?.data?.message || error.message);
         } finally {
             setLoading(false);
@@ -738,6 +743,7 @@ export function usePlaybackTokenManagementPage() {
         visibleEditCameras,
         cameraPickerVisibleLimit: CAMERA_PICKER_VISIBLE_LIMIT,
         loading,
+        loadError,
         saving,
         sharingTokenId,
         editingTokenId,

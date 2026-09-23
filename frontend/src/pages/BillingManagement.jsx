@@ -34,9 +34,13 @@ export default function BillingManagement() {
     const [registrations, setRegistrations] = useState([]);
     const [loading, setLoading] = useState(true);
     const [busy, setBusy] = useState(false);
+    // A failed load must not render the tabs with empty arrays — "Pembayaran (0)" and
+    // "Belum ada pembayaran" would claim there is no data when the fetch simply failed.
+    const [loadError, setLoadError] = useState(null);
 
     const reload = useCallback(async () => {
         setLoading(true);
+        setLoadError(null);
         try {
             const [customersRes, subsRes, paymentsRes, camerasRes, plansRes, regRes, regsRes] = await Promise.all([
                 billingAdminService.getCustomers(),
@@ -47,15 +51,19 @@ export default function BillingManagement() {
                 billingAdminService.getRegistrationSettings(),
                 billingAdminService.getRegistrations(),
             ]);
-            if (customersRes.success) setCustomers(customersRes.data || []);
-            if (subsRes.success) setSubscriptions(subsRes.data || []);
-            if (paymentsRes.success) setPayments(paymentsRes.data || []);
-            if (camerasRes.success) setCameras(camerasRes.data || []);
-            if (plansRes.success) setPlans(plansRes.data || []);
-            if (regRes.success) setRegSettings(regRes.data || null);
-            if (regsRes.success) setRegistrations(regsRes.data || []);
+            const failed = [];
+            if (customersRes.success) setCustomers(customersRes.data || []); else failed.push('pelanggan');
+            if (subsRes.success) setSubscriptions(subsRes.data || []); else failed.push('langganan');
+            if (paymentsRes.success) setPayments(paymentsRes.data || []); else failed.push('pembayaran');
+            if (camerasRes.success) setCameras(camerasRes.data || []); else failed.push('kamera');
+            if (plansRes.success) setPlans(plansRes.data || []); else failed.push('paket');
+            if (regRes.success) setRegSettings(regRes.data || null); else failed.push('pengaturan persetujuan');
+            if (regsRes.success) setRegistrations(regsRes.data || []); else failed.push('persetujuan');
+            // Any failed slice would otherwise render as a fabricated empty list/count.
+            if (failed.length) setLoadError(`Sebagian data gagal dimuat: ${failed.join(', ')}.`);
         } catch (err) {
             console.error('Load billing data error:', err);
+            setLoadError('Data billing tidak dapat dimuat.');
             showError('Gagal memuat', 'Data billing tidak dapat dimuat.');
         } finally {
             setLoading(false);
@@ -139,6 +147,13 @@ export default function BillingManagement() {
             <TabPanel id={tab} idPrefix="billing">
                 {loading ? (
                     <div className="py-16 text-center text-content-muted">Memuat data billing…</div>
+                ) : loadError ? (
+                    <div className="py-16 text-center">
+                        <p className="text-sm text-status-fault">{loadError}</p>
+                        <button type="button" onClick={reload} className="mt-3 rounded-xl border border-edge-strong px-4 py-2 text-sm text-content-muted hover:bg-surface-sunken">
+                            Coba lagi
+                        </button>
+                    </div>
                 ) : (
                     <>
                         {tab === 'registrations' && <RegistrationsTab registrations={registrations} run={run} busy={busy} />}

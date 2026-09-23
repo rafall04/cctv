@@ -76,6 +76,7 @@ export default function VoucherManagement() {
     const { formatDateTime } = useTimezone();
 
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState(null);
     const [enabled, setEnabled] = useState(false);
     const [gatedAreaIds, setGatedAreaIds] = useState([]);
     const [areas, setAreas] = useState([]);
@@ -111,6 +112,7 @@ export default function VoucherManagement() {
 
     const loadData = useCallback(async () => {
         setLoading(true);
+        setLoadError(null);
         try {
             const [settingsRes, areasRes, profilesRes, codesRes] = await Promise.all([
                 voucherAdminService.getSettings(),
@@ -119,17 +121,25 @@ export default function VoucherManagement() {
                 voucherAdminService.getCodes({ limit: 300 }),
             ]);
 
+            const failed = [];
             if (settingsRes?.success) {
                 setEnabled(!!settingsRes.data.enabled);
                 setGatedAreaIds(settingsRes.data.gated_area_ids || []);
             } else {
-                notifyError('Gagal memuat pengaturan voucher', settingsRes?.message);
+                failed.push('pengaturan');
             }
-            if (areasRes?.success) setAreas(normalizeAreas(areasRes));
-            if (profilesRes?.success) setProfiles(Array.isArray(profilesRes.data) ? profilesRes.data : []);
-            if (codesRes?.success) setCodes(Array.isArray(codesRes.data) ? codesRes.data : []);
+            if (areasRes?.success) setAreas(normalizeAreas(areasRes)); else failed.push('area');
+            if (profilesRes?.success) setProfiles(Array.isArray(profilesRes.data) ? profilesRes.data : []); else failed.push('profil');
+            if (codesRes?.success) setCodes(Array.isArray(codesRes.data) ? codesRes.data : []); else failed.push('kode');
+            // A failed slice must not render as a fabricated empty list — and a fabricated
+            // `enabled=false` would let the header toggle flip the live flag the wrong way.
+            if (failed.length) {
+                setLoadError(`Sebagian data gagal dimuat: ${failed.join(', ')}.`);
+                notifyError('Gagal memuat data voucher', `Slice gagal: ${failed.join(', ')}`);
+            }
         } catch (e) {
             // A rejected request (offline / 500) must NOT leave the page stuck on the skeleton forever.
+            setLoadError('Gagal memuat data voucher.');
             notifyError('Gagal memuat data voucher', e?.response?.data?.message || e?.message);
         } finally {
             setLoading(false);
@@ -295,6 +305,17 @@ export default function VoucherManagement() {
 
     if (loading) {
         return <div className="space-y-5"><TableSkeleton rows={6} columns={5} /></div>;
+    }
+
+    if (loadError) {
+        return (
+            <div className="py-16 text-center">
+                <p className="text-sm text-status-fault">{loadError}</p>
+                <button type="button" onClick={loadData} className="mt-3 rounded-xl border border-edge-strong px-4 py-2 text-sm text-content-muted hover:bg-surface-sunken">
+                    Coba lagi
+                </button>
+            </div>
+        );
     }
 
     return (

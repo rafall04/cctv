@@ -136,14 +136,19 @@ export default function GeneralSettingsPanel() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+    // A failed load must not render DEFAULT_SETTINGS as if they were the real ones — Simpan
+    // there would overwrite the live landing-page config with factory defaults.
+    const [loadError, setLoadError] = useState(null);
 
     const fetchSettings = useCallback(async () => {
         try {
             setLoading(true);
+            setLoadError(null);
             const response = await adminAPI.get('/api/settings/landing-page');
             setSettings(mapResponseToSettings(response.data.data));
         } catch (requestError) {
             console.error('Error fetching settings:', requestError);
+            setLoadError('Gagal memuat pengaturan landing page');
             showError('Gagal Memuat', 'Gagal memuat pengaturan landing page');
         } finally {
             setLoading(false);
@@ -187,6 +192,17 @@ export default function GeneralSettingsPanel() {
         return (
             <div className="flex items-center justify-center py-12">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+        );
+    }
+
+    if (loadError) {
+        return (
+            <div className="py-12 text-center">
+                <p className="text-sm text-status-fault">{loadError}</p>
+                <button type="button" onClick={fetchSettings} className="mt-3 rounded-xl border border-edge-strong px-4 py-2 text-sm text-content-muted hover:bg-surface-sunken">
+                    Coba lagi
+                </button>
             </div>
         );
     }

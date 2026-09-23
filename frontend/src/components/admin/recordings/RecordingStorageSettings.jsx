@@ -25,31 +25,40 @@ import { useNotification } from '../../../contexts/NotificationContext';
 const MAX_KEY = 'recording_max_storage_gb';
 const ENABLED_KEY = 'recording_archive_hold_enabled';
 
-/** GET satu setting; 404 (belum diset) dikembalikan sebagai null, bukan galat. */
+/** GET satu setting; 404 (belum diset) dikembalikan sebagai null — galat lain tetap dilempar
+ *  supaya UI bisa membedakan "belum diset" dari "gagal memuat". */
 async function bacaSetting(key) {
     try {
         const res = await apiClient.get(`/api/settings/${key}`);
         return res.data?.data?.value ?? null;
-    } catch {
-        return null;
+    } catch (err) {
+        if (err?.response?.status === 404) return null;
+        throw err;
     }
 }
 
 export default function RecordingStorageSettings() {
     const { success: notifySuccess, error: notifyError } = useNotification();
     const [loaded, setLoaded] = useState(false);
+    const [loadError, setLoadError] = useState(null);
     const [enabled, setEnabled] = useState(true);
     const [maxGb, setMaxGb] = useState('');   // string di input; '' = tanpa batas
     const [saving, setSaving] = useState(false);
 
     useEffect(() => {
         let hidup = true;
-        Promise.all([bacaSetting(ENABLED_KEY), bacaSetting(MAX_KEY)]).then(([en, max]) => {
-            if (!hidup) return;
-            if (en !== null) setEnabled(en === true || en === 'true' || en === 1 || en === '1');
-            if (max !== null && Number(max) > 0) setMaxGb(String(max));
-            setLoaded(true);
-        });
+        Promise.all([bacaSetting(ENABLED_KEY), bacaSetting(MAX_KEY)])
+            .then(([en, max]) => {
+                if (!hidup) return;
+                if (en !== null) setEnabled(en === true || en === 'true' || en === 1 || en === '1');
+                if (max !== null && Number(max) > 0) setMaxGb(String(max));
+                setLoaded(true);
+            })
+            .catch(() => {
+                // Tanpa ini, gagal baca menampilkan bawaan (aktif + tanpa batas) seolah itu
+                // nilai tersimpan — padahal yang tersimpan bisa saja sebaliknya.
+                if (hidup) setLoadError('Gagal memuat setelan penyimpanan.');
+            });
         return () => { hidup = false; };
     }, []);
 
@@ -90,6 +99,9 @@ export default function RecordingStorageSettings() {
                 description="Saat jaringan ke Telegram bermasalah, rekaman yang belum sempat terunggah DITAHAN (tidak dihapus retensi) selama masih ada ruang. Atur batasnya di sini."
             />
 
+            {loadError ? (
+                <p className="mt-4 text-sm text-status-fault">{loadError} Muat ulang halaman untuk mencoba lagi.</p>
+            ) : (
             <div className="mt-4 space-y-4">
                 <label className="flex items-start gap-3">
                     <input
@@ -133,6 +145,7 @@ export default function RecordingStorageSettings() {
                     {saving ? 'Menyimpan…' : 'Simpan setelan'}
                 </button>
             </div>
+            )}
         </Card>
     );
 }

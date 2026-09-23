@@ -48,6 +48,15 @@ export default function PlaybackTokenManagement() {
                 onNativeShare={page.handleNativeShare}
             />
 
+            {!page.loading && page.loadError && (
+                <div className="flex items-center justify-between gap-3 rounded-card border border-status-fault/30 bg-status-fault/10 px-4 py-2.5">
+                    <p className="text-xs text-status-fault">{page.loadError}</p>
+                    <button type="button" onClick={page.loadData} className="shrink-0 rounded-lg border border-edge-strong px-3 py-1.5 text-xs text-content-muted hover:bg-surface-sunken">
+                        Coba lagi
+                    </button>
+                </div>
+            )}
+
             <PlaybackTokenTable
                 tokens={page.tokens}
                 loading={page.loading}

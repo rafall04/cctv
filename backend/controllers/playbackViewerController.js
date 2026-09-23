@@ -2,8 +2,23 @@ import playbackViewerSessionService from '../services/playbackViewerSessionServi
 import playbackTokenService from '../services/playbackTokenService.js';
 import cameraService from '../services/cameraService.js';
 
+const CLAIMED_MODES = new Set(['public_preview', 'token_full', 'admin_full', 'owner_full']);
+
 function normalizeAccessMode(value) {
-    return value === 'admin_full' ? 'admin_full' : 'public_preview';
+    return CLAIMED_MODES.has(value) ? value : 'public_preview';
+}
+
+/**
+ * Server-side check for a client CLAIMING owner_full. Mirrors resolveOwnerScopeAccess in
+ * rentalPlaybackAccessPolicy — signed-in user, owns this subscriber camera, rental still paid —
+ * minus the throw: this endpoint is analytics, so a bogus claim degrades to public_preview
+ * instead of refusing the request.
+ */
+function isVerifiedCameraOwner(camera, user) {
+    return !!user?.id
+        && Number(camera.owner_user_id) === Number(user.id)
+        && camera.camera_class === 'subscriber'
+        && camera.billing_status === 'active';
 }
 
 /**
@@ -51,10 +66,16 @@ export async function startPlaybackViewerSession(request, reply) {
             return reply.code(400).send({ success: false, message: 'Camera is disabled' });
         }
 
-        // A valid token outranks whatever the client claimed: it is server-verified, so it is the
-        // honest answer for both the mode and the attribution.
-        const token = accessMode === 'admin_full' ? null : resolveViewerToken(request, cameraId);
-        const effectiveMode = token ? 'token_full' : accessMode;
+        // Every privileged mode is VERIFIED server-side — the client claim only picks which check
+        // runs. A valid playback token outranks a bogus claim (it is server-verified and carries
+        // the attribution); an unauthenticated 'admin_full' claim verifies nothing and degrades
+        // to public_preview.
+        const isAdmin = request.user?.role === 'admin';
+        const token = (accessMode === 'admin_full' && isAdmin) ? null : resolveViewerToken(request, cameraId);
+        const effectiveMode = token ? 'token_full'
+            : (accessMode === 'admin_full' && isAdmin) ? 'admin_full'
+            : (accessMode === 'owner_full' && isVerifiedCameraOwner(camera, request.user)) ? 'owner_full'
+            : 'public_preview';
 
         const sessionId = playbackViewerSessionService.startSession({
             cameraId,

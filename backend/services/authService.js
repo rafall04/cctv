@@ -266,12 +266,21 @@ class AuthService {
         }
 
         const user = queryOne(
-            'SELECT id, username, role FROM users WHERE id = ?',
+            'SELECT id, username, role, account_status FROM users WHERE id = ?',
             [decoded.id]
         );
 
         if (!user) {
             const err = new Error('User not found');
+            err.statusCode = 401;
+            throw err;
+        }
+
+        // A still-valid refresh token must not outlive the account: a registration rejected
+        // (or re-pended) after login would otherwise keep minting sessions for ~7d. Same
+        // predicate as the login gate — NULL/'approved' pass, 'pending'/'rejected' do not.
+        if (user.account_status === 'pending' || user.account_status === 'rejected') {
+            const err = new Error('Akun tidak aktif — silakan login ulang');
             err.statusCode = 401;
             throw err;
         }

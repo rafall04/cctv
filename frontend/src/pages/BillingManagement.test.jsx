@@ -10,11 +10,15 @@ const svc = vi.hoisted(() => ({
     getPlans: vi.fn(),
     getRegistrationSettings: vi.fn(),
     getRegistrations: vi.fn(),
+    // Stabil: `reload` di komponen menaruh `showError` di dep array useCallback — fn baru tiap
+    // render akan memicu useEffect berulang (loop load) yang tidak terjadi di produksi.
+    notifySuccess: vi.fn(),
+    notifyError: vi.fn(),
 }));
 
 vi.mock('../services/billingAdminService', () => ({ default: svc }));
 vi.mock('../services/cameraService', () => ({ cameraService: { getAllCameras: vi.fn().mockResolvedValue({ success: true, data: [] }) } }));
-vi.mock('../contexts/NotificationContext', () => ({ useNotification: () => ({ success: vi.fn(), error: vi.fn() }) }));
+vi.mock('../contexts/NotificationContext', () => ({ useNotification: () => ({ success: svc.notifySuccess, error: svc.notifyError }) }));
 vi.mock('../contexts/ConfirmContext', () => ({ useConfirm: () => () => Promise.resolve(true) }));
 // Heavy sub-tabs not under test here.
 vi.mock('../components/admin/BillingPlansTab', () => ({ default: () => <div>plans-tab</div> }));
@@ -139,5 +143,37 @@ describe('BillingManagement tab strip (ARIA contract)', () => {
         fireEvent.click(screen.getByRole('tab', { name: /Persetujuan/ }));
 
         expect(screen.queryByText('perlu ditinjau')).toBeNull();
+    });
+});
+
+/*
+ * A failed fetch used to fall out of `loading` into tabs full of EMPTY arrays — "Pembayaran (0)"
+ * and "Belum ada pembayaran" claiming there was no data when the request simply failed. The gate
+ * below is what keeps a 500/offline reading as an error instead of as an empty dataset.
+ */
+describe('BillingManagement load failure', () => {
+    it('shows an error + retry instead of fabricated empty tabs when a request rejects', async () => {
+        svc.getCustomers.mockRejectedValueOnce(new Error('network down'));
+        render(<BillingManagement />);
+        await waitFor(() => screen.getByText('Data billing tidak dapat dimuat.'));
+        expect(screen.getByText('Coba lagi')).toBeTruthy();
+        // "Pembayaran (0)" must not be reachable as a tab panel.
+        expect(screen.queryByText('Belum ada pembayaran.')).toBeNull();
+    });
+
+    it('names the failed slice when one response is success:false', async () => {
+        svc.getPayments.mockResolvedValueOnce({ success: false, message: 'boom' });
+        render(<BillingManagement />);
+        await waitFor(() => screen.getByText(/Sebagian data gagal dimuat: pembayaran/));
+    });
+
+    it('recovers when the retry succeeds', async () => {
+        svc.getCustomers.mockRejectedValueOnce(new Error('network down'));
+        render(<BillingManagement />);
+        await waitFor(() => screen.getByText('Coba lagi'));
+
+        fireEvent.click(screen.getByText('Coba lagi'));
+
+        await waitFor(() => screen.getAllByText('budi'));
     });
 });

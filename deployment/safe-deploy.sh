@@ -530,7 +530,10 @@ else
     err "Health check FAILED after ~40s."
     echo "  Inspect:  pm2 logs ${BACKEND_PM2} --lines 50"
     echo "  Common cause: a weak/placeholder secret — the boot guard refused to start."
-    echo "  Rollback:  git -C ${APP_DIR} reset --hard ${ROLLBACK_COMMIT} && bash deployment/safe-deploy.sh deploy"
+    echo "  Rollback:  DEPLOY_CHANNEL=${ROLLBACK_COMMIT} bash ${APP_DIR}/deployment/safe-deploy.sh deploy"
+    echo "             (explicit commit pin — do NOT 'reset --hard' + plain deploy: the '${DEPLOY_CHANNEL}' channel"
+    echo "             would fast-forward the tree right back onto the broken HEAD.)"
+    [ -n "${DB_BAK:-}" ] && echo "  If that deploy ran migrations, restore the DB first (backend stopped): pm2 stop ${BACKEND_PM2} && cp '${DB_BAK}' '${DB_PATH}' && rm -f '${DB_PATH}-wal' '${DB_PATH}-shm'"
     exit 1
 fi
 
@@ -570,7 +573,10 @@ else
         echo "  Real reason (startup crashes now print synchronously):"
         echo "    pm2 logs ${BACKEND_PM2} --err --lines 80 | grep -A20 '\[Fatal\]'"
         echo ""
-        echo "  Rollback:  git -C ${APP_DIR} reset --hard ${ROLLBACK_COMMIT} && bash deployment/safe-deploy.sh deploy"
+        echo "  Rollback:  DEPLOY_CHANNEL=${ROLLBACK_COMMIT} bash ${APP_DIR}/deployment/safe-deploy.sh deploy"
+    echo "             (explicit commit pin — do NOT 'reset --hard' + plain deploy: the '${DEPLOY_CHANNEL}' channel"
+    echo "             would fast-forward the tree right back onto the broken HEAD.)"
+    [ -n "${DB_BAK:-}" ] && echo "  If that deploy ran migrations, restore the DB first (backend stopped): pm2 stop ${BACKEND_PM2} && cp '${DB_BAK}' '${DB_PATH}' && rm -f '${DB_PATH}-wal' '${DB_PATH}-shm'"
         exit 1
     fi
     ok "Stability gate passed — no crash-restarts in ${STABILITY_WINDOW}s."
@@ -621,7 +627,10 @@ if [ -n "$BACKEND_OUT_LOG" ] && [ -f "$BACKEND_OUT_LOG" ]; then
         echo ""
         echo "    pm2 logs ${BACKEND_PM2} --lines 80"
         echo ""
-        echo "  Rollback:  git -C ${APP_DIR} reset --hard ${ROLLBACK_COMMIT} && bash deployment/safe-deploy.sh deploy"
+        echo "  Rollback:  DEPLOY_CHANNEL=${ROLLBACK_COMMIT} bash ${APP_DIR}/deployment/safe-deploy.sh deploy"
+    echo "             (explicit commit pin — do NOT 'reset --hard' + plain deploy: the '${DEPLOY_CHANNEL}' channel"
+    echo "             would fast-forward the tree right back onto the broken HEAD.)"
+    [ -n "${DB_BAK:-}" ] && echo "  If that deploy ran migrations, restore the DB first (backend stopped): pm2 stop ${BACKEND_PM2} && cp '${DB_BAK}' '${DB_PATH}' && rm -f '${DB_PATH}-wal' '${DB_PATH}-shm'"
         exit 1
     fi
 else
@@ -644,6 +653,7 @@ echo "Watch the logs for a few minutes:"
 echo "  pm2 logs ${BACKEND_PM2} --lines 50"
 echo ""
 echo "Rollback (if anything breaks):"
-echo "  git -C ${APP_DIR} reset --hard ${ROLLBACK_COMMIT}"
-echo "  bash deployment/safe-deploy.sh deploy"
+echo "  DEPLOY_CHANNEL=${ROLLBACK_COMMIT} bash ${APP_DIR}/deployment/safe-deploy.sh deploy"
+echo "  (pins the tree to this exact commit — a plain deploy would fast-forward back to HEAD)"
+[ -n "${DB_BAK:-}" ] && echo "  If this deploy ran migrations, restore the DB first (backend stopped): pm2 stop ${BACKEND_PM2} && cp '${DB_BAK}' '${DB_PATH}' && rm -f '${DB_PATH}-wal' '${DB_PATH}-shm'"
 hr

@@ -11,21 +11,39 @@ import { readFile } from 'fs/promises';
 
 const queryMock = vi.fn();
 const getRuntimeStatusMock = vi.fn();
+// The service reads runtime status BULK — getRuntimeStatusMap(ids) — not per camera (the N+1
+// fix). The map mock delegates to the legacy per-camera mock so mockResolvedValueOnce
+// sequencing in existing tests keeps working.
+const getRuntimeStatusMapMock = vi.fn(async (ids) => {
+    const map = new Map();
+    for (const id of ids) {
+        map.set(id, await getRuntimeStatusMock(id));
+    }
+    return map;
+});
 const existsSyncMock = vi.fn();
 const statSyncMock = vi.fn();
 const summarizeActiveMock = vi.fn();
 const getActiveHealthSummaryMock = vi.fn();
 const listActiveByCameraMock = vi.fn();
+const listActiveForCamerasMock = vi.fn((ids) => {
+    const map = new Map();
+    for (const id of ids) {
+        map.set(id, listActiveByCameraMock(id));
+    }
+    return map;
+});
 
 vi.mock('../database/connectionPool.js', () => ({
     query: queryMock,
 }));
 
-// Worker-aware runtime status lives in recordingControlService (getRuntimeStatus), NOT the
+// Worker-aware runtime status lives in recordingControlService (getRuntimeStatusMap), NOT the
 // in-process recordingService.getRecordingStatus — the whole point of fix #9.
 vi.mock('../services/recordingControlService.js', () => ({
     default: {
         getRuntimeStatus: getRuntimeStatusMock,
+        getRuntimeStatusMap: getRuntimeStatusMapMock,
     },
 }));
 
@@ -34,6 +52,7 @@ vi.mock('../services/recordingRecoveryDiagnosticsRepository.js', () => ({
         summarizeActive: summarizeActiveMock,
         getActiveHealthSummary: getActiveHealthSummaryMock,
         listActiveByCamera: listActiveByCameraMock,
+        listActiveForCameras: listActiveForCamerasMock,
     },
 }));
 
@@ -144,7 +163,9 @@ describe('recordingAssuranceService', () => {
         });
 
         expect(queryMock).toHaveBeenCalledTimes(3);
-        expect(queryMock.mock.calls[1][0]).toContain('ROW_NUMBER() OVER');
+        // Latest-per-camera is a correlated LIMIT 1 probe on idx_recording_segments_camera_start_time,
+        // not a ROW_NUMBER() ranking of every segment row.
+        expect(queryMock.mock.calls[1][0]).toContain('LIMIT 1');
         expect(queryMock.mock.calls[2][0]).toContain('LAG(rs.end_time)');
         expect(result.summary).toEqual(expect.objectContaining({
             total_monitored: 2,
@@ -222,7 +243,7 @@ describe('recordingAssuranceService', () => {
         expect(result.cameras[0].reasons).not.toContain('recording_process_down');
     });
 
-    it('WORKER MODE: reads runtime status via recordingControlService.getRuntimeStatus per camera', async () => {
+    it('WORKER MODE: reads runtime status via recordingControlService.getRuntimeStatusMap (bulk, not per-camera N+1)', async () => {
         queryMock
             .mockReturnValueOnce([
                 { id: 5, name: 'C', stream_source: 'internal', recording_status: 'recording', last_recording_start: '2026-05-02T01:45:00.000Z' },
@@ -232,6 +253,7 @@ describe('recordingAssuranceService', () => {
 
         await recordingAssuranceService.getSnapshot({ now: new Date('2026-05-02T01:50:00.000Z') });
 
+        expect(getRuntimeStatusMapMock).toHaveBeenCalledWith([5]);
         expect(getRuntimeStatusMock).toHaveBeenCalledWith(5);
     });
 

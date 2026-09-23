@@ -46,17 +46,23 @@ export default function CustomerCameraIPs() {
     const { success, error: showError } = useNotification();
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
+    // A failed load must not render "Belum ada kamera pelanggan" — the list is only empty
+    // after a SUCCESSFUL empty response.
+    const [loadError, setLoadError] = useState(null);
 
     const load = useCallback(async () => {
         setLoading(true);
+        setLoadError(null);
         try {
             const res = await billingAdminService.getCameraIps();
             if (res.success) {
                 setData(res.data);
             } else {
+                setLoadError(res.message || 'Gagal memuat daftar IP.');
                 showError('Gagal', res.message || 'Gagal memuat daftar IP.');
             }
         } catch (err) {
+            setLoadError('Gagal memuat daftar IP.');
             showError('Gagal', err.response?.data?.message || 'Gagal memuat daftar IP.');
         } finally {
             setLoading(false);
@@ -95,6 +101,13 @@ export default function CustomerCameraIPs() {
 
             {loading ? (
                 <div className="py-16 text-center text-content-muted">Memuat & meresolve IP…</div>
+            ) : loadError ? (
+                <div className="py-16 text-center">
+                    <p className="text-sm text-status-fault">{loadError}</p>
+                    <button type="button" onClick={load} className="mt-3 rounded-xl border border-edge-strong px-4 py-2 text-sm text-content-muted hover:bg-surface-sunken">
+                        Coba lagi
+                    </button>
+                </div>
             ) : (
                 <>
                     {data?.summary && (

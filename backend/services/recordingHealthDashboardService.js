@@ -245,18 +245,32 @@ export function createRecordingHealthDashboardService({
         };
     }
 
+    // COUNT+SUM over recording_segments walks the whole table; the recorder worker publishes
+    // this snapshot every statePublishIntervalMs (~15s), so the aggregate is cached briefly —
+    // a 60s-stale storage number changes nothing an operator can act on.
+    const STORAGE_CACHE_TTL_MS = 60000;
+    let storageCache = { at: 0, data: null };
+
     function buildStorageSection() {
+        const now = Date.now();
+        if (storageCache.data && now - storageCache.at < STORAGE_CACHE_TTL_MS) {
+            return storageCache.data;
+        }
         const row = queryOneFn(
             `SELECT COUNT(*) AS segment_count, COALESCE(SUM(file_size), 0) AS total_size
              FROM recording_segments`,
             []
         ) || { segment_count: 0, total_size: 0 };
         const totalSize = row.total_size || 0;
-        return {
-            totalSegments: row.segment_count || 0,
-            totalSizeBytes: totalSize,
-            totalSizeGB: Number((totalSize / 1024 / 1024 / 1024).toFixed(2)),
+        storageCache = {
+            at: now,
+            data: {
+                totalSegments: row.segment_count || 0,
+                totalSizeBytes: totalSize,
+                totalSizeGB: Number((totalSize / 1024 / 1024 / 1024).toFixed(2)),
+            },
         };
+        return storageCache.data;
     }
 
     /**

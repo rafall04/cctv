@@ -36,6 +36,8 @@ export function TelegramArchiveSettings() {
     const [overview, setOverview] = useState(null);
     const [activity, setActivity] = useState(null);
     const [loading, setLoading] = useState(true);
+    // A failed load must not render the empty form — saving it would wipe the live routes.
+    const [loadError, setLoadError] = useState(null);
     const [draft, setDraft] = useState(EMPTY_DRAFT);
     const [editingId, setEditingId] = useState(null);
     /*
@@ -52,6 +54,7 @@ export function TelegramArchiveSettings() {
     const [manualChat, setManualChat] = useState(false);
 
     const load = useCallback(async () => {
+        setLoadError(null);
         try {
             const [ov, act] = await Promise.all([
                 telegramArchiveService.getOverview(),
@@ -59,7 +62,9 @@ export function TelegramArchiveSettings() {
             ]);
             setOverview(ov?.data ?? null);
             setActivity(act?.data ?? null);
+            if (!ov?.data) setLoadError('Gagal memuat pengaturan arsip.');
         } catch (error) {
+            setLoadError(error.response?.data?.message || 'Gagal memuat pengaturan arsip.');
             showNotification(error.response?.data?.message || 'Gagal memuat pengaturan arsip', 'error');
         } finally {
             setLoading(false);
@@ -238,6 +243,20 @@ export function TelegramArchiveSettings() {
             <div className="space-y-5">
                 <PageHeader title={JUDUL} />
                 <TableSkeleton rows={5} />
+            </div>
+        );
+    }
+
+    if (loadError) {
+        return (
+            <div className="space-y-5">
+                <PageHeader title={JUDUL} />
+                <div className="py-12 text-center">
+                    <p className="text-sm text-status-fault">{loadError}</p>
+                    <button type="button" onClick={load} className="mt-3 rounded-xl border border-edge-strong px-4 py-2 text-sm text-content-muted hover:bg-surface-sunken">
+                        Coba lagi
+                    </button>
+                </div>
             </div>
         );
     }

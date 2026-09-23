@@ -63,7 +63,18 @@ export function effectiveHours(retentionHours) {
  * julianday() rather than parsing in JS: segment timestamps are written UTC, but a bare
  * 'YYYY-MM-DD HH:MM:SS' would be read as local time by Date.parse and skew the span by the offset.
  */
+// The measured rate walks every segment row (per-camera GROUP BY + julianday on each). The
+// number is inherently slow-moving — a minute-stale rate cannot meaningfully change a
+// retention projection — so it is cached rather than re-scanned per request.
+const RATE_CACHE_TTL_MS = 60000;
+let rateCache = { at: 0, value: null };
+
 function measureRate() {
+    const now = Date.now();
+    if (rateCache.value && now - rateCache.at < RATE_CACHE_TTL_MS) {
+        return rateCache.value;
+    }
+
     let row;
     try {
         row = queryOne(`
@@ -85,21 +96,21 @@ function measureRate() {
     const bytes = Number(row?.bytes) || 0;
     const cameraHours = Number(row?.camera_hours) || 0;
 
-    if (!bytes || cameraHours < MIN_SAMPLE_HOURS) {
-        return {
+    const value = (!bytes || cameraHours < MIN_SAMPLE_HOURS)
+        ? {
             bytesPerCameraHour: DEFAULT_BYTES_PER_CAMERA_HOUR,
             source: 'default',
             sampleCameras: 0,
             sampleHours: 0,
+        }
+        : {
+            bytesPerCameraHour: bytes / cameraHours,
+            source: 'measured',
+            sampleCameras: Number(row.cameras) || 0,
+            sampleHours: Math.round(cameraHours),
         };
-    }
-
-    return {
-        bytesPerCameraHour: bytes / cameraHours,
-        source: 'measured',
-        sampleCameras: Number(row.cameras) || 0,
-        sampleHours: Math.round(cameraHours),
-    };
+    rateCache = { at: now, value };
+    return value;
 }
 
 class RecordingCapacityService {

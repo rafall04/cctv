@@ -12,12 +12,17 @@ export default function SaweriaSettingsPanel() {
         leaderboard_link: '',
         enabled: true,
     });
+    // A failed load must not render the blank/default form — Simpan would overwrite the live
+    // Saweria config with empties.
+    const [loadError, setLoadError] = useState(null);
 
     const fetchSettings = useCallback(async () => {
         try {
             setLoading(true);
+            setLoadError(null);
             const response = await saweriaService.getSaweriaSettings();
             if (!response.success) {
+                setLoadError(response.message || 'Gagal memuat pengaturan Saweria');
                 showError('Gagal Memuat', response.message || 'Gagal memuat pengaturan Saweria');
                 return;
             }
@@ -29,6 +34,7 @@ export default function SaweriaSettingsPanel() {
             });
         } catch (requestError) {
             console.error('Error fetching Saweria settings:', requestError);
+            setLoadError('Gagal memuat pengaturan Saweria');
             showError('Gagal Memuat', 'Gagal memuat pengaturan Saweria');
         } finally {
             setLoading(false);
@@ -70,6 +76,17 @@ export default function SaweriaSettingsPanel() {
         return (
             <div className="p-6">
                 <FormSkeleton fields={5} />
+            </div>
+        );
+    }
+
+    if (loadError) {
+        return (
+            <div className="py-12 text-center">
+                <p className="text-sm text-status-fault">{loadError}</p>
+                <button type="button" onClick={fetchSettings} className="mt-3 rounded-xl border border-edge-strong px-4 py-2 text-sm text-content-muted hover:bg-surface-sunken">
+                    Coba lagi
+                </button>
             </div>
         );
     }

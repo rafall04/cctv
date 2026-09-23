@@ -23,6 +23,7 @@ import { query, queryOne, execute } from '../database/connectionPool.js';
 import walletService from './walletService.js';
 import billingService from './billingService.js';
 import { validatePassword, getPasswordRequirements } from './passwordValidator.js';
+import { normalizePhone, isValidIdMobile, phoneLookupVariants } from '../utils/phoneNumber.js';
 import { logAdminAction, logSecurityEvent, SECURITY_EVENTS } from './securityAuditLogger.js';
 
 export const REGISTRATION_ENABLED_KEY = 'billing_registration_enabled';
@@ -447,12 +448,14 @@ class BillingPlanService {
             throw badRequest('Username sudah dipakai');
         }
 
-        const cleanPhone = String(phone || '').replace(/[\s-]/g, '');
-        if (!/^(\+62|62|0)8\d{7,12}$/.test(cleanPhone)) {
+        const cleanPhone = normalizePhone(phone);
+        if (!isValidIdMobile(cleanPhone)) {
             throw badRequest('Nomor HP tidak valid (contoh: 081234567890)');
         }
-        // One phone = one account: the cheap anti-abuse lever for free trials.
-        if (queryOne('SELECT id FROM users WHERE phone = ?', [cleanPhone])) {
+        // One phone = one account: the cheap anti-abuse lever for free trials. Variants catch
+        // rows stored before canonicalization ('62xxx'/'+62xxx' spellings of the same number).
+        const dupes = phoneLookupVariants(cleanPhone);
+        if (queryOne(`SELECT id FROM users WHERE phone IN (${dupes.map(() => '?').join(',')})`, dupes)) {
             throw badRequest('Nomor HP sudah terdaftar — silakan login');
         }
 

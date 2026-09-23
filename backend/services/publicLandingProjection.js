@@ -16,6 +16,7 @@
  */
 
 import { stripUrlCredentials } from '../utils/logRedaction.js';
+import { getEffectiveDeliveryType, DELIVERY_TYPE_PATTERNS } from '../utils/cameraDelivery.js';
 
 export const PUBLIC_LANDING_INTERNAL_FIELDS = [
     'monitoring_state',
@@ -52,6 +53,22 @@ function shouldHideOriginUrls(camera) {
     return camera.stream_source === 'external'
         && camera.delivery_type === 'external_hls'
         && proxied;
+}
+
+/*
+ * external_mjpeg is the other delivery type whose origin must never ship raw: the stream is an
+ * <img src>, so the URL — routinely a ZoneMinder nph-zms URL carrying a ?token= JWT — used to be
+ * published verbatim for the browser to fetch direct. The opaque /api/stream/:id/external.mjpeg
+ * relay resolves it server-side instead, so the public payload REWRITES (not drops — the <img>
+ * still needs a src) external_stream_url to the opaque path. delivery_type may be absent on
+ * secondary projections, so resolve it when missing (same inference the frontend runs).
+ */
+function mjpegOpaquePath(camera) {
+    if (camera?.stream_source !== 'external' || !camera?.id) return null;
+    const deliveryType = camera.delivery_type || getEffectiveDeliveryType(camera);
+    return deliveryType === 'external_mjpeg'
+        ? `/api/stream/${camera.id}/external.mjpeg`
+        : null;
 }
 
 /*
@@ -114,6 +131,25 @@ export function stripProxiedOriginUrls(camera, { assumeProxied = false } = {}) {
     const subject = assumeProxied && publicCamera.external_use_proxy === undefined
         ? { ...publicCamera, external_use_proxy: 1 }
         : publicCamera;
+
+    // MJPEG rewrite BEFORE the hls-drop branch — an mjpeg camera keeps a playable field, just
+    // an opaque one. The token-bearing copy in external_hls_url/external_embed_url (whichever
+    // duplicates the nph-zms source) is dropped so the secret has exactly one exit: the relay.
+    const opaqueMjpeg = mjpegOpaquePath(publicCamera);
+    if (opaqueMjpeg) {
+        if (publicCamera === camera) publicCamera = { ...camera };
+        publicCamera.external_stream_url = opaqueMjpeg;
+        // Emit the resolved type too — a legacy row with delivery_type NULL would otherwise
+        // re-infer 'external_hls' from the now-relative path and try to HLS-play an <img>.
+        publicCamera.delivery_type = 'external_mjpeg';
+        if (DELIVERY_TYPE_PATTERNS.zoneminderMjpeg.test(publicCamera.external_hls_url || '')) {
+            delete publicCamera.external_hls_url;
+        }
+        if (DELIVERY_TYPE_PATTERNS.zoneminderMjpeg.test(publicCamera.external_embed_url || '')) {
+            delete publicCamera.external_embed_url;
+        }
+        return publicCamera;
+    }
 
     if (!shouldHideOriginUrls(subject)) {
         return publicCamera;

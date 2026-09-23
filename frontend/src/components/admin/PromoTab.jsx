@@ -30,16 +30,25 @@ export default function PromoTab() {
     const confirm = useConfirm();
     const [promos, setPromos] = useState([]);
     const [loading, setLoading] = useState(true);
+    // A failed load must not render "Belum ada promo" — the list is empty only after a
+    // successful empty response.
+    const [loadError, setLoadError] = useState(null);
     const [busy, setBusy] = useState(false);
     const [form, setForm] = useState(EMPTY);
     const [showForm, setShowForm] = useState(false);
 
     const load = useCallback(async () => {
         setLoading(true);
+        setLoadError(null);
         try {
             const res = await billingAdminService.getPromos();
-            if (res.success) setPromos(res.data || []);
+            if (res.success) {
+                setPromos(res.data || []);
+            } else {
+                setLoadError(res.message || 'Daftar promo tidak dapat dimuat.');
+            }
         } catch {
+            setLoadError('Daftar promo tidak dapat dimuat.');
             showError('Gagal memuat', 'Daftar promo tidak dapat dimuat.');
         } finally {
             setLoading(false);
@@ -104,6 +113,17 @@ export default function PromoTab() {
 
     if (loading) {
         return <div className="py-16 text-center text-content-muted">Memuat promo…</div>;
+    }
+
+    if (loadError) {
+        return (
+            <div className="py-16 text-center">
+                <p className="text-sm text-status-fault">{loadError}</p>
+                <button type="button" onClick={load} className="mt-3 rounded-xl border border-edge-strong px-4 py-2 text-sm text-content-muted hover:bg-surface-sunken">
+                    Coba lagi
+                </button>
+            </div>
+        );
     }
 
     return (

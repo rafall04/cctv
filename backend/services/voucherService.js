@@ -27,6 +27,7 @@
 import crypto from 'crypto';
 import { query, queryOne, execute, transaction } from '../database/connectionPool.js';
 import { logAdminAction } from './securityAuditLogger.js';
+import { normalizePhone } from '../utils/phoneNumber.js';
 
 export const FEATURE_KEY = 'voucher_access_enabled';
 
@@ -59,17 +60,8 @@ function normalizeCode(code) {
     return String(code || '').trim().toUpperCase().replace(/\s+/g, '');
 }
 
-function normalizePhone(phone) {
-    if (phone === null || phone === undefined) return null;
-    let clean = String(phone).replace(/[\s-]/g, '');
-    if (!clean) return null;
-    // Canonicalize Indonesian prefixes to one leading-0 form (same as billingPlanService's
-    // accepted /^(\+62|62|0)8.../ inputs) so the same human number stored/searched as +62 / 62 / 0
-    // is one consistent value. (Phone is contact-only — not used for access — but consistency matters
-    // for admin lookups, the COALESCE-on-redeem, and any future per-buyer query.)
-    clean = clean.replace(/^\+62/, '0').replace(/^62/, '0');
-    return clean || null;
-}
+// normalizePhone is the shared utils/phoneNumber.js copy — same '0xxx' canonical rule this file
+// established, now reused by users.phone + playback_orders so one number is one string everywhere.
 
 function toMinutes(value, unit) {
     const v = Number(value);

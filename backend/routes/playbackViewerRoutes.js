@@ -16,19 +16,22 @@ export default async function playbackViewerRoutes(fastify) {
             body: {
                 type: 'object',
                 required: ['cameraId', 'segmentFilename', 'accessMode'],
+                maxProperties: 6,
                 properties: {
                     cameraId: {
                         anyOf: [
                             { type: 'integer' },
-                            { type: 'string', minLength: 1 },
+                            { type: 'string', minLength: 1, maxLength: 20 },
                         ],
                     },
-                    segmentFilename: { type: 'string', minLength: 1 },
-                    segmentStartedAt: { type: 'string' },
+                    segmentFilename: { type: 'string', minLength: 1, maxLength: 255 },
+                    segmentStartedAt: { type: 'string', maxLength: 64 },
                     // token_full was missing here, so once the client started reporting it the
                     // whole request was rejected with 400 and the session vanished — the very
-                    // viewers we wanted to attribute stopped being recorded at all.
-                    accessMode: { type: 'string', enum: ['public_preview', 'token_full', 'admin_full'] },
+                    // viewers we wanted to attribute stopped being recorded at all. owner_full is
+                    // the rental-owner equivalent: the client CLAIMS it, the controller VERIFIES
+                    // ownership server-side before recording it.
+                    accessMode: { type: 'string', enum: ['public_preview', 'token_full', 'admin_full', 'owner_full'] },
                 },
             },
         },
@@ -41,8 +44,9 @@ export default async function playbackViewerRoutes(fastify) {
             body: {
                 type: 'object',
                 required: ['sessionId'],
+                maxProperties: 3,
                 properties: {
-                    sessionId: { type: 'string', minLength: 1 },
+                    sessionId: { type: 'string', minLength: 1, maxLength: 64 },
                 },
             },
         },
@@ -55,8 +59,9 @@ export default async function playbackViewerRoutes(fastify) {
             body: {
                 type: 'object',
                 required: ['sessionId'],
+                maxProperties: 3,
                 properties: {
-                    sessionId: { type: 'string', minLength: 1 },
+                    sessionId: { type: 'string', minLength: 1, maxLength: 64 },
                 },
             },
         },

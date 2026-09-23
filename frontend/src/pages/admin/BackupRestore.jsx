@@ -37,6 +37,7 @@ export default function BackupRestore() {
     const [searchParams, setSearchParams] = useSearchParams();
     const [areas, setAreas] = useState([]);
     const [loadingAreas, setLoadingAreas] = useState(true);
+    const [areasError, setAreasError] = useState(null);
     const [fileName, setFileName] = useState('');
     const [backupItems, setBackupItems] = useState([]);
     const [scopeMode, setScopeMode] = useState(searchParams.get('scope') === 'unresolved_only' ? 'unresolved_only' : (searchParams.get('areaId') ? 'area_ids' : 'all'));
@@ -54,12 +55,16 @@ export default function BackupRestore() {
         const loadAreas = async () => {
             try {
                 setLoadingAreas(true);
+                setAreasError(null);
                 const response = await areaService.getAllAreas();
                 if (mounted && response.success) {
                     setAreas(response.data || response.areas || []);
+                } else if (mounted) {
+                    setAreasError('Daftar area gagal dimuat.');
                 }
             } catch (error) {
                 console.error('Load areas for backup restore error:', error);
+                if (mounted) setAreasError('Daftar area gagal dimuat.');
             } finally {
                 if (mounted) {
                     setLoadingAreas(false);
@@ -277,11 +282,12 @@ export default function BackupRestore() {
                                 onChange={(event) => updateQuickScope('area_ids', event.target.value)}
                                 className="mt-2 w-full rounded-control border border-edge bg-surface px-4 py-2.5 text-base sm:text-sm text-content disabled:opacity-60"
                             >
-                                <option value="">Pilih area</option>
+                                <option value="">{loadingAreas ? 'Memuat area…' : 'Pilih area'}</option>
                                 {areas.map((area) => (
                                     <option key={area.id} value={area.id}>{area.name}</option>
                                 ))}
                             </select>
+                            {areasError && <p className="mt-1 text-xs text-status-fault">{areasError}</p>}
                         </label>
                     </div>
 

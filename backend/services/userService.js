@@ -11,6 +11,7 @@ import {
     logPasswordChanged,
     logPasswordValidationFailed
 } from './securityAuditLogger.js';
+import { normalizePhone, phoneLookupVariants } from '../utils/phoneNumber.js';
 
 class UserService {
     getAllUsers() {
@@ -69,7 +70,7 @@ class UserService {
 
         const result = execute(
             'INSERT INTO users (username, password_hash, role, phone, email, password_changed_at) VALUES (?, ?, ?, ?, ?, ?)',
-            [username, passwordHash, role || 'admin', phone || null, email || null, new Date().toISOString()]
+            [username, passwordHash, role || 'admin', normalizePhone(phone), email || null, new Date().toISOString()]
         );
 
         addPasswordToHistory(result.lastInsertRowid, passwordHash);
@@ -125,7 +126,7 @@ class UserService {
 
         if (phone !== undefined) {
             updates.push('phone = ?');
-            values.push(phone || null);
+            values.push(normalizePhone(phone));
         }
 
         if (email !== undefined) {
@@ -296,9 +297,14 @@ class UserService {
         }
 
         if (phone !== undefined) {
-            const cleanPhone = phone ? String(phone).replace(/[\s-]/g, '') : null;
+            const cleanPhone = normalizePhone(phone);
             if (cleanPhone) {
-                const duplicatePhone = queryOne('SELECT id FROM users WHERE phone = ? AND id != ?', [cleanPhone, userId]);
+                // IN (variants): a legacy '62xxx'/verbatim row still counts as taken.
+                const dupes = phoneLookupVariants(cleanPhone);
+                const duplicatePhone = queryOne(
+                    `SELECT id FROM users WHERE phone IN (${dupes.map(() => '?').join(',')}) AND id != ?`,
+                    [...dupes, userId]
+                );
                 if (duplicatePhone) {
                     const err = new Error('Nomor HP sudah dipakai akun lain');
                     err.statusCode = 400;

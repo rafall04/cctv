@@ -63,8 +63,10 @@ export async function generateLiveGrant(request, reply) {
         // The playback token (cookie/header) is the authorization: validateRequestForCamera runs the
         // full existence/revoked/expired/in-scope check (throws 401/403). It returns null only when NO
         // token was presented — a missing credential (401), not a live-permission denial (403).
-        // requireSession:false — live is bounded by the short stream_access JWT, not a playback slot.
-        const token = playbackTokenService.validateRequestForCamera(request, id, { requireSession: false });
+        // Session enforcement stays ON: a capped token (max_active_sessions) minting live grants
+        // without a session slot was a share-key bypass — the JWT is short, but unlimited devices
+        // could each hold one. Unlimited-mode tokens pass straight through (assert returns early).
+        const token = playbackTokenService.validateRequestForCamera(request, id);
         if (!token) {
             return reply.code(401).send({ success: false, message: 'Token playback diperlukan untuk akses live' });
         }

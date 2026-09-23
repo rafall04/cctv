@@ -399,6 +399,9 @@ export default function AffiliateManagement() {
     const [cameras, setCameras] = useState([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    // Core slices (mitra/barang) failing must not render as fabricated empty lists.
+    const [loadError, setLoadError] = useState(null);
+    const [reloadKey, setReloadKey] = useState(0);
     const [editingPartner, setEditingPartner] = useState(null);
     const [editingOffer, setEditingOffer] = useState(null);
     const { showNotification } = useNotification();
@@ -446,14 +449,17 @@ export default function AffiliateManagement() {
             if (cancelled) {
                 return;
             }
+            const gagal = [];
             if (partnerResult.success) {
                 setPartners(partnerResult.data || []);
             } else {
+                gagal.push('mitra');
                 showNotification({ type: 'error', title: 'Gagal memuat mitra', message: partnerResult.message });
             }
             if (offerResult.success) {
                 setOffers(offerResult.data || []);
             } else {
+                gagal.push('barang');
                 showNotification({ type: 'error', title: 'Gagal memuat barang', message: offerResult.message });
             }
             if (areaResult.success) {
@@ -462,12 +468,13 @@ export default function AffiliateManagement() {
             if (cameraResult.success) {
                 setCameras(cameraResult.data || []);
             }
+            setLoadError(gagal.length ? `Sebagian data gagal dimuat: ${gagal.join(', ')}.` : null);
             setLoading(false);
         };
 
         load();
         return () => { cancelled = true; };
-    }, [showNotification]);
+    }, [showNotification, reloadKey]);
 
     const areaNameById = useMemo(() => new Map(areas.map((area) => [area.id, area.name])), [areas]);
     const partnerById = useMemo(
@@ -624,6 +631,15 @@ export default function AffiliateManagement() {
             <Tabs tabs={tabs} activeId={tab} onChange={setTab} idPrefix="affiliate" />
 
             {loading && <p className="text-sm text-content-muted">Memuat…</p>}
+
+            {!loading && loadError && (
+                <div className="mb-3 flex items-center justify-between gap-3 rounded-card border border-status-fault/30 bg-status-fault/10 px-4 py-2.5">
+                    <p className="text-xs text-status-fault">{loadError}</p>
+                    <button type="button" onClick={() => setReloadKey((k) => k + 1)} className="shrink-0 rounded-lg border border-edge-strong px-3 py-1.5 text-xs text-content-muted hover:bg-surface-sunken">
+                        Coba lagi
+                    </button>
+                </div>
+            )}
 
             {!loading && tab === 'partners' && (
                 <TabPanel id="partners" idPrefix="affiliate" className="space-y-3">

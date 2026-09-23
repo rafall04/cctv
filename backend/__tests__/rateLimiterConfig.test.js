@@ -144,11 +144,13 @@ describe('media GET whitelist — thumbnails & recording streams', () => {
         expect(isWhitelisted('/api/playback-archive/42/stream', 'POST')).toBe(false);
     });
 
-    it('playback session lifecycle (start/heartbeat/stop, any method) is whitelisted — heartbeats fire every 5s', async () => {
+    it('playback-viewer heartbeat is whitelisted (every 5s); start/stop are one-shot inserts — limited', async () => {
         const { isWhitelisted, getEndpointType } = await loadRateLimiter({});
-        for (const p of ['/api/playback-viewer/start', '/api/playback-viewer/heartbeat', '/api/playback-viewer/stop']) {
-            expect(isWhitelisted(p, 'POST')).toBe(true);
-            expect(getEndpointType(p, 'POST')).toBe('whitelist');
+        expect(isWhitelisted('/api/playback-viewer/heartbeat', 'POST')).toBe(true);
+        expect(getEndpointType('/api/playback-viewer/heartbeat', 'POST')).toBe('whitelist');
+        for (const p of ['/api/playback-viewer/start', '/api/playback-viewer/stop']) {
+            expect(isWhitelisted(p, 'POST')).toBe(false);
+            expect(getEndpointType(p, 'POST')).toBe('public');
         }
         expect(isWhitelisted('/api/playback-token/heartbeat', 'POST')).toBe(true);
         // Token activation/clear stay limited — they throttle token-guessing, not playback.

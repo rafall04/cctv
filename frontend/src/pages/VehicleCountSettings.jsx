@@ -153,6 +153,9 @@ export default function VehicleCountSettings() {
      */
     const [mengedit, setMengedit] = useState(false);
     const [memuat, setMemuat] = useState(true);
+    // Gagal muat awal tidak boleh merender "Belum ada" — itu mengklaim tidak ada penghitungan
+    // padahal fetch-nya yang gagal.
+    const [gagalMuat, setGagalMuat] = useState(null);
     const [menyimpan, setMenyimpan] = useState(false);
     const [kameraBaru, setKameraBaru] = useState('');
     const [ringkasan, setRingkasan] = useState(null);
@@ -165,7 +168,9 @@ export default function VehicleCountSettings() {
             ]);
             setTerpasang(a?.data || []);
             setTersedia(b?.data || []);
+            setGagalMuat(null);
         } catch {
+            setGagalMuat('Gagal memuat daftar penghitungan.');
             showNotification('Gagal memuat daftar penghitungan', 'error');
         } finally {
             setMemuat(false);
@@ -328,6 +333,13 @@ export default function VehicleCountSettings() {
                 </h2>
                 {memuat ? (
                     <p className="text-sm text-content-muted">Memuat…</p>
+                ) : gagalMuat ? (
+                    <div className="py-4 text-center">
+                        <p className="text-sm text-status-fault">{gagalMuat}</p>
+                        <button type="button" onClick={muatDaftar} className="mt-2 rounded-lg border border-edge-strong px-3 py-1.5 text-xs text-content-muted hover:bg-surface-sunken">
+                            Coba lagi
+                        </button>
+                    </div>
                 ) : terpasang.length === 0 ? (
                     <p className="text-sm text-content-muted">Belum ada. Tambahkan di bawah.</p>
                 ) : (

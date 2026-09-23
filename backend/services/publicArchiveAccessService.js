@@ -83,6 +83,9 @@ class PublicArchiveAccessService {
 
         // Gate 3. The real camera row goes in: resolveCameraAccess reads area_id for area-scoped
         // tokens and denies when it is absent, so a stub here would break area tokens entirely.
+        // Session enforcement ON (requireSession default): an archive hit on a capped token must
+        // hold a live session slot — otherwise a shared key streams forever on unlimited devices.
+        // Unlimited-mode tokens skip the assert internally, so public-style tokens are unaffected.
         const access = playbackTokenService.validateRequestForCamera(request, row.camera_id, {
             camera: {
                 id: row.camera_id,
@@ -90,7 +93,6 @@ class PublicArchiveAccessService {
                 camera_class: row.camera_class,
                 public_playback_mode: row.public_playback_mode,
             },
-            requireSession: false,
             touch: false,
             eventType: 'access_archive_segment',
         });

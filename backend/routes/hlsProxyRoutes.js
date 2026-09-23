@@ -55,6 +55,29 @@ function shouldSignalRuntime(cameraId) {
     return true;
 }
 
+// A flaky upstream is an expected condition, but every viewer's ~3s playlist refetch used to
+// print one stderr line — a dead MediaMTX once sprayed thousands of identical 502s. Keep one
+// line per camera per window and fold the repeats into a suppressed count.
+const PROXY_ERROR_LOG_INTERVAL_MS = 60000;
+const proxyErrorLogState = new Map(); // key -> { lastLogAt, suppressed }
+function logProxyErrorThrottled(key, message) {
+    const now = Date.now();
+    const entry = proxyErrorLogState.get(key) || { lastLogAt: 0, suppressed: 0 };
+    if (now - entry.lastLogAt < PROXY_ERROR_LOG_INTERVAL_MS) {
+        entry.suppressed += 1;
+        proxyErrorLogState.set(key, entry);
+        return;
+    }
+    const suffix = entry.suppressed > 0 ? ` (+${entry.suppressed} similar suppressed)` : '';
+    console.error(`${message}${suffix}`);
+    proxyErrorLogState.set(key, { lastLogAt: now, suppressed: 0 });
+    if (proxyErrorLogState.size > 2000) {
+        for (const [mapKey, value] of proxyErrorLogState) {
+            if (now - value.lastLogAt >= PROXY_ERROR_LOG_INTERVAL_MS) proxyErrorLogState.delete(mapKey);
+        }
+    }
+}
+
 export default async function hlsProxyRoutes(fastify, _options) {
     const mediamtxHlsUrl = config.mediamtx?.hlsUrlInternal || 'http://localhost:8888';
     // Hostnames allowed to hotlink community playlists when a browser omits
@@ -263,7 +286,7 @@ export default async function hlsProxyRoutes(fastify, _options) {
             }
             return reply.send(response.data);
         } catch (error) {
-            console.error(`[HLSProxy] Error proxying ${fullPath}:`, error.message);
+            logProxyErrorThrottled(cameraId || fullPath, `[HLSProxy] Error proxying ${fullPath}: ${error.message}`);
             return reply.code(502).send('');
         }
     });

@@ -46,12 +46,17 @@ export default function PlaybackSettingsPanel() {
     const [saving, setSaving] = useState(false);
     const [settings, setSettings] = useState(DEFAULT_SETTINGS);
     const [whatsappNumber, setWhatsappNumber] = useState('');
+    // A failed load must not render DEFAULT_SETTINGS as the real config — Simpan would then
+    // overwrite live playback settings with factory defaults.
+    const [loadError, setLoadError] = useState(null);
 
     const loadSettings = useCallback(async () => {
         try {
             setLoading(true);
+            setLoadError(null);
             const response = await settingsService.getAllSettings();
             if (!response.success) {
+                setLoadError(response.message || 'Gagal memuat pengaturan playback.');
                 showError('Gagal Memuat', response.message || 'Gagal memuat pengaturan playback.');
                 return;
             }
@@ -69,6 +74,7 @@ export default function PlaybackSettingsPanel() {
             setWhatsappNumber(String(data.whatsapp_number || '').trim());
         } catch (requestError) {
             console.error('Failed to load playback settings:', requestError);
+            setLoadError('Gagal memuat pengaturan playback.');
             showError('Gagal Memuat', 'Gagal memuat pengaturan playback.');
         } finally {
             setLoading(false);
@@ -118,6 +124,17 @@ export default function PlaybackSettingsPanel() {
         return (
             <div className="flex items-center justify-center py-12">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+        );
+    }
+
+    if (loadError) {
+        return (
+            <div className="py-12 text-center">
+                <p className="text-sm text-status-fault">{loadError}</p>
+                <button type="button" onClick={loadSettings} className="mt-3 rounded-xl border border-edge-strong px-4 py-2 text-sm text-content-muted hover:bg-surface-sunken">
+                    Coba lagi
+                </button>
             </div>
         );
     }

@@ -47,12 +47,12 @@ export const RATE_LIMIT_CONFIG = {
         // an open playback tab alone would eat ~12% of the shared 100/min public bucket
         // forever; during a spike the 429'd heartbeat ALSO let playback-token sessions
         // expire (dead video until reload). Same class as /api/viewer/heartbeat above.
-        // Listed one by one: the /api/playback-viewer/* GET routes (active/stats/
+        // /start and /stop are NOT here: they fire once per session (start = a DB insert),
+        // so they stay in the shared public bucket — unlimited anonymous inserts was the
+        // abuse path this closes. The /api/playback-viewer/* GET routes (active/stats/
         // history/analytics) are admin-only reads — keep them rate-limited (public
         // bucket; their auth gate is requireAdmin on the route, not this limiter).
-        '/api/playback-viewer/start',
         '/api/playback-viewer/heartbeat',
-        '/api/playback-viewer/stop',
         '/api/playback-token/heartbeat',
         '/hls',                   // HLS proxy - high frequency segment requests
         '/api/internal',          // MediaMTX push hooks - bursty on restart; self-bounded (debounce + in-flight cap)

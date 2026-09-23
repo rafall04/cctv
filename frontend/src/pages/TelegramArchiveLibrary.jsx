@@ -184,6 +184,9 @@ export default function TelegramArchiveLibrary() {
     // like a page reload — and what silently scrolled the view to the top (see load()).
     const [ready, setReady] = useState(false);
     const [busy, setBusy] = useState(true);
+    // Initial-load failure must surface — otherwise `ready` never flips and the skeleton
+    // spins forever, reading as "still loading" rather than "failed".
+    const [loadError, setLoadError] = useState(null);
     const [playing, setPlaying] = useState(null);
 
     const filters = useMemo(() => ({
@@ -223,8 +226,10 @@ export default function TelegramArchiveLibrary() {
             setRows(result.items);
             setTotal(result.total);
             setReady(true);
+            setLoadError(null);
         } catch (err) {
             if (ticket !== requestRef.current) return;
+            setLoadError('Gagal memuat arsip.');
             notifyError('Gagal memuat arsip', err?.response?.data?.message || err.message);
         } finally {
             if (ticket === requestRef.current) setBusy(false);
@@ -460,7 +465,14 @@ export default function TelegramArchiveLibrary() {
               * clamped the scroll position to the new maximum — which read as "it jumped to the
               * top by itself". Opacity costs no height, so the view stays where the finger left it.
               */}
-            {!ready ? (
+            {!ready && loadError ? (
+                <div className="rounded-card border border-edge bg-surface px-4 py-12 text-center">
+                    <p className="text-sm text-status-fault">{loadError}</p>
+                    <button type="button" onClick={load} className="mt-3 rounded-xl border border-edge-strong px-4 py-2 text-sm text-content-muted hover:bg-surface-sunken">
+                        Coba lagi
+                    </button>
+                </div>
+            ) : !ready ? (
                 <TableSkeleton rows={6} columns={4} />
             ) : days.length === 0 ? (
                 <div className="rounded-card border border-edge bg-surface px-4 py-12 text-center">

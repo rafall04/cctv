@@ -53,10 +53,14 @@ export default function StreamHealthSettingsPanel() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [form, setForm] = useState(DEFAULT_FORM);
+    // A failed load must not render DEFAULT_FORM as the real config — Simpan would overwrite
+    // live health-monitoring defaults with factory values.
+    const [loadError, setLoadError] = useState(null);
 
     const loadSettings = useCallback(async () => {
         try {
             setLoading(true);
+            setLoadError(null);
             const result = await settingsService.getAllSettings();
             if (result.success) {
                 setForm({
@@ -70,10 +74,12 @@ export default function StreamHealthSettingsPanel() {
                     camera_source_dead_confirm_hours: Number(result.data.camera_source_dead_confirm_hours) || 6,
                 });
             } else {
+                setLoadError(result.message || 'Tidak bisa memuat default health monitoring.');
                 showError('Gagal Memuat', result.message || 'Tidak bisa memuat default health monitoring.');
             }
         } catch (error) {
             console.error('Load stream health defaults error:', error);
+            setLoadError('Tidak bisa memuat default health monitoring.');
             showError('Gagal Memuat', 'Tidak bisa memuat default health monitoring.');
         } finally {
             setLoading(false);
@@ -127,6 +133,17 @@ export default function StreamHealthSettingsPanel() {
         return (
             <div className="flex items-center justify-center py-12">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+        );
+    }
+
+    if (loadError) {
+        return (
+            <div className="py-12 text-center">
+                <p className="text-sm text-status-fault">{loadError}</p>
+                <button type="button" onClick={loadSettings} className="mt-3 rounded-xl border border-edge-strong px-4 py-2 text-sm text-content-muted hover:bg-surface-sunken">
+                    Coba lagi
+                </button>
             </div>
         );
     }

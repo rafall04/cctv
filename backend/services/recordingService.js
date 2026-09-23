@@ -65,6 +65,10 @@ class RecordingService {
     constructor() {
         this.isShuttingDown = false;
         this.scheduler = null;
+        // FFmpeg stderr 'error' lines are per-CAMERA throttled: an upstream flap prints one
+        // line, then repeats fold into a suppressed count — otherwise a wedged recorder
+        // sprays stderr faster than anything downstream can read it.
+        this.stderrErrorLogState = new Map(); // cameraId -> { lastLogAt, suppressed }
 
         // Ensure recordings directory exists
         if (!existsSync(RECORDINGS_BASE_PATH)) {
@@ -325,7 +329,16 @@ class RecordingService {
             // pending directory, and the completion branch above is what turns a
             // marker into an event. So it is dropped rather than printed.
             if (parsed.kind === 'error') {
-                console.error(`[FFmpeg Camera ${cameraId}] ${redactUrlCredentials(parsed.logLine)}`);
+                const logState = this.stderrErrorLogState.get(cameraId) || { lastLogAt: 0, suppressed: 0 };
+                const now = Date.now();
+                if (now - logState.lastLogAt < 60000) {
+                    logState.suppressed += 1;
+                    this.stderrErrorLogState.set(cameraId, logState);
+                    continue;
+                }
+                const suffix = logState.suppressed > 0 ? ` (+${logState.suppressed} similar suppressed)` : '';
+                console.error(`[FFmpeg Camera ${cameraId}] ${redactUrlCredentials(parsed.logLine)}${suffix}`);
+                this.stderrErrorLogState.set(cameraId, { lastLogAt: now, suppressed: 0 });
             }
         }
     }

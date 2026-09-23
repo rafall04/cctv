@@ -210,8 +210,9 @@ class TelegramArchiveService {
      *     20-min stall alert cannot fire if the process itself died, so this is the backstop.
      *   - evidenceAvailable: false when the state.db could not be read (missing/locked/corrupt). The
      *     caller must HOLD on this, not treat it as healthy — "cannot read" is not "all clear".
-     * All time math runs in SQL via julianday() (UTC-absolute) so it is correct whatever the process
-     * timezone, and the cross-DB backlog subtraction stays valid.
+     * Time math stays UTC-absolute: julianday() where a cross-DB subtraction needs it, bare ISO
+     * string compare where an index-friendly range filter does the same job (recording_segments
+     * timestamps are stored ISO-8601 UTC).
      */
     archiveDeliverySnapshot({ failWindowMinutes = 45 } = {}) {
         const doc = readRoutesFile();
@@ -275,10 +276,12 @@ class TelegramArchiveService {
         // prod), and a dead/wedged sidecar makes it climb without bound. When the fleet is idle (no
         // recent footage) it goes null, so idleness never reads as a stall. Both julianday()s are
         // UTC-absolute, so the cross-DB subtraction is valid whatever the process timezone.
+        // end_time is stored ISO-8601 UTC, so a bare string compare is the same filter
+        // julianday() computed — minus the per-row function call that defeated indexing.
         const latest = query(
             `SELECT MAX(end_time) AS latestAt, julianday(MAX(end_time)) AS latestJul
-             FROM recording_segments WHERE julianday(end_time) > julianday('now', ?)`,
-            ['-3 hours'],
+             FROM recording_segments WHERE end_time > ?`,
+            [new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString()],
         )[0] || {};
         const lastJul = evidence.upload.lastJul ?? null;
         const latestJul = latest.latestJul ?? null;

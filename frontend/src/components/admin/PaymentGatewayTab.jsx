@@ -19,6 +19,9 @@ export default function PaymentGatewayTab() {
     const { success, error: showError } = useNotification();
     const [view, setView] = useState(null);
     const [loading, setLoading] = useState(true);
+    // A failed load must NOT render the fabricated default form — an admin hitting Simpan there
+    // would overwrite the working gateway config with 'manual' + empty credentials.
+    const [loadError, setLoadError] = useState(null);
     const [saving, setSaving] = useState(false);
     const [testing, setTesting] = useState(false);
     const [testResult, setTestResult] = useState(null);
@@ -38,6 +41,7 @@ export default function PaymentGatewayTab() {
 
     const load = useCallback(async () => {
         setLoading(true);
+        setLoadError(null);
         try {
             const res = await billingAdminService.getPaymentGateway();
             if (res.success) {
@@ -51,8 +55,11 @@ export default function PaymentGatewayTab() {
                 setMethods((d.ipaymu.methods || []).map((m) => ({ ...m })));
                 setMidtransKey('');
                 setMidtransProduction(!!d.midtrans.production);
+            } else {
+                setLoadError(res.message || 'Pengaturan gateway tidak dapat dimuat.');
             }
-        } catch {
+        } catch (err) {
+            setLoadError(err.response?.data?.message || 'Pengaturan gateway tidak dapat dimuat.');
             showError('Gagal memuat', 'Pengaturan gateway tidak dapat dimuat.');
         } finally {
             setLoading(false);
@@ -156,6 +163,17 @@ export default function PaymentGatewayTab() {
 
     if (loading) {
         return <div className="py-16 text-center text-content-muted">Memuat pengaturan gateway…</div>;
+    }
+
+    if (loadError) {
+        return (
+            <div className="py-16 text-center">
+                <p className="text-sm text-status-fault">{loadError}</p>
+                <button type="button" onClick={load} className="mt-3 rounded-xl border border-edge-strong px-4 py-2 text-sm text-content-muted hover:bg-surface-sunken">
+                    Coba lagi
+                </button>
+            </div>
+        );
     }
 
     return (

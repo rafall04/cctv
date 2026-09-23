@@ -80,12 +80,22 @@ class StreamService {
         //   - external_embed / external_mjpeg / external_jsmpeg use their own
         //     dedicated URL fields and are out of scope for HLS proxying.
         const stripExternalHlsUrls = isExternalHls && externalProxyEnabled;
+        // external_mjpeg: the <img> still needs a src, so instead of nulling we REWRITE the
+        // field to the opaque relay path — the token-bearing nph-zms URL never ships. Any
+        // duplicate copy of that stream URL in external_hls_url/external_embed_url is nulled.
+        const mjpegOpaquePath = deliveryType === 'external_mjpeg'
+            ? `/api/stream/${camera.id}/external.mjpeg`
+            : null;
+        const isZoneminderMjpeg = (u) => /\/zm\/cgi-bin\/nph-zms/i.test(u || '');
         const sanitizedExternalHlsUrl = stripExternalHlsUrls
             ? null
-            : (camera.external_hls_url || (deliveryType === 'external_hls' ? camera.external_stream_url || null : null));
+            : mjpegOpaquePath && isZoneminderMjpeg(camera.external_hls_url)
+                ? null
+                : (camera.external_hls_url || (deliveryType === 'external_hls' ? camera.external_stream_url || null : null));
         const sanitizedExternalStreamUrl = stripExternalHlsUrls
             ? null
-            : (camera.external_stream_url || (deliveryType === 'external_hls' ? camera.external_hls_url || null : null));
+            : mjpegOpaquePath
+                || (camera.external_stream_url || (deliveryType === 'external_hls' ? camera.external_hls_url || null : null));
 
         let streams = isExternalHls
             ? externalStreams
@@ -150,7 +160,9 @@ class StreamService {
             // reaches an anonymous client. Credential-free URLs are returned unchanged.
             external_hls_url: stripUrlCredentials(extHlsUrl),
             external_stream_url: stripUrlCredentials(extStreamUrl),
-            external_embed_url: stripUrlCredentials(camera.external_embed_url) || null,
+            external_embed_url: mjpegOpaquePath && isZoneminderMjpeg(camera.external_embed_url)
+                ? null
+                : stripUrlCredentials(camera.external_embed_url) || null,
             external_snapshot_url: stripUrlCredentials(camera.external_snapshot_url) || null,
             external_origin_mode: camera.external_origin_mode || 'direct',
         };

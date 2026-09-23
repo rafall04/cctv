@@ -22,6 +22,7 @@ import paymentSettingsService from './paymentSettingsService.js';
 import voucherService from './voucherService.js';
 import { ipaymuRequest, interpretIpaymuTransaction } from '../utils/ipaymuClient.js';
 import { parseIpaymuExpiryIso } from './paymentService.js';
+import { normalizePhone } from '../utils/phoneNumber.js';
 
 const ORDER_EXPIRY_MINUTES = 30;
 const RECHECK_THROTTLE_MS = 15000;
@@ -120,7 +121,7 @@ class VoucherOrderService {
 
         const { httpOk, body } = await ipaymuRequest('/api/v2/payment/direct', {
             name: (name && String(name).trim()) || 'Donatur',
-            phone: (phone && String(phone).trim()) || '081234567890',
+            phone: normalizePhone(phone) || (phone && String(phone).trim()) || '081234567890',
             email: fallbackEmail(publicBaseUrl),
             amount,
             notifyUrl: publicBaseUrl ? `${publicBaseUrl}/api/voucher/webhook/ipaymu` : undefined,
@@ -150,7 +151,7 @@ class VoucherOrderService {
             [
                 profileId,
                 name ? String(name).trim() : null,
-                phone ? String(phone).trim() : null,
+                normalizePhone(phone) || (phone ? String(phone).trim() : null),
                 deviceHash,
                 ip || null,
                 String(data.TransactionId),

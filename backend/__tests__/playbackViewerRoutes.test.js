@@ -30,11 +30,11 @@ vi.mock('../services/cameraService.js', () => ({
 
 vi.mock('../middleware/authMiddleware.js', () => ({
     authMiddleware: async (request) => {
-        request.user = { id: 1, username: 'admin' };
+        request.user = { id: 1, username: 'admin', role: 'admin' };
     },
     optionalAuthMiddleware: async (request) => {
         if (request.headers.authorization) {
-            request.user = { id: 1, username: 'admin' };
+            request.user = { id: 1, username: 'admin', role: 'admin' };
         }
     },
 }));
@@ -113,6 +113,100 @@ describe('playbackViewerRoutes', () => {
             adminUserId: 1,
             adminUsername: 'admin',
         }), expect.any(Object));
+        await fastify.close();
+    });
+
+    it('degrades an anonymous admin_full claim to public_preview — privilege is verified, not claimed', async () => {
+        getCameraByIdMock.mockReturnValue({ id: 8, enabled: 1, name: 'Gate' });
+        const { default: playbackViewerRoutes } = await import('../routes/playbackViewerRoutes.js');
+        const fastify = Fastify();
+        await fastify.register(playbackViewerRoutes, { prefix: '/api/playback-viewer' });
+
+        const response = await fastify.inject({
+            method: 'POST',
+            url: '/api/playback-viewer/start',
+            payload: {
+                cameraId: 8,
+                segmentFilename: 'seg-2.mp4',
+                accessMode: 'admin_full',
+            },
+        });
+
+        expect(response.statusCode).toBe(200);
+        expect(startSessionMock).toHaveBeenCalledWith(expect.objectContaining({
+            cameraId: 8,
+            accessMode: 'public_preview',
+            adminUserId: null,
+            adminUsername: null,
+        }), expect.any(Object));
+        await fastify.close();
+    });
+
+    it('records owner_full only for the verified camera owner (active subscriber)', async () => {
+        getCameraByIdMock.mockReturnValue({
+            id: 11, enabled: 1, name: 'Rental',
+            owner_user_id: 1, camera_class: 'subscriber', billing_status: 'active',
+        });
+        const { default: playbackViewerRoutes } = await import('../routes/playbackViewerRoutes.js');
+        const fastify = Fastify();
+        await fastify.register(playbackViewerRoutes, { prefix: '/api/playback-viewer' });
+
+        const response = await fastify.inject({
+            method: 'POST',
+            url: '/api/playback-viewer/start',
+            headers: { authorization: 'Bearer fake-token' },
+            payload: { cameraId: 11, segmentFilename: 'seg-11.mp4', accessMode: 'owner_full' },
+        });
+
+        expect(response.statusCode).toBe(200);
+        expect(startSessionMock).toHaveBeenCalledWith(expect.objectContaining({
+            cameraId: 11,
+            accessMode: 'owner_full',
+        }), expect.any(Object));
+        await fastify.close();
+    });
+
+    it('degrades an owner_full claim by a non-owner to public_preview', async () => {
+        getCameraByIdMock.mockReturnValue({
+            id: 12, enabled: 1, name: 'Rental',
+            owner_user_id: 999, camera_class: 'subscriber', billing_status: 'active',
+        });
+        const { default: playbackViewerRoutes } = await import('../routes/playbackViewerRoutes.js');
+        const fastify = Fastify();
+        await fastify.register(playbackViewerRoutes, { prefix: '/api/playback-viewer' });
+
+        const response = await fastify.inject({
+            method: 'POST',
+            url: '/api/playback-viewer/start',
+            headers: { authorization: 'Bearer fake-token' },
+            payload: { cameraId: 12, segmentFilename: 'seg-12.mp4', accessMode: 'owner_full' },
+        });
+
+        expect(response.statusCode).toBe(200);
+        expect(startSessionMock).toHaveBeenCalledWith(expect.objectContaining({
+            cameraId: 12,
+            accessMode: 'public_preview',
+        }), expect.any(Object));
+        await fastify.close();
+    });
+
+    it('rejects oversized fields at the schema boundary', async () => {
+        const { default: playbackViewerRoutes } = await import('../routes/playbackViewerRoutes.js');
+        const fastify = Fastify();
+        await fastify.register(playbackViewerRoutes, { prefix: '/api/playback-viewer' });
+
+        const response = await fastify.inject({
+            method: 'POST',
+            url: '/api/playback-viewer/start',
+            payload: {
+                cameraId: 7,
+                segmentFilename: 'x'.repeat(300),
+                accessMode: 'public_preview',
+            },
+        });
+
+        expect(response.statusCode).toBe(400);
+        expect(startSessionMock).not.toHaveBeenCalled();
         await fastify.close();
     });
 

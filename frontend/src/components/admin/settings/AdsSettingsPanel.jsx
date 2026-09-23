@@ -253,18 +253,24 @@ export default function AdsSettingsPanel() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+    // A failed load must not render DEFAULT_SETTINGS as the real config — Simpan would then
+    // overwrite live ad settings with factory defaults.
+    const [loadError, setLoadError] = useState(null);
 
     const fetchSettings = useCallback(async () => {
         try {
             setLoading(true);
+            setLoadError(null);
             const response = await settingsService.getAllSettings();
             if (response.success) {
                 setSettings(mapSettingsResponse(response.data));
             } else {
+                setLoadError(response.message || 'Gagal memuat pengaturan iklan.');
                 showError('Gagal Memuat', response.message || 'Gagal memuat pengaturan iklan.');
             }
         } catch (requestError) {
             console.error('Error fetching ads settings:', requestError);
+            setLoadError('Gagal memuat pengaturan iklan.');
             showError('Gagal Memuat', 'Gagal memuat pengaturan iklan.');
         } finally {
             setLoading(false);
@@ -314,6 +320,17 @@ export default function AdsSettingsPanel() {
         return (
             <div className="flex items-center justify-center py-12">
                 <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary"></div>
+            </div>
+        );
+    }
+
+    if (loadError) {
+        return (
+            <div className="py-12 text-center">
+                <p className="text-sm text-status-fault">{loadError}</p>
+                <button type="button" onClick={fetchSettings} className="mt-3 rounded-xl border border-edge-strong px-4 py-2 text-sm text-content-muted hover:bg-surface-sunken">
+                    Coba lagi
+                </button>
             </div>
         );
     }

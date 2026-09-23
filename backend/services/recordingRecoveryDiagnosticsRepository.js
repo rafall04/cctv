@@ -83,6 +83,36 @@ class RecordingRecoveryDiagnosticsRepository {
         );
     }
 
+    /**
+     * Bulk variant of listActiveByCamera for fleet-wide readers (assurance snapshot):
+     * one query for all cameras, then grouped and capped per camera in memory. The global
+     * ORDER BY preserves each camera's own last_seen_at DESC order, so the per-camera
+     * slice is identical to N individual LIMIT queries — without the N queries.
+     * @returns {Map<number, object[]>} camera_id -> up to perCameraLimit active rows
+     */
+    listActiveForCameras(cameraIds, perCameraLimit = 100) {
+        if (!Array.isArray(cameraIds) || cameraIds.length === 0) {
+            return new Map();
+        }
+        const rows = query(
+            `SELECT *
+            FROM recording_recovery_diagnostics
+            WHERE active = 1 AND camera_id IN (${cameraIds.map(() => '?').join(',')})
+            ORDER BY last_seen_at DESC`,
+            cameraIds
+        );
+        const byCamera = new Map();
+        for (const row of rows) {
+            const list = byCamera.get(row.camera_id);
+            if (list) {
+                if (list.length < perCameraLimit) list.push(row);
+            } else {
+                byCamera.set(row.camera_id, [row]);
+            }
+        }
+        return byCamera;
+    }
+
     summarizeActive() {
         const rows = query(
             `SELECT state, COUNT(*) as count

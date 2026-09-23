@@ -148,11 +148,16 @@ class TotpAuthService {
             throw fail(401, 'Token verifikasi tidak valid');
         }
         const row = queryOne(
-            `SELECT id, username, role, totp_enabled, totp_secret, totp_recovery_hashes,
+            `SELECT id, username, role, account_status, totp_enabled, totp_secret, totp_recovery_hashes,
                     totp_failed_attempts, totp_locked_until FROM users WHERE id = ?`,
             [claims.sub]
         );
         if (!row || row.totp_enabled !== 1) throw fail(401, '2FA tidak aktif untuk akun ini');
+        // The pending token was minted BEFORE this check — an admin rejecting the registration
+        // inside the 5-minute window must not let the exchange finish. Same rule as login.
+        if (row.account_status === 'pending' || row.account_status === 'rejected') {
+            throw fail(401, 'Akun tidak aktif — hubungi admin');
+        }
 
         const lockedUntil = row.totp_locked_until ? Date.parse(row.totp_locked_until) : 0;
         if (lockedUntil > Date.now()) {

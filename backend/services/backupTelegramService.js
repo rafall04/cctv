@@ -6,15 +6,18 @@
  * MainFuncs: createDatabaseSnapshot, sendDatabaseBackup, runScheduledBackup.
  * SideEffects: Writes a temp snapshot under data/backups/, uploads it to Telegram, deletes the temp.
  *
- * Why VACUUM INTO and not a file copy: this database runs in WAL mode, so the .db file on disk is
- * NOT a complete database on its own — recent commits live in -wal. Copying it while the app is
- * running yields a torn snapshot that can restore short, or not at all. `VACUUM INTO` asks SQLite
- * itself for a consistent copy, and compacts it on the way out (measured on prod: 77.7 MB -> 73.4 MB,
- * then 12.5 MB gzipped, comfortably inside the 50 MB Bot API limit).
+ * Why SQLite's own copy and not a file copy: this database runs in WAL mode, so the .db file on disk
+ * is NOT a complete database on its own — recent commits live in -wal. Copying it while the app is
+ * running yields a torn snapshot that can restore short, or not at all. `db.backup()` drives the
+ * SQLite Online Backup API: consistent (WAL-aware), and incremental — it copies in page batches that
+ * yield between steps, unlike `VACUUM INTO` which ran as ONE synchronous call and froze the whole
+ * event loop (every public stream request included) for the duration of a manual admin backup.
+ * It does not compact like VACUUM does; gzip absorbs the slack anyway (measured 77.7 MB -> 12.5 MB).
  */
 
 import { createGzip } from 'zlib';
-import { createReadStream, createWriteStream, existsSync, mkdirSync, statSync, unlinkSync, readFileSync } from 'fs';
+import { createReadStream, createWriteStream, existsSync, mkdirSync, unlinkSync } from 'fs';
+import { readFile, stat } from 'fs/promises';
 import { pipeline } from 'stream/promises';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
@@ -102,11 +105,11 @@ export async function createDatabaseSnapshot({ now = new Date() } = {}) {
         if (existsSync(stale)) unlinkSync(stale);
     }
 
-    // VACUUM INTO needs a real read-write handle, which the readonly pool cannot give —
-    // so this is the one place that reaches for the writer directly rather than going
-    // through query/execute. It also cannot run inside a transaction, which is why the
-    // backup is only ever driven from the scheduler, never from inside one.
-    pool.getWriteConnection().prepare('VACUUM INTO ?').run(rawPath);
+    // The backup API needs a real read-write handle, which the readonly pool cannot give —
+    // so this is the one place that reaches for the writer directly. `db.backup()` resolves
+    // when the copy completes; each progress callback sets the batch size so the copy yields
+    // the event loop between steps instead of blocking for the whole database.
+    await pool.getWriteConnection().backup(rawPath, { progress: () => 500, pause: 20 });
 
     try {
         await pipeline(createReadStream(rawPath), createGzip({ level: 6 }), createWriteStream(gzPath));
@@ -115,7 +118,8 @@ export async function createDatabaseSnapshot({ now = new Date() } = {}) {
         if (existsSync(rawPath)) unlinkSync(rawPath);
     }
 
-    return { path: gzPath, bytes: statSync(gzPath).size, filename: `cctv_${stamp}.db.gz` };
+    const { size } = await stat(gzPath);
+    return { path: gzPath, bytes: size, filename: `cctv_${stamp}.db.gz` };
 }
 
 /**
@@ -150,7 +154,7 @@ export async function sendDatabaseBackup({ chatId = null, reason = 'manual' } = 
 
         const sizeMb = (snapshot.bytes / 1048576).toFixed(1);
         await sendTelegramDocument(targetChatId, {
-            buffer: readFileSync(snapshot.path),
+            buffer: await readFile(snapshot.path),
             filename: snapshot.filename,
             caption: `🗄️ <b>Backup database CCTV</b>\n`
                 + `Ukuran: ${sizeMb} MB (gzip)\n`
