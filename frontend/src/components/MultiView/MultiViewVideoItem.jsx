@@ -257,6 +257,13 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
     } = useStreamTimeout({
         deviceTier,
         onTimeout: (stage) => {
+            // A hanging direct upstream never emits a fatal hls error — the pending
+            // request outlives this timeout and dies with it. Hop to the proxy instead.
+            if (isDirectStream && proxyFallbackUrl) {
+                console.log('[MultiViewVideoItem] Direct stream timed out, falling back to proxy');
+                setForceProxyFallback(true);
+                return;
+            }
             cleanupResources();
             setStatus('timeout');
             setLoadingStage(LoadingStage.TIMEOUT);
@@ -541,6 +548,14 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
 
                     // Aggressive network error recovery for external streams with CORS fallback
                     if (camera.stream_source === 'external' && d.type === Hls.ErrorTypes.NETWORK_ERROR) {
+                        // Direct-stream mode: a fatal network error means the browser→upstream
+                        // path is dead — startLoad() would re-walk it. Proxy immediately.
+                        if (isDirectStream && proxyFallbackUrl) {
+                            console.log('[MultiViewVideoItem] Direct stream failed, falling back to proxy');
+                            setForceProxyFallback(true);
+                            return;
+                        }
+
                         if (!hls._networkErrorRecoveryCount) hls._networkErrorRecoveryCount = 0;
                         hls._networkErrorRecoveryCount++;
 
@@ -548,13 +563,6 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                             console.log(`[MultiViewVideoItem] Recovering external stream network error (${hls._networkErrorRecoveryCount}/2)`);
                             hls.startLoad();
                             if (video.paused) video.play().catch(() => { });
-                            return;
-                        }
-
-                        // CORS Fallback: if direct stream failed after 2 retries, switch to proxy
-                        if (isDirectStream && proxyFallbackUrl) {
-                            console.log('[MultiViewVideoItem] Direct stream failed, falling back to proxy');
-                            setForceProxyFallback(true);
                             return;
                         }
                     }

@@ -40,3 +40,35 @@ describe('resolveStreamUrl — isAnnotated', () => {
         expect(resolveStreamUrl(null).isAnnotated).toBe(false);
     });
 });
+
+describe('resolveStreamUrl — forceProxy fallback', () => {
+    const directCam = {
+        id: 181,
+        delivery_type: 'external_hls',
+        external_use_proxy: 0,
+        external_stream_url: 'https://up.example/live.m3u8',
+        // For use_proxy=0 the backend puts the RAW upstream URL in streams.hls.
+        streams: { hls: 'https://up.example/live.m3u8' },
+    };
+
+    it('resolves the PROXY url as target, not the raw upstream URL', () => {
+        const r = resolveStreamUrl(directCam, { forceProxy: true });
+        expect(r.isDirectStream).toBe(false);
+        expect(r.targetUrl).toContain('/hls/proxy?');
+        expect(r.targetUrl).toContain(encodeURIComponent('https://up.example/live.m3u8'));
+        expect(r.targetUrl).toContain('cameraId=181');
+    });
+
+    it('offers the proxy url as proxyFallbackUrl in direct mode', () => {
+        const r = resolveStreamUrl(directCam);
+        expect(r.isDirectStream).toBe(true);
+        expect(r.targetUrl).toBe('https://up.example/live.m3u8');
+        expect(r.proxyFallbackUrl).toContain('/hls/proxy?');
+    });
+
+    it('forceProxy on a proxied camera keeps the opaque streams.hls target', () => {
+        const r = resolveStreamUrl({ id: 9, delivery_type: 'external_hls', external_use_proxy: 1, streams: { hls: '/api/stream/9/external.m3u8' } }, { forceProxy: true });
+        expect(r.targetUrl).toBe('/api/stream/9/external.m3u8');
+        expect(r.isDirectStream).toBe(false);
+    });
+});

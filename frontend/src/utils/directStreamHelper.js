@@ -36,24 +36,28 @@ export function resolveStreamUrl(camera, { forceProxy = false } = {}) {
     // 4. We have the raw external URL available
     const useDirectStream = isExternalHls && proxyDisabled && !forceProxy && !!rawUrl;
 
+    // Proxy URL for use when direct stream fails (CORS, network, upstream hang)
+    const baseUrl = getApiUrl();
+    const proxyUrl = rawUrl
+        ? `${baseUrl}/hls/proxy?${new URLSearchParams({ url: rawUrl, cameraId: String(camera.id) }).toString()}`
+        : null;
+
     if (!useDirectStream) {
+        // A direct-mode external camera's streams.hls IS the raw upstream URL — when
+        // forceProxy flips us out of direct mode, the fallback target must be the proxy
+        // URL, or the "fallback" just reloads the same dead path.
+        const forcedProxyUrl = (forceProxy && isExternalHls && proxyDisabled) ? proxyUrl : null;
         return {
-            targetUrl: currentStreamUrl,
+            targetUrl: forcedProxyUrl || currentStreamUrl,
             proxyFallbackUrl: null,
             isDirectStream: false,
             isAnnotated,
         };
     }
 
-    // Build proxy fallback URL for use when direct stream fails (CORS, network)
-    const baseUrl = getApiUrl();
-    const query = new URLSearchParams({ url: rawUrl });
-    query.set('cameraId', String(camera.id));
-    const proxyFallbackUrl = `${baseUrl}/hls/proxy?${query.toString()}`;
-
     return {
         targetUrl: rawUrl,
-        proxyFallbackUrl,
+        proxyFallbackUrl: proxyUrl,
         isDirectStream: true,
         isAnnotated,
     };

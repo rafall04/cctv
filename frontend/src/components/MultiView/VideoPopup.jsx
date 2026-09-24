@@ -439,6 +439,14 @@ function VideoPopup({
      } = useStreamTimeout({
         deviceTier,
         onTimeout: () => {
+            // A hanging direct upstream never emits a fatal hls error — the pending
+            // request outlives this timeout and dies with it. Hop to the proxy
+            // instead of declaring failure; the effect re-run re-arms the timeout.
+            if (isDirectStream && proxyFallbackUrl) {
+                console.log('[VideoPopup] Direct stream timed out, falling back to proxy');
+                setForceProxyFallback(true);
+                return;
+            }
             cleanupResources();
             setStatus('timeout');
             setErrorType('timeout');
@@ -723,6 +731,15 @@ function VideoPopup({
 
                 // Aggressive network error recovery for external streams
                 if (isExternal && d.type === HlsClass.ErrorTypes.NETWORK_ERROR) {
+                    // Direct-stream mode: a fatal network error means the browser→upstream
+                    // path is dead (CORS, TLS block, upstream hang). startLoad() would just
+                    // re-walk that same dead path — hop to the proxy immediately.
+                    if (isDirectStream && proxyFallbackUrl) {
+                        console.log('[VideoPopup] Direct stream failed, falling back to proxy');
+                        setForceProxyFallback(true);
+                        return;
+                    }
+
                     if (!hls._networkErrorRecoveryCount) hls._networkErrorRecoveryCount = 0;
                     hls._networkErrorRecoveryCount++;
 
@@ -736,13 +753,6 @@ function VideoPopup({
                         }
 
                         requestVideoPlay(video);
-                        return;
-                    }
-
-                    // CORS Fallback: if direct stream failed after 2 retries, switch to proxy
-                    if (isDirectStream && proxyFallbackUrl) {
-                        console.log('[VideoPopup] Direct stream failed, falling back to proxy');
-                        setForceProxyFallback(true);
                         return;
                     }
                 }
