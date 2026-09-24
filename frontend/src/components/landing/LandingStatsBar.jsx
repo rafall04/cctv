@@ -9,6 +9,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useCameras } from '../../contexts/CameraContext';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
+import { useCountUp } from '../../hooks/useCountUp';
 import { getCameraAvailabilityState } from '../../utils/cameraAvailability.js';
 import { groupCamerasByCity } from '../../utils/publicCityMapping';
 import { Icons } from '../ui/Icons';
@@ -230,9 +231,21 @@ export default function StatsBar({ onCameraClick }) {
      * "belum diketahui" placeholder, and neither states a figure it does not have.
      */
     const unknown = loading || dataUnavailable;
-    const figure = (value) => (unknown ? '…' : value);
     const drillDown = (key) => (unknown ? undefined : () => setActiveModal(key));
     const figureClass = (known) => (unknown ? 'text-content-subtle' : known);
+
+    /*
+     * Count-up on every numeral the board owns. While the figure is unknown the hook
+     * receives the '…' placeholder and passes it straight through; once the real count
+     * lands it eases up from 0. The flag is redundant (the hook consults
+     * shouldDisableAnimations itself) but keeps the motion gate visible at the call site.
+     */
+    const countGate = { disabled: disableAnimations };
+    const onlineDisplay = useCountUp(unknown ? '…' : stats.online, countGate);
+    const offlineDisplay = useCountUp(unknown ? '…' : stats.offline, countGate);
+    const totalDisplay = useCountUp(unknown ? '…' : stats.total, countGate);
+    const cityDisplay = useCountUp(unknown ? '…' : cities.length, countGate);
+    const viewersDisplay = useCountUp(unknown ? '…' : liveViewersNow, countGate);
 
     const handleCameraItemClick = (camera) => {
         setActiveModal(null);
@@ -256,7 +269,7 @@ export default function StatsBar({ onCameraClick }) {
 
             <div className="grid grid-cols-2 gap-px overflow-hidden rounded-control border border-edge bg-edge">
                 <Metric
-                    value={figure(stats.online)}
+                    value={onlineDisplay}
                     label="Online"
                     ariaLabel={`${stats.online} kamera online`}
                     valueClass={figureClass('text-status-live')}
@@ -271,16 +284,35 @@ export default function StatsBar({ onCameraClick }) {
                   * colour on the ordinary case of a third-party feed being down.
                   */}
                 <Metric
-                    value={figure(stats.offline)}
+                    value={offlineDisplay}
                     label="Offline"
                     ariaLabel={`${stats.offline} kamera offline`}
                     valueClass={figureClass('text-status-idle')}
                     onClick={drillDown('offline')}
                     disableAnimations={disableAnimations}
                 />
-                <Metric value={figure(stats.total)} label="Total unit" valueClass={figureClass('text-content')} />
-                <Metric value={figure(cities.length)} label="Kota terpantau" valueClass={figureClass('text-content')} />
+                <Metric value={totalDisplay} label="Total unit" valueClass={figureClass('text-content')} />
+                <Metric value={cityDisplay} label="Kota terpantau" valueClass={figureClass('text-content')} />
             </div>
+
+            {/*
+              * One glance says what the four cells say in prose: how much of the fleet
+              * is actually up. Real data (the same counts the cells show), so it earns
+              * its place — but it stays a quiet single-track bar, not a second board.
+              */}
+            {!unknown && stats.total > 0 && (
+                <div
+                    role="img"
+                    aria-label={`${stats.online} online, ${stats.offline} offline${stats.maintenance > 0 ? `, ${stats.maintenance} dalam perbaikan` : ''} dari ${stats.total} kamera`}
+                    className="mt-2.5 flex h-1.5 overflow-hidden rounded-full bg-surface-sunken"
+                >
+                    <span className="inline-flex bg-status-live" aria-hidden="true" style={{ width: `${(stats.online / stats.total) * 100}%` }} />
+                    <span className="inline-flex bg-status-idle" aria-hidden="true" style={{ width: `${(stats.offline / stats.total) * 100}%` }} />
+                    {stats.maintenance > 0 && (
+                        <span className="inline-flex bg-status-fault" aria-hidden="true" style={{ width: `${(stats.maintenance / stats.total) * 100}%` }} />
+                    )}
+                </div>
+            )}
 
             {stats.maintenance > 0 && (
                 <button
@@ -299,7 +331,7 @@ export default function StatsBar({ onCameraClick }) {
                 <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-content-subtle">Menonton sekarang</span>
                 <span className={`flex items-center gap-1.5 font-mono text-sm font-semibold tabular-nums ${unknown ? 'text-content-subtle' : 'text-data'}`}>
                     <span className={`h-1.5 w-1.5 rounded-full ${unknown ? 'bg-status-idle' : `bg-data ${disableAnimations ? '' : 'animate-pulse'}`}`} aria-hidden="true"></span>
-                    {figure(liveViewersNow.toLocaleString('id-ID'))}
+                    {typeof viewersDisplay === 'number' ? viewersDisplay.toLocaleString('id-ID') : viewersDisplay}
                 </span>
             </div>
 

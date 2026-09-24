@@ -211,8 +211,13 @@ export default function CamerasSection({
     );
 
     return (
-        <section id="camera-workspace" className="py-8 pb-16 sm:py-12 sm:pb-24">
+        <section id="camera-workspace" className="mt-8 pb-16 sm:mt-10 sm:pb-24">
             <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                {/* Section eyebrow — the house mono micro-label; the title, count, and
+                    view-mode switch themselves stay inside LandingCameraToolbar. */}
+                <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.14em] text-content-subtle">
+                    Katalog
+                </p>
                 <LandingCameraToolbar
                     title={landingSettings.section_title}
                     camerasCount={cameras.length}

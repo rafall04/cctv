@@ -285,14 +285,23 @@ function LandingPageContent({ onRefreshPauseChange }) {
                         discovery={publicDiscovery}
                         loading={discoveryLoading}
                         onCameraClick={handleGridPopupOpen}
+                        /* Rhythm via its className prop, not a wrapper div: the strip returns
+                           null when discovery is empty, and a wrapper would leave a dead
+                           margin between the hero and quick access. */
+                        className="mt-8 sm:mt-10"
                     />
 
-                    <LandingQuickAccessStrip
-                        recentCameras={recentCameraItems}
-                        favoriteCameras={favoriteCameras}
-                        onCameraClick={handleGridPopupOpen}
-                        forceVisible
-                    />
+                    {/* Same mt-8 sm:mt-10 section rhythm. This strip takes no className prop,
+                        so the margin lives on a wrapper — safe because forceVisible means it
+                        never renders null here. */}
+                    <div className="mt-8 sm:mt-10">
+                        <LandingQuickAccessStrip
+                            recentCameras={recentCameraItems}
+                            favoriteCameras={favoriteCameras}
+                            onCameraClick={handleGridPopupOpen}
+                            forceVisible
+                        />
+                    </div>
 
                     <LandingCamerasSection
                         onCameraClick={handleGridPopupOpen}

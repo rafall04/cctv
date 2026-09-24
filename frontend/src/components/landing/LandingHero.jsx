@@ -88,7 +88,7 @@ export default function Hero({ branding, landingSettings, disableHeavyEffects, o
             <div className="relative mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
                 <div
                     data-testid="landing-hero-badge-stack"
-                    className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2"
+                    className={`mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 ${disableAnimations ? '' : 'animate-slideUp'}`}
                 >
                     <span className="flex items-center gap-2">
                         <span className={`h-1.5 w-1.5 rounded-full ${unknown ? 'bg-status-idle' : `bg-status-live ${disableAnimations ? '' : 'animate-pulse'}`}`}></span>
@@ -96,7 +96,7 @@ export default function Hero({ branding, landingSettings, disableHeavyEffects, o
                             {landingSettings.hero_badge}
                         </span>
                     </span>
-                    <span className="h-3 w-px bg-edge-strong" aria-hidden="true"></span>
+                    <span className={`h-3 w-px bg-edge-strong ${disableAnimations ? '' : 'animate-fadeIn'}`} aria-hidden="true"></span>
                     <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-content-subtle">
                         {unknown ? '…' : cityCount} kota · siaran 24 jam
                     </span>
@@ -108,12 +108,19 @@ export default function Hero({ branding, landingSettings, disableHeavyEffects, o
                     )}
                 </div>
 
-                <h1 className="max-w-3xl text-balance text-3xl font-bold leading-[1.05] tracking-tight text-content sm:text-4xl lg:text-[2.75rem]">
-                    {heroTitle}
-                </h1>
-                <p className="mt-3 max-w-xl text-sm leading-6 text-content-muted sm:text-base">
-                    {heroSubtitle}
-                </p>
+                {/*
+                  * Headline+sub copy slide up as one block, a beat after the badge.
+                  * fill-mode backwards holds the `from` state through the 80 ms delay
+                  * so the text never flashes visible before the animation starts.
+                  */}
+                <div className={disableAnimations ? '' : 'animate-slideUp [animation-delay:80ms] [animation-fill-mode:backwards]'}>
+                    <h1 className="max-w-3xl text-balance text-3xl font-bold leading-[1.05] tracking-tight text-content sm:text-4xl lg:text-[2.75rem]">
+                        {heroTitle}
+                    </h1>
+                    <p className="mt-3 max-w-xl text-sm leading-6 text-content-muted sm:text-base">
+                        {heroSubtitle}
+                    </p>
+                </div>
 
                 <div className={`mt-6 grid gap-4 ${featured ? 'lg:grid-cols-[1.4fr_1fr] lg:items-stretch' : ''}`}>
                     <LandingHeroSpotlight

@@ -11,6 +11,7 @@
 import CameraThumbnail from '../CameraThumbnail';
 import LandingBezelTicks from './LandingBezelTicks';
 import { getAreaCity } from '../../utils/publicCityMapping';
+import { shouldDisableAnimations } from '../../utils/animationControl';
 
 export default function LandingHeroSpotlight({ camera, onOpen, disableHeavyEffects = false }) {
     if (!camera) {
@@ -19,6 +20,9 @@ export default function LandingHeroSpotlight({ camera, onOpen, disableHeavyEffec
 
     const city = getAreaCity(camera.area_name).label || camera.area_name || '';
     const viewers = Number(camera.live_viewers ?? camera.viewer_stats?.live_viewers ?? 0);
+    // Hover/focus motion is gated on BOTH the device-tier prop and the OS
+    // reduced-motion preference — the prop alone doesn't know about the latter.
+    const motionOff = disableHeavyEffects || shouldDisableAnimations();
 
     return (
         <button
@@ -28,7 +32,7 @@ export default function LandingHeroSpotlight({ camera, onOpen, disableHeavyEffec
             className="group relative flex flex-col overflow-hidden rounded-card border border-edge bg-surface text-left transition-colors hover:border-edge-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-data"
         >
             <LandingBezelTicks />
-            <div className="relative aspect-video overflow-hidden bg-black">
+            <div className={`relative aspect-video overflow-hidden bg-black ${motionOff ? '' : '[&_img]:transition-transform [&_img]:duration-300 group-hover:[&_img]:scale-[1.03] group-focus-visible:[&_img]:scale-[1.03]'}`}>
                 <CameraThumbnail
                     thumbnailPath={camera.external_snapshot_url || camera.thumbnail_path}
                     thumbnailVersion={camera.thumbnail_updated_at}
@@ -46,7 +50,7 @@ export default function LandingHeroSpotlight({ camera, onOpen, disableHeavyEffec
                     Live
                 </span>
                 <span className="pointer-events-none absolute inset-0 z-20 grid place-items-center opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100">
-                    <span className="grid h-12 w-12 place-items-center rounded-full border border-white/40 bg-black/55 backdrop-blur-sm">
+                    <span className={`grid h-12 w-12 place-items-center rounded-full border border-white/40 bg-black/55 backdrop-blur-sm ${motionOff ? '' : 'transition-transform duration-200 group-hover:scale-110 group-focus-visible:scale-110'}`}>
                         <svg viewBox="0 0 24 24" fill="#fff" className="h-5 w-5"><path d="M8 5v14l11-7z" /></svg>
                     </span>
                 </span>

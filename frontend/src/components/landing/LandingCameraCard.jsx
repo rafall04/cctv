@@ -73,7 +73,19 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
     // fail to play the stream, which is actionable.
     const codecWarning = camera.video_codec ? getCodecWarning(camera.video_codec) : null;
 
-    const transitionClass = disableAnimations ? '' : 'transition-colors duration-200';
+    // The hover lift is a transform+shadow pair, so the transition widens from
+    // `transition-colors` to Tailwind's default set (which also carries box-shadow,
+    // letting the hover ring fade smoothly). `hover:shadow-e1` composes with `ring-1`
+    // rather than replacing it — Tailwind stacks ring and shadow into one box-shadow.
+    const transitionClass = disableAnimations ? '' : 'transition duration-200';
+    const hoverLiftClass = disableAnimations ? '' : 'hover:-translate-y-0.5 hover:shadow-e1';
+    // Snapshot zoom is the same "this is playable" cue as the hover overlay below.
+    // `group-focus-within`, not `group-focus-visible`: the group element is the card
+    // itself, which is never focusable, so `focus-visible` on it could never match —
+    // keyboard reach always arrives through a descendant (the watch target, actions).
+    const thumbnailZoomClass = disableAnimations
+        ? ''
+        : '[&_img]:transition-transform [&_img]:duration-300 group-hover/card:[&_img]:scale-[1.04] group-focus-within/card:[&_img]:scale-[1.04]';
     const prewarmVideoPopup = () => {
         if (didPrewarmVideoPopupRef.current) {
             return;
@@ -101,7 +113,7 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
 
     return (
         <div
-            className={`group/card relative overflow-hidden rounded-card bg-surface ring-1 ${status.ring} ${transitionClass} ${contentVisibilityClass} hover:ring-edge-strong`}
+            className={`group/card relative overflow-hidden rounded-card bg-surface ring-1 ${status.ring} ${transitionClass} ${hoverLiftClass} ${contentVisibilityClass} hover:ring-edge-strong`}
             onPointerEnter={prewarmVideoPopup}
             onFocus={prewarmVideoPopup}
         >
@@ -111,7 +123,7 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
                 aria-label={`Tonton ${camera.name}`}
                 onClick={onClick}
                 onKeyDown={handleOpenKeyDown}
-                className="relative aspect-video cursor-pointer overflow-hidden bg-surface-sunken focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
+                className={`relative aspect-video cursor-pointer overflow-hidden bg-surface-sunken focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary ${thumbnailZoomClass}`}
             >
                 <CameraThumbnail
                     cameraId={camera.id}

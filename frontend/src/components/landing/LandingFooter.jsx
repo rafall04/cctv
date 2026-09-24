@@ -83,7 +83,7 @@ export default function Footer({ saweriaEnabled, saweriaLink, branding }) {
                       */}
                     {whatsappLink && (
                     <div className="text-center md:text-right">
-                        <h4 className="mb-2 font-semibold text-content">Hubungi Kami</h4>
+                        <h4 className="mb-3 font-semibold text-content">Hubungi Kami</h4>
                         <p className="mb-3 text-sm text-content-muted">
                             Ada pertanyaan atau masukan?
                         </p>
@@ -144,7 +144,7 @@ export default function Footer({ saweriaEnabled, saweriaLink, branding }) {
                     </Link>
                 </div>
 
-                <div className="border-t border-edge pt-4">
+                <div className="mt-6 border-t border-edge pt-6">
                     <p className="text-center text-xs text-content-muted">
                         &copy; {new Date().getFullYear()} {branding.company_name} &bull; {branding.copyright_text}
                     </p>

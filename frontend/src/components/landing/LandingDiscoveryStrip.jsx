@@ -20,9 +20,29 @@ function DiscoverySkeleton() {
 
 const ITEM_CLASS = 'group flex min-h-[72px] w-[min(18rem,calc(100vw-4rem))] shrink-0 items-center gap-3 rounded-card border border-edge bg-surface px-3 py-2 text-left transition-colors hover:border-edge-strong hover:bg-primary/5 sm:w-[250px]';
 
-function DiscoveryCameraButton({ camera, metricLabel, metricValue, onCameraClick }) {
+// Rank is real information here — every tab in this strip is an ordered list, so
+// "#1" genuinely says something (unlike the old all-LIVE badges). Kept mono + tiny
+// so it reads as an index rather than a badge competing with the status dot.
+// `min-w`/`px` instead of a fixed width lets "#10"+ grow without clipping.
+// `subtle` is for the area tab: it ranks places, not cameras, so it sits quieter.
+function RankChip({ rank, subtle = false }) {
+    return (
+        <>
+            <span
+                className={`grid h-5 min-w-5 shrink-0 place-items-center rounded-control border border-edge bg-surface-overlay px-0.5 font-mono text-[10px] font-bold leading-none ${subtle ? 'text-content-subtle' : 'text-content'}`}
+                aria-hidden="true"
+            >
+                #{rank}
+            </span>
+            <span className="sr-only">Peringkat {rank}</span>
+        </>
+    );
+}
+
+function DiscoveryCameraButton({ camera, metricLabel, metricValue, onCameraClick, rank }) {
     return (
         <button type="button" onClick={() => onCameraClick?.(camera)} className={ITEM_CLASS}>
+            <RankChip rank={rank} />
             {/* Was a red "LIVE" tile. Red is reserved for faults now (see LandingCameraCard),
                 and every card in this strip is live anyway, so the badge said nothing. */}
             <span className="flex h-2 w-2 shrink-0 rounded-full bg-status-live" aria-hidden="true"></span>
@@ -38,9 +58,10 @@ function DiscoveryCameraButton({ camera, metricLabel, metricValue, onCameraClick
     );
 }
 
-function DiscoveryAreaLink({ area }) {
+function DiscoveryAreaLink({ area, rank }) {
     return (
         <Link to={`/area/${area.slug}`} className={ITEM_CLASS}>
+            <RankChip rank={rank} subtle />
             <span className="shrink-0 text-content-subtle" aria-hidden="true">
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z" />
@@ -127,9 +148,9 @@ export default function LandingDiscoveryStrip({
                     overflow-hidden on the two ancestors stopped it, and changing the root's
                     overflow-x to hidden or visible did not either — only paint containment did. */}
                 <div data-testid="landing-discovery-strip-list" className="flex min-w-0 max-w-full gap-2 overflow-x-auto pt-1 [contain:paint] [-webkit-overflow-scrolling:touch]">
-                    {activeItems.map((item) => (
+                    {activeItems.map((item, index) => (
                         activeSection.type === 'area' ? (
-                            <DiscoveryAreaLink key={`area-${item.id}`} area={item} />
+                            <DiscoveryAreaLink key={`area-${item.id}`} area={item} rank={index + 1} />
                         ) : (
                             <DiscoveryCameraButton
                                 key={`${activeSection.key}-${item.id}`}
@@ -137,6 +158,7 @@ export default function LandingDiscoveryStrip({
                                 metricLabel={activeSection.metricLabel}
                                 metricValue={activeSection.metric(item)}
                                 onCameraClick={onCameraClick}
+                                rank={index + 1}
                             />
                         )
                     ))}
