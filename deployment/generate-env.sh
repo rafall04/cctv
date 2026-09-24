@@ -200,8 +200,10 @@ server {
 
 # Unified Single-Port Server (Frontend & Backend)
 server {
-    listen NGINX_PORT_PLACEHOLDER;
-    listen [::]:NGINX_PORT_PLACEHOLDER;
+    # default_server is REQUIRED: without it the MediaMTX-403 block above (listed first)
+    # wins for every unmatched Host, so direct-IP access (LAN deployments) 403s.
+    listen NGINX_PORT_PLACEHOLDER default_server;
+    listen [::]:NGINX_PORT_PLACEHOLDER default_server;
 
     server_name _ FRONTEND_DOMAIN_PLACEHOLDER SERVER_IP_PLACEHOLDER BACKEND_DOMAIN_PLACEHOLDER;
 
