@@ -87,11 +87,12 @@ describe('LandingCamerasSection controls', () => {
         expect(screen.queryByText('Gate')).toBeNull();
     });
 
-    it('grid default menaruh head terkurasi dulu lalu sisa kamera agar load-more menjangkau semua', () => {
+    it('grid default menaruh head terkurasi dulu lalu sisa kamera agar load-more menjangkau semua', async () => {
         render(<LandingCamerasSection {...commonProps} viewMode="grid" />);
 
         // Dander head (limit 2) = Gate,Lobby; overflow Market; Baureno (non-default) last.
-        expect(screen.getByText('results-grid:Gate,Lobby,Market,Square')).toBeTruthy();
+        // findBy* (not getBy*): LandingResultsGrid is lazyWithRetry — Suspense resolves async.
+        expect(await screen.findByText('results-grid:Gate,Lobby,Market,Square')).toBeTruthy();
 
         fireEvent.change(screen.getByRole('combobox'), {
             target: { value: 'Baureno' },
@@ -100,11 +101,13 @@ describe('LandingCamerasSection controls', () => {
         expect(screen.getByText('results-grid:Square')).toBeTruthy();
     });
 
-    it('menambahkan tab paling ramai dan terbaru pada filter grid area', () => {
+    it('menambahkan tab paling ramai dan terbaru pada filter grid area', async () => {
         render(<LandingCamerasSection {...commonProps} viewMode="grid" />);
 
         expect(screen.getByRole('button', { name: /Paling Ramai/i })).toBeTruthy();
         expect(screen.getByRole('button', { name: /Terbaru/i })).toBeTruthy();
+
+        await screen.findByText('results-grid:Gate,Lobby,Market,Square');
 
         fireEvent.click(screen.getByRole('button', { name: /Paling Ramai/i }));
         expect(screen.getByText('results-grid:Gate,Market,Lobby,Square')).toBeTruthy();

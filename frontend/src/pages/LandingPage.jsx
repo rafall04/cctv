@@ -23,7 +23,7 @@ import LandingHero from '../components/landing/LandingHero';
 import LandingFooter from '../components/landing/LandingFooter';
 import LandingCamerasSection from '../components/landing/LandingCamerasSection';
 import LandingPublicTopStack from '../components/landing/LandingPublicTopStack';
-import CommercialSlot from '../components/commerce/CommercialSlot.jsx';
+
 import LandingDiscoveryStrip from '../components/landing/LandingDiscoveryStrip';
 import LandingQuickAccessStrip from '../components/landing/LandingQuickAccessStrip';
 import LandingMobileDock from '../components/landing/LandingMobileDock';
@@ -37,6 +37,9 @@ import { sortCamerasByDistance } from '../utils/geoDistance';
 import { InlineErrorBoundary } from '../components/ui/ErrorBoundary';
 
 const LandingPageSimple = lazyWithRetry(() => import('../components/landing/LandingPageSimple'), 'landing-page-simple');
+// Lazy: affiliate/promo subtree (~25KB) is not needed for first paint — its own data fetch is
+// already IntersectionObserver-gated inside the component.
+const CommercialSlot = lazyWithRetry(() => import('../components/commerce/CommercialSlot.jsx'), 'commercial-slot');
 const MultiViewLayout = lazyWithRetry(() => import('../components/MultiView/MultiViewLayout'), 'multi-view-layout');
 const VideoPopup = lazyWithRetry(() => import('../components/MultiView/VideoPopup'), 'video-popup');
 const SaweriaLeaderboard = lazyWithRetry(() => import('../components/SaweriaLeaderboard'), 'saweria-leaderboard');
@@ -356,7 +359,9 @@ function LandingPageContent({ onRefreshPauseChange }) {
                       * "paling banyak satu blok per halaman", bukan oleh mata.
                       */}
                     {viewMode !== 'playback' && (
-                        <CommercialSlot placement="landing" className="mx-auto mt-6 w-full max-w-2xl px-4" />
+                        <Suspense fallback={null}>
+                            <CommercialSlot placement="landing" className="mx-auto mt-6 w-full max-w-2xl px-4" />
+                        </Suspense>
                     )}
 
                     {saweriaEnabled && saweriaLeaderboardLink && (

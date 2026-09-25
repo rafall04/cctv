@@ -81,25 +81,69 @@
           add('areaCameras:' + areaMatch[1], '/api/public/areas/' + areaMatch[1] + '/cameras');
         }
         /*
-         * Prewarm the likely-LCP thumbnails. The first visible camera cards mirror the
-         * discovery ordering, so the moment discovery JSON lands we fire the same
-         * versioned /api/thumbnails/* URLs CameraThumbnail renders — under Slow 4G the
-         * image bytes then arrive inside the JS-boot window instead of after it. Cap at
-         * 4 unique URLs so a stale ordering wastes at most ~100KB.
+         * Order cameras the way the DEFAULT grid does — flagged-area heads first
+         * (online → name inside each head), else raw API order — then warm the real
+         * first cards and fill the boot-shell <img> (see below #root) with the first
+         * one. The previous version warmed discovery live_now/top_cameras thumbs, but
+         * those strips render no <img> and discovery ordering (viewer_count DESC) is
+         * not grid ordering — the bytes warmed the wrong images entirely.
          */
-        store.discovery.then(function (json) {
-          var data = json && json.data ? json.data : {};
-          var seen = {};
-          (data.live_now || []).concat(data.top_cameras || []).forEach(function (cam) {
-            if (!cam || seen[cam.id] || !cam.thumbnail_path || cam.thumbnail_path.indexOf('/api/thumbnails/') !== 0) return;
-            seen[cam.id] = true;
-            if (Object.keys(seen).length > 4) return;
-            var url = cam.thumbnail_path;
-            if (cam.thumbnail_updated_at) url += '?v=' + encodeURIComponent(cam.thumbnail_updated_at);
-            var img = new Image();
-            img.src = url;
-          });
-        }).catch(function () {});
+        if (store.cameras) {
+          Promise.all([store.cameras, store.areas]).then(function (res) {
+            var camJson = res[0] || {};
+            var areaJson = res[1] || {};
+            var cameras = Array.isArray(camJson) ? camJson : (camJson.data || []);
+            var areasArr = Array.isArray(areaJson) ? areaJson : (areaJson.data || []);
+            var flagged = {};
+            areasArr.forEach(function (a) {
+              if (a && a.name && (a.show_on_grid_default === 1 || a.show_on_grid_default === true)) flagged[a.name] = true;
+            });
+            var firstArea = null, head = [];
+            if (Object.keys(flagged).length) {
+              var groups = {};
+              for (var i = 0; i < cameras.length; i++) {
+                var c = cameras[i];
+                if (!c || !c.area_name || !flagged[c.area_name]) continue;
+                if (!groups[c.area_name]) { groups[c.area_name] = []; if (!firstArea) firstArea = c.area_name; }
+                groups[c.area_name].push(c);
+              }
+              if (firstArea) {
+                head = groups[firstArea].slice().sort(function (l, r) {
+                  var lo = (l.is_online === 1 || l.is_online === true) ? 1 : 0;
+                  var ro = (r.is_online === 1 || r.is_online === true) ? 1 : 0;
+                  if (lo !== ro) return ro - lo;
+                  return (l.name || '').localeCompare(r.name || '');
+                });
+              }
+            }
+            var ordered = head.concat(cameras);
+            var seen = {};
+            var warmed = 0;
+            for (var j = 0; j < ordered.length && warmed < 4; j++) {
+              var cam = ordered[j];
+              if (!cam || seen[cam.id]) continue;
+              seen[cam.id] = true;
+              var tpath = cam.external_snapshot_url || cam.thumbnail_path;
+              if (!tpath) continue;
+              var url = tpath;
+              if (cam.thumbnail_updated_at && tpath.indexOf('/api/thumbnails/') === 0) {
+                url += (tpath.indexOf('?') >= 0 ? '&' : '?') + 'v=' + encodeURIComponent(cam.thumbnail_updated_at);
+              }
+              warmed++;
+              if (warmed === 1) {
+                var lcp = document.getElementById('boot-lcp-img');
+                if (lcp) {
+                  lcp.onerror = function () { lcp.style.display = 'none'; };
+                  lcp.src = url;
+                  lcp.alt = (cam.name || 'CCTV') + ' preview';
+                  lcp.style.display = 'block';
+                }
+              }
+              var pi = new Image();
+              pi.src = url;
+            }
+          }).catch(function () {});
+        }
         window.__RAFNET_PREFETCH__ = store;
       })();
     </script>
@@ -233,7 +277,32 @@
     <script defer src="/meta-config.js?v=4"></script>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!--
+        Pre-React boot shell. React's first root.render() clears everything inside
+        #root, so there is no hydration concern. Purposes: (1) no blank dark page
+        during bundle eval — heights approximate the simple mobile landing chrome
+        (header ~56, status ~150, discovery ~170, quick-access ~140, toolbar ~96) so
+        the swap stays small; (2) the aspect-ratio box hosts #boot-lcp-img, whose
+        src the prefetch bootstrap fills with the SAME versioned thumbnail URL the
+        first grid card will render — the LCP image starts downloading ~1 RTT after
+        HTML instead of after JS boot. The <img> stays hidden until a real src is
+        set, and hides itself again on error.
+      -->
+      <div id="boot-shell" style="background:#08090b;min-height:100vh" aria-hidden="true">
+        <div style="height:56px;background:#0b0d0f;border-bottom:1px solid #1c2024"></div>
+        <div style="max-width:1152px;margin:0 auto;padding:12px 16px">
+          <div style="height:150px;border-radius:12px;background:#101316;border:1px solid #1c2024"></div>
+          <div style="height:170px;border-radius:12px;background:#101316;border:1px solid #1c2024;margin-top:12px"></div>
+          <div style="height:140px;border-radius:12px;background:#101316;border:1px solid #1c2024;margin-top:12px"></div>
+          <div style="height:96px;border-radius:12px;background:#101316;border:1px solid #1c2024;margin-top:12px"></div>
+          <div style="position:relative;aspect-ratio:16/9;max-width:380px;border-radius:12px;overflow:hidden;background:#15181b;margin-top:16px">
+            <img id="boot-lcp-img" alt="" fetchpriority="high" decoding="async"
+                 style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:none" />
+          </div>
+        </div>
+      </div>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
     
     <!-- Noscript fallback for SEO -->

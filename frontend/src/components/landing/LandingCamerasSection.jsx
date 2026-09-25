@@ -6,6 +6,7 @@
  * SideEffects: Invokes camera popup, map focus, multiview, favorite, and mode-change callbacks.
  */
 
+import { Suspense } from 'react';
 import { useCameras } from '../../contexts/CameraContext';
 import { useLandingCameraFilters } from '../../hooks/public/useLandingCameraFilters';
 import { GridSkeleton, CameraCardSkeleton } from '../ui/Skeleton';
@@ -15,7 +16,6 @@ import LandingCameraToolbar from './LandingCameraToolbar';
 import LandingAreaFilter from './LandingAreaFilter';
 import LandingConnectionTabs from './LandingConnectionTabs';
 import LandingCitySwitch from './LandingCitySwitch';
-import LandingResultsGrid from './LandingResultsGrid';
 import LandingMapPanel from './LandingMapPanel';
 import LandingPlaybackPanel from './LandingPlaybackPanel';
 import { preloadLandingMapView } from '../../utils/preloadLandingMapView';
@@ -25,6 +25,9 @@ import { lazyWithRetry } from '../../utils/lazyWithRetry';
 // failed keeps throwing the cached rejection forever — one dropped chunk killed the public page for
 // the rest of the visit.
 const MapView = lazyWithRetry(() => preloadLandingMapView(), 'landing-map-view');
+// Lazy like MapView: grid is the mobile/lite default but NOT the desktop default (map is), so the
+// card tree (~CameraThumbnail, codecSupport, viewer-stats badges) should not ride the eager bundle.
+const LandingResultsGrid = lazyWithRetry(() => import('./LandingResultsGrid'), 'landing-results-grid');
 // Lazy so Playback (recordingService + playback tree) stays out of the eager landing bundle; it is only
 // needed when the user switches to playback view mode. LandingPlaybackPanel renders it inside <Suspense>.
 const Playback = lazyWithRetry(() => import('../../pages/Playback'), 'landing-playback');
@@ -298,15 +301,17 @@ export default function CamerasSection({
                         onCameraOpen={onMapCameraOpen}
                     />
                 ) : (
-                    <LandingResultsGrid
-                        cameras={filteredForGrid}
+                    <Suspense fallback={<GridSkeleton items={6} columns={3} SkeletonComponent={CameraCardSkeleton} />}>
+                        <LandingResultsGrid
+                            cameras={filteredForGrid}
                         onCameraClick={onCameraClick}
                         onAddMulti={onAddMulti}
                         multiCameras={multiCameras}
                         isFavorite={isFavorite}
                         onToggleFavorite={onToggleFavorite}
-                        disableHeavyEffects={disableHeavyEffects}
-                    />
+                            disableHeavyEffects={disableHeavyEffects}
+                        />
+                    </Suspense>
                 )}
             </div>
         </section>

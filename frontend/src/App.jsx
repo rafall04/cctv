@@ -21,7 +21,6 @@ import { NetworkStatusBanner } from './components/ui/NetworkStatusBanner';
 import PwaInstallPrompt from './components/PwaInstallPrompt';
 import UpdateAvailableBar from './components/UpdateAvailableBar';
 import LandingPage from './pages/LandingPage';
-import LoginPage from './pages/LoginPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import CustomerRoute from './components/CustomerRoute';
 import lazyWithRetry from './utils/lazyWithRetry';
@@ -30,6 +29,8 @@ import lazyWithRetry from './utils/lazyWithRetry';
 // Halaman jualan: dimuat malas supaya bundel beranda tidak membesar untuk halaman yang
 // hanya dibuka pengunjung yang mengklik tautan dari proposal.
 const SupportPage = lazyWithRetry(() => import('./pages/SupportPage'), 'support-page');
+// Lazy: only /admin/login renders it — ~15KB out of the public landing chunk.
+const LoginPage = lazyWithRetry(() => import('./pages/LoginPage'), 'login-page');
 const AdminLayout = lazyWithRetry(() => import('./layouts/AdminLayout'), 'admin-layout');
 const CameraManagement = lazyWithRetry(() => import('./pages/CameraManagement'), 'camera-management');
 const ImportExport = lazyWithRetry(() => import('./pages/admin/ImportExport'), 'import-export');
@@ -148,7 +149,11 @@ function App() {
                 <Route path="/dukungan" element={
                     <PublicPageRoute><SupportPage /></PublicPageRoute>
                 } />
-                <Route path="/admin/login" element={<LoginPage />} />
+                <Route path="/admin/login" element={
+                    <Suspense fallback={<div className="flex min-h-screen items-center justify-center">Loading...</div>}>
+                        <LoginPage />
+                    </Suspense>
+                } />
                 <Route path="/daftar" element={
                     <PublicPageRoute><RegisterPage /></PublicPageRoute>
                 } />

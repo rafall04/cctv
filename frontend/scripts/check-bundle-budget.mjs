@@ -24,7 +24,7 @@ const DIST = join(fileURLToPath(import.meta.url), '..', '..', 'dist', 'assets');
 // Shrinking a frozen chunk is welcome; growing it past the cap is a failure.
 const FROZEN_CHUNKS = {
     'video-player-': 360_000, // measured 342,776
-    'App-': 302_000,          // measured 287,676
+    'App-': 265_000,          // measured 250,090
     'react-vendor-': 172_000, // measured 163,021
     'map-vendor-': 170_000,   // measured 161,696
     'flv-': 164_000,          // measured 156,371
