@@ -238,9 +238,15 @@
           <div style="height:120px;border-radius:12px;background:#101316;border:1px solid #1c2024;margin-top:12px"></div>
           <div style="height:88px;border-radius:12px;background:#101316;border:1px solid #1c2024;margin-top:12px"></div>
           <div style="height:64px;border-radius:12px;background:#101316;border:1px solid #1c2024;margin-top:12px"></div>
-          <div style="position:relative;aspect-ratio:16/9;max-width:380px;border-radius:12px;overflow:hidden;background:#15181b;margin-top:16px">
-            <img id="boot-lcp-img" alt="" fetchpriority="high" decoding="async"
-                 style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:none" />
+          <div id="boot-lcp-slot" style="position:relative;aspect-ratio:16/9;max-width:380px;border-radius:12px;overflow:hidden;background:#15181b;margin-top:16px">
+            <!--
+              nginx SSI: the backend answers this subrequest with the real first-card
+              <img> markup (src already resolved), so the thumbnail fetch starts
+              with the HTML — not after the cameras JSON. If the backend is down or
+              answers empty, nginx inserts nothing harmful and the script below
+              fills #boot-lcp-slot itself once the prefetch promises resolve.
+            -->
+            <!--# include virtual="/api/public/lcp-card" wait="yes" -->
           </div>
         </div>
       </div>
@@ -306,11 +312,22 @@
             warmed++;
             if (warmed === 1) {
               var lcp = document.getElementById('boot-lcp-img');
+              if (!lcp) {
+                // SSI emitted nothing (backend down / empty pick) — create the img ourselves.
+                var slot = document.getElementById('boot-lcp-slot');
+                if (slot) {
+                  lcp = document.createElement('img');
+                  lcp.id = 'boot-lcp-img';
+                  lcp.setAttribute('fetchpriority', 'high');
+                  lcp.setAttribute('decoding', 'async');
+                  lcp.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover';
+                  slot.appendChild(lcp);
+                }
+              }
               if (lcp) {
                 lcp.onerror = function () { lcp.style.display = 'none'; };
                 lcp.src = url;
                 lcp.alt = (cam.name || 'CCTV') + ' preview';
-                lcp.style.display = 'block';
               }
             }
             var pi = new Image();

@@ -14,11 +14,15 @@ const {
     getPublicAreaCamerasMock,
     getTrendingCamerasMock,
     getPublicDiscoveryMock,
+    getPublicLandingCameraListMock,
+    getAllAreasMock,
 } = vi.hoisted(() => ({
     getPublicAreaBySlugMock: vi.fn(),
     getPublicAreaCamerasMock: vi.fn(),
     getTrendingCamerasMock: vi.fn(),
     getPublicDiscoveryMock: vi.fn(),
+    getPublicLandingCameraListMock: vi.fn(),
+    getAllAreasMock: vi.fn(),
 }));
 
 vi.mock('../services/publicGrowthService.js', () => ({
@@ -28,6 +32,14 @@ vi.mock('../services/publicGrowthService.js', () => ({
     getPublicDiscovery: getPublicDiscoveryMock,
 }));
 
+vi.mock('../services/cameraService.js', () => ({
+    default: { getPublicLandingCameraList: getPublicLandingCameraListMock },
+}));
+
+vi.mock('../services/areaService.js', () => ({
+    default: { getAllAreas: getAllAreasMock },
+}));
+
 describe('publicGrowthRoutes', () => {
     beforeEach(() => {
         vi.resetModules();
@@ -35,6 +47,8 @@ describe('publicGrowthRoutes', () => {
         getPublicAreaCamerasMock.mockReset();
         getTrendingCamerasMock.mockReset();
         getPublicDiscoveryMock.mockReset();
+        getPublicLandingCameraListMock.mockReset();
+        getAllAreasMock.mockReset();
     });
 
     it('serves public area data without auth', async () => {
@@ -100,6 +114,43 @@ describe('publicGrowthRoutes', () => {
         expect(response.statusCode).toBe(200);
         expect(getPublicDiscoveryMock).toHaveBeenCalledWith({ limit: '6' });
         expect(response.json()).toMatchObject({ success: true, data: { live_now: [], popular_areas: [] } });
+        await fastify.close();
+    });
+
+    it('serves the SSI LCP fragment as text/html with the first grid card img', async () => {
+        getPublicLandingCameraListMock.mockReturnValue([
+            {
+                id: 3, name: 'CCTV A', area_name: 'DS DANDER', is_online: 1,
+                thumbnail_path: '/api/thumbnails/3.jpg', thumbnail_updated_at: 't1',
+            },
+        ]);
+        getAllAreasMock.mockReturnValue({ areas: [{ name: 'DS DANDER', show_on_grid_default: 1 }] });
+        const { default: publicGrowthRoutes } = await import('../routes/publicGrowthRoutes.js');
+        const fastify = Fastify();
+        await fastify.register(publicGrowthRoutes, { prefix: '/api/public' });
+
+        const response = await fastify.inject({ method: 'GET', url: '/api/public/lcp-card' });
+
+        expect(response.statusCode).toBe(200);
+        expect(response.headers['content-type']).toMatch(/text\/html/);
+        expect(response.body).toContain('id="boot-lcp-img"');
+        expect(response.body).toContain('src="/api/thumbnails/3.jpg?v=t1"');
+        await fastify.close();
+    });
+
+    it('degrades to an empty 200 fragment when the data source throws', async () => {
+        getPublicLandingCameraListMock.mockImplementation(() => { throw new Error('db down'); });
+        getAllAreasMock.mockReturnValue({ areas: [] });
+        const { default: publicGrowthRoutes } = await import('../routes/publicGrowthRoutes.js');
+        const fastify = Fastify();
+        await fastify.register(publicGrowthRoutes, { prefix: '/api/public' });
+
+        const response = await fastify.inject({ method: 'GET', url: '/api/public/lcp-card' });
+
+        // nginx renders whatever this returns INSIDE the page — an error JSON or a 500
+        // body would leak into the markup, so the route must answer an empty 200.
+        expect(response.statusCode).toBe(200);
+        expect(response.body).toBe('');
         await fastify.close();
     });
 });

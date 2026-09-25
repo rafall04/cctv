@@ -224,6 +224,85 @@ export function slimLandingCamera(camera) {
 }
 
 /*
+ * Default-grid ordering, replicated server-side for the SSI LCP fragment.
+ *
+ * The landing grid's first card under the default state (no search, city 'all',
+ * area 'all', tab 'all') is decided by `gridAreaScopedCameras` in
+ * hooks/public/useLandingCameraFilters.js: cameras belonging to an area flagged
+ * `show_on_grid_default` are grouped in first-occurrence order, each group is
+ * sorted online-first then name-asc and capped at grid_default_camera_limit, and
+ * the scoped heads lead the list. For the SINGLE first pick only the head of the
+ * earliest-occurring flagged area matters — overflow and unscoped cameras can
+ * never precede it. With no flagged areas (or no cameras inside any), the raw
+ * API order (is_tunnel ASC, id ASC) decides.
+ *
+ * Keep the two implementations in sync — a wrong pick still produces a correct
+ * LCP-size image, just for a different camera than the real first card.
+ */
+export function pickFirstGridCamera(cameras, areas) {
+    if (!Array.isArray(cameras) || cameras.length === 0) {
+        return null;
+    }
+    const flagged = new Set();
+    for (const area of areas || []) {
+        if (area?.name && (area.show_on_grid_default === 1 || area.show_on_grid_default === true)) {
+            flagged.add(area.name);
+        }
+    }
+    if (flagged.size === 0) {
+        return cameras[0] || null;
+    }
+    const groups = new Map();
+    for (const camera of cameras) {
+        if (!camera?.area_name || !flagged.has(camera.area_name)) continue;
+        if (!groups.has(camera.area_name)) groups.set(camera.area_name, []);
+        groups.get(camera.area_name).push(camera);
+    }
+    const firstGroup = groups.values().next().value;
+    if (!firstGroup) {
+        return cameras[0] || null;
+    }
+    const head = [...firstGroup].sort((left, right) => {
+        const leftOnline = left?.is_online === 1 || left?.is_online === true ? 1 : 0;
+        const rightOnline = right?.is_online === 1 || right?.is_online === true ? 1 : 0;
+        if (leftOnline !== rightOnline) return rightOnline - leftOnline;
+        return (left?.name || '').localeCompare(right?.name || '');
+    });
+    return head[0] || cameras[0] || null;
+}
+
+function escapeAttr(value) {
+    return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+/*
+ * HTML fragment for the SSI include in index.html's boot shell: the real <img>
+ * markup for the first grid card's thumbnail, baked into the initial bytes so the
+ * browser starts the LCP fetch with the document instead of after JSON boot.
+ * Empty string when nothing imageable exists — the JS fallback (and nginx's
+ * include-error behaviour is to emit nothing harmful) keeps the shell skeleton.
+ *
+ * URL shape mirrors CameraThumbnail: `external_snapshot_url || thumbnail_path`,
+ * with `?v=thumbnail_updated_at` appended only for /api/thumbnails/* paths.
+ */
+export function buildLcpCardFragment(camera) {
+    const thumbPath = camera?.external_snapshot_url || camera?.thumbnail_path;
+    if (!thumbPath) {
+        return '';
+    }
+    let url = String(thumbPath);
+    if (camera.thumbnail_updated_at && url.indexOf('/api/thumbnails/') === 0) {
+        url += (url.indexOf('?') >= 0 ? '&' : '?') + 'v=' + encodeURIComponent(camera.thumbnail_updated_at);
+    }
+    const alt = escapeAttr((camera.name || 'CCTV') + ' preview');
+    return `<img id="boot-lcp-img" src="${escapeAttr(url)}" alt="${alt}" fetchpriority="high" decoding="async" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover" />`;
+}
+
+/*
  * Ingest and routing policy. Distinct from the health fields above because it answers a different
  * question — not "is this camera up" but "how does this backend TALK to it": whether the stream is
  * held open or dialled on demand and for how long, which RTSP transport is used, and which source

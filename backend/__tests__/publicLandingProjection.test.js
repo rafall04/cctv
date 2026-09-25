@@ -8,7 +8,9 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+    buildLcpCardFragment,
     CREDENTIALED_EXTERNAL_URL_FIELDS,
+    pickFirstGridCamera,
     PROXIED_ORIGIN_URL_FIELDS,
     PUBLIC_LANDING_INTERNAL_FIELDS,
     PUBLIC_LANDING_SLIM_FIELDS,
@@ -265,5 +267,78 @@ describe('slimLandingCamera (?summary=1)', () => {
         });
         expect(slim.external_hls_url).toBeUndefined();
         expect(slim.external_stream_url).toBeUndefined();
+    });
+});
+
+describe('pickFirstGridCamera (SSI LCP pick)', () => {
+    const areas = [
+        { name: 'DS DANDER', show_on_grid_default: 1, grid_default_camera_limit: 10 },
+        { name: 'KEDUNGDUNG', show_on_grid_default: 0, grid_default_camera_limit: 12 },
+    ];
+    const cameras = [
+        { id: 1, name: 'X NOAREA', area_name: 'ELSEWHERE', is_online: 1 },
+        { id: 5, name: 'Z OFFLINE', area_name: 'DS DANDER', is_online: 0 },
+        { id: 2, name: 'A ONLINE B', area_name: 'DS DANDER', is_online: 1 },
+        { id: 3, name: 'A ONLINE A', area_name: 'DS DANDER', is_online: 1 },
+        { id: 4, name: 'K1', area_name: 'KEDUNGDUNG', is_online: 1 },
+    ];
+
+    it('picks the online-first/name-asc head of the earliest flagged area', () => {
+        // Mirrors gridAreaScopedCameras: group order = first camera-list occurrence of the
+        // flagged area; head sorted online desc, name asc.
+        expect(pickFirstGridCamera(cameras, areas).id).toBe(3);
+    });
+
+    it('ignores non-flagged areas even if they occur first', () => {
+        const unflaggedOnly = [
+            { id: 9, name: 'K9', area_name: 'KEDUNGDUNG', is_online: 1 },
+        ];
+        expect(pickFirstGridCamera(unflaggedOnly, areas).id).toBe(9); // falls back to raw order
+    });
+
+    it('falls back to raw API order when no flagged area exists', () => {
+        expect(pickFirstGridCamera(cameras, [{ name: 'NONE', show_on_grid_default: 0 }]).id).toBe(1);
+        expect(pickFirstGridCamera(cameras, []).id).toBe(1);
+    });
+
+    it('returns null on an empty camera list', () => {
+        expect(pickFirstGridCamera([], areas)).toBeNull();
+        expect(pickFirstGridCamera(null, areas)).toBeNull();
+    });
+});
+
+describe('buildLcpCardFragment (SSI LCP img)', () => {
+    it('emits a full <img> with ?v= version token for /api/thumbnails paths', () => {
+        const html = buildLcpCardFragment({
+            name: 'CCTV <ALANG>', thumbnail_path: '/api/thumbnails/1168.jpg',
+            thumbnail_updated_at: '2026-09-25 10:00:00', external_snapshot_url: null,
+        });
+        expect(html).toContain('id="boot-lcp-img"');
+        expect(html).toContain('src="/api/thumbnails/1168.jpg?v=2026-09-25%2010%3A00%3A00"');
+        expect(html).toContain('fetchpriority="high"');
+        expect(html).toContain('alt="CCTV &lt;ALANG&gt; preview"');
+        expect(html).not.toContain('display:none');
+    });
+
+    it('prefers external_snapshot_url (no ?v= appended to absolute URLs)', () => {
+        const html = buildLcpCardFragment({
+            name: 'X', external_snapshot_url: 'https://snap.example/x.jpg',
+            thumbnail_path: '/api/thumbnails/9.jpg', thumbnail_updated_at: 't',
+        });
+        expect(html).toContain('src="https://snap.example/x.jpg"');
+        expect(html).not.toContain('?v=');
+    });
+
+    it('returns empty string when the camera has no imageable field', () => {
+        expect(buildLcpCardFragment({ name: 'X' })).toBe('');
+        expect(buildLcpCardFragment(null)).toBe('');
+    });
+
+    it('escapes attribute-breaking characters in name and URL', () => {
+        const html = buildLcpCardFragment({
+            name: 'A"B', thumbnail_path: '/api/thumbnails/1.jpg?x="q"',
+        });
+        expect(html).toContain('alt="A&quot;B preview"');
+        expect(html).toContain('src="/api/thumbnails/1.jpg?x=&quot;q&quot;"');
     });
 });

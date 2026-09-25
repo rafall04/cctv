@@ -12,6 +12,9 @@ import {
     getPublicDiscovery as getPublicDiscoveryData,
     getTrendingCameras,
 } from '../services/publicGrowthService.js';
+import { pickFirstGridCamera, buildLcpCardFragment } from '../services/publicLandingProjection.js';
+import cameraService from '../services/cameraService.js';
+import areaService from '../services/areaService.js';
 
 function sendError(reply, error, fallbackMessage) {
     const statusCode = error.statusCode || 500;
@@ -59,5 +62,24 @@ export async function getPublicDiscovery(request, reply) {
         return reply.send({ success: true, data });
     } catch (error) {
         return sendError(reply, error, 'Internal server error');
+    }
+}
+
+/*
+ * SSI fragment for index.html's boot shell: the real first-grid-card <img> with
+ * src already resolved, so the LCP thumbnail starts downloading with the HTML.
+ * Always answers 200 — an error body would end up rendered INSIDE the page by
+ * nginx's include, so failures degrade to an empty fragment (the inline-JS
+ * fallback still fills the slot later) and get logged, not returned.
+ */
+export async function getPublicLcpCard(request, reply) {
+    reply.type('text/html; charset=utf-8');
+    try {
+        const cameras = cameraService.getPublicLandingCameraList();
+        const { areas } = areaService.getAllAreas({ publicOnly: true });
+        return reply.send(buildLcpCardFragment(pickFirstGridCamera(cameras, areas)));
+    } catch (error) {
+        console.error('LCP card fragment error:', error);
+        return reply.send('');
     }
 }

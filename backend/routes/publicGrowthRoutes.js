@@ -10,6 +10,7 @@ import {
     getPublicArea,
     getPublicAreaCameras,
     getPublicDiscovery,
+    getPublicLcpCard,
     getPublicTrendingCameras,
 } from '../controllers/publicGrowthController.js';
 import { cacheMiddleware } from '../middleware/cacheMiddleware.js';
@@ -38,5 +39,10 @@ export default async function publicGrowthRoutes(fastify) {
     fastify.get('/trending-cameras', {
         preHandler: cacheMiddleware(30000),
         handler: getPublicTrendingCameras,
+    });
+
+    // SSI include target for index.html — text/html fragment, always 200 (see controller).
+    fastify.get('/lcp-card', {
+        handler: getPublicLcpCard,
     });
 }
