@@ -41,19 +41,35 @@ function bootstrap() {
     loadRuntimeConfig().catch((error) => {
         console.warn('Runtime config load failed; using fallback:', error?.message);
     });
-    ReactDOM.createRoot(document.getElementById('root')).render(
-        <React.StrictMode>
-            <Suspense
-                fallback={
-                    <div className="flex min-h-screen items-center justify-center bg-surface-sunken">
-                        <div className="h-6 w-6 animate-spin rounded-full border-2 border-edge border-t-primary" />
-                    </div>
-                }
-            >
-                <AppShell />
-            </Suspense>
-        </React.StrictMode>
-    );
+    /*
+     * Mount on the NEXT frame, not inside this task. createRoot().render() wipes
+     * #root — including the SSI-injected #boot-lcp-img — and under CPU throttling
+     * the eval long-task starves every paint until mount, so the already-decoded
+     * image never reaches a frame and can't be an LCP candidate. A double rAF
+     * yields exactly one post-eval paint (the thumbnail lands in it), then React
+     * takes over. The timeout is the no-frames path (hidden tab / headless): the
+     * page must still boot even when rAF never fires.
+     */
+    let mounted = false;
+    const mount = () => {
+        if (mounted) return;
+        mounted = true;
+        ReactDOM.createRoot(document.getElementById('root')).render(
+            <React.StrictMode>
+                <Suspense
+                    fallback={
+                        <div className="flex min-h-screen items-center justify-center bg-surface-sunken">
+                            <div className="h-6 w-6 animate-spin rounded-full border-2 border-edge border-t-primary" />
+                        </div>
+                    }
+                >
+                    <AppShell />
+                </Suspense>
+            </React.StrictMode>
+        );
+    };
+    requestAnimationFrame(() => requestAnimationFrame(mount));
+    setTimeout(mount, 800);
 }
 
 try {
