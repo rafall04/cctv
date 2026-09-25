@@ -80,70 +80,6 @@
         if (areaMatch) {
           add('areaCameras:' + areaMatch[1], '/api/public/areas/' + areaMatch[1] + '/cameras');
         }
-        /*
-         * Order cameras the way the DEFAULT grid does — flagged-area heads first
-         * (online → name inside each head), else raw API order — then warm the real
-         * first cards and fill the boot-shell <img> (see below #root) with the first
-         * one. The previous version warmed discovery live_now/top_cameras thumbs, but
-         * those strips render no <img> and discovery ordering (viewer_count DESC) is
-         * not grid ordering — the bytes warmed the wrong images entirely.
-         */
-        if (store.cameras) {
-          Promise.all([store.cameras, store.areas]).then(function (res) {
-            var camJson = res[0] || {};
-            var areaJson = res[1] || {};
-            var cameras = Array.isArray(camJson) ? camJson : (camJson.data || []);
-            var areasArr = Array.isArray(areaJson) ? areaJson : (areaJson.data || []);
-            var flagged = {};
-            areasArr.forEach(function (a) {
-              if (a && a.name && (a.show_on_grid_default === 1 || a.show_on_grid_default === true)) flagged[a.name] = true;
-            });
-            var firstArea = null, head = [];
-            if (Object.keys(flagged).length) {
-              var groups = {};
-              for (var i = 0; i < cameras.length; i++) {
-                var c = cameras[i];
-                if (!c || !c.area_name || !flagged[c.area_name]) continue;
-                if (!groups[c.area_name]) { groups[c.area_name] = []; if (!firstArea) firstArea = c.area_name; }
-                groups[c.area_name].push(c);
-              }
-              if (firstArea) {
-                head = groups[firstArea].slice().sort(function (l, r) {
-                  var lo = (l.is_online === 1 || l.is_online === true) ? 1 : 0;
-                  var ro = (r.is_online === 1 || r.is_online === true) ? 1 : 0;
-                  if (lo !== ro) return ro - lo;
-                  return (l.name || '').localeCompare(r.name || '');
-                });
-              }
-            }
-            var ordered = head.concat(cameras);
-            var seen = {};
-            var warmed = 0;
-            for (var j = 0; j < ordered.length && warmed < 4; j++) {
-              var cam = ordered[j];
-              if (!cam || seen[cam.id]) continue;
-              seen[cam.id] = true;
-              var tpath = cam.external_snapshot_url || cam.thumbnail_path;
-              if (!tpath) continue;
-              var url = tpath;
-              if (cam.thumbnail_updated_at && tpath.indexOf('/api/thumbnails/') === 0) {
-                url += (tpath.indexOf('?') >= 0 ? '&' : '?') + 'v=' + encodeURIComponent(cam.thumbnail_updated_at);
-              }
-              warmed++;
-              if (warmed === 1) {
-                var lcp = document.getElementById('boot-lcp-img');
-                if (lcp) {
-                  lcp.onerror = function () { lcp.style.display = 'none'; };
-                  lcp.src = url;
-                  lcp.alt = (cam.name || 'CCTV') + ' preview';
-                  lcp.style.display = 'block';
-                }
-              }
-              var pi = new Image();
-              pi.src = url;
-            }
-          }).catch(function () {});
-        }
         window.__RAFNET_PREFETCH__ = store;
       })();
     </script>
@@ -309,6 +245,80 @@
         </div>
       </div>
     </div>
+    <script>
+      /*
+       * LCP injection — MUST live after the boot-shell markup. The same code used
+       * to run inside the <head> bootstrap, where a fast API response could resolve
+       * before the parser reached <body>: getElementById returned null, so the img
+       * never got a src (only the new Image() prewarm fired — the 4 thumbnail
+       * requests we saw were those, not the boot img). Here the element is
+       * guaranteed parsed; the promises are read from __RAFNET_PREFETCH__.
+       *
+       * Ordering replicates gridAreaScopedCameras for the default state (no search,
+       * area 'all', tab 'all'): flagged-area heads first — online → name inside
+       * each head — else raw API order. This replaced a discovery-based prewarm
+       * that warmed live_now/top_cameras thumbs: those strips render no <img> and
+       * discovery ordering (viewer_count DESC) is not grid ordering.
+       */
+      (function () {
+        var store = window.__RAFNET_PREFETCH__;
+        if (!store || !store.cameras) return;
+        Promise.all([store.cameras, store.areas]).then(function (res) {
+          var camJson = res[0] || {};
+          var areaJson = res[1] || {};
+          var cameras = Array.isArray(camJson) ? camJson : (camJson.data || []);
+          var areasArr = Array.isArray(areaJson) ? areaJson : (areaJson.data || []);
+          var flagged = {};
+          areasArr.forEach(function (a) {
+            if (a && a.name && (a.show_on_grid_default === 1 || a.show_on_grid_default === true)) flagged[a.name] = true;
+          });
+          var firstArea = null, head = [];
+          if (Object.keys(flagged).length) {
+            var groups = {};
+            for (var i = 0; i < cameras.length; i++) {
+              var c = cameras[i];
+              if (!c || !c.area_name || !flagged[c.area_name]) continue;
+              if (!groups[c.area_name]) { groups[c.area_name] = []; if (!firstArea) firstArea = c.area_name; }
+              groups[c.area_name].push(c);
+            }
+            if (firstArea) {
+              head = groups[firstArea].slice().sort(function (l, r) {
+                var lo = (l.is_online === 1 || l.is_online === true) ? 1 : 0;
+                var ro = (r.is_online === 1 || r.is_online === true) ? 1 : 0;
+                if (lo !== ro) return ro - lo;
+                return (l.name || '').localeCompare(r.name || '');
+              });
+            }
+          }
+          var ordered = head.concat(cameras);
+          var seen = {};
+          var warmed = 0;
+          for (var j = 0; j < ordered.length && warmed < 4; j++) {
+            var cam = ordered[j];
+            if (!cam || seen[cam.id]) continue;
+            seen[cam.id] = true;
+            var tpath = cam.external_snapshot_url || cam.thumbnail_path;
+            if (!tpath) continue;
+            var url = tpath;
+            if (cam.thumbnail_updated_at && tpath.indexOf('/api/thumbnails/') === 0) {
+              url += (tpath.indexOf('?') >= 0 ? '&' : '?') + 'v=' + encodeURIComponent(cam.thumbnail_updated_at);
+            }
+            warmed++;
+            if (warmed === 1) {
+              var lcp = document.getElementById('boot-lcp-img');
+              if (lcp) {
+                lcp.onerror = function () { lcp.style.display = 'none'; };
+                lcp.src = url;
+                lcp.alt = (cam.name || 'CCTV') + ' preview';
+                lcp.style.display = 'block';
+              }
+            }
+            var pi = new Image();
+            pi.src = url;
+          }
+        }).catch(function () {});
+      })();
+    </script>
     <script type="module" src="/src/main.jsx"></script>
     
     <!-- Noscript fallback for SEO -->
