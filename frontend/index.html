@@ -80,6 +80,26 @@
         if (areaMatch) {
           add('areaCameras:' + areaMatch[1], '/api/public/areas/' + areaMatch[1] + '/cameras');
         }
+        /*
+         * Prewarm the likely-LCP thumbnails. The first visible camera cards mirror the
+         * discovery ordering, so the moment discovery JSON lands we fire the same
+         * versioned /api/thumbnails/* URLs CameraThumbnail renders — under Slow 4G the
+         * image bytes then arrive inside the JS-boot window instead of after it. Cap at
+         * 4 unique URLs so a stale ordering wastes at most ~100KB.
+         */
+        store.discovery.then(function (json) {
+          var data = json && json.data ? json.data : {};
+          var seen = {};
+          (data.live_now || []).concat(data.top_cameras || []).forEach(function (cam) {
+            if (!cam || seen[cam.id] || !cam.thumbnail_path || cam.thumbnail_path.indexOf('/api/thumbnails/') !== 0) return;
+            seen[cam.id] = true;
+            if (Object.keys(seen).length > 4) return;
+            var url = cam.thumbnail_path;
+            if (cam.thumbnail_updated_at) url += '?v=' + encodeURIComponent(cam.thumbnail_updated_at);
+            var img = new Image();
+            img.src = url;
+          });
+        }).catch(function () {});
         window.__RAFNET_PREFETCH__ = store;
       })();
     </script>
