@@ -137,6 +137,44 @@ describe('configRoutes', () => {
         await fastify.close();
     });
 
+    it('serves /robots.txt with a Sitemap line bound to the request host', async () => {
+        queryMock.mockImplementation(() => []);
+        const { default: configRoutes } = await import('../routes/configRoutes.js');
+        const fastify = Fastify();
+        await fastify.register(configRoutes);
+
+        const response = await fastify.inject({
+            method: 'GET',
+            url: '/robots.txt',
+            headers: { host: 'cctv.raf.my.id', 'x-forwarded-proto': 'https' },
+        });
+
+        expect(response.statusCode).toBe(200);
+        expect(response.headers['content-type']).toContain('text/plain');
+        expect(response.body).toContain('Disallow: /admin/');
+        expect(response.body).toContain('Sitemap: https://cctv.raf.my.id/sitemap.xml');
+
+        await fastify.close();
+    });
+
+    it('sitemap URLs stay https when nginx forwards an empty proto header', async () => {
+        queryMock.mockImplementation(() => []);
+        const { default: configRoutes } = await import('../routes/configRoutes.js');
+        const fastify = Fastify();
+        await fastify.register(configRoutes);
+
+        const response = await fastify.inject({
+            method: 'GET',
+            url: '/sitemap.xml',
+            headers: { host: 'cctv.raf.my.id' },
+        });
+
+        expect(response.body).not.toContain('<loc>http://');
+        expect(response.body).toContain('<loc>https://cctv.raf.my.id/');
+
+        await fastify.close();
+    });
+
     it('sitemap query only includes areas that carry publicly visible cameras', async () => {
         queryMock.mockImplementation(() => []);
         const { buildSitemapXml } = await import('../services/appConfigService.js');

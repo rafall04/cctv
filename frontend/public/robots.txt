@@ -1,7 +1,0 @@
-User-agent: *
-Allow: /
-Disallow: /admin/
-Disallow: /api/
-
-# /sitemap.xml is served dynamically by the backend (it lists the live public
-# area pages) — no static file needs to be kept in sync.
