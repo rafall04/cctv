@@ -13,6 +13,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import userService from '../../services/userService';
 import { authService } from '../../services/authService';
+import TotpSecurityCard from '../../components/TotpSecurityCard';
 
 const cardClass = 'rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900';
 const inputClass = 'w-full rounded-xl border border-gray-300 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-primary dark:border-gray-700 dark:bg-gray-900/50 dark:text-white';
@@ -203,6 +204,11 @@ export default function MyAccount() {
                     {savingPwd ? 'Menyimpan…' : 'Ubah Password'}
                 </button>
             </form>
+
+            {/* 2FA self-service — sama dengan kartu di halaman Security admin */}
+            <div className="lg:col-span-2">
+                <TotpSecurityCard />
+            </div>
 
             {/* Informasi akun */}
             <div className={`${cardClass} lg:col-span-2`}>

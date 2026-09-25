@@ -29,6 +29,12 @@ vi.mock('../../services/adminService', () => ({
     adminService: {
         getSecurityLogs: getSecurityLogsMock,
         getSecurityStats: getSecurityStatsMock,
+    },
+}));
+
+// The 2FA card calls the shared self-service endpoints, not the admin API.
+vi.mock('../../services/userService', () => ({
+    default: {
         getTotpStatus: getTotpStatusMock,
         startTotpSetup: startTotpSetupMock,
         confirmTotpSetup: confirmTotpSetupMock,

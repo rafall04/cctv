@@ -18,6 +18,7 @@ import { logAuthorizationFailure } from '../services/securityAuditLogger.js';
 const CUSTOMER_ALLOWED_PREFIXES = [
     '/api/auth/',          // logout, refresh, verify, csrf
     '/api/users/profile',  // own profile read/update + /profile/password (prefix match)
+    '/api/users/totp',     // own 2FA self-service (status/setup/confirm/disable)
     '/api/customer/',      // the customer portal API
 ];
 

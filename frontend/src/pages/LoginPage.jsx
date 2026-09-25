@@ -690,8 +690,8 @@ export default function LoginPage() {
                         {/* Recovery codes — shown exactly once, right after enrollment. */}
                         {enrollRecoveryCodes && (
                             <div>
-                                <div className="mb-4 flex items-center gap-3 p-4 bg-status-ok/10 border border-status-ok/30 rounded-xl">
-                                    <div className="text-status-ok flex-shrink-0"><Icons.Lock /></div>
+                                <div className="mb-4 flex items-center gap-3 p-4 bg-status-live/10 border border-status-live/30 rounded-xl">
+                                    <div className="text-status-live flex-shrink-0"><Icons.Lock /></div>
                                     <p className="text-sm text-content">
                                         <span className="font-semibold">2FA aktif.</span> Simpan kode pemulihan ini — dipakai bila HP/authenticator hilang. Tidak ditampilkan lagi.
                                     </p>

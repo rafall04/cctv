@@ -1,8 +1,9 @@
 /*
- * Purpose: Admin self-service TOTP management — status, enrollment (setup → confirm),
- *          and disable. Each handler requires an authenticated admin session
- *          (authMiddleware + requireAdmin on the route).
- * Caller: adminRoutes.js under /api/admin/totp/*.
+ * Purpose: Self-service TOTP management — status, enrollment (setup → confirm), and
+ *          disable. Each handler uses request.user.id, so any authenticated role manages
+ *          only their OWN second factor (the session JWT is the credential).
+ * Caller: userRoutes.js under /api/users/totp/* (whitelisted for customers in
+ *         middleware/customerAccessPolicy.js).
  * Deps: totpAuthService.
  * MainFuncs: getTotpStatus, startTotpSetup, confirmTotpSetup, disableTotp.
  */

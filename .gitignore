@@ -68,6 +68,8 @@ backend/data/promos/
 backend/data/affiliate/
 backend/data/branding/
 backend/data/backups/
+# Boot lifecycle journal — written on every server/recorder start (runtime, per-machine).
+backend/data/process-boots.jsonl
 
 # Logs
 logs/

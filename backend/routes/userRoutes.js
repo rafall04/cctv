@@ -11,6 +11,7 @@ import {
     getPasswordPolicyRequirements,
 } from '../controllers/userController.js';
 import { authMiddleware, requireAdmin } from '../middleware/authMiddleware.js';
+import { getTotpStatus, startTotpSetup, confirmTotpSetup, disableTotp } from '../controllers/totpController.js';
 import {
     createUserSchema,
     updateUserSchema,
@@ -19,6 +20,7 @@ import {
     updateProfileSchema,
     userIdParamSchema,
 } from '../middleware/schemaValidators.js';
+import { totpCodeSchema } from '../middleware/totpSchemas.js';
 
 export default async function userRoutes(fastify, options) {
     // Public route - password requirements (no auth needed)
@@ -40,6 +42,14 @@ export default async function userRoutes(fastify, options) {
             schema: changeOwnPasswordSchema,
             handler: changeOwnPassword,
         });
+
+        // TOTP self-service — ANY authenticated user manages their OWN second factor.
+        // (Admins previously had a separate /api/admin/totp/* mount; single path now —
+        //  customerAccessPolicy whitelists this prefix for the customer role.)
+        fastify.get('/totp/status', { handler: getTotpStatus });
+        fastify.post('/totp/setup', { handler: startTotpSetup });
+        fastify.post('/totp/confirm', { schema: totpCodeSchema, handler: confirmTotpSetup });
+        fastify.post('/totp/disable', { schema: totpCodeSchema, handler: disableTotp });
 
         // User management routes (admin role required — not just any logged-in user)
         fastify.get('/', { onRequest: [requireAdmin], handler: getAllUsers });

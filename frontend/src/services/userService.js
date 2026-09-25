@@ -103,6 +103,45 @@ export const userService = {
         }
     },
 
+    // ---- TOTP self-service (own account only — any authenticated role) ----
+    // Same {success, message} contract as the rest of the profile calls so callers can
+    // render errors without try/catch.
+    async getTotpStatus() {
+        try {
+            const response = await apiClient.get('/api/users/totp/status');
+            return response.data;
+        } catch (error) {
+            return { success: false, message: error.response?.data?.message || 'Gagal membaca status 2FA' };
+        }
+    },
+
+    async startTotpSetup() {
+        try {
+            const response = await apiClient.post('/api/users/totp/setup');
+            return response.data;
+        } catch (error) {
+            return { success: false, message: error.response?.data?.message || 'Gagal memulai setup 2FA' };
+        }
+    },
+
+    async confirmTotpSetup(code) {
+        try {
+            const response = await apiClient.post('/api/users/totp/confirm', { code });
+            return response.data;
+        } catch (error) {
+            return { success: false, message: error.response?.data?.message || 'Kode verifikasi salah' };
+        }
+    },
+
+    async disableTotp(code) {
+        try {
+            const response = await apiClient.post('/api/users/totp/disable', { code });
+            return response.data;
+        } catch (error) {
+            return { success: false, message: error.response?.data?.message || 'Kode salah' };
+        }
+    },
+
     // Password policy requirements (public endpoint — no auth)
     async getPasswordRequirements() {
         try {

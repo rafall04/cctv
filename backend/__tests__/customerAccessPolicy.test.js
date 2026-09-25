@@ -55,7 +55,7 @@ describe('customerAccessPolicyHook', () => {
     });
 
     it('allows customers on whitelisted prefixes', async () => {
-        for (const url of ['/api/auth/logout', '/api/users/profile', '/api/users/profile/password', '/api/customer/wallet?limit=10']) {
+        for (const url of ['/api/auth/logout', '/api/users/profile', '/api/users/profile/password', '/api/users/totp/status', '/api/users/totp/disable', '/api/customer/wallet?limit=10']) {
             const reply = makeReply();
             await customerAccessPolicyHook(
                 { authWasRequired: true, user: { role: 'customer' }, url },

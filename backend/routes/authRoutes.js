@@ -2,6 +2,7 @@ import { login, logout, verifyToken, refreshTokens, register, registerInfo, veri
 import { getCsrfToken } from '../controllers/csrfController.js';
 import { fingerprintAuthMiddleware } from '../middleware/fingerprintValidator.js';
 import { loginSchema, refreshTokenSchema, registerSchema } from '../middleware/schemaValidators.js';
+import { totpVerifySchema, totpEnrollSetupSchema, totpEnrollConfirmSchema } from '../middleware/totpSchemas.js';
 
 export default async function authRoutes(fastify, options) {
     // CSRF token endpoint (public - needed before login)
@@ -16,15 +17,18 @@ export default async function authRoutes(fastify, options) {
     // Second-factor exchange (public — the pending JWT is the credential; the code
     // check + per-user lockout live in totpAuthService).
     fastify.post('/totp/verify', {
+        schema: totpVerifySchema,
         handler: verifyTotp,
     });
 
     // Mandatory-admin enrollment (public — the enroll-only JWT is the credential;
     // confirm enables 2FA and issues the session atomically).
     fastify.post('/totp/enroll-setup', {
+        schema: totpEnrollSetupSchema,
         handler: enrollTotpSetup,
     });
     fastify.post('/totp/enroll-confirm', {
+        schema: totpEnrollConfirmSchema,
         handler: enrollTotpConfirm,
     });
 
