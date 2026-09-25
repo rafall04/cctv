@@ -15,32 +15,57 @@ import {
 import { pickFirstGridCamera, buildLcpCardFragment } from '../services/publicLandingProjection.js';
 import cameraService from '../services/cameraService.js';
 import areaService from '../services/areaService.js';
-import { readFileSync } from 'fs';
+import { readFileSync, statSync, existsSync, mkdirSync } from 'fs';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
+const execFileAsync = promisify(execFile);
 const THUMBNAILS_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'data', 'thumbnails');
-const INLINE_THUMB_MAX_BYTES = 40 * 1024;
+const LCP_MINI_DIR = join(THUMBNAILS_DIR, '.lcp');
+const INLINE_THUMB_MAX_BYTES = 8 * 1024;
 
 /*
- * data: URI of the LOCAL thumbnail file, so the SSI fragment carries the image
- * bytes in the HTML itself (paint in the first frame even under CPU throttling —
- * see buildLcpCardFragment). Only /api/thumbnails/{id}.{ext} paths map to files
- * we serve statically; digits-only id means no traversal is possible. External
- * snapshots, missing files, or oversized ones fall back to a plain src URL.
+ * data: URI of a SMALL downscaled thumbnail, so the SSI fragment carries the
+ * image bytes in the HTML itself (paint in the first frame even under CPU
+ * throttling — see buildLcpCardFragment). The 160x90 mini (~3-4KB) is generated
+ * once per source mtime by ffmpeg — the same binary thumbnailService already
+ * uses — and cached at data/thumbnails/.lcp/{id}-{mtime}.jpg; regenerating the
+ * source thumbnail changes its mtime, which mints a fresh mini name, so stale
+ * minis can never outlive their source. Missing files, ffmpeg failures, or
+ * oversized outputs all fall back to a plain src URL.
+ *
+ * Why not the full 320px file (~10KB)? Its base64 attribute (~14KB) finishes
+ * streaming right AT the ~1.9s first-paint window under Slow 4G — the img tag
+ * doesn't exist until the attribute closes, so it missed the frame; later
+ * frames are starved by bundle-eval long tasks until React clears #root.
  */
-function inlineThumbnailDataUri(thumbnailPath) {
-    const match = /^\/api\/thumbnails\/(\d{1,10})\.(jpe?g|png|webp)$/.exec(String(thumbnailPath || ''));
+const miniInflight = new Map();
+async function inlineThumbnailDataUri(thumbnailPath) {
+    const match = /^\/api\/thumbnails\/(\d{1,10})\.jpe?g$/.exec(String(thumbnailPath || ''));
     if (!match) {
         return null;
     }
     try {
-        const bytes = readFileSync(join(THUMBNAILS_DIR, `${match[1]}.${match[2]}`));
-        if (bytes.length > INLINE_THUMB_MAX_BYTES) {
-            return null;
+        const source = join(THUMBNAILS_DIR, `${match[1]}.jpg`);
+        const mini = join(LCP_MINI_DIR, `${match[1]}-${Math.trunc(statSync(source).mtimeMs)}.jpg`);
+        if (!existsSync(mini)) {
+            if (!miniInflight.has(mini)) {
+                miniInflight.set(mini, (async () => {
+                    mkdirSync(LCP_MINI_DIR, { recursive: true });
+                    await execFileAsync('ffmpeg', [
+                        '-y', '-loglevel', 'error', '-i', source,
+                        '-vf', 'scale=160:90', '-q:v', '6', '-f', 'image2', mini,
+                    ], { timeout: 8000 });
+                })().finally(() => miniInflight.delete(mini)));
+            }
+            await miniInflight.get(mini);
         }
-        const mime = match[2] === 'jpg' ? 'jpeg' : match[2];
-        return `data:image/${mime};base64,${bytes.toString('base64')}`;
+        const bytes = readFileSync(mini);
+        return bytes.length <= INLINE_THUMB_MAX_BYTES
+            ? `data:image/jpeg;base64,${bytes.toString('base64')}`
+            : null;
     } catch {
         return null;
     }
@@ -111,7 +136,7 @@ export async function getPublicLcpCard(request, reply) {
         // Inline only when the fragment's effective src IS the local thumbnail —
         // an external snapshot is the card's preferred image and can't be inlined.
         const inlineDataUri = camera && !camera.external_snapshot_url
-            ? inlineThumbnailDataUri(camera.thumbnail_path)
+            ? await inlineThumbnailDataUri(camera.thumbnail_path)
             : null;
         return reply.send(buildLcpCardFragment(camera, { inlineDataUri }));
     } catch (error) {
