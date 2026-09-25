@@ -1,12 +1,23 @@
 /*
 Purpose: Verify provider-specific proxy glue — Malang Referer/Cookie injection, session minting + 403 re-mint retry, and the Gresik on-demand start URL.
 Caller: Vitest backend suite.
-Deps: vitest; module-under-test with global fetch stubbed (no real network).
+Deps: vitest; node:https mocked (session minting), no real network.
 MainFuncs: tests for buildExternalStartUrl, attachProviderInterceptors, resetExternalProviderForTests.
 SideEffects: None.
 */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const { httpsRequestMock } = vi.hoisted(() => ({ httpsRequestMock: vi.fn() }));
+
+vi.mock('node:https', async (importOriginal) => ({
+    ...(await importOriginal()),
+    default: {
+        ...(await importOriginal()).default,
+        request: httpsRequestMock,
+    },
+}));
+
 import {
     buildExternalStartUrl,
     attachProviderInterceptors,
@@ -15,6 +26,21 @@ import {
 
 const MALANG_M3U8 = 'https://cctv.malangkota.go.id/cctv-stream/streams/abc123.m3u8';
 const MALANG_SEG = 'https://cctv.malangkota.go.id/cctv-stream/streams/abc123_0p001.ts';
+
+function stubMint(cookies = ['NANCY_TOKEN_Q=qa; Path=/', 'NANCY_TOKEN_W=wb; Path=/']) {
+    httpsRequestMock.mockImplementation((url, opts, cb) => {
+        const res = {
+            headers: { 'set-cookie': cookies },
+            resume() {},
+        };
+        queueMicrotask(() => cb(res));
+        return {
+            on() {},
+            end() {},
+            destroy() {},
+        };
+    });
+}
 
 function makeAxiosStub() {
     // Minimal axios-shaped double: runs request interceptors, "hits the
@@ -39,14 +65,17 @@ function makeAxiosStub() {
     return stub;
 }
 
-beforeEach(() => resetExternalProviderForTests());
+beforeEach(() => {
+    resetExternalProviderForTests();
+    httpsRequestMock.mockReset();
+});
 
 describe('buildExternalStartUrl', () => {
     it('emits the provider start endpoint for gresikkab profiles', () => {
         expect(buildExternalStartUrl({ source_profile: 'gresikkab:584' }))
             .toBe('https://cctvkanjeng.gresikkab.go.id/api/v1/public/cctv/584/start');
-        expect(buildExternalStartUrl({ source_profile: 'gresikkab:abc-DEF_123' }))
-            .toBe('https://cctvkanjeng.gresikkab.go.id/api/v1/public/cctv/abc-DEF_123/start');
+        expect(buildExternalStartUrl({ source_profile: 'gresikkab:de05c73a-459e-4e56-9bdf-f1d3245a5d56' }))
+            .toBe('https://cctvkanjeng.gresikkab.go.id/api/v1/public/cctv/de05c73a-459e-4e56-9bdf-f1d3245a5d56/start');
     });
 
     it('returns null when there is no provider id to start', () => {
@@ -61,14 +90,7 @@ describe('buildExternalStartUrl', () => {
 });
 
 describe('attachProviderInterceptors — malangkota session', () => {
-    beforeEach(() => {
-        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-            ok: true,
-            // real undici responses expose one entry per Set-Cookie header
-            headers: { getSetCookie: () => ['NANCY_TOKEN_Q=qa; Path=/', 'NANCY_TOKEN_W=wb; Path=/'] },
-        }));
-    });
-    afterEach(() => vi.unstubAllGlobals());
+    beforeEach(() => stubMint());
 
     it('injects Referer + freshly-minted Cookie on playlist and segment requests', async () => {
         const http = makeAxiosStub();
@@ -78,11 +100,10 @@ describe('attachProviderInterceptors — malangkota session', () => {
         await http.request({ url: MALANG_SEG, method: 'get', responseType: 'arraybuffer' });
         expect(res.status).toBe(200);
         // session minted once via the provider page, then cached for the segment
-        expect(fetch).toHaveBeenCalledTimes(1);
-        expect(fetch).toHaveBeenCalledWith(
-            'https://cctv.malangkota.go.id/sebaran-cctv',
-            expect.objectContaining({ signal: expect.any(AbortSignal) }),
-        );
+        expect(httpsRequestMock).toHaveBeenCalledTimes(1);
+        expect(httpsRequestMock.mock.calls[0][0]).toBe('https://cctv.malangkota.go.id/sebaran-cctv');
+        // provider's broken cert chain requires the insecure mint
+        expect(httpsRequestMock.mock.calls[0][1].rejectUnauthorized).toBe(false);
         const sent = res.config.headers;
         expect(sent.Referer).toBe('https://cctv.malangkota.go.id/');
         expect(sent.Cookie).toContain('NANCY_TOKEN_Q=qa');
@@ -95,7 +116,7 @@ describe('attachProviderInterceptors — malangkota session', () => {
         http.responses.push({ status: 403, data: 'forbidden' }, { status: 200, data: '#EXTM3U' });
         const res = await http.get(MALANG_M3U8);
         expect(res.status).toBe(200);
-        expect(fetch).toHaveBeenCalledTimes(2); // initial mint + forced re-mint
+        expect(httpsRequestMock).toHaveBeenCalledTimes(2); // initial mint + forced re-mint
     });
 
     it('passes a persistent 403 through instead of looping', async () => {
@@ -104,22 +125,19 @@ describe('attachProviderInterceptors — malangkota session', () => {
         http.responses.push({ status: 403 }, { status: 403 });
         const res = await http.get(MALANG_M3U8);
         expect(res.status).toBe(403);
-        expect(fetch).toHaveBeenCalledTimes(2);
+        expect(httpsRequestMock).toHaveBeenCalledTimes(2);
     });
 });
 
 describe('attachProviderInterceptors — passthrough + guards', () => {
-    afterEach(() => vi.unstubAllGlobals());
-
     it('never mints sessions or adds headers for unregistered hosts', async () => {
-        vi.stubGlobal('fetch', vi.fn());
         const http = makeAxiosStub();
         attachProviderInterceptors(http);
         http.responses.push({ status: 200 });
         const res = await http.get('https://cctvjss.jogjakota.go.id/atcs/x.stream/playlist.m3u8');
         expect(res.config.headers?.Cookie).toBeUndefined();
         expect(res.config.headers?.Referer).toBeUndefined();
-        expect(fetch).not.toHaveBeenCalled();
+        expect(httpsRequestMock).not.toHaveBeenCalled();
     });
 
     it('survives axios doubles that lack interceptors (injected test clients)', () => {

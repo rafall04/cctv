@@ -19,15 +19,21 @@
  * SideEffects: in-memory cookie jar per provider host; upstream page fetches.
  */
 
+import https from 'node:https';
+
 // ---- provider registry -----------------------------------------------------
 // Keyed by URL hostname. `sessionUrl` is a page that mints the cookies the
-// stream endpoints demand; `headers` are the static extras sent upstream.
+// stream endpoints demand; `referer` is the Referer those endpoints check.
+// `insecureTls`: the origin serves an incomplete cert chain that browsers fix
+// via AIA but Node cannot verify — pair with external_tls_mode='insecure' on
+// the camera row so axios and this session mint agree.
 const PROVIDERS = [
     {
         id: 'malangkota',
         host: 'cctv.malangkota.go.id',
         sessionUrl: 'https://cctv.malangkota.go.id/sebaran-cctv',
         referer: 'https://cctv.malangkota.go.id/',
+        insecureTls: true,
     },
 ];
 
@@ -48,18 +54,29 @@ function providerForUrl(targetUrl) {
     }
 }
 
-async function mintSession(provider) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), SESSION_FETCH_TIMEOUT_MS);
-    try {
-        const res = await fetch(provider.sessionUrl, {
-            signal: controller.signal,
-            redirect: 'follow',
+function fetchSetCookies(url, { insecureTls = false } = {}) {
+    return new Promise((resolve, reject) => {
+        const req = https.request(url, {
+            method: 'GET',
+            agent: false,
+            timeout: SESSION_FETCH_TIMEOUT_MS,
+            rejectUnauthorized: !insecureTls,
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             },
+        }, (res) => {
+            res.resume(); // drain — only the Set-Cookie headers matter
+            resolve(res.headers['set-cookie'] || []);
         });
-        const setCookies = res.headers.getSetCookie?.() || [];
+        req.on('timeout', () => req.destroy(new Error('session fetch timeout')));
+        req.on('error', reject);
+        req.end();
+    });
+}
+
+async function mintSession(provider) {
+    try {
+        const setCookies = await fetchSetCookies(provider.sessionUrl, provider);
         const cookieHeader = setCookies
             .map((c) => String(c).split(';')[0])
             .filter(Boolean)
@@ -68,8 +85,6 @@ async function mintSession(provider) {
     } catch (error) {
         console.error(`[ExternalProvider] session mint failed for ${provider.host}:`, error.message);
         return null;
-    } finally {
-        clearTimeout(timer);
     }
 }
 
