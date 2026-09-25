@@ -19,6 +19,7 @@ import { redactUrlCredentials } from '../utils/logRedaction.js';
 import { resolveInternalIngestPolicy } from '../utils/internalIngestPolicy.js';
 import { buildFfmpegRtspInputArgs, resolveInternalRtspTransport } from '../utils/internalRtspTransportPolicy.js';
 import { normalizeThumbnailStrategy } from '../utils/thumbnailStrategyPolicy.js';
+import { buildProviderRequestHeaders, providerSupportsSession } from './externalProviderSupport.js';
 import { parseUtcSql } from './timeService.js';
 
 const execAsync = promisify(exec);
@@ -130,7 +131,9 @@ class ThumbnailService {
      * pm2 logs every time a Jombang camera failed to yield a frame.
      */
     sanitizeErrorMessage(message = '') {
-        return redactUrlCredentials(String(message));
+        // execFile errors echo the whole argv — provider cookies ride in -headers.
+        return redactUrlCredentials(String(message))
+            .replace(/Cookie:[^\r\n'"]*/g, 'Cookie: [redacted]');
     }
 
     getThumbnailAgeMs(camera) {
@@ -223,7 +226,7 @@ class ThumbnailService {
             .slice(0, THUMBNAIL_MAX_PER_RUN);
     }
 
-    buildFfmpegInputArgs(sourceUrl, externalTlsMode = 'strict', rtspTransport = 'tcp') {
+    buildFfmpegInputArgs(sourceUrl, externalTlsMode = 'strict', rtspTransport = 'tcp', requestHeaders = null) {
         const args = [];
         const normalizedTlsMode = this.normalizeExternalTlsMode(externalTlsMode);
         const isHttps = typeof sourceUrl === 'string' && sourceUrl.startsWith('https://');
@@ -250,6 +253,14 @@ class ThumbnailService {
             // decode a LOCAL recording into a public thumbnail. http/https/tls cover HLS and
             // snapshots; crypto covers AES-128 segments. No file — that is the point.
             args.push('-protocol_whitelist', 'http,https,tcp,tls,crypto');
+
+            // Session-gated providers (e.g. Malang) 403 every request without
+            // their Referer+Cookie — ffmpeg's -headers applies to the playlist
+            // AND every segment fetch.
+            const headerPairs = Object.entries(requestHeaders || {});
+            if (headerPairs.length > 0 && !isRtsp) {
+                args.push('-headers', headerPairs.map(([k, v]) => `${k}: ${v}`).join('\r\n') + '\r\n');
+            }
         }
 
         args.push('-i', sourceUrl);
@@ -305,7 +316,12 @@ class ThumbnailService {
 
         if (deliveryType === 'external_hls') {
             if (externalStreamUrl.startsWith('http://') || externalStreamUrl.startsWith('https://')) {
-                return [{ type: 'external_hls', sourceUrl: externalStreamUrl, externalTlsMode }];
+                return [{
+                    type: 'external_hls',
+                    sourceUrl: externalStreamUrl,
+                    externalTlsMode,
+                    providerSession: providerSupportsSession(externalStreamUrl),
+                }];
             }
 
             return [{ type: 'unavailable', reason: 'missing_external_hls_url' }];
@@ -600,9 +616,12 @@ class ThumbnailService {
         const tempPath = join(THUMBNAIL_DIR, `${cameraId}_temp.jpg`);
 
         try {
+            const providerHeaders = strategy.providerSession
+                ? await buildProviderRequestHeaders(strategy.sourceUrl)
+                : null;
             const ffmpegArgs = [
                 '-loglevel', 'error',
-                ...this.buildFfmpegInputArgs(strategy.sourceUrl, strategy.externalTlsMode, strategy.rtspTransport),
+                ...this.buildFfmpegInputArgs(strategy.sourceUrl, strategy.externalTlsMode, strategy.rtspTransport, providerHeaders),
                 '-vframes', '1',
                 '-vf', 'scale=320:180:force_original_aspect_ratio=decrease,pad=320:180:(ow-iw)/2:(oh-ih)/2',
                 '-q:v', '8',

@@ -142,6 +142,25 @@ export function attachProviderInterceptors(httpClient) {
     return httpClient;
 }
 
+/**
+ * Non-axios consumers (e.g. ffmpeg thumbnail capture) need the same session
+ * headers the interceptors inject. providerSupportsSession() is the sync probe;
+ * buildProviderRequestHeaders() mints/caches the cookie and returns the header
+ * map — null for unregistered hosts.
+ */
+export function providerSupportsSession(targetUrl) {
+    return Boolean(providerForUrl(targetUrl));
+}
+
+export async function buildProviderRequestHeaders(targetUrl) {
+    const provider = providerForUrl(targetUrl);
+    if (!provider) return null;
+    const cookie = await getSessionCookie(provider);
+    const headers = { Referer: provider.referer };
+    if (cookie) headers.Cookie = cookie;
+    return headers;
+}
+
 // ---- on-demand stream bootstrap (direct browser path) ----------------------
 
 /**

@@ -17,9 +17,19 @@ const copyFileSyncMock = vi.fn();
 const executeMock = vi.fn();
 const queryMock = vi.fn();
 
+const { httpsRequestMock } = vi.hoisted(() => ({ httpsRequestMock: vi.fn() }));
+
 vi.mock('child_process', () => ({
     exec: execMock,
     execFile: execFileMock,
+}));
+
+vi.mock('node:https', async (importOriginal) => ({
+    ...(await importOriginal()),
+    default: {
+        ...(await importOriginal()).default,
+        request: httpsRequestMock,
+    },
 }));
 
 vi.mock('fs', () => ({
@@ -85,6 +95,63 @@ describe('thumbnailService external thumbnails', () => {
             'UPDATE cameras SET thumbnail_path = ?, thumbnail_updated_at = CURRENT_TIMESTAMP WHERE id = ?',
             ['/api/thumbnails/18.jpg', 18]
         );
+    });
+
+    it('attaches provider Referer+Cookie headers for session-gated external HLS (Malang)', async () => {
+        httpsRequestMock.mockImplementation((url, opts, cb) => {
+            queueMicrotask(() => cb({
+                headers: { 'set-cookie': ['NANCY_TOKEN_Q=qa; Path=/'] },
+                resume() {},
+            }));
+            return { on() {}, end() {}, destroy() {} };
+        });
+
+        const { default: thumbnailService } = await import('../services/thumbnailService.js');
+
+        const result = await thumbnailService.generateSingle(
+            1500,
+            null,
+            'external',
+            'https://cctv.malangkota.go.id/cctv-stream/streams/abc123.m3u8',
+            'external_hls'
+        );
+
+        expect(result).toEqual({ success: true, source: 'external_hls' });
+        const [binary, args] = execFileMock.mock.calls[0];
+        expect(binary).toBe('ffmpeg');
+        const headersIdx = args.indexOf('-headers');
+        expect(headersIdx).toBeGreaterThan(-1);
+        expect(headersIdx).toBeLessThan(args.indexOf('-i'));
+        expect(args[headersIdx + 1]).toContain('Referer: https://cctv.malangkota.go.id/');
+        expect(args[headersIdx + 1]).toContain('Cookie: NANCY_TOKEN_Q=qa');
+    });
+
+    it('does not add -headers for unregistered external HLS hosts', async () => {
+        const { default: thumbnailService } = await import('../services/thumbnailService.js');
+
+        await thumbnailService.generateSingle(
+            18,
+            null,
+            'external',
+            'https://cctvkanjeng.gresikkab.go.id/hls/x/index.m3u8',
+            'external_hls'
+        );
+
+        const [, args] = execFileMock.mock.calls[0];
+        expect(args).not.toContain('-headers');
+        expect(httpsRequestMock).not.toHaveBeenCalled();
+    });
+
+    it('redacts Cookie header values from thumbnail error messages', async () => {
+        const { default: thumbnailService } = await import('../services/thumbnailService.js');
+
+        const cleaned = thumbnailService.sanitizeErrorMessage(
+            "Command failed: ffmpeg -headers 'Referer: https://x/\r\nCookie: NANCY_TOKEN_Q=secret\r\n' -i https://x/m.m3u8"
+        );
+
+        expect(cleaned).not.toContain('secret');
+        expect(cleaned).not.toContain('NANCY_TOKEN_Q');
+        expect(cleaned).toContain('Cookie: [redacted]');
     });
 
     it('uses RTSP-compatible timeout args without rw_timeout for internal RTSP thumbnails', async () => {

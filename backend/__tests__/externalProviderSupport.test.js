@@ -21,6 +21,8 @@ vi.mock('node:https', async (importOriginal) => ({
 import {
     buildExternalStartUrl,
     attachProviderInterceptors,
+    buildProviderRequestHeaders,
+    providerSupportsSession,
     resetExternalProviderForTests,
 } from '../services/externalProviderSupport.js';
 
@@ -126,6 +128,28 @@ describe('attachProviderInterceptors — malangkota session', () => {
         const res = await http.get(MALANG_M3U8);
         expect(res.status).toBe(403);
         expect(httpsRequestMock).toHaveBeenCalledTimes(2);
+    });
+});
+
+describe('buildProviderRequestHeaders — non-axios consumers (ffmpeg thumbnails)', () => {
+    beforeEach(() => stubMint());
+
+    it('returns Referer + minted Cookie for a provider host', async () => {
+        const headers = await buildProviderRequestHeaders(MALANG_M3U8);
+        expect(headers.Referer).toBe('https://cctv.malangkota.go.id/');
+        expect(headers.Cookie).toContain('NANCY_TOKEN_Q=qa');
+        expect(httpsRequestMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns null for unregistered hosts without minting', async () => {
+        expect(await buildProviderRequestHeaders('https://cctvkanjeng.gresikkab.go.id/hls/x/index.m3u8')).toBeNull();
+        expect(httpsRequestMock).not.toHaveBeenCalled();
+    });
+
+    it('providerSupportsSession flags provider hosts synchronously', () => {
+        expect(providerSupportsSession(MALANG_M3U8)).toBe(true);
+        expect(providerSupportsSession('https://cctvjss.jogjakota.go.id/x.m3u8')).toBe(false);
+        expect(providerSupportsSession('not a url')).toBe(false);
     });
 });
 
