@@ -158,8 +158,10 @@ export function useLandingCameraFilters(cameras, areas, favorites, viewMode, onC
         }
 
         const grouped = new Map();
+        const unscoped = [];
         areaFilteredCameras.forEach((camera) => {
             if (!camera?.area_name || !defaultGridAreaConfigs.has(camera.area_name)) {
+                unscoped.push(camera);
                 return;
             }
             if (!grouped.has(camera.area_name)) {
@@ -168,7 +170,11 @@ export function useLandingCameraFilters(cameras, areas, favorites, viewMode, onC
             grouped.get(camera.area_name).push(camera);
         });
 
+        // The per-area limit curates the *head* of the default grid only —
+        // overflow cameras (and cameras in non-default areas) follow it so the
+        // "Tampilkan lagi" pagination can eventually reach every camera.
         const scoped = [];
+        const overflow = [];
         grouped.forEach((areaCameras, areaName) => {
             const { limit } = defaultGridAreaConfigs.get(areaName) || {};
             const sortedAreaCameras = [...areaCameras].sort((left, right) => {
@@ -181,14 +187,12 @@ export function useLandingCameraFilters(cameras, areas, favorites, viewMode, onC
                 return (left?.name || '').localeCompare(right?.name || '');
             });
 
-            if (limit && limit > 0) {
-                scoped.push(...sortedAreaCameras.slice(0, limit));
-            } else {
-                scoped.push(...sortedAreaCameras);
-            }
+            const headCount = limit && limit > 0 ? limit : sortedAreaCameras.length;
+            scoped.push(...sortedAreaCameras.slice(0, headCount));
+            overflow.push(...sortedAreaCameras.slice(headCount));
         });
 
-        return scoped;
+        return [...scoped, ...overflow, ...unscoped];
     }, [areaFilteredCameras, defaultGridAreaConfigs, selectedArea, viewMode]);
 
     const filteredForGrid = useMemo(() => {

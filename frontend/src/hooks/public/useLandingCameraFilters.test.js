@@ -12,8 +12,8 @@ import { createElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { buildLandingCameraSearchIndex, normalizeSearchText, useLandingCameraFilters } from './useLandingCameraFilters';
 
-function FilterProbe({ cameras, favorites }) {
-    const filters = useLandingCameraFilters(cameras, [], favorites, 'grid', vi.fn());
+function FilterProbe({ cameras, areas = [], favorites }) {
+    const filters = useLandingCameraFilters(cameras, areas, favorites, 'grid', vi.fn());
 
     return createElement(
         'div',
@@ -114,5 +114,24 @@ describe('landing camera filter search index', () => {
 
         expect(screen.getByTestId('selected-city').textContent).toBe('bojonegoro');
         expect(screen.getByTestId('filtered-ids').textContent).toBe('3,4');
+    });
+
+    it('keeps the default-grid curated head first but lets load-more reach every camera', () => {
+        render(createElement(FilterProbe, {
+            cameras: [
+                { id: 1, name: 'X Alpha', area_name: 'KAB X' },
+                { id: 2, name: 'X Bravo', area_name: 'KAB X' },
+                { id: 3, name: 'X Charlie', area_name: 'KAB X' },
+                { id: 4, name: 'Y Solo', area_name: 'KAB Y' },
+            ],
+            areas: [
+                { name: 'KAB X', show_on_grid_default: 1, grid_default_camera_limit: 2 },
+            ],
+            favorites: [],
+        }));
+
+        // Curated head (limit 2 per flagged area) leads; overflow and
+        // non-default areas follow so "Tampilkan lagi" eventually shows all.
+        expect(screen.getByTestId('filtered-ids').textContent).toBe('1,2,3,4');
     });
 });

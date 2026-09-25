@@ -87,12 +87,11 @@ describe('LandingCamerasSection controls', () => {
         expect(screen.queryByText('Gate')).toBeNull();
     });
 
-    it('grid default hanya memuat area yang diizinkan sampai user memilih area lain', () => {
+    it('grid default menaruh head terkurasi dulu lalu sisa kamera agar load-more menjangkau semua', () => {
         render(<LandingCamerasSection {...commonProps} viewMode="grid" />);
 
-        expect(screen.getByText('results-grid:Gate,Lobby')).toBeTruthy();
-        expect(screen.queryByText(/Square/)).toBeNull();
-        expect(screen.queryByText(/Market/)).toBeNull();
+        // Dander head (limit 2) = Gate,Lobby; overflow Market; Baureno (non-default) last.
+        expect(screen.getByText('results-grid:Gate,Lobby,Market,Square')).toBeTruthy();
 
         fireEvent.change(screen.getByRole('combobox'), {
             target: { value: 'Baureno' },
