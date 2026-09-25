@@ -239,7 +239,6 @@ const SaweriaSupport = memo(function SaweriaSupport() {
                                     type="button"
                                     onClick={() => setShowModal(true)}
                                     className="flex items-center gap-2 text-left"
-                                    aria-label="Selengkapnya tentang dukungan"
                                 >
                                     <CoffeeIcon />
                                     <span className="text-white font-bold text-sm">Dukung Kami</span>

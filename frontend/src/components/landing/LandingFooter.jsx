@@ -25,7 +25,7 @@ export default function Footer({ saweriaEnabled, saweriaLink, branding }) {
                             <div className="flex h-8 w-8 items-center justify-center rounded-control bg-primary text-onprimary">
                                 <span className="text-sm font-bold">{branding.logo_text}</span>
                             </div>
-                            <span className="font-bold text-primary-600 dark:text-primary-400">{branding.company_name}</span>
+                            <span className="font-bold text-content">{branding.company_name}</span>
                         </div>
                     </div>
 
@@ -138,7 +138,7 @@ export default function Footer({ saweriaEnabled, saweriaLink, branding }) {
                 <div className="mb-4 text-center">
                     <Link
                         to="/dukungan"
-                        className="text-sm font-medium text-primary-600 underline-offset-2 hover:underline dark:text-primary-400"
+                        className="text-sm font-medium text-content underline underline-offset-2 hover:text-content-muted"
                     >
                         Jadi sponsor CCTV publik
                     </Link>

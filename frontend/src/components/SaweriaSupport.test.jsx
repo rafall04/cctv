@@ -120,7 +120,7 @@ describe('SaweriaSupport floating layout', () => {
     /* Backdrop click was the only quick exit, so the ask was mouse-only to escape. */
     it('opens the ask as a real dialog that Escape closes', async () => {
         await renderAndPeek();
-        fireEvent.click(screen.getByRole('button', { name: 'Selengkapnya tentang dukungan' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Dukung Kami' }));
 
         const dialog = screen.getByRole('dialog');
         expect(dialog.getAttribute('aria-modal')).toBe('true');

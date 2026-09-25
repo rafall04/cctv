@@ -1,0 +1,16 @@
+# RAF NET CCTV
+
+> Public CCTV streaming hub — watch community and published subscriber cameras live,
+> browse cameras by area, and replay public archive footage.
+
+## Pages
+
+- [Beranda](https://cctv.raf.my.id/): peta dan grid semua kamera publik yang sedang live
+- [Dukungan](https://cctv.raf.my.id/dukungan): cara mendukung dan menjadi sponsor
+- [Sewa CCTV](https://cctv.raf.my.id/sewa): paket sewa kamera untuk pemilik lokasi
+- [Daftar](https://cctv.raf.my.id/daftar): registrasi akun customer
+
+## Notes
+
+- Kamera publik hanya mencakup kamera komunitas dan kamera subscriber yang dipublikasikan.
+- Arsip replay publik terbatas pada kamera komunitas.

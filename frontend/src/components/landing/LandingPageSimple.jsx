@@ -151,7 +151,7 @@ function SimpleFooter({ branding, saweriaEnabled, saweriaLink }) {
                             <div className="flex h-7 w-7 items-center justify-center rounded-control bg-primary text-onprimary">
                                 <span className="text-xs font-bold">{branding.logo_text}</span>
                             </div>
-                            <span className="text-sm font-bold text-primary-600 dark:text-primary-400">{branding.company_name}</span>
+                            <span className="text-sm font-bold text-content">{branding.company_name}</span>
                         </div>
 
                         {/* Operational mono-stat cluster — echoes the Full footer's statistik board in a
@@ -284,19 +284,25 @@ function SimpleStatusOverview({ disableHeavyEffects = false }) {
                     </div>
                 )}
 
-                {cities.length > 0 && (
-                    <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-                        <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-content-subtle">Cakupan</span>
-                        {cities.slice(0, 3).map((city) => (
-                            <span key={city.key} className="rounded-full border border-edge px-2 py-0.5 font-mono text-[10px] text-content-muted">
-                                {city.label} <span className="text-content-subtle">{city.count}</span>
-                            </span>
-                        ))}
-                        {cities.length > 3 && (
-                            <span className="font-mono text-[10px] text-content-subtle">+{cities.length - 3} kota</span>
-                        )}
-                    </div>
-                )}
+                {/* Always rendered (visibility-hidden when the payload has no cities) — the
+                    row appearing after data lands used to shove everything below it ~30px. */}
+                <div className={`mt-2.5 flex flex-wrap items-center gap-1.5 ${!unknown && cities.length === 0 ? 'invisible' : ''}`}>
+                    <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-content-subtle">Cakupan</span>
+                    {unknown ? (
+                        <span className="rounded-full border border-edge px-2 py-0.5 font-mono text-[10px] text-content-subtle">…</span>
+                    ) : (
+                        <>
+                            {cities.slice(0, 3).map((city) => (
+                                <span key={city.key} className="rounded-full border border-edge px-2 py-0.5 font-mono text-[10px] text-content-muted">
+                                    {city.label} <span className="text-content-subtle">{city.count}</span>
+                                </span>
+                            ))}
+                            {cities.length > 3 && (
+                                <span className="font-mono text-[10px] text-content-subtle">+{cities.length - 3} kota</span>
+                            )}
+                        </>
+                    )}
+                </div>
             </section>
         </div>
     );
