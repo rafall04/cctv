@@ -40,6 +40,7 @@ import {
     resolveHlsViewerUser,
 } from '../services/hlsProxyService.js';
 import { config } from '../config/config.js';
+import { attachProviderInterceptors } from './externalProviderSupport.js';
 
 const DEFAULT_TIMEOUT_MS = 30000;
 // Whitelist for the (decoded) path portion of an opaque `/external-segment`
@@ -151,11 +152,8 @@ function lookupExternalCamera(cameraId) {
  * rather than silently bypassing the admin's choice.
  */
 function isCameraProxyable(camera) {
-    if (!camera) return false;
-    if (camera.stream_source !== 'external') return false;
-    if (!camera.external_hls_url) return false;
-    if (camera.external_use_proxy === 0 || camera.external_use_proxy === false) return false;
-    return true;
+    return !!(camera && camera.stream_source === 'external' && camera.external_hls_url
+        && camera.external_use_proxy !== 0 && camera.external_use_proxy !== false);
 }
 
 /**
@@ -377,9 +375,9 @@ export function resolveSegmentTargetUrl(camera, rawFilename, allowOptions) {
 
 function pickHttpClient({ tlsMode, baseClient, timeout }) {
     if (tlsMode !== 'insecure') return baseClient;
-    return createHlsHttpClient(timeout, {
+    return attachProviderInterceptors(createHlsHttpClient(timeout, {
         httpsAgent: new https.Agent({ rejectUnauthorized: false }),
-    });
+    }));
 }
 
 // HLS playlist content type — used to distinguish a small frequently-
@@ -444,7 +442,7 @@ export async function registerExternalStreamProxyRoutes(fastify, options = {}) {
     // options to assert hit/miss counts cleanly.
     const playlistCache = options.playlistCache || createPlaylistCache();
     const segmentCache = options.segmentCache || createSegmentCache();
-    const baseClient = options.httpClient || createHlsHttpClient(timeout);
+    const baseClient = attachProviderInterceptors(options.httpClient || createHlsHttpClient(timeout));
 
     // Query params stripped from the SEGMENT cache key so rotating per-viewer
     // session tokens (e.g. Bojonegoro's `?session=`) don't fragment the cache.

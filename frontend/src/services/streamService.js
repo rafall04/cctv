@@ -69,6 +69,29 @@ const convertToExternalProxyUrl = (externalUrl, cameraId = null) => {
     return `${baseUrl}/hls/proxy?${query.toString()}`;
 };
 
+/**
+ * Wake an on-demand provider stream (e.g. Gresik cctvkanjeng): the origin only
+ * spawns the transcode after POST /start, so the m3u8 404s until then. The call
+ * goes browser→provider directly (no server load); we then poll the playlist
+ * briefly so hls.js receives a URL that is actually live instead of erroring
+ * on its first manifest fetch.
+ */
+const warmExternalProviderStream = async (startUrl, hlsUrl) => {
+    try {
+        const viewerId = `rafnet-${Math.random().toString(36).slice(2, 10)}`;
+        const sep = startUrl.includes('?') ? '&' : '?';
+        await fetch(`${startUrl}${sep}viewer_id=${viewerId}&context=public&quality=auto`, { method: 'POST' });
+        const deadline = Date.now() + 20000;
+        while (Date.now() < deadline) {
+            const probe = await fetch(hlsUrl, { cache: 'no-store' });
+            if (probe.ok) return;
+            await new Promise((r) => setTimeout(r, 2000));
+        }
+    } catch {
+        // Provider unreachable — let the player's normal error path report it.
+    }
+};
+
 const makeStreamUrlsAbsolute = (streams) => {
     if (!streams) return streams;
 
@@ -121,6 +144,10 @@ export const streamService = {
                             ...processedStreams,
                             hls: convertToExternalProxyUrl(processedStreams.hls, camera.id)
                         };
+                    } else if (!useProxy && processedStreams?.external_start_url && processedStreams.hls) {
+                        const { external_start_url: startUrl, ...rest } = processedStreams;
+                        await warmExternalProviderStream(startUrl, processedStreams.hls);
+                        processedStreams = rest;
                     }
                 } else {
                     processedStreams = makeStreamUrlsAbsolute(processedStreams);

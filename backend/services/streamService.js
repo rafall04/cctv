@@ -23,6 +23,7 @@ import {
 } from '../utils/cameraDelivery.js';
 import { SHARED_CAMERA_STREAM_PROJECTION, SHARED_CAMERA_STREAM_WITH_AREA_PROJECTION } from '../utils/cameraProjection.js';
 import { stripUrlCredentials } from '../utils/logRedaction.js';
+import { buildExternalStartUrl } from './externalProviderSupport.js';
 
 function resolveViewerStats(statsByCamera, cameraId) {
     return statsByCamera[cameraId] || cameraViewStatsService.emptyStats;
@@ -59,12 +60,20 @@ class StreamService {
             || camera.external_use_proxy === true
         );
         const externalRawUrl = camera.external_stream_url || camera.external_hls_url || null;
+        // On-demand provider (e.g. Gresik): browser POSTs this first so the
+        // origin spawns the transcode; hls.js then finds the m3u8. Only ever
+        // emitted for direct mode — proxied cameras never need the browser to
+        // know the provider's control endpoint.
+        const externalStartUrl = isExternalHls && !externalProxyEnabled
+            ? buildExternalStartUrl(camera)
+            : null;
         const externalStreams = isExternalHls
             ? {
                 hls: externalProxyEnabled
                     ? `/api/stream/${camera.id}/external.m3u8`
                     : externalRawUrl,
                 webrtc: null,
+                ...(externalStartUrl ? { external_start_url: externalStartUrl } : {}),
             }
             : null;
 

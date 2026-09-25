@@ -163,6 +163,50 @@ describe('streamService camera response routing', () => {
         });
     });
 
+    it('exposes streams.external_start_url for a direct on-demand provider camera (gresikkab)', () => {
+        const response = streamService.buildCameraResponse({
+            id: 21,
+            stream_key: 'camera21',
+            stream_source: 'external',
+            external_hls_url: 'https://cctvkanjeng.gresikkab.go.id/hls/legundi-4/index.m3u8',
+            external_use_proxy: 0,
+            source_profile: 'gresikkab:584',
+        });
+
+        expect(response.streams.external_start_url)
+            .toBe('https://cctvkanjeng.gresikkab.go.id/api/v1/public/cctv/584/start');
+    });
+
+    it('withholds external_start_url when the proxy path is used (browser must not see it)', () => {
+        const response = streamService.buildCameraResponse({
+            id: 22,
+            stream_source: 'external',
+            external_hls_url: 'https://cctvkanjeng.gresikkab.go.id/hls/legundi-4/index.m3u8',
+            external_use_proxy: 1,
+            source_profile: 'gresikkab:584',
+        });
+
+        expect(response.streams).toEqual({
+            hls: '/api/stream/22/external.m3u8',
+            webrtc: null,
+        });
+    });
+
+    it('withholds external_start_url for a gated provider camera', () => {
+        voucherGatedMock.mockReturnValue(true);
+        const response = streamService.buildCameraResponse({
+            id: 23,
+            stream_source: 'external',
+            external_hls_url: 'https://cctvkanjeng.gresikkab.go.id/hls/legundi-4/index.m3u8',
+            external_use_proxy: 0,
+            source_profile: 'gresikkab:584',
+            area_id: 5,
+        });
+
+        expect(response.streams.hls).toBeNull();
+        expect(response.streams.external_start_url).toBeUndefined();
+    });
+
     it('strips external_hls_url + external_stream_url from public response when proxy is enabled', () => {
         // G4: with proxy enabled (default), the upstream URL must NOT
         // ride along on the response. The opaque streams.hls path is
