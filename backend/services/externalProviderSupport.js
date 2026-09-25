@@ -41,6 +41,9 @@ const PROVIDERS = [
 // TTL keeps us immune to silent server-side rotation; minting is one GET.
 const SESSION_TTL_MS = 10 * 60 * 1000;
 const SESSION_FETCH_TIMEOUT_MS = 10000;
+// The provider 403s non-browser user agents — minted cookies are bound to the
+// UA that fetched them, so every consumer (axios proxy, ffmpeg) must reuse it.
+const PROVIDER_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
 // host -> { cookieHeader, expiresAt } | { inflight: Promise }
 const sessions = new Map();
@@ -62,7 +65,7 @@ function fetchSetCookies(url, { insecureTls = false } = {}) {
             timeout: SESSION_FETCH_TIMEOUT_MS,
             rejectUnauthorized: !insecureTls,
             headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'User-Agent': PROVIDER_USER_AGENT,
             },
         }, (res) => {
             res.resume(); // drain — only the Set-Cookie headers matter
@@ -156,7 +159,7 @@ export async function buildProviderRequestHeaders(targetUrl) {
     const provider = providerForUrl(targetUrl);
     if (!provider) return null;
     const cookie = await getSessionCookie(provider);
-    const headers = { Referer: provider.referer };
+    const headers = { Referer: provider.referer, 'User-Agent': PROVIDER_USER_AGENT };
     if (cookie) headers.Cookie = cookie;
     return headers;
 }

@@ -255,11 +255,19 @@ class ThumbnailService {
             args.push('-protocol_whitelist', 'http,https,tcp,tls,crypto');
 
             // Session-gated providers (e.g. Malang) 403 every request without
-            // their Referer+Cookie — ffmpeg's -headers applies to the playlist
-            // AND every segment fetch.
+            // their Referer+Cookie AND a browser User-Agent — ffmpeg's -headers
+            // applies to the playlist AND every segment fetch, while the UA is
+            // a separate ffmpeg option (-headers won't override it).
             const headerPairs = Object.entries(requestHeaders || {});
             if (headerPairs.length > 0 && !isRtsp) {
-                args.push('-headers', headerPairs.map(([k, v]) => `${k}: ${v}`).join('\r\n') + '\r\n');
+                const userAgent = headerPairs.find(([k]) => k.toLowerCase() === 'user-agent')?.[1];
+                const rest = headerPairs.filter(([k]) => k.toLowerCase() !== 'user-agent');
+                if (userAgent) {
+                    args.push('-user_agent', userAgent);
+                }
+                if (rest.length > 0) {
+                    args.push('-headers', rest.map(([k, v]) => `${k}: ${v}`).join('\r\n') + '\r\n');
+                }
             }
         }
 

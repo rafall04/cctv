@@ -124,6 +124,11 @@ describe('thumbnailService external thumbnails', () => {
         expect(headersIdx).toBeLessThan(args.indexOf('-i'));
         expect(args[headersIdx + 1]).toContain('Referer: https://cctv.malangkota.go.id/');
         expect(args[headersIdx + 1]).toContain('Cookie: NANCY_TOKEN_Q=qa');
+        // The provider rejects non-browser user agents — ffmpeg's Lavf default 403s.
+        const uaIdx = args.indexOf('-user_agent');
+        expect(uaIdx).toBeGreaterThan(-1);
+        expect(uaIdx).toBeLessThan(args.indexOf('-i'));
+        expect(args[uaIdx + 1]).toContain('Mozilla/5.0');
     });
 
     it('does not add -headers for unregistered external HLS hosts', async () => {
