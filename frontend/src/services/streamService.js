@@ -83,8 +83,13 @@ const warmExternalProviderStream = async (startUrl, hlsUrl) => {
         await fetch(`${startUrl}${sep}viewer_id=${viewerId}&context=public&quality=auto`, { method: 'POST' });
         const deadline = Date.now() + 20000;
         while (Date.now() < deadline) {
-            const probe = await fetch(hlsUrl, { cache: 'no-store' });
-            if (probe.ok) return;
+            try {
+                const probe = await fetch(hlsUrl, { cache: 'no-store' });
+                if (probe.ok) return;
+            } catch {
+                // Cold streams answer 404 WITHOUT CORS headers, so fetch rejects
+                // outright — that rejection IS the "not ready yet" signal.
+            }
             await new Promise((r) => setTimeout(r, 2000));
         }
     } catch {

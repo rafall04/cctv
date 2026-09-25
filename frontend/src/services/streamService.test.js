@@ -27,6 +27,8 @@ const GRESIK_CAM = {
 };
 
 describe('streamService.getStreamUrls — on-demand provider warm-up', () => {
+    const cam = () => structuredClone(GRESIK_CAM); // getStreamUrls mutates data.streams in place
+
     beforeEach(() => {
         get.mockReset();
         vi.stubGlobal('fetch', vi.fn());
@@ -34,7 +36,7 @@ describe('streamService.getStreamUrls — on-demand provider warm-up', () => {
     afterEach(() => vi.unstubAllGlobals());
 
     it('POSTs the provider start endpoint then polls the playlist until it is live', async () => {
-        get.mockResolvedValue({ data: { success: true, data: GRESIK_CAM } });
+        get.mockResolvedValue({ data: { success: true, data: cam() } });
         fetch
             .mockResolvedValueOnce({ ok: true })                          // POST /start
             .mockResolvedValueOnce({ ok: false, status: 404 })            // playlist not ready yet
@@ -71,7 +73,7 @@ describe('streamService.getStreamUrls — on-demand provider warm-up', () => {
         get.mockResolvedValue({
             data: {
                 success: true,
-                data: { ...GRESIK_CAM, external_use_proxy: 1 },
+                data: { ...cam(), external_use_proxy: 1 },
             },
         });
         const res = await streamService.getStreamUrls(584);
@@ -80,9 +82,21 @@ describe('streamService.getStreamUrls — on-demand provider warm-up', () => {
     });
 
     it('still returns the stream when the provider never comes up (player error path decides)', async () => {
-        get.mockResolvedValue({ data: { success: true, data: GRESIK_CAM } });
+        get.mockResolvedValue({ data: { success: true, data: cam() } });
         fetch.mockResolvedValue({ ok: false, status: 404 });
         const res = await streamService.getStreamUrls(584);
         expect(res.data.streams.hls).toBe(GRESIK_CAM.streams.hls);
     }, 30000);
+
+    it('keeps polling when the cold playlist rejects (404 without CORS → TypeError)', async () => {
+        get.mockResolvedValue({ data: { success: true, data: cam() } });
+        fetch
+            .mockResolvedValueOnce({ ok: true })                                // POST /start
+            .mockRejectedValueOnce(new TypeError('Failed to fetch'))            // cold: CORS-masked 404
+            .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+            .mockResolvedValueOnce({ ok: true, status: 200 });                  // warmed
+        const res = await streamService.getStreamUrls(584);
+        expect(fetch).toHaveBeenCalledTimes(4);
+        expect(res.data.streams.hls).toBe(GRESIK_CAM.streams.hls);
+    });
 });
