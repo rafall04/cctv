@@ -10,6 +10,8 @@
  * close repeatedly, and it must not re-ask the backend every time.
  */
 
+import { peekPrefetchedJson } from './earlyPrefetch.js';
+
 export const SAWERIA_SUPPRESSED_KEY = 'saweria_dont_show';
 export const SAWERIA_URL = 'https://saweria.co/raflialdi';
 
@@ -23,8 +25,15 @@ let inflight = null;
  */
 export function isSaweriaEnabled() {
     if (!inflight) {
+        // Peek, don't take: saweriaService.getPublicSaweriaConfig reads the same seed, and both
+        // consumers are memoised for the page's lifetime so neither ever needs a fresh fetch.
+        const prefetched = peekPrefetchedJson('saweria');
         inflight = (async () => {
             try {
+                if (prefetched) {
+                    const seeded = await prefetched.catch(() => null);
+                    return seeded?.data?.enabled === true;
+                }
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
                 const response = await fetch('/api/saweria/config', { signal: controller.signal })

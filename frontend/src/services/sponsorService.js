@@ -7,6 +7,7 @@
  */
 
 import apiClient from './apiClient';
+import { takePrefetchedJson } from '../utils/earlyPrefetch.js';
 
 function failure(error, fallback) {
     return {
@@ -33,6 +34,10 @@ export const getAllSponsors = async () => {
  */
 export const getActiveSponsors = async () => {
     try {
+        const prefetched = takePrefetchedJson('sponsors');
+        if (prefetched) {
+            return await prefetched;
+        }
         const response = await apiClient.get('/api/sponsors/active');
         return response.data;
     } catch (error) {

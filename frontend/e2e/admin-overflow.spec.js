@@ -121,6 +121,9 @@ const ADMIN_CAMERAS = Array.from({ length: 750 }, (_, i) => ({
      * for an empty result — i.e. without this field that whole page measures an empty box. */
     enable_recording: i % 5 === 0 ? 0 : 1,
     recording_duration_hours: [4, 8, 24, 72][i % 4],
+    /* The playback picker reads getStreamCapabilities — without a delivery type every camera
+       resolves to "unsupported" and the page measures an empty "Belum Ada" box. */
+    delivery_type: 'internal_hls',
 }));
 
 const ADMIN_AREAS = Array.from({ length: 40 }, (_, i) => ({
@@ -957,6 +960,7 @@ const API_FIXTURES = [
     [/^\/api\/areas$/, ADMIN_AREAS],
     [/^\/api\/areas\/overview$/, AREAS_OVERVIEW],
     [/^\/api\/cameras\/active$/, ADMIN_CAMERAS.slice(0, 24)],
+    [/^\/api\/cameras\/playback$/, ADMIN_CAMERAS],
 
     [/^\/api\/admin\/stats\/today/, TODAY_STATS],
     [/^\/api\/admin\/stats$/, DASHBOARD_STATS],

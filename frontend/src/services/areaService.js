@@ -1,5 +1,6 @@
 import apiClient from './apiClient';
 import { getRequestPolicyConfig, REQUEST_POLICY } from './requestPolicy';
+import { takePrefetchedJson } from '../utils/earlyPrefetch.js';
 
 /**
  * Area API client.
@@ -21,6 +22,10 @@ export const areaService = {
     // Public - get all areas (no auth required)
     getPublicAreas: async (policy = REQUEST_POLICY.SILENT_PUBLIC, config = {}) => {
         try {
+            const prefetched = takePrefetchedJson('areas');
+            if (prefetched) {
+                return await prefetched;
+            }
             const response = await apiClient.get('/api/areas/public', getRequestPolicyConfig(policy, config));
             return response.data;
         } catch (error) {

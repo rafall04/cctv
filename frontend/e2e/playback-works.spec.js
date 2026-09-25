@@ -72,7 +72,7 @@ test.beforeEach(async ({ page, context }) => {
                     body: JSON.stringify({ success: true, data: { segments: SEGMENTS, playback_policy: PLAYBACK_POLICY } }),
                 });
             }
-            if (/\/api\/cameras\/(active|public)/.test(path)) {
+            if (/\/api\/cameras\/(active|public|playback)/.test(path)) {
                 return route.fulfill({
                     status: 200, contentType: 'application/json',
                     body: JSON.stringify({ success: true, data: CAMERAS }),

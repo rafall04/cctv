@@ -31,7 +31,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 // Import security middleware (in order of execution)
-import { securityHeadersMiddleware } from './middleware/securityHeaders.js';
+import { securityHeadersMiddleware } from './middleware/securityHeaders.js'; import { publicCacheHeadersMiddleware } from './middleware/publicCacheHeaders.js';
 import { rateLimiterMiddleware } from './middleware/rateLimiter.js';
 import { apiKeyValidatorMiddleware } from './middleware/apiKeyValidator.js';
 import { originValidatorMiddleware } from './middleware/originValidator.js';
@@ -271,7 +271,7 @@ fastify.addHook('preHandler', customerAccessPolicyHook);
 // - Removes X-Powered-By and Server headers
 // - Cache-Control: no-store for auth endpoints
 // Requirements: 8.1, 8.2, 8.3, 8.5, 8.6, 8.7
-await fastify.register(securityHeadersMiddleware);
+await fastify.register(securityHeadersMiddleware); await fastify.register(publicCacheHeadersMiddleware); // short public Cache-Control on whitelisted anonymous GETs — cacheMiddleware never emitted it; file is frozen so this shares the line
 
 // ============================================
 // 2. RATE LIMITER MIDDLEWARE

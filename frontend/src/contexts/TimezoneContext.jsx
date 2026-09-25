@@ -8,6 +8,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { adminAPI } from '../services/api';
+import { takePrefetchedJson } from '../utils/earlyPrefetch.js';
 
 const TimezoneContext = createContext();
 
@@ -94,10 +95,13 @@ export function TimezoneProvider({ children }) {
 
     const loadTimezone = useCallback(async () => {
         try {
-            const { data } = await adminAPI.get('/api/settings/timezone', {
-                skipGlobalErrorNotification: true,
-                skipAuthRefresh: true,
-            });
+            const prefetched = takePrefetchedJson('timezone');
+            const { data } = prefetched
+                ? { data: await prefetched }
+                : await adminAPI.get('/api/settings/timezone', {
+                    skipGlobalErrorNotification: true,
+                    skipAuthRefresh: true,
+                });
             setTimezone(data.data.timezone);
         } catch (error) {
             console.error('Failed to load timezone:', error);

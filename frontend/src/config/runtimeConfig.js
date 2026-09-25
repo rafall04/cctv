@@ -14,6 +14,8 @@
  *   const apiUrl = getApiUrl();
  */
 
+import { takePrefetchedJson } from '../utils/earlyPrefetch.js';
+
 let runtimeConfig = null;
 let loadPromise = null;
 
@@ -102,19 +104,23 @@ export const loadRuntimeConfig = async () => {
     // Start loading
     loadPromise = (async () => {
         try {
-            // Try to load from backend
-            const response = await fetch('/api/config/public', {
-                method: 'GET',
-                headers: {
-                    'Accept': 'application/json',
-                },
-            });
-
-            if (!response.ok) {
-                throw new Error(`Failed to load config: ${response.status}`);
-            }
-
-            const config = await response.json();
+            // The index.html inline prefetch fired this GET during HTML parse, so the parsed
+            // JSON is usually already in flight — take it instead of starting a second request.
+            const prefetched = takePrefetchedJson('config');
+            const config = prefetched
+                ? await prefetched
+                : await (async () => {
+                    const response = await fetch('/api/config/public', {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/json',
+                        },
+                    });
+                    if (!response.ok) {
+                        throw new Error(`Failed to load config: ${response.status}`);
+                    }
+                    return response.json();
+                })();
 
             console.log('✅ Runtime config loaded from backend:', config);
 

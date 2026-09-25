@@ -8,11 +8,17 @@
 
 import apiClient from './apiClient';
 import { getRequestPolicyConfig, REQUEST_POLICY } from './requestPolicy';
+import { takePrefetchedJson } from '../utils/earlyPrefetch.js';
 
 export const cameraService = {
     // Get all active cameras (public)
     async getActiveCameras(policy = REQUEST_POLICY.BLOCKING, config = {}) {
         try {
+            // The index.html prefetch usually already has this 50KB envelope in flight.
+            const prefetched = takePrefetchedJson('cameras');
+            if (prefetched) {
+                return await prefetched;
+            }
             const response = await apiClient.get('/api/cameras/active', getRequestPolicyConfig(policy, config));
             return response.data;
         } catch (error) {

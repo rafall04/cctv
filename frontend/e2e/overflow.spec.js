@@ -73,6 +73,9 @@ const CAMERAS = Array.from({ length: 8 }, (_, i) => ({
      */
     enable_recording: 1,
     camera_class: 'community',
+    /* Without this the playback capability check falls through to "unsupported" and the picker
+       empties itself — the page then measures "Belum Ada Recording Tersedia", not the layout. */
+    delivery_type: 'internal_hls',
 }));
 
 /*
@@ -174,6 +177,7 @@ const API_FIXTURES = [
     [/\/api\/public\/trending-cameras/, CAMERAS],
     [/\/api\/cameras\/active/, CAMERAS],
     [/\/api\/cameras\/public/, CAMERAS],
+    [/\/api\/cameras\/playback/, CAMERAS],
     [/\/api\/areas\/public/, AREAS],
 ];
 

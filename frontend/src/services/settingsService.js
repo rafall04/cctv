@@ -1,5 +1,6 @@
 import apiClient from './apiClient';
 import { getRequestPolicyConfig, REQUEST_POLICY } from './requestPolicy';
+import { takePrefetchedJson } from '../utils/earlyPrefetch.js';
 
 /**
  * Settings API client.
@@ -41,7 +42,10 @@ export const settingsService = {
         }
         mapCenterInFlight = (async () => {
             try {
-                const response = await apiClient.get('/api/settings/map-center');
+                const prefetched = takePrefetchedJson('mapCenter');
+                const response = prefetched
+                    ? { data: await prefetched }
+                    : await apiClient.get('/api/settings/map-center');
                 if (response.data?.success) {
                     mapCenterCache = response.data;
                     mapCenterCachedAt = Date.now();
@@ -59,6 +63,10 @@ export const settingsService = {
 
     getPublicLandingPageSettings: async () => {
         try {
+            const prefetched = takePrefetchedJson('landingSettings');
+            if (prefetched) {
+                return await prefetched;
+            }
             const response = await apiClient.get(
                 '/api/settings/landing-page',
                 getRequestPolicyConfig(REQUEST_POLICY.SILENT_PUBLIC)
@@ -72,6 +80,10 @@ export const settingsService = {
 
     getPublicAdsSettings: async () => {
         try {
+            const prefetched = takePrefetchedJson('publicAds');
+            if (prefetched) {
+                return await prefetched;
+            }
             const response = await apiClient.get(
                 '/api/settings/public-ads',
                 getRequestPolicyConfig(REQUEST_POLICY.SILENT_PUBLIC)

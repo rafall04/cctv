@@ -186,9 +186,13 @@
   
   console.log('✅ URLs updated for domain:', domain);
   
-  // Fetch branding data from API
-  fetch(buildApiUrl('/api/branding/public'))
-    .then(response => response.json())
+  // Fetch branding data from API — reuse the index.html inline prefetch when present so this
+  // file doesn't fire a second identical GET.
+  const seededBranding = window.__RAFNET_PREFETCH__ && window.__RAFNET_PREFETCH__.branding;
+  const brandingPromise = (seededBranding && typeof seededBranding.then === 'function')
+    ? seededBranding
+    : fetch(buildApiUrl('/api/branding/public')).then(response => response.json());
+  brandingPromise
     .then(payload => {
       // The API wraps the payload as { success, data }. Unwrap it: passing the envelope made every
       // branding.* read undefined, so title/description/OG/Twitter/JSON-LD silently kept the static

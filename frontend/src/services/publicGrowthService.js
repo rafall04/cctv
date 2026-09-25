@@ -7,6 +7,7 @@
  */
 
 import apiClient from './apiClient';
+import { takePrefetchedJson } from '../utils/earlyPrefetch.js';
 
 const publicRequestConfig = {
     skipGlobalErrorNotification: true,
@@ -20,11 +21,22 @@ export const publicGrowthService = {
     },
 
     async getAreaCameras(slug) {
+        const prefetched = takePrefetchedJson(`areaCameras:${slug}`);
+        if (prefetched) {
+            return await prefetched;
+        }
         const response = await apiClient.get(`/api/public/areas/${encodeURIComponent(slug)}/cameras`, publicRequestConfig);
         return response.data;
     },
 
     async getDiscovery({ limit = 6 } = {}) {
+        // The index.html prefetch seeds exactly this URL shape on public pages.
+        if (limit === 6) {
+            const prefetched = takePrefetchedJson('discovery');
+            if (prefetched) {
+                return await prefetched;
+            }
+        }
         const response = await apiClient.get('/api/public/discovery', {
             ...publicRequestConfig,
             params: { limit },
