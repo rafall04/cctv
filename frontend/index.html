@@ -70,7 +70,7 @@
         add('discovery', '/api/public/discovery?limit=6');
         add('timezone', '/api/settings/timezone');
         if (path === '/' || path === '') {
-          add('cameras', '/api/cameras/active');
+          add('cameras', '/api/cameras/active?summary=1');
           add('areas', '/api/areas/public');
           if (/[?&]view=map/.test(window.location.search)) {
             add('mapCenter', '/api/settings/map-center');

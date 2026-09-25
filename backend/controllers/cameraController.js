@@ -10,6 +10,7 @@ import cameraService from '../services/cameraService.js';
 import billingService from '../services/billingService.js';
 import bulkRecordingDurationUpdater from '../services/recordingRetentionBulkService.js';
 import { stripUrlCredentials } from '../utils/logRedaction.js';
+import { slimLandingCamera } from '../services/publicLandingProjection.js';
 
 // URL-valued columns in the admin camera list that may embed third-party credentials
 // (`https://user:pass@host/...`). Same rule as getCameraById: only admins ever need them.
@@ -53,10 +54,14 @@ export async function getAllCameras(request, reply) {
 export async function getActiveCameras(request, reply) {
     try {
         const view = request.query?.view === 'map' ? 'map' : 'landing';
+        // ?summary=1 → landing-slim read model: the same cached/enriched/stripped list,
+        // minus every field no public landing component reads (stream URLs, transport
+        // knobs, description) — ~60% fewer bytes on the wire for a ~1k-camera list.
+        const slim = request.query?.summary === '1' || request.query?.summary === 'true';
         const cameras = view === 'map'
             ? cameraService.getPublicMapCameraList()
             : cameraService.getPublicLandingCameraList();
-        return reply.send({ success: true, data: cameras });
+        return reply.send({ success: true, data: slim ? cameras.map(slimLandingCamera) : cameras });
     } catch (error) {
         console.error('Get active cameras error:', error);
         return reply.code(500).send({ success: false, message: 'Internal server error' });

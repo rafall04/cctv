@@ -175,6 +175,55 @@ export function stripInternalLandingFields(camera) {
 }
 
 /*
+ * Fields the public landing grid/map/filters actually read (verified against every
+ * `camera.*` access under components/landing, CameraContext, hooks/public, the map
+ * subtree, and AreaPublicPage). Everything else the row carries — stream URLs, the
+ * external_* transport knobs, description/group_name, and the availability detail
+ * fields — is playback-detail or backend-internal data the landing list was
+ * shipping anyway: ~33 keys per camera, ~1MB raw for a ~1000-camera list.
+ *
+ * `?summary=1` picks these AFTER the full projection has been built, enriched, and
+ * stripped, so the slim read model can never drift from the hardening rules above.
+ */
+export const PUBLIC_LANDING_SLIM_FIELDS = [
+    'id',
+    'name',
+    'location',
+    'area_id',
+    'area_name',
+    'is_tunnel',
+    'latitude',
+    'longitude',
+    'status',
+    'enabled',
+    'enable_recording',
+    'camera_class',
+    'video_codec',
+    'thumbnail_path',
+    'thumbnail_updated_at',
+    'external_snapshot_url',
+    'delivery_type',
+    'is_online',
+    'is_recording',
+    'created_at',
+    'availability_state',
+    'live_viewers',
+    'total_views',
+    'viewer_stats',
+];
+
+export function slimLandingCamera(camera) {
+    if (!camera || typeof camera !== 'object') {
+        return camera;
+    }
+    const slim = {};
+    for (const field of PUBLIC_LANDING_SLIM_FIELDS) {
+        if (field in camera) slim[field] = camera[field];
+    }
+    return slim;
+}
+
+/*
  * Ingest and routing policy. Distinct from the health fields above because it answers a different
  * question — not "is this camera up" but "how does this backend TALK to it": whether the stream is
  * held open or dialled on demand and for how long, which RTSP transport is used, and which source

@@ -14,12 +14,13 @@ export const cameraService = {
     // Get all active cameras (public)
     async getActiveCameras(policy = REQUEST_POLICY.BLOCKING, config = {}) {
         try {
-            // The index.html prefetch usually already has this 50KB envelope in flight.
+            // The index.html prefetch usually already has this envelope in flight. ?summary=1
+            // asks for the landing-slim read model — same rows, ~60% fewer bytes.
             const prefetched = takePrefetchedJson('cameras');
             if (prefetched) {
                 return await prefetched;
             }
-            const response = await apiClient.get('/api/cameras/active', getRequestPolicyConfig(policy, config));
+            const response = await apiClient.get('/api/cameras/active?summary=1', getRequestPolicyConfig(policy, config));
             return response.data;
         } catch (error) {
             console.error('Get active cameras error:', error);

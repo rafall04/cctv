@@ -11,6 +11,8 @@ import {
     CREDENTIALED_EXTERNAL_URL_FIELDS,
     PROXIED_ORIGIN_URL_FIELDS,
     PUBLIC_LANDING_INTERNAL_FIELDS,
+    PUBLIC_LANDING_SLIM_FIELDS,
+    slimLandingCamera,
     stripInternalLandingFields,
     stripProxiedOriginUrls,
 } from '../services/publicLandingProjection.js';
@@ -223,5 +225,45 @@ describe('stripProxiedOriginUrls — credential stripping (THEME C)', () => {
             external_snapshot_url: 'https://user:pass@snap.example/x.jpg',
         });
         expect(result.external_snapshot_url).toBe('https://snap.example/x.jpg');
+    });
+});
+
+describe('slimLandingCamera (?summary=1)', () => {
+    it('keeps only the fields public landing code reads', () => {
+        const fat = {
+            id: 7, name: 'CCTV A', location: 'Dander', area_id: 2, area_name: 'DS DANDER',
+            is_tunnel: 0, latitude: -7.25, longitude: 111.83, status: 'active', enabled: 1,
+            enable_recording: 1, camera_class: 'community', video_codec: 'h265',
+            thumbnail_path: '/api/thumbnails/7.jpg', thumbnail_updated_at: '2026-09-25 12:00:00',
+            external_snapshot_url: null, delivery_type: 'internal_hls', is_online: 1,
+            availability_state: 'online', live_viewers: 3, total_views: 900, viewer_stats: { live_viewers: 3 },
+            is_recording: 1, created_at: '2026-05-04 08:00:00',
+            // Everything below must NOT survive the slim projection:
+            description: 'internal notes', group_name: null, stream_source: 'internal',
+            external_hls_url: 'https://origin.example/x.m3u8',
+            external_stream_url: 'https://origin.example/x.m3u8',
+            external_embed_url: null, external_origin_mode: 'direct', external_tls_mode: 'strict',
+            external_use_proxy: 1, availability_reason: 'x', availability_confidence: 'high',
+        };
+
+        const slim = slimLandingCamera(fat);
+        const slimKeys = Object.keys(slim).sort();
+        expect(slimKeys).toEqual([...PUBLIC_LANDING_SLIM_FIELDS].sort());
+        expect(slim.id).toBe(7);
+        expect(slim.viewer_stats).toEqual({ live_viewers: 3 });
+        for (const dropped of ['description', 'stream_source', 'external_hls_url',
+            'external_stream_url', 'external_use_proxy', 'availability_reason']) {
+            expect(slim).not.toHaveProperty(dropped);
+        }
+    });
+
+    it('slim list never carries a stream URL field even when upstream had one', () => {
+        const slim = slimLandingCamera({
+            id: 9, name: 'B',
+            external_hls_url: 'https://u:p@origin/x.m3u8',
+            external_stream_url: 'https://u:p@origin/x.m3u8',
+        });
+        expect(slim.external_hls_url).toBeUndefined();
+        expect(slim.external_stream_url).toBeUndefined();
     });
 });
