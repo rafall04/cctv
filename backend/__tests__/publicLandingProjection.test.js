@@ -320,6 +320,20 @@ describe('buildLcpCardFragment (SSI LCP img)', () => {
         expect(html).not.toContain('display:none');
     });
 
+    it('inlines a data: URI when provided, ignoring the network URL', () => {
+        const html = buildLcpCardFragment(
+            { name: 'X', thumbnail_path: '/api/thumbnails/3.jpg', thumbnail_updated_at: 't' },
+            { inlineDataUri: 'data:image/jpeg;base64,QUJD' },
+        );
+        expect(html).toContain('src="data:image/jpeg;base64,QUJD"');
+        expect(html).not.toContain('/api/thumbnails/');
+    });
+
+    it('emits even without a thumbnail path when an inline URI exists', () => {
+        const html = buildLcpCardFragment({ name: 'X' }, { inlineDataUri: 'data:image/jpeg;base64,QQ==' });
+        expect(html).toContain('src="data:image/jpeg;base64,QQ=="');
+    });
+
     it('prefers external_snapshot_url (no ?v= appended to absolute URLs)', () => {
         const html = buildLcpCardFragment({
             name: 'X', external_snapshot_url: 'https://snap.example/x.jpg',

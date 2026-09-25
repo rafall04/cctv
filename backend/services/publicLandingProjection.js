@@ -288,18 +288,23 @@ function escapeAttr(value) {
  *
  * URL shape mirrors CameraThumbnail: `external_snapshot_url || thumbnail_path`,
  * with `?v=thumbnail_updated_at` appended only for /api/thumbnails/* paths.
+ *
+ * `inlineDataUri` trades ~14KB of HTML for a paint GUARANTEE: with the bytes
+ * already inside the tag, the thumbnail decodes with the very first frame —
+ * under CPU throttling a network-fetched image routinely misses that frame and
+ * the next ones are starved by bundle-eval long tasks until React clears #root.
  */
-export function buildLcpCardFragment(camera) {
+export function buildLcpCardFragment(camera, { inlineDataUri = null } = {}) {
     const thumbPath = camera?.external_snapshot_url || camera?.thumbnail_path;
-    if (!thumbPath) {
+    if (!thumbPath && !inlineDataUri) {
         return '';
     }
-    let url = String(thumbPath);
-    if (camera.thumbnail_updated_at && url.indexOf('/api/thumbnails/') === 0) {
+    let url = inlineDataUri || String(thumbPath);
+    if (!inlineDataUri && camera.thumbnail_updated_at && url.indexOf('/api/thumbnails/') === 0) {
         url += (url.indexOf('?') >= 0 ? '&' : '?') + 'v=' + encodeURIComponent(camera.thumbnail_updated_at);
     }
     const alt = escapeAttr((camera.name || 'CCTV') + ' preview');
-    return `<img id="boot-lcp-img" src="${escapeAttr(url)}" alt="${alt}" fetchpriority="high" decoding="async" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover" />`;
+    return `<img id="boot-lcp-img" src="${escapeAttr(url)}" alt="${alt}" fetchpriority="high" decoding="sync" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover" />`;
 }
 
 /*

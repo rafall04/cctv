@@ -324,10 +324,13 @@
                   slot.appendChild(lcp);
                 }
               }
-              if (lcp) {
+              if (lcp && !lcp.getAttribute('src')) {
+                // SSI already resolved a src (or inlined the bytes) — don't disturb it.
                 lcp.onerror = function () { lcp.style.display = 'none'; };
                 lcp.src = url;
                 lcp.alt = (cam.name || 'CCTV') + ' preview';
+              } else if (lcp) {
+                lcp.onerror = function () { lcp.style.display = 'none'; };
               }
             }
             var pi = new Image();
