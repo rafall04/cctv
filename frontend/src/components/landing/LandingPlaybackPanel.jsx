@@ -1,4 +1,5 @@
 import { Suspense } from 'react';
+import { InlineErrorBoundary } from '../ui/ErrorBoundary';
 
 export default function LandingPlaybackPanel({ Playback, cameras, selectedCamera, adsConfig = null, accessScope = 'public_preview' }) {
     return (
@@ -9,8 +10,11 @@ export default function LandingPlaybackPanel({ Playback, cameras, selectedCamera
                 </div>
             }
         >
-            {/* LandingPage renders the mobile dock; Playback must not add a second one. */}
-            <Playback cameras={cameras} selectedCamera={selectedCamera} adsConfig={adsConfig} accessScope={accessScope} showMobileDock={false} />
+            {/* LandingPage renders the mobile dock; Playback must not add a second one.
+                Boundary: a playback render crash must not take down the landing page. */}
+            <InlineErrorBoundary title="Pemutar ulang gagal dimuat">
+                <Playback cameras={cameras} selectedCamera={selectedCamera} adsConfig={adsConfig} accessScope={accessScope} showMobileDock={false} />
+            </InlineErrorBoundary>
         </Suspense>
     );
 }

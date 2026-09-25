@@ -172,7 +172,6 @@ MEDIAMTX_WEBRTC_URL_INTERNAL=http://localhost:8889
 # ===================================
 PUBLIC_STREAM_BASE_URL=$PROTOCOL://$BACKEND_DOMAIN
 PUBLIC_HLS_PATH=/hls
-PUBLIC_WEBRTC_PATH=/webrtc
 
 # ===================================
 # Domain Configuration
@@ -256,6 +255,9 @@ VITE_API_KEY=
 EOF
 
 print_success "Frontend .env created: $FRONTEND_ENV_FILE"
+
+# Both .env files carry secrets (JWT/DB/API keys) — root-only, same as generate-env.sh.
+chmod 600 "$BACKEND_ENV_FILE" "$FRONTEND_ENV_FILE"
 
 # ============================================
 # Summary

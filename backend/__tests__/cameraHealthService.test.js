@@ -334,6 +334,9 @@ async function createRtspTestServer(handler) {
     // `socket.write(...)` (and stay alive for the next request) or
     // `socket.end(...)` (and close).
     const server = net.createServer((socket) => {
+        // The probe ends sockets with resetAndDestroy() — that RST arrives here as
+        // ECONNRESET. Without a listener it becomes an unhandled error AFTER the test passed.
+        socket.on('error', () => {});
         let requestBuffer = '';
         let requestIndex = 0;
 
@@ -683,6 +686,7 @@ describe('cameraHealthService internal RTSP probe', () => {
         // DESCRIBE+Digest reply.
         let connectionCount = 0;
         const server = net.createServer((socket) => {
+            socket.on('error', () => {}); // client resetAndDestroy() → ECONNRESET noise
             connectionCount += 1;
             const connectionNonce = `nonce-conn-${connectionCount}`;
             let buf = '';
@@ -753,6 +757,7 @@ describe('cameraHealthService internal RTSP probe', () => {
         // ran (and only ran once).
         let connectionCount = 0;
         const server = net.createServer((socket) => {
+            socket.on('error', () => {}); // client resetAndDestroy() → ECONNRESET noise
             connectionCount += 1;
             const captured = connectionCount;
             let buf = '';

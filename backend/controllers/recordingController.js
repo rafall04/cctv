@@ -120,7 +120,6 @@ export async function getSegments(request, reply) {
 export async function streamSegment(request, reply) {
     try {
         const { cameraId, filename } = request.params;
-        console.log(`[Stream Request] Camera: ${cameraId}, File: ${filename}`);
 
         const { segment, stats } = recordingPlaybackService.getStreamSegment(cameraId, filename, request);
 
@@ -147,7 +146,6 @@ export async function streamSegment(request, reply) {
         }
 
         if (range.partial) {
-            console.log(`[Stream Info] Range request: ${range.start}-${range.end}/${stats.size}`);
             reply.code(206);
             reply.header('Content-Range', range.contentRange);
             reply.header('Content-Length', range.chunkSize);
@@ -157,7 +155,6 @@ export async function streamSegment(request, reply) {
         }
 
         // Stream entire file
-        console.log(`[Stream Info] Streaming entire file: ${stats.size} bytes`);
         const stream = createReadStream(segment.file_path);
         return reply.send(stream);
 
@@ -174,8 +171,7 @@ export async function streamSegment(request, reply) {
         }
         return reply.code(500).send({
             success: false,
-            message: 'Internal server error',
-            error: error.message
+            message: 'Internal server error'
         });
     }
 }

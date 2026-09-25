@@ -34,6 +34,7 @@ import GlobalAdScript from '../components/ads/GlobalAdScript';
 import { isAdsMobileViewport, shouldRenderAdSlot } from '../components/ads/adsConfig';
 import lazyWithRetry from '../utils/lazyWithRetry';
 import { sortCamerasByDistance } from '../utils/geoDistance';
+import { InlineErrorBoundary } from '../components/ui/ErrorBoundary';
 
 const LandingPageSimple = lazyWithRetry(() => import('../components/landing/LandingPageSimple'), 'landing-page-simple');
 const MultiViewLayout = lazyWithRetry(() => import('../components/MultiView/MultiViewLayout'), 'multi-view-layout');
@@ -225,26 +226,31 @@ function LandingPageContent({ onRefreshPauseChange }) {
 
                 {popup && (
                     <Suspense fallback={null}>
-                        <VideoPopup
-                            camera={popup}
-                            onClose={handlePopupClose}
-                            adsConfig={adsConfig}
-                            modalTestId={activePopupSource === 'map' ? 'map-popup-modal' : 'grid-popup-modal'}
-                            bodyTestId={activePopupSource === 'map' ? 'map-video-body' : 'grid-video-body'}
-                            relatedCameras={relatedPopupCameras}
-                            onRelatedCameraClick={(camera) => handleGridPopupOpen(camera, { replaceHistory: true })}
-                            isFavorite={isFavorite}
-                            onToggleFavorite={toggleFavorite}
-                        />
+                        {/* A render crash in the popup must not take down the whole landing. */}
+                        <InlineErrorBoundary title="Video popup gagal dimuat">
+                            <VideoPopup
+                                camera={popup}
+                                onClose={handlePopupClose}
+                                adsConfig={adsConfig}
+                                modalTestId={activePopupSource === 'map' ? 'map-popup-modal' : 'grid-popup-modal'}
+                                bodyTestId={activePopupSource === 'map' ? 'map-video-body' : 'grid-video-body'}
+                                relatedCameras={relatedPopupCameras}
+                                onRelatedCameraClick={(camera) => handleGridPopupOpen(camera, { replaceHistory: true })}
+                                isFavorite={isFavorite}
+                                onToggleFavorite={toggleFavorite}
+                            />
+                        </InlineErrorBoundary>
                     </Suspense>
                 )}
                 {showMulti && multiCameras.length > 0 && (
                     <Suspense fallback={null}>
-                        <MultiViewLayout
-                            cameras={multiCameras}
-                            onRemove={handleRemoveMulti}
-                            onClose={() => setShowMulti(false)}
-                        />
+                        <InlineErrorBoundary title="Multi-view gagal dimuat">
+                            <MultiViewLayout
+                                cameras={multiCameras}
+                                onRemove={handleRemoveMulti}
+                                onClose={() => setShowMulti(false)}
+                            />
+                        </InlineErrorBoundary>
                     </Suspense>
                 )}
             </div>
@@ -400,26 +406,30 @@ function LandingPageContent({ onRefreshPauseChange }) {
 
                 {popup && (
                     <Suspense fallback={null}>
-                        <VideoPopup
-                            camera={popup}
-                            onClose={handlePopupClose}
-                            adsConfig={adsConfig}
-                            modalTestId={activePopupSource === 'map' ? 'map-popup-modal' : 'grid-popup-modal'}
-                            bodyTestId={activePopupSource === 'map' ? 'map-video-body' : 'grid-video-body'}
-                            relatedCameras={relatedPopupCameras}
-                            onRelatedCameraClick={(camera) => handleGridPopupOpen(camera, { replaceHistory: true })}
-                            isFavorite={isFavorite}
-                            onToggleFavorite={toggleFavorite}
-                        />
+                        <InlineErrorBoundary title="Video popup gagal dimuat">
+                            <VideoPopup
+                                camera={popup}
+                                onClose={handlePopupClose}
+                                adsConfig={adsConfig}
+                                modalTestId={activePopupSource === 'map' ? 'map-popup-modal' : 'grid-popup-modal'}
+                                bodyTestId={activePopupSource === 'map' ? 'map-video-body' : 'grid-video-body'}
+                                relatedCameras={relatedPopupCameras}
+                                onRelatedCameraClick={(camera) => handleGridPopupOpen(camera, { replaceHistory: true })}
+                                isFavorite={isFavorite}
+                                onToggleFavorite={toggleFavorite}
+                            />
+                        </InlineErrorBoundary>
                     </Suspense>
                 )}
                 {showMulti && multiCameras.length > 0 && (
                     <Suspense fallback={null}>
-                        <MultiViewLayout
-                            cameras={multiCameras}
-                            onRemove={handleRemoveMulti}
-                            onClose={() => setShowMulti(false)}
-                        />
+                        <InlineErrorBoundary title="Multi-view gagal dimuat">
+                            <MultiViewLayout
+                                cameras={multiCameras}
+                                onRemove={handleRemoveMulti}
+                                onClose={() => setShowMulti(false)}
+                            />
+                        </InlineErrorBoundary>
                     </Suspense>
                 )}
 

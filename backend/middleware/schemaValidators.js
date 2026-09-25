@@ -104,16 +104,16 @@ export const createCameraSchema = {
                 enum: ['internal_hls', 'external_hls', 'external_flv', 'external_mjpeg', 'external_embed', 'external_jsmpeg', 'external_custom_ws']
             },
             external_hls_url: {
-                anyOf: [{ type: 'string', maxLength: 1000 }, { type: 'null' }]
+                anyOf: [{ type: 'string', maxLength: 1000, pattern: '^https?://' }, { type: 'null' }]
             },
             external_stream_url: {
-                anyOf: [{ type: 'string', maxLength: 1000 }, { type: 'null' }]
+                anyOf: [{ type: 'string', maxLength: 1000, pattern: '^https?://' }, { type: 'null' }]
             },
             external_embed_url: {
-                anyOf: [{ type: 'string', maxLength: 1000 }, { type: 'null' }]
+                anyOf: [{ type: 'string', maxLength: 1000, pattern: '^https?://' }, { type: 'null' }]
             },
             external_snapshot_url: {
-                anyOf: [{ type: 'string', maxLength: 1000 }, { type: 'null' }]
+                anyOf: [{ type: 'string', maxLength: 1000, pattern: '^https?://' }, { type: 'null' }]
             },
             external_origin_mode: {
                 type: 'string',
@@ -231,16 +231,16 @@ export const updateCameraSchema = {
                 enum: ['internal_hls', 'external_hls', 'external_flv', 'external_mjpeg', 'external_embed', 'external_jsmpeg', 'external_custom_ws']
             },
             external_hls_url: {
-                anyOf: [{ type: 'string', maxLength: 1000 }, { type: 'null' }]
+                anyOf: [{ type: 'string', maxLength: 1000, pattern: '^https?://' }, { type: 'null' }]
             },
             external_stream_url: {
-                anyOf: [{ type: 'string', maxLength: 1000 }, { type: 'null' }]
+                anyOf: [{ type: 'string', maxLength: 1000, pattern: '^https?://' }, { type: 'null' }]
             },
             external_embed_url: {
-                anyOf: [{ type: 'string', maxLength: 1000 }, { type: 'null' }]
+                anyOf: [{ type: 'string', maxLength: 1000, pattern: '^https?://' }, { type: 'null' }]
             },
             external_snapshot_url: {
-                anyOf: [{ type: 'string', maxLength: 1000 }, { type: 'null' }]
+                anyOf: [{ type: 'string', maxLength: 1000, pattern: '^https?://' }, { type: 'null' }]
             },
             external_origin_mode: {
                 type: 'string',

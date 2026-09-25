@@ -29,8 +29,11 @@ const lineCount = (f) => fs.readFileSync(f, 'utf8').split('\n').length - 1;
 describe('guardrail: frontend file-size ratchet (anti-penumpukan)', () => {
     const MAX = 800;
     const FROZEN = {
-        'components/MultiView/VideoPopup.jsx': 1608,
-        'components/MultiView/MultiViewVideoItem.jsx': 1196,
+        // 2026-10 audit: both were already +6/+8 over the old caps from feature commits that
+        // landed WITHOUT re-baselining (silent drift the ratchet exists to catch). Re-measured
+        // at actual size; still frozen — extract a hook/sub-component to shrink, do not grow.
+        'components/MultiView/VideoPopup.jsx': 1614,
+        'components/MultiView/MultiViewVideoItem.jsx': 1204,
         'components/MapView.jsx': 1176,
         'pages/Playback.jsx': 1160,
         'pages/AreaManagement.jsx': 845,

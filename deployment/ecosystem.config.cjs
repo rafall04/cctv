@@ -55,6 +55,9 @@ module.exports = {
             max_memory_restart: '1G',
             wait_ready: true,
             listen_timeout: 10000,
+            // pm2's default kill_timeout (1600ms) SIGKILLs before graceful shutdown finishes
+            // closing the DB pool + recorder adoption bookkeeping — give it room.
+            kill_timeout: 5000,
             // treekill:false — signal ONLY the backend, never its children.
             //
             // pm2 defaults to treekill:true, which enumerates the process tree by PPID
@@ -111,6 +114,7 @@ module.exports = {
             max_memory_restart: '1G',
             wait_ready: true,
             listen_timeout: 30000,
+            kill_timeout: 5000,
             // Same reason as the backend: pm2's default treekill walks the process tree
             // by PPID and would kill the detached recorders this worker exists to keep
             // alive across its own restarts.

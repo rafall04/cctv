@@ -1,4 +1,5 @@
 import { Suspense } from 'react';
+import { InlineErrorBoundary } from '../ui/ErrorBoundary';
 
 export default function LandingMapPanel({
     MapView,
@@ -19,18 +20,21 @@ export default function LandingMapPanel({
                 </div>
             }
         >
-            <MapView
-                cameras={cameras}
-                areas={areas}
-                selectedArea={selectedArea}
-                onAreaChange={onAreaChange}
-                showAreaFilter={false}
-                className="h-[450px] sm:h-[550px]"
-                focusedCameraId={focusedCameraId}
-                onFocusHandled={onFocusHandled}
-                adsConfig={adsConfig}
-                onCameraOpen={onCameraOpen}
-            />
+            {/* Leaflet/DOM crashes in MapView must not take down the landing page. */}
+            <InlineErrorBoundary title="Peta gagal dimuat">
+                <MapView
+                    cameras={cameras}
+                    areas={areas}
+                    selectedArea={selectedArea}
+                    onAreaChange={onAreaChange}
+                    showAreaFilter={false}
+                    className="h-[450px] sm:h-[550px]"
+                    focusedCameraId={focusedCameraId}
+                    onFocusHandled={onFocusHandled}
+                    adsConfig={adsConfig}
+                    onCameraOpen={onCameraOpen}
+                />
+            </InlineErrorBoundary>
         </Suspense>
     );
 }

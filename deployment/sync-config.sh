@@ -102,7 +102,6 @@ MEDIAMTX_WEBRTC_URL_INTERNAL=http://localhost:${PORT_MEDIAMTX_WEBRTC}
 # ===================================
 PUBLIC_STREAM_BASE_URL=${PUBLIC_STREAM_BASE_URL}
 PUBLIC_HLS_PATH=/hls
-PUBLIC_WEBRTC_PATH=/webrtc
 
 # ===================================
 # Domain Configuration

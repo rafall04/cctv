@@ -908,14 +908,14 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
 
     // Get status display info for multi-view - **Validates: Requirements 4.1, 4.2, 4.3, 4.4**
     const getStatusBadge = () => {
-        if (status === 'live') return { label: 'LIVE', color: 'bg-emerald-500' };
-        if (status === 'maintenance') return { label: 'PERBAIKAN', color: 'bg-red-500' };
-        if (status === 'offline') return { label: 'OFFLINE', color: 'bg-gray-500' };
-        if (status === 'degraded') return { label: 'TIDAK STABIL', color: 'bg-amber-500' };
-        if (status === 'timeout') return { label: 'TIMEOUT', color: 'bg-amber-500' };
-        if (status === 'error') return { label: 'OFF', color: 'bg-red-500' };
+        if (status === 'live') return { label: 'LIVE', color: 'bg-status-live' };
+        if (status === 'maintenance') return { label: 'PERBAIKAN', color: 'bg-status-fault' };
+        if (status === 'offline') return { label: 'OFFLINE', color: 'bg-edge-strong' };
+        if (status === 'degraded') return { label: 'TIDAK STABIL', color: 'bg-status-warn' };
+        if (status === 'timeout') return { label: 'TIMEOUT', color: 'bg-status-warn' };
+        if (status === 'error') return { label: 'OFF', color: 'bg-status-fault' };
         // Connecting - show abbreviated stage
-        return { label: '...', color: 'bg-amber-500' };
+        return { label: '...', color: 'bg-status-warn' };
     };
 
     const statusBadge = getStatusBadge();
@@ -996,8 +996,8 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
             {snapshotNotification && (
                 <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
                     <div className={`px-4 py-2 rounded-lg shadow-xl border ${snapshotNotification.type === 'success'
-                        ? 'bg-green-500 border-green-400'
-                        : 'bg-red-500 border-red-400'
+                        ? 'bg-status-live border-status-live'
+                        : 'bg-status-fault border-status-fault'
                         } text-white text-xs font-semibold`}>
                         {snapshotNotification.message}
                     </div>

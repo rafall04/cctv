@@ -389,7 +389,8 @@ npm install --production || {
 
 print_info "Creating data directory..."
 mkdir -p data
-chmod 755 data
+# 700, not 755: cctv.db holds credentials/PII — no reason for other local users to read it.
+chmod 700 data
 
 print_info "Initializing database..."
 npm run setup-db || {
@@ -402,7 +403,7 @@ npm run setup-db || {
 # No need to run manually to avoid duplicate execution
 
 mkdir -p "$APP_DIR/recordings"
-chmod 755 "$APP_DIR/recordings"
+chmod 700 "$APP_DIR/recordings"
 
 print_success "Backend setup complete"
 
@@ -487,6 +488,20 @@ print_info "Configuring firewall..."
 if command -v ufw &> /dev/null; then
     ufw allow ${PORT_PUBLIC}/tcp
     ufw allow 443/tcp
+    # `ufw allow` alone is inert while UFW is inactive — but enabling blindly can lock out
+    # SSH on custom ports (prod runs sshd on 2222, not the OpenSSH profile's 22). Detect the
+    # live SSH port from this session, allow it, THEN enable.
+    if ! ufw status | grep -q "Status: active"; then
+        SSH_PORT=$(echo "$SSH_CONNECTION" | awk '{print $4}')
+        if [[ "$SSH_PORT" =~ ^[0-9]+$ ]]; then
+            ufw allow ${SSH_PORT}/tcp comment 'sshd (detected)'
+            ufw --force enable
+            print_success "Firewall enabled (SSH port ${SSH_PORT} preserved)"
+        else
+            ufw allow OpenSSH
+            print_warning "UFW left INACTIVE — could not detect SSH port; allow sshd then 'ufw enable' manually"
+        fi
+    fi
     print_success "Firewall configured"
 fi
 

@@ -40,7 +40,10 @@ jobs:
       # on every run since the workflow was created). setup-db is non-interactive.
       - run: npm run setup-db
       - run: npm run migrate
-      - run: npm test
+      # Coverage run, not bare `npm test`: vitest.config pins floor thresholds (lines/stmts/funcs/
+      # branches) that were never enforced because nothing invoked --coverage. Now a PR that drops
+      # coverage fails here; raise the floors in the same commit when coverage improves.
+      - run: npm run test:coverage
 
   deps-audit:
     # Fails when a HIGH/CRITICAL advisory affects a package that actually ships to
@@ -81,7 +84,8 @@ jobs:
       - name: Test
         run: |
           set -o pipefail
-          npm test 2>&1 | tee /tmp/frontend-test.log
+          # Coverage run — frontend vitest.config pins floor thresholds that were never enforced.
+          npm run test:coverage 2>&1 | tee /tmp/frontend-test.log
       # Job logs need an authenticated session to read; the run summary does not. Putting the tail
       # of the failure here makes it readable (and screenshottable) by whoever hits it.
       - name: Surface the failure in the run summary

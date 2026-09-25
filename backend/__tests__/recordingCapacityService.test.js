@@ -53,6 +53,9 @@ beforeEach(() => {
         );
     `);
     getFreeBytes.mockResolvedValue(100 * GB);
+    // The measured rate is cached 60s at module level — a previous test's 4h-span fixture would
+    // otherwise answer for this test's 10-minute one before the new DB is even consulted.
+    capacityService.resetRateCacheForTests();
 });
 
 afterEach(() => {

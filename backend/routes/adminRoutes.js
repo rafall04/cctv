@@ -22,6 +22,7 @@ import { authMiddleware, requireAdmin } from '../middleware/authMiddleware.js';
 import vehicleCountAdminRoutes from './vehicleCountAdminRoutes.js';
 import cameraTimeRoutes from './cameraTimeRoutes.js';
 import { createApiKeySchema, apiKeyIdParamSchema } from '../middleware/schemaValidators.js';
+import { config } from '../config/config.js';
 import mediaMtxService from '../services/mediaMtxService.js';
 import { stripUrlCredentials } from '../utils/logRedaction.js';
 
@@ -254,7 +255,7 @@ export default async function adminRoutes(fastify, options) {
         handler: async (request, reply) => {
             try {
                 const axios = (await import('axios')).default;
-                const pathsRes = await axios.get('http://localhost:9997/v3/paths/list', { timeout: 5000 });
+                const pathsRes = await axios.get(`${config.mediamtx.apiUrl}/v3/paths/list`, { timeout: 5000 });
                 const paths = pathsRes.data?.items || [];
                 
                 // Get raw readers data for debugging
@@ -299,7 +300,7 @@ export default async function adminRoutes(fastify, options) {
                 const axios = (await import('axios')).default;
                 
                 // Get configured paths from MediaMTX
-                const configRes = await axios.get('http://localhost:9997/v3/config/paths/list', { timeout: 5000 });
+                const configRes = await axios.get(`${config.mediamtx.apiUrl}/v3/config/paths/list`, { timeout: 5000 });
                 const configuredPaths = configRes.data?.items || [];
                 
                 // Get database cameras

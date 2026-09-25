@@ -12,6 +12,7 @@ import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 
 const spawnMock = vi.fn();
 const execMock = vi.fn();
+const execFileMock = vi.fn();
 const existsSyncMock = vi.fn();
 const mkdirSyncMock = vi.fn();
 const unlinkSyncMock = vi.fn();
@@ -38,6 +39,7 @@ const fsPromisesMock = {
 vi.mock('child_process', () => ({
     spawn: spawnMock,
     exec: execMock,
+    execFile: execFileMock,
 }));
 
 vi.mock('fs', () => ({
@@ -90,6 +92,9 @@ describe('recordingService external recording support', () => {
         vi.resetModules();
         vi.clearAllMocks();
         delete execMock[promisify.custom];
+        // Default: plenty of free bytes so unstubbed disk checks never trigger emergency
+        // cleanup; the disk-space tests override this with '100\n' per test.
+        execFileMock[promisify.custom] = vi.fn(async () => ({ stdout: '999999999999\n', stderr: '' }));
 
         existsSyncMock.mockReturnValue(true);
         statSyncMock.mockReturnValue({ size: 1024 });
@@ -911,7 +916,7 @@ describe('recordingService external recording support', () => {
     it('does not emergency-delete recent filesystem orphan recordings', async () => {
         const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
         vi.setSystemTime(Date.parse('2026-05-02T10:00:00.000Z'));
-        execMock[promisify.custom] = vi.fn(async () => ({ stdout: '100\n', stderr: '' }));
+        execFileMock[promisify.custom] = vi.fn(async () => ({ stdout: '100\n', stderr: '' }));
         const { recordingService } = await import('../services/recordingService.js');
         queryMock.mockReturnValue([]);
         queryOneMock.mockReturnValue({ recording_duration_hours: 5 });
@@ -933,7 +938,7 @@ describe('recordingService external recording support', () => {
 
     it('emergency disk cleanup does not directly delete filesystem final orphans', async () => {
         vi.setSystemTime(Date.parse('2026-05-02T10:00:00.000Z'));
-        execMock[promisify.custom] = vi.fn(async () => ({ stdout: '100\n', stderr: '' }));
+        execFileMock[promisify.custom] = vi.fn(async () => ({ stdout: '100\n', stderr: '' }));
         const { recordingService } = await import('../services/recordingService.js');
         const onSegmentSpy = vi.spyOn(recordingService, 'onSegmentCreated').mockImplementation(() => {});
 

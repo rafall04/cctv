@@ -96,7 +96,6 @@ MEDIAMTX_WEBRTC_URL_INTERNAL=http://localhost:${MEDIAMTX_WEBRTC_PORT}
 # Public Stream URLs
 PUBLIC_STREAM_BASE_URL=
 PUBLIC_HLS_PATH=/hls
-PUBLIC_WEBRTC_PATH=/webrtc
 
 # CORS Configuration
 CORS_ORIGIN=*
@@ -166,6 +165,10 @@ VITE_API_KEY=CHANGE_THIS_TO_YOUR_API_KEY
 EOF
 
 echo "✅ Frontend .env generated at: ${APP_DIR}/frontend/.env"
+
+# .env holds JWT_SECRET + DB credentials — 644 lets every local user on a shared
+# box read them (flagged in two consecutive audits). 600: owner-only.
+chmod 600 "${APP_DIR}/backend/.env" "${APP_DIR}/frontend/.env"
 
 # ============================================
 # Generate Nginx Configuration
@@ -243,16 +246,36 @@ server {
 
     client_max_body_size 10M;
 
-    # Security: Block sensitive files
+    # Security: Block sensitive files — same deny list as the hardened deployment/nginx.conf.
     location ~ /\.env { deny all; return 404; }
     location ~ /\.git { deny all; return 404; }
-    location ~ \.(bak|backup|old|sql|db|sqlite)$ { deny all; return 404; }
+    location ~ \.(bak|backup|old|orig|save|swp|swo|tmp)$ { deny all; return 404; }
+    location ~ /(config|configuration)\.(php|js|json|yml|yaml)\.bak$ { deny all; return 404; }
+    location ~ \.(sql|db|sqlite|sqlite3)$ { deny all; return 404; }
+    location ~ /\.ht { deny all; return 404; }
+    location ~ /\. { deny all; return 404; }
     location ~ /node_modules/ { deny all; return 404; }
+    location ~ /(package\.json|package-lock\.json|yarn\.lock|composer\.json|composer\.lock)$ { deny all; return 404; }
 
-    # Security Headers
-    add_header X-Frame-Options "SAMEORIGIN" always;
+    # Security Headers — same set as deployment/nginx.conf. '0' XSS auditor: deprecated,
+    # and itself an XSS vector. DENY (not SAMEORIGIN) — the SPA never frames itself.
+    add_header X-Frame-Options "DENY" always;
     add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
+    add_header X-XSS-Protection "0" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Permissions-Policy "geolocation=(self), microphone=(self), camera=()" always;
+    add_header Strict-Transport-Security "max-age=15552000; includeSubDomains" always;
+    server_tokens off;
+
+    location = /robots.txt {
+        try_files $uri =404;
+        add_header Content-Type text/plain;
+    }
+
+    location = /sitemap.xml {
+        try_files $uri =404;
+        add_header Content-Type application/xml;
+    }
 
     # Service Worker
     # `.webmanifest` tidak ada di mime.types bawaan nginx, jadi ia keluar sebagai
@@ -267,21 +290,63 @@ server {
     }
 
     location = /sw.js {
-        add_header Cache-Control "no-store, no-cache, must-revalidate";
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Cache-Control "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0";
+        add_header Pragma "no-cache";
+        add_header Expires "0";
+        add_header Service-Worker-Allowed "/";
         try_files $uri =404;
     }
 
     # Recording Playback (MUST be before /api/)
     location ^~ /api/recordings/ {
         proxy_pass http://localhost:BACKEND_PORT_PLACEHOLDER;
+        proxy_hide_header Content-Security-Policy;
+        proxy_hide_header X-Frame-Options;
+        proxy_hide_header X-Content-Type-Options;
+        proxy_hide_header X-XSS-Protection;
+        proxy_hide_header Referrer-Policy;
+        proxy_hide_header Permissions-Policy;
+        proxy_hide_header Strict-Transport-Security;
         proxy_http_version 1.1;
         proxy_set_header Host $http_host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_set_header Range $http_range;
+        proxy_set_header If-Range $http_if_range;
         proxy_buffering off;
+        proxy_cache off;
+        proxy_request_buffering off;
+        proxy_max_temp_file_size 0;
+        proxy_buffer_size 128k;
+        proxy_buffers 8 128k;
+        proxy_busy_buffers_size 256k;
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 300s;
         proxy_read_timeout 300s;
+        client_max_body_size 0;
+    }
+
+    # Thumbnails — own block so the *.jpg regex below can't steal them (same reason as
+    # ^~ on /api/): served by the backend's cameraAccessService gate, never from disk.
+    location ^~ /api/thumbnails/ {
+        proxy_pass http://localhost:BACKEND_PORT_PLACEHOLDER;
+        proxy_hide_header Content-Security-Policy;
+        proxy_hide_header X-Frame-Options;
+        proxy_hide_header X-Content-Type-Options;
+        proxy_hide_header X-XSS-Protection;
+        proxy_hide_header Referrer-Policy;
+        proxy_hide_header Permissions-Policy;
+        proxy_hide_header Strict-Transport-Security;
+        proxy_http_version 1.1;
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
     }
 
     # Backend API Proxy
@@ -290,11 +355,36 @@ server {
     # ending in .jpg (thumbnails) and serve it from the SPA root as a 404.
     location ^~ /api/ {
         proxy_pass http://localhost:BACKEND_PORT_PLACEHOLDER;
+        proxy_hide_header Content-Security-Policy;
+        proxy_hide_header X-Frame-Options;
+        proxy_hide_header X-Content-Type-Options;
+        proxy_hide_header X-XSS-Protection;
+        proxy_hide_header Referrer-Policy;
+        proxy_hide_header Permissions-Policy;
+        proxy_hide_header Strict-Transport-Security;
         proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
         proxy_set_header Host $http_host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+    }
+
+    # WebRTC is CLOSED — proxied raw to MediaMTX it bypasses canViewLive entirely.
+    # Never proxy it; re-enable only behind an auth_request → canViewLive gate.
+    location ^~ /webrtc/ {
+        return 403;
+    }
+
+    # MediaMTX push hooks are LOOPBACK-ONLY — MediaMTX curls 127.0.0.1:3000 directly,
+    # never through nginx. Block from the public internet as defense-in-depth.
+    location ^~ /api/internal/ {
+        return 403;
     }
 
     # HLS Stream Proxy
@@ -308,11 +398,27 @@ server {
         proxy_buffering off;
         proxy_cache hls_cache;
         proxy_cache_valid 200 2s;
+        proxy_cache_lock on;
+        proxy_cache_lock_timeout 5s;
+        proxy_cache_key "$scheme$proxy_host$request_uri";
         add_header X-Cache-Status $upstream_cache_status;
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
     }
 
-    # React SPA
+    # React SPA — this location owns its add_headers, so it inherits NONE of the
+    # server-level set; the full set is repeated on purpose (nginx semantics).
     location / {
+        add_header X-Frame-Options "DENY" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-XSS-Protection "0" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header Permissions-Policy "geolocation=(self), microphone=(self), camera=()" always;
+        add_header Strict-Transport-Security "max-age=15552000; includeSubDomains" always;
+        # 'unsafe-inline' script-src is REQUIRED while admin-configured atOptions ad
+        # blocks exist; camera embeds are operator-chosen origins -> frame-src any.
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.topcreativeformat.com https://*.topcreativeformat.com https://*.effectivegatecpm.com https://inklinkor.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: http:; font-src 'self' data:; connect-src 'self' ws: wss: https://nominatim.openstreetmap.org https://*.effectivegatecpm.com https://*.topcreativeformat.com https://inklinkor.com; media-src 'self' blob: http: https:; worker-src 'self' blob:; manifest-src 'self'; frame-src https: http:; form-action 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'" always;
         try_files $uri $uri/ /index.html;
     }
 
@@ -320,6 +426,7 @@ server {
     location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2)$ {
         expires 1y;
         add_header Cache-Control "public, immutable";
+        add_header X-Content-Type-Options "nosniff" always;
     }
 
     access_log /var/log/nginx/CLIENT_CODE_PLACEHOLDER-access.log;

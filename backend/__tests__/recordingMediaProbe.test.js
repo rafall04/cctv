@@ -22,23 +22,26 @@ describe('parseDurationStdout', () => {
 });
 
 describe('createRecordingMediaProbe.probeDuration', () => {
-    it('shells out to ffprobe with the configured timeout and returns parsed integer', async () => {
-        const execPromise = vi.fn().mockResolvedValue({ stdout: '600.5\n' });
-        const probe = createRecordingMediaProbe({ execPromise, timeoutMs: 1234 });
+    it('execFile ffprobe dengan argv array — path adalah arg terakhir, bukan string shell', async () => {
+        const execFilePromise = vi.fn().mockResolvedValue({ stdout: '600.5\n' });
+        const probe = createRecordingMediaProbe({ execFilePromise, timeoutMs: 1234 });
 
         const duration = await probe.probeDuration('/path/to/file.mp4');
 
         expect(duration).toBe(601);
-        expect(execPromise).toHaveBeenCalledWith(
-            expect.stringContaining('ffprobe'),
+        // No shell: the path travels as a plain argv entry — quotes/$( ) inside it can never
+        // become command injection even if a future caller loosens the filename regex.
+        expect(execFilePromise).toHaveBeenCalledWith(
+            'ffprobe',
+            expect.arrayContaining(['/path/to/file.mp4']),
             expect.objectContaining({ timeout: 1234, encoding: 'utf8' })
         );
-        expect(execPromise.mock.calls[0][0]).toContain('"/path/to/file.mp4"');
+        expect(execFilePromise.mock.calls[0][1].at(-1)).toBe('/path/to/file.mp4');
     });
 
     it('propagates errors from ffprobe', async () => {
-        const execPromise = vi.fn().mockRejectedValue(new Error('ffprobe missing'));
-        const probe = createRecordingMediaProbe({ execPromise });
+        const execFilePromise = vi.fn().mockRejectedValue(new Error('ffprobe missing'));
+        const probe = createRecordingMediaProbe({ execFilePromise });
 
         await expect(probe.probeDuration('/x')).rejects.toThrow(/ffprobe missing/);
     });

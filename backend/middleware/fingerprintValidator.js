@@ -74,6 +74,16 @@ export async function fingerprintAuthMiddleware(request, reply) {
             });
         }
 
+        // Only session 'access' JWTs authenticate here — a refresh token also carries
+        // fingerprint + sessionCreatedAt, so without this gate it would pass every check
+        // below. Same rule as authMiddleware.js (SESSION_TOKEN_TYPE).
+        if (decoded?.type !== 'access') {
+            return reply.code(401).send({
+                success: false,
+                message: 'Unauthorized - Invalid or expired token',
+            });
+        }
+
         // Check absolute session timeout (24 hours)
         if (isSessionExpired(decoded)) {
             logSessionInvalidated({

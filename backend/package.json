@@ -13,6 +13,7 @@
     "migrate-security": "node database/migrate_security.js",
     "extract:surabaya-sits": "node scripts/extractSurabayaSits.js",
     "test": "vitest --run",
+    "test:coverage": "vitest --run --coverage",
     "test:watch": "vitest"
   },
   "keywords": [

@@ -8,10 +8,10 @@ services:
     container_name: rafnet-cctv
     restart: unless-stopped
     ports:
-      - "3000:3000"    # Backend API
-      - "8888:8888"    # MediaMTX HLS
-      - "8889:8889"    # MediaMTX WebRTC
-      - "9997:9997"    # MediaMTX API
+      - "3000:3000"    # Backend API (nginx proxies /api + /hls here)
+    # MediaMTX ports (8554/8888/8889/9997/1935) must NEVER be published — they bind
+    # loopback inside the container and every public path goes through the backend's
+    # canViewLive gate on :3000. Publishing them would bypass the privacy boundary.
     volumes:
       # Persistent data
       - ./backend/data:/app/backend/data

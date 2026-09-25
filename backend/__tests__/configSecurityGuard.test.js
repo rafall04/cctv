@@ -46,6 +46,9 @@ describe('assertSecureConfig', () => {
         const assertSecureConfig = await loadGuard({
             NODE_ENV: 'production',
             JWT_SECRET: 'a'.repeat(48),
+            // Hermetic: the assertion is about the secret, but a production boot also requires a
+            // resolvable CORS origin — a fresh checkout has no .env to provide one ambiently.
+            ALLOWED_ORIGINS: 'https://cctv.example.test',
         });
         const result = assertSecureConfig();
         expect(result.ok).toBe(true);

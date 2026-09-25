@@ -179,7 +179,7 @@ class DatabaseConnectionPool {
             try {
                 return this.writeConnection.prepare(sql).all(params);
             } catch (error) {
-                console.error('[ConnectionPool] Query error:', error);
+                error.sql = sql;
                 throw error;
             }
         }
@@ -189,7 +189,7 @@ class DatabaseConnectionPool {
             const result = conn.prepare(sql).all(params);
             return result;
         } catch (error) {
-            console.error('[ConnectionPool] Query error:', error);
+            error.sql = sql;
             throw error;
         } finally {
             this.releaseReadConnection(conn);
@@ -209,7 +209,7 @@ class DatabaseConnectionPool {
             try {
                 return this.writeConnection.prepare(sql).get(params);
             } catch (error) {
-                console.error('[ConnectionPool] QueryOne error:', error);
+                error.sql = sql;
                 throw error;
             }
         }
@@ -219,7 +219,7 @@ class DatabaseConnectionPool {
             const result = conn.prepare(sql).get(params);
             return result;
         } catch (error) {
-            console.error('[ConnectionPool] QueryOne error:', error);
+            error.sql = sql;
             throw error;
         } finally {
             this.releaseReadConnection(conn);
@@ -238,7 +238,7 @@ class DatabaseConnectionPool {
             const result = conn.prepare(sql).run(params);
             return result;
         } catch (error) {
-            console.error('[ConnectionPool] Execute error:', error);
+            error.sql = sql;
             throw error;
         }
     }

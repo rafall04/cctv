@@ -85,7 +85,6 @@ PORT_PUBLIC=800
 # ===================================
 PUBLIC_STREAM_BASE_URL=
 PUBLIC_HLS_PATH=/hls
-PUBLIC_WEBRTC_PATH=/webrtc
 
 # ===================================
 # Security Secrets (CHANGE IN PRODUCTION!)
@@ -135,11 +134,15 @@ EOF
 
 print_success "Frontend .env created"
 
+# backend/.env carries JWT/API secrets — root-only, not the umask default.
+chmod 600 backend/.env frontend/.env
+
 # 5. Create necessary directories
 echo ""
 echo "📁 Creating directories..."
 mkdir -p backend/data recordings logs ssl
-chmod 755 recordings
+# 700: data holds cctv.db (credentials/PII); recordings holds subscriber footage.
+chmod 700 backend/data recordings
 print_success "Directories created"
 
 # 6. Build and start containers

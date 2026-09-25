@@ -120,11 +120,11 @@ function normalizeAccessCodeLength(value) {
     return Math.min(Math.max(parsed, MIN_ACCESS_CODE_LENGTH), MAX_ACCESS_CODE_LENGTH);
 }
 
-// Unknown values fall back to 'all' — the WIDEST scope. Safe only because every consumer decides
-// 'area' and 'selected' explicitly before its own fall-through: a new scope added here without a
-// branch in playbackTokenRuleService.resolveCameraAccess silently grants every camera.
+// Unknown values resolve to 'selected' — the NARROWEST scope (empty set = grant nothing).
+// Fail-open to 'all' here once meant a scope type added to the DB without a matching
+// branch in playbackTokenRuleService would silently grant every camera. Deny by default.
 function normalizeScopeType(value) {
-    return ['selected', 'area'].includes(value) ? value : 'all';
+    return ['all', 'area'].includes(value) ? value : 'selected';
 }
 
 function hashToken(token) {

@@ -21,6 +21,28 @@ import {
 } from '../controllers/recordingController.js';
 import { authMiddleware, optionalAuthMiddleware, requireAdmin } from '../middleware/authMiddleware.js';
 
+// Params/querystring were previously unvalidated — `?limit=abc` reached handlers as a string
+// and a path-traversal :cameraId/:filename fell through to the service layer. cameraId is
+// digits-only; filename follows the segment-stamp policy (YYYYMMDD_HHMMSS.mp4 — no '/', no '..').
+const cameraIdParamSchema = {
+    type: 'object',
+    required: ['cameraId'],
+    properties: { cameraId: { type: 'string', pattern: '^[0-9]+$' } }
+};
+const restartLimitQuerySchema = {
+    type: 'object',
+    properties: { limit: { type: 'integer', minimum: 1, maximum: 500 } },
+    additionalProperties: false
+};
+const segmentStreamParamSchema = {
+    type: 'object',
+    required: ['cameraId', 'filename'],
+    properties: {
+        cameraId: { type: 'string', pattern: '^[0-9]+$' },
+        filename: { type: 'string', pattern: '^\\d{8}_\\d{6}\\.mp4$' }
+    }
+};
+
 /**
  * Recording Routes
  * Admin routes untuk recording management dan public routes untuk playback
@@ -45,32 +67,38 @@ export default async function recordingRoutes(fastify) {
 
     // Get restart logs - MUST BE BEFORE :cameraId routes
     fastify.get('/recordings/restarts', {
-        onRequest: [authMiddleware]
+        onRequest: [authMiddleware],
+        schema: { querystring: restartLimitQuerySchema }
     }, getRestartLogs);
 
     // Start recording
     fastify.post('/recordings/:cameraId/start', {
-        onRequest: [authMiddleware, requireAdmin]
+        onRequest: [authMiddleware, requireAdmin],
+        schema: { params: cameraIdParamSchema }
     }, startRecording);
 
     // Stop recording
     fastify.post('/recordings/:cameraId/stop', {
-        onRequest: [authMiddleware, requireAdmin]
+        onRequest: [authMiddleware, requireAdmin],
+        schema: { params: cameraIdParamSchema }
     }, stopRecording);
 
     // Get recording status
     fastify.get('/recordings/:cameraId/status', {
-        onRequest: [authMiddleware]
+        onRequest: [authMiddleware],
+        schema: { params: cameraIdParamSchema }
     }, getRecordingStatus);
 
     // Update recording settings
     fastify.put('/recordings/:cameraId/settings', {
-        onRequest: [authMiddleware, requireAdmin]
+        onRequest: [authMiddleware, requireAdmin],
+        schema: { params: cameraIdParamSchema }
     }, updateRecordingSettings);
 
     // Get restart logs for specific camera
     fastify.get('/recordings/:cameraId/restarts', {
-        onRequest: [authMiddleware]
+        onRequest: [authMiddleware],
+        schema: { params: cameraIdParamSchema, querystring: restartLimitQuerySchema }
     }, getRestartLogs);
 
     // ============================================
@@ -79,7 +107,8 @@ export default async function recordingRoutes(fastify) {
 
     // Get segments untuk camera (untuk playback UI)
     fastify.get('/recordings/:cameraId/segments', {
-        onRequest: [optionalAuthMiddleware]
+        onRequest: [optionalAuthMiddleware],
+        schema: { params: cameraIdParamSchema }
     }, getSegments);
 
     // Stream ONE archived (Telegram) segment to the camera's OWNER. Static 'archive' is registered
@@ -98,11 +127,13 @@ export default async function recordingRoutes(fastify) {
 
     // Stream segment file
     fastify.get('/recordings/:cameraId/stream/:filename', {
-        onRequest: [optionalAuthMiddleware]
+        onRequest: [optionalAuthMiddleware],
+        schema: { params: segmentStreamParamSchema }
     }, streamSegment);
 
     // Generate HLS playlist
     fastify.get('/recordings/:cameraId/playlist.m3u8', {
-        onRequest: [optionalAuthMiddleware]
+        onRequest: [optionalAuthMiddleware],
+        schema: { params: cameraIdParamSchema }
     }, generatePlaylist);
 }

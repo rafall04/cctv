@@ -246,6 +246,10 @@ class ThumbnailService {
             return args;
         } else {
             args.push('-rw_timeout', '10000000');
+            // Remote-only input: without a whitelist an external_*_url of "file:///…" would
+            // decode a LOCAL recording into a public thumbnail. http/https/tls cover HLS and
+            // snapshots; crypto covers AES-128 segments. No file — that is the point.
+            args.push('-protocol_whitelist', 'http,https,tcp,tls,crypto');
         }
 
         args.push('-i', sourceUrl);

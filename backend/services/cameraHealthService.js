@@ -1409,7 +1409,7 @@ class CameraHealthService {
             timeout: timeoutMs,
             validateStatus: (status) => status < 500,
             headers: buildExternalRequestHeaders(acceptHeader),
-            maxRedirects: options.maxRedirects ?? 5,
+            maxRedirects: options.maxRedirects ?? 0,
             httpsAgent: isHttpsRequest ? requestOptions.httpsAgent : undefined,
         };
 
@@ -1543,7 +1543,7 @@ class CameraHealthService {
             timeout: timeoutMs,
             validateStatus: (status) => status < 500,
             headers: buildExternalRequestHeaders('image/*,*/*;q=0.8'),
-            maxRedirects: options.maxRedirects ?? 5,
+            maxRedirects: options.maxRedirects ?? 0,
             httpsAgent: isHttpsRequest ? requestOptions.httpsAgent : undefined,
             responseType: 'stream',
         };

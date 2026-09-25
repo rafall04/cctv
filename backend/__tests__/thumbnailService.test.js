@@ -139,6 +139,10 @@ describe('thumbnailService external thumbnails', () => {
         expect(args).toEqual([
             '-rw_timeout',
             '10000000',
+            // Remote-only input whitelist — without it a stored "file:///…" snapshot URL would
+            // let ffmpeg decode a LOCAL recording into a public thumbnail (SSRF/file-read fix).
+            '-protocol_whitelist',
+            'http,https,tcp,tls,crypto',
             '-i',
             'https://example.com/live/index.m3u8',
         ]);

@@ -118,11 +118,12 @@ function cleanupOldPasswords(userId) {
         
         const keepIds = toKeep.map(p => p.id);
         
-        // Delete passwords not in the keep list
+        // Delete passwords not in the keep list — placeholders, never string interpolation.
+        const placeholders = keepIds.map(() => '?').join(',');
         execute(
             `DELETE FROM password_history 
-             WHERE user_id = ? AND id NOT IN (${keepIds.join(',')})`,
-            [userId]
+             WHERE user_id = ? AND id NOT IN (${placeholders})`,
+            [userId, ...keepIds]
         );
     } catch (error) {
         console.error('Error cleaning up old passwords:', error);

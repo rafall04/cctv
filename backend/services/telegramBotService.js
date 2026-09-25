@@ -49,7 +49,7 @@ class TelegramBotService {
         this.abortController = null;
         this.loopPromise = null;
         this.tokenSeen = false;
-        this.startupLogged = false;
+        this.startupLogged = this.conflictActive = false;
     }
 
     // ---------------------------------------------------------------------
@@ -64,7 +64,7 @@ class TelegramBotService {
         this.isRunning = true;
         this.abortController = new AbortController();
         this.tokenSeen = false;
-        this.startupLogged = false;
+        this.startupLogged = this.conflictActive = false;
         this.loopPromise = this.runLoop().catch((error) => {
             console.error('[TelegramBot] Fatal loop error:', error?.message);
         });
@@ -136,13 +136,13 @@ class TelegramBotService {
                     continue;
                 }
                 if (!data.ok) {
-                    // 409 = a webhook OR another poller owns this token's update stream.
-                    // Either way getUpdates returns nothing until that is resolved.
-                    if (/conflict/i.test(data.description || '')) {
+                    const isConflict = /conflict/i.test(data.description || '');
+                    if (isConflict && !this.conflictActive) {
                         console.error('[TelegramBot] getUpdates 409 CONFLICT — another process is polling this bot token, or a webhook is set. Run ONE server per token and remove any webhook (deleteWebhook).');
-                    } else {
+                    } else if (!isConflict) {
                         console.error('[TelegramBot] getUpdates failed:', data.description);
                     }
+                    this.conflictActive = isConflict;
                     await this.sleep(API_ERROR_BACKOFF_MS);
                     continue;
                 }

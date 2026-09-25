@@ -288,7 +288,9 @@ describe('guardrail: a DB spy never falls through to the real database', () => {
      *
      * A terminal `.mockReturnValue(...)` costs one line and makes the mock total.
      */
-    const DB_FNS = new Set(['queryOne', 'query']);
+    // 'execute' and 'transaction' are the same DB boundary — a Once-chain on them falls
+    // through to the real cctv.db exactly like query/queryOne (2026-10 audit gap).
+    const DB_FNS = new Set(['queryOne', 'query', 'execute', 'transaction']);
     const ONCE = /mockReturnValueOnce|mockResolvedValueOnce|mockImplementationOnce/;
     const TERMINAL = /mockReturnValue\(|mockResolvedValue\(|mockImplementation\(/;
 
@@ -345,11 +347,18 @@ describe('guardrail: runtime-settings consumers are tested against an isolated d
         'services/passwordValidator.js',
         'services/passwordExpiry.js',
         'services/securitySettingsService.js',
+        // system_settings readers — same trap: asserts flip when an admin saves a setting.
+        'services/backupService.js',
+        'services/setupNotificationService.js',
+        'services/timezoneService.js',
     ].map((p) => path.basename(p, '.js'));
 
     // guardrails.test.js greps source text by name; it never imports these modules.
     const NOT_A_CONSUMER = new Set(['guardrails.test.js']);
-    const ISOLATED = /vi\.mock\(\s*['"][^'"]*connectionPool\.js['"]|:memory:/;
+    // Isolation = either a full module mock, an in-memory DB, or spying the pool's methods
+    // (spyOn without Once-chains is total — the sibling guardrail above forces a terminal
+    // default on every Once-chain, so spyOn here can't silently reach the real DB).
+    const ISOLATED = /vi\.mock\(\s*['"][^'"]*connectionPool\.js['"]|:memory:|vi\.spyOn\(\s*(connectionPool|database)\s*,/;
 
     it('any test importing a settings consumer mocks the database', () => {
         const offenders = [];

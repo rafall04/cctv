@@ -20,7 +20,13 @@ function listen(onConnection) {
         // holding unconsumed inbound data never processes the peer's FIN — the server socket
         // stays half-open and server.close() in afterEach waits on it forever. (The same
         // never-quite-closed shape as the bug under test, just on the other side.)
-        const server = net.createServer((socket) => { socket.resume(); onConnection(socket); });
+        const server = net.createServer((socket) => {
+            // Probe-side resetAndDestroy() lands here as ECONNRESET — expected teardown noise,
+            // not a test failure. Without a listener it surfaces as an unhandled error.
+            socket.on('error', () => {});
+            socket.resume();
+            onConnection(socket);
+        });
         servers.push(server);
         server.listen(0, '127.0.0.1', () => resolve(server.address().port));
     });

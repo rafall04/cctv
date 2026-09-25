@@ -20,6 +20,7 @@ const TMP_OUTPUT = path.join(RECORDINGS_BASE, 'camera9', '20260511_211000.tmp.mp
 const FINAL_OUTPUT = path.join(RECORDINGS_BASE, 'camera9', '20260511_211000.mp4');
 
 const execMock = vi.fn();
+const execFileMock = vi.fn();
 const spawnMock = vi.fn();
 const fsPromisesMock = {
     access: vi.fn(),
@@ -32,7 +33,7 @@ const fsPromisesMock = {
 const repository = { upsertSegment: vi.fn() };
 const diagnostics = { upsertDiagnostic: vi.fn(), clearDiagnostic: vi.fn() };
 
-vi.mock('child_process', () => ({ exec: execMock, spawn: spawnMock }));
+vi.mock('child_process', () => ({ exec: execMock, spawn: spawnMock, execFile: execFileMock }));
 vi.mock('fs', () => ({ promises: fsPromisesMock, existsSync: vi.fn(() => true), unlinkSync: vi.fn() }));
 
 /*
@@ -60,7 +61,7 @@ describe('recordingSegmentFinalizer', () => {
         vi.useFakeTimers();
         vi.resetModules();
         vi.clearAllMocks();
-        execMock[promisify.custom] = vi.fn(async () => ({ stdout: '240.2\n', stderr: '' }));
+        execFileMock[promisify.custom] = vi.fn(async () => ({ stdout: '240.2\n', stderr: '' }));
         fsPromisesMock.access.mockResolvedValue(undefined);
         fsPromisesMock.mkdir.mockResolvedValue(undefined);
         fsPromisesMock.stat
@@ -174,7 +175,7 @@ describe('recordingSegmentFinalizer', () => {
     });
 
     it('records retryable diagnostic when ffprobe returns zero duration', async () => {
-        execMock[promisify.custom] = vi.fn(async () => ({ stdout: '0\n', stderr: '' }));
+        execFileMock[promisify.custom] = vi.fn(async () => ({ stdout: '0\n', stderr: '' }));
         const { createRecordingSegmentFinalizer } = await import('../services/recordingSegmentFinalizer.js');
         const finalizer = createRecordingSegmentFinalizer({
             recordingsBasePath: RECORDINGS_BASE,

@@ -121,6 +121,12 @@ class RecordingCapacityService {
      * spare room — crossing it triggers bulk deletion of footage, so a retention that "fits" only
      * by eating into it does not actually fit.
      */
+    /* rateCache is module state that outlives a test fixture — without a reset, one test's
+       measured rate leaks into the next test's expectation. Mirrors playbackTelemetryService. */
+    resetRateCacheForTests() {
+        rateCache = { at: 0, value: null };
+    }
+
     async getCapacity() {
         const cameras = query(`
             SELECT id, recording_duration_hours
