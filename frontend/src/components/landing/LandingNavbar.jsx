@@ -68,7 +68,7 @@ export default function Navbar({ branding, layoutMode, onLayoutToggle }) {
                         {/* Flat primary, no gradient, no coloured drop shadow — the same call
                             already made for the admin shell logo tile. */}
                         <div className="relative">
-                            <div className="w-10 h-10 rounded-control bg-primary flex items-center justify-center text-white">
+                            <div className="w-10 h-10 rounded-control bg-primary flex items-center justify-center text-onprimary">
                                 <span className="text-lg font-bold">{branding.logo_text}</span>
                             </div>
                             {!unknown && cameraCount > 0 && (

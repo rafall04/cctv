@@ -120,7 +120,7 @@ export default function LandingDiscoveryStrip({
                                     onClick={() => setActiveKey(section.key)}
                                     className={`shrink-0 rounded-control px-3 py-2 text-xs font-medium transition-colors ${
                                         active
-                                            ? 'bg-primary text-white'
+                                            ? 'bg-primary text-onprimary'
                                             : 'text-content-muted hover:bg-surface-raised hover:text-content'
                                     }`}
                                 >

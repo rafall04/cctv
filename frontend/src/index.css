@@ -6,6 +6,10 @@
 :root {
     --primary-color: #0ea5e9;
     --primary-color-rgb: 14, 165, 233;
+    /* Foreground ON primary — recomputed at runtime by BrandingContext whenever the admin
+       changes --primary-color (white text fails WCAG AA on bright brands like #fa3333).
+       This default matches the default sky blue above: near-black is the legible choice. */
+    --primary-foreground: #0b0e13;
 }
 
 /*

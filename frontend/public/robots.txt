@@ -3,5 +3,5 @@ Allow: /
 Disallow: /admin/
 Disallow: /api/
 
-# Sitemap location (update with your domain after deployment)
-# Sitemap: https://your-domain.com/sitemap.xml
+# /sitemap.xml is served dynamically by the backend (it lists the live public
+# area pages) — no static file needs to be kept in sync.

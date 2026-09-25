@@ -121,7 +121,7 @@ export default function LandingMobileDock({
                     const active = item.key === viewMode;
                     const className = `relative flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 rounded-control px-1 py-2 text-[10px] font-medium leading-none transition-colors sm:text-[11px] ${
                         active
-                            ? 'bg-primary text-white'
+                            ? 'bg-primary text-onprimary'
                             : 'text-content-muted hover:bg-surface-raised hover:text-content'
                     }`;
                     const ariaLabel = item.key === 'quick' && favoriteCount > 0 ? `${item.label} ${favoriteCount}` : item.label;

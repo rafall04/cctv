@@ -40,7 +40,7 @@ export default function LandingViewModeSwitch({ viewMode, onChange }) {
                     aria-pressed={viewMode === button.key}
                     className={`flex min-h-[40px] min-w-0 items-center justify-center gap-1.5 rounded-control px-3 py-2 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary sm:min-h-0 sm:text-sm ${
                         viewMode === button.key
-                            ? 'bg-primary text-white'
+                            ? 'bg-primary text-onprimary'
                             : 'text-content-muted hover:bg-surface-raised hover:text-content'
                     }`}
                     title={button.title}

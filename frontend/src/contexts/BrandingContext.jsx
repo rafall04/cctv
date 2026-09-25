@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { brandingService } from '../services/brandingService';
 import { isPageTitleOwned } from '../utils/pageTitle.js';
+import { pickContrastingForeground } from '../utils/colorContrast.js';
 
 const BrandingContext = createContext();
 
@@ -81,6 +82,7 @@ export function BrandingProvider({ children }) {
                     const g = parseInt(hex.substring(2, 4), 16);
                     const b = parseInt(hex.substring(4, 6), 16);
                     document.documentElement.style.setProperty('--primary-color-rgb', `${r}, ${g}, ${b}`);
+                    document.documentElement.style.setProperty('--primary-foreground', pickContrastingForeground(data.primary_color));
                 }
             }
         } finally {

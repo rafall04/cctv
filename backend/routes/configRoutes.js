@@ -10,6 +10,7 @@ import {
     getVersionInfo,
     getManifest,
     buildManifestFromBranding,
+    buildSitemapXml,
 } from '../services/appConfigService.js';
 
 export default async function configRoutes(fastify) {
@@ -41,5 +42,17 @@ export default async function configRoutes(fastify) {
             fastify.log.error('Error generating manifest:', error);
             return buildManifestFromBranding();
         }
+    });
+
+    /**
+     * GET /sitemap.xml — static public pages + public area pages (no auth). Nginx proxies
+     * it through like every other non-asset path, so it always reflects the live area list.
+     */
+    fastify.get('/sitemap.xml', async (request, reply) => {
+        const protocol = request.headers['x-forwarded-proto'] ||
+            (request.socket.encrypted ? 'https' : 'http');
+        reply.header('Content-Type', 'application/xml');
+        reply.header('Cache-Control', 'public, max-age=3600');
+        return buildSitemapXml({ protocol, hostname: request.hostname });
     });
 }

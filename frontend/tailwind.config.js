@@ -43,6 +43,8 @@ export default {
                 },
                 // Data accent (not a status). See --data in index.css.
                 data: 'rgb(var(--data) / <alpha-value>)',
+                // Foreground ON primary — computed per brand color in BrandingContext.
+                onprimary: 'var(--primary-foreground)',
                 primary: {
                     DEFAULT: 'var(--primary-color)',
                     50: 'rgba(var(--primary-color-rgb), 0.05)',

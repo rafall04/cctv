@@ -102,7 +102,7 @@ export default function Hero({ branding, landingSettings, disableHeavyEffects, o
                     </span>
                     {branding.show_powered_by === 'true' && (
                         <span className="flex items-center gap-1.5 rounded-full border border-edge bg-surface px-2.5 py-1 text-[10px] font-semibold text-content-muted sm:ml-auto">
-                            <span className="flex h-4 w-4 items-center justify-center rounded bg-primary text-[9px] font-bold text-white">{branding.logo_text}</span>
+                            <span className="flex h-4 w-4 items-center justify-center rounded bg-primary text-[9px] font-bold text-onprimary">{branding.logo_text}</span>
                             <span>Powered by {branding.company_name}</span>
                         </span>
                     )}

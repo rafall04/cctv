@@ -66,7 +66,7 @@ function SimpleHeader({ branding, layoutMode, onLayoutToggle, disableHeavyEffect
                     <div className="flex min-w-0 items-center gap-2.5">
                         <Link to="/" className="flex shrink-0 items-center gap-2 transition-opacity hover:opacity-90" title={branding.company_name}>
                             <div className="relative">
-                                <div className="flex h-8 w-8 items-center justify-center rounded-control bg-primary text-white">
+                                <div className="flex h-8 w-8 items-center justify-center rounded-control bg-primary text-onprimary">
                                     <span className="text-sm font-bold">{branding.logo_text}</span>
                                 </div>
                                 {isLive && (
@@ -148,7 +148,7 @@ function SimpleFooter({ branding, saweriaEnabled, saweriaLink }) {
                 <div className="text-center space-y-3">
                     <div className="flex flex-col items-center gap-3">
                         <div className="inline-flex items-center gap-2 rounded-full border border-edge bg-surface px-4 py-2">
-                            <div className="flex h-7 w-7 items-center justify-center rounded-control bg-primary text-white">
+                            <div className="flex h-7 w-7 items-center justify-center rounded-control bg-primary text-onprimary">
                                 <span className="text-xs font-bold">{branding.logo_text}</span>
                             </div>
                             <span className="text-sm font-bold text-primary-600 dark:text-primary-400">{branding.company_name}</span>

@@ -487,7 +487,7 @@ export default function AreaPublicPage() {
                     <p className="mt-3 text-sm text-content-muted">
                         Area CCTV yang Anda buka belum tersedia untuk publik.
                     </p>
-                    <Link to="/" className="mt-6 inline-flex rounded-control bg-primary px-4 py-2 text-sm font-semibold text-white">
+                    <Link to="/" className="mt-6 inline-flex rounded-control bg-primary px-4 py-2 text-sm font-semibold text-onprimary">
                         Kembali ke CCTV Publik
                     </Link>
                 </div>

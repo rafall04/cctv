@@ -8,6 +8,7 @@
 
 import { config } from '../config/config.js';
 import { query } from '../database/connectionPool.js';
+import { PUBLIC_LIVE_SQL } from '../utils/cameraVisibility.js';
 
 export function getAppVersionInfo() {
     return {
@@ -110,4 +111,43 @@ export function getVersionInfo() {
 
 export function getManifest() {
     return buildManifestFromBranding(loadBrandingSettings());
+}
+
+const SITEMAP_STATIC_ROUTES = ['/', '/dukungan', '/sewa', '/daftar'];
+
+function xmlEscape(value) {
+    return String(value).replace(/[<>&'"]/g, (c) => (
+        { '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' }[c]
+    ));
+}
+
+/**
+ * GET /sitemap.xml — crawlable public entry points: the static public pages plus every
+ * area page that actually carries public cameras (the same rule the area route uses, so a
+ * slug with zero public cameras — e.g. an owner_private-only area — never leaks into it).
+ */
+export function buildSitemapXml({ protocol = 'https', hostname } = {}) {
+    const origin = `${protocol}://${hostname || config.security.frontendDomain || 'localhost'}`;
+    const areas = query(`
+        SELECT COALESCE(a.slug, LOWER(REPLACE(a.name, ' ', '-'))) AS slug
+        FROM areas a
+        WHERE EXISTS (
+            SELECT 1 FROM cameras c
+            WHERE c.area_id = a.id AND c.enabled = 1 AND ${PUBLIC_LIVE_SQL}
+        )
+        ORDER BY slug
+    `);
+
+    const today = new Date().toISOString().slice(0, 10);
+    const urls = [
+        ...SITEMAP_STATIC_ROUTES.map((path) => ({ loc: `${origin}${path}`, priority: path === '/' ? '1.0' : '0.7' })),
+        ...areas.map((a) => ({ loc: `${origin}/area/${xmlEscape(a.slug)}`, priority: '0.8' })),
+    ];
+
+    return [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+        ...urls.map(({ loc, priority }) => `  <url><loc>${loc}</loc><lastmod>${today}</lastmod><changefreq>hourly</changefreq><priority>${priority}</priority></url>`),
+        '</urlset>',
+    ].join('\n');
 }

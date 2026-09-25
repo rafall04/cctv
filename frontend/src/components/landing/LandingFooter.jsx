@@ -22,7 +22,7 @@ export default function Footer({ saweriaEnabled, saweriaLink, branding }) {
                         className="mx-auto mb-5 flex max-w-sm flex-col items-center gap-3"
                     >
                         <div className="flex items-center gap-2 rounded-full border border-edge bg-surface px-4 py-2 text-sm">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-control bg-primary text-white">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-control bg-primary text-onprimary">
                                 <span className="text-sm font-bold">{branding.logo_text}</span>
                             </div>
                             <span className="font-bold text-primary-600 dark:text-primary-400">{branding.company_name}</span>
