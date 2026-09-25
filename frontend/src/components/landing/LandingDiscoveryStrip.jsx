@@ -13,7 +13,10 @@ import { buildLandingDiscoverySections, formatLandingDiscoveryCount, LANDING_DIS
 function DiscoverySkeleton() {
     return (
         <section data-testid="landing-discovery-strip-loading" className="mx-auto max-w-7xl px-4 py-3 sm:px-6 lg:px-8">
-            <div className="h-[116px] animate-pulse rounded-card border border-edge bg-surface" />
+            {/* 156px matches the loaded card (tabs row + 72px items + padding) — the strip below
+                it does not jump when the skeleton swaps out (a mismatched shell was a measured
+                CLS source). */}
+            <div className="h-[156px] animate-pulse rounded-card border border-edge bg-surface" />
         </section>
     );
 }

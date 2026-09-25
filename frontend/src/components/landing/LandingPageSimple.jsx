@@ -388,9 +388,10 @@ export default function LandingPageSimple({
                 className="pt-2"
             />
 
-            {disableHeavyEffects
-                ? <DeferUntilVisible minHeight={120}>{quickAccessSection}</DeferUntilVisible>
-                : quickAccessSection}
+            {/* Not deferred: the section sits inside the first viewport on phones, so a placeholder
+                whose height never matches the real block is a guaranteed CLS — and the subtree is
+                too small (~20 nodes) for deferral to save anything. */}
+            {quickAccessSection}
 
             <main className="flex-1 min-h-0 pb-4 sm:pb-6">
                 {CamerasSection && (camerasReady ? (
