@@ -162,6 +162,71 @@ describe('LandingHero', () => {
         );
     });
 
+    /*
+     * CLS guardrail: `featured` baru ada setelah payload kamera tiba (~800ms di prod),
+     * dan sebelumnya deck hanya dua kolom saat featured ada — saat spotlight
+     * materializes, grid restruktur + seluruh konten di bawah hero terdorong
+     * (terukur 0.184 CLS pada ?mode=full&view=map). Selama loading, deck harus
+     * SUDAH dua kolom dengan skeleton seukuran kartu asli menempati slotnya.
+     */
+    it('mencadangkan slot spotlight selama loading agar deck tidak restruktur saat data tiba', () => {
+        cameraState.cameras = [];
+        cameraState.loading = true;
+        try {
+            const { container, unmount } = render(
+                <LandingHero
+                    branding={baseBranding}
+                    landingSettings={landingSettings}
+                    disableHeavyEffects
+                />
+            );
+
+            const deckWhileLoading = container.querySelector('.lg\\:grid-cols-\\[1\\.4fr_1fr\\]');
+            expect(deckWhileLoading).not.toBeNull();
+            expect(screen.getByTestId('spotlight-skeleton')).toBeTruthy();
+            expect(screen.queryByTestId('spotlight')).toBeNull();
+            unmount();
+        } finally {
+            cameraState.cameras = [{ id: 1, area_name: 'KAB SURABAYA', is_online: true, thumbnail_path: 'c1.jpg' }];
+            cameraState.loading = false;
+        }
+
+        // Setelah data tiba: kelas deck identik, skeleton digantikan kartu asli.
+        const { container } = render(
+            <LandingHero
+                branding={baseBranding}
+                landingSettings={landingSettings}
+                disableHeavyEffects
+            />
+        );
+        expect(container.querySelector('.lg\\:grid-cols-\\[1\\.4fr_1fr\\]')).not.toBeNull();
+        expect(screen.queryByTestId('spotlight-skeleton')).toBeNull();
+        expect(screen.getByTestId('spotlight')).toBeTruthy();
+    });
+
+    /*
+     * Edge case jujur: fetch selesai tanpa satu pun kamera layak sorot (semua
+     * offline / tanpa thumbnail / backend unreachable) — skeleton tidak boleh
+     * tinggal selamanya menyiratkan "masih memuat".
+     */
+    it('menarik skeleton begitu data selesai tanpa kamera layak sorot', () => {
+        const previous = cameraState.cameras;
+        cameraState.cameras = [];
+        cameraState.loading = false;
+        try {
+            render(
+                <LandingHero
+                    branding={baseBranding}
+                    landingSettings={landingSettings}
+                    disableHeavyEffects
+                />
+            );
+            expect(screen.queryByTestId('spotlight-skeleton')).toBeNull();
+        } finally {
+            cameraState.cameras = previous;
+        }
+    });
+
     it('tidak merender powered by saat dinonaktifkan', () => {
         render(
             <LandingHero

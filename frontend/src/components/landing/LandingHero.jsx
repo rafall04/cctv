@@ -122,12 +122,39 @@ export default function Hero({ branding, landingSettings, disableHeavyEffects, o
                     </p>
                 </div>
 
-                <div className={`mt-6 grid gap-4 ${featured ? 'lg:grid-cols-[1.4fr_1fr] lg:items-stretch' : ''}`}>
-                    <LandingHeroSpotlight
-                        camera={featured}
-                        onOpen={onCameraClick}
-                        disableHeavyEffects={disableHeavyEffects}
-                    />
+                {/*
+                  * The deck is two columns from the FIRST paint while data is still
+                  * in flight — not only once `featured` exists. The payload lands
+                  * ~800ms in, and if the grid only restructures then, the spotlight
+                  * card materializes out of nowhere and pushes everything below the
+                  * hero ~250px (measured: the 0.184 CLS on /?mode=full&view=map).
+                  * The skeleton borrows the real card's geometry so the swap is
+                  * pixel-identical; it comes out once data settles with nothing to
+                  * spotlight, because a permanent placeholder would claim a camera
+                  * is coming that never does.
+                  */}
+                <div className={`mt-6 grid gap-4 ${featured || loading ? 'lg:grid-cols-[1.4fr_1fr] lg:items-stretch' : ''}`}>
+                    {featured ? (
+                        <LandingHeroSpotlight
+                            camera={featured}
+                            onOpen={onCameraClick}
+                            disableHeavyEffects={disableHeavyEffects}
+                        />
+                    ) : loading ? (
+                        <div
+                            data-testid="spotlight-skeleton"
+                            aria-hidden="true"
+                            className="overflow-hidden rounded-card border border-edge bg-surface"
+                        >
+                            <div className="aspect-video bg-black" />
+                            <div className="flex items-center gap-3 border-t border-edge px-3.5 py-2.5">
+                                <span className="min-w-0 flex-1">
+                                    <span className="block h-4 w-2/3 rounded bg-surface-sunken" />
+                                    <span className="mt-1.5 block h-3 w-1/3 rounded bg-surface-sunken" />
+                                </span>
+                            </div>
+                        </div>
+                    ) : null}
                     <LandingStatsBar onCameraClick={onCameraClick} />
                 </div>
             </div>
