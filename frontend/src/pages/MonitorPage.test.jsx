@@ -29,10 +29,17 @@ vi.mock('../contexts/BrandingContext', () => ({
     useBranding: () => ({ branding: { logo_text: 'R', company_name: 'RAF NET' } }),
 }));
 
-const playerState = { status: 'playing', kind: null, httpCode: null, message: '', needsGesture: false };
+// Two slots each run their own useHlsLivePlayer instance — the mock must be able to answer
+// per resetKey (camera id), not with one global state.
+const { hookSpy, playerStates } = vi.hoisted(() => ({
+    hookSpy: vi.fn(),
+    playerStates: {},
+}));
+
+const P = (over = {}) => ({ status: 'playing', kind: null, httpCode: null, message: '', needsGesture: false, ...over });
 
 vi.mock('../hooks/useHlsLivePlayer', () => ({
-    useHlsLivePlayer: () => playerState,
+    useHlsLivePlayer: (opts) => hookSpy(opts),
 }));
 
 // Mirror the real contract: streams resolve on demand (the public list carries none), and a
@@ -40,8 +47,6 @@ vi.mock('../hooks/useHlsLivePlayer', () => ({
 vi.mock('../utils/directStreamHelper', () => ({
     resolveStreamUrl: (camera) => ({ targetUrl: camera?.streams?.hls || null, proxyFallbackUrl: null, isDirectStream: false }),
 }));
-
-import resolvePublicPopupCamera from '../services/publicCameraResolver';
 
 vi.mock('../services/publicCameraResolver', () => ({
     default: vi.fn(async (camera) => camera),
@@ -75,9 +80,14 @@ describe('MonitorPage — Mode Monitor', () => {
         cameraState.loading = false;
         cameraState.dataUnavailable = false;
         cameraState.backgroundRefreshError = null;
-        playerState.status = 'playing';
-        playerState.needsGesture = false;
-        playerState.message = '';
+        Object.keys(playerStates).forEach((key) => delete playerStates[key]);
+        hookSpy.mockReset();
+        // Stable object per resetKey — the real hook returns the same state object between
+        // renders; a fresh P() every call would make the slot re-report forever (render loop).
+        hookSpy.mockImplementation((opts) => {
+            if (!playerStates[opts.resetKey]) playerStates[opts.resetKey] = P();
+            return playerStates[opts.resetKey];
+        });
     });
 
     afterEach(() => {
@@ -124,8 +134,7 @@ describe('MonitorPage — Mode Monitor', () => {
     });
 
     it('melewati kamera yang stream-nya gagal setelah jeda singkat, bukan diam di layar error', () => {
-        playerState.status = 'error';
-        playerState.message = 'Stream terputus.';
+        playerStates[CAM_A.id] = P({ status: 'error', message: 'Stream terputus.' });
 
         renderMonitor();
 
@@ -170,8 +179,7 @@ describe('MonitorPage — Mode Monitor', () => {
     });
 
     it('menampilkan affordance ketuk-putar saat autoplay ditolak browser', () => {
-        playerState.status = 'loading';
-        playerState.needsGesture = true;
+        playerStates[CAM_A.id] = P({ status: 'loading', needsGesture: true });
 
         renderMonitor();
 
@@ -204,7 +212,7 @@ describe('MonitorPage — Mode Monitor', () => {
     });
 
     it('dwell hanya berjalan saat siaran benar-benar diputar — loading tidak memakan slot', () => {
-        playerState.status = 'loading';
+        playerStates[CAM_A.id] = P({ status: 'loading' });
         const view = renderMonitor(['/monitor?area=all&interval=10']);
 
         // 10 detik loading (di bawah batas macet) — belum pindah.
@@ -213,7 +221,7 @@ describe('MonitorPage — Mode Monitor', () => {
         expect(screen.getByText('1/2')).toBeTruthy();
 
         // Stream mulai diputar -> dwell 10 detik baru dihitung dari sini.
-        act(() => { playerState.status = 'playing'; });
+        act(() => { playerStates[CAM_A.id] = P(); });
         view.rerender(
             <MemoryRouter initialEntries={['/monitor?area=all&interval=10']}>
                 <Routes>
@@ -226,7 +234,7 @@ describe('MonitorPage — Mode Monitor', () => {
     });
 
     it('kamera yang loading macet dilewati setelah batas wajar, bukan membekukan wall', () => {
-        playerState.status = 'loading';
+        playerStates[CAM_A.id] = P({ status: 'loading' });
 
         renderMonitor(['/monitor?area=all&interval=10']);
         act(() => { vi.advanceTimersByTime(15000); });
@@ -235,13 +243,40 @@ describe('MonitorPage — Mode Monitor', () => {
         expect(screen.getByText('2/2')).toBeTruthy();
     });
 
-    it('pra-panaskan stream kamera berikutnya agar transisi tidak mulai dari nol', async () => {
-        renderMonitor(['/monitor?area=all&interval=10']);
-        await act(async () => { await Promise.resolve(); });
+    it('menjalankan dua slot: kamera tampil + kamera berikutnya diputar penuh di latar', () => {
+        renderMonitor();
 
-        expect(resolvePublicPopupCamera).toHaveBeenCalledWith(
-            expect.objectContaining({ id: CAM_B.id }),
-            expect.any(Array),
-        );
+        const videos = document.querySelectorAll('video');
+        expect(videos).toHaveLength(2);
+        const ids = [...videos].map((video) => video.dataset.cameraId);
+        expect(ids).toContain(String(CAM_A.id));
+        expect(ids).toContain(String(CAM_B.id));
+
+        // Kedua slot memakai player live sungguhan (active) — slot belakang benar-benar
+        // streaming (muxer tetap hangat + frame sudah ter-decode), bukan fetch playlist sekali.
+        const calls = hookSpy.mock.calls.map((call) => call[0]);
+        expect(calls.some((opts) => opts.resetKey === CAM_A.id && opts.active)).toBe(true);
+        expect(calls.some((opts) => opts.resetKey === CAM_B.id && opts.active)).toBe(true);
+    });
+
+    it('rotasi hanya menukar visibilitas — kamera berikutnya sudah diputar, tanpa jeda memuat', () => {
+        renderMonitor();
+
+        // Slot belakang sudah 'playing' jauh sebelum gilirannya (default P()).
+        act(() => { vi.advanceTimersByTime(10000); });
+
+        const videos = [...document.querySelectorAll('video')];
+        const visible = videos.filter((video) => video.getAttribute('aria-hidden') !== 'true');
+        expect(visible).toHaveLength(1);
+        expect(visible[0].dataset.cameraId).toBe(String(CAM_B.id));
+        expect(screen.queryByText(/Memuat siaran/)).toBeNull();
+    });
+
+    it('hanya merender satu slot saat kamera playable tinggal satu', () => {
+        cameraState.cameras = [CAM_A];
+
+        renderMonitor();
+
+        expect(document.querySelectorAll('video')).toHaveLength(1);
     });
 });

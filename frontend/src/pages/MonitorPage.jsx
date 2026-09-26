@@ -17,6 +17,13 @@
  * 5–120). A stream that errors is skipped early — a dead feed must never hold a wall slot.
  * Offline/maintenance/no-URL cameras never enter the rotation. Chrome fades after a few idle
  * seconds so the wall reads clean on a TV; any pointer/key wake brings it back.
+ *
+ * Double-buffer: the wall runs TWO player slots like a TV channel-surf — the visible slot plays
+ * the current camera while a hidden slot plays the NEXT camera outright (an active reader keeps
+ * the MediaMTX muxer warm AND decodes frames ahead of time). Rotation is then a visibility swap,
+ * not a cold start; a one-shot playlist "prewarm" fetch can't achieve this because the muxer
+ * goes cold again the moment that request ends. Cost: one extra live stream's bandwidth, which
+ * the operator explicitly accepted — correctness of the wall beats saving a couple of Mbit.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -57,6 +64,39 @@ function MonitorClock() {
     );
 }
 
+const SLOT_LOADING = { status: 'loading', kind: null, httpCode: null, message: '', needsGesture: false };
+
+// One player slot = one <video> + one useHlsLivePlayer instance. The slot reports its player
+// state upward so the parent can drive dwell/advance/overlays off the VISIBLE slot only.
+// An invisible slot still streams — that is the preload.
+function MonitorSlot({ camera, cameras, visible, onStatus, videoRef }) {
+    const resolveStream = useCallback(async () => {
+        const resolved = await resolvePublicPopupCamera(camera, cameras) || camera;
+        const { targetUrl } = resolveStreamUrl(resolved);
+        if (!targetUrl) throw Object.assign(new Error('Stream tidak tersedia'), { friendly: true });
+        return targetUrl;
+    }, [camera, cameras]);
+    const player = useHlsLivePlayer({
+        videoRef,
+        resolveStream,
+        resetKey: camera?.id ?? 'kosong',
+        active: Boolean(camera),
+        videoCodec: camera?.video_codec,
+    });
+    useEffect(() => { onStatus(player); }, [player, onStatus]);
+    return (
+        <video
+            ref={videoRef}
+            data-camera-id={camera?.id}
+            muted
+            playsInline
+            aria-hidden={!visible}
+            aria-label={visible && camera ? `Siaran langsung ${camera.name}` : undefined}
+            className={`absolute inset-0 h-full w-full bg-black object-contain transition-opacity duration-500 ${visible ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+        />
+    );
+}
+
 function MonitorView() {
     const { cameras, areas, loading, dataUnavailable, backgroundRefreshError } = useCameras();
     const { branding } = useBranding();
@@ -92,80 +132,67 @@ function MonitorView() {
     );
 
     const [index, setIndex] = useState(0);
+    const [front, setFront] = useState(0);
     const [paused, setPaused] = useState(false);
     const [chromeVisible, setChromeVisible] = useState(true);
-    const videoRef = useRef(null);
     const current = playable.length > 0 ? playable[Math.min(index, playable.length - 1)] : null;
     const nextCamera = playable.length > 1 ? playable[(Math.min(index, playable.length - 1) + 1) % playable.length] : null;
+
+    // Slot assignment is derived: the `front` slot shows `current`, the other slot plays
+    // `nextCamera` as a live preload. Rotating = advance index + swap front — the camera that
+    // was preloading becomes visible with its already-decoded stream, and its old slot picks up
+    // the new next camera.
+    const slotCameras = [null, null];
+    slotCameras[front] = current;
+    if (nextCamera) slotCameras[1 - front] = nextCamera;
+
+    const [slotStates, setSlotStates] = useState([SLOT_LOADING, SLOT_LOADING]);
+    const videoRefs = [useRef(null), useRef(null)];
+    const reportStatus = useCallback((slot, p) => {
+        setSlotStates((prev) => (prev[slot] === p ? prev : (slot === 0 ? [p, prev[1]] : [prev[0], p])));
+    }, []);
+    const report0 = useCallback((p) => reportStatus(0, p), [reportStatus]);
+    const report1 = useCallback((p) => reportStatus(1, p), [reportStatus]);
+    const frontStatus = slotStates[front];
 
     // The list can shrink mid-cycle when a camera goes offline between refreshes.
     useEffect(() => {
         if (index >= playable.length) setIndex(0);
     }, [index, playable.length]);
 
-    // Pre-warm the NEXT camera while the current slot plays: resolve its stream grant AND
-    // touch the internal playlist once, so the MediaMTX muxer is already warm at switch time
-    // and the transition doesn't burn its first seconds on a cold resolve. Internal paths only —
-    // an external absolute URL warms nothing on our side and would just cost a CORS hit.
-    const prewarmRef = useRef(null);
-    useEffect(() => {
-        if (!nextCamera) return undefined;
-        let stale = false;
-        resolvePublicPopupCamera(nextCamera, cameras)
-            .then((resolved) => {
-                if (stale || !resolved) return;
-                prewarmRef.current = { id: nextCamera.id, camera: resolved };
-                const { targetUrl } = resolveStreamUrl(resolved);
-                if (targetUrl && targetUrl.startsWith('/')) {
-                    fetch(targetUrl, { credentials: 'omit', cache: 'no-store' }).catch(() => {});
-                }
-            })
-            .catch(() => {});
-        return () => { stale = true; };
-    }, [nextCamera, cameras]);
-
-    const resolveStream = useCallback(async () => {
-        const warm = prewarmRef.current?.id === current?.id ? prewarmRef.current.camera : null;
-        const resolved = warm || await resolvePublicPopupCamera(current, cameras) || current;
-        const { targetUrl } = resolveStreamUrl(resolved);
-        if (!targetUrl) throw Object.assign(new Error('Stream tidak tersedia'), { friendly: true });
-        return targetUrl;
-    }, [current, cameras]);
-
-    const player = useHlsLivePlayer({
-        videoRef,
-        resolveStream,
-        resetKey: current?.id ?? 'kosong',
-        active: Boolean(current),
-        videoCodec: current?.video_codec,
-    });
+    const advance = useCallback(() => {
+        setIndex((prev) => (prev + 1) % playable.length);
+        setFront((prev) => 1 - prev);
+    }, [playable.length]);
 
     const stepCamera = useCallback((delta) => {
         setIndex((prev) => (prev + delta + playable.length) % playable.length);
+        setFront((prev) => 1 - prev);
     }, [playable.length]);
 
-    // Rotation dwell counts WATCH time, not load time: the timer only runs while the player
-    // reports 'playing' (a decoded frame — not merely a fetched playlist). Loading/warmup
-    // seconds belong to the stream, not to the viewer.
+    // Rotation dwell counts WATCH time, not load time: the timer only runs while the VISIBLE
+    // player reports 'playing' (a decoded frame — not merely a fetched playlist). A preloaded
+    // slot usually already reports 'playing' when it becomes visible, so the dwell starts
+    // immediately after the swap.
     useEffect(() => {
-        if (paused || playable.length < 2 || player.status !== 'playing') return undefined;
-        const timer = setTimeout(() => setIndex((prev) => (prev + 1) % playable.length), rotateSeconds * 1000);
+        if (paused || playable.length < 2 || frontStatus.status !== 'playing') return undefined;
+        const timer = setTimeout(advance, rotateSeconds * 1000);
         return () => clearTimeout(timer);
-    }, [index, paused, playable.length, rotateSeconds, player.status]);
+    }, [index, front, paused, playable.length, rotateSeconds, frontStatus.status, advance]);
 
     // …but a camera stuck loading must not freeze the wall — give it a fair chance, then skip.
     useEffect(() => {
-        if (player.status !== 'loading' || playable.length < 2) return undefined;
-        const timer = setTimeout(() => setIndex((prev) => (prev + 1) % playable.length), MAX_LOAD_MS);
+        if (frontStatus.status !== 'loading' || playable.length < 2) return undefined;
+        const timer = setTimeout(advance, MAX_LOAD_MS);
         return () => clearTimeout(timer);
-    }, [index, player.status, playable.length]);
+    }, [index, front, frontStatus.status, playable.length, advance]);
 
     // A dead stream must not hold the wall: hop to the next camera after a short verdict beat.
     useEffect(() => {
-        if (player.status !== 'error' || playable.length < 2) return undefined;
-        const timer = setTimeout(() => setIndex((prev) => (prev + 1) % playable.length), ERROR_ADVANCE_MS);
+        if (frontStatus.status !== 'error' || playable.length < 2) return undefined;
+        const timer = setTimeout(advance, ERROR_ADVANCE_MS);
         return () => clearTimeout(timer);
-    }, [player.status, playable.length]);
+    }, [frontStatus.status, playable.length, advance]);
 
     // Chrome auto-hide — the wall is for watching; any gesture wakes it.
     useEffect(() => {
@@ -297,33 +324,38 @@ function MonitorView() {
 
     return (
         <div className={`fixed inset-0 select-none bg-black ${chromeVisible ? '' : 'cursor-none'}`}>
-            <video
-                ref={videoRef}
-                muted
-                playsInline
-                className="absolute inset-0 h-full w-full bg-black object-contain"
-                aria-label={`Siaran langsung ${current.name}`}
-            />
+            {slotCameras.map((camera, slot) => (
+                (camera || slot === front) && (
+                    <MonitorSlot
+                        key={slot}
+                        camera={camera}
+                        cameras={cameras}
+                        visible={slot === front}
+                        onStatus={slot === 0 ? report0 : report1}
+                        videoRef={videoRefs[slot]}
+                    />
+                )
+            ))}
             <span className="sr-only" aria-live="polite">Menampilkan {current.name}</span>
 
-            {player.status === 'loading' && !player.needsGesture && (
-                <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-sm text-white/60">
+            {frontStatus.status === 'loading' && !frontStatus.needsGesture && (
+                <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center text-sm text-white/60">
                     Memuat siaran…
                 </div>
             )}
-            {player.status === 'loading' && player.needsGesture && (
+            {frontStatus.status === 'loading' && frontStatus.needsGesture && (
                 <button
                     type="button"
-                    onClick={() => videoRef.current?.play().catch(() => {})}
+                    onClick={() => videoRefs[front].current?.play?.().catch(() => {})}
                     className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-black/60 text-white"
                 >
                     <span className="text-4xl leading-none">▶</span>
                     <span className="text-sm">Ketuk untuk memutar</span>
                 </button>
             )}
-            {player.status === 'error' && (
-                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/80 px-6 text-center">
-                    <p className="text-sm text-status-fault">{player.message}</p>
+            {frontStatus.status === 'error' && (
+                <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-black/80 px-6 text-center">
+                    <p className="text-sm text-status-fault">{frontStatus.message}</p>
                     {playable.length > 1 && <p className="text-xs text-white/50">Melewati kamera ini…</p>}
                 </div>
             )}
@@ -380,7 +412,7 @@ function MonitorView() {
                     </div>
                 </div>
                 {/* Dwell progress — fills only while the stream actually plays, matching the timer. */}
-                {!paused && playable.length > 1 && player.status === 'playing' && (
+                {!paused && playable.length > 1 && frontStatus.status === 'playing' && (
                     <div className="mt-2 h-0.5 overflow-hidden rounded-full bg-white/15">
                         <div
                             key={`${current.id}-${index}`}
