@@ -79,6 +79,8 @@ const RegisterPage = lazyWithRetry(() => import('./pages/RegisterPage'), 'regist
 // and admin /admin/playback routes already render it inside <Suspense>, and LandingCamerasSection also
 // imports it dynamically — so Vite splits it into its own chunk loaded only when playback is opened.
 const Playback = lazyWithRetry(() => import('./pages/Playback'), 'playback');
+// Mode Monitor (pos-ronda TV wall) — visited rarely, keeps its own chunk so the landing stays light.
+const MonitorPage = lazyWithRetry(() => import('./pages/MonitorPage'), 'monitor-page');
 
 // Public visitor routes: own ErrorBoundary so a crash in one public page
 // (e.g. a bad camera record in the landing/map/playback subtree) shows a
@@ -149,6 +151,9 @@ function App() {
                 } />
                 <Route path="/playback" element={
                     <PublicPageRoute><Playback accessScope="public_preview" /></PublicPageRoute>
+                } />
+                <Route path="/monitor" element={
+                    <PublicPageRoute><MonitorPage /></PublicPageRoute>
                 } />
                 <Route path="/dukungan" element={
                     <PublicPageRoute><SupportPage /></PublicPageRoute>

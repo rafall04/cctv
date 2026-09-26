@@ -39,6 +39,7 @@ const Icons = {
     Sun: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="4" /><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" /></svg>,
     Moon: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" /></svg>,
     Bolt: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>,
+    Tv: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><rect x="2" y="7" width="20" height="13" rx="2" /><path d="M17 2l-5 5-5-5" /></svg>,
 };
 
 function SimpleHeader({ branding, layoutMode, onLayoutToggle, disableHeavyEffects = false }) {
@@ -97,6 +98,16 @@ function SimpleHeader({ branding, layoutMode, onLayoutToggle, disableHeavyEffect
                     </div>
 
                     <div className="flex shrink-0 items-center gap-2">
+                        {/* Mode Monitor — rute React biasa (bukan dokumen statis seperti /sewa/),
+                            jadi Link SPA aman di sini. */}
+                        <Link
+                            to="/monitor"
+                            aria-label="Mode Monitor — putar semua kamera bergantian"
+                            title="Mode Monitor — putar semua kamera bergantian"
+                            className="rounded-control border border-edge bg-surface p-2 text-content-muted transition-colors hover:border-edge-strong hover:text-content"
+                        >
+                            <Icons.Tv />
+                        </Link>
                         <LayoutModeToggle
                             layoutMode={layoutMode}
                             onChange={handleLayoutChange}

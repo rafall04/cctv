@@ -123,6 +123,16 @@ export default function Navbar({ branding, layoutMode, onLayoutToggle }) {
                         >
                             Sewa
                         </a>
+                        {/* Mode Monitor: TV-wall pos ronda di rute sendiri — Link SPA biasa,
+                            bukan <a>, karena /monitor adalah rute React (beda dengan /sewa/). */}
+                        <Link
+                            to="/monitor"
+                            aria-label="Mode Monitor — putar semua kamera bergantian"
+                            title="Mode Monitor — putar semua kamera bergantian"
+                            className="rounded-control border border-edge p-2.5 text-content-muted transition-colors hover:border-edge-strong hover:bg-surface-raised hover:text-content"
+                        >
+                            <Icons.Tv />
+                        </Link>
                         <LayoutModeToggle
                             layoutMode={layoutMode}
                             onChange={handleLayoutChange}
