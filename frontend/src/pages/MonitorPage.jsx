@@ -6,7 +6,9 @@
  *          the landing grid renders — so the public/private boundary is inherited unchanged.
  * Caller: App.jsx public route "/monitor"; navbar/simple-header monitor link.
  * Deps: CameraContext (public list + freshness), BrandingContext, useHlsLivePlayer (shared
- *       playback core), isCameraPlayable + resolveStreamUrl (same playability rule the cards use).
+ *       playback core), isCameraPlayable + getStreamCapabilities (same playability rule the
+ *       cards use), resolvePublicPopupCamera (same /api/stream/:id resolution the popup uses —
+ *       the public list carries no streams, so URLs resolve per camera on demand).
  * MainFuncs: MonitorPage (provider shell), MonitorView (wall), readRotateSeconds.
  * SideEffects: One live HLS session at a time (auto-released on rotate); keydown + pointer listeners;
  *              chrome auto-hide timer.
@@ -25,6 +27,8 @@ import { useBranding } from '../contexts/BrandingContext';
 import { useHlsLivePlayer } from '../hooks/useHlsLivePlayer';
 import { isCameraPlayable } from '../utils/cameraAvailability';
 import { resolveStreamUrl } from '../utils/directStreamHelper';
+import { getStreamCapabilities } from '../utils/cameraDelivery';
+import resolvePublicPopupCamera from '../services/publicCameraResolver';
 
 const ROTATE_DEFAULT_SECONDS = 20;
 const ROTATE_MIN_SECONDS = 5;
@@ -58,10 +62,15 @@ function MonitorView() {
     const navigate = useNavigate();
     const rotateSeconds = readRotateSeconds(searchParams);
 
-    // Playable = the same verdict the card grid renders: online-ish, not maintenance — plus a
-    // resolvable public stream URL, or the slot would just burn its seconds on an error.
+    // Playable = the same verdict the card grid renders: online-ish, not maintenance — plus an
+    // HLS-playable capability. The public list carries no `streams`; the URL is resolved per
+    // camera on demand (same path as the popup), so upfront URL checks would empty the wall.
     const playable = useMemo(
-        () => cameras.filter((camera) => isCameraPlayable(camera) && Boolean(resolveStreamUrl(camera).targetUrl)),
+        () => cameras.filter((camera) => {
+            if (!isCameraPlayable(camera)) return false;
+            const caps = getStreamCapabilities(camera);
+            return caps.popup === true && caps.supported_player === 'hls';
+        }),
         [cameras],
     );
 
@@ -78,10 +87,11 @@ function MonitorView() {
     }, [index, playable.length]);
 
     const resolveStream = useCallback(async () => {
-        const { targetUrl } = resolveStreamUrl(current);
+        const resolved = await resolvePublicPopupCamera(current, cameras) || current;
+        const { targetUrl } = resolveStreamUrl(resolved);
         if (!targetUrl) throw Object.assign(new Error('Stream tidak tersedia'), { friendly: true });
         return targetUrl;
-    }, [current]);
+    }, [current, cameras]);
 
     const player = useHlsLivePlayer({
         videoRef,

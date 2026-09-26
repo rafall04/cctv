@@ -34,16 +34,21 @@ vi.mock('../hooks/useHlsLivePlayer', () => ({
     useHlsLivePlayer: () => playerState,
 }));
 
-// Mirror the real contract: a camera without a resolvable HLS target is not wallable.
+// Mirror the real contract: streams resolve on demand (the public list carries none), and a
+// camera without a resolvable HLS target cannot hold a wall slot.
 vi.mock('../utils/directStreamHelper', () => ({
     resolveStreamUrl: (camera) => ({ targetUrl: camera?.streams?.hls || null, proxyFallbackUrl: null, isDirectStream: false }),
+}));
+
+vi.mock('../services/publicCameraResolver', () => ({
+    default: vi.fn(async (camera) => camera),
 }));
 
 const CAM_A = { id: 1, name: 'Pos Ronda Utara', area_name: 'Sekaran', status: 'active', is_online: 1, streams: { hls: 'https://x/a.m3u8' } };
 const CAM_B = { id: 2, name: 'Balai Warga', area_name: 'Genuk', status: 'active', is_online: 1, streams: { hls: 'https://x/b.m3u8' } };
 const CAM_OFF = { id: 3, name: 'Gerbang Mati', status: 'active', is_online: 0, streams: { hls: 'https://x/c.m3u8' } };
 const CAM_MAINT = { id: 4, name: 'Lampu Perbaikan', status: 'maintenance', is_online: 1, streams: { hls: 'https://x/d.m3u8' } };
-const CAM_NOSTREAM = { id: 5, name: 'Tanpa Stream', status: 'active', is_online: 1, streams: {} };
+const CAM_MJPEG = { id: 5, name: 'MJPEG Saja', status: 'active', is_online: 1, delivery_type: 'external_mjpeg', streams: {} };
 
 function renderMonitor(entries = ['/monitor?interval=10']) {
     return render(
@@ -73,8 +78,8 @@ describe('MonitorPage — Mode Monitor', () => {
         vi.clearAllMocks();
     });
 
-    it('memutar hanya kamera yang playable: offline, perbaikan, dan tanpa stream dilewati', () => {
-        cameraState.cameras = [CAM_A, CAM_OFF, CAM_MAINT, CAM_NOSTREAM, CAM_B];
+    it('memutar hanya kamera yang playable: offline, perbaikan, dan non-HLS dilewati', () => {
+        cameraState.cameras = [CAM_A, CAM_OFF, CAM_MAINT, CAM_MJPEG, CAM_B];
 
         renderMonitor();
 
@@ -83,7 +88,7 @@ describe('MonitorPage — Mode Monitor', () => {
         expect(screen.getByText(/Balai Warga/)).toBeTruthy();
         expect(screen.queryByText('Gerbang Mati')).toBeNull();
         expect(screen.queryByText('Lampu Perbaikan')).toBeNull();
-        expect(screen.queryByText('Tanpa Stream')).toBeNull();
+        expect(screen.queryByText('MJPEG Saja')).toBeNull();
     });
 
     it('berpindah otomatis ke kamera berikutnya sesuai interval, lalu berputar dari awal', () => {
