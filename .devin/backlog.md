@@ -17,7 +17,7 @@ Status: `open` | `needs-human` | `done`. Score = impact × (1/risk) − cost.
 
 | Item | Tanggal | Bukti |
 |---|---|---|
-| Mode Monitor `/monitor` — TV-wall pos ronda auto-cycle publik | 2026-09-27 | 8 test baru, 2082 vitest + 246 e2e hijau, chunk 3.1KB gz |
+| Mode Monitor `/monitor` — TV-wall pos ronda auto-cycle publik | 2026-09-27 | 8 test, 2083 vitest + 246 e2e, chunk 3.2KB gz; live-verified 800 kamera playable, rotasi presisi 10s, HLS memutar, console bersih. Hotfix v1.4.153: list publik tanpa `streams` → filter `getStreamCapabilities` + resolve per slot (invariant di `pages/.module_map.md`) |
 | `backgroundRefreshError` dead-signal → chip `Menunda`/warn di navbar+simple | 2026-09-27 | 2 test baru, 2075 vitest + 246 e2e hijau |
 | Legenda map menimpa dock mobile + dedupe API tick | 2026-09-26 | v1.4.149 live, rect terukur |
 | Console production bersih | 2026-09-26 | v1.4.147–148, list_console_messages 1 info Chrome |
