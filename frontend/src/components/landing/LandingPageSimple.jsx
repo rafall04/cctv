@@ -43,7 +43,7 @@ const Icons = {
 
 function SimpleHeader({ branding, layoutMode, onLayoutToggle, disableHeavyEffects = false }) {
     const { isDark, toggleTheme } = useTheme();
-    const { cameras, loading, dataUnavailable } = useCameras();
+    const { cameras, loading, dataUnavailable, backgroundRefreshError } = useCameras();
     // backdrop-blur on a sticky header re-composites the scrolling content behind it on every frame —
     // the worst scroll-jank offender on weak GPUs. Drop it under the lite experience (or low/reduced-motion).
     const disableAnimations = disableHeavyEffects || shouldDisableAnimations();
@@ -52,7 +52,10 @@ function SimpleHeader({ branding, layoutMode, onLayoutToggle, disableHeavyEffect
     // Unknown ≠ zero. While loading, and when the initial load failed outright, the pulse must not
     // assert a count — and it must not stay green, which would paint an outage as a healthy network.
     const unknown = loading || dataUnavailable;
-    const isLive = !unknown && onlineCount > 0;
+    // Stale ≠ live — same rule as the Full navbar: a failed background refresh keeps the
+    // last-known count but must drop the green claim to 'Menunda' + warn.
+    const stale = !unknown && Boolean(backgroundRefreshError);
+    const isLive = !unknown && !stale && onlineCount > 0;
     const handleLayoutChange = (nextMode) => {
         if (nextMode !== layoutMode) {
             onLayoutToggle();
@@ -79,17 +82,17 @@ function SimpleHeader({ branding, layoutMode, onLayoutToggle, disableHeavyEffect
                             are dropped to keep this mode light. */}
                         <div
                             className="flex min-w-0 items-center gap-1.5 rounded-control border border-edge bg-surface-sunken px-2 py-1"
-                            title={dataUnavailable ? 'Data kamera belum bisa diambil' : 'Kamera daring sekarang'}
+                            title={dataUnavailable ? 'Data kamera belum bisa diambil' : stale ? 'Pembaruan tertunda — menampilkan data terakhir' : 'Kamera daring sekarang'}
                         >
                             <span
-                                className={`h-1.5 w-1.5 shrink-0 rounded-full ${isLive ? `bg-status-live ${disableAnimations ? '' : 'animate-pulse'}` : dataUnavailable ? 'bg-status-warn' : 'bg-status-idle'}`}
+                                className={`h-1.5 w-1.5 shrink-0 rounded-full ${isLive ? `bg-status-live ${disableAnimations ? '' : 'animate-pulse'}` : dataUnavailable || stale ? 'bg-status-warn' : 'bg-status-idle'}`}
                                 aria-hidden="true"
                             ></span>
                             <span className="font-mono text-xs font-semibold tabular-nums text-content">{unknown ? '…' : onlineCount}</span>
                             <span className={`hidden font-mono text-[10px] uppercase tracking-[0.12em] sm:inline ${isLive ? 'text-status-live' : 'text-content-muted'}`}>
-                                {loading ? 'Memuat' : dataUnavailable ? 'Tak terhubung' : 'Online'}
+                                {loading ? 'Memuat' : dataUnavailable ? 'Tak terhubung' : stale ? 'Menunda' : 'Online'}
                             </span>
-                            <span className="sr-only">{dataUnavailable ? 'Data kamera belum bisa diambil' : `${unknown ? 'Memuat' : onlineCount} kamera daring`}</span>
+                            <span className="sr-only">{dataUnavailable ? 'Data kamera belum bisa diambil' : stale ? `${onlineCount} kamera daring — data mungkin kedaluwarsa` : `${unknown ? 'Memuat' : onlineCount} kamera daring`}</span>
                         </div>
                     </div>
 

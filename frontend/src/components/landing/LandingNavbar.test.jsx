@@ -23,6 +23,7 @@ const cameraContextState = {
     cameras: [{ id: 1, status: 'active', is_online: 1 }],
     loading: false,
     dataUnavailable: false,
+    backgroundRefreshError: null,
 };
 
 vi.mock('../../contexts/CameraContext', () => ({
@@ -30,6 +31,7 @@ vi.mock('../../contexts/CameraContext', () => ({
         cameras: cameraContextState.cameras,
         loading: cameraContextState.loading,
         dataUnavailable: cameraContextState.dataUnavailable,
+        backgroundRefreshError: cameraContextState.backgroundRefreshError,
     }),
 }));
 
@@ -86,6 +88,31 @@ describe('LandingNavbar', () => {
 
         cameraContextState.cameras = [{ id: 1, status: 'active', is_online: 1 }];
         cameraContextState.dataUnavailable = false;
+    });
+
+    /*
+     * backgroundRefreshError used to be written by CameraContext and read by no one: a failing
+     * background tick left the pulse green over data that could be minutes stale. The count
+     * stays — it is the last-known truth — but the label and dot must stop claiming "Online".
+     */
+    it('menandai data kedaluwarsa saat refresh latar gagal, bukan hijau bukan putus', () => {
+        cameraContextState.backgroundRefreshError = new Error('timeout');
+
+        render(
+            <MemoryRouter>
+                <LandingNavbar branding={branding} layoutMode="full" onLayoutToggle={vi.fn()} />
+            </MemoryRouter>
+        );
+
+        expect(screen.getByText('Menunda')).toBeTruthy();
+        expect(screen.queryByText('Online')).toBeNull();
+        expect(screen.queryByText('Tak terhubung')).toBeNull();
+        // The last-known count is still shown — dropping it would overstate the outage.
+        expect(screen.getByText('1')).toBeTruthy();
+        expect([...document.querySelectorAll('[class*="status-live"]')]).toHaveLength(0);
+        expect([...document.querySelectorAll('[class*="status-warn"]')].length).toBeGreaterThan(0);
+
+        cameraContextState.backgroundRefreshError = null;
     });
     /*
      * Halaman jualan adalah HTML STATIS (frontend/public/sewa/), dan App.jsx:147 mencatat bahwa

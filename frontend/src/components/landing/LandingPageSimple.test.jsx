@@ -38,6 +38,7 @@ const cameraContextState = {
     cameras: HEALTHY_CAMERAS,
     loading: false,
     dataUnavailable: false,
+    backgroundRefreshError: null,
 };
 
 vi.mock('../../contexts/CameraContext', () => ({
@@ -45,6 +46,7 @@ vi.mock('../../contexts/CameraContext', () => ({
         cameras: cameraContextState.cameras,
         loading: cameraContextState.loading,
         dataUnavailable: cameraContextState.dataUnavailable,
+        backgroundRefreshError: cameraContextState.backgroundRefreshError,
         refreshData: () => {},
     }),
 }));
@@ -280,5 +282,46 @@ describe('LandingPageSimple', () => {
         const green = [...document.querySelectorAll('[class*="status-live"]')];
         expect(green).toHaveLength(0);
         expect(screen.getByText('Tak terhubung')).toBeTruthy();
+    });
+
+    /*
+     * Stale honesty — the middle state the page never had. A failing BACKGROUND tick keeps the
+     * last-known count visible (still useful) but must stop the green pulse and 'Online' label:
+     * what the visitor is looking at is old data, not live truth.
+     */
+    it('menandai data kedaluwarsa saat refresh latar gagal', async () => {
+        cameraContextState.backgroundRefreshError = new Error('timeout');
+        const CamerasSection = () => <div data-testid="cameras-section">cameras</div>;
+
+        renderWithRouter(
+            <LandingPageSimple
+                onCameraClick={vi.fn()}
+                onAddMulti={vi.fn()}
+                multiCameras={[]}
+                saweriaEnabled={false}
+                saweriaLink=""
+                CamerasSection={CamerasSection}
+                layoutMode="simple"
+                onLayoutToggle={vi.fn()}
+                favorites={[]}
+                onToggleFavorite={vi.fn()}
+                isFavorite={vi.fn(() => false)}
+                viewMode="grid"
+                setViewMode={vi.fn()}
+                adsConfig={null}
+            />
+        );
+
+        await screen.findByText('feedback-widget');
+        const header = document.querySelector('header');
+        expect(within(header).getByText('Menunda')).toBeTruthy();
+        expect(within(header).queryByText('Online')).toBeNull();
+        // Last-known tally stays in the chip — it's still the truth we have, just not claimed live.
+        expect(within(header).getByText('2')).toBeTruthy();
+        // The freshness claim lives in the header chip only; per-camera dots in the stats
+        // board describe the snapshot's content (last-known data), not connection health.
+        expect([...header.querySelectorAll('[class*="status-live"]')]).toHaveLength(0);
+
+        cameraContextState.backgroundRefreshError = null;
     });
 });
