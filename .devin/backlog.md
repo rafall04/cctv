@@ -5,7 +5,7 @@ Status: `open` | `needs-human` | `done`. Score = impact × (1/risk) − cost.
 
 | # | Item | Source | Score hint | Status |
 |---|---|---|---|---|
-| 1 | Audit `rafnet-mediamtx` CPU (~46% idle-ish) — hot loop vs normal streaming load | ops / pm2 | high impact, low code risk, needs box access | open |
+| 1 | ~~Audit `rafnet-mediamtx` CPU~~ → done: beban sah dari 6 container `motion-ai` (box multi-tenant); bukan bug. Detail di ops SKILL.md "Known CPU baseline" | ops / pm2 | resolved-by-audit | done |
 | 2 | Verifikasi HP asli (Telegram WebView) untuk fix legend map z-raised — gate wajib layout publik | AGENTS.md rule | user action required | needs-human |
 | 3 | `npx skills update` mingguan — review diff lalu merge (jangan auto-merge tanpa baca) | skills-lock.json | tiny, safe as PR | open |
 | 4 | Ci workflow untuk item 3 (PR otomatis, bukan auto-merge) | CI | small, contained | open |

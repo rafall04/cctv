@@ -52,3 +52,17 @@ Canonical references: `README.md` (runbook), `deployment/` (scripts), `MIGRATION
 - `pm2 list` all online; `pm2 logs --err` quiet (stderr = real errors only).
 - `curl /health` on the box; spot-check `/api/cameras/active` publicly.
 - Run the `security-audit` skill probe matrix after access-control changes.
+
+## Known CPU baseline (audited 2026-09-27 — mediamtx ~46–56% is NOT a bug)
+
+The prod box is **multi-tenant**: six `motion-ai` Docker containers (motion-rt02, tijar1/2,
+cam, pertigaan, cctv-timur-kali-apur) each pull `rtsp://localhost:8554/<path>` from our
+mediamtx at full camera fps but only analyse `TARGET_FPS=5`. MediaMTX then spends ~50%+ of
+one core copying frames into readers that can't keep up — visible as `WAR [RTSP] reader is
+too slow, discarding N frames` spam. That is **real consumer load, not a hot loop**: only
+~6 of ~416 paths are `ready` (on-demand remux works correctly). Diagnose with
+`curl localhost:9997/v3/paths/list` (ready count), `ss -tnp | grep :8554` (reader pids),
+`docker stats` (container CPU). Do NOT "fix" by restarting mediamtx — readers reconnect and
+the load returns. Structural fix belongs to the motion-ai project (read camera sub-streams
+or a lower-fps source). MediaMTX log noise on the box is dominated by this discard spam —
+filter it mentally when scanning pm2 logs.
