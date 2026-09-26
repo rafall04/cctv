@@ -174,9 +174,13 @@ function resolveOgImage(camera, origin) {
 export async function getPublicOgMeta(request, reply) {
     reply.type('text/html; charset=utf-8');
     try {
-        const rawPath = String(request.query?.path || '/');
+        // `u` carries the ORIGINAL request URI ($request_uri) — $uri would arrive
+        // as /index.html because try_files rewrites SPA routes before SSI runs.
+        const rawUri = String(request.query?.u || '/');
+        const rawPath = String(rawUri.split('?')[0] || '/');
         const path = /^\/[a-z0-9\-/]*$/i.test(rawPath) ? rawPath : '/';
-        const cameraSlug = String(request.query?.camera || '');
+        const uCamera = /[?&]camera=([^&]*)/.exec(rawUri)?.[1];
+        const cameraSlug = String(request.query?.camera || uCamera || '');
         const areaMatch = /^\/area\/([a-z0-9][a-z0-9-]*)$/i.exec(path);
         const cameraId = Number.parseInt((cameraSlug.split('-')[0] || ''), 10);
         if (!Number.isFinite(cameraId) && !areaMatch) {

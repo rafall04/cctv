@@ -73,7 +73,7 @@ describe('GET /api/public/og-meta', () => {
         const fastify = await buildApp();
         const response = await fastify.inject({
             method: 'GET',
-            url: '/api/public/og-meta?path=/&camera=5-cctv-musholla-at-tijar-1',
+            url: '/api/public/og-meta?u=/&camera=5-cctv-musholla-at-tijar-1',
             headers: { host: 'cctv.raf.my.id', 'x-forwarded-proto': 'https' },
         });
 
@@ -94,7 +94,7 @@ describe('GET /api/public/og-meta', () => {
         const fastify = await buildApp();
         const response = await fastify.inject({
             method: 'GET',
-            url: '/api/public/og-meta?path=/&camera=5-x',
+            url: '/api/public/og-meta?u=/&camera=5-x',
             headers: { host: 'cctv.raf.my.id' },
         });
 
@@ -102,11 +102,24 @@ describe('GET /api/public/og-meta', () => {
         await fastify.close();
     });
 
+    it('recovers the camera slug embedded inside u when the separate param is absent', async () => {
+        const fastify = await buildApp();
+        const response = await fastify.inject({
+            method: 'GET',
+            url: '/api/public/og-meta?u=/area/ds-dander?camera=5-cctv-musholla-at-tijar-1',
+            headers: { host: 'cctv.raf.my.id' },
+        });
+
+        expect(response.body).toContain('og:title" content="CCTV MUSHOLLA AT TIJAR 1');
+        expect(response.body).toContain('og:url" content="https://cctv.raf.my.id/area/ds-dander?camera=5-cctv-musholla-at-tijar-1"');
+        await fastify.close();
+    });
+
     it('keeps the share canonical og:url for area-prefixed camera links', async () => {
         const fastify = await buildApp();
         const response = await fastify.inject({
             method: 'GET',
-            url: '/api/public/og-meta?path=/area/ds-dander&camera=5-cctv-musholla-at-tijar-1',
+            url: '/api/public/og-meta?u=/area/ds-dander&camera=5-cctv-musholla-at-tijar-1',
             headers: { host: 'cctv.raf.my.id' },
         });
 
@@ -119,7 +132,7 @@ describe('GET /api/public/og-meta', () => {
         const fastify = await buildApp();
         const response = await fastify.inject({
             method: 'GET',
-            url: '/api/public/og-meta?path=/&camera=999-secret',
+            url: '/api/public/og-meta?u=/&camera=999-secret',
             headers: { host: 'cctv.raf.my.id' },
         });
 
@@ -132,7 +145,7 @@ describe('GET /api/public/og-meta', () => {
         const fastify = await buildApp();
         const response = await fastify.inject({
             method: 'GET',
-            url: '/api/public/og-meta?path=/&camera=',
+            url: '/api/public/og-meta?u=/&camera=',
             headers: { host: 'cctv.raf.my.id' },
         });
 
@@ -146,7 +159,7 @@ describe('GET /api/public/og-meta', () => {
         const fastify = await buildApp();
         const response = await fastify.inject({
             method: 'GET',
-            url: '/api/public/og-meta?path=/area/ds-dander',
+            url: '/api/public/og-meta?u=/area/ds-dander',
             headers: { host: 'cctv.raf.my.id' },
         });
 
@@ -162,7 +175,7 @@ describe('GET /api/public/og-meta', () => {
         const fastify = await buildApp();
         const response = await fastify.inject({
             method: 'GET',
-            url: '/api/public/og-meta?path=/&camera=5-x',
+            url: '/api/public/og-meta?u=/&camera=5-x',
             headers: { host: 'cctv.raf.my.id' },
         });
 
@@ -176,7 +189,7 @@ describe('GET /api/public/og-meta', () => {
         const fastify = await buildApp();
         const response = await fastify.inject({
             method: 'GET',
-            url: '/api/public/og-meta?path=/&camera=5-x',
+            url: '/api/public/og-meta?u=/&camera=5-x',
             headers: { host: 'cctv.raf.my.id' },
         });
 
