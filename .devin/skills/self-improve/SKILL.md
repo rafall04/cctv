@@ -54,6 +54,14 @@ uncertain one. If the top item is ambiguous, ask the user once — never guess o
 
 - Tag `vX.Y.Z` → bump `deployment/release-channels.json` → push → `safe-deploy.sh` on the
   box → verify `/health`, `buildId`, stability gate. Never deploy without gates green.
+- ⚠️ Channel manifest gotcha (hit 2026-09-27): the script reads
+  `manifest.channels[DEPLOY_CHANNEL]` FIRST, top-level keys only as fallback. Edit the
+  nested `channels` object — adding top-level `"stable"/"canary"` keys is silently ignored
+  and produces a no-op deploy of the previous tag. After deploy, confirm
+  `git describe --tags` on the box equals the intended tag, not just that it completed.
+- `safe-deploy.sh` prompts `Proceed? [y/N]` on stdin — run it detached with the answer
+  piped in and output to a log (`setsid bash -c 'echo y | bash ... > /tmp/log 2>&1'`),
+  never inline over SSH: a >5min deploy outlives the channel's read timeout.
 
 ### 6. Log & self-update
 
