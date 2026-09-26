@@ -126,6 +126,13 @@ body {
          * ignore this line, so they are no worse off than before.
          */
         overflow-x: clip;
+        /*
+         * Reserve the vertical scrollbar's gutter ALWAYS, even while the document
+         * is still short. The boot shell is a fixed overlay, so the page has ~zero
+         * flow height until React mounts — without a reserved gutter the scrollbar
+         * appearing at mount would itself be a small layout shift.
+         */
+        scrollbar-gutter: stable;
     }
     
     /*
