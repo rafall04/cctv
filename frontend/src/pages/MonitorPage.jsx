@@ -28,12 +28,14 @@ import { useHlsLivePlayer } from '../hooks/useHlsLivePlayer';
 import { isCameraPlayable } from '../utils/cameraAvailability';
 import { resolveStreamUrl } from '../utils/directStreamHelper';
 import { getStreamCapabilities } from '../utils/cameraDelivery';
+import { getPublicAreaSlug } from '../utils/publicGrowthShare';
 import resolvePublicPopupCamera from '../services/publicCameraResolver';
 
 const ROTATE_DEFAULT_SECONDS = 20;
 const ROTATE_MIN_SECONDS = 5;
 const ROTATE_MAX_SECONDS = 120;
 const ERROR_ADVANCE_MS = 5000;
+const MAX_LOAD_MS = 15000;
 const CHROME_HIDE_MS = 4000;
 
 function readRotateSeconds(searchParams) {
@@ -56,7 +58,7 @@ function MonitorClock() {
 }
 
 function MonitorView() {
-    const { cameras, loading, dataUnavailable, backgroundRefreshError } = useCameras();
+    const { cameras, areas, loading, dataUnavailable, backgroundRefreshError } = useCameras();
     const { branding } = useBranding();
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
@@ -65,13 +67,28 @@ function MonitorView() {
     // Playable = the same verdict the card grid renders: online-ish, not maintenance — plus an
     // HLS-playable capability. The public list carries no `streams`; the URL is resolved per
     // camera on demand (same path as the popup), so upfront URL checks would empty the wall.
-    const playable = useMemo(
+    const hlsPlayable = useMemo(
         () => cameras.filter((camera) => {
             if (!isCameraPlayable(camera)) return false;
             const caps = getStreamCapabilities(camera);
             return caps.popup === true && caps.supported_player === 'hls';
         }),
         [cameras],
+    );
+
+    // ?area=<slug> scopes the wall to one village/area — cycling ~800 cameras across the whole
+    // network is not what a pos ronda watches. `?area=all` keeps the old everything-rotation.
+    const areaParam = (searchParams.get('area') || '').trim();
+    const areaSlug = areaParam ? getPublicAreaSlug(areaParam) : null;
+    const showAll = areaSlug === 'all';
+    const selectedArea = useMemo(() => {
+        if (!areaSlug || showAll) return null;
+        return areas.find((area) => getPublicAreaSlug(area) === areaSlug) || null;
+    }, [areas, areaSlug, showAll]);
+
+    const playable = useMemo(
+        () => (selectedArea ? hlsPlayable.filter((camera) => camera.area_id === selectedArea.id) : hlsPlayable),
+        [hlsPlayable, selectedArea],
     );
 
     const [index, setIndex] = useState(0);
@@ -86,8 +103,30 @@ function MonitorView() {
         if (index >= playable.length) setIndex(0);
     }, [index, playable.length]);
 
+    // Pre-warm the NEXT camera while the current slot plays: resolve its stream grant AND
+    // touch the internal playlist once, so the MediaMTX muxer is already warm at switch time
+    // and the transition doesn't burn its first seconds on a cold resolve. Internal paths only —
+    // an external absolute URL warms nothing on our side and would just cost a CORS hit.
+    const prewarmRef = useRef(null);
+    useEffect(() => {
+        if (!nextCamera) return undefined;
+        let stale = false;
+        resolvePublicPopupCamera(nextCamera, cameras)
+            .then((resolved) => {
+                if (stale || !resolved) return;
+                prewarmRef.current = { id: nextCamera.id, camera: resolved };
+                const { targetUrl } = resolveStreamUrl(resolved);
+                if (targetUrl && targetUrl.startsWith('/')) {
+                    fetch(targetUrl, { credentials: 'omit', cache: 'no-store' }).catch(() => {});
+                }
+            })
+            .catch(() => {});
+        return () => { stale = true; };
+    }, [nextCamera, cameras]);
+
     const resolveStream = useCallback(async () => {
-        const resolved = await resolvePublicPopupCamera(current, cameras) || current;
+        const warm = prewarmRef.current?.id === current?.id ? prewarmRef.current.camera : null;
+        const resolved = warm || await resolvePublicPopupCamera(current, cameras) || current;
         const { targetUrl } = resolveStreamUrl(resolved);
         if (!targetUrl) throw Object.assign(new Error('Stream tidak tersedia'), { friendly: true });
         return targetUrl;
@@ -105,13 +144,21 @@ function MonitorView() {
         setIndex((prev) => (prev + delta + playable.length) % playable.length);
     }, [playable.length]);
 
-    // Rotation: a plain timeout keyed on index — manual skips and error-skips both restart the
-    // dwell, which is exactly what a wall wants (full slot per camera shown).
+    // Rotation dwell counts WATCH time, not load time: the timer only runs while the player
+    // reports 'playing' (a decoded frame — not merely a fetched playlist). Loading/warmup
+    // seconds belong to the stream, not to the viewer.
     useEffect(() => {
-        if (paused || playable.length < 2) return undefined;
+        if (paused || playable.length < 2 || player.status !== 'playing') return undefined;
         const timer = setTimeout(() => setIndex((prev) => (prev + 1) % playable.length), rotateSeconds * 1000);
         return () => clearTimeout(timer);
-    }, [index, paused, playable.length, rotateSeconds]);
+    }, [index, paused, playable.length, rotateSeconds, player.status]);
+
+    // …but a camera stuck loading must not freeze the wall — give it a fair chance, then skip.
+    useEffect(() => {
+        if (player.status !== 'loading' || playable.length < 2) return undefined;
+        const timer = setTimeout(() => setIndex((prev) => (prev + 1) % playable.length), MAX_LOAD_MS);
+        return () => clearTimeout(timer);
+    }, [index, player.status, playable.length]);
 
     // A dead stream must not hold the wall: hop to the next camera after a short verdict beat.
     useEffect(() => {
@@ -179,14 +226,71 @@ function MonitorView() {
         );
     }
 
+    // No ?area — or an unrecognized slug — lands on the picker, not an 800-camera wall.
+    // The list is intentionally bare text links: this screen exists to pick a village, and it
+    // must stay light on the same TV that will run the wall all day.
+    if (!selectedArea && !showAll) {
+        const suffix = rotateSeconds !== ROTATE_DEFAULT_SECONDS ? `&interval=${rotateSeconds}` : '';
+        return (
+            <div className="flex min-h-screen flex-col bg-black px-5 py-8 text-white">
+                <div className="mx-auto w-full max-w-md">
+                    <div className="mb-6 flex items-center gap-3">
+                        <span className="flex h-9 w-9 items-center justify-center rounded-control bg-primary font-bold text-onprimary">
+                            {branding?.logo_text || 'R'}
+                        </span>
+                        <div>
+                            <p className="text-sm font-semibold">Mode Monitor</p>
+                            <p className="text-xs text-white/60">Pilih area pantauan</p>
+                        </div>
+                    </div>
+                    <ul className="divide-y divide-white/10 rounded-card border border-white/10">
+                        {areas.map((area) => {
+                            const count = hlsPlayable.filter((camera) => camera.area_id === area.id).length;
+                            return (
+                                <li key={area.id}>
+                                    <Link
+                                        to={`/monitor?area=${encodeURIComponent(getPublicAreaSlug(area))}${suffix}`}
+                                        className="flex items-center justify-between px-4 py-3 text-sm transition-colors hover:bg-white/10"
+                                    >
+                                        <span className="truncate">{area.name}</span>
+                                        <span className="ml-3 shrink-0 font-mono text-xs text-white/50">{count} kamera</span>
+                                    </Link>
+                                </li>
+                            );
+                        })}
+                        <li>
+                            <Link
+                                to={`/monitor?area=all${suffix}`}
+                                className="flex items-center justify-between px-4 py-3 text-sm font-semibold transition-colors hover:bg-white/10"
+                            >
+                                <span>Semua area</span>
+                                <span className="ml-3 shrink-0 font-mono text-xs text-white/50">{hlsPlayable.length} kamera</span>
+                            </Link>
+                        </li>
+                    </ul>
+                    <Link to="/" className="mt-6 inline-block text-xs text-white/50 transition-colors hover:text-white">
+                        Kembali ke beranda
+                    </Link>
+                </div>
+            </div>
+        );
+    }
+
     if (!current) {
         return (
             <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-black px-6 text-center">
                 <Monitor className="h-10 w-10 text-white/40" aria-hidden="true" />
-                <p className="text-sm text-white/80">Tidak ada kamera yang sedang online.</p>
-                <Link to="/" className="rounded-control border border-white/20 px-4 py-2 text-sm text-white transition-colors hover:bg-white/10">
-                    Kembali ke beranda
-                </Link>
+                <p className="text-sm text-white/80">
+                    {selectedArea ? `Tidak ada kamera yang sedang online di ${selectedArea.name}.` : 'Tidak ada kamera yang sedang online.'}
+                </p>
+                <div className="flex items-center gap-3">
+                    <Link to="/monitor" className="rounded-control border border-white/20 px-4 py-2 text-sm text-white transition-colors hover:bg-white/10">
+                        Pilih area lain
+                    </Link>
+                    <Link to="/" className="rounded-control border border-white/20 px-4 py-2 text-sm text-white transition-colors hover:bg-white/10">
+                        Kembali ke beranda
+                    </Link>
+                </div>
             </div>
         );
     }
@@ -275,8 +379,8 @@ function MonitorView() {
                         </button>
                     </div>
                 </div>
-                {/* Dwell progress — satu strip tipis yang terisi selama slot kamera ini. */}
-                {!paused && playable.length > 1 && (
+                {/* Dwell progress — fills only while the stream actually plays, matching the timer. */}
+                {!paused && playable.length > 1 && player.status === 'playing' && (
                     <div className="mt-2 h-0.5 overflow-hidden rounded-full bg-white/15">
                         <div
                             key={`${current.id}-${index}`}

@@ -560,6 +560,12 @@ export default function AreaPublicPage() {
                             <p className="mt-2 max-w-2xl text-sm text-content-muted">
                                 {area?.description || 'Pantau CCTV publik area ini secara online melalui RAF.'}
                             </p>
+                            <Link
+                                to={`/monitor?area=${encodeURIComponent(areaSlug)}`}
+                                className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-primary transition-colors hover:underline"
+                            >
+                                Mode Monitor — putar kamera area ini bergantian
+                            </Link>
                         </div>
                     </div>
                     {/*

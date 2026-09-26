@@ -13,6 +13,7 @@ import MonitorPage from './MonitorPage.jsx';
 
 const cameraState = {
     cameras: [],
+    areas: [],
     loading: false,
     dataUnavailable: false,
     backgroundRefreshError: null,
@@ -40,17 +41,22 @@ vi.mock('../utils/directStreamHelper', () => ({
     resolveStreamUrl: (camera) => ({ targetUrl: camera?.streams?.hls || null, proxyFallbackUrl: null, isDirectStream: false }),
 }));
 
+import resolvePublicPopupCamera from '../services/publicCameraResolver';
+
 vi.mock('../services/publicCameraResolver', () => ({
     default: vi.fn(async (camera) => camera),
 }));
 
-const CAM_A = { id: 1, name: 'Pos Ronda Utara', area_name: 'Sekaran', status: 'active', is_online: 1, streams: { hls: 'https://x/a.m3u8' } };
-const CAM_B = { id: 2, name: 'Balai Warga', area_name: 'Genuk', status: 'active', is_online: 1, streams: { hls: 'https://x/b.m3u8' } };
-const CAM_OFF = { id: 3, name: 'Gerbang Mati', status: 'active', is_online: 0, streams: { hls: 'https://x/c.m3u8' } };
-const CAM_MAINT = { id: 4, name: 'Lampu Perbaikan', status: 'maintenance', is_online: 1, streams: { hls: 'https://x/d.m3u8' } };
-const CAM_MJPEG = { id: 5, name: 'MJPEG Saja', status: 'active', is_online: 1, delivery_type: 'external_mjpeg', streams: {} };
+const AREA_GRESIK = { id: 10, name: 'KAB GRESIK', slug: 'kab-gresik', camera_count: 3 };
+const AREA_DANDER = { id: 2, name: 'DS DANDER', slug: 'ds-dander', camera_count: 1 };
 
-function renderMonitor(entries = ['/monitor?interval=10']) {
+const CAM_A = { id: 1, name: 'Pos Ronda Utara', area_id: 10, area_name: 'Sekaran', status: 'active', is_online: 1, streams: { hls: 'https://x/a.m3u8' } };
+const CAM_B = { id: 2, name: 'Balai Warga', area_id: 2, area_name: 'Genuk', status: 'active', is_online: 1, streams: { hls: 'https://x/b.m3u8' } };
+const CAM_OFF = { id: 3, name: 'Gerbang Mati', area_id: 10, status: 'active', is_online: 0, streams: { hls: 'https://x/c.m3u8' } };
+const CAM_MAINT = { id: 4, name: 'Lampu Perbaikan', area_id: 10, status: 'maintenance', is_online: 1, streams: { hls: 'https://x/d.m3u8' } };
+const CAM_MJPEG = { id: 5, name: 'MJPEG Saja', area_id: 10, status: 'active', is_online: 1, delivery_type: 'external_mjpeg', streams: {} };
+
+function renderMonitor(entries = ['/monitor?area=all&interval=10']) {
     return render(
         <MemoryRouter initialEntries={entries}>
             <Routes>
@@ -65,6 +71,7 @@ describe('MonitorPage — Mode Monitor', () => {
     beforeEach(() => {
         vi.useFakeTimers();
         cameraState.cameras = [CAM_A, CAM_B];
+        cameraState.areas = [AREA_GRESIK, AREA_DANDER];
         cameraState.loading = false;
         cameraState.dataUnavailable = false;
         cameraState.backgroundRefreshError = null;
@@ -169,5 +176,72 @@ describe('MonitorPage — Mode Monitor', () => {
         renderMonitor();
 
         expect(screen.getByRole('button', { name: /ketuk untuk memutar/i })).toBeTruthy();
+    });
+
+    it('membatasi rotasi ke kamera satu area saat ?area=<slug> diberikan', () => {
+        renderMonitor(['/monitor?area=kab-gresik&interval=10']);
+
+        expect(screen.getByText('Pos Ronda Utara')).toBeTruthy();
+        expect(screen.getByText('1/1')).toBeTruthy();
+        expect(screen.queryByText('Balai Warga')).toBeNull();
+    });
+
+    it('tanpa ?area menampilkan pemilih area, bukan wall 800 kamera', () => {
+        renderMonitor(['/monitor']);
+
+        expect(screen.getByText(/pilih area/i)).toBeTruthy();
+        expect(screen.getByRole('link', { name: /KAB GRESIK/ })).toBeTruthy();
+        expect(screen.getByRole('link', { name: /DS DANDER/ })).toBeTruthy();
+        expect(screen.getByRole('link', { name: /semua area/i })).toBeTruthy();
+        expect(screen.queryByText('Pos Ronda Utara')).toBeNull();
+    });
+
+    it('?area=all memutar semua kamera playable seperti semula', () => {
+        renderMonitor(['/monitor?area=all&interval=10']);
+
+        expect(screen.getByText('Pos Ronda Utara')).toBeTruthy();
+        expect(screen.getByText('1/2')).toBeTruthy();
+    });
+
+    it('dwell hanya berjalan saat siaran benar-benar diputar — loading tidak memakan slot', () => {
+        playerState.status = 'loading';
+        const view = renderMonitor(['/monitor?area=all&interval=10']);
+
+        // 10 detik loading (di bawah batas macet) — belum pindah.
+        act(() => { vi.advanceTimersByTime(10000); });
+        expect(screen.getByText('Pos Ronda Utara')).toBeTruthy();
+        expect(screen.getByText('1/2')).toBeTruthy();
+
+        // Stream mulai diputar -> dwell 10 detik baru dihitung dari sini.
+        act(() => { playerState.status = 'playing'; });
+        view.rerender(
+            <MemoryRouter initialEntries={['/monitor?area=all&interval=10']}>
+                <Routes>
+                    <Route path="/monitor" element={<MonitorPage />} />
+                </Routes>
+            </MemoryRouter>
+        );
+        act(() => { vi.advanceTimersByTime(10000); });
+        expect(screen.getByText('Balai Warga')).toBeTruthy();
+    });
+
+    it('kamera yang loading macet dilewati setelah batas wajar, bukan membekukan wall', () => {
+        playerState.status = 'loading';
+
+        renderMonitor(['/monitor?area=all&interval=10']);
+        act(() => { vi.advanceTimersByTime(15000); });
+
+        expect(screen.getByText('Balai Warga')).toBeTruthy();
+        expect(screen.getByText('2/2')).toBeTruthy();
+    });
+
+    it('pra-panaskan stream kamera berikutnya agar transisi tidak mulai dari nol', async () => {
+        renderMonitor(['/monitor?area=all&interval=10']);
+        await act(async () => { await Promise.resolve(); });
+
+        expect(resolvePublicPopupCamera).toHaveBeenCalledWith(
+            expect.objectContaining({ id: CAM_B.id }),
+            expect.any(Array),
+        );
     });
 });
