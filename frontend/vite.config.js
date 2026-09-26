@@ -36,6 +36,13 @@ function stampServiceWorkerVersion() {
 }
 
 export default defineConfig({
+    // Strip console.log/info/debug from the production bundle: the public console must not
+    // narrate internals (runtime config objects carry buildId/portPublic, viewer logs carry
+    // session ids). console.warn/error survive — they're the deliberate diagnostic channel.
+    // Dev server output is unaffected (pure marks only take effect in the minified build).
+    esbuild: {
+        pure: ['console.log', 'console.info', 'console.debug'],
+    },
     plugins: [react(), stampServiceWorkerVersion()],
     resolve: {
         // Live CCTV needs only core MSE playback, so alias hls.js to its LIGHT build (no subtitles /

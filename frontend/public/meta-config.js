@@ -132,8 +132,6 @@
       name: `Live CCTV ${branding.city_name || ''}`.trim(),
       description: branding.meta_description || 'Live streaming CCTV'
     });
-    
-    console.log('✅ Meta tags updated with branding:', branding.company_name);
   };
   
   // Update URLs first
@@ -183,8 +181,6 @@
       console.warn('Failed to update structured data:', e);
     }
   });
-  
-  console.log('✅ URLs updated for domain:', domain);
   
   // Fetch branding data from API — reuse the index.html inline prefetch when present so this
   // file doesn't fire a second identical GET.
