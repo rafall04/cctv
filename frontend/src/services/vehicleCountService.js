@@ -7,6 +7,7 @@
  */
 
 import apiClient from './apiClient';
+import { dedupeInflight } from '../utils/inflightDedupe.js';
 
 const publicRequestConfig = {
     skipGlobalErrorNotification: true,
@@ -20,11 +21,13 @@ export const vehicleCountService = {
      *                       angka detik ini yang selalu lebih maju daripada video.
      */
     async getForCamera(cameraId, pada = '') {
-        const response = await apiClient.get(
-            `/api/public/vehicle-count/${encodeURIComponent(cameraId)}`,
-            pada ? { ...publicRequestConfig, params: { pada } } : publicRequestConfig
-        );
-        return response.data;
+        return dedupeInflight(`vehicle:${cameraId}:${pada}`, async () => {
+            const response = await apiClient.get(
+                `/api/public/vehicle-count/${encodeURIComponent(cameraId)}`,
+                pada ? { ...publicRequestConfig, params: { pada } } : publicRequestConfig
+            );
+            return response.data;
+        });
     },
 };
 

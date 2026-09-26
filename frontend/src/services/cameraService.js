@@ -9,23 +9,28 @@
 import apiClient from './apiClient';
 import { getRequestPolicyConfig, REQUEST_POLICY } from './requestPolicy';
 import { takePrefetchedJson } from '../utils/earlyPrefetch.js';
+import { dedupeInflight } from '../utils/inflightDedupe.js';
 
 export const cameraService = {
     // Get all active cameras (public)
     async getActiveCameras(policy = REQUEST_POLICY.BLOCKING, config = {}) {
-        try {
-            // The index.html prefetch usually already has this envelope in flight. ?summary=1
-            // asks for the landing-slim read model — same rows, ~60% fewer bytes.
-            const prefetched = takePrefetchedJson('cameras');
-            if (prefetched) {
-                return await prefetched;
+        // Parallel callers (e.g. a leaked provider instance ticking alongside the live one) share
+        // one request — the payload is ~42KB gz, so each duplicate costs real bandwidth.
+        return dedupeInflight(`active:${policy}:${JSON.stringify(config)}`, async () => {
+            try {
+                // The index.html prefetch usually already has this envelope in flight. ?summary=1
+                // asks for the landing-slim read model — same rows, ~60% fewer bytes.
+                const prefetched = takePrefetchedJson('cameras');
+                if (prefetched) {
+                    return await prefetched;
+                }
+                const response = await apiClient.get('/api/cameras/active?summary=1', getRequestPolicyConfig(policy, config));
+                return response.data;
+            } catch (error) {
+                console.error('Get active cameras error:', error);
+                throw error;
             }
-            const response = await apiClient.get('/api/cameras/active?summary=1', getRequestPolicyConfig(policy, config));
-            return response.data;
-        } catch (error) {
-            console.error('Get active cameras error:', error);
-            throw error;
-        }
+        });
     },
 
     // Get all cameras (admin only)

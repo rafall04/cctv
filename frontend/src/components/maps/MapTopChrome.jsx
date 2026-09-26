@@ -38,7 +38,7 @@ export default function MapTopChrome({
     return (
         <div
             data-testid="map-top-chrome"
-            className="pointer-events-none absolute left-3 right-3 top-3 z-[1000] flex items-start justify-between gap-3"
+            className="pointer-events-none absolute left-3 right-3 top-3 z-raised flex items-start justify-between gap-3"
         >
             <div
                 data-testid="map-top-chrome-controls"

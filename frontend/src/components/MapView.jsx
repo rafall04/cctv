@@ -1138,7 +1138,7 @@ const MapView = memo(({
                 nearbyMessage={nearbyMessage}
             />
 
-            <div className="pointer-events-none absolute bottom-3 left-1/2 z-[1000] w-full -translate-x-1/2 px-3">
+            <div className="pointer-events-none absolute bottom-24 left-1/2 z-raised w-full -translate-x-1/2 px-3 sm:bottom-3">
                 <div
                     className="mx-auto inline-flex max-w-[calc(100%-3rem)] items-center gap-1.5 overflow-hidden rounded-full border border-edge bg-surface/80 px-2 py-1.5 shadow-e2 backdrop-blur-xl sm:gap-2 sm:px-3"
                     data-testid="map-status-bar"

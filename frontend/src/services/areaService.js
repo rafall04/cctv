@@ -1,6 +1,7 @@
 import apiClient from './apiClient';
 import { getRequestPolicyConfig, REQUEST_POLICY } from './requestPolicy';
 import { takePrefetchedJson } from '../utils/earlyPrefetch.js';
+import { dedupeInflight } from '../utils/inflightDedupe.js';
 
 /**
  * Area API client.
@@ -21,17 +22,21 @@ function failure(error, fallback) {
 export const areaService = {
     // Public - get all areas (no auth required)
     getPublicAreas: async (policy = REQUEST_POLICY.SILENT_PUBLIC, config = {}) => {
-        try {
-            const prefetched = takePrefetchedJson('areas');
-            if (prefetched) {
-                return await prefetched;
+        // Same shared-in-flight rule as getActiveCameras — background refresh fires this once
+        // per tick, and duplicate callers must ride the same request.
+        return dedupeInflight(`public:${policy}:${JSON.stringify(config)}`, async () => {
+            try {
+                const prefetched = takePrefetchedJson('areas');
+                if (prefetched) {
+                    return await prefetched;
+                }
+                const response = await apiClient.get('/api/areas/public', getRequestPolicyConfig(policy, config));
+                return response.data;
+            } catch (error) {
+                console.error('Get public areas error:', error);
+                return failure(error, 'Failed to fetch areas');
             }
-            const response = await apiClient.get('/api/areas/public', getRequestPolicyConfig(policy, config));
-            return response.data;
-        } catch (error) {
-            console.error('Get public areas error:', error);
-            return failure(error, 'Failed to fetch areas');
-        }
+        });
     },
 
     getAllAreas: async (policy = REQUEST_POLICY.BLOCKING, config = {}) => {
