@@ -18,7 +18,6 @@ import { ToastContainer } from './components/ui/ToastContainer';
 import { ApiClientInitializer } from './components/ApiClientInitializer';
 import ErrorBoundary from './components/ui/ErrorBoundary';
 import { NetworkStatusBanner } from './components/ui/NetworkStatusBanner';
-import PwaInstallPrompt from './components/PwaInstallPrompt';
 import UpdateAvailableBar from './components/UpdateAvailableBar';
 import LandingPage from './pages/LandingPage';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -28,6 +27,9 @@ import lazyWithRetry from './utils/lazyWithRetry';
 // Lazy load admin pages for better code splitting
 // Halaman jualan: dimuat malas supaya bundel beranda tidak membesar untuk halaman yang
 // hanya dibuka pengunjung yang mengklik tautan dari proposal.
+// The install prompt renders nothing until the browser fires beforeinstallprompt — it has no
+// business sitting in the eager graph; loading it on demand keeps the App chunk smaller.
+const PwaInstallPrompt = lazyWithRetry(() => import('./components/PwaInstallPrompt'), 'pwa-install-prompt');
 const SupportPage = lazyWithRetry(() => import('./pages/SupportPage'), 'support-page');
 // Lazy: only /admin/login renders it — ~15KB out of the public landing chunk.
 const LoginPage = lazyWithRetry(() => import('./pages/LoginPage'), 'login-page');
@@ -135,7 +137,9 @@ function App() {
         <ApiClientInitializer>
         <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
             <ToastContainer />
-            <PwaInstallPrompt />
+            <Suspense fallback={null}>
+                <PwaInstallPrompt />
+            </Suspense>
             <UpdateAvailableBar />
             <Routes>
                 {/* Public routes */}

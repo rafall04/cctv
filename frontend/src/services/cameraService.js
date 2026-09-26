@@ -14,8 +14,8 @@ import { dedupeInflight } from '../utils/inflightDedupe.js';
 export const cameraService = {
     // Get all active cameras (public)
     async getActiveCameras(policy = REQUEST_POLICY.BLOCKING, config = {}) {
-        // Parallel callers (e.g. a leaked provider instance ticking alongside the live one) share
-        // one request — the payload is ~42KB gz, so each duplicate costs real bandwidth.
+        // Parallel callers share one request — the payload is ~42KB gz, so each duplicate
+        // costs real bandwidth. (Browser SWR revalidation may still log a second entry.)
         return dedupeInflight(`active:${policy}:${JSON.stringify(config)}`, async () => {
             try {
                 // The index.html prefetch usually already has this envelope in flight. ?summary=1

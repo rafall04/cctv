@@ -20,7 +20,6 @@ import { useDeferredPublicFloatingWidgets } from '../hooks/public/useDeferredPub
 import { useLitePublicExperience } from '../hooks/public/useLitePublicExperience';
 import LandingNavbar from '../components/landing/LandingNavbar';
 import LandingHero from '../components/landing/LandingHero';
-import LandingFooter from '../components/landing/LandingFooter';
 import LandingCamerasSection from '../components/landing/LandingCamerasSection';
 import LandingPublicTopStack from '../components/landing/LandingPublicTopStack';
 
@@ -28,7 +27,6 @@ import LandingDiscoveryStrip from '../components/landing/LandingDiscoveryStrip';
 import LandingQuickAccessStrip from '../components/landing/LandingQuickAccessStrip';
 import LandingMobileDock from '../components/landing/LandingMobileDock';
 import MultiViewButton from '../components/MultiView/MultiViewButton';
-import InlineAdSlot from '../components/ads/InlineAdSlot';
 import DeferUntilVisible from '../components/landing/DeferUntilVisible';
 import GlobalAdScript from '../components/ads/GlobalAdScript';
 import { isAdsMobileViewport, shouldRenderAdSlot } from '../components/ads/adsConfig';
@@ -45,6 +43,10 @@ const VideoPopup = lazyWithRetry(() => import('../components/MultiView/VideoPopu
 const SaweriaLeaderboard = lazyWithRetry(() => import('../components/SaweriaLeaderboard'), 'saweria-leaderboard');
 const FeedbackWidget = lazyWithRetry(() => import('../components/FeedbackWidget'), 'feedback-widget');
 const SaweriaSupport = lazyWithRetry(() => import('../components/SaweriaSupport'), 'saweria-support');
+// Below-fold only: the footer sits at document end and InlineAdSlot only mounts inside
+// DeferUntilVisible, so neither has a reason to ride the eager App chunk.
+const LandingFooter = lazyWithRetry(() => import('../components/landing/LandingFooter'), 'landing-footer');
+const InlineAdSlot = lazyWithRetry(() => import('../components/ads/InlineAdSlot'), 'inline-ad-slot');
 
 function DeferredSurfaceFallback({ className = '' }) {
     return (
@@ -333,12 +335,14 @@ function LandingPageContent({ onRefreshPauseChange }) {
                         bandwidth or main thread during the initial load. */}
                     {showAfterCamerasNative && (
                         <DeferUntilVisible minHeight={120}>
-                            <InlineAdSlot
-                                slotKey="after-cameras-native"
-                                script={adsConfig.slots.afterCamerasNative.script}
-                                className="mt-2"
-                                minHeightClassName="min-h-[120px]"
-                            />
+                            <Suspense fallback={null}>
+                                <InlineAdSlot
+                                    slotKey="after-cameras-native"
+                                    script={adsConfig.slots.afterCamerasNative.script}
+                                    className="mt-2"
+                                    minHeightClassName="min-h-[120px]"
+                                />
+                            </Suspense>
                         </DeferUntilVisible>
                     )}
 
@@ -374,21 +378,25 @@ function LandingPageContent({ onRefreshPauseChange }) {
 
                     {showFooterBanner && (
                         <DeferUntilVisible minHeight={120}>
-                            <InlineAdSlot
-                                slotKey="footer-banner"
-                                script={adsConfig.slots.footerBanner.script}
-                                className="mt-6"
-                                minHeightClassName="min-h-[120px]"
-                            />
+                            <Suspense fallback={null}>
+                                <InlineAdSlot
+                                    slotKey="footer-banner"
+                                    script={adsConfig.slots.footerBanner.script}
+                                    className="mt-6"
+                                    minHeightClassName="min-h-[120px]"
+                                />
+                            </Suspense>
                         </DeferUntilVisible>
                     )}
                 </main>
 
-                <LandingFooter
-                    saweriaEnabled={saweriaEnabled}
-                    saweriaLink={saweriaLink}
-                    branding={branding}
-                />
+                <Suspense fallback={null}>
+                    <LandingFooter
+                        saweriaEnabled={saweriaEnabled}
+                        saweriaLink={saweriaLink}
+                        branding={branding}
+                    />
+                </Suspense>
 
                 {!showMulti && (
                     <MultiViewButton

@@ -1,21 +1,20 @@
 /*
  * Purpose: One source of truth for whether the Saweria ask is switched on, and one fetch for it.
  * Caller: SaweriaSupport (floating banner), SupportInlineNote (line under the video).
- * Deps: fetch.
+ * Deps: saweriaService.getPublicSaweriaConfig (which owns the early-prefetch seed + in-flight dedupe).
  * MainFuncs: isSaweriaEnabled, SAWERIA_SUPPRESSED_KEY, SAWERIA_URL.
- * SideEffects: A single GET /api/saweria/config per page load, memoised.
+ * SideEffects: Shares the single GET /api/saweria/config, memoised here for the page's lifetime.
  *
  * The promise is cached rather than the value, so two components mounting in the same tick share
  * one request instead of racing two — the inline note lives inside a popup that can open and
- * close repeatedly, and it must not re-ask the backend every time.
+ * close repeatedly, and it must not re-ask the backend every time. Riding the service keeps this
+ * consumer on the same fetch path (apiClient + seed + dedupe) as the landing config loader.
  */
 
-import { peekPrefetchedJson } from './earlyPrefetch.js';
+import { getPublicSaweriaConfig } from '../services/saweriaService.js';
 
 export const SAWERIA_SUPPRESSED_KEY = 'saweria_dont_show';
 export const SAWERIA_URL = 'https://saweria.co/raflialdi';
-
-const REQUEST_TIMEOUT_MS = 3000;
 
 let inflight = null;
 
@@ -25,28 +24,9 @@ let inflight = null;
  */
 export function isSaweriaEnabled() {
     if (!inflight) {
-        // Peek, don't take: saweriaService.getPublicSaweriaConfig reads the same seed, and both
-        // consumers are memoised for the page's lifetime so neither ever needs a fresh fetch.
-        const prefetched = peekPrefetchedJson('saweria');
-        inflight = (async () => {
-            try {
-                if (prefetched) {
-                    const seeded = await prefetched.catch(() => null);
-                    return seeded?.data?.enabled === true;
-                }
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-                const response = await fetch('/api/saweria/config', { signal: controller.signal })
-                    .catch(() => null);
-                clearTimeout(timeoutId);
-
-                if (!response?.ok) return false;
-                const data = await response.json().catch(() => null);
-                return data?.data?.enabled === true;
-            } catch {
-                return false;
-            }
-        })();
+        inflight = getPublicSaweriaConfig()
+            .then((data) => data?.data?.enabled === true)
+            .catch(() => false);
     }
     return inflight;
 }

@@ -9,18 +9,22 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import SaweriaSupport from './SaweriaSupport';
+import { resetSaweriaConfigCache } from '../utils/saweriaConfig';
+import { getPublicSaweriaConfig } from '../services/saweriaService';
+
+vi.mock('../services/saweriaService', () => ({
+    getPublicSaweriaConfig: vi.fn(),
+}));
 
 describe('SaweriaSupport floating layout', () => {
     beforeEach(() => {
         vi.useFakeTimers();
         localStorage.clear();
+        resetSaweriaConfigCache();
         // Deliberately NOT setting `saweria_dont_show`. It used to be the shortcut into the
         // banner branch (the other branch auto-opened the modal); the banner is now the only
         // path, and that key means "suppress the ask entirely", which would hide the banner.
-        globalThis.fetch = vi.fn().mockResolvedValue({
-            ok: true,
-            json: async () => ({ data: { enabled: true } }),
-        });
+        getPublicSaweriaConfig.mockResolvedValue({ success: true, data: { enabled: true } });
         vi.spyOn(window, 'open').mockImplementation(() => null);
     });
 

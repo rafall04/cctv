@@ -1,6 +1,7 @@
 import apiClient from './apiClient';
 import { getRequestPolicyConfig, REQUEST_POLICY } from './requestPolicy';
 import { takePrefetchedJson } from '../utils/earlyPrefetch.js';
+import { dedupeInflight } from '../utils/inflightDedupe.js';
 
 /**
  * Branding Service
@@ -13,20 +14,22 @@ export const brandingService = {
      * @returns {Promise<Object>} Branding settings object
      */
     async getPublicBranding() {
-        try {
-            const prefetched = takePrefetchedJson('branding');
-            if (prefetched) {
-                const payload = await prefetched;
-                return payload?.success ? payload.data : null;
+        return dedupeInflight('branding:public', async () => {
+            try {
+                const prefetched = takePrefetchedJson('branding');
+                if (prefetched) {
+                    const payload = await prefetched;
+                    return payload?.success ? payload.data : null;
+                }
+                const response = await apiClient.get(
+                    '/api/branding/public',
+                    getRequestPolicyConfig(REQUEST_POLICY.SILENT_PUBLIC)
+                );
+                return response.data.success ? response.data.data : null;
+            } catch (error) {
+                return null;
             }
-            const response = await apiClient.get(
-                '/api/branding/public',
-                getRequestPolicyConfig(REQUEST_POLICY.SILENT_PUBLIC)
-            );
-            return response.data.success ? response.data.data : null;
-        } catch (error) {
-            return null;
-        }
+        });
     },
 
     /**

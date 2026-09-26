@@ -8,6 +8,7 @@
 
 import apiClient from './apiClient';
 import { takePrefetchedJson } from '../utils/earlyPrefetch.js';
+import { dedupeInflight } from '../utils/inflightDedupe.js';
 
 function failure(error, fallback) {
     return {
@@ -32,7 +33,7 @@ export const getAllSponsors = async () => {
 /**
  * Get active sponsors (public)
  */
-export const getActiveSponsors = async () => {
+export const getActiveSponsors = async () => dedupeInflight('sponsors:active', async () => {
     try {
         const prefetched = takePrefetchedJson('sponsors');
         if (prefetched) {
@@ -44,7 +45,7 @@ export const getActiveSponsors = async () => {
         console.error('Get active sponsors error:', error);
         return failure(error, 'Gagal memuat sponsor aktif');
     }
-};
+});
 
 /**
  * Get sponsor by ID

@@ -1,6 +1,7 @@
 import apiClient from './apiClient';
 import { getRequestPolicyConfig, REQUEST_POLICY } from './requestPolicy';
 import { takePrefetchedJson } from '../utils/earlyPrefetch.js';
+import { dedupeInflight } from '../utils/inflightDedupe.js';
 
 /**
  * Settings API client.
@@ -61,7 +62,7 @@ export const settingsService = {
         return mapCenterInFlight;
     },
 
-    getPublicLandingPageSettings: async () => {
+    getPublicLandingPageSettings: async () => dedupeInflight('settings:landing-page', async () => {
         try {
             const prefetched = takePrefetchedJson('landingSettings');
             if (prefetched) {
@@ -76,9 +77,9 @@ export const settingsService = {
             console.error('Get landing page settings error:', error);
             return failure(error, 'Failed to fetch landing page settings');
         }
-    },
+    }),
 
-    getPublicAdsSettings: async () => {
+    getPublicAdsSettings: async () => dedupeInflight('settings:public-ads', async () => {
         try {
             const prefetched = takePrefetchedJson('publicAds');
             if (prefetched) {
@@ -93,7 +94,7 @@ export const settingsService = {
             console.error('Get public ads settings error:', error);
             return failure(error, 'Failed to fetch ads settings');
         }
-    },
+    }),
 
     // Admin - get all settings
     getAllSettings: async () => {

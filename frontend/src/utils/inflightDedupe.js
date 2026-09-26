@@ -5,12 +5,11 @@
  * MainFuncs: dedupeInflight.
  * SideEffects: Holds pending promises in a module-scope map until they settle.
  *
- * Why module scope: CameraProvider already dedupes refreshes through an instance ref, but a
- * provider instance that React abandons mid-commit (concurrent render) keeps its timers and
- * listeners alive — so the landing page can end up firing the same pair of GETs twice on every
- * 30s tick. Instance-level dedupe cannot see across that boundary; a module-level map can.
- * Only the IN-FLIGHT window is shared — nothing is cached after settle, so refresh cadence
- * and error semantics are unchanged.
+ * Why module scope: a provider-level dedupe ref can only see its own instance. Sharing the
+ * in-flight promise at the service layer collapses any parallel identical GET — double
+ * mounts, StrictMode re-runs in dev, or two components fetching the same read model in the
+ * same tick. Only the IN-FLIGHT window is shared — nothing is cached after settle, so
+ * refresh cadence and error semantics are unchanged.
  */
 
 const inflight = new Map();

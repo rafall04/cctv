@@ -4,19 +4,21 @@
  * Caller: Frontend test gate.
  * Deps: React Testing Library, Vitest, saweriaConfig.
  * MainFuncs: SupportInlineNote visibility tests.
- * SideEffects: Mocks fetch and localStorage.
+ * SideEffects: Mocks saweriaService and localStorage.
  */
 
 import { render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import SupportInlineNote from './SupportInlineNote';
 import { resetSaweriaConfigCache } from '../../utils/saweriaConfig';
+import { getPublicSaweriaConfig } from '../../services/saweriaService';
+
+vi.mock('../../services/saweriaService', () => ({
+    getPublicSaweriaConfig: vi.fn(),
+}));
 
 const mockConfig = (enabled) => {
-    globalThis.fetch = vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => ({ data: { enabled } }),
-    });
+    getPublicSaweriaConfig.mockResolvedValue({ success: true, data: { enabled } });
 };
 
 describe('SupportInlineNote', () => {
@@ -39,7 +41,7 @@ describe('SupportInlineNote', () => {
     it('renders nothing when the operator has support disabled', async () => {
         mockConfig(false);
         const { container } = render(<SupportInlineNote />);
-        await waitFor(() => expect(globalThis.fetch).toHaveBeenCalled());
+        await waitFor(() => expect(getPublicSaweriaConfig).toHaveBeenCalled());
         expect(container.textContent).toBe('');
     });
 
@@ -58,9 +60,9 @@ describe('SupportInlineNote', () => {
     });
 
     it('stays quiet when the config cannot be read at all', async () => {
-        globalThis.fetch = vi.fn().mockRejectedValue(new Error('offline'));
+        getPublicSaweriaConfig.mockRejectedValue(new Error('offline'));
         const { container } = render(<SupportInlineNote />);
-        await waitFor(() => expect(globalThis.fetch).toHaveBeenCalled());
+        await waitFor(() => expect(getPublicSaweriaConfig).toHaveBeenCalled());
         expect(container.textContent).toBe('');
     });
 });

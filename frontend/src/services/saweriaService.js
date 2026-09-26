@@ -1,6 +1,7 @@
 import apiClient from './apiClient';
 import { getRequestPolicyConfig, REQUEST_POLICY } from './requestPolicy';
 import { takePrefetchedJson } from '../utils/earlyPrefetch.js';
+import { dedupeInflight } from '../utils/inflightDedupe.js';
 
 /**
  * Get Saweria settings (Admin only)
@@ -22,16 +23,18 @@ export async function updateSaweriaSettings(settings) {
  * Get public Saweria config (Public endpoint)
  * Returns only enabled settings
  */
-export async function getPublicSaweriaConfig() {
-    const prefetched = takePrefetchedJson('saweria');
-    if (prefetched) {
-        return await prefetched;
-    }
-    const response = await apiClient.get(
-        '/api/saweria/config',
-        getRequestPolicyConfig(REQUEST_POLICY.SILENT_PUBLIC)
-    );
-    return response.data;
+export function getPublicSaweriaConfig() {
+    return dedupeInflight('saweria:config', async () => {
+        const prefetched = takePrefetchedJson('saweria');
+        if (prefetched) {
+            return await prefetched;
+        }
+        const response = await apiClient.get(
+            '/api/saweria/config',
+            getRequestPolicyConfig(REQUEST_POLICY.SILENT_PUBLIC)
+        );
+        return response.data;
+    });
 }
 
 export const saweriaService = {
