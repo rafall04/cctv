@@ -123,6 +123,18 @@
       })();
     </script>
     
+    <!--
+      Per-share OG/Twitter override — nginx SSI subrequest. Crawlers (WhatsApp,
+      Telegram, Facebook…) never execute JS, so meta-config.js can never give a
+      shared ?camera= or /area/ link a real title/thumbnail; this include is the
+      only head surface they read. The backend answers tags ONLY when the URL
+      resolves to a public camera/area — empty otherwise. Placed BEFORE the static
+      defaults because the major scrapers use the FIRST occurrence of a duplicated
+      property, so ours win while the generic block stays as the fallback for
+      last-wins parsers and any deployment served with SSI off.
+    -->
+    <!--# include virtual="/api/public/og-meta?path=$uri&camera=$arg_camera" wait="yes" -->
+
     <!-- Open Graph / Facebook (will be updated by meta-config.js) -->
     <meta property="og:type" content="website" />
     <meta property="og:url" content="/" />

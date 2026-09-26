@@ -11,6 +11,7 @@ import {
     getPublicAreaCameras,
     getPublicDiscovery,
     getPublicLcpCard,
+    getPublicOgMeta,
     getPublicTrendingCameras,
 } from '../controllers/publicGrowthController.js';
 import { cacheMiddleware } from '../middleware/cacheMiddleware.js';
@@ -44,5 +45,11 @@ export default async function publicGrowthRoutes(fastify) {
     // SSI include target for index.html — text/html fragment, always 200 (see controller).
     fastify.get('/lcp-card', {
         handler: getPublicLcpCard,
+    });
+
+    // SSI include target for <head> share-preview tags — text/html fragment, always 200.
+    fastify.get('/og-meta', {
+        preHandler: cacheMiddleware(30000),
+        handler: getPublicOgMeta,
     });
 }

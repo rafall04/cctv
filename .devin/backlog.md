@@ -17,6 +17,7 @@ Status: `open` | `needs-human` | `done`. Score = impact × (1/risk) − cost.
 
 | Item | Tanggal | Bukti |
 |---|---|---|
+| OG/Twitter share preview per kamera & area — SSI `/api/public/og-meta?path=$uri&camera=$arg_camera` di `<head>` sebelum default statis (first-wins scrapers); lookup hanya di list publik → privat tak mungkin leak; empty-safe 200 | 2026-09-27 | 8 test baru `publicOgMeta.test.js`, 2969 backend hijau, lint bersih |
 | Mode Monitor `/monitor` — TV-wall pos ronda auto-cycle publik | 2026-09-27 | 8 test, 2083 vitest + 246 e2e, chunk 3.2KB gz; live-verified 800 kamera playable, rotasi presisi 10s, HLS memutar, console bersih. Hotfix v1.4.153: list publik tanpa `streams` → filter `getStreamCapabilities` + resolve per slot (invariant di `pages/.module_map.md`) |
 | Mode Monitor v2 — per-area + double-buffer channel-surf | 2026-09-27 | v1.4.154: `?area=<slug>` + picker + dwell dari status `playing` + resolver-per-slot (16 test, 2090 vitest, 246 e2e). v1.4.155: hidden slot memutar kamera berikutnya penuh — rotasi jadi swap visibilitas; live DS DANDER: mayoritas slot 0s "Memuat siaran" (dulu 6–10s tiap slot). Deploy note: health-gate 40s bisa kalah dari boot berat di box multi-tenant — cek `/health` manual sebelum rollback |
 | `backgroundRefreshError` dead-signal → chip `Menunda`/warn di navbar+simple | 2026-09-27 | 2 test baru, 2075 vitest + 246 e2e hijau |

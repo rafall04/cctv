@@ -308,6 +308,41 @@ export function buildLcpCardFragment(camera, { inlineDataUri = null } = {}) {
 }
 
 /*
+ * SSI fragment for the OG/Twitter override tags in index.html's <head>. Crawlers
+ * (WA/TG/FB) never run JS, so meta-config.js can never give a shared camera link a
+ * real title/thumbnail — this include is the only surface they read. The include
+ * sits BEFORE the static defaults because the major scrapers use the FIRST
+ * occurrence of a duplicate property, so ours win and the static block stays as
+ * the harmless generic fallback for last-wins parsers and SSI-off deployments.
+ * Emits only what differs per page: og:type/site_name/card stay in the static set.
+ * title is required; empty string when nothing matches (an empty include body is
+ * safe — nginx renders nothing, the defaults alone then apply).
+ */
+const OG_TITLE_MAX = 60;
+const OG_DESC_MAX = 200;
+
+function truncateOg(value, max) {
+    const s = String(value || '').trim();
+    return s.length <= max ? s : `${s.slice(0, max - 1).trimEnd()}…`;
+}
+
+export function buildOgMetaFragment({ title, description, url, imageUrl, imageAlt, siteName }) {
+    if (!title) {
+        return '';
+    }
+    const lines = [`<meta property="og:title" content="${escapeAttr(truncateOg(title, OG_TITLE_MAX))}" />`];
+    if (description) lines.push(`<meta property="og:description" content="${escapeAttr(truncateOg(description, OG_DESC_MAX))}" />`);
+    if (url) lines.push(`<meta property="og:url" content="${escapeAttr(url)}" />`);
+    if (imageUrl) lines.push(`<meta property="og:image" content="${escapeAttr(imageUrl)}" />`);
+    if (imageAlt) lines.push(`<meta property="og:image:alt" content="${escapeAttr(imageAlt)}" />`);
+    if (siteName) lines.push(`<meta property="og:site_name" content="${escapeAttr(siteName)}" />`);
+    lines.push(`<meta name="twitter:title" content="${escapeAttr(truncateOg(title, OG_TITLE_MAX))}" />`);
+    if (description) lines.push(`<meta name="twitter:description" content="${escapeAttr(truncateOg(description, OG_DESC_MAX))}" />`);
+    if (imageUrl) lines.push(`<meta name="twitter:image" content="${escapeAttr(imageUrl)}" />`);
+    return lines.join('\n');
+}
+
+/*
  * Ingest and routing policy. Distinct from the health fields above because it answers a different
  * question — not "is this camera up" but "how does this backend TALK to it": whether the stream is
  * held open or dialled on demand and for how long, which RTSP transport is used, and which source

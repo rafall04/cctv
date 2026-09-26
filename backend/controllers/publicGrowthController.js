@@ -12,9 +12,10 @@ import {
     getPublicDiscovery as getPublicDiscoveryData,
     getTrendingCameras,
 } from '../services/publicGrowthService.js';
-import { pickFirstGridCamera, buildLcpCardFragment } from '../services/publicLandingProjection.js';
+import { pickFirstGridCamera, buildLcpCardFragment, buildOgMetaFragment } from '../services/publicLandingProjection.js';
 import cameraService from '../services/cameraService.js';
 import areaService from '../services/areaService.js';
+import brandingService from '../services/brandingService.js';
 import { readFileSync, statSync, existsSync, mkdirSync } from 'fs';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
@@ -141,6 +142,90 @@ export async function getPublicLcpCard(request, reply) {
         return reply.send(buildLcpCardFragment(camera, { inlineDataUri }));
     } catch (error) {
         console.error('LCP card fragment error:', error);
+        return reply.send('');
+    }
+}
+
+/*
+ * SSI include target for the OG/Twitter share-preview tags in index.html's <head>.
+ * Query is `?path=$uri&camera=$arg_camera` — nginx passes the request's normalized
+ * path and raw ?camera= slug so this route can resolve WHO the shared page is about
+ * without trusting any free-form URL text. Lookups run ONLY against the public
+ * landing list / public area service, so a private camera slug simply isn't found
+ * and yields an empty fragment — nothing private can ever leak through here.
+ *
+ * Cheap-path first: requests with no camera arg and a non-/area/ path return ''
+ * without touching the camera list (this runs as an SSI subrequest on EVERY
+ * index.html load — the common case must stay ~0ms).
+ * Always answers 200: an error body would be rendered INSIDE <head> by nginx.
+ */
+function resolveOgImage(camera, origin) {
+    const raw = camera?.external_snapshot_url || camera?.thumbnail_path || '';
+    if (!raw) return null;
+    let url = String(raw);
+    if (url.charAt(0) === '/') url = `${origin}${url}`;
+    if (!/^https?:\/\//i.test(url)) return null;
+    if (url.indexOf(`${origin}/api/thumbnails/`) === 0 && camera.thumbnail_updated_at) {
+        url += (url.indexOf('?') >= 0 ? '&' : '?') + 'v=' + encodeURIComponent(camera.thumbnail_updated_at);
+    }
+    return url;
+}
+
+export async function getPublicOgMeta(request, reply) {
+    reply.type('text/html; charset=utf-8');
+    try {
+        const rawPath = String(request.query?.path || '/');
+        const path = /^\/[a-z0-9\-/]*$/i.test(rawPath) ? rawPath : '/';
+        const cameraSlug = String(request.query?.camera || '');
+        const areaMatch = /^\/area\/([a-z0-9][a-z0-9-]*)$/i.exec(path);
+        const cameraId = Number.parseInt((cameraSlug.split('-')[0] || ''), 10);
+        if (!Number.isFinite(cameraId) && !areaMatch) {
+            return reply.send('');
+        }
+
+        const proto = request.headers['x-forwarded-proto'] === 'http' ? 'http' : 'https';
+        const host = request.headers['x-forwarded-host'] || request.headers.host || 'localhost';
+        const origin = `${proto}://${host}`;
+        const siteName = brandingService.getBrandingSettings().company_name || null;
+
+        if (Number.isFinite(cameraId)) {
+            const camera = cameraService.getPublicLandingCameraList()
+                .find((candidate) => candidate.id === cameraId);
+            if (camera) {
+                const safeSlug = encodeURIComponent(cameraSlug);
+                const imageUrl = resolveOgImage(camera, origin) || `${origin}/og-image.png`;
+                return reply.send(buildOgMetaFragment({
+                    title: `${camera.name}${camera.area_name ? ` — ${camera.area_name}` : ''}`,
+                    description: camera.area_name
+                        ? `Pantau siaran langsung ${camera.name} di ${camera.area_name} — CCTV online 24 jam.`
+                        : `Pantau siaran langsung ${camera.name} — CCTV online 24 jam.`,
+                    url: `${origin}${path === '/' ? '/' : path}?camera=${safeSlug}`,
+                    imageUrl,
+                    imageAlt: `${camera.name} preview`,
+                    siteName,
+                }));
+            }
+            return reply.send('');
+        }
+
+        try {
+            const area = getPublicAreaBySlug(areaMatch[1]);
+            const thumbed = getPublicAreaCamerasData(area.slug)
+                .find((candidate) => candidate.external_snapshot_url || candidate.thumbnail_path);
+            return reply.send(buildOgMetaFragment({
+                title: `CCTV ${area.name}`,
+                description: `Pantau ${area.camera_count} kamera CCTV publik di ${area.name} — live 24 jam.`,
+                url: `${origin}/area/${area.slug}`,
+                imageUrl: (thumbed && resolveOgImage(thumbed, origin)) || `${origin}/og-image.png`,
+                imageAlt: `CCTV ${area.name} preview`,
+                siteName,
+            }));
+        } catch (error) {
+            if (error.statusCode !== 404) throw error;
+            return reply.send('');
+        }
+    } catch (error) {
+        console.error('OG meta fragment error:', error);
         return reply.send('');
     }
 }
