@@ -14,6 +14,7 @@ export default function LandingAreaFilter({
                 Area
             </span>
             <select
+                name="area"
                 value={selectedArea}
                 onChange={onChange}
                 aria-label="Filter kamera berdasarkan area"

@@ -65,6 +65,8 @@ export default function LandingSearchBox({
                 <input
                     ref={searchInputRef}
                     type="text"
+                    name="camera-search"
+                    autoComplete="off"
                     value={searchQuery}
                     onChange={(event) => onSearchChange(event.target.value)}
                     onFocus={onFocus}
