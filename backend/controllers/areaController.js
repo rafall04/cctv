@@ -127,11 +127,13 @@ export async function updateArea(request, reply) {
                 from: before && {
                     name: before.name,
                     show_on_grid_default: before.show_on_grid_default,
+                    monitor_enabled: before.monitor_enabled,
                     coverage_scope: before.coverage_scope,
                 },
                 to: {
                     name: updatedArea?.name,
                     show_on_grid_default: updatedArea?.show_on_grid_default,
+                    monitor_enabled: updatedArea?.monitor_enabled,
                     coverage_scope: updatedArea?.coverage_scope,
                 },
             },

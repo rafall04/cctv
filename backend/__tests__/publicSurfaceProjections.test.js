@@ -57,7 +57,7 @@ const AREA_PUBLIC_COLUMNS = [
     'latitude', 'longitude',
     'coverage_scope', 'viewport_zoom_override',
     'show_on_grid_default', 'grid_default_camera_limit',
-    'is_access_gated', 'camera_count',
+    'monitor_enabled', 'is_access_gated', 'camera_count',
 ];
 
 function resetSchema() {
@@ -73,7 +73,8 @@ function resetSchema() {
             latitude REAL, longitude REAL,
             external_health_mode_override TEXT, coverage_scope TEXT,
             viewport_zoom_override INTEGER, show_on_grid_default INTEGER,
-            grid_default_camera_limit INTEGER, internal_ingest_policy_default TEXT,
+            grid_default_camera_limit INTEGER, monitor_enabled INTEGER,
+            internal_ingest_policy_default TEXT,
             internal_on_demand_close_after_seconds INTEGER, internal_rtsp_transport_default TEXT,
             slug TEXT, is_access_gated INTEGER
         );

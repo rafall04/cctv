@@ -23,18 +23,26 @@ function isGridDefaultEnabled(area) {
     return area.show_on_grid_default === 1 || area.show_on_grid_default === true;
 }
 
+function isMonitorEnabled(area) {
+    return area.monitor_enabled === 1 || area.monitor_enabled === true;
+}
+
 export default function AreaCard({
     area,
     togglingGridAreaId,
+    togglingMonitorAreaId,
     onOpenBulkConfig,
     onBulkDelete,
     onEdit,
     onDelete,
     onToggleGridDefault,
     onGridDefaultLimitChange,
+    onToggleMonitor,
 }) {
     const gridDefaultEnabled = isGridDefaultEnabled(area);
     const gridDefaultBusy = togglingGridAreaId === area.id;
+    const monitorEnabled = isMonitorEnabled(area);
+    const monitorBusy = togglingMonitorAreaId === area.id;
     const internalIngestLabel = INTERNAL_INGEST_POLICY_OPTIONS.find(
         (option) => option.value === (area.internal_ingest_policy_default || 'default')
     )?.label || 'Ikuti Default Sistem';
@@ -107,6 +115,11 @@ export default function AreaCard({
                         Grid Default Off
                     </span>
                 )}
+                {monitorEnabled && (
+                    <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300">
+                        Mode Monitor
+                    </span>
+                )}
                 {area.externalUnresolvedCount > 0 && <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300">{area.externalUnresolvedCount} unresolved</span>}
                 {area.degradedCount > 0 && <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-300">{area.degradedCount} degraded</span>}
                 {area.offlineCount > 0 && <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300">{area.offlineCount} offline</span>}
@@ -173,10 +186,42 @@ export default function AreaCard({
                             </div>
                         </div>
                         <span className={`inline-flex h-7 w-12 items-center rounded-full px-1 transition-colors ${
-                            gridDefaultEnabled ? 'bg-primary' : 'bg-gray-300'
+                            gridDefaultEnabled ? 'bg-primary' : 'bg-edge-strong'
                         }`}>
-                            <span className={`h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                            <span className={`h-5 w-5 rounded-full bg-surface shadow transition-transform ${
                                 gridDefaultEnabled ? 'translate-x-5' : 'translate-x-0'
+                            }`} />
+                        </span>
+                    </div>
+                </button>
+                <button
+                    type="button"
+                    role="switch"
+                    aria-checked={monitorEnabled}
+                    onClick={() => onToggleMonitor(area)}
+                    disabled={monitorBusy}
+                    className={`w-full rounded-2xl border px-4 py-3 text-left transition-colors ${
+                        monitorEnabled
+                            ? 'border-emerald-300 bg-emerald-100 text-emerald-800 hover:bg-emerald-200 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/20 dark:text-emerald-200'
+                            : 'border-edge bg-surface-sunken text-content hover:bg-surface-raised'
+                    } ${monitorBusy ? 'cursor-wait opacity-70' : ''}`}
+                >
+                    <div className="flex items-center justify-between gap-4">
+                        <div>
+                            <div className="text-sm font-semibold">
+                                {monitorBusy
+                                    ? 'Menyimpan...'
+                                    : (monitorEnabled ? 'Mode Monitor Aktif' : 'Mode Monitor Nonaktif')}
+                            </div>
+                            <div className="mt-1 text-xs opacity-80">
+                                Area aktif tampil di pemilih /monitor (mode TV pos ronda) — area lain tidak ikut rotasi.
+                            </div>
+                        </div>
+                        <span className={`inline-flex h-7 w-12 items-center rounded-full px-1 transition-colors ${
+                            monitorEnabled ? 'bg-emerald-600' : 'bg-edge-strong'
+                        }`}>
+                            <span className={`h-5 w-5 rounded-full bg-surface shadow transition-transform ${
+                                monitorEnabled ? 'translate-x-5' : 'translate-x-0'
                             }`} />
                         </span>
                     </div>

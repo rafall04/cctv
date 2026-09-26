@@ -116,20 +116,29 @@ function MonitorView() {
         [cameras],
     );
 
+    // The operator chooses which areas may join the wall (admin → Areas → "Mode Monitor").
+    // An absent flag reads as disabled: /monitor is an opt-in pos-ronda surface, so the picker
+    // must never imply the whole network is watchable there. `?area=all` rotates only the
+    // ENABLED areas — the allowlist is the point of the feature, not a picker filter alone.
+    const isMonitorArea = (area) => area?.monitor_enabled === 1 || area?.monitor_enabled === true;
+    const monitorAreas = useMemo(() => areas.filter(isMonitorArea), [areas]);
+    const monitorAreaIds = useMemo(() => new Set(monitorAreas.map((area) => area.id)), [monitorAreas]);
+
     // ?area=<slug> scopes the wall to one village/area — cycling ~800 cameras across the whole
-    // network is not what a pos ronda watches. `?area=all` keeps the old everything-rotation.
+    // network is not what a pos ronda watches. A disabled/unknown slug falls back to the picker.
     const areaParam = (searchParams.get('area') || '').trim();
     const areaSlug = areaParam ? getPublicAreaSlug(areaParam) : null;
     const showAll = areaSlug === 'all';
     const selectedArea = useMemo(() => {
         if (!areaSlug || showAll) return null;
-        return areas.find((area) => getPublicAreaSlug(area) === areaSlug) || null;
-    }, [areas, areaSlug, showAll]);
+        return monitorAreas.find((area) => getPublicAreaSlug(area) === areaSlug) || null;
+    }, [monitorAreas, areaSlug, showAll]);
 
-    const playable = useMemo(
-        () => (selectedArea ? hlsPlayable.filter((camera) => camera.area_id === selectedArea.id) : hlsPlayable),
-        [hlsPlayable, selectedArea],
-    );
+    const playable = useMemo(() => {
+        if (selectedArea) return hlsPlayable.filter((camera) => camera.area_id === selectedArea.id);
+        if (showAll) return hlsPlayable.filter((camera) => monitorAreaIds.has(camera.area_id));
+        return hlsPlayable;
+    }, [hlsPlayable, selectedArea, showAll, monitorAreaIds]);
 
     const [index, setIndex] = useState(0);
     const [front, setFront] = useState(0);
@@ -271,7 +280,12 @@ function MonitorView() {
                         </div>
                     </div>
                     <ul className="divide-y divide-white/10 rounded-card border border-white/10">
-                        {areas.map((area) => {
+                        {monitorAreas.length === 0 && (
+                            <li className="px-4 py-3 text-xs text-white/50">
+                                Belum ada area yang diaktifkan untuk Mode Monitor.
+                            </li>
+                        )}
+                        {monitorAreas.map((area) => {
                             const count = hlsPlayable.filter((camera) => camera.area_id === area.id).length;
                             return (
                                 <li key={area.id}>
@@ -291,7 +305,7 @@ function MonitorView() {
                                 className="flex items-center justify-between px-4 py-3 text-sm font-semibold transition-colors hover:bg-white/10"
                             >
                                 <span>Semua area</span>
-                                <span className="ml-3 shrink-0 font-mono text-xs text-white/50">{hlsPlayable.length} kamera</span>
+                                <span className="ml-3 shrink-0 font-mono text-xs text-white/50">{hlsPlayable.filter((camera) => monitorAreaIds.has(camera.area_id)).length} kamera</span>
                             </Link>
                         </li>
                     </ul>

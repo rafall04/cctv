@@ -24,6 +24,8 @@ const PUBLIC_AREA_COLUMNS = [
     // Display defaults the public map and landing filters actually read.
     'a.coverage_scope', 'a.viewport_zoom_override',
     'a.show_on_grid_default', 'a.grid_default_camera_limit',
+    // The /monitor area picker reads this — a visibility flag, not a secret.
+    'a.monitor_enabled',
     // Honest to publish: a visitor should know an area needs a voucher before clicking it.
     'a.is_access_gated',
 ].join(', ');
@@ -63,6 +65,12 @@ function normalizeShowOnGridDefault(value) {
     if (value === undefined) {
         return 1;
     }
+    return value === true || value === 1 || value === '1' ? 1 : 0;
+}
+
+// Unlike show_on_grid_default this is OPT-IN: /monitor is a pos-ronda surface the
+// operator scopes, so a missing/undefined/absent value must normalize to OFF.
+function normalizeMonitorEnabled(value) {
     return value === true || value === 1 || value === '1' ? 1 : 0;
 }
 
@@ -317,6 +325,7 @@ class AreaService {
             SELECT a.id, a.name, a.description, a.rt, a.rw, a.kelurahan, a.kecamatan, a.latitude, a.longitude,
                    a.coverage_scope, a.viewport_zoom_override, COALESCE(a.show_on_grid_default, 1) as show_on_grid_default,
                    COALESCE(a.grid_default_camera_limit, 12) as grid_default_camera_limit,
+                   COALESCE(a.monitor_enabled, 0) as monitor_enabled,
                    CASE
                         WHEN a.internal_ingest_policy_default IN ('default', 'always_on', 'on_demand')
                             THEN a.internal_ingest_policy_default
@@ -389,6 +398,7 @@ class AreaService {
             viewport_zoom_override,
             show_on_grid_default,
             grid_default_camera_limit,
+            monitor_enabled,
             internal_ingest_policy_default,
             internal_on_demand_close_after_seconds,
             internal_rtsp_transport_default,
@@ -403,9 +413,9 @@ class AreaService {
         try {
             const result = execute(
                 `INSERT INTO areas (
-                    name, description, rt, rw, kelurahan, kecamatan, latitude, longitude, external_health_mode_override, coverage_scope, viewport_zoom_override, show_on_grid_default, grid_default_camera_limit
+                    name, description, rt, rw, kelurahan, kecamatan, latitude, longitude, external_health_mode_override, coverage_scope, viewport_zoom_override, show_on_grid_default, grid_default_camera_limit, monitor_enabled
                     , internal_ingest_policy_default, internal_on_demand_close_after_seconds, internal_rtsp_transport_default
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     name,
                     description || null,
@@ -420,6 +430,7 @@ class AreaService {
                     normalizeViewportZoomOverride(viewport_zoom_override),
                     normalizeShowOnGridDefault(show_on_grid_default),
                     normalizeGridDefaultCameraLimit(grid_default_camera_limit),
+                    normalizeMonitorEnabled(monitor_enabled),
                     normalizeInternalIngestPolicyDefault(internal_ingest_policy_default),
                     normalizeOnDemandCloseAfterSeconds(internal_on_demand_close_after_seconds, null),
                     normalizeInternalRtspTransport(internal_rtsp_transport_default),
@@ -454,6 +465,7 @@ class AreaService {
             viewport_zoom_override,
             show_on_grid_default,
             grid_default_camera_limit,
+            monitor_enabled,
             internal_ingest_policy_default,
             internal_on_demand_close_after_seconds,
             internal_rtsp_transport_default,
@@ -479,7 +491,7 @@ class AreaService {
             execute(
                 `UPDATE areas
                  SET name = ?, description = ?, rt = ?, rw = ?, kelurahan = ?, kecamatan = ?, latitude = ?, longitude = ?,
-                     external_health_mode_override = ?, coverage_scope = ?, viewport_zoom_override = ?, show_on_grid_default = ?, grid_default_camera_limit = ?,
+                     external_health_mode_override = ?, coverage_scope = ?, viewport_zoom_override = ?, show_on_grid_default = ?, grid_default_camera_limit = ?, monitor_enabled = ?,
                      internal_ingest_policy_default = ?, internal_on_demand_close_after_seconds = ?, internal_rtsp_transport_default = ?
                  WHERE id = ?`,
                 [
@@ -506,6 +518,9 @@ class AreaService {
                     grid_default_camera_limit !== undefined
                         ? normalizeGridDefaultCameraLimit(grid_default_camera_limit)
                         : normalizeGridDefaultCameraLimit(area.grid_default_camera_limit),
+                    monitor_enabled !== undefined
+                        ? normalizeMonitorEnabled(monitor_enabled)
+                        : normalizeMonitorEnabled(area.monitor_enabled),
                     internal_ingest_policy_default !== undefined
                         ? normalizeInternalIngestPolicyDefault(internal_ingest_policy_default)
                         : normalizeInternalIngestPolicyDefault(area.internal_ingest_policy_default),

@@ -170,6 +170,24 @@ export default function AreaFormModal({
                     </label>
                 </div>
 
+                <div className="rounded-card border border-edge bg-surface-sunken px-4 py-3">
+                    <label className="flex items-start gap-3">
+                        <input
+                            type="checkbox"
+                            name="monitor_enabled"
+                            checked={Boolean(formData.monitor_enabled)}
+                            onChange={onChange}
+                            className="mt-1 h-4 w-4 shrink-0 rounded border-edge-strong text-primary focus:ring-primary"
+                        />
+                        <span className="min-w-0">
+                            <span className="block text-sm font-medium text-content">Aktifkan di Mode Monitor</span>
+                            <span className="mt-1 block text-xs text-content-muted">
+                                Area yang dicentang muncul di pemilih /monitor (mode TV pos ronda). Area lain tidak bisa diputar lewat halaman itu — cocok untuk membatasi monitor ke kamera milik sendiri.
+                            </span>
+                        </span>
+                    </label>
+                </div>
+
                 <div>
                     <label className="block text-sm font-medium text-content-muted mb-1.5">Limit Kamera di Grid Default</label>
                     <select

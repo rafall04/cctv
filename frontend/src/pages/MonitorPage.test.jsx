@@ -52,14 +52,16 @@ vi.mock('../services/publicCameraResolver', () => ({
     default: vi.fn(async (camera) => camera),
 }));
 
-const AREA_GRESIK = { id: 10, name: 'KAB GRESIK', slug: 'kab-gresik', camera_count: 3 };
-const AREA_DANDER = { id: 2, name: 'DS DANDER', slug: 'ds-dander', camera_count: 1 };
+const AREA_GRESIK = { id: 10, name: 'KAB GRESIK', slug: 'kab-gresik', camera_count: 3, monitor_enabled: 1 };
+const AREA_DANDER = { id: 2, name: 'DS DANDER', slug: 'ds-dander', camera_count: 1, monitor_enabled: 1 };
+const AREA_PAGAR = { id: 20, name: 'DS PAGAR', slug: 'ds-pagar', camera_count: 1, monitor_enabled: 0 };
 
 const CAM_A = { id: 1, name: 'Pos Ronda Utara', area_id: 10, area_name: 'Sekaran', status: 'active', is_online: 1, streams: { hls: 'https://x/a.m3u8' } };
 const CAM_B = { id: 2, name: 'Balai Warga', area_id: 2, area_name: 'Genuk', status: 'active', is_online: 1, streams: { hls: 'https://x/b.m3u8' } };
 const CAM_OFF = { id: 3, name: 'Gerbang Mati', area_id: 10, status: 'active', is_online: 0, streams: { hls: 'https://x/c.m3u8' } };
 const CAM_MAINT = { id: 4, name: 'Lampu Perbaikan', area_id: 10, status: 'maintenance', is_online: 1, streams: { hls: 'https://x/d.m3u8' } };
 const CAM_MJPEG = { id: 5, name: 'MJPEG Saja', area_id: 10, status: 'active', is_online: 1, delivery_type: 'external_mjpeg', streams: {} };
+const CAM_PAGAR = { id: 9, name: 'Kamera Pagar', area_id: 20, area_name: 'Pagar', status: 'active', is_online: 1, streams: { hls: 'https://x/p.m3u8' } };
 
 function renderMonitor(entries = ['/monitor?area=all&interval=10']) {
     return render(
@@ -209,6 +211,37 @@ describe('MonitorPage — Mode Monitor', () => {
 
         expect(screen.getByText('Pos Ronda Utara')).toBeTruthy();
         expect(screen.getByText('1/2')).toBeTruthy();
+    });
+
+    it('pemilih hanya menampilkan area yang diaktifkan admin (monitor_enabled)', () => {
+        cameraState.areas = [AREA_GRESIK, AREA_DANDER, AREA_PAGAR];
+
+        renderMonitor(['/monitor']);
+
+        expect(screen.getByRole('link', { name: /KAB GRESIK/ })).toBeTruthy();
+        expect(screen.getByRole('link', { name: /DS DANDER/ })).toBeTruthy();
+        expect(screen.queryByRole('link', { name: /DS PAGAR/ })).toBeNull();
+    });
+
+    it('?area=<slug area nonaktif> jatuh kembali ke pemilih, bukan wall', () => {
+        cameraState.areas = [AREA_GRESIK, AREA_PAGAR];
+        cameraState.cameras = [CAM_A, CAM_PAGAR];
+
+        renderMonitor(['/monitor?area=ds-pagar&interval=10']);
+
+        expect(screen.getByText(/pilih area/i)).toBeTruthy();
+        expect(screen.queryByText('Kamera Pagar')).toBeNull();
+    });
+
+    it('?area=all hanya memutar kamera dari area yang diaktifkan admin', () => {
+        cameraState.areas = [AREA_GRESIK, AREA_PAGAR];
+        cameraState.cameras = [CAM_A, CAM_PAGAR];
+
+        renderMonitor(['/monitor?area=all&interval=10']);
+
+        expect(screen.getByText('Pos Ronda Utara')).toBeTruthy();
+        expect(screen.getByText('1/1')).toBeTruthy();
+        expect(screen.queryByText('Kamera Pagar')).toBeNull();
     });
 
     it('dwell hanya berjalan saat siaran benar-benar diputar — loading tidak memakan slot', () => {

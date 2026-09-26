@@ -36,7 +36,6 @@ describe('guardrail: frontend file-size ratchet (anti-penumpukan)', () => {
         'components/MultiView/MultiViewVideoItem.jsx': 1204,
         'components/MapView.jsx': 1176,
         'pages/Playback.jsx': 1160,
-        'pages/AreaManagement.jsx': 845,
     };
 
     const files = walk(SRC_ROOT);

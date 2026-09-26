@@ -18,6 +18,7 @@ import AreaFormModal from '../components/admin/areas/AreaFormModal';
 import BulkPolicyPreview from '../components/admin/areas/BulkPolicyPreview';
 import lazyWithRetry from '../utils/lazyWithRetry';
 import { useAreaFormState } from '../hooks/admin/useAreaFormState';
+import { useAreaFlagToggles } from '../hooks/admin/useAreaFlagToggles';
 import { buildBulkPayload, defaultBulkConfig, getEffectiveTargetFilter, requiresExternalHlsTarget, requiresExternalStreamsTarget } from '../utils/admin/areaBulkPolicy';
 
 // Lazy load LocationPicker to avoid conflicts with CameraManagement
@@ -30,7 +31,7 @@ export default function AreaManagement() {
     const [filterKecamatan, setFilterKecamatan] = useState('');
     const [deleteConfirm, setDeleteConfirm] = useState(null);
     const [deleting, setDeleting] = useState(false);
-    const [togglingGridAreaId, setTogglingGridAreaId] = useState(null);
+
     
     // Map center settings
     const [showMapCenterModal, setShowMapCenterModal] = useState(false);
@@ -91,6 +92,14 @@ export default function AreaManagement() {
         setLoading(false);
     }, [showError]);
 
+    const {
+        togglingGridAreaId,
+        togglingMonitorAreaId,
+        handleToggleGridDefault,
+        handleToggleMonitor,
+        handleGridDefaultLimitChange,
+    } = useAreaFlagToggles({ setAreas, loadAreas, success, showError });
+
     const loadMapCenter = useCallback(async () => {
         try {
             const response = await settingsService.getMapCenter();
@@ -146,49 +155,6 @@ export default function AreaManagement() {
             showError('Gagal Menghapus', err.response?.data?.message || 'Gagal menghapus area');
         } finally {
             setDeleting(false);
-        }
-    };
-
-    const handleToggleGridDefault = async (area) => {
-        const nextValue = !(area.show_on_grid_default === 1 || area.show_on_grid_default === true);
-        setTogglingGridAreaId(area.id);
-        try {
-            const payload = {
-                name: area.name,
-                description: area.description || '',
-                rt: area.rt || '',
-                rw: area.rw || '',
-                kelurahan: area.kelurahan || '',
-                kecamatan: area.kecamatan || '',
-                latitude: area.latitude || '',
-                longitude: area.longitude || '',
-                external_health_mode_override: area.external_health_mode_override || 'default',
-                coverage_scope: area.coverage_scope || 'default',
-                viewport_zoom_override: area.viewport_zoom_override || '',
-                show_on_grid_default: nextValue,
-                grid_default_camera_limit: area.grid_default_camera_limit === null || area.grid_default_camera_limit === undefined ? '' : area.grid_default_camera_limit,
-                internal_ingest_policy_default: area.internal_ingest_policy_default || 'default',
-                internal_on_demand_close_after_seconds: area.internal_on_demand_close_after_seconds === null || area.internal_on_demand_close_after_seconds === undefined ? '' : area.internal_on_demand_close_after_seconds,
-            };
-            const result = await areaService.updateArea(area.id, payload);
-            if (result.success) {
-                setAreas((currentAreas) => currentAreas.map((currentArea) => (
-                    currentArea.id === area.id
-                        ? { ...currentArea, show_on_grid_default: nextValue ? 1 : 0 }
-                        : currentArea
-                )));
-                success(
-                    'Grid Default Diperbarui',
-                    `Area "${area.name}" sekarang ${nextValue ? 'ditampilkan' : 'disembunyikan'} pada Grid View default.`
-                );
-                loadAreas();
-            } else {
-                showError('Gagal Memperbarui Grid Default', result.message);
-            }
-        } catch (err) {
-            showError('Gagal Memperbarui Grid Default', err.response?.data?.message || 'Terjadi kesalahan saat menyimpan area.');
-        } finally {
-            setTogglingGridAreaId(null);
         }
     };
 
@@ -309,48 +275,6 @@ export default function AreaManagement() {
         () => areas.reduce((sum, area) => ((area.show_on_grid_default === 1 || area.show_on_grid_default === true) ? sum + (area.cameraCount || 0) : sum), 0),
         [areas]
     );
-
-    const handleGridDefaultLimitChange = async (area, nextLimit) => {
-        setTogglingGridAreaId(area.id);
-        try {
-            const payload = {
-                name: area.name,
-                description: area.description || '',
-                rt: area.rt || '',
-                rw: area.rw || '',
-                kelurahan: area.kelurahan || '',
-                kecamatan: area.kecamatan || '',
-                latitude: area.latitude || '',
-                longitude: area.longitude || '',
-                external_health_mode_override: area.external_health_mode_override || 'default',
-                coverage_scope: area.coverage_scope || 'default',
-                viewport_zoom_override: area.viewport_zoom_override || '',
-                show_on_grid_default: area.show_on_grid_default === 1 || area.show_on_grid_default === true,
-                grid_default_camera_limit: nextLimit,
-                internal_ingest_policy_default: area.internal_ingest_policy_default || 'default',
-                internal_on_demand_close_after_seconds: area.internal_on_demand_close_after_seconds === null || area.internal_on_demand_close_after_seconds === undefined ? '' : area.internal_on_demand_close_after_seconds,
-            };
-            const result = await areaService.updateArea(area.id, payload);
-            if (result.success) {
-                setAreas((currentAreas) => currentAreas.map((currentArea) => (
-                    currentArea.id === area.id
-                        ? { ...currentArea, grid_default_camera_limit: nextLimit === '' ? null : parseInt(nextLimit, 10) }
-                        : currentArea
-                )));
-                success(
-                    'Limit Grid Default Diperbarui',
-                    `Area "${area.name}" sekarang memakai limit ${nextLimit === '' ? 'tanpa batas' : `${nextLimit} kamera`} pada Grid View default.`
-                );
-                loadAreas();
-            } else {
-                showError('Gagal Memperbarui Limit Grid Default', result.message);
-            }
-        } catch (err) {
-            showError('Gagal Memperbarui Limit Grid Default', err.response?.data?.message || 'Terjadi kesalahan saat menyimpan limit area.');
-        } finally {
-            setTogglingGridAreaId(null);
-        }
-    };
 
     if (loading) {
         return (
@@ -487,12 +411,14 @@ export default function AreaManagement() {
                             key={area.id}
                             area={area}
                             togglingGridAreaId={togglingGridAreaId}
+                            togglingMonitorAreaId={togglingMonitorAreaId}
                             onOpenBulkConfig={openBulkConfigModal}
                             onBulkDelete={setBulkDeleteAreaConfirm}
                             onEdit={openEditModal}
                             onDelete={setDeleteConfirm}
                             onToggleGridDefault={handleToggleGridDefault}
                             onGridDefaultLimitChange={handleGridDefaultLimitChange}
+                            onToggleMonitor={handleToggleMonitor}
                         />
                     ))}
                 </div>
